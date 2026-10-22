@@ -37,6 +37,36 @@ pub const MOST_RESETTLES: u8 = 3;
 /// A voice state older than this is not known to be resting: the voice
 /// says its state once a second.
 const VOICE_FRESH_US: u64 = 3_000_000;
+/// Why a rest cannot be had while no fresh receipt comes from Expression:
+/// it is down, faulted, on another boot's clock, or its rest requests are
+/// off (`LAMP_REST_REQUESTS`).
+pub const NOT_CONNECTED: &str = "Expression's rest receipts are not fresh";
+/// A rest ask Expression neither admitted nor refused in time: its loop is
+/// held up, or it drops this publisher's requests (a retired session).
+pub const NOT_ANSWERED: &str = "Expression did not answer the rest in time";
+
+/// Refusals of a rest ask that will meet the next ask too (#940, the first
+/// builder's P2 on #2744), so the rest path is down until an ask is
+/// admitted: Expression's clock and lamp-skills' disagree or its loop lags
+/// (Expression's `rest observation is future, stale or expired`), no trusted
+/// local clock, no fresh Expression, no answer in time, or a bound spent.
+/// Every other refusal passes with the moment: the voice in a turn, a hand
+/// or a lean (`rest owner is unavailable ...`, `rest transition is
+/// unavailable ...`), lost input, a window not yet current, a rest already
+/// active.
+const REPEATS: [&str; 6] = [
+    "rest observation is future, stale or expired",
+    "rest transitions require a trusted local clock",
+    "Expression is not fresh and enabled",
+    "rest source history is full",
+    "rest episodes exhausted",
+    NOT_ANSWERED,
+];
+
+/// Whether a rest refused for `why` will be refused again ([`REPEATS`]).
+pub fn refusal_repeats(why: &str) -> bool {
+    REPEATS.contains(&why)
+}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -371,6 +401,12 @@ pub struct Manager {
     generation: Arc<Mutex<Arc<()>>>,
     /// Where the nights are kept ([`RESTED_FILE`]), and what it last held.
     rested_file: Option<(PathBuf, BTreeMap<String, i64>)>,
+    /// A fresh receipt from Expression at the last tick.
+    connected: bool,
+    /// Each skill's last rest ask, if it was refused for a reason that
+    /// repeats ([`refusal_repeats`]). An admitted ask, or one refused for a
+    /// passing reason, clears it.
+    refused: HashMap<String, String>,
 }
 
 impl Manager {
@@ -395,6 +431,8 @@ impl Manager {
                 definitions: HashMap::new(),
                 generation,
                 rested_file: None,
+                connected: false,
+                refused: HashMap::new(),
             },
             client,
         ))
@@ -447,6 +485,17 @@ impl Manager {
         self.enabled = definitions.keys().cloned().collect();
         self.definitions = definitions;
         self.keep_rested();
+    }
+
+    /// Why `skill` cannot rest now, if it cannot (#940, the first
+    /// builder's P2 on #2744): Expression is not connected
+    /// ([`NOT_CONNECTED`]), or its last rest ask was refused for a reason
+    /// that repeats. Night sleep's claim is not said while this is so.
+    pub fn cannot_rest(&self, skill: &str) -> Option<String> {
+        if !self.connected {
+            return Some(NOT_CONNECTED.into());
+        }
+        self.refused.get(skill).cloned()
     }
 
     /// The local day the last night a routine rested began (its rest
@@ -596,6 +645,7 @@ impl Manager {
                     && now - receipt.stamp.at_us < 500_000)
                     .then_some(receipt)
             });
+        self.connected = receipt.is_some();
         let voice = self
             .bus
             .latest(VoiceState::TOPIC)
@@ -696,6 +746,13 @@ impl Manager {
             // A completion from an old owner/window is no authority for
             // following sound, even if that receipt itself is still fresh.
             if expired {
+                if active
+                    .waiting
+                    .as_ref()
+                    .is_some_and(|ask| now >= ask.expires_us)
+                {
+                    self.refused.insert(name.clone(), NOT_ANSWERED.into());
+                }
                 cancel(&mut self.publisher, source, now);
                 continue;
             }
@@ -712,12 +769,23 @@ impl Manager {
             }
             if accepted {
                 active.admitted = true;
+                self.refused.remove(name);
             }
             if accepted && let Some(asked) = active.waiting.take() {
                 // A caller that already left cannot leave an active routine.
                 if now >= asked.expires_us || asked.answer.try_send(Ok(Woke::Owner)).is_err() {
                     cancel(&mut self.publisher, source, now);
                     continue;
+                }
+            }
+            if let Some(why) = correlated
+                .filter(|receipt| receipt.phase == Phase::Refused)
+                .map(|receipt| receipt.reason.as_deref().unwrap_or("refused"))
+            {
+                if refusal_repeats(why) {
+                    self.refused.insert(name.clone(), why.into());
+                } else {
+                    self.refused.remove(name);
                 }
             }
             if terminal {
@@ -860,7 +928,13 @@ impl Manager {
                 self.early.push(ask);
                 continue;
             }
-            let refuse = |why: &str| {
+            let refused = &mut self.refused;
+            let mut refuse = |why: &str| {
+                if refusal_repeats(why) {
+                    refused.insert(ask.skill.clone(), why.into());
+                } else {
+                    refused.remove(&ask.skill);
+                }
                 let _ = ask.answer.try_send(Err(why.into()));
             };
             let current = self
@@ -1020,11 +1094,21 @@ pub const NIGHT_SLEEP: &str = "night-sleep";
 /// chose a lamp that does not sleep, and Expression must not sleep by
 /// itself. With no such folder, or one that does not load, no claim, and
 /// Expression sleeps by its own schedule (its fallback, for one release).
-pub fn sleep_claim(dir: &std::path::Path, stopped: bool) -> Option<ExpressionSleepClaim> {
+///
+/// On only while the skill can rest (the first builder's P2 on #2744):
+/// with `cannot_rest` set ([`Manager::cannot_rest`]), no claim either, so
+/// the last one goes stale and Expression's own sleep takes the night,
+/// rather than a lamp nobody sleeps.
+pub fn sleep_claim(
+    dir: &std::path::Path,
+    stopped: bool,
+    cannot_rest: Option<&str>,
+) -> Option<ExpressionSleepClaim> {
     let skill = crate::load(&dir.join(NIGHT_SLEEP)).ok()?;
-    let granted = skill.permissions.grants("sleep");
+    let on = skill.enabled && !stopped;
+    let granted = skill.permissions.grants("sleep") && !(on && cannot_rest.is_some());
     granted.then_some(ExpressionSleepClaim {
-        on: skill.enabled && !stopped,
+        on,
         skill: skill.name,
     })
 }
@@ -1924,6 +2008,61 @@ mod tests {
             assert!(f.manager.sources["routine"].active.is_none());
         }
     }
+    /// What night sleep's claim reads (the first builder's P2 on #2744): no
+    /// fresh receipt, or a last ask refused for a reason that repeats or not
+    /// answered, is a skill that cannot rest. An admission, or a refusal
+    /// that passes with the moment, clears it.
+    #[test]
+    fn a_skill_cannot_rest_with_no_receipt_or_a_refusal_that_repeats() {
+        let mut f = Fixture::new();
+        let say = |f: &mut Fixture, phase: Phase, reason: Option<&str>| {
+            let request = f
+                .manager
+                .sources
+                .get("routine")
+                .and_then(|source| source.active.as_ref().map(|active| active.request.clone()));
+            let receipt = Receipt {
+                stamp: ClockStamp {
+                    clock_id: CLOCK.into(),
+                    at_us: f.now,
+                    sequence: f.receipt.totals().published + 1,
+                },
+                expression_session_id: f.state.boot().into(),
+                enabled: true,
+                request: request.filter(|_| phase != Phase::Idle),
+                phase,
+                reason: reason.map(str::to_owned),
+            };
+            f.receipt.publish_json(f.now, &receipt).unwrap();
+            f.tick(NIGHT);
+        };
+        f.tick(NIGHT);
+        assert_eq!(
+            f.manager.cannot_rest("routine").as_deref(),
+            Some(NOT_CONNECTED)
+        );
+        say(&mut f, Phase::Idle, None);
+        assert_eq!(f.manager.cannot_rest("routine"), None);
+        let stale = "rest observation is future, stale or expired";
+        let passing = "rest owner is unavailable or another routine owns it";
+        for (reason, cannot) in [(stale, Some(stale)), (passing, None), (stale, Some(stale))] {
+            let _rest = f.ask(Op::Rest);
+            f.tick(NIGHT);
+            say(&mut f, Phase::Refused, Some(reason));
+            assert_eq!(f.manager.cannot_rest("routine").as_deref(), cannot);
+        }
+        let _rest = f.ask(Op::Rest);
+        f.tick(NIGHT);
+        f.now += ADMISSION_US;
+        say(&mut f, Phase::Idle, None);
+        assert_eq!(
+            f.manager.cannot_rest("routine").as_deref(),
+            Some(NOT_ANSWERED)
+        );
+        f.resting();
+        assert_eq!(f.manager.cannot_rest("routine"), None);
+    }
+
     #[test]
     fn wake_uses_the_admitted_episode_and_cancellation_stops_renewal() {
         let mut f = Fixture::new();
