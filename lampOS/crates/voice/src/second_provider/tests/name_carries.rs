@@ -14,19 +14,43 @@ const NAME_HEARD_US: u64 = 1_100_000;
 
 /// What the rule was asked of each line: its request, window and words.
 type Judged = Arc<Mutex<Vec<(u64, (u64, u64), String)>>>;
+/// Each line kept for the one-speaker check before it was judged: its
+/// request and window.
+type Kept = Arc<Mutex<Vec<(u64, (u64, u64))>>>;
+
+/// One face seen speaking both, as the rule would say it.
+const ONE_FACE: Joined = Joined::Same("one face seen speaking both");
+
+/// [`lamp_said`], one person shown to have said both.
+fn lamp(script: &Arc<Script>, on: bool, judged: &Judged) -> (Engine, Arc<Mutex<Instant>>) {
+    lamp_said(script, on, judged, Some(ONE_FACE), &Kept::default())
+}
 
 /// The engine as the lamp runs it: short sounds checked, the switch as
-/// given, and a rule that holds a line whose words don't begin with the
-/// name. The name note is the worker's own reading of it
-/// (`worker::Heeding::note_the_name`): given when the rule's window for the
-/// line takes in the name's hearing.
-fn lamp(script: &Arc<Script>, on: bool, judged: &Judged) -> (Engine, Arc<Mutex<Instant>>) {
+/// given, a rule that holds a line whose words don't begin with the name,
+/// and `said` for whether one person said the name and the line after it
+/// (none: nothing tells it). The name note is the worker's own reading of
+/// it (`worker::Heeding::note_the_name`): given when the rule's window for
+/// the line takes in the name's hearing.
+fn lamp_said(
+    script: &Arc<Script>,
+    on: bool,
+    judged: &Judged,
+    said: Option<Joined>,
+    kept: &Kept,
+) -> (Engine, Arc<Mutex<Instant>>) {
     let (engine, _, now) = scripted(script.clone());
     let seen = judged.clone();
     let windows = judged.clone();
+    let mut engine = engine.checking_sounds(true).carrying_the_name(on);
+    if let Some(said) = said {
+        let kept = kept.clone();
+        engine = engine.telling_one_speaker(
+            Arc::new(move |_, _| said.clone()),
+            Arc::new(move |request, window| kept.lock().unwrap().push((request, window))),
+        );
+    }
     let engine = engine
-        .checking_sounds(true)
-        .carrying_the_name(on)
         .heeding(Arc::new(move |request, window, words, _| {
             seen.lock()
                 .unwrap()
@@ -118,19 +142,20 @@ fn last_words(asked: &[Message]) -> Option<&Message> {
 /// line is let out as said by the name, judged with the name's window and
 /// told the name note, and the name itself gets no answer. At 1.2 s the
 /// name's words already begin the line (the kept sound, `KeptSound`); at
-/// 2 s, past its 1.5 s, the name is put before them. A name misheard, or
-/// the name with more, with the coordinator's `Called`, carries the same.
+/// 2 s, past its 1.5 s, this route puts them before it. A name misheard,
+/// with the coordinator's `Called`, carries the same, "Lamp, " before the
+/// line; and so does the name with more, its words before the line.
 #[tokio::test(start_paused = true)]
 async fn a_line_after_the_lamps_name_alone_is_said_by_it() {
     let note = Message::system(crate::called::NOTE);
     for (name, called, after, asked_as) in [
         ("Lamp.", false, 1_200, "Lamp. I need a gift for my sister."),
-        ("Lamp.", false, 2_000, "Lamp, I need a gift for my sister."),
+        ("Lamp.", false, 2_000, "Lamp. I need a gift for my sister."),
         (
             "Hey lamp",
             false,
             2_000,
-            "Lamp, I need a gift for my sister.",
+            "Hey lamp I need a gift for my sister.",
         ),
         ("Life.", true, 1_200, "Lamp, I need a gift for my sister."),
         ("Louvre,", true, 2_400, "Lamp, I need a gift for my sister."),
@@ -138,7 +163,7 @@ async fn a_line_after_the_lamps_name_alone_is_said_by_it() {
             "Lamp. So",
             true,
             2_000,
-            "Lamp, I need a gift for my sister.",
+            "Lamp. So I need a gift for my sister.",
         ),
     ] {
         let played = script(&[name, "I need a gift for my sister."]);
@@ -170,6 +195,21 @@ async fn a_line_after_the_lamps_name_alone_is_said_by_it() {
         assert_eq!((*request, *began), (2, NAME_READ_US), "{name} {after}");
         assert_eq!(words, asked_as, "{name} {after}");
     }
+    // Both lines are kept for the one-speaker check, each with its own
+    // window, the name's first.
+    let played = script(&["Lamp.", "I need a gift for my sister."]);
+    let (judged, kept) = (Judged::default(), Kept::default());
+    let (mut engine, now) = lamp_said(&played, true, &judged, Some(ONE_FACE), &kept);
+    say_the_name(&mut engine, false, true);
+    say_after(&mut engine, &now, Duration::from_millis(2_000)).await;
+    turn(&mut engine).await;
+    assert_eq!(
+        kept.lock().unwrap().clone(),
+        [
+            (1, (NAME_READ_US, NAME_READ_US)),
+            (2, (NAME_READ_US + 2_000_000, NAME_READ_US + 2_000_000))
+        ]
+    );
 }
 
 /// "Lamp." alone, or "Hey Lamp", and nothing after: answered as a call,
@@ -203,16 +243,16 @@ async fn the_lamps_name_alone_is_answered_as_a_call_after_the_wait() {
     }
 }
 
-/// A short sound that is not only the name is still held at once without
-/// the coordinator's `Called`: a sound, a word that isn't the name, or the
-/// name and more; and a line that begins with the name is answered at
-/// once, no wait.
+/// A short sound that doesn't begin with the name is still held at once
+/// without the coordinator's `Called`: a sound, a word that isn't the name,
+/// "So I"; and a line that begins with the name and goes on past 3 words
+/// is answered at once, no wait.
 #[tokio::test(start_paused = true)]
 async fn a_short_sound_that_is_no_name_is_still_held() {
     for (heard, called, sound) in [
         ("Hmm.", false, true),
         ("Life.", false, true),
-        ("Lamp. So", false, true),
+        ("So I", false, true),
     ] {
         let held = script(&[heard]);
         let judged = Judged::default();
@@ -235,6 +275,78 @@ async fn a_short_sound_that_is_no_name_is_still_held() {
     tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(asked(&asks).len(), 1, "asked at once");
     turn(&mut engine).await;
+}
+
+/// A short line begun with the name ("Lamp. So", held as a short sound in
+/// the played round, the rest of the request then held for no name) waits
+/// as the name alone does: the rest, 1.0 s later, is asked as one named
+/// line, the short line's words before its own. With nothing after it, the
+/// short line is answered as it is, not as a call. "So I", with no name
+/// and no `Called`, is held at once as before, and so is the rest.
+#[tokio::test(start_paused = true)]
+async fn a_short_line_begun_with_the_name_carries_it_too() {
+    let played = script(&["Lamp. So", "I have a meeting at three, any tips?"]);
+    let judged = Judged::default();
+    let (mut engine, now) = lamp(&played, true, &judged);
+    say_the_name(&mut engine, false, true);
+    say_after(&mut engine, &now, Duration::from_millis(1_000)).await;
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    let asked_once = asked(&played);
+    assert_eq!(asked_once.len(), 1, "the short line got no answer");
+    assert_eq!(
+        last_words(&asked_once[0]),
+        Some(&Message::user(
+            "Lamp. So I have a meeting at three, any tips?"
+        ))
+    );
+    assert!(asked_once[0].contains(&Message::system(crate::called::NOTE)));
+    let judged = judged.lock().unwrap().clone();
+    assert_eq!(judged.len(), 1, "the short line is never judged");
+    assert_eq!((judged[0].0, (judged[0].1).0), (2, NAME_READ_US));
+    // Nothing after it: answered as it is, no sooner than 2.5 s.
+    let alone = script(&["Lamp, can"]);
+    let judged = Judged::default();
+    let (mut engine, _) = lamp(&alone, true, &judged);
+    say_the_name(&mut engine, false, true);
+    tokio::time::sleep(Duration::from_millis(2_400)).await;
+    assert!(asked(&alone).is_empty(), "still waiting at 2.4 s");
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    let asked_alone = asked(&alone);
+    assert_eq!(
+        last_words(&asked_alone[0]),
+        Some(&Message::user("Lamp, can"))
+    );
+    assert!(
+        !asked_alone[0].contains(&Message::system(crate::provider_worker::CALLED_NOTE)),
+        "not a call"
+    );
+    // No name, no `Called`: as before.
+    let played = script(&["So I", "have a meeting at three, any tips?"]);
+    let judged = Judged::default();
+    let (mut engine, now) = lamp(&played, true, &judged);
+    say_the_name(&mut engine, false, true);
+    assert_eq!(
+        turn_within(&mut engine, Duration::from_millis(100))
+            .await
+            .last()
+            .unwrap(),
+        "complete",
+        "held at once"
+    );
+    say_after(&mut engine, &now, Duration::from_millis(1_000)).await;
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert!(asked(&played).is_empty());
+    let judged = judged.lock().unwrap().clone();
+    assert_eq!(
+        judged
+            .last()
+            .map(|(request, (began, _), words)| (*request, *began, words.as_str())),
+        Some((
+            2,
+            NAME_READ_US + 1_000_000,
+            "have a meeting at three, any tips?"
+        ))
+    );
 }
 
 /// The name answered as a call once its wait is over: a line begun 3 s
@@ -291,68 +403,114 @@ async fn a_name_is_never_carried_across_sessions_or_a_stop() {
     }
 }
 
-/// Never into a line the eyes saw a face speak that they did not see say
-/// the name; the same face, or one seen only on the line, carries it.
+/// Not without a sign of one speaker (El's P1s): two faces, two voices,
+/// a busy or unknown room with nothing else, or no rule to tell it. The
+/// line after the name is judged as its own, with its own words and
+/// window, and held as it would be; the name, dropped by it, is answered
+/// in its held place as words cut short are, as the name ("Lamp." for a
+/// name misheard).
 #[tokio::test(start_paused = true)]
-async fn a_name_is_not_carried_to_a_line_another_face_spoke() {
-    use crate::speaking_faces::SpeakingFaces;
-    let mut frame = 0;
-    let mut seen_speaking = |eyes: &SpeakingFaces, id: Option<&str>| {
-        for _ in 0..4 {
-            frame += 1;
-            let faces = lamp_msgs::Faces {
-                faces: id
-                    .map(|id| lamp_msgs::Face {
-                        id: id.to_owned(),
-                        xmin: 0.1,
-                        ymin: 0.1,
-                        xmax: 0.3,
-                        ymax: 0.4,
-                        confidence: 1.0,
-                        yaw: None,
-                        facing: None,
-                        speaking: Some(lamp_msgs::Speaking {
-                            state: lamp_msgs::SpeakingState::Yes,
-                            score: 0.9,
-                            from: None,
-                        }),
-                    })
-                    .into_iter()
-                    .collect(),
-            };
-            eyes.look(Instant::now(), Some((("eyes", frame), &faces)));
-            std::thread::sleep(Duration::from_millis(1));
-        }
-    };
-    for (said_the_name, spoke, carried) in [
-        (Some("f1"), Some("f2"), false),
-        (Some("f1"), Some("f1"), true),
-        (None, Some("f2"), true),
+async fn a_name_carries_only_on_a_sign_of_one_speaker() {
+    for (name, called, said, asked_as) in [
+        (
+            "Lamp.",
+            false,
+            Some(Joined::Not("two faces were seen speaking them".to_owned())),
+            Some("Lamp."),
+        ),
+        (
+            "Life.",
+            true,
+            Some(Joined::Not("two voices (cosine 0.12)".to_owned())),
+            Some("Lamp."),
+        ),
+        ("Lamp. So", false, None, Some("Lamp. So")),
+        (
+            "Lamp.",
+            false,
+            Some(Joined::NoSecond("no sign of a second person".to_owned())),
+            None,
+        ),
     ] {
-        let played = script(&["Lamp.", "I need a gift for my sister."]);
+        let played = script(&[name, "I need a gift for my sister."]);
         let judged = Judged::default();
-        let (engine, now) = lamp(&played, true, &judged);
-        let eyes = Arc::new(SpeakingFaces::default());
-        let mut engine =
-            engine.confirming_forgets_by_sight(eyes.clone(), std::path::PathBuf::from("/nowhere"));
-        engine.submit(start(1));
-        engine.submit(audio_at(1, NAME_READ_US));
-        tokio::time::sleep(Duration::from_millis(10)).await;
-        seen_speaking(&eyes, said_the_name);
-        engine.submit(ended(1, true));
-        tokio::time::sleep(Duration::from_millis(2_000)).await;
-        *now.lock().unwrap() += Duration::from_millis(2_000);
-        engine.submit(start(2));
-        engine.submit(audio_at(2, 3_000_000));
-        tokio::time::sleep(Duration::from_millis(10)).await;
-        seen_speaking(&eyes, spoke);
-        engine.submit(ended(2, false));
+        let (mut engine, now) = lamp_said(&played, true, &judged, said.clone(), &Kept::default());
+        say_the_name(&mut engine, called, true);
+        say_after(&mut engine, &now, Duration::from_millis(2_000)).await;
         assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
-        assert_eq!(
-            asked(&played).len(),
-            usize::from(carried),
-            "{said_the_name:?} then {spoke:?}"
+        let judged = judged.lock().unwrap().clone();
+        let asked = asked(&played);
+        match asked_as {
+            Some(asked_as) => {
+                assert_eq!(
+                    judged.last().map(|(request, (began, _), words)| (
+                        *request,
+                        *began,
+                        words.as_str()
+                    )),
+                    Some((2, NAME_READ_US + 2_000_000, "I need a gift for my sister.")),
+                    "{name} {said:?}: judged as its own"
+                );
+                assert_eq!(asked.len(), 1, "{name} {said:?}");
+                assert_eq!(
+                    last_words(&asked[0]),
+                    Some(&Message::user(asked_as)),
+                    "{name} {said:?}: the name in the held line's place"
+                );
+            }
+            None => assert_eq!(
+                last_words(&asked[0]),
+                Some(&Message::user("Lamp. I need a gift for my sister.")),
+                "no sign of a second person, as the rule says it in a quiet room"
+            ),
+        }
+    }
+}
+
+/// El's P2: the coordinator's call whose words are not back when the next
+/// line begins is kept running for them, its newer owner's authority
+/// retiring it first or not, and the line is said by it once they come
+/// within 2.5 s of its end. The call itself says nothing. Words later than
+/// that carry nothing, and the line is judged as its own.
+#[tokio::test(start_paused = true)]
+async fn a_calls_words_back_after_the_next_line_began_still_carry() {
+    for (retired, back_after, carried) in
+        [(false, 600, true), (true, 600, true), (true, 3_000, false)]
+    {
+        let played = Arc::new(Script {
+            finish_after: Some(Duration::from_millis(back_after)),
+            ..Arc::into_inner(script(&["Life.", "I need a gift for my sister."])).unwrap()
+        });
+        let judged = Judged::default();
+        let (mut engine, now) = lamp(&played, true, &judged);
+        say_the_name(&mut engine, true, true);
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        *now.lock().unwrap() += Duration::from_millis(300);
+        if retired {
+            engine.retire_through(1);
+        }
+        engine.submit(start(2));
+        engine.submit(audio_at(2, NAME_READ_US + 300_000));
+        engine.submit(ended(2, false));
+        let heard = turn_within(&mut engine, Duration::from_secs(5)).await;
+        assert_eq!(heard.last().unwrap(), "complete", "{retired} {back_after}");
+        assert!(
+            !heard.iter().any(|label| label == "heard:Life."),
+            "{retired} {back_after}: the call says nothing: {heard:?}"
         );
+        let asked = asked(&played);
+        if carried {
+            assert_eq!(asked.len(), 1, "{retired} {back_after}");
+            assert_eq!(
+                last_words(&asked[0]),
+                Some(&Message::user("Lamp, I need a gift for my sister.")),
+                "{retired} {back_after}"
+            );
+            let judged = judged.lock().unwrap().clone();
+            assert_eq!((judged[0].0, (judged[0].1).0), (2, NAME_READ_US));
+        } else {
+            assert!(asked.is_empty(), "{retired} {back_after}: {asked:?}");
+        }
     }
 }
 
@@ -430,16 +588,34 @@ fn only_the_name_is_the_name_alone() {
     }
 }
 
-/// The faces: another face is one the eyes saw speak the line and not say
-/// the name; nobody seen saying the name tells nothing.
+/// A short line begun with the name: the name first, set off as a call,
+/// at most 3 words after it, and no question it ends ("Lamp?" is still the
+/// name alone).
 #[test]
-fn another_face_is_one_not_seen_saying_the_name() {
-    use super::super::another_face;
-    let faces = |ids: &[&str]| ids.iter().map(|id| (*id).to_owned()).collect::<Vec<_>>();
-    assert!(another_face(&faces(&["e/f1"]), &faces(&["e/f2"])));
-    assert!(another_face(&faces(&["e/f1"]), &faces(&["e/f1", "e/f2"])));
-    assert!(!another_face(&faces(&["e/f1"]), &faces(&["e/f1"])));
-    assert!(!another_face(&faces(&["e/f1", "e/f2"]), &faces(&["e/f2"])));
-    assert!(!another_face(&faces(&["e/f1"]), &faces(&[])));
-    assert!(!another_face(&faces(&[]), &faces(&["e/f2"])));
+fn a_short_line_begun_with_the_name_is_told_apart() {
+    use super::super::name_first;
+    for short in [
+        "Lamp.",
+        "Hey Lamp",
+        "Lamp. So",
+        "Lamp, can",
+        "Hey Lamp, what's",
+        "Lamp, what's the",
+        "OK lamp, um, so",
+        "Lamp?",
+    ] {
+        assert!(name_first(short), "{short}");
+    }
+    for not in [
+        "",
+        "So I",
+        "Life.",
+        "Lamp is broken.",
+        "Lamp's on.",
+        "Lamp, what time is it?",
+        "Hey Lamp, what's the time?",
+        "I need the lamp.",
+    ] {
+        assert!(!name_first(not), "{not}");
+    }
 }
