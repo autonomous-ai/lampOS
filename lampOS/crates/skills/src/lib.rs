@@ -59,7 +59,7 @@ pub const ADDONS_ENVIRONMENT: &str = "LAMP_ADDONS";
 pub const REST_THROUGH_SOUNDS_ENVIRONMENT: &str = "LAMP_REST_THROUGH_SOUNDS";
 
 /// The topics a `[[while]]`'s `broken_by` may name, each with its rule
-/// ([`breaks`]): words heard, the lamp's name heard, a hand pushing the
+/// ([`breaks`]): words heard, the lamp's name heard, a new push on the
 /// lamp, and a touch.
 pub const BROKEN_BY: [&str; 4] = ["voice/heard", "name/heard", "body/hand", "controls/touch"];
 
@@ -70,16 +70,22 @@ const BROKEN_BY_READ: &str = "a [[while]]'s broken_by";
 /// was heard, only with a letter or a digit in it (a sound heard as no words
 /// does not); the lamp's name, any hearing of it, written down or not (El's
 /// and reviewer-two's P2 on #3092: "Hey Lamp" from out of view may come with
-/// no words); a hand, only pushing; a touch, any one the controls say is on
-/// (reviewer-two on #3092: a tap on an awake lamp).
-fn breaks(topic: &str, value: &Value) -> bool {
+/// no words); a hand, only a new push, pushing where `before` (the topic's
+/// last value that still lasts) was not or there was none (#1672's lamp row
+/// on lamp-06c1: a push held or reported steadily restarted the clock at
+/// every message); a touch, any one the controls say is on (reviewer-two on
+/// #3092: a tap on an awake lamp).
+fn breaks(topic: &str, value: &Value, before: Option<&Value>) -> bool {
     match topic {
         "voice/heard" => value["text"]
             .as_str()
             .is_some_and(|text| text.chars().any(char::is_alphanumeric)),
         "name/heard" => serde_json::from_value::<NameHeard>(value.clone())
             .is_ok_and(|name| name.check().is_ok()),
-        "body/hand" => value["pushed"].as_bool() == Some(true),
+        "body/hand" => {
+            let pushed = |value: &Value| value["pushed"].as_bool() == Some(true);
+            pushed(value) && !before.is_some_and(pushed)
+        }
         "controls/touch" => serde_json::from_value::<TouchEvent>(value.clone())
             .is_ok_and(|touch| touch.enabled && touch.check().is_ok()),
         _ => false,
@@ -623,7 +629,7 @@ struct TestFile {
     /// with [`REST_THROUGH_SOUNDS_ENVIRONMENT`] on; off, read and ignored.
     through: Option<Vec<toml::Value>>,
     /// Topics whose messages begin that clock again ([`BROKEN_BY`]): words
-    /// heard, a push. With `through`.
+    /// heard, a new push. With `through`.
     broken_by: Option<Vec<String>>,
 }
 
@@ -5793,9 +5799,9 @@ impl Engine {
                 }
             }
         }
-        // Words heard or a push: the clocks carried through a sound begin
-        // again at the next value that holds.
-        if self.rest_through_sounds && breaks(topic, &value) {
+        // Words heard or a new push: the clocks carried through a sound
+        // begin again at the next value that holds.
+        if self.rest_through_sounds && breaks(topic, &value, before.as_ref()) {
             for skill in &self.skills {
                 for (index, condition) in skill.conditions.iter().enumerate() {
                     if condition.broken_by.iter().any(|by| by == topic) {
