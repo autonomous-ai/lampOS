@@ -1,0 +1,1514 @@
+{
+  "observed_utc": "2026-10-22T05:19:04.547969+00:00",
+  "head_before_commit": "22061b427805e4f6131cd5b15f2f1f287107fdf2",
+  "commands": [
+    {
+      "base": "22061b427805e4f6131cd5b15f2f1f287107fdf2",
+      "name": "current-fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 11.435657232999802,
+      "groups": [],
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "base": "22061b427805e4f6131cd5b15f2f1f287107fdf2",
+      "name": "current-clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 68.358061326202,
+      "groups": [],
+      "sha256": "fd46324d76e1424d25630bb699357faa665a62bc33492c543d595b8da2d2a30f"
+    },
+    {
+      "base": "22061b427805e4f6131cd5b15f2f1f287107fdf2",
+      "name": "current-onboarding",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "onboarding",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "seconds": 126.64757821708918,
+      "groups": [
+        {
+          "passed": 128,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      ],
+      "sha256": "47fe215d10a018a6ea3aeed4105b7fcb709ced15279c2177b7a897bbc51ec444"
+    },
+    {
+      "base": "22061b427805e4f6131cd5b15f2f1f287107fdf2",
+      "name": "voice-lib",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib"
+      ],
+      "exit": 0,
+      "seconds": 223.62874899385497,
+      "groups": [
+        {
+          "passed": 3233,
+          "failed": 0,
+          "ignored": 14
+        }
+      ],
+      "sha256": "e6f36d10bf2adc206fb3574c4e3fe5ad7e9c3c8f427ab0493caa125d494a11cf"
+    },
+    {
+      "base": "22061b427805e4f6131cd5b15f2f1f287107fdf2",
+      "name": "voice-bins",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--bins"
+      ],
+      "exit": 0,
+      "seconds": 0.5706007499247789,
+      "groups": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        }
+      ],
+      "sha256": "7754e6e8ba960770fd56b5ef2995678c5acab2a1a58653f8548820bf76ad5242"
+    },
+    {
+      "base": "22061b427805e4f6131cd5b15f2f1f287107fdf2",
+      "name": "voice-integration",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--test",
+        "it",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 28.536731886211783,
+      "groups": [
+        {
+          "passed": 265,
+          "failed": 0,
+          "ignored": 0
+        }
+      ],
+      "sha256": "0b2cf8d12d9e1dfbdab3bd5b5d5016fdca5c331b8017b993c4e460cccb94cd57"
+    },
+    {
+      "base": "22061b427805e4f6131cd5b15f2f1f287107fdf2",
+      "name": "dependents",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-update"
+      ],
+      "exit": 0,
+      "seconds": 827.6811777520925,
+      "groups": [
+        {
+          "passed": 149,
+          "failed": 0,
+          "ignored": 1
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 26,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 95,
+          "failed": 0,
+          "ignored": 1
+        },
+        {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 23,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 136,
+          "failed": 0,
+          "ignored": 5
+        },
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 142,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 19,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 272,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 31,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 107,
+          "failed": 0,
+          "ignored": 2
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 74,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 99,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      ],
+      "sha256": "7d509c58d32145b956104103063db223c44205943846e1688046f347e5e265b5"
+    },
+    {
+      "base": "22061b427805e4f6131cd5b15f2f1f287107fdf2",
+      "name": "eval-lib-bins",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice-eval",
+        "--lib",
+        "--bins"
+      ],
+      "exit": 0,
+      "seconds": 73.93350091995671,
+      "groups": [
+        {
+          "passed": 378,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        }
+      ],
+      "sha256": "1b37026100a533e81cb0ed991bf3a483ad52950f15afb2cb1fa04a2da591db78"
+    },
+    {
+      "base": "22061b427805e4f6131cd5b15f2f1f287107fdf2",
+      "name": "eval-integration",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice-eval",
+        "--test",
+        "it",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 97.07914888579398,
+      "groups": [
+        {
+          "passed": 238,
+          "failed": 0,
+          "ignored": 0
+        }
+      ],
+      "sha256": "970ac6a1f5472dcb54ee2116be570dd482664dfa369469c98623e189ef17ba92"
+    },
+    {
+      "base": "22061b427805e4f6131cd5b15f2f1f287107fdf2",
+      "name": "voice-examples",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--examples"
+      ],
+      "exit": 0,
+      "seconds": 6.77325242664665,
+      "groups": [
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        }
+      ],
+      "sha256": "85153b2648c8b13cc0904b42ed1f65ea00d9db7630a1b8b35efe4456d0c2e3e7"
+    },
+    {
+      "base": "22061b427805e4f6131cd5b15f2f1f287107fdf2",
+      "name": "voice-eval-doc",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--doc"
+      ],
+      "exit": 0,
+      "seconds": 14.097981436178088,
+      "groups": [
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      ],
+      "sha256": "244c66066f05a88d2d7c27bcfb9d190b8877cfe6cb62ab75a3c7fc908d1ffe3f"
+    },
+    {
+      "base": "22061b427805e4f6131cd5b15f2f1f287107fdf2",
+      "name": "workspace-build",
+      "command": [
+        "cargo",
+        "build",
+        "--workspace"
+      ],
+      "exit": 0,
+      "seconds": 77.52095329901204,
+      "groups": [],
+      "sha256": "e19b6c66990055c0463289f1fa22b9507a1f47aad54dc188da219be11bae242e"
+    }
+  ],
+  "full_counts": {
+    "passed": 5351,
+    "failed": 0,
+    "ignored": 23
+  },
+  "focused_counts": {
+    "passed": 128,
+    "failed": 0,
+    "ignored": 0
+  },
+  "isolated_timings": {
+    "startup_read_validate_us": 37063,
+    "cached_selection_pair_mean_ns": 195,
+    "iterations": 10000,
+    "service_startup_to_active_true_us": 13697,
+    "service_startup_to_active_false_us": 1448
+  },
+  "timing_commands": [
+    {
+      "stage": "timing-cached",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "installed_startup_and_cached_selection_have_no_turn_path_io",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.513
+    },
+    {
+      "stage": "timing-service",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "onboarding_skill_snapshot_survives_mute_reopen_and_recovers_only_in_a_new_service",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.664
+    }
+  ],
+  "host_targets": {
+    "startup_read_validate_us": 50000,
+    "cached_selection_ns": 1000000
+  },
+  "independent_parity": {
+    "base": "3095487ad6330c89566e7d6db6208dcc882f47e9",
+    "checked_at": "2026-10-22T04:37:15.630415+00:00",
+    "byte_equal_prompt_fields": 40,
+    "fields": [
+      "where_you_sit.first",
+      "where_you_sit.reoffer",
+      "who_you_are.first",
+      "who_you_are.reoffer",
+      "how_you_sound.first",
+      "how_you_sound.reoffer",
+      "touch.first",
+      "touch.reoffer",
+      "privacy.first",
+      "privacy.reoffer",
+      "giving_way.first",
+      "giving_way.reoffer",
+      "room_sounds.first",
+      "room_sounds.reoffer",
+      "preferences.first",
+      "preferences.reoffer",
+      "sit_no_face",
+      "sit_closer",
+      "sit_turn",
+      "sit_done",
+      "sit_failed",
+      "who_again",
+      "touch_remind",
+      "privacy_done",
+      "privacy_done_camera",
+      "privacy_failed",
+      "near_again",
+      "near_done",
+      "near_failed",
+      "sentence_first",
+      "sentence_louder",
+      "sentence_closer",
+      "sentence_again",
+      "sentence_done",
+      "sentence_failed",
+      "give_done",
+      "give_failed",
+      "who_confirm",
+      "who_you_are.nudge",
+      "preferences.nudge"
+    ],
+    "order_equal": true,
+    "reoffer_interval_equal": true,
+    "original_captures_match_git_base": true,
+    "skill_sha256": "9ce85ced164e3436fc006d7b778d963867d88f7e8b96edd6b0bdbc99ef81d0b8",
+    "limits": "Static source/manifest parity only; runtime/schema/service gates handled separately."
+  },
+  "target_count_audit": "50 Cargo target groups, one result per target; no child-harness duplicates",
+  "limitations": [
+    "Host measurements only; no acoustic/device timing or lamp-52e6 walk.",
+    "Skill-only edits and restoration activate only on the next operator-managed Voice restart.",
+    "Initial Clippy and sandbox/fixture failures retained in private raw logs."
+  ],
+  "focused_counts_are_repeats": true,
+  "timing_counts_are_repeats": true,
+  "host_source_sha256": {
+    "crates/skills/src/lib.rs": "7b88a4c8f07e9dbd6abab438947c97666291a3c2596a3e2eb1fcfbbb7428f66a",
+    "crates/skills/tests/it/skills.rs": "6bacecaf7cf4dbcea22e5b300194c3e83f282e03a80e421a8e28e18dcc57024e",
+    "crates/voice/src/coordinator.rs": "b5c275ea3566d7a56e8e561c13bb6f7c2adc33261b65895df08aed0df580d246",
+    "crates/voice/src/coordinator/service.rs": "786fc43058c65ca7fb8f4c3e451745b2a85f13b45f57021e34b67a69f318a3fa",
+    "crates/voice/src/onboarding.rs": "9e9c824fc59ef6cc96c823db864f8e53b114375bd95aaeae62ab5f55d8203d2b",
+    "crates/voice/src/onboarding/giving_way.rs": "1b45f837590b80ffa09713d47f413eecf6be586b267dc906329c7d19f3f6d6d3",
+    "crates/voice/src/onboarding/near.rs": "19192b08798efff0f6f10bc88cdf6ba9a8e771c78b63f23479cb51f7f90db874",
+    "crates/voice/src/onboarding/privacy_flow_tests.rs": "dedd010034af3066fea9adc2ffded80543edd962b1bd7b35ecdc6e2266187e17",
+    "crates/voice/src/session_state.rs": "9467598c61f7ee8ca2ea79accec15fde029e1419569e7e2192b3ecac7921d9a5",
+    "crates/voice/src/onboarding/legacy_words.rs": "4421eeef2e33fab3cec8734f0737b024f107ffbf6a4d48a2aa7e3705c56dc313",
+    "crates/voice/src/onboarding/skill.rs": "ea1449fe8e5749af7a16bc310b9617a6a6e000468910d4b4691944e9f8a75c29",
+    "crates/voice/src/onboarding/skill/tests.rs": "91b80a70d792627b8e7b7a7b37815746bebafec24939f0f3a5b1ebf4db6e764d",
+    "skills/onboarding/skill.toml": "9ce85ced164e3436fc006d7b778d963867d88f7e8b96edd6b0bdbc99ef81d0b8",
+    "skills/onboarding/SKILL.md": "55072f949134489469c5bff7db6fbf3fcf97054a27ea563933125b8e91f7bc8c",
+    "docs/onboarding.md": "96298bead2ff1bcc3acd99f47d2313e451ce5e1869fea24bb7d380a7c0ea933e",
+    "docs/skills.md": "61cbb62e8b4646a51576ce2fcfd40e9f3a9099ba8eeb7499c320a5fe4f79d0ee"
+  },
+  "post_rebase": {
+    "base": "fdf8914f338dd0c1888be2581d90275e106a0cbe",
+    "source_commit_before_evidence_amend": "03adaafdf4a09e8f7496791975922b35197ab751",
+    "range_diff": "ee8d1d7bc = 134df3b21; 134df3b21 = 03adaafdf",
+    "commands": [
+      {
+        "stage": "fmt",
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit": 0,
+        "seconds": 10.927,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "stage": "clippy",
+        "command": [
+          "cargo",
+          "clippy",
+          "--workspace",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "seconds": 70.446,
+        "log_sha256": "bb140735bfd3574ebbeb32bf01c969a787602775f17fa794d91d4804bd03c01a"
+      },
+      {
+        "stage": "onboarding",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "onboarding",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "seconds": 118.314,
+        "counts": {
+          "passed": 128,
+          "failed": 0,
+          "ignored": 0
+        },
+        "log_sha256": "ec0111a8d843450ec833c3384098ba1480e54103e156c9279a4c5b41ff2b4c60"
+      },
+      {
+        "stage": "skills",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-skills"
+        ],
+        "exit": 0,
+        "seconds": 124.891,
+        "counts": {
+          "passed": 467,
+          "failed": 0,
+          "ignored": 0
+        },
+        "log_sha256": "141eac7f5ecb09db871a86ce0d97e3f9f90360b1a45db3e0db7ea7dadb701ed9"
+      },
+      {
+        "stage": "census",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "switch_census_tests",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "seconds": 3.934,
+        "counts": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        },
+        "log_sha256": "7068a089fa959ce0508d7839b1ed424e1561d23f52715a96ab03db34fd11a8f3"
+      },
+      {
+        "stage": "workspace-build",
+        "command": [
+          "cargo",
+          "build",
+          "--workspace"
+        ],
+        "exit": 0,
+        "seconds": 56.136,
+        "log_sha256": "560bd37f13a672e09a7b13f7d5147343470ff95e15fb916f36bcd78876c813f2"
+      }
+    ],
+    "source_sha256": {
+      "crates/skills/src/lib.rs": "628c454aee2098f233448b63fc414fe555a8697dcfff034d2a13f98c4bbde526",
+      "crates/skills/tests/it/skills.rs": "6bacecaf7cf4dbcea22e5b300194c3e83f282e03a80e421a8e28e18dcc57024e",
+      "crates/voice/src/coordinator.rs": "b5c275ea3566d7a56e8e561c13bb6f7c2adc33261b65895df08aed0df580d246",
+      "crates/voice/src/coordinator/service.rs": "786fc43058c65ca7fb8f4c3e451745b2a85f13b45f57021e34b67a69f318a3fa",
+      "crates/voice/src/onboarding.rs": "9e9c824fc59ef6cc96c823db864f8e53b114375bd95aaeae62ab5f55d8203d2b",
+      "crates/voice/src/onboarding/giving_way.rs": "1b45f837590b80ffa09713d47f413eecf6be586b267dc906329c7d19f3f6d6d3",
+      "crates/voice/src/onboarding/near.rs": "19192b08798efff0f6f10bc88cdf6ba9a8e771c78b63f23479cb51f7f90db874",
+      "crates/voice/src/onboarding/privacy_flow_tests.rs": "dedd010034af3066fea9adc2ffded80543edd962b1bd7b35ecdc6e2266187e17",
+      "crates/voice/src/session_state.rs": "9467598c61f7ee8ca2ea79accec15fde029e1419569e7e2192b3ecac7921d9a5",
+      "crates/voice/src/onboarding/legacy_words.rs": "4421eeef2e33fab3cec8734f0737b024f107ffbf6a4d48a2aa7e3705c56dc313",
+      "crates/voice/src/onboarding/skill.rs": "ea1449fe8e5749af7a16bc310b9617a6a6e000468910d4b4691944e9f8a75c29",
+      "crates/voice/src/onboarding/skill/tests.rs": "91b80a70d792627b8e7b7a7b37815746bebafec24939f0f3a5b1ebf4db6e764d",
+      "skills/onboarding/skill.toml": "9ce85ced164e3436fc006d7b778d963867d88f7e8b96edd6b0bdbc99ef81d0b8",
+      "skills/onboarding/SKILL.md": "55072f949134489469c5bff7db6fbf3fcf97054a27ea563933125b8e91f7bc8c",
+      "docs/onboarding.md": "96298bead2ff1bcc3acd99f47d2313e451ce5e1869fea24bb7d380a7c0ea933e",
+      "docs/skills.md": "8cbe0161562d1199dc95c5b8ee12e7bf9469b3defb03682f0b39aa954ec46878"
+    },
+    "qualification": "Whole authored patch rebases unchanged; current base includes Skills management, worker switch census and memory retries. Fresh integration checks pass; full 5351-test count remains on its earlier host-tested base. Current-head native gates still required."
+  },
+  "current_base_replay": {
+    "old_head": "f6431ebcb386a25b806e0db87b5842607c8d93af",
+    "old_base": "fdf8914f338dd0c1888be2581d90275e106a0cbe",
+    "base": "4f82e1f1bee098e5524298f1307102e22391508e",
+    "source_commit_before_evidence_amend": "73890de01886027dbafb69114a283e05c8f42c31",
+    "conflicts": [
+      {
+        "path": "lampOS/docs/skills.md",
+        "resolution": "Inserted onboarding row while retaining the exact current-base reminder budget row."
+      }
+    ],
+    "authored_source_patch_unchanged": true,
+    "source": [
+      {
+        "path": "lampOS/crates/skills/src/lib.rs",
+        "authored_change_unchanged": true,
+        "sha256": "628c454aee2098f233448b63fc414fe555a8697dcfff034d2a13f98c4bbde526"
+      },
+      {
+        "path": "lampOS/crates/skills/tests/it/skills.rs",
+        "authored_change_unchanged": true,
+        "sha256": "37e359ab38d669209b022b8e0e63c5b7469ea991983f5bf782ee63e8e4a3bf02"
+      },
+      {
+        "path": "lampOS/crates/voice/src/coordinator.rs",
+        "authored_change_unchanged": true,
+        "sha256": "45d61fcde0cd7284ef3944fa5d3fdf80c355692a9cf88a38be103ffa5cc62e3e"
+      },
+      {
+        "path": "lampOS/crates/voice/src/coordinator/service.rs",
+        "authored_change_unchanged": true,
+        "sha256": "786fc43058c65ca7fb8f4c3e451745b2a85f13b45f57021e34b67a69f318a3fa"
+      },
+      {
+        "path": "lampOS/crates/voice/src/onboarding.rs",
+        "authored_change_unchanged": true,
+        "sha256": "9e9c824fc59ef6cc96c823db864f8e53b114375bd95aaeae62ab5f55d8203d2b"
+      },
+      {
+        "path": "lampOS/crates/voice/src/onboarding/giving_way.rs",
+        "authored_change_unchanged": true,
+        "sha256": "1b45f837590b80ffa09713d47f413eecf6be586b267dc906329c7d19f3f6d6d3"
+      },
+      {
+        "path": "lampOS/crates/voice/src/onboarding/legacy_words.rs",
+        "authored_change_unchanged": true,
+        "sha256": "4421eeef2e33fab3cec8734f0737b024f107ffbf6a4d48a2aa7e3705c56dc313"
+      },
+      {
+        "path": "lampOS/crates/voice/src/onboarding/near.rs",
+        "authored_change_unchanged": true,
+        "sha256": "19192b08798efff0f6f10bc88cdf6ba9a8e771c78b63f23479cb51f7f90db874"
+      },
+      {
+        "path": "lampOS/crates/voice/src/onboarding/privacy_flow_tests.rs",
+        "authored_change_unchanged": true,
+        "sha256": "dedd010034af3066fea9adc2ffded80543edd962b1bd7b35ecdc6e2266187e17"
+      },
+      {
+        "path": "lampOS/crates/voice/src/onboarding/skill.rs",
+        "authored_change_unchanged": true,
+        "sha256": "ea1449fe8e5749af7a16bc310b9617a6a6e000468910d4b4691944e9f8a75c29"
+      },
+      {
+        "path": "lampOS/crates/voice/src/onboarding/skill/tests.rs",
+        "authored_change_unchanged": true,
+        "sha256": "91b80a70d792627b8e7b7a7b37815746bebafec24939f0f3a5b1ebf4db6e764d"
+      },
+      {
+        "path": "lampOS/crates/voice/src/session_state.rs",
+        "authored_change_unchanged": true,
+        "sha256": "9467598c61f7ee8ca2ea79accec15fde029e1419569e7e2192b3ecac7921d9a5"
+      },
+      {
+        "path": "lampOS/skills/onboarding/SKILL.md",
+        "authored_change_unchanged": true,
+        "sha256": "55072f949134489469c5bff7db6fbf3fcf97054a27ea563933125b8e91f7bc8c"
+      },
+      {
+        "path": "lampOS/skills/onboarding/skill.toml",
+        "authored_change_unchanged": true,
+        "sha256": "9ce85ced164e3436fc006d7b778d963867d88f7e8b96edd6b0bdbc99ef81d0b8"
+      }
+    ],
+    "reminder_row_preserved_byte_for_byte": true,
+    "untouched_parent_sources": {
+      "lampOS/crates/voice/src/process/switch_census_tests.rs": "12f4b1f3acf80538c56cb489aac106aa9e1fa96f14bc0948add05685ce616901",
+      "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+    },
+    "commands": [
+      {
+        "stage": "fmt",
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit": 0,
+        "seconds": 11.039,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "stage": "clippy",
+        "command": [
+          "cargo",
+          "clippy",
+          "--workspace",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "seconds": 71.008,
+        "log_sha256": "515db5063015793db3bcec9b791a9d872f30b012392803c3a8c3b37a8eed635d"
+      },
+      {
+        "stage": "onboarding",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "onboarding",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "seconds": 116.569,
+        "log_sha256": "0ee90c30b98b124958321504f4d12199e2f0c030b14983de2151a0119271747c",
+        "counts": {
+          "passed": 128,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "stage": "skills",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-skills"
+        ],
+        "exit": 0,
+        "seconds": 117.223,
+        "log_sha256": "60754e11186a20d92952ae113e19168192b093b56876bddbaf1edc3b1d634193",
+        "counts": {
+          "passed": 477,
+          "failed": 0,
+          "ignored": 1
+        }
+      },
+      {
+        "stage": "census",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "switch_census_tests",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "seconds": 3.877,
+        "log_sha256": "13ff9ba41f2677393275c43d3d9deb5d3d9da31e47fbaef1d5ba9ad7bc907c2f",
+        "counts": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "stage": "workspace-build",
+        "command": [
+          "cargo",
+          "build",
+          "--workspace"
+        ],
+        "exit": 0,
+        "seconds": 56.378,
+        "log_sha256": "9977eac3e010894a08385b4db6ed6050ac8a85e7b4a9f3b0fa8220d3e457b4eb"
+      }
+    ],
+    "source_sha256": {
+      "crates/skills/src/lib.rs": "628c454aee2098f233448b63fc414fe555a8697dcfff034d2a13f98c4bbde526",
+      "crates/skills/tests/it/skills.rs": "37e359ab38d669209b022b8e0e63c5b7469ea991983f5bf782ee63e8e4a3bf02",
+      "crates/voice/src/coordinator.rs": "45d61fcde0cd7284ef3944fa5d3fdf80c355692a9cf88a38be103ffa5cc62e3e",
+      "crates/voice/src/coordinator/service.rs": "786fc43058c65ca7fb8f4c3e451745b2a85f13b45f57021e34b67a69f318a3fa",
+      "crates/voice/src/onboarding.rs": "9e9c824fc59ef6cc96c823db864f8e53b114375bd95aaeae62ab5f55d8203d2b",
+      "crates/voice/src/onboarding/giving_way.rs": "1b45f837590b80ffa09713d47f413eecf6be586b267dc906329c7d19f3f6d6d3",
+      "crates/voice/src/onboarding/legacy_words.rs": "4421eeef2e33fab3cec8734f0737b024f107ffbf6a4d48a2aa7e3705c56dc313",
+      "crates/voice/src/onboarding/near.rs": "19192b08798efff0f6f10bc88cdf6ba9a8e771c78b63f23479cb51f7f90db874",
+      "crates/voice/src/onboarding/privacy_flow_tests.rs": "dedd010034af3066fea9adc2ffded80543edd962b1bd7b35ecdc6e2266187e17",
+      "crates/voice/src/onboarding/skill.rs": "ea1449fe8e5749af7a16bc310b9617a6a6e000468910d4b4691944e9f8a75c29",
+      "crates/voice/src/onboarding/skill/tests.rs": "91b80a70d792627b8e7b7a7b37815746bebafec24939f0f3a5b1ebf4db6e764d",
+      "crates/voice/src/session_state.rs": "9467598c61f7ee8ca2ea79accec15fde029e1419569e7e2192b3ecac7921d9a5",
+      "skills/onboarding/SKILL.md": "55072f949134489469c5bff7db6fbf3fcf97054a27ea563933125b8e91f7bc8c",
+      "skills/onboarding/skill.toml": "9ce85ced164e3436fc006d7b778d963867d88f7e8b96edd6b0bdbc99ef81d0b8",
+      "docs/onboarding.md": "96298bead2ff1bcc3acd99f47d2313e451ce5e1869fea24bb7d380a7c0ea933e",
+      "docs/skills.md": "00f22e4c5b921ce4f731ca98d20b741ebfbaef5e225532360312ebfa80a36ba2"
+    },
+    "range_diff_summary": "f6431ebcb ! 73890de01: only newer docs/skills.md reminder-row context differs; all 14 authored Rust/manifest changes are unchanged.",
+    "qualification": "Fresh focused checks total610 passed/0 failed/1 ignored (128 onboarding,477 Skills with the unchanged ignored fixture writer,5 census). Full5351 host and native10238/0/63 results retain their earlier bases. Replacement-head native gates remain required.",
+    "commands_pending": false,
+    "ignored_tests": [
+      {
+        "name": "write_an_off_fixture",
+        "crate": "lamp-skills",
+        "reason": "writes a fixture",
+        "attribution": "Inherited from authored parent 4f82e1f1bee098e5524298f1307102e22391508e; not added or waived by this change."
+      }
+    ]
+  },
+  "conflict_free_replay": {
+    "old_head": "468d655f98b989b95f25631cacba0b206e1c393d",
+    "old_base": "4f82e1f1bee098e5524298f1307102e22391508e",
+    "base": "fb5d82a8782ac46df9b5ac7df5e1834582c0d9d0",
+    "source_commit_before_evidence_amend": "7e90bcc91799493b7a7307b0ef217e633f8fc16f",
+    "conflicts": [
+      {
+        "path": "lampOS/docs/skills.md",
+        "resolution": "Preserved current news and reminder rows byte for byte; relocated all onboarding schema and lifecycle details from the adjacent table row into a standalone subsection before the lamp-skills process section."
+      }
+    ],
+    "authored_source_patch_unchanged": true,
+    "source": [
+      {
+        "path": "lampOS/crates/skills/src/lib.rs",
+        "authored_change_unchanged": true,
+        "sha256": "d128bde5df200ef1cffcc7042bcc6d44d08f8197ae0fcc78643e1878806a4376"
+      },
+      {
+        "path": "lampOS/crates/skills/tests/it/skills.rs",
+        "authored_change_unchanged": true,
+        "sha256": "1899c55b74751cf62e2217227feab3d9dcff385999c08d2a2190e7aca1637480"
+      },
+      {
+        "path": "lampOS/crates/voice/src/coordinator.rs",
+        "authored_change_unchanged": true,
+        "sha256": "45d61fcde0cd7284ef3944fa5d3fdf80c355692a9cf88a38be103ffa5cc62e3e"
+      },
+      {
+        "path": "lampOS/crates/voice/src/coordinator/service.rs",
+        "authored_change_unchanged": true,
+        "sha256": "786fc43058c65ca7fb8f4c3e451745b2a85f13b45f57021e34b67a69f318a3fa"
+      },
+      {
+        "path": "lampOS/crates/voice/src/onboarding.rs",
+        "authored_change_unchanged": true,
+        "sha256": "9e9c824fc59ef6cc96c823db864f8e53b114375bd95aaeae62ab5f55d8203d2b"
+      },
+      {
+        "path": "lampOS/crates/voice/src/onboarding/giving_way.rs",
+        "authored_change_unchanged": true,
+        "sha256": "1b45f837590b80ffa09713d47f413eecf6be586b267dc906329c7d19f3f6d6d3"
+      },
+      {
+        "path": "lampOS/crates/voice/src/onboarding/legacy_words.rs",
+        "authored_change_unchanged": true,
+        "sha256": "4421eeef2e33fab3cec8734f0737b024f107ffbf6a4d48a2aa7e3705c56dc313"
+      },
+      {
+        "path": "lampOS/crates/voice/src/onboarding/near.rs",
+        "authored_change_unchanged": true,
+        "sha256": "19192b08798efff0f6f10bc88cdf6ba9a8e771c78b63f23479cb51f7f90db874"
+      },
+      {
+        "path": "lampOS/crates/voice/src/onboarding/privacy_flow_tests.rs",
+        "authored_change_unchanged": true,
+        "sha256": "dedd010034af3066fea9adc2ffded80543edd962b1bd7b35ecdc6e2266187e17"
+      },
+      {
+        "path": "lampOS/crates/voice/src/onboarding/skill.rs",
+        "authored_change_unchanged": true,
+        "sha256": "ea1449fe8e5749af7a16bc310b9617a6a6e000468910d4b4691944e9f8a75c29"
+      },
+      {
+        "path": "lampOS/crates/voice/src/onboarding/skill/tests.rs",
+        "authored_change_unchanged": true,
+        "sha256": "91b80a70d792627b8e7b7a7b37815746bebafec24939f0f3a5b1ebf4db6e764d"
+      },
+      {
+        "path": "lampOS/crates/voice/src/session_state.rs",
+        "authored_change_unchanged": true,
+        "sha256": "9467598c61f7ee8ca2ea79accec15fde029e1419569e7e2192b3ecac7921d9a5"
+      },
+      {
+        "path": "lampOS/skills/onboarding/SKILL.md",
+        "authored_change_unchanged": true,
+        "sha256": "55072f949134489469c5bff7db6fbf3fcf97054a27ea563933125b8e91f7bc8c"
+      },
+      {
+        "path": "lampOS/skills/onboarding/skill.toml",
+        "authored_change_unchanged": true,
+        "sha256": "9ce85ced164e3436fc006d7b778d963867d88f7e8b96edd6b0bdbc99ef81d0b8"
+      }
+    ],
+    "parent_news_and_reminder_rows_unchanged": true,
+    "commands_pending": false,
+    "commands": [
+      {
+        "stage": "fmt",
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit": 0,
+        "seconds": 11.076,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "stage": "skills-onboarding",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-skills",
+          "onboarding",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "seconds": 48.942,
+        "log_sha256": "cb0c175d7a170610cf67c819537e5597feb6fa8e6e46dbe3a59b740f1315dc97",
+        "counts": {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "stage": "skills-guard",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-skills",
+          "guard_modes_new_words_come_only_with_their_switch",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "seconds": 0.44,
+        "log_sha256": "65c23ca63e2f262f0138fb5fc8d545b146639d793f004ac9ddf5fff72da30d79",
+        "counts": {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        }
+      }
+    ],
+    "source_sha256": {
+      "crates/skills/src/lib.rs": "d128bde5df200ef1cffcc7042bcc6d44d08f8197ae0fcc78643e1878806a4376",
+      "crates/skills/tests/it/skills.rs": "1899c55b74751cf62e2217227feab3d9dcff385999c08d2a2190e7aca1637480",
+      "crates/voice/src/coordinator.rs": "45d61fcde0cd7284ef3944fa5d3fdf80c355692a9cf88a38be103ffa5cc62e3e",
+      "crates/voice/src/coordinator/service.rs": "786fc43058c65ca7fb8f4c3e451745b2a85f13b45f57021e34b67a69f318a3fa",
+      "crates/voice/src/onboarding.rs": "9e9c824fc59ef6cc96c823db864f8e53b114375bd95aaeae62ab5f55d8203d2b",
+      "crates/voice/src/onboarding/giving_way.rs": "1b45f837590b80ffa09713d47f413eecf6be586b267dc906329c7d19f3f6d6d3",
+      "crates/voice/src/onboarding/legacy_words.rs": "4421eeef2e33fab3cec8734f0737b024f107ffbf6a4d48a2aa7e3705c56dc313",
+      "crates/voice/src/onboarding/near.rs": "19192b08798efff0f6f10bc88cdf6ba9a8e771c78b63f23479cb51f7f90db874",
+      "crates/voice/src/onboarding/privacy_flow_tests.rs": "dedd010034af3066fea9adc2ffded80543edd962b1bd7b35ecdc6e2266187e17",
+      "crates/voice/src/onboarding/skill.rs": "ea1449fe8e5749af7a16bc310b9617a6a6e000468910d4b4691944e9f8a75c29",
+      "crates/voice/src/onboarding/skill/tests.rs": "91b80a70d792627b8e7b7a7b37815746bebafec24939f0f3a5b1ebf4db6e764d",
+      "crates/voice/src/session_state.rs": "9467598c61f7ee8ca2ea79accec15fde029e1419569e7e2192b3ecac7921d9a5",
+      "skills/onboarding/SKILL.md": "55072f949134489469c5bff7db6fbf3fcf97054a27ea563933125b8e91f7bc8c",
+      "skills/onboarding/skill.toml": "9ce85ced164e3436fc006d7b778d963867d88f7e8b96edd6b0bdbc99ef81d0b8",
+      "docs/skills.md": "119a28598a59fe4e676536578b4ccb0d6ea4c97653527161a02262691bdbd6fd"
+    },
+    "qualification": "All14 authored source/manifest changes remain unchanged. Only onboarding schema documentation moved outside the hot table; parent news/reminder rows retained. Fresh fmt and focused Skills onboarding/guard tests pass on fb5d82a87. The610/0/1 host count, strict workspace Clippy and workspace build remain attributed to4f82e1f1b, not this base. New native whole-workspace gates remain required; no CI run was scheduled for prior468d because it conflicted after main advanced."
+  },
+  "consent_boundary_fix": {
+    "review": "https://github.com/autonomous-ai/lampOS/pull/2899#issuecomment-6334751365",
+    "previous_published_head": "a3f13a013c1ad850d6abf51704a039b0c6a8c0d3",
+    "authored_base": "fb5d82a8782ac46df9b5ac7df5e1834582c0d9d0",
+    "source_commit_before_evidence_amend": "e34ea40ca2e94f569dcce775b6c791713607541b",
+    "implementation": "Two private exact consent clauses are required in both first/reoffer WhoYouAre and RoomSounds notes by shared Definition::checked. No public API or shipped manifest change. Fixed content-free error; noted P3 service diagnostic/no-walk behavior unchanged.",
+    "commands": [
+      {
+        "stage": "fmt",
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit": 0,
+        "seconds": 10.69,
+        "log_path": "/private/tmp/fourth-onboarding-skill-checks-20261022/consent-p2-20261022/fmt.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "stage": "clippy",
+        "command": [
+          "cargo",
+          "clippy",
+          "--workspace",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "seconds": 4.692,
+        "log_path": "/private/tmp/fourth-onboarding-skill-checks-20261022/consent-p2-20261022/clippy.log",
+        "log_sha256": "f1d7afe14b690cb1fbf6ce23f9d356c8d622b5cc4e5dcd9f5030b31551ba14fc"
+      },
+      {
+        "stage": "onboarding",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "onboarding",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "seconds": 126.714,
+        "log_path": "/private/tmp/fourth-onboarding-skill-checks-20261022/consent-p2-20261022/post-msgs-clean-attempt/onboarding.log",
+        "log_sha256": "a10749480c594c3f94dd9f3bbf2813d7c99825b3e73c227f136e8d8b6b357b15",
+        "counts": {
+          "passed": 129,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "stage": "skills",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-skills"
+        ],
+        "exit": 0,
+        "seconds": 71.66,
+        "log_path": "/private/tmp/fourth-onboarding-skill-checks-20261022/consent-p2-20261022/skills.log",
+        "log_sha256": "cbf29b63903e98201c86238248ccb86593a9e204cd1083fd8da1922f485a74de",
+        "counts": {
+          "passed": 479,
+          "failed": 0,
+          "ignored": 1
+        }
+      },
+      {
+        "stage": "census",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "switch_census_tests",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "seconds": 3.821,
+        "log_path": "/private/tmp/fourth-onboarding-skill-checks-20261022/consent-p2-20261022/census.log",
+        "log_sha256": "1a486f2779c3a0d1377f4dfc47c009dc0effe10e2969af4a56092561d6655a34",
+        "counts": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "stage": "workspace-build",
+        "command": [
+          "cargo",
+          "build",
+          "--workspace"
+        ],
+        "exit": 0,
+        "seconds": 71.173,
+        "log_path": "/private/tmp/fourth-onboarding-skill-checks-20261022/consent-p2-20261022/workspace-build.log",
+        "log_sha256": "9fe69fde138bdb4c7309086d98e7ae2232db83d9a00c85a7aec45dfe69f98dbc"
+      }
+    ],
+    "unique_focused_counts": {
+      "passed": 613,
+      "failed": 0,
+      "ignored": 1,
+      "by_group": {
+        "onboarding": {
+          "passed": 129,
+          "failed": 0,
+          "ignored": 0
+        },
+        "skills": {
+          "passed": 479,
+          "failed": 0,
+          "ignored": 1
+        },
+        "census": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      "qualification": "Focused results are not added to the historical full5351 host total; repeated green/timing controls are excluded.",
+      "ignored_test": "Inherited skills::write_an_off_fixture (writes a fixture)."
+    },
+    "new_test_functions": 2,
+    "total_new_test_functions_in_pr": 12,
+    "table_cases": {
+      "unique_invalid_note_mutations": 8,
+      "dimensions": "2 steps x2 modes(first/reoffer) x2 edits(remove/alter)",
+      "checked_paths": [
+        "Voice parse",
+        "Voice installed-file load",
+        "Skills load",
+        "Skills pack with consent-specific error"
+      ],
+      "positive_surrounding_prose_edits": 4,
+      "shipped_core_control": "Restored data loads; package refusal is the existing core policy, not consent validation."
+    },
+    "initial_attempts": [
+      {
+        "commands": [
+          {
+            "stage": "fmt",
+            "command": [
+              "cargo",
+              "fmt",
+              "--all",
+              "--check"
+            ],
+            "exit": 0,
+            "seconds": 10.605
+          },
+          {
+            "stage": "clippy",
+            "command": [
+              "cargo",
+              "clippy",
+              "--workspace",
+              "--all-targets",
+              "--",
+              "-D",
+              "warnings"
+            ],
+            "exit": 101,
+            "seconds": 47.776
+          }
+        ],
+        "qualification": "New fixture used TOML serialization without Voice display feature; changed to scoped string edits with no dependency change. Unchanged Cloud also saw stale callback-worktree MessageOut fields in shared target; targeted Msgs clean resolved it."
+      },
+      {
+        "commands": [
+          {
+            "stage": "fmt",
+            "command": [
+              "cargo",
+              "fmt",
+              "--all",
+              "--check"
+            ],
+            "exit": 0,
+            "seconds": 10.682
+          },
+          {
+            "stage": "clippy",
+            "command": [
+              "cargo",
+              "clippy",
+              "--workspace",
+              "--all-targets",
+              "--",
+              "-D",
+              "warnings"
+            ],
+            "exit": 0,
+            "seconds": 77.504
+          },
+          {
+            "stage": "onboarding",
+            "command": [
+              "cargo",
+              "test",
+              "-p",
+              "lamp-voice",
+              "onboarding",
+              "--",
+              "--nocapture"
+            ],
+            "exit": 0,
+            "seconds": 126.714
+          },
+          {
+            "stage": "skills",
+            "command": [
+              "cargo",
+              "test",
+              "-p",
+              "lamp-skills"
+            ],
+            "exit": 101,
+            "seconds": 115.824
+          }
+        ],
+        "skills_partial_counts": {
+          "passed": 447,
+          "failed": 1,
+          "ignored": 1
+        },
+        "unrun": "Later Skills CLI/doc targets and subsequent census/build stages did not run.",
+        "qualification": "The new positive control wrongly expected valid core packaging; corrected to require the existing core policy refusal and require consent-specific errors for invalid notes. The completed Voice129 group remains used because its source bytes did not change."
+      }
+    ],
+    "shared_target_audit": {
+      "sources": [
+        {
+          "path": "/private/tmp/fourth-onboarding-skill-steps-20261022/lampOS/crates/msgs/src/chat.rs",
+          "sha256": "52d5080ea707e05f6d1ec01b20ab8f74aa8e6f8681af16d019ccb22052f147d8",
+          "head": "a3f13a013c1ad850d6abf51704a039b0c6a8c0d3",
+          "definition": "pub struct MessageOut {\n    /// Who sends it: `skill:<name>`, stamped by the part that publishes it,\n    /// never by the skill's own files.\n    pub from: String,\n    /// One line, at most [`MESSAGE_TEXT_BYTES`]: never a picture, never a\n    /// name of anyone the lamp saw.\n    pub text: String,\n}"
+        },
+        {
+          "path": "/private/tmp/fourth-kept-name-callback-20261022/lampOS/crates/msgs/src/chat.rs",
+          "sha256": "5fa48b5de55f0dfd2bfa4ceb698fec0bc89f01938af84458aaab7b479cc66549",
+          "head": "f0a5a12b7c1e464e4b9dcae92fff883262ae3541",
+          "definition": "pub struct MessageOut {\n    /// Who sends it: `skill:<name>`, stamped by the part that publishes it,\n    /// never by the skill's own files.\n    pub from: String,\n    /// One line, at most [`MESSAGE_TEXT_BYTES`]: never a picture, and a\n    /// name of anyone the lamp saw only in guard mode's named text, for\n    /// someone who said yes to being named (`LAMP_GUARD_NAMES`, #2562).\n    pub text: String,\n    /// With a name in `text`: the same line as it reads with no name, the\n    /// words guard mode says with names off. `lamp-cloud` sends `text` only\n    /// when it sends at once and the eyes still say each of [`Self::named`]\n    /// said yes; else this, so a held, retried or late text never names\n    /// anyone who took their yes back (#2562). Left out when there is no\n    /// name, so an older reader reads the message as before.\n    #[serde(default, skip_serializing_if = \"Option::is_none\")]\n    pub unnamed: Option<String>,\n    /// With `unnamed`: who `text` names, as their\n    /// [`crate::known::person_id`]s, never their names, for `lamp-cloud` to\n    /// check against the eyes' `tellable` as it sends\n    /// ([`crate::known::still_tellable`]).\n    #[serde(default, skip_serializing_if = \"Vec::is_empty\")]\n    pub named: Vec<String>,\n}"
+        }
+      ],
+      "diagnostic_log": "initial-attempt/clippy.log",
+      "action": "cargo clean --manifest-path lampOS/Cargo.toml -p lamp-msgs with the existing shared CARGO_TARGET_DIR; no source changes to Msgs or Cloud",
+      "qualification": "After the targeted lamp-msgs clean, strict workspace Clippy passed with exit0 in77.504s, including unchanged Cloud tests. Neither Msgs nor Cloud source changed. This resolves the cross-worktree MessageOut artifact mismatch without an unrelated source fix.",
+      "post_clean_clippy": {
+        "stage": "clippy",
+        "command": [
+          "cargo",
+          "clippy",
+          "--workspace",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "seconds": 77.504
+      },
+      "post_clean_clippy_log_sha256": "ae3d9a583f7bd414524aa4ce759c44e5ba26f3ebc495e2e9936d3ae7e8ab4b72",
+      "no_msgs_or_cloud_source_changes": true
+    },
+    "red_control": {
+      "passing_source_sha256": "aba7ee44db34e71b19676910d5cc1deda1bb3608695d508bc05c2eb3c1d61705",
+      "negative_control_source_sha256": "ea1449fe8e5749af7a16bc310b9617a6a6e000468910d4b4691944e9f8a75c29",
+      "removed": "Only the new clear-yes validation block and constants. The entire validator file matches the published a3f13a013 implementation byte for byte.",
+      "commands": [
+        {
+          "stage": "negative-voice",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "both_consent_clauses_hold_for_first_and_reoffer_in_the_installed_file",
+            "--",
+            "--nocapture"
+          ],
+          "exit": 101,
+          "seconds": 90.697,
+          "log_sha256": "18bed5b536aee502c7443446f8b8a6f192683824c92cc947d139343413c6908f"
+        },
+        {
+          "stage": "negative-skills",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-skills",
+            "onboarding_consent_clauses_cannot_be_removed_when_loading_or_packaging",
+            "--",
+            "--nocapture"
+          ],
+          "exit": 101,
+          "seconds": 48.558,
+          "log_sha256": "ebe18bcc3de670a49458baf74a3d7a2f5bc014f9ecc647fce977e0163e169cec"
+        },
+        {
+          "stage": "restored-voice",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "both_consent_clauses_hold_for_first_and_reoffer_in_the_installed_file",
+            "--",
+            "--nocapture"
+          ],
+          "exit": 0,
+          "seconds": 91.265,
+          "log_sha256": "30499d7535e14e6d2eaa8de79d69a4a026b59f4941e31f377b638d41d0c7885f"
+        },
+        {
+          "stage": "restored-skills",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-skills",
+            "onboarding_consent_clauses_cannot_be_removed_when_loading_or_packaging",
+            "--",
+            "--nocapture"
+          ],
+          "exit": 0,
+          "seconds": 50.583,
+          "log_sha256": "f351b3410bf5a6fbe5c0390fa306c82d3b51085407527607f10408a36d57ff1b"
+        },
+        {
+          "stage": "isolated-timing",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "onboarding::skill::tests::installed_startup_and_cached_selection_have_no_turn_path_io",
+            "--",
+            "--exact",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "exit": 0,
+          "seconds": 0.508,
+          "log_sha256": "7138391c453fcdfa16d9b52f7899a44ab7e2cd4a5c21a81627104f3904a619c9"
+        }
+      ],
+      "source_restored_byte_for_byte": true,
+      "qualification": "Both new regressions fail with the prior structural-only validation because who_you_are/first without its consent clause is accepted. Both pass after restoring the exact source from the passing full focused gate. Negative failures are controls, not waived final failures.",
+      "timing_lines": [
+        "     Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-be83f016820779f2)",
+        "test onboarding::skill::tests::installed_startup_and_cached_selection_have_no_turn_path_io ... onboarding skill timing: startup_read_validate_us=2661 cached_selection_pair_mean_ns=154 iterations=10000"
+      ],
+      "timing_count_is_repeat_not_added": true
+    },
+    "isolated_timing": {
+      "startup_read_validate_us": 2661,
+      "cached_selection_pair_mean_ns": 154,
+      "iterations": 10000,
+      "startup_target_us": 50000,
+      "cached_selection_target_ns": 1000000,
+      "qualification": "Separate single-host observation after restoring exact tested source; cached lookups continue after file removal. No acoustic/cold-device claim. Repeated timing case excluded from613."
+    },
+    "source_sha256": {
+      "crates/skills/src/lib.rs": "d128bde5df200ef1cffcc7042bcc6d44d08f8197ae0fcc78643e1878806a4376",
+      "crates/skills/tests/it/skills.rs": "dba51416278b5992d0f5fbd828ac097ad8561be50e5620c3d7be4fa58392937d",
+      "crates/voice/src/coordinator.rs": "45d61fcde0cd7284ef3944fa5d3fdf80c355692a9cf88a38be103ffa5cc62e3e",
+      "crates/voice/src/coordinator/service.rs": "786fc43058c65ca7fb8f4c3e451745b2a85f13b45f57021e34b67a69f318a3fa",
+      "crates/voice/src/onboarding.rs": "9e9c824fc59ef6cc96c823db864f8e53b114375bd95aaeae62ab5f55d8203d2b",
+      "crates/voice/src/onboarding/giving_way.rs": "1b45f837590b80ffa09713d47f413eecf6be586b267dc906329c7d19f3f6d6d3",
+      "crates/voice/src/onboarding/legacy_words.rs": "4421eeef2e33fab3cec8734f0737b024f107ffbf6a4d48a2aa7e3705c56dc313",
+      "crates/voice/src/onboarding/near.rs": "19192b08798efff0f6f10bc88cdf6ba9a8e771c78b63f23479cb51f7f90db874",
+      "crates/voice/src/onboarding/privacy_flow_tests.rs": "dedd010034af3066fea9adc2ffded80543edd962b1bd7b35ecdc6e2266187e17",
+      "crates/voice/src/onboarding/skill.rs": "aba7ee44db34e71b19676910d5cc1deda1bb3608695d508bc05c2eb3c1d61705",
+      "crates/voice/src/onboarding/skill/tests.rs": "45347813ad5b8f63d0df45362cd8a20159aed99c4b6ebada30121f4968cbaca1",
+      "crates/voice/src/session_state.rs": "9467598c61f7ee8ca2ea79accec15fde029e1419569e7e2192b3ecac7921d9a5",
+      "docs/onboarding.md": "18d918a7be42fff8f01e9529ae58812df396c23d8d8f3c135b7468ddc8b08426",
+      "docs/skills.md": "dfe6e6831b66d6f163676da084f1b27a828ac80f929ea05c40ad70b7b118438a",
+      "skills/onboarding/SKILL.md": "e4bbfaf4577cac1990c23c95bed847a3e8b791b5e2a201d55f05cb42e140b420",
+      "skills/onboarding/skill.toml": "9ce85ced164e3436fc006d7b778d963867d88f7e8b96edd6b0bdbc99ef81d0b8"
+    },
+    "native_gate": "Previous a3f13a013 ARM39734146637(10289/0/66) and Clippy39734146677 remain historical. Replacement head requires new ARM64/Clippy qualification plus P2 reread and authorized lamp52e6 acceptance."
+  }
+}

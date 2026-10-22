@@ -11601,3 +11601,95 @@ fn unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt()
         request
     );
 }
+
+#[test]
+fn onboarding_consent_clauses_cannot_be_removed_when_loading_or_packaging() {
+    let dir = tempfile::tempdir().unwrap();
+    let folder = dir.path().join("onboarding");
+    copy(&skills_root().join("onboarding"), &folder);
+    let shipped = fs::read_to_string(folder.join("skill.toml")).unwrap();
+    let edit = |text: &str, step: &str, mode: &str, from: &str, to: &str| {
+        let header = format!("[onboarding.steps.{step}]\n");
+        let (before, section) = text.split_once(&header).unwrap();
+        let key = format!("{mode} = ");
+        let (before_note, note_and_rest) = section.split_once(&key).unwrap();
+        let (note, rest) = note_and_rest.split_once('\n').unwrap();
+        assert!(note.contains(from));
+        format!(
+            "{before}{header}{before_note}{key}{}\n{rest}",
+            note.replace(from, to)
+        )
+    };
+    for (step, clause) in [
+        (
+            "who_you_are",
+            "only after a clear yes call remember_my_face",
+        ),
+        ("room_sounds", "done only after a clear yes"),
+    ] {
+        for mode in ["first", "reoffer"] {
+            for replacement in ["", "a yes is not needed"] {
+                let text = edit(&shipped, step, mode, clause, replacement);
+                fs::write(folder.join("skill.toml"), text).unwrap();
+                assert!(load(&folder).is_err(), "loaded {step}/{mode}/{replacement}");
+                let error =
+                    lamp_skills::package::pack(&folder, &dir.path().join("bad")).unwrap_err();
+                assert!(error.contains("clear-yes consent clause"), "{error}");
+            }
+        }
+    }
+    fs::write(folder.join("skill.toml"), shipped).unwrap();
+    assert!(load(&folder).is_ok());
+    // Core skills ship with the product: after valid data passes loading,
+    // packaging still refuses them for that existing, separate reason.
+    let error = lamp_skills::package::pack(&folder, &dir.path().join("good")).unwrap_err();
+    assert!(error.contains("is a core skill"), "{error}");
+}
+
+#[test]
+fn onboarding_data_is_required_and_checked_before_a_skill_loads() {
+    let dir = tempfile::tempdir().unwrap();
+    for (i, from, to) in [
+        (
+            0,
+            "order = [\"where_you_sit\",",
+            "order = [\"who_you_are\",",
+        ),
+        (1, "reoffer_after_s = 86400", "reoffer_after_s = 0"),
+        (2, "after_answers = 1", "after_answers = 9"),
+        (3, "{location}", "{wrong}"),
+        (4, "{name}", "{name}{name}"),
+    ] {
+        let folder = repo_skill_with(&dir.path().join(i.to_string()), "onboarding", from, to);
+        assert!(
+            load(&folder).is_err(),
+            "accepted invalid onboarding data {i}"
+        );
+        assert!(
+            lamp_skills::package::pack(&folder, &dir.path().join(format!("bad-{i}"))).is_err(),
+            "packaged invalid onboarding data {i}"
+        );
+    }
+    let missing = dir.path().join("missing/onboarding");
+    copy(&skills_root().join("onboarding"), &missing);
+    let manifest = fs::read_to_string(missing.join("skill.toml")).unwrap();
+    let without = manifest
+        .split("# The walk reads this checked data once")
+        .next()
+        .unwrap();
+    fs::write(missing.join("skill.toml"), without).unwrap();
+    assert!(
+        load(&missing)
+            .unwrap_err()
+            .contains("requires [onboarding]")
+    );
+    let oversized = dir.path().join("oversized/onboarding");
+    copy(&skills_root().join("onboarding"), &oversized);
+    fs::write(
+        oversized.join("skill.toml"),
+        format!("{manifest}\n#{}", "x".repeat(65_536)),
+    )
+    .unwrap();
+    assert!(load(&oversized).is_err());
+    assert!(load(&skills_root().join("onboarding")).is_ok());
+}

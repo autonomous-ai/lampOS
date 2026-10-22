@@ -32,6 +32,12 @@
 //! The model may only skip it. Every file operation runs on the onboarding
 //! storage worker; the interaction loop only buffers bounded evidence and
 //! submits.
+#[cfg(test)]
+pub use super::legacy_words::{
+    NEAR_DONE, NEAR_FAILED, SENTENCE_AGAIN, SENTENCE_CLOSER, SENTENCE_DONE, SENTENCE_FAILED,
+    SENTENCE_FIRST, SENTENCE_LOUDER,
+};
+
 use super::{
     FRESH_MS, GONE_US, Onboarding, Outcome, START_QUIET_US, STEP_GIVE_UP_US, Step,
     TIMED_OUT_QUIET_US, fresh_token, storage,
@@ -93,18 +99,6 @@ const WORDS_WAIT_US: u64 = 3_000_000;
 /// its speech, half the pace of ordinary speech (two to three words a
 /// second). A line whose words came back fewer is a fragment.
 const MS_A_WORD: u64 = 1_000;
-
-pub const NEAR_FIRST: &str = "(Nobody has spoken. Tell them in a few words that you would like to learn how they call you from where they usually sit. Ask them to stay in their seat and call your name once, the way they would to get your attention, and then stay quiet yourself. Do not say your own name, and do not claim anything was measured.)";
-pub const NEAR_AGAIN: &str = "(Ask them in a few words to call your name once more from their seat, the same way, and then stay quiet yourself. Do not say your own name.)";
-pub const NEAR_DONE: &str = "(You have learned how they call you from their seat. Tell them so in a few words. Nothing more.)";
-pub const NEAR_FAILED: &str = "(You could not learn how they call you from their seat this time. Tell them in a few light words that it is fine and that they can redo the setup later. Do not claim anything was measured.)";
-pub const SENTENCE_FIRST: &str = "(Nobody has spoken. Ask them in a few words to say a sentence to you from where they sit, anything at all in their own words, so you can get used to their voice, and then stay quiet yourself while they speak. Do not claim anything was measured.)";
-pub const SENTENCE_LOUDER: &str = "(Ask them in a few words to say another sentence from their seat, a little louder, and then stay quiet yourself.)";
-pub const SENTENCE_CLOSER: &str = "(Ask them in a few words to come a little closer and say another sentence, and then stay quiet yourself.)";
-pub const SENTENCE_AGAIN: &str = "(Ask them in a few words to say another sentence from their seat, and then stay quiet yourself.)";
-pub const SENTENCE_DONE: &str =
-    "(You heard them well from where they sit. Tell them so in a few words. Nothing more.)";
-pub const SENTENCE_FAILED: &str = "(You could not hear them well enough from where they sit this time. Tell them in a few light words: I'll get used to your voice as we talk. Do not claim anything was measured.)";
 
 /// What fell short in a sentence try: the coaching it gets.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -578,13 +572,16 @@ impl Onboarding {
         offer.ready = false;
         Some(
             match (offer.sentence, offer.prompt, self.near.short) {
-                (false, 1, _) => NEAR_FIRST,
-                (false, _, _) => NEAR_AGAIN,
-                (true, 1, _) => SENTENCE_FIRST,
-                (true, _, Some(Short::Level)) => SENTENCE_LOUDER,
-                (true, _, Some(Short::Coverage)) => SENTENCE_CLOSER,
+                (false, 1, _) => self.definition.note(
+                    Step::HowYouSound,
+                    self.desired.steps.contains_key(Step::HowYouSound.name()),
+                ),
+                (false, _, _) => self.definition.words.near_again.as_str(),
+                (true, 1, _) => self.definition.words.sentence_first.as_str(),
+                (true, _, Some(Short::Level)) => self.definition.words.sentence_louder.as_str(),
+                (true, _, Some(Short::Coverage)) => self.definition.words.sentence_closer.as_str(),
                 // A new voice cycle: what fell short is not known.
-                (true, _, None) => SENTENCE_AGAIN,
+                (true, _, None) => self.definition.words.sentence_again.as_str(),
             }
             .to_owned(),
         )
@@ -798,11 +795,14 @@ impl Onboarding {
 
     fn sentence_finished(&mut self, outcome: Outcome, now_us: u64) {
         self.finish(Step::HowYouSound, outcome, None, now_us);
-        self.owed = Some(if outcome == Outcome::Done {
-            SENTENCE_DONE
-        } else {
-            SENTENCE_FAILED
-        });
+        self.owed = Some(
+            if outcome == Outcome::Done {
+                self.definition.words.sentence_done.as_str()
+            } else {
+                self.definition.words.sentence_failed.as_str()
+            }
+            .to_owned(),
+        );
     }
 
     /// Judge the try being listened for, once its evidence is all in. Pure
@@ -882,11 +882,14 @@ impl Onboarding {
         self.near.named = Some(outcome);
         self.records.push(json!({"kind":"onboarding_near_call",
             "outcome":outcome,"at_us":now_us}));
-        self.owed = Some(if outcome == Outcome::Done {
-            NEAR_DONE
-        } else {
-            NEAR_FAILED
-        });
+        self.owed = Some(
+            if outcome == Outcome::Done {
+                self.definition.words.near_done.as_str()
+            } else {
+                self.definition.words.near_failed.as_str()
+            }
+            .to_owned(),
+        );
     }
 
     /// The step being led, with storage idle.
