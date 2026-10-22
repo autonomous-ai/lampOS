@@ -759,9 +759,9 @@ order is kept. A written turn is the same from the chat on.
     first, with at least one word not the lamp's: "Did you say five
     o'clock?"), begins after the lamp's words when they ended on a question
     ("Yes, start it." after "Shall I start it?"), or answers an offer in the
-    answer (`OFFERS`: "I can", "I could", "shall I", "should I", "want me
-    to", "would you like", "do you want", "let me know if", "if you want",
-    "if you'd like", "if you like"; "I can't" is none). An offer covers a
+    answer's last sentence (`OFFERS`: "I can", "I could", "shall I", "should I", "want me
+    to", "would you like", "do you want", "if you want",
+    "if you'd like", "if you like"; "I can't" is none, and a sign-off such as "let me know if" is none). An offer covers a
     line begun after the lamp's words, and one over its voice that adds a
     word: "set a reminder for six" after "I can set a reminder for six." is
     answered. When such a line would have been held or cut, the journal
