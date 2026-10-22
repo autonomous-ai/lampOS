@@ -1570,6 +1570,7 @@ fn second_route_worker_environment(
         crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
         crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
+        crate::second_provider::CHAT_AGAIN_ENVIRONMENT,
         crate::second_provider::CUE_AFTER_ENVIRONMENT,
         crate::second_provider::LOOK_NOTE_ENVIRONMENT,
         crate::second_provider::LOOK_WALK_ENVIRONMENT,
@@ -1649,6 +1650,7 @@ mod tests {
             crate::unfinished_words::ENVIRONMENT,
             crate::same_voice::CALLER_ONLY_ENVIRONMENT,
             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
+            crate::second_provider::CHAT_AGAIN_ENVIRONMENT,
             crate::second_provider::CUE_AFTER_ENVIRONMENT,
             crate::second_provider::OPEN_NAME_ENVIRONMENT,
             crate::second_provider::NAME_CARRIES_ENVIRONMENT,
@@ -2276,6 +2278,7 @@ mod tests {
                     || name == crate::unfinished_words::ENVIRONMENT
                     || name == crate::same_voice::CALLER_ONLY_ENVIRONMENT
                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
+                    || name == crate::second_provider::CHAT_AGAIN_ENVIRONMENT
                     || name == crate::second_provider::CUE_AFTER_ENVIRONMENT
                     || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
                     || name == crate::second_provider::NAME_CARRIES_ENVIRONMENT
@@ -2414,6 +2417,7 @@ mod tests {
                     "LAMP_SAME_SPEAKER_CARRIES=on",
                     "LAMP_SAME_VOICE_CALLER_ONLY=on",
                     "LAMP_SCHEDULE_ASKED=on",
+                    "LAMP_SECOND_CHAT_AGAIN=on",
                     "LAMP_SECOND_CHAT_KEPT=on",
                     "LAMP_SECOND_CHAT_WARM=on",
                     "LAMP_SECOND_CUE_AFTER_MS=on",
