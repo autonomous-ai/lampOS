@@ -38,6 +38,9 @@ struct Ran {
     forgets: Vec<(String, Value)>,
     /// What each chat round was asked.
     asked: Vec<Vec<Message>>,
+    /// For each tool call, its request and what the eyes saw saying that
+    /// request's line, read as it ran ([`crate::speaking_faces::line_seen`]).
+    lines: Vec<(u64, Option<crate::speaking_faces::LineSeen>)>,
 }
 
 async fn run(turns: &[Turn]) -> Ran {
@@ -63,6 +66,12 @@ type Sight = (&'static [&'static str], bool);
 /// known person's face is beside the known file (a missing reading when
 /// not).
 async fn run_seen(turns: &[Turn], sight: Option<&[Sight]>) -> Ran {
+    run_seen_from(turns, sight, 1).await
+}
+
+/// [`run_seen`], its first turn request `first`: lines seen are kept for
+/// the whole process, so a test that reads them takes numbers of its own.
+async fn run_seen_from(turns: &[Turn], sight: Option<&[Sight]>, first: u64) -> Ran {
     use crate::speaking_faces::{SpeakingFaces, known_face_of};
     use std::sync::atomic::{AtomicBool, Ordering};
     let mut chats = VecDeque::new();
@@ -95,8 +104,14 @@ async fn run_seen(turns: &[Turn], sight: Option<&[Sight]>) -> Ran {
     });
     let forgets: Calls = Arc::default();
     let seen = forgets.clone();
-    let runner: ScopedToolRunner = Arc::new(move |_, heard, name, args, _| {
+    let lines = Arc::new(Mutex::new(Vec::new()));
+    let lines_seen = lines.clone();
+    let runner: ScopedToolRunner = Arc::new(move |request, heard, name, args, _| {
         seen.lock().unwrap().push((name, args, heard));
+        lines_seen
+            .lock()
+            .unwrap()
+            .push((request, crate::speaking_faces::line_seen(request)));
         Box::pin(async { json!({"ok": true}) })
     });
     let path = std::env::temp_dir().join(format!(
@@ -121,9 +136,15 @@ async fn run_seen(turns: &[Turn], sight: Option<&[Sight]>) -> Ran {
         engine = engine.confirming_forgets_by_sight(eyes.clone(), path.clone());
     }
     engine.memory_camera(true, 1);
+    // The eyes publishing before the first turn: a known face's file is
+    // tied to the boot whose frames were read before it was written.
+    eyes.look(
+        Instant::now(),
+        Some((("eyes", 0), &lamp_msgs::Faces { faces: Vec::new() })),
+    );
     let mut frame = 0u64;
     for (at, (who, said, _, after)) in turns.iter().enumerate() {
-        let request = at as u64 + 1;
+        let request = at as u64 + first;
         *now.lock().unwrap() += Duration::from_secs(*after);
         let (speaking, face_beside) = sight.map_or((&[][..], false), |sight| sight[at]);
         let _ = std::fs::remove_file(known_face_of(&path));
@@ -203,7 +224,12 @@ async fn run_seen(turns: &[Turn], sight: Option<&[Sight]>) -> Ran {
         .map(|(name, args, _)| (name.clone(), args.clone()))
         .collect();
     let asked = script.asked.lock().unwrap().clone();
-    Ran { forgets, asked }
+    let lines = lines.lock().unwrap().clone();
+    Ran {
+        forgets,
+        asked,
+        lines,
+    }
 }
 
 const FACE: &str = crate::known_faces::FORGET;
@@ -791,4 +817,32 @@ async fn without_the_eyes_switch_a_held_forget_is_as_before() {
     assert!(ran.asked.iter().all(|asked| !asked.contains(&told)));
     let ran = run(&[held, ("B", "Yes.", Lamp::Says("Okay."), 5)]).await;
     assert_eq!(ran.forgets, []);
+}
+
+/// #3037: a line asking to forget, with the eyes reading speaking, records
+/// at its end who the eyes saw saying it and the known person with their
+/// face, each id with the eyes' boot, for that request's calls
+/// (`speaking_faces::line_seen`). Without the eyes' switch nothing is
+/// recorded. Request numbers of this test's own: the lines seen are the
+/// process's.
+#[tokio::test]
+async fn a_lines_end_records_who_was_seen_saying_it() {
+    use crate::speaking_faces::LineSeen;
+    let asks = ("A", "Forget my face.", Lamp::Calls(FACE, "Done."), 0);
+    let seen = |request, speaker: &str| {
+        (
+            request,
+            Some(LineSeen {
+                request,
+                speakers: vec![format!("eyes/{speaker}")],
+                known: Some(("A".to_owned(), "eyes/f1".to_owned())),
+            }),
+        )
+    };
+    let ran = run_seen_from(&[asks], Some(&[(&["A"], true)]), 3_037_001).await;
+    assert_eq!(ran.lines, [seen(3_037_001, "f1")]);
+    let ran = run_seen_from(&[asks], Some(&[(&["B"], true)]), 3_037_002).await;
+    assert_eq!(ran.lines, [seen(3_037_002, "f2")]);
+    let ran = run_seen_from(&[asks], None, 3_037_003).await;
+    assert_eq!(ran.lines, [(3_037_003, None)]);
 }
