@@ -6904,6 +6904,31 @@ Ready for lamp-voice: no
 - No lamp, SSH, provider/model call or physical acceptance in these checks.
   The owner name row remains held for the first builder and person.
 
+## 2026-10-22, 23:57: final private output guard and reset correction
+
+Ready for lamp-voice: no
+
+- #3064: the private memory note, history and remembered hits now use the same
+  request-owned positive speaker evidence as the name. Neutral private requests
+  make no memory lookup and do not fall back to the room. Source is authored,
+  not yet qualified. The final output envelope retains this authority through
+  output-credit waits and checks it immediately before speech IPC; fourteen
+  Engine/IPC regression tests are authored. A source-fresh Mac gate is running.
+- #2988: the source-fresh Mac run passed 74 focused Eyes/Voice tests with one
+  existing ignore, formatting and strict workspace clippy. The full Cloud run
+  retained 203 passed, one failed, two ignored: its refused-cleanup fixture did
+  not observe the required fixed startup warning. Diagnosis is in progress;
+  this is not a passing gate and the current correction is not pushed yet.
+- #3072: the repair temporary file is now one exact reset-plan path, swept at
+  startup. All three live reset plans list both exact temporary siblings. Six
+  Eyes regressions and one actual mapped reset-plan wipe test are authored,
+  unrun. The own branch is being carried onto the current base before its gate.
+- Updated the clean local branch to `073a05d2c`; read the new diff-review rules
+  and all Queue/own-PR comments through 23:51. Posted the open-issue inventory
+  and next work on #2602. All four PRs remain draft and outside the merge train.
+- No lamp, install, model spend or physical acceptance is claimed. The known
+  name row remains 0.40 until the first builder's person check on 23 October.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
