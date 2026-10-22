@@ -1,0 +1,36 @@
+{
+  "label": "original_order",
+  "head": "43bc29f9b3163e03165148813c27af9e073e615c",
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--offline",
+    "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply",
+    "--",
+    "--exact",
+    "--nocapture"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 55.564,
+  "log_bytes": 1542,
+  "log_sha256": "ea2c864f8f60b47abdbd018235eb0c26567a6286f97cb996cda568573d7b46f8",
+  "bound_files": 6509,
+  "inputs_stable_during_command": true,
+  "input_manifest_sha256": "ec07e48e468550f4236ead5b9a4d4fe3f79167130e197a4883e791d483e97ede",
+  "fixture_sha256": "3b066f7f24045d1af9024d0afb8624f6c41c3372db6bbeec526c5b7812e89cb1",
+  "result_lines": [
+    "SECOND_QUEUE_CONTROL: worker state is held; original accept bound is three seconds",
+    "thread '<unnamed>' (65438057) panicked at crates/voice/src/provider_worker.rs:11528:58:",
+    "SECOND_QUEUE_CONTROL: releasing worker state after five seconds",
+    "lamp-voice provider: request 1 asked for play_relaxing_music; the executive did not answer in 0 ms; the answer was sent",
+    "thread 'provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply' (65438055) panicked at crates/voice/src/provider_worker.rs:11588:13:",
+    "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3498 filtered out; finished in 5.05s"
+  ],
+  "command_note": "Executable displayed as cargo; the installed Rust 1.96.0 toolchain was invoked by its absolute path.",
+  "host": "Darwin arm64; rustc 1.96.0; aarch64-apple-darwin"
+}

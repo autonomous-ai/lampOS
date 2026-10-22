@@ -1,0 +1,28 @@
+diff --git a/lampOS/crates/voice/src/provider_worker.rs b/lampOS/crates/voice/src/provider_worker.rs
+index 36718eb4f..a6fa3b903 100644
+--- a/lampOS/crates/voice/src/provider_worker.rs
++++ b/lampOS/crates/voice/src/provider_worker.rs
+@@ -11502,6 +11502,23 @@ pub(crate) mod tests {
+     #[tokio::test]
+     async fn requested_audio_crosses_the_live_worker_only_after_its_tool_reply() {
+         use std::io::{BufRead, Read, Write};
++        // Deliberate contention: another test owns the shared worker state.
++        // A bounded receive models a queued rig without adding any product delay.
++        let (held, held_rx) = std::sync::mpsc::sync_channel(1);
++        let (_never_sent, until_release) = std::sync::mpsc::sync_channel::<()>(1);
++        let _holder = std::thread::spawn(move || {
++            let _one = one_thread();
++            held.send(()).unwrap();
++            assert!(matches!(
++                until_release.recv_timeout(Duration::from_secs(5)),
++                Err(std::sync::mpsc::RecvTimeoutError::Timeout)
++            ));
++            eprintln!("SECOND_QUEUE_CONTROL: releasing worker state after five seconds");
++        });
++        held_rx.recv_timeout(Duration::from_secs(10)).unwrap();
++        eprintln!("SECOND_QUEUE_CONTROL: worker state is held; original accept bound is three seconds");
++        // Own the process-wide worker state before starting a bounded peer.
++        let _one = one_thread();
+         for wrapped in [false, true] {
+             let home = crate::process::SessionDirectory::create().unwrap();
+             std::fs::write(home.path.join(crate::tools::CATALOG_FILE),
