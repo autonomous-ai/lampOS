@@ -20,6 +20,7 @@ use std::{
         Arc,
         atomic::{AtomicU64, Ordering},
     },
+    time::{Duration, Instant},
 };
 use tract_onnx::prelude::*;
 
@@ -1588,6 +1589,26 @@ pub const TAKING_FOR_US: u64 = 4_000_000;
 /// 2026-10-15 the model waited 4.2 s for "I could not see a face".
 pub const NOBODY_FOR_US: u64 = 1_500_000;
 
+/// Whose the near face is, asked at most this often: a print takes a
+/// tenth of a second or more on the lamp.
+pub const RECOGNISE_EVERY: Duration = Duration::from_secs(2);
+
+/// Whether this look asks whose the near face is: at every look while
+/// someone is being remembered, else once `RECOGNISE_EVERY` has passed.
+pub fn recognise_due(looked_for: Option<Instant>, taking: bool, now: Instant) -> bool {
+    taking || looked_for.is_none_or(|at| now.saturating_duration_since(at) >= RECOGNISE_EVERY)
+}
+
+/// After a remembering at the lamp: kept, the next look asks at once, so the
+/// known file names the person within one look, not two seconds later
+/// (#3108). Refused or failed, the wait stands. A face from a photo is not
+/// passed here: it is named only on its person's yes.
+pub fn after_remembering(looked_for: &mut Option<Instant>, kept: bool) {
+    if kept {
+        *looked_for = None;
+    }
+}
+
 /// Remembering someone: their prints, taken over a few looks while they are
 /// the one face at the lamp.
 #[derive(Debug)]
@@ -2111,6 +2132,43 @@ fn valid(people: &[Person]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_remember_kept_is_recognised_at_the_next_look_and_then_every_two_seconds() {
+        let start = Instant::now();
+        // The last look while remembering, then the reply.
+        let mut looked_for = Some(start);
+        after_remembering(&mut looked_for, true);
+        let next = start + Duration::from_millis(350);
+        assert!(recognise_due(looked_for, false, next));
+        // That look asks once; the two seconds stand again after it.
+        looked_for = Some(next);
+        assert!(!recognise_due(
+            looked_for,
+            false,
+            next + Duration::from_millis(350)
+        ));
+        assert!(recognise_due(looked_for, false, next + RECOGNISE_EVERY));
+    }
+
+    #[test]
+    fn a_remember_refused_waits_the_two_seconds() {
+        let start = Instant::now();
+        let mut looked_for = Some(start);
+        after_remembering(&mut looked_for, false);
+        assert!(!recognise_due(
+            looked_for,
+            false,
+            start + Duration::from_millis(350)
+        ));
+        assert!(recognise_due(looked_for, false, start + RECOGNISE_EVERY));
+        // While remembering, every look asks.
+        assert!(recognise_due(
+            looked_for,
+            true,
+            start + Duration::from_millis(350)
+        ));
+    }
 
     /// A picture whose red is the column, green the row, and blue zero.
     fn gradient() -> Picture {
