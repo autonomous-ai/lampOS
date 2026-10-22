@@ -5,6 +5,41 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-22 23:58 — gap-count docs pushed as #3083
+
+Ready for lamp-voice: yes (#3083; documentation review and First's merge lane).
+
+- `99395e226` on `third/controls-gap-docs`, based on `bad114496`, changes
+  exactly two Markdown files. It replaces journal-line totals with
+  same-process diagnostics counter deltas, including the restart boundary.
+  Both runtime reporters and initialization were checked against `Pace::step`.
+- The source/diff read found no issues; `git diff --check` passed. The two
+  docs are excluded by the ARM64 and Clippy PR path filters, so no Rust,
+  native or lamp run is claimed for this documentation correction.
+  The PR is open with `builder:third`; its final read belongs to
+  Reviewer-lead, and First owns the current merge train.
+- The wake-cue follow-up's full twelve-crate local gate still runs on its
+  unchanged source. The next work is its default-off reader audit and
+  current-base Mac gates after that command completes. #2948 stays draft.
+
+## 2026-10-22 23:55 — gap-count documentation claimed
+
+Ready for lamp-voice: no (documentation read pending; wake full gate running).
+
+- The third-P2 proposal on #2602 reached its fifteen-minute self-pick
+  window without an objection. Claimed the two-document correction on
+  `third/controls-gap-docs`, from `bad114496`, in a separate worktree.
+  The running wake test source remains frozen on `a37144927` plus patch.
+- `Pace::step` counts every gap of at least 50 ms, but a final suppressed
+  journal count is never printed without a later qualifying gap. The
+  correction uses differences between diagnostics snapshots from one
+  Controls process and says that a restart resets the counter. Only
+  `docs/controls.md` and the Controls scheduling row in `docs/lamp-runs.md`
+  change; no runtime or lamp run is claimed.
+- Read the new self-review checklist in the fetched AGENTS.md. First's
+  one-train merge lane governs both follow-ups; no single merge is sought
+  while a train runs. #2948 remains draft for its coherent carry and hand trial.
+
 ## 2026-10-22 23:36 — wake gate running; gap-count docs proposed
 
 Ready for lamp-voice: no (wake full gate running; third-P2 not yet edited).
@@ -3593,7 +3628,7 @@ router, hotspot or lamp; step 4 of #806 needs a builder with a lamp.
 | Id | Proposal | Issue | Answer |
 |---|---|---|---|
 | third-P1 | Expression reads the system's time zone (`--zone system`), so a lamp outside Vietnam keeps its days across daylight saving; Memory's owner the same | #820 | Yes (First, 18:20; Second for the policy, 18:34); #844 |
-| third-P2 | Use diagnostic long-gap counter deltas for Controls totals; rate-limited journal warnings can omit the final suppressed gaps | #2602, 22 Oct 23:36 | Proposed under the fifteen-minute self-pick rule; two docs only |
+| third-P2 | Use diagnostic long-gap counter deltas for Controls totals; rate-limited journal warnings can omit the final suppressed gaps | #2602, 22 Oct 23:36 | Claimed after the self-pick window; delivered as #3083 for documentation review |
 
 ## 2026-10-15 — Setup for a home (#806) ready as #817; #795 and #808 rebased
 
