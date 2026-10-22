@@ -664,8 +664,11 @@ are off:
   sign-in is used within a minute, with no restart.
 - **No Harness program** at `--harness` (not there at all; one there and
   not fit to run is refused as before): the part runs with a stand-in that
-  sends nothing. Every `prepare` is refused, code `no_harness`. Harness put
-  on later is used once the part starts again.
+  sends nothing. Every `prepare` is refused, code `no_harness`, and the voice
+  tells the model `agent_tasks::NO_HARNESS`, that hand-overs aren't set up
+  on this lamp and can be set up later. Any other refusal is "could not be
+  prepared just now", which the model said as a retry to offer on lamp-75c9
+  (#2842). Harness put on later is used once the part starts again.
 - **The sign-in** is read once a minute with `harness auth status --json`
   (one line, `loggedIn`, and `offline` when signed in but its sign-in
   couldn't be renewed just now). It goes on the Harness worker after
