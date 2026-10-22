@@ -7585,6 +7585,82 @@ async fn a_line_already_answered_is_never_chained_into_the_next() {
     );
 }
 
+/// Reviewer-three (23 Oct): a piece cut while its verdict waits (here for
+/// the Policy) is chained only in a room that isn't busy: in a busy room
+/// "yeah, I'll send it after lunch." then "Lamp, what's on my calendar?"
+/// is asked alone; in a quiet one, the same person by no sign of another,
+/// as one line.
+#[tokio::test]
+async fn a_piece_cut_while_its_verdict_waits_is_chained_only_in_a_room_not_busy() {
+    async fn asked(busy: bool) -> Message {
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok("yeah, I'll send it after lunch.".to_owned()),
+                    Ok("Lamp, what's on my calendar?".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new([vec![text("A meeting at three."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let now = Arc::new(Mutex::new(Instant::now()));
+        let clock = now.clone();
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            Arc::new(|_, _, _, _| Box::pin(async { json!({}) })),
+            Arc::new(move || *clock.lock().unwrap()),
+        )
+        .announcing(false)
+        .heeding(Arc::new(|request, _, _, _| {
+            (request == 1).then_some(WAITS_FOR_POLICY)
+        }))
+        .asking_the_policy(Arc::new(|_| Some(None)))
+        .judging_busy(Arc::new(move |_| busy))
+        .joining_cut_words(Arc::new(|_, _| {
+            Joined::NoSecond("no sign of a second person".to_owned())
+        }));
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+                .await
+                .expect("the talk's words");
+            if matches!(&event, ProviderOutput::Transcript { text, finished: true, .. } if text.contains("lunch"))
+            {
+                break;
+            }
+        }
+        *now.lock().unwrap() += Duration::from_millis(1_500);
+        engine.submit(start(2));
+        engine.retire_through(1);
+        engine.submit(audio(2, 1));
+        engine.submit(end(2));
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(3), engine.next())
+                .await
+                .expect("the call's turn ends");
+            if matches!(event, ProviderOutput::TurnComplete { request: 2, .. }) {
+                break;
+            }
+        }
+        let asked = script.asked.lock().unwrap();
+        asked[asked.len() - 1].last().unwrap().clone()
+    }
+    assert_eq!(
+        asked(true).await,
+        Message::user("Lamp, what's on my calendar?"),
+        "a busy room"
+    );
+    assert_eq!(
+        asked(false).await,
+        Message::user("yeah, I'll send it after lunch. Lamp, what's on my calendar?"),
+        "a room not busy"
+    );
+}
+
 /// A piece cut short before its words came back, the next begun within
 /// `CARRY_AFTER_END` of its end, goes on in that line's sound: the chain
 /// goes on across it, from the line before it, so the line asked holds all
