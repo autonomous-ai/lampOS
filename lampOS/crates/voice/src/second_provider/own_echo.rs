@@ -125,9 +125,20 @@ fn offers(answer: &str) -> bool {
         .rfind(|sentence| !sentence.is_empty())
         .unwrap_or_default();
     let answer = keys(last);
+    // "Let me know if you want anything else." is a sign-off: an "if you
+    // want/like" after "let me know" offers nothing.
+    let signed_off = |at: usize| {
+        let let_me_know = keys("let me know");
+        answer[..at]
+            .windows(let_me_know.len())
+            .any(|window| window == let_me_know)
+    };
     OFFERS.iter().any(|offer| {
         let offer = keys(offer);
-        answer.windows(offer.len()).any(|window| window == offer)
+        answer
+            .windows(offer.len())
+            .enumerate()
+            .any(|(at, window)| window == offer && !signed_off(at))
     })
 }
 
@@ -419,6 +430,9 @@ mod tests {
         // An offer the lamp ends on is still one.
         assert!(offers("It's five. I can set a reminder for six."));
         assert!(!offers("I can hear you. It's five."));
+        // The commonest sign-off holds "if you want" after "let me know".
+        assert!(!offers("It's five. Let me know if you want anything else."));
+        assert!(offers("It's five. If you want, I can remind you at six."));
     }
 
     #[test]
