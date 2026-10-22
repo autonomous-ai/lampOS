@@ -8681,6 +8681,90 @@ fn the_program_forgets_a_snooze_at_a_restart() {
     );
 }
 
+/// Guard mode's words for the model (#2827): with `LAMP_GUARD_WORDS_V2`
+/// on, `keep_watch` is described off first, a return said in "keep an eye"
+/// words among the offs; off, its description and choice are its
+/// `SKILL.md`'s and `skill.toml`'s byte for byte. Only guard mode's tool
+/// changes, and the new words stay inside the provider's bounds.
+#[test]
+fn guard_modes_new_words_come_only_with_their_switch() {
+    let guard = load(&skills_root().join("guard-mode")).unwrap();
+    let other = load(&skills_root().join("who-was-here")).unwrap();
+    let skills = [guard, other];
+    let find = |file: &serde_json::Value, name: &str| {
+        file["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|tool| tool["name"] == name)
+            .cloned()
+            .unwrap()
+    };
+    let old = lamp_skills::tools_file_with(&skills, false, false);
+    assert_eq!(
+        old,
+        lamp_skills::tools_file_with_requested_audio(&skills, false)
+    );
+    let tool = find(&old, "keep_watch");
+    let skill_md = fs::read_to_string(skills_root().join("guard-mode/SKILL.md")).unwrap();
+    let described = skill_md
+        .lines()
+        .find_map(|line| line.strip_prefix("description: "))
+        .unwrap();
+    assert_eq!(tool["description"], described);
+    assert_eq!(
+        tool["parameters"]["properties"]["turn"]["description"],
+        "on: the person at the lamp asked you out loud to keep an eye on things while they're out; off: they asked you to stop, or said they're back"
+    );
+
+    let new = lamp_skills::tools_file_with(&skills, false, true);
+    let tool = find(&new, "keep_watch");
+    assert_eq!(
+        tool["description"],
+        lamp_skills::watch::WORDS_V2_DESCRIPTION
+    );
+    assert_eq!(
+        tool["parameters"]["properties"]["turn"]["description"],
+        lamp_skills::watch::WORDS_V2_TURN
+    );
+    assert_eq!(
+        tool["parameters"]["properties"]["turn"]["enum"],
+        serde_json::json!(["on", "off"])
+    );
+    assert!(lamp_skills::watch::WORDS_V2_DESCRIPTION.starts_with(
+        "Keeps an eye on the desk while the person is out and texts them once if someone comes to it. Call keep_watch with turn off"
+    ));
+    assert!(
+        lamp_skills::watch::WORDS_V2_DESCRIPTION
+            .contains("\"I'm back, you can stop keeping an eye on things\"")
+    );
+    assert!(lamp_skills::watch::WORDS_V2_TURN.starts_with("off: "));
+    assert!(lamp_skills::watch::WORDS_V2_DESCRIPTION.len() <= 1_024);
+    assert!(lamp_skills::watch::WORDS_V2_TURN.len() <= 256);
+    // Every other tool is as it was.
+    let others = |file: &serde_json::Value| {
+        file["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|tool| tool["name"] != "keep_watch")
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    assert!(!others(&old).is_empty());
+    assert_eq!(others(&old), others(&new));
+    assert_eq!(
+        old["tools"].as_array().unwrap().len(),
+        new["tools"].as_array().unwrap().len()
+    );
+
+    assert!(lamp_skills::watch::words_v2(Some("on")));
+    for value in [None, Some(""), Some("off"), Some("1"), Some("ON")] {
+        assert!(!lamp_skills::watch::words_v2(value));
+    }
+    assert_eq!(lamp_skills::watch::WORDS_ENVIRONMENT, "LAMP_GUARD_WORDS_V2");
+}
+
 /// Guard mode is a watch (#1685): turned on only by its tool, never by a
 /// trigger; its tool's choice is on and off; its mark is faint and steady;
 /// and it may text, know a face from one it does not know and show its
