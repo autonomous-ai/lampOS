@@ -6077,6 +6077,32 @@ Ready for lamp-voice: yes (#2782 and #2870; #2774 and #2824 are not ready).
   operator gate. #2789 piece 1 is ready; its group/bus contract still has
   no owner reply. No lamp, account, unit or permission change was made.
 
+## 2026-10-22 11:34 ICT: retry ready; onboarding move continues
+
+Ready for lamp-voice: yes (#2774, #2782 and #2870; #2824 is not ready).
+
+- #2774 is ready at `c7418b7654d84567c15967316e3b59bc250b7e16`.
+  ARM64 39719611512 passed 10,202 nextest cases, zero failed, 63 skipped;
+  all nine worker checks, six typed-client checks and the repaired fixture
+  passed. One unchanged same-voice journal check is a leaky pass. Four
+  doctests, 12 separate process checks and relay signals passed. Clippy
+  39719611468 passed. No rerun was used on this head.
+- CI merge `55945105d` uses base `3095487ad`. Artifact 12400632580 has
+  SHA-256 `cf72244af548d75b0bc394e0eff4177caf83b1dbd3ec91284890928443dad10f`.
+  Raw receipt: `/private/tmp/fourth-memory-retry-ci-20261022/rebase-c7418b765/qualification.json`.
+  Ready receipt: issuecomment-6332762220; Queue: issuecomment-6332762572.
+  Both previous failures remain historical. The second memory PR to merge
+  must preserve callback extraction and the leased authority guard on rebase.
+- #2824 implementation is active on `fourth/onboarding-skill-steps`.
+  Checked data loads once before Voice opens audio; a later file-only
+  edit or restoration requires the next operator-managed Voice restart.
+  Initial rollout installs product skills before part restarts. Shipped
+  words have an independent byte-parity oracle; service-cycle coverage
+  and strict local gates are being completed. No readiness is claimed.
+- #2782 and #2870 await reviewer-two/First. #2789's later permission/bus
+  pieces await the requested owner contract. No lamp, account, unit or
+  permission change was made.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
