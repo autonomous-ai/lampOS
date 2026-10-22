@@ -10,7 +10,16 @@
 //! apart, so a person sees it, and never counts as a pass.
 //!
 //! The record is judged again from the matrix, not trusted: a verdict, a
-//! failure or a limit that does not follow from the matrix is a gap.
+//! failure or a limit that does not follow from the matrix is a gap. So is
+//! a verdict the record says was changed from what the station said where
+//! the matrix would not change it: only a pass outside its limit, or
+//! `not_fitted` where the revision must have the part, becomes a fail.
+//! `failures` and `incomplete` are lists in the matrix's order, as the
+//! record tool writes them: each check once, an unfinished one with its own
+//! verdict.
+//!
+//! The result carries the run's verdict as judged here, so a caller tells a
+//! complete failed run from a complete passed one.
 //!
 //! It reads a record already kept and changes nothing. Where records are
 //! kept and finding one lamp's records are the station tool's (#2794).
@@ -89,6 +98,9 @@ impl fmt::Display for Gap {
 pub struct Completeness {
     pub run_id: String,
     pub device: String,
+    /// The run's verdict as its checks give it, judged here, whatever the
+    /// record says. A complete record can be a failed run.
+    pub verdict: RunVerdict,
     /// What keeps the record from being complete; none when it is.
     pub gaps: Vec<Gap>,
     /// Checks that are not mandatory and were not judged, for a person to
@@ -147,8 +159,8 @@ pub fn check(matrix: &Matrix, record: &Record) -> Completeness {
 
     // Each check the occasion expects, judged or not, as the record lists
     // it or missing from it.
-    let mut failed = BTreeSet::new();
-    let mut unfinished = BTreeSet::new();
+    let mut failed = Vec::new();
+    let mut unfinished = Vec::new();
     let mut not_mandatory_not_judged = Vec::new();
     for check in &matrix.checks {
         let entry = record.checks.iter().find(|c| c.id == check.id);
@@ -160,12 +172,12 @@ pub fn check(matrix: &Matrix, record: &Record) -> Completeness {
         let verdict = entry.map_or(Outcome::Missing, |e| e.verdict);
         match verdict {
             Outcome::Fail => {
-                failed.insert(check.id.as_str());
+                failed.push(check.id.as_str());
             }
             Outcome::Pass | Outcome::NotFitted => {}
             Outcome::NotChecked | Outcome::Skipped | Outcome::Interrupted | Outcome::Missing => {
                 if check.mandatory {
-                    unfinished.insert(check.id.as_str());
+                    unfinished.push((check.id.as_str(), verdict));
                     gaps.push(Gap::Unfinished {
                         check: check.id.clone(),
                         verdict,
@@ -177,8 +189,9 @@ pub fn check(matrix: &Matrix, record: &Record) -> Completeness {
         }
     }
 
-    let listed_failures: BTreeSet<&str> =
-        record.failures.iter().map(|f| f.check.as_str()).collect();
+    // Compared as lists, not sets: a check listed twice, or an unfinished
+    // one listed with another verdict than its own, is a gap.
+    let listed_failures: Vec<&str> = record.failures.iter().map(|f| f.check.as_str()).collect();
     if listed_failures != failed {
         gaps.push(Gap::Lists(format!(
             "failures lists {listed_failures:?}, its checks fail {failed:?}"
@@ -186,8 +199,11 @@ pub fn check(matrix: &Matrix, record: &Record) -> Completeness {
     }
     // A check a record leaves out is missing, so `incomplete` names it too;
     // the record tool puts every unfinished mandatory check there.
-    let listed_unfinished: BTreeSet<&str> =
-        record.incomplete.iter().map(|u| u.check.as_str()).collect();
+    let listed_unfinished: Vec<(&str, Outcome)> = record
+        .incomplete
+        .iter()
+        .map(|u| (u.check.as_str(), u.verdict))
+        .collect();
     if listed_unfinished != unfinished {
         gaps.push(Gap::Lists(format!(
             "incomplete lists {listed_unfinished:?}, its checks leave {unfinished:?} unfinished"
@@ -211,6 +227,7 @@ pub fn check(matrix: &Matrix, record: &Record) -> Completeness {
     Completeness {
         run_id: record.run_id.clone(),
         device: record.device.id.clone(),
+        verdict: judged,
         gaps,
         not_mandatory_not_judged,
     }
@@ -241,6 +258,16 @@ fn misjudged(check: &Check, revision: &str, entry: &CheckResult) -> Option<Strin
         _ => None,
     };
     match (entry.verdict, entry.said) {
+        // The record tool sets `said` only when it turns a pass or a
+        // `not_fitted` into a fail; any other is a verdict changed by hand,
+        // as a station's fail recorded as a pass.
+        (verdict, Some(said))
+            if verdict != Outcome::Fail || !matches!(said, Outcome::Pass | Outcome::NotFitted) =>
+        {
+            Some(format!(
+                "recorded {verdict:?} where {said:?} was said; only a pass or not_fitted is ever turned into a fail"
+            ))
+        }
         (Outcome::Pass, _) if check.limit.is_some() && entry.measurement.is_none() => {
             Some("a pass with a limit and no measurement".into())
         }
@@ -343,6 +370,7 @@ mod tests {
         let result = check(&matrix, &record);
         assert!(result.complete(), "{:?}", result.gaps);
         assert_eq!(result.device, "lamp-4ace");
+        assert_eq!(result.verdict, RunVerdict::Pass);
         assert!(result.not_mandatory_not_judged.is_empty());
     }
 
@@ -364,6 +392,29 @@ mod tests {
         record.verdict = RunVerdict::Fail;
         let result = check(&matrix, &record);
         assert!(result.complete(), "{:?}", result.gaps);
+        // Complete, and the result says the run failed.
+        assert_eq!(result.verdict, RunVerdict::Fail);
+    }
+
+    /// The judged verdict is the checks', not the record's.
+    #[test]
+    fn the_result_carries_the_judged_verdict() {
+        let matrix = matrix();
+        let mut record = passed(&matrix);
+        get(&mut record, "privacy_switch").verdict = Outcome::Skipped;
+        record.incomplete.push(Unfinished {
+            check: "privacy_switch".into(),
+            verdict: Outcome::Skipped,
+            reason: "told to".into(),
+        });
+        record.verdict = RunVerdict::Incomplete;
+        assert_eq!(check(&matrix, &record).verdict, RunVerdict::Incomplete);
+        // A record that says pass over a failed check is judged a fail.
+        let mut record = passed(&matrix);
+        get(&mut record, "ring").verdict = Outcome::Fail;
+        let result = check(&matrix, &record);
+        assert!(!result.complete());
+        assert_eq!(result.verdict, RunVerdict::Fail);
     }
 
     #[test]
@@ -489,6 +540,160 @@ mod tests {
         );
     }
 
+    /// A station's fail recorded as a pass is misjudged, even within its
+    /// limit; so is any other `said` the record tool never writes.
+    #[test]
+    fn a_verdict_changed_from_what_was_said_is_misjudged() {
+        let matrix = matrix();
+        for (id, verdict, said) in [
+            ("ring", Outcome::Pass, Outcome::Fail),
+            ("board_load_temperature", Outcome::Pass, Outcome::Fail),
+            ("air", Outcome::NotFitted, Outcome::Fail),
+            ("ring", Outcome::Pass, Outcome::Pass),
+        ] {
+            let mut record = passed(&matrix);
+            let entry = get(&mut record, id);
+            entry.verdict = verdict;
+            entry.said = Some(said);
+            record.device.hardware_revision = "a-no-air".into();
+            let gaps = check(&matrix, &record).gaps;
+            assert!(
+                matches!(&gaps[..], [Gap::Misjudged { check, .. }] if check == id),
+                "{id} {verdict:?} said {said:?}: {gaps:?}"
+            );
+        }
+        // A fail where a skip was said: the matrix never turns a skip into
+        // a fail.
+        let mut record = passed(&matrix);
+        let ring = get(&mut record, "ring");
+        ring.verdict = Outcome::Fail;
+        ring.said = Some(Outcome::Skipped);
+        record.failures.push(Failure {
+            check: "ring".into(),
+            reason: "dark".into(),
+            measured: None,
+            limit: None,
+        });
+        record.verdict = RunVerdict::Fail;
+        let gaps = check(&matrix, &record).gaps;
+        assert!(
+            matches!(&gaps[..], [Gap::Misjudged { check, .. }] if check == "ring"),
+            "{gaps:?}"
+        );
+    }
+
+    /// A measurement in another unit, or in none, is misjudged whatever
+    /// its value.
+    #[test]
+    fn a_measurement_in_another_or_no_unit_is_misjudged() {
+        let matrix = matrix();
+        for unit in ["°F", ""] {
+            let mut record = passed(&matrix);
+            get(&mut record, "board_load_temperature")
+                .measurement
+                .as_mut()
+                .unwrap()
+                .unit = unit.into();
+            let gaps = check(&matrix, &record).gaps;
+            assert!(
+                matches!(&gaps[..], [Gap::Misjudged { check, why }]
+                    if check == "board_load_temperature" && why.contains("measured in")),
+                "{unit:?}: {gaps:?}"
+            );
+        }
+    }
+
+    /// At least and at most hold their own value: a pass exactly on the
+    /// limit is complete, a fail there for the limit is misjudged.
+    #[test]
+    fn a_value_exactly_on_a_limit_is_within_it() {
+        let at_most = matrix();
+        let at_least = Matrix::parse(
+            &SMALL
+                .replace("approved = false", "approved = true")
+                .replace("max = 85.0", "min = 20.0"),
+        )
+        .unwrap();
+        for (matrix, on, past) in [(&at_most, 85.0, 85.5), (&at_least, 20.0, 19.5)] {
+            let set = |record: &mut Record, value: f64| {
+                get(record, "board_load_temperature")
+                    .measurement
+                    .as_mut()
+                    .unwrap()
+                    .value = value;
+            };
+            let mut record = passed(matrix);
+            set(&mut record, on);
+            let result = check(matrix, &record);
+            assert!(result.complete(), "{on}: {:?}", result.gaps);
+            // Just past it, a pass is misjudged.
+            set(&mut record, past);
+            assert_eq!(check(matrix, &record).gaps.len(), 1, "{past}");
+            // On it, a fail for the limit is misjudged.
+            let mut record = passed(matrix);
+            set(&mut record, on);
+            let board = get(&mut record, "board_load_temperature");
+            board.verdict = Outcome::Fail;
+            board.said = Some(Outcome::Pass);
+            record.failures.push(Failure {
+                check: "board_load_temperature".into(),
+                reason: "outside".into(),
+                measured: None,
+                limit: None,
+            });
+            record.verdict = RunVerdict::Fail;
+            let gaps = check(matrix, &record).gaps;
+            assert!(
+                matches!(&gaps[..], [Gap::Misjudged { check, .. }] if check == "board_load_temperature"),
+                "{on}: {gaps:?}"
+            );
+        }
+    }
+
+    /// `failures` and `incomplete` are lists: a check twice, or an
+    /// unfinished one with another verdict, is a gap.
+    #[test]
+    fn failures_and_incomplete_are_compared_as_lists() {
+        let matrix = matrix();
+        let mut record = passed(&matrix);
+        get(&mut record, "ring").verdict = Outcome::Fail;
+        let failure = Failure {
+            check: "ring".into(),
+            reason: "dark".into(),
+            measured: None,
+            limit: None,
+        };
+        record.failures = vec![failure.clone(), failure];
+        record.verdict = RunVerdict::Fail;
+        let gaps = check(&matrix, &record).gaps;
+        assert!(matches!(&gaps[..], [Gap::Lists(_)]), "{gaps:?}");
+
+        let mut record = passed(&matrix);
+        get(&mut record, "privacy_switch").verdict = Outcome::Skipped;
+        let unfinished = Unfinished {
+            check: "privacy_switch".into(),
+            verdict: Outcome::Skipped,
+            reason: "told to".into(),
+        };
+        record.verdict = RunVerdict::Incomplete;
+        record.incomplete = vec![unfinished.clone(), unfinished.clone()];
+        let gaps = check(&matrix, &record).gaps;
+        assert!(
+            matches!(&gaps[..], [Gap::Unfinished { .. }, Gap::Lists(_)]),
+            "{gaps:?}"
+        );
+        // Listed once, with another verdict than its check's.
+        record.incomplete = vec![Unfinished {
+            verdict: Outcome::Interrupted,
+            ..unfinished
+        }];
+        let gaps = check(&matrix, &record).gaps;
+        assert!(
+            matches!(&gaps[..], [Gap::Unfinished { .. }, Gap::Lists(_)]),
+            "{gaps:?}"
+        );
+    }
+
     #[test]
     fn not_fitted_follows_the_revision() {
         let matrix = matrix();
@@ -552,7 +757,8 @@ mod tests {
                     verdict: Outcome::Missing
                 },
                 Gap::Lists(
-                    "incomplete lists {}, its checks leave {\"servo_endurance\"} unfinished".into()
+                    "incomplete lists [], its checks leave [(\"servo_endurance\", Missing)] unfinished"
+                        .into()
                 ),
                 Gap::Verdict {
                     recorded: RunVerdict::Pass,
