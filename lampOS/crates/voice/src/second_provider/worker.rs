@@ -2687,6 +2687,18 @@ pub fn serve(
                 heeding.attention.ask_a_second_sign_of_the_name(true);
             }
         }
+        // At a desk, a face turned to the lamp is no sign, and a
+        // conversation goes on only shortly after its words
+        // (`LAMP_NAME_OR_FOLLOW_UP=on`).
+        if files.name_or_follow_up
+            && let Ok(mut heeding) = heeding.lock()
+        {
+            eprintln!(
+                "lamp-voice second: a face turned to the lamp lets no line out alone, and a conversation goes on only {} s after the lamp's own words (LAMP_NAME_OR_FOLLOW_UP)",
+                crate::name_or_follow_up::FOLLOW_UP_FOR.as_secs()
+            );
+            heeding.needing_name_or_follow_up();
+        }
         // Someone else's answer left alone (`LAMP_OTHERS_ANSWER=on`,
         // #2136): the rule learns which line began over the lamp's answer.
         if files.others_answer
@@ -3794,6 +3806,8 @@ pub(crate) struct Heeding {
     busy_called_strict: bool,
     /// `LAMP_TURNED_SPEAKING=on` ([`Self::counting_only_turned_speakers`]).
     turned_speaking: bool,
+    /// `LAMP_NAME_OR_FOLLOW_UP=on` ([`Self::needing_name_or_follow_up`]).
+    name_or_follow_up: bool,
     /// The faces the eyes saw speaking each of the last lines judged, newest
     /// last, at most [`SPOKE_KEPT`] ([`Self::same_speaker`]).
     spoke: std::collections::VecDeque<(u64, crate::speaking_faces::Speakers)>,
@@ -4115,6 +4129,17 @@ fn going_on_from(
         || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR)
 }
 
+/// With `LAMP_NAME_OR_FOLLOW_UP`, whether a line is a follow-up, said
+/// within [`crate::name_or_follow_up::FOLLOW_UP_FOR`] of the end of the
+/// lamp's own last words (`said_ago`) or of a call let out (`called_ago`,
+/// which carries no longer than the words do): only then does a
+/// conversation go on. The windows of [`going_on_from`] and
+/// [`went_on_told`] still bound it, so the switch only narrows them.
+fn follows_up(said_ago: Option<Duration>, called_ago: Option<Duration>) -> bool {
+    crate::name_or_follow_up::follows_up(said_ago)
+        || crate::name_or_follow_up::follows_up(called_ago)
+}
+
 /// How long a call let out carries the person's next lines when the lamp
 /// has said no word since (`Heeding::called_at`): the owner's lines on
 /// lamp-4ace came every 6 s. The lamp's own words carry them for
@@ -4296,6 +4321,7 @@ impl Heeding {
             said_until_free_us: None,
             busy_called_strict: false,
             turned_speaking: false,
+            name_or_follow_up: false,
             spoke: std::collections::VecDeque::new(),
         }
     }
@@ -4342,6 +4368,42 @@ impl Heeding {
     /// [`crate::speaking_faces::SpeakingFaces::turned_only_silent`]).
     pub(crate) fn counting_only_turned_speakers(&mut self) {
         self.turned_speaking = true;
+    }
+
+    /// At a desk a line is the lamp's by its name, a tap, its words calling
+    /// it, or a follow-up said soon after it spoke
+    /// (`LAMP_NAME_OR_FOLLOW_UP=on`, [`crate::name_or_follow_up`]): a face
+    /// turned to the lamp lets no line out alone, nor makes a call that
+    /// carries the next lines ([`crate::attention::Attention::face_shows`]);
+    /// and a conversation goes on only within
+    /// [`crate::name_or_follow_up::FOLLOW_UP_FOR`] of the end of the lamp's
+    /// own last words, or of a call let out ([`follows_up`]).
+    pub(crate) fn needing_name_or_follow_up(&mut self) {
+        self.name_or_follow_up = true;
+        self.attention.need_name_or_follow_up(true);
+    }
+
+    /// With [`Self::needing_name_or_follow_up`], whether a line now follows
+    /// up the lamp's words, its answers to `chain` left out as
+    /// [`Self::voice_going_on`] leaves them, or its call; without it,
+    /// always.
+    fn follows_up_now(&self) -> bool {
+        if !self.name_or_follow_up {
+            return true;
+        }
+        let said_ago = crate::thread::current(self.thread.as_deref(), |thread| {
+            thread.said_last_ago_but(Instant::now(), &self.chain)
+        })
+        .flatten();
+        let until_us = if self.chain.is_empty() {
+            self.said_until_us
+        } else {
+            self.said_until_free_us
+        };
+        follows_up(
+            to_the_end(said_ago, ended_ago(until_us, monotonic_us())),
+            self.called_at.map(|at| at.elapsed()),
+        )
     }
 
     /// Whether one person said `cut`, a line cut short before any of its
@@ -4492,6 +4554,9 @@ impl Heeding {
     /// lamp. The second field: held as another voice; the third: found in
     /// the conversation's own voice.
     fn voice_going_on(&mut self, request: u64, going_on: bool) -> (bool, bool, bool, Option<f32>) {
+        // `LAMP_NAME_OR_FOLLOW_UP`: a conversation another voice ended goes
+        // on again only soon after the lamp's words, as any other does.
+        let follows_up = self.follows_up_now();
         let Some(voices) = self.voices.as_mut() else {
             return (going_on, false, false, None);
         };
@@ -4513,7 +4578,8 @@ impl Heeding {
                     .said_last_ago_but(Instant::now(), &self.chain)
                     .is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR)
             })
-            .unwrap_or_default();
+            .unwrap_or_default()
+            && follows_up;
         let at = voices.at_verdict(
             request,
             going_on || under_the_mark,
@@ -4960,6 +5026,18 @@ impl Heeding {
         // held in a busy room).
         let said_ago = to_the_end(said_ago, ended_ago(said_until_us, monotonic_us()));
         let going_on = going_on_from(said_going_on, said_ago, called_ago);
+        // `LAMP_NAME_OR_FOLLOW_UP`: only a follow-up soon after the lamp's
+        // words, or its call, goes on, in a quiet room and a busy one.
+        let followed_up = !self.name_or_follow_up || follows_up(said_ago, called_ago);
+        if going_on && !followed_up {
+            eprintln!(
+                "lamp-voice second: request {request}: no conversation going on: the lamp's words ended {}, its call {}, past the {} s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)",
+                said_ago.map_or("never".to_owned(), |ago| format!("{} s ago", ago.as_secs())),
+                called_ago.map_or("never".to_owned(), |ago| format!("{} s ago", ago.as_secs())),
+                crate::name_or_follow_up::FOLLOW_UP_FOR.as_secs()
+            );
+        }
+        let going_on = going_on && followed_up;
         // What a busy room goes on by: the thread's window or the call,
         // never the quiet room's 20 s after the words (`went_on_told`).
         let thread_or_call = said_going_on || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR);
@@ -5373,6 +5451,7 @@ impl Heeding {
             && [
                 crate::attention::BUSY_NAMED_UNTURNED,
                 crate::attention::BUSY_UNCALLED,
+                crate::attention::BUSY_TURNED_ALONE,
                 BUSY_SHORT,
                 BUSY_TURNED,
             ]
@@ -5429,8 +5508,9 @@ impl Heeding {
             ));
         }
         let played = matches!(verdict, Some(crate::attention::Verdict::Play(_)));
-        let called =
-            played && (attention.called_for_itself() || turned == Some(true) || seen.named_faced);
+        // A face alone is no call with `LAMP_NAME_OR_FOLLOW_UP`.
+        let called = played
+            && (attention.called_for_itself() || attention.face_shows(turned) || seen.named_faced);
         // Let out as the conversation going on, or for itself: a line that
         // called the lamp begins a conversation of its own (Eighth on #829).
         // With the caller's voice only, the same call as the caller's face
@@ -6765,6 +6845,133 @@ mod tests {
         }
         assert_eq!(heeding.attention.sign(Some(true)), Some(TURNED));
         assert_eq!(heeding.attention.sign(Some(false)), None);
+    }
+
+    /// `LAMP_NAME_OR_FOLLOW_UP` on this route (the owner's desk on lamp-4ace,
+    /// 22 October): a face turned to the lamp lets no line out alone, in a
+    /// session trusted or not, and in a busy room; a line it was in, let
+    /// out as the conversation going on, is no call that carries the next
+    /// lines; and with the name heard it is played. Without the switch the
+    /// face alone is played, as the test above has it.
+    #[test]
+    fn with_name_or_follow_up_a_face_alone_lets_no_line_out_on_this_route() {
+        use crate::room_told::Room;
+        let signs = |room, going_on, names: Vec<(u64, f32)>| Signs {
+            room,
+            going_on,
+            lamp_asked: false,
+            turned: Some(true),
+            names,
+            near: false,
+            continues_from: None,
+        };
+        let said = (10_000_000, 11_000_000);
+        let desk = |on: bool| {
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            if on {
+                heeding.needing_name_or_follow_up();
+            }
+            heeding
+        };
+        let mut heeding = desk(true);
+        for request in [1, 2, 3] {
+            assert_eq!(
+                heeding.judge(
+                    request,
+                    said,
+                    "Okay yeah sure.",
+                    signs(Room::Unknown, false, Vec::new())
+                ),
+                Some(crate::attention::TURNED_NOT_SPOKEN_TO),
+                "{request}"
+            );
+            assert_eq!(heeding.attention.sign(Some(true)), None);
+        }
+        assert_eq!(
+            desk(true).judge(
+                1,
+                said,
+                "Okay yeah sure.",
+                signs(Room::Busy, false, Vec::new())
+            ),
+            Some(crate::attention::BUSY_TURNED_ALONE)
+        );
+        // With the name heard in the line's sound, the face confirms it.
+        let named = vec![(said.0 + 100_000, 0.95)];
+        assert_eq!(
+            desk(true).judge(1, said, "What time is it?", signs(Room::Busy, false, named)),
+            None
+        );
+        // Let out as the conversation going on: a call only without it.
+        for on in [true, false] {
+            let mut heeding = desk(on);
+            assert_eq!(
+                heeding.judge(
+                    1,
+                    said,
+                    "And what about tomorrow?",
+                    signs(Room::Quiet, true, Vec::new())
+                ),
+                None
+            );
+            assert_eq!(heeding.called_at.is_some(), !on, "{on}");
+        }
+    }
+
+    /// `LAMP_NAME_OR_FOLLOW_UP` on this route, through the thread and the
+    /// lamp's words as the route keeps them: after "Lamp, what's the weather
+    /// today?" was answered, a follow-up said 5 s after the lamp's words
+    /// ended is played as the conversation going on, and one said 12 s
+    /// after, without the name, is held, in a quiet room and a busy one; with
+    /// the name it is played. Without the switch the 12 s one is played, in
+    /// the 20 s after the words and a busy room's 15 s.
+    #[test]
+    fn with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
+        let s = Duration::from_secs;
+        let judged = |on: bool, busy: bool, ago: u64, heard: &str| {
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            if busy {
+                let mut room = crate::room_told::room().lock().unwrap();
+                for other in 901..=903 {
+                    room.unanswered(other, monotonic_us());
+                }
+                assert_eq!(room.at(monotonic_us()), Room::Busy);
+            }
+            // The answer began 2 s before its words ended, `ago` s ago.
+            let began = Instant::now() - s(ago + 2);
+            let mut thread = crate::thread::Thread::new();
+            thread.person("Lamp, what's the weather today?", true, began);
+            thread.lamp(1, "Sunny and warm today.", began);
+            *crate::thread::THREAD.lock().unwrap() = thread;
+            let mut heeding = Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            if on {
+                heeding.needing_name_or_follow_up();
+            }
+            heeding.lamp_did(crate::second_provider::Did::Said(
+                1,
+                monotonic_us() - ago * 1_000_000,
+            ));
+            let said = (monotonic_us(), monotonic_us() + 1_000_000);
+            heeding.heed(2, said, heard, None)
+        };
+        use crate::room_told::Room;
+        let follow_up = "And what about tomorrow?";
+        for busy in [false, true] {
+            assert_eq!(judged(true, busy, 5, follow_up), None, "5 s, {busy}");
+            assert!(judged(true, busy, 12, follow_up).is_some(), "12 s, {busy}");
+            assert_eq!(
+                judged(true, busy, 12, "Lamp, and what about tomorrow?"),
+                None,
+                "12 s, the name, {busy}"
+            );
+            assert_eq!(judged(false, busy, 12, follow_up), None, "without, {busy}");
+        }
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
 
     /// #829 on the second route (#1712, Tests' map item 1): with

@@ -115,6 +115,54 @@ worker_global! {
     /// Requests the service has left unanswered since it last answered one.
     fn unanswered_requests() -> std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 }
+worker_global! {
+    /// A face turned to the lamp lets no line out alone, and a conversation
+    /// goes on only shortly after the lamp's own words
+    /// (`--name-or-follow-up`, [`crate::name_or_follow_up`]). Only with the
+    /// attention rule.
+    fn name_or_follow_up() -> std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+}
+worker_global! {
+    /// When the lamp's words handed on so far will have been played, by
+    /// this process's clock, as if each packet plays as it is handed on,
+    /// after the one before it, as the second route counts its own
+    /// (`second_provider::Did::Said`). Zero: none handed on yet. Kept only
+    /// with [`name_or_follow_up`].
+    fn said_until_us() -> std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+}
+
+/// `samples` more of the lamp's words, at the service's rate, were handed
+/// on at `now_us`: they will have been played after those before them, or
+/// from now ([`said_until_us`]).
+fn said_through(samples: usize, now_us: u64) {
+    let length_us = samples as u64 * 1_000_000 / u64::from(lamp_gemini::OUTPUT_RATE);
+    let _ = said_until_us().fetch_update(
+        std::sync::atomic::Ordering::Relaxed,
+        std::sync::atomic::Ordering::Relaxed,
+        |before| Some(before.max(now_us) + length_us),
+    );
+}
+
+/// Whether a line now may be in a conversation going on as far as the
+/// lamp's own words go: with [`name_or_follow_up`], only when they ended
+/// no longer than [`crate::name_or_follow_up::FOLLOW_UP_FOR`] ago, or still
+/// play; without it, always, and the thread's window alone decides.
+fn follows_up_now() -> bool {
+    !name_or_follow_up().load(std::sync::atomic::Ordering::Relaxed)
+        || follows_up_at(
+            said_until_us().load(std::sync::atomic::Ordering::Relaxed),
+            monotonic_us(),
+        )
+}
+
+/// [`follows_up_now`]'s reading of words played until `until_us` (zero:
+/// none), at `now_us`.
+fn follows_up_at(until_us: u64, now_us: u64) -> bool {
+    until_us != 0
+        && crate::name_or_follow_up::follows_up(Some(Duration::from_micros(
+            now_us.saturating_sub(until_us),
+        )))
+}
 /// Where the eyes keep their newest frame, when the lamp may take a look.
 static LOOK_FILE: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 /// A look is a full look (`--eyes-look-full`): its still may be older.
@@ -309,6 +357,11 @@ pub struct Files {
     /// Whether a line goes only into a session opened for the person it was
     /// admitted for (`--live-scoped-session`, [`crate::scoped_session`]).
     pub scoped_session: bool,
+    /// Whether, on both routes, a face turned to the lamp lets no line out
+    /// alone and the conversation going on ends soon after the lamp's own
+    /// words (`--name-or-follow-up`, `LAMP_NAME_OR_FOLLOW_UP`,
+    /// [`crate::name_or_follow_up`]). Only with the attention rule.
+    pub name_or_follow_up: bool,
 }
 
 /// The bus's root for this worker, if it publishes.
@@ -396,6 +449,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (going_on_same_one, flags) = crate::going_on_same_one::take(flags);
     let (said_as_heard, flags) = crate::said_as_heard::take(flags);
     let (scoped_session, flags) = crate::scoped_session::take(flags);
+    let (name_or_follow_up, flags) = crate::name_or_follow_up::take(flags);
     // `start_agent_task` says what the staff's note asks, when it is sent.
     if let Some(place) = tools.tasks.as_mut() {
         place.staff_note = staff_note;
@@ -449,6 +503,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         going_on_same_one,
         said_as_heard,
         scoped_session,
+        name_or_follow_up,
     };
     Ok((continuation, sight, files, visual))
 }
@@ -1162,6 +1217,9 @@ pub(crate) struct Options {
 /// How the room is and whether the lamp is in a conversation, now. With
 /// `--spoken-to`, none is once people have gone on talking to each other
 /// since the lamp last spoke ([`crate::room_told::RoomTold::talked_past_the_lamp`]).
+/// With `--name-or-follow-up`, none is once the lamp's own words ended
+/// more than [`crate::name_or_follow_up::FOLLOW_UP_FOR`] ago
+/// ([`follows_up_now`]).
 fn attention_now() -> (crate::room_told::Room, bool) {
     let (room, talked_past) = crate::room_told::room()
         .lock()
@@ -1171,7 +1229,8 @@ fn attention_now() -> (crate::room_told::Room, bool) {
     let going_on = !talked_past
         && crate::thread::THREAD
             .lock()
-            .is_ok_and(|thread| thread.going_on(Instant::now()));
+            .is_ok_and(|thread| thread.going_on(Instant::now()))
+        && follows_up_now();
     (room, going_on)
 }
 #[cfg(test)]
@@ -1375,6 +1434,10 @@ pub async fn run_with_continuation(
     );
     ADDRESSED.store(
         files.attention && files.addressed,
+        std::sync::atomic::Ordering::Relaxed,
+    );
+    name_or_follow_up().store(
+        files.attention && files.name_or_follow_up,
         std::sync::atomic::Ordering::Relaxed,
     );
     // The conversation a service that ended a moment ago was in.
@@ -1834,6 +1897,16 @@ async fn serve_with_visual<C: Connect>(
     let mut let_go: Option<Notice> = None;
     attention.speak_when_spoken_to(spoken_to);
     attention.judge_by_day(SPOKEN_TO_BY_DAY.load(std::sync::atomic::Ordering::Relaxed));
+    // At a desk, a face turned to the lamp is no sign, and a conversation
+    // goes on only shortly after its words (`LAMP_NAME_OR_FOLLOW_UP`).
+    let face_or_window = name_or_follow_up().load(std::sync::atomic::Ordering::Relaxed);
+    attention.need_name_or_follow_up(face_or_window);
+    if face_or_window {
+        eprintln!(
+            "lamp-voice provider: a face turned to the lamp lets no line out alone, and a conversation goes on only {} s after the lamp's own words (LAMP_NAME_OR_FOLLOW_UP)",
+            crate::name_or_follow_up::FOLLOW_UP_FOR.as_secs()
+        );
+    }
     // With it, only talk between people makes the room busy (#829).
     if let Ok(mut room) = crate::room_told::room().lock() {
         room.count_only_talk(spoken_to);
@@ -2501,9 +2574,14 @@ async fn serve_with_visual<C: Connect>(
                         // handed on, owner-checked and credited (#829, #918):
                         // not when it was heard from the service, nor sound
                         // a cancellation dropped before it went.
-                        if let Some(Outbound::Output(ProviderOutput::Audio { request, .. })) = queue.front() {
+                        if let Some(Outbound::Output(ProviderOutput::Audio { request, samples, .. })) = queue.front() {
                             attention.spoke(*request, monotonic_us());
                             lamp_spoke_us = Some(monotonic_us());
+                            // Where a follow-up's window counts from
+                            // (`LAMP_NAME_OR_FOLLOW_UP`).
+                            if face_or_window {
+                                said_through(samples.len(), monotonic_us());
+                            }
                         }
                         queue.pop_front();
                     } else { break; }
@@ -2754,10 +2832,13 @@ async fn serve_with_visual<C: Connect>(
                             // too: a question in the conversation's voice goes
                             // on, and a statement in it is talk past the lamp
                             // (the reviewer on #1636).
+                            // With `LAMP_NAME_OR_FOLLOW_UP`, only while the
+                            // lamp's words ended lately, as `attention_now`.
                             let under_the_mark = !going_on
                                 && intake.handoff.voices.is_some()
                                 && crate::room_told::room().lock().is_ok_and(|room| room.ended_only_by_another_voice())
-                                && crate::thread::THREAD.lock().is_ok_and(|thread| thread.going_on(Instant::now()));
+                                && crate::thread::THREAD.lock().is_ok_and(|thread| thread.going_on(Instant::now()))
+                                && follows_up_now();
                             let judged = intake.handoff.voices.as_mut().filter(|_| attention.awaits_verdict(request)).map(|voices| {
                                 voices.at_verdict(request, going_on || under_the_mark, attention.called_for_itself())
                             });

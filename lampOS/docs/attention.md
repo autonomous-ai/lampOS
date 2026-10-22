@@ -2301,6 +2301,27 @@ and no decision; without it, played after the 2 s),
 and the next call answered at once) and
 `…::going_on_asks_is_read_after_remarks`.
 
+## At a desk, the name or a follow-up (`LAMP_NAME_OR_FOLLOW_UP`)
+
+At the owner's desk on lamp-4ace on 22 October, the owner talked to a
+colleague and the lamp kept answering: of its 18 answers, the journal gave 8
+to "someone is turned to the lamp", 6 to "a conversation with the lamp is
+going on" and 4 to its name. A person at a desk faces the lamp's way while
+talking to someone else, and whether a turned face means a line is for the
+lamp was never checked with real people (above). The room was never judged
+busy either, since the lamp answered everything, so the weak reasons (the
+room not known to be busy, a trusted session) went out with the face as
+their sign, and each answer's window let the next lines of the talk in. With
+`LAMP_NAME_OR_FOLLOW_UP=on` (the worker's `--name-or-follow-up`, right after
+`--live-scoped-session`, on both routes), a face turned to the lamp is never
+a reason on its own and only confirms the name heard in the sound, and a
+line is in the conversation going on only within 8 s of the end of the
+lamp's own last words (`name_or_follow_up::FOLLOW_UP_FOR`), in quiet and
+busy rooms; later, it needs the name, a tap or its words calling the lamp.
+What the model is told of the conversation is not changed. Off until a real
+desk-talk set passes; its cost is that an answer to the lamp's own question
+said more than 8 s after its words needs the name.
+
 ## Switch
 
 `LAMP_ATTENTION=on` in the voice unit (the worker's `--attention`). Off by
