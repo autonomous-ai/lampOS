@@ -785,6 +785,11 @@ struct Shared {
     /// A line whose words end before a name waits for it
     /// ([`Engine::waiting_for_a_name`]).
     open_name: bool,
+    /// A line that was only the lamp's name waits for the line after it,
+    /// which is then said by it ([`Engine::carrying_the_name`]).
+    name_carries: bool,
+    /// That line, while its answer waits ([`NameWait`]).
+    name_waits: Mutex<Option<NameWait>>,
     /// A line of nothing but the lamp's own words heard back is held, and
     /// its own words at a line's start or end are taken out
     /// ([`Engine::holding_own_echo`]).
@@ -853,6 +858,36 @@ struct Shared {
 /// line's end, past 1.5 s, and the body's move let it go (the first
 /// builder on #1722 at 06:00). The cost falls only on lines that end so.
 pub const OPEN_NAME_WITHIN: Duration = Duration::from_millis(2_500);
+
+/// How long after its end a line that was only the lamp's name waits for
+/// the line after it (`LAMP_SECOND_NAME_CARRIES`, [`Engine::carrying_the_name`]).
+/// A line begun in it is said by that name, and the name's own request is
+/// dropped; with none, the name is answered as a call. As long as
+/// [`OPEN_NAME_WITHIN`], and past [`CARRY_AFTER_END`]'s 1.5 s, which the
+/// kept sound needs. In a played round on lamp-4ace on 22 Oct, 4 of 38
+/// requests said with a pause after "Lamp," were lost: the name's piece
+/// (heard as "Life." or "Louvre,", or as the name with more) was held, as a
+/// short sound or as said to nobody, and each piece after it as said to
+/// nobody.
+pub const NAME_CARRIES_FOR: Duration = Duration::from_millis(2_500);
+
+/// A line that was only the lamp's name, while its answer waits for the
+/// line after it ([`NAME_CARRIES_FOR`], `LAMP_SECOND_NAME_CARRIES`).
+#[derive(Clone, Copy, Debug)]
+struct NameWait {
+    request: u64,
+    session: u64,
+    privacy: u64,
+    /// When its wait is over, by the runtime's clock.
+    until: tokio::time::Instant,
+    /// When its first sound was read, by this process's clock: the rule's
+    /// window for the line said by it begins here, so the name heard in it
+    /// counts for that line.
+    said_from: u64,
+    /// When it began and ended, for the faces seen speaking it.
+    began: Instant,
+    ended: Instant,
+}
 
 /// The last spoken line's sound, at most [`KEPT_SAMPLES`], for a line that
 /// goes on from it in the same session: one the coordinator says continues
@@ -1177,13 +1212,62 @@ struct Marks {
     /// When it began by the engine's clock, or, folded, when the line it
     /// began with did ([`KeptSound::began`]); none for a line not spoken.
     began: Option<Instant>,
+    /// Begun while the line before it, only the lamp's name, waited for it
+    /// (`LAMP_SECOND_NAME_CARRIES`): said by that name, unless the eyes saw
+    /// another face speak it.
+    name_of: Option<NameWait>,
 }
 
 /// What a line that was only the lamp's name is asked as when no words of
 /// it came back: the name the coordinator heard, as Live's model hears it.
 const CALLED_WORDS: &str = "Lamp.";
 
+/// A line's words past a "hey" or "ok" before them, any case and
+/// punctuation aside (`LAMP_SECOND_NAME_CARRIES`).
+fn past_a_greeting(text: &str) -> Vec<&str> {
+    let mut words: Vec<&str> = text
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    if words.first().is_some_and(|first| {
+        ["hey", "ok", "okay"]
+            .iter()
+            .any(|greeting| first.eq_ignore_ascii_case(greeting))
+    }) {
+        words.remove(0);
+    }
+    words
+}
+
+/// Whether a line's words are only the lamp's name
+/// ([`net::key_terms::NAME`]), in any case and with any punctuation, with
+/// "hey" or "ok" before it at most (`LAMP_SECOND_NAME_CARRIES`).
+fn name_alone(text: &str) -> bool {
+    matches!(past_a_greeting(text)[..], [word] if word.eq_ignore_ascii_case(net::key_terms::NAME))
+}
+
+/// Whether the eyes saw a face speak a line said after the lamp's name that
+/// they did not see say the name (`LAMP_SECOND_NAME_CARRIES`): never when
+/// they saw nobody say it.
+fn another_face(said_the_name: &[String], spoke: &[String]) -> bool {
+    !said_the_name.is_empty() && spoke.iter().any(|face| !said_the_name.contains(face))
+}
+
 impl Shared {
+    /// The faces the eyes saw speaking from `from` to `to`, each with the
+    /// eyes' boot, when this route reads who speaks
+    /// (`LAMP_SECOND_SPEAKING_FACE` or `LAMP_EYES_SPEAKING`).
+    fn faces_speaking(
+        &self,
+        from: Instant,
+        to: Instant,
+    ) -> Option<crate::speaking_faces::Speakers> {
+        self.speaking
+            .as_ref()
+            .or(self.forget_sight.as_ref())
+            .map(|(eyes, _)| eyes.speakers_with_boot(from, to))
+    }
+
     /// Whether `request` was judged in a busy room: by the rule's hook, or
     /// else by this process's room now, as the Live worker reads its own.
     fn busy(&self, request: u64) -> bool {
@@ -1336,6 +1420,8 @@ impl Engine {
                 tools_journal: None,
                 keep_listener: false,
                 open_name: false,
+                name_carries: false,
+                name_waits: Mutex::new(None),
                 own_echo: false,
                 spare: Mutex::new(None),
                 spares: AtomicU64::new(0),
@@ -1711,6 +1797,24 @@ impl Engine {
     pub fn waiting_for_a_name(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.open_name = on;
+        }
+        self
+    }
+
+    /// A spoken line that is only the lamp's name ([`name_alone`]), or that
+    /// the coordinator says was ([`ProviderInput::Called`]), is never held
+    /// as a short sound, and its answer waits up to
+    /// [`NAME_CARRIES_FOR`] after its end (`LAMP_SECOND_NAME_CARRIES=on`). A
+    /// line begun in that wait, in the same session, drops the name's
+    /// request and is said by the name: the rule judges it with the name
+    /// before its words and its window from the name's first sound, and it
+    /// is asked with the name before its words. Not when the eyes saw a
+    /// face speak it that they did not see say the name. With none, the
+    /// name is answered as a call ([`crate::provider_worker::CALLED_NOTE`]).
+    /// Before any turn only.
+    pub fn carrying_the_name(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.name_carries = on;
         }
         self
     }
@@ -2284,6 +2388,15 @@ impl Engine {
                 if after_stop {
                     self.let_go_cut(&format!("request {request} is the first line after a stop"));
                 }
+                // The lamp's name said alone just before, its answer waiting
+                // for this line (`LAMP_SECOND_NAME_CARRIES`): begin dropped
+                // that request, and this line is said by its name.
+                let name_of = self.name_said_before(
+                    request,
+                    (session, privacy_generation),
+                    previous,
+                    after_stop,
+                );
                 room(|room| {
                     room.heard(request, monotonic_us());
                     if over_the_lamps_voice {
@@ -2468,6 +2581,7 @@ impl Engine {
                     folded,
                     over_the_lamps_voice,
                     began: Some(began),
+                    name_of,
                 });
                 let said = Arc::new(Mutex::new((0, 0)));
                 self.kept = Some(match carried {
@@ -3063,6 +3177,33 @@ impl Engine {
         }
     }
 
+    /// The line that was only the lamp's name, begun just before `request`
+    /// and still waiting for the line after it (`LAMP_SECOND_NAME_CARRIES`):
+    /// `request` is said by it. Any start takes the wait; one in another
+    /// session or privacy generation, after a stop, past the wait, or not
+    /// begun just after the name leaves it dropped.
+    fn name_said_before(
+        &self,
+        request: u64,
+        (session, privacy): (u64, u64),
+        previous: Option<(u64, u64)>,
+        after_stop: bool,
+    ) -> Option<NameWait> {
+        let wait = self.shared.name_waits.lock().ok()?.take()?;
+        let carries = previous == Some((wait.request, wait.session))
+            && wait.session == session
+            && wait.privacy == privacy
+            && !after_stop
+            && tokio::time::Instant::now() <= wait.until;
+        if !carries {
+            eprintln!(
+                "lamp-voice second: request {request}: request {}'s name is not carried: begun past its wait, in another session or after a stop (LAMP_SECOND_NAME_CARRIES)",
+                wait.request
+            );
+        }
+        carries.then_some(wait)
+    }
+
     /// A spoken request up to `through` still being answered, none of its
     /// answer heard, is cut short: its words are kept for the next line, and
     /// the journal says so (#1712: on lamp-4ace on 19 Oct the weather and a
@@ -3617,6 +3758,78 @@ async fn spoken(
     } else {
         text
     };
+    // Said by the lamp's name alone just before, whose request this line
+    // dropped (`LAMP_SECOND_NAME_CARRIES`): the name goes before its words,
+    // unless they begin with it already (the name's words carried in front
+    // of them, [`KeptSound`]); with no words of its own, it is the call.
+    // Never a line the eyes saw a face speak that they did not see say the
+    // name.
+    let name_of = marks.name_of.filter(|name| {
+        let another = shared
+            .faces_speaking(name.began, name.ended)
+            .zip(shared.faces_speaking(begun, finishing))
+            .is_some_and(|(said_the_name, spoke)| another_face(&said_the_name, &spoke));
+        if another {
+            eprintln!(
+                "lamp-voice second: request {request}: the eyes saw another face than request {}'s speak it: the name is not carried (LAMP_SECOND_NAME_CARRIES)",
+                name.request
+            );
+        } else {
+            eprintln!(
+                "lamp-voice second: request {request} is said by the name of request {}",
+                name.request
+            );
+        }
+        !another
+    });
+    let wordless = text.trim().is_empty();
+    let (text, called) = match name_of {
+        Some(_) if wordless => (CALLED_WORDS.to_owned(), true),
+        Some(_) if !crate::attention::begins_with_the_name(&text) => {
+            (format!("{}, {}", net::key_terms::NAME, text.trim()), called)
+        }
+        _ => (text, called),
+    };
+    // Only the lamp's name, or the coordinator heard the name and nothing
+    // more (`Called`; the words may be a name misheard, "Life."): its answer
+    // waits for the line after it, which drops this request; with none, it
+    // is answered as a call (`LAMP_SECOND_NAME_CARRIES`). A line said by a
+    // name waits no more.
+    let name_waits = shared.name_carries && name_of.is_none() && (called || name_alone(&text));
+    if name_waits {
+        let left = NAME_CARRIES_FOR.saturating_sub(finishing.elapsed());
+        eprintln!(
+            "lamp-voice second: request {request}: only the lamp's name: its answer waits for the line after it (LAMP_SECOND_NAME_CARRIES)"
+        );
+        let wait = NameWait {
+            request,
+            session: turn.session,
+            privacy: turn.privacy_generation,
+            until: tokio::time::Instant::now() + left,
+            said_from: said.lock().map_or(0, |said| said.0),
+            began: begun,
+            ended: finishing,
+        };
+        if let Ok(mut waits) = shared.name_waits.lock() {
+            *waits = Some(wait);
+        }
+        tokio::time::sleep(left).await;
+        // Nothing began in it: the wait, and the name's carry, are over.
+        if let Ok(mut waits) = shared.name_waits.lock() {
+            waits.take_if(|wait| wait.request == request);
+        }
+        eprintln!(
+            "lamp-voice second: request {request}: no line came after its name: answered as a call"
+        );
+    }
+    // Answered as a call: the name for one word misheard, else its words,
+    // told it was a call as without the switch.
+    let (text, called) = match name_waits {
+        true if !name_alone(&text) && past_a_greeting(&text).len() <= 1 => {
+            (CALLED_WORDS.to_owned(), true)
+        }
+        _ => (text, called || name_waits),
+    };
     // Its words end before a name: answered no sooner than
     // [`OPEN_NAME_WITHIN`] after the line's end, so the name said next goes
     // on from it (`LAMP_SECOND_OPEN_NAME`). A newer line drops this request,
@@ -3631,8 +3844,12 @@ async fn spoken(
         eprintln!("lamp-voice second: request {request}: no name came after it: answered as it is");
     }
     let empty = text.trim().is_empty();
+    // Only the lamp's name, or said by it (`LAMP_SECOND_NAME_CARRIES`): it
+    // shows it was said to the lamp, so it is never held as a short sound.
     let marked = checked.is_some_and(|sound| sound.load(Ordering::Acquire))
-        && !crate::not_speech::short_word(&text);
+        && !crate::not_speech::short_word(&text)
+        && !name_waits
+        && name_of.is_none();
     // A sound with a word in it, right after the lamp's own question in a
     // conversation going on, is the person's answer, as on the Live route
     // (lamp-4ace, 17 October 16:11: "Yes. Please start it." heard as
@@ -3679,6 +3896,15 @@ async fn spoken(
         _ if echoed => Some(OWN_ECHO_HELD),
         Some(heed) if !empty && !held => {
             let window = said.lock().map_or((0, 0), |said| *said);
+            // Said by the name just before: its window begins with the
+            // name's line, so the name heard there is this line's, as for
+            // a heard name.
+            let window = match name_of {
+                Some(name) if name.said_from != 0 && window.0 != 0 => {
+                    (window.0.min(name.said_from), window.1)
+                }
+                _ => window,
+            };
             heed(request, window, &text, continues_from)
         }
         _ => None,
@@ -4439,6 +4665,10 @@ pub const PREPARED_ENVIRONMENT: &str = "LAMP_SECOND_PREPARED";
 /// coordinator whether a sound after such a line's end goes on from it:
 /// `on`, and nothing else.
 pub const OPEN_NAME_ENVIRONMENT: &str = "LAMP_SECOND_OPEN_NAME";
+
+/// Where the worker reads [`Engine::carrying_the_name`]: `on`, and nothing
+/// else.
+pub const NAME_CARRIES_ENVIRONMENT: &str = "LAMP_SECOND_NAME_CARRIES";
 
 /// Where the worker reads [`Engine::holding_own_echo`] (#2997): `on`, and
 /// nothing else.
