@@ -5,6 +5,9 @@
 //! none (`docs/presence.md`). What showed someone is kept as one yes or no
 //! a spell: whether a face did, or only a voice (`by`, #1771).
 use lamp_msgs::{RoomPresence, SeenBy};
+// A name is filled in one pass, never read as a slot, as the voice fills
+// its skills' words (#940).
+use lamp_voice::skill_words::fill;
 use serde::Deserialize;
 use std::collections::VecDeque;
 
@@ -144,27 +147,6 @@ impl Words {
         )?;
         Ok(self)
     }
-}
-
-/// `text` with each `{slot}` filled, in one pass, so a filled value (a
-/// name) is never read as a slot.
-fn fill(text: &str, slots: &[(&str, &str)]) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut rest = text;
-    while let Some(open) = rest.find('{') {
-        let Some(close) = rest[open..].find('}').map(|close| open + close) else {
-            break;
-        };
-        out.push_str(&rest[..open]);
-        let name = &rest[open + 1..close];
-        match slots.iter().find(|(slot, _)| *slot == name) {
-            Some((_, value)) => out.push_str(value),
-            None => out.push_str(&rest[open..=close]),
-        }
-        rest = &rest[close + 1..];
-    }
-    out.push_str(rest);
-    out
 }
 
 /// A value of `room/presence` means nothing past this: a later one after a

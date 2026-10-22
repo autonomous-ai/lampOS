@@ -1472,8 +1472,8 @@ going?" now serves a page of over 9,000 bytes.
 ### Told when a skill asks (#939, (c), off unless `LAMP_TASK_NEWS=skill`)
 
 The Task news skill (Jarvis, #1021) triggers on `tasks/status` and moves and
-lights with the news; the voice keeps the words and tells each piece once,
-as above. With `LAMP_TASK_NEWS=skill`, news of work finished, stopped or
+lights with the news; the voice tells each piece once, as above, in the
+skill's own words (`[news.words]` in its `skill.toml`, #940). With `LAMP_TASK_NEWS=skill`, news of work finished, stopped or
 asking waits for the skill's `from: tasks` ask on the say service until
 10 s after the voice had it, and is then told with that ask's ticket, or by
 the voice itself (news that settled while nobody was there is told when

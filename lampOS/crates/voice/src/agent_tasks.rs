@@ -2043,7 +2043,14 @@ fn next(
         "idle" if settled => {
             "Give them the gist of what it came back with in one or two plain spoken sentences; no code, lists, paths or links. If there is more, say the rest is on their computer."
         }
-        "needs-input" => return crate::task_news::waiting(who, "their computer", answer),
+        "needs-input" => {
+            return crate::task_news::waiting(
+                &crate::skill_words::NewsWords::installed(),
+                who,
+                "their computer",
+                answer,
+            );
+        }
         "stopped" | "failed" => {
             "Tell them in one plain sentence that it stopped without finishing."
         }

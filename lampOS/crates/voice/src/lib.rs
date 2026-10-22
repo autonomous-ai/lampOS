@@ -130,6 +130,7 @@ pub mod session_fact;
 pub mod session_tools;
 pub mod short_turns;
 pub mod sight;
+pub mod skill_words;
 pub mod speak_up;
 pub mod speaker_check;
 pub mod speaking_faces;

@@ -597,22 +597,38 @@ fn write_index(directory: &Path, entries: &[Value]) -> io::Result<()> {
 /// What the model is told of a made skill, or of one not kept: the news
 /// of the hand-over, in place of its answer, which is files and never
 /// read out.
-pub fn note(who: &str, when: &str, computer: &str, made: &Result<Made, Refused>) -> String {
-    let opening = "(Nobody has spoken. News from work you handed over for the person.";
-    match made {
-        Ok(made) => format!(
-            "{opening} {who} {when} made the skill they asked for, \"{}\": {} It would use {}. \
-             Tell them in one or two short sentences what it would do and what it would use, then ask exactly: \
-             \"{ASK_TO_PUT_ON}\" It is not on the lamp yet. Put it on only if they then say yes ({PUT_ON}). No file names.)",
-            made.name,
-            made.description,
-            made.uses.spoken()
+pub fn note(
+    words: &crate::skill_words::NewsWords,
+    who: &str,
+    when: &str,
+    computer: &str,
+    made: &Result<Made, Refused>,
+) -> String {
+    use crate::skill_words::fill;
+    let said = match made {
+        Ok(made) => fill(
+            &words.made,
+            &[
+                ("who", who),
+                ("when", when),
+                ("name", &made.name),
+                ("description", &made.description),
+                ("uses", &made.uses.spoken()),
+                ("ask", ASK_TO_PUT_ON),
+                ("put_on", PUT_ON),
+            ],
         ),
-        Err(Refused(why)) => format!(
-            "{opening} {who} {when} made a skill for them, but the lamp can't keep it: {why}. \
-             Tell them so in one short sentence, and that the rest is on {computer}. No question.)"
+        Err(Refused(why)) => fill(
+            &words.not_kept,
+            &[
+                ("who", who),
+                ("when", when),
+                ("why", why),
+                ("computer", computer),
+            ],
         ),
-    }
+    };
+    crate::task_news::unprompted(&said)
 }
 
 /// Keep, beside the package whose SHA-256 is `sha256`, that the lamp asked
@@ -973,12 +989,19 @@ light = { dim = 1 }
             },
             package: PathBuf::from("/x"),
         };
-        let told = note("Claude Code", "just", "your computer", &Ok(made));
+        let told = note(
+            &crate::skill_words::NewsWords::built_in(),
+            "Claude Code",
+            "just",
+            "your computer",
+            &Ok(made),
+        );
         assert!(told.contains("\"evening-dim\": Dims the light a shade at 10 pm."));
         assert!(told.contains("It would use its light and whether it is talking."));
         assert!(told.contains(ASK_TO_PUT_ON));
         assert!(!told.contains(&"ab".repeat(32)), "no hash for the model");
         let refused = note(
+            &crate::skill_words::NewsWords::built_in(),
             "Claude Code",
             "just",
             "your computer",

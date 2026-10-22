@@ -174,6 +174,13 @@ struct SkillFile {
     /// What the room's presence was over the last hours, for the model
     /// (#1685, "was anyone here while I was out?").
     history: Option<HistoryFile>,
+    /// What the voice says of the news a `say = { from = "tasks" }` asks
+    /// for, in the skill's own words (`[news.words]`, #940): the voice
+    /// reads them from the installed file; here they are checked.
+    news: Option<lamp_voice::skill_words::Section<lamp_voice::skill_words::NewsWords>>,
+    /// The same for a `say = { from = "schedule" }`, a due reminder
+    /// (`[reminder.words]`, #940).
+    reminder: Option<lamp_voice::skill_words::Section<lamp_voice::skill_words::ReminderWords>>,
     /// Local hours when the skill never starts itself.
     quiet: Option<QuietFile>,
     /// The most runs it starts itself a local day (#1685's nudges).
@@ -3414,6 +3421,30 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             })
         }
     };
+    // The words the voice says for a `say = { from = ... }` are the skill
+    // whose say it is (#940): checked here as the voice checks them, and
+    // only in a skill with that say.
+    let says_from = |source: Source| {
+        steps
+            .iter()
+            .any(|(_, step)| matches!(step, Step::Call(Call::SayFrom(from, _)) if *from == source))
+    };
+    if let Some(news) = file.news {
+        if !says_from(Source::Tasks) {
+            return Err(
+                "[news] is the words of a say = { from = \"tasks\" }: only with one".into(),
+            );
+        }
+        news.words.checked()?;
+    }
+    if let Some(reminder) = file.reminder {
+        if !says_from(Source::Schedule) {
+            return Err(
+                "[reminder] is the words of a say = { from = \"schedule\" }: only with one".into(),
+            );
+        }
+        reminder.words.checked()?;
+    }
     // The words are the grant's: a skill granted it says them all, and no
     // other skill has them (#940).
     let unplug = match (file.unplug, file.permissions.grants("prepare_unplug")) {

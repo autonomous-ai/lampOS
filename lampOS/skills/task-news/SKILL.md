@@ -32,10 +32,13 @@ comes back: look up, say it in a line, and leave it there.
   `needs_input` to `idle` (or comes back as `idle` after its two minutes):
   the question is told once, then the end once.
 
-The words are the voice's (`say = { from = "tasks" }`, #1033): it keeps the
-news of work handed over, who did it and what came back, and tells each
-piece once. The skill says when, and moves and lights with the words. The
-agent's own words stay with the tasks part and the voice, never on the bus.
+The voice keeps the news of work handed over (`say = { from = "tasks" }`,
+#1033), who did it and what came back, and tells each piece once. The
+words it tells it in are this skill's own: every line is in its
+`skill.toml`'s `[news.words]`, put together from slots (#940,
+`docs/skills.md`), and the voice reads them from the installed file. The
+skill says when, and moves and lights with the words. The agent's own
+words stay with the tasks part and the voice, never on the bus.
 
 Asked about it, the lamp says it tells you when work you handed to Claude
 Code or Codex comes back, once and briefly, and that it can be switched off.

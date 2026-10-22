@@ -25,6 +25,7 @@
 //! of this store and about the newest change on `tasks/status` is fetched
 //! (`get_progress`) and offered here like any other news, under the same
 //! gates.
+use crate::skill_words::{NewsWords, fill};
 use lamp_bus::{Bus, Subscriber};
 use lamp_msgs::{AgentState, Decision, Sign, TaskStatus};
 use serde_json::{Value, json};
@@ -991,6 +992,7 @@ impl TaskNews {
             .map(|(place, _)| place)
             .take(TOGETHER_MOST - 1)
             .collect();
+        let words = NewsWords::installed();
         while !places.is_empty() {
             let note = {
                 let parts: Vec<&Finished> = std::iter::once(&first)
@@ -1000,7 +1002,7 @@ impl TaskNews {
                             .filter_map(|place| self.waiting[*place].finished.as_ref()),
                     )
                     .collect();
-                note_together(&parts)
+                note_together(&words, &parts)
             };
             if let Some(note) = note {
                 // From the back, so that the places before stay right.
@@ -1233,6 +1235,8 @@ fn read_once_with(
     offered: &BTreeSet<String>,
     made: Option<&crate::made_skill::Keeping>,
 ) -> Vec<News> {
+    // Read once there is news to put in words, not at each look.
+    let words = std::cell::LazyCell::new(NewsWords::installed);
     let mut news = Vec::new();
     let mut after = 0;
     loop {
@@ -1251,7 +1255,7 @@ fn read_once_with(
                 if !told.contains(&key)
                     && !offered.contains(&key)
                     && let Some(task) = ask(socket, &json!({"op":"get_task","id":id}))
-                    && let Some(note) = note_failed(&task, failed)
+                    && let Some(note) = note_failed(&words, &task, failed)
                 {
                     news.push(News {
                         key,
@@ -1314,10 +1318,13 @@ fn read_once_with(
             };
             let made_note = made
                 .filter(|_| making)
-                .and_then(|keeping| made_note(&task, &data, age_ms, &key, keeping));
+                .and_then(|keeping| made_note(&words, &task, &data, age_ms, &key, keeping));
             let (note, finished) = match made_note {
                 Some(note) => (Some(note), None),
-                None => (note(&task, &data, age_ms), finished(&task, &data, age_ms)),
+                None => (
+                    note(&words, &task, &data, age_ms),
+                    finished(&task, &data, age_ms),
+                ),
             };
             if let Some(note) = note {
                 news.push(News {
@@ -1400,23 +1407,29 @@ fn failed_hand_over(item: &Value, now: &BootClock) -> Option<bool> {
         .then_some(unsure)
 }
 
-fn note_failed(task: &Value, unsure: bool) -> Option<String> {
-    let who = who(task);
+fn note_failed(words: &NewsWords, task: &Value, unsure: bool) -> Option<String> {
     let (asked, _) = quoted(task["text"].as_str()?, MOST_TASK_CHARS);
-    let what = if unsure {
-        format!("may not have reached {who}: you cannot tell whether it started")
+    let line = if unsure {
+        &words.failed_unsure
     } else {
-        format!("did not reach {who}: it could not be started just now")
+        &words.failed
     };
-    Some(format!(
-        "(Nobody has spoken. The work the person asked you to hand over, \"{asked}\", {what}. \
-         Tell them in one plain, light sentence, with no technical words, and offer to try again.)"
-    ))
+    Some(unprompted(&fill(
+        line,
+        &[("asked", &asked), ("who", who(task))],
+    )))
+}
+
+/// News said unprompted, as the voice frames it: "(Nobody has spoken. "
+/// opens it, which `messages` reads, and ")" closes it.
+pub(crate) fn unprompted(words: &str) -> String {
+    format!("(Nobody has spoken. {words})")
 }
 
 /// The news of a skill made by voice that came back done: kept, or why
 /// not, as [`crate::made_skill::note`] tells it.
 fn made_note(
+    words: &NewsWords,
     task: &Value,
     data: &Value,
     age_ms: u64,
@@ -1440,11 +1453,12 @@ fn made_note(
         Err(why) => eprintln!("lamp-voice: a skill made by voice is not kept: {}", why.0),
     }
     let when = if age_ms <= JUST_MS {
-        "just"
+        &words.just
     } else {
-        "a while ago, and you have not told them yet:"
+        &words.while_ago
     };
     Some(crate::made_skill::note(
+        words,
         who(task),
         when,
         &their_computer(task),
@@ -1493,7 +1507,7 @@ pub(crate) fn quoted(text: &str, most: usize) -> (String, bool) {
 
 /// What the model is told, for the agent's state; none when there is
 /// nothing to tell.
-fn note(task: &Value, data: &Value, age_ms: u64) -> Option<String> {
+fn note(words: &NewsWords, task: &Value, data: &Value, age_ms: u64) -> Option<String> {
     let who = who(task);
     let computer = their_computer(task);
     let (asked, _) = quoted(task["text"].as_str()?, MOST_TASK_CHARS);
@@ -1503,60 +1517,58 @@ fn note(task: &Value, data: &Value, age_ms: u64) -> Option<String> {
     );
     let cut = cut || data["truncated"] == json!(true);
     let when = if age_ms <= JUST_MS {
-        "just"
+        &words.just
     } else {
-        "a while ago, and you have not told them yet:"
+        &words.while_ago
     };
-    let opening = "(Nobody has spoken. News from work you handed over for the person.";
     // Devin Cloud is read as done whether or not it asked something
     // (openharness#1449, `harness::state_of`): a question in its answer is
     // said, with where they answer it, not told as a result (Jarvis's P2 on
     // #2240).
     let (no_question_cut, no_question) = if task["target"]["engine"] == "devin-cloud" {
-        let asks = format!(
-            "If its answer asks them something, say what it asks, and that they answer it in {computer}."
-        );
+        let asks = fill(&words.asks, &[("computer", &computer)]);
         (
-            format!("and no question of your own. {asks}"),
-            format!("No question of your own at the end. {asks}"),
+            fill(&words.and_no_question_asks, &[("asks", &asks)]),
+            fill(&words.no_question_asks, &[("asks", &asks)]),
         )
     } else {
-        (
-            "and no question.".to_owned(),
-            "No question at the end.".to_owned(),
-        )
+        (words.and_no_question.clone(), words.no_question.clone())
     };
     let state = match data["state"].as_str()? {
         "idle" if !answer.is_empty() => "idle",
         state @ ("needs-input" | "stopped" | "failed") => state,
         _ => return None,
     };
-    let say = |asked: &str, answer: &str, more: &str| match state {
-        // Cut: the gist first, from what is kept, then where the rest is.
-        "idle" if !more.is_empty() => format!(
-            "{opening} {who} {when} finished the task they gave it: \"{asked}\". Its answer is long; it begins: \"{answer}{more}\". \
-             Tell them now in one or two natural spoken sentences, as a good chief of staff would: \"Oh, {who} just finished…\" (\"earlier\" if it was a while ago), \
-             then its gist in one plain line from that beginning (a story: who it is about and what happens; code: what it does now), \
-             then that the rest is on {computer}. Never only that. No code, lists, file paths or links, {no_question_cut})"
-        ),
-        "idle" => format!(
-            "{opening} {who} {when} finished the task they gave it: \"{asked}\". What it came back with: \"{answer}{more}\". \
-             Tell them now, the way a good chief of staff tells the person they work for: one or two natural spoken sentences, \
-             starting with something like \"Oh, {who} just finished…\" (or \"earlier\" if it was a while ago), then the gist of the result in plain words. \
-             Do not read out code, lists, file paths or links; if there is more than fits, say the rest is on {computer}. {no_question})"
-        ),
-        "needs-input" if answer.is_empty() && more.is_empty() => format!(
-            "{opening} {who} has stopped and is waiting for them about the task they gave it: \"{asked}\". {})",
-            waiting(who, &computer, "")
-        ),
-        "needs-input" => format!(
-            "{opening} {who} has stopped and is waiting for them about the task they gave it: \"{asked}\". What it last said: \"{answer}{more}\". {})",
-            waiting(who, &computer, answer)
-        ),
-        _ => format!(
-            "{opening} {who} stopped without finishing the task they gave it: \"{asked}\". What it last said: \"{answer}{more}\". \
-             Tell them in one short, plain sentence, without alarm.)"
-        ),
+    let say = |asked: &str, answer: &str, more: &str| {
+        let said = format!("{answer}{more}");
+        let (line, no_question, waiting) = match state {
+            // Cut: the gist first, from what is kept, then where the rest is.
+            "idle" if !more.is_empty() => {
+                (&words.done_cut, no_question_cut.as_str(), String::new())
+            }
+            "idle" => (&words.done, no_question.as_str(), String::new()),
+            "needs-input" if said.is_empty() => {
+                (&words.asking, "", waiting(words, who, &computer, ""))
+            }
+            "needs-input" => (
+                &words.asking_said,
+                "",
+                waiting(words, who, &computer, answer),
+            ),
+            _ => (&words.stopped, "", String::new()),
+        };
+        unprompted(&fill(
+            line,
+            &[
+                ("who", who),
+                ("when", when),
+                ("asked", asked),
+                ("answer", &said),
+                ("computer", &computer),
+                ("no_question", no_question),
+                ("waiting", &waiting),
+            ],
+        ))
     };
     fitted(&asked, &answer, cut, say)
 }
@@ -1585,11 +1597,11 @@ fn finished(task: &Value, data: &Value, age_ms: u64) -> Option<Finished> {
 /// beginning of its answer, the answers cut alike to one written turn
 /// (`lamp_gemini::wire::MAX_NOTE_BYTES`). None if each would keep less than
 /// [`TOGETHER_ANSWER_LEAST`] of an answer that is longer.
-fn note_together(parts: &[&Finished]) -> Option<String> {
+fn note_together(words: &NewsWords, parts: &[&Finished]) -> Option<String> {
     let first = parts.first()?.who;
     let how_many = match parts.len() {
-        2 => "two",
-        3 => "three",
+        2 => &words.two,
+        3 => &words.three,
         _ => return None,
     };
     let say = |answer_most: usize| {
@@ -1605,29 +1617,39 @@ fn note_together(parts: &[&Finished]) -> Option<String> {
                 } else {
                     ""
                 };
-                let when = if part.just { "just now" } else { "a while ago" };
-                format!(
-                    "{} finished \"{asked}\" {when}: \"{answer}{more}\".",
-                    part.who
+                let when = if part.just {
+                    &words.just_now
+                } else {
+                    &words.a_while_ago
+                };
+                fill(
+                    &words.together_each,
+                    &[
+                        ("who", part.who),
+                        ("asked", &asked),
+                        ("when", when),
+                        ("answer", &format!("{answer}{more}")),
+                    ],
                 )
             })
             .collect();
-        format!(
-            "(Nobody has spoken. News from {how_many} pieces of work you handed over for the person. {} \
-             Tell them now, together, in one turn: one plain spoken sentence for each, starting with something like \
-             \"Oh, {first} just finished…\" (\"earlier\" for one a while ago), each with the gist of its result. \
-             No code, lists, file paths or links.{} No question.)",
-            each.join(" "),
-            // #757's guard, as for one cut answer: once the lamp told a
-            // story as only "the rest is waiting on your computer" (the
-            // reviewer on #1223).
-            if cut {
-                " Where an answer goes on, give its gist in one plain line from that beginning, \
-                 then that the rest is on their computer: never only that."
-            } else {
-                ""
-            }
-        )
+        // #757's guard, as for one cut answer: once the lamp told a story
+        // as only "the rest is waiting on your computer" (the reviewer on
+        // #1223).
+        let goes_on = if cut {
+            words.together_goes_on.as_str()
+        } else {
+            ""
+        };
+        unprompted(&fill(
+            &words.together,
+            &[
+                ("how_many", how_many),
+                ("each", &each.join(" ")),
+                ("first", first),
+                ("goes_on", goes_on),
+            ],
+        ))
     };
     let longest = parts.iter().map(|part| part.answer.chars().count()).max()?;
     let mut answer_most = longest;
@@ -1651,19 +1673,13 @@ fn note_together(parts: &[&Finished]) -> Option<String> {
 /// 0.4.6's `show` carries no question while it waits (probed 2026-10-15,
 /// #770): `answer` is empty or the previous answer. So the model is never
 /// asked to voice a question it was not given.
-pub(crate) fn waiting(who: &str, computer: &str, answer: &str) -> String {
-    let tell = format!(
-        "Tell them once, in one short sentence, that {who} is waiting for them on {computer} and that they can answer it there."
-    );
-    if answer.is_empty() {
-        format!(
-            "{tell} It did not say what it is asking: do not ask a question for it or guess one."
-        )
+pub(crate) fn waiting(words: &NewsWords, who: &str, computer: &str, answer: &str) -> String {
+    let line = if answer.is_empty() {
+        &words.waiting
     } else {
-        format!(
-            "{tell} If what it last said is a question to them, you may pass it on in your own words; otherwise do not ask a question for it or guess one."
-        )
-    }
+        &words.waiting_said
+    };
+    fill(line, &[("who", who), ("computer", computer)])
 }
 
 /// A progress decision that is to be told: what it is about.
@@ -1760,14 +1776,14 @@ fn wanted(
 }
 
 /// A sign in the words the person would use.
-fn sign_words(sign: Sign) -> &'static str {
+fn sign_words(words: &NewsWords, sign: Sign) -> &str {
     match sign {
-        Sign::TestsPass => "the tests pass",
-        Sign::BuildWorks => "the build works",
-        Sign::Fixed => "something was fixed",
-        Sign::Found => "something was found",
-        Sign::Done => "a part was done",
-        Sign::PullRequest => "a pull request was opened",
+        Sign::TestsPass => &words.tests_pass,
+        Sign::BuildWorks => &words.build_works,
+        Sign::Fixed => &words.fixed,
+        Sign::Found => &words.found,
+        Sign::Done => &words.part_done,
+        Sign::PullRequest => &words.pull_request,
     }
 }
 
@@ -1775,6 +1791,7 @@ fn sign_words(sign: Sign) -> &'static str {
 /// progress line, the signs not told yet in words and how long it has been
 /// at it, cut to one written turn ([`fitted`]).
 fn note_progress(
+    words: &NewsWords,
     task: &Value,
     about: &str,
     signs: &BTreeSet<Sign>,
@@ -1789,22 +1806,28 @@ fn note_progress(
     let signs = if signs.is_empty() {
         String::new()
     } else {
-        let words: Vec<&str> = signs.iter().map(|sign| sign_words(*sign)).collect();
-        format!(" Signs of a step forward in it: {}.", words.join(", "))
+        let each: Vec<&str> = signs.iter().map(|sign| sign_words(words, *sign)).collect();
+        fill(&words.progress_signs, &[("signs", &each.join(", "))])
     };
     let time = match working_s.map(|s| (s + 30) / 60) {
         None => String::new(),
-        Some(0 | 1) => " It has been at it for about a minute.".to_owned(),
-        Some(minutes) => format!(" It has been at it for about {minutes} minutes."),
+        Some(0 | 1) => words.progress_a_minute.clone(),
+        Some(minutes) => fill(
+            &words.progress_minutes,
+            &[("minutes", &minutes.to_string())],
+        ),
     };
     let say = |asked: &str, about: &str, more: &str| {
-        format!(
-            "(Nobody has spoken. Progress on work you handed over for the person: {who} is still working on the task they gave it: \"{asked}\". \
-             Its latest progress line: \"{about}{more}\".{signs}{time} \
-             Tell them how it is going in one short, natural sentence, the way a good chief of staff mentions it in passing, \
-             starting with something like \"Oh, {who} has…\". Do not read the line out word for word, and no code, file paths or links. \
-             No question at the end.)"
-        )
+        unprompted(&fill(
+            &words.progress,
+            &[
+                ("who", who),
+                ("asked", asked),
+                ("about", &format!("{about}{more}")),
+                ("signs", &signs),
+                ("time", &time),
+            ],
+        ))
     };
     fitted(&asked, &about, cut, say)
 }
@@ -1934,6 +1957,7 @@ impl ProgressReader {
             serde_json::from_value(progress["signs_seen"].clone()).unwrap_or_default();
         let new: BTreeSet<Sign> = seen.difference(said).copied().collect();
         let note = note_progress(
+            &NewsWords::installed(),
             &task,
             progress["about"].as_str().unwrap_or_default(),
             &new,
@@ -2013,6 +2037,400 @@ mod tests {
         io::{BufRead, BufReader},
         os::unix::net::UnixListener,
     };
+
+    /// Task news' own words, as the repository has them.
+    fn own() -> NewsWords {
+        NewsWords::in_dir(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills"))
+    }
+
+    /// What the voice said before its words were Task news' (#940), kept
+    /// here as it was: the byte-for-byte test below holds the skill's
+    /// words to it.
+    mod before {
+        use super::super::*;
+
+        pub fn note_failed(task: &Value, unsure: bool) -> Option<String> {
+            let who = who(task);
+            let (asked, _) = quoted(task["text"].as_str()?, MOST_TASK_CHARS);
+            let what = if unsure {
+                format!("may not have reached {who}: you cannot tell whether it started")
+            } else {
+                format!("did not reach {who}: it could not be started just now")
+            };
+            Some(format!(
+                "(Nobody has spoken. The work the person asked you to hand over, \"{asked}\", {what}. \
+                 Tell them in one plain, light sentence, with no technical words, and offer to try again.)"
+            ))
+        }
+
+        pub fn note(task: &Value, data: &Value, age_ms: u64) -> Option<String> {
+            let who = who(task);
+            let computer = their_computer(task);
+            let (asked, _) = quoted(task["text"].as_str()?, MOST_TASK_CHARS);
+            let (answer, cut) = quoted(
+                data["answer"].as_str().unwrap_or_default(),
+                MOST_ANSWER_CHARS,
+            );
+            let cut = cut || data["truncated"] == json!(true);
+            let when = if age_ms <= JUST_MS {
+                "just"
+            } else {
+                "a while ago, and you have not told them yet:"
+            };
+            let opening = "(Nobody has spoken. News from work you handed over for the person.";
+            let (no_question_cut, no_question) = if task["target"]["engine"] == "devin-cloud" {
+                let asks = format!(
+                    "If its answer asks them something, say what it asks, and that they answer it in {computer}."
+                );
+                (
+                    format!("and no question of your own. {asks}"),
+                    format!("No question of your own at the end. {asks}"),
+                )
+            } else {
+                (
+                    "and no question.".to_owned(),
+                    "No question at the end.".to_owned(),
+                )
+            };
+            let state = match data["state"].as_str()? {
+                "idle" if !answer.is_empty() => "idle",
+                state @ ("needs-input" | "stopped" | "failed") => state,
+                _ => return None,
+            };
+            let say = |asked: &str, answer: &str, more: &str| match state {
+                "idle" if !more.is_empty() => format!(
+                    "{opening} {who} {when} finished the task they gave it: \"{asked}\". Its answer is long; it begins: \"{answer}{more}\". \
+                     Tell them now in one or two natural spoken sentences, as a good chief of staff would: \"Oh, {who} just finished…\" (\"earlier\" if it was a while ago), \
+                     then its gist in one plain line from that beginning (a story: who it is about and what happens; code: what it does now), \
+                     then that the rest is on {computer}. Never only that. No code, lists, file paths or links, {no_question_cut})"
+                ),
+                "idle" => format!(
+                    "{opening} {who} {when} finished the task they gave it: \"{asked}\". What it came back with: \"{answer}{more}\". \
+                     Tell them now, the way a good chief of staff tells the person they work for: one or two natural spoken sentences, \
+                     starting with something like \"Oh, {who} just finished…\" (or \"earlier\" if it was a while ago), then the gist of the result in plain words. \
+                     Do not read out code, lists, file paths or links; if there is more than fits, say the rest is on {computer}. {no_question})"
+                ),
+                "needs-input" if answer.is_empty() && more.is_empty() => format!(
+                    "{opening} {who} has stopped and is waiting for them about the task they gave it: \"{asked}\". {})",
+                    waiting(who, &computer, "")
+                ),
+                "needs-input" => format!(
+                    "{opening} {who} has stopped and is waiting for them about the task they gave it: \"{asked}\". What it last said: \"{answer}{more}\". {})",
+                    waiting(who, &computer, answer)
+                ),
+                _ => format!(
+                    "{opening} {who} stopped without finishing the task they gave it: \"{asked}\". What it last said: \"{answer}{more}\". \
+                     Tell them in one short, plain sentence, without alarm.)"
+                ),
+            };
+            fitted(&asked, &answer, cut, say)
+        }
+
+        pub fn note_together(parts: &[&Finished]) -> Option<String> {
+            let first = parts.first()?.who;
+            let how_many = match parts.len() {
+                2 => "two",
+                3 => "three",
+                _ => return None,
+            };
+            let say = |answer_most: usize| {
+                let mut cut = false;
+                let each: Vec<String> = parts
+                    .iter()
+                    .map(|part| {
+                        let asked: String = part.asked.chars().take(TOGETHER_TASK_CHARS).collect();
+                        let answer: String = part.answer.chars().take(answer_most).collect();
+                        let more = if part.cut || answer.len() < part.answer.len() {
+                            cut = true;
+                            GOES_ON
+                        } else {
+                            ""
+                        };
+                        let when = if part.just { "just now" } else { "a while ago" };
+                        format!(
+                            "{} finished \"{asked}\" {when}: \"{answer}{more}\".",
+                            part.who
+                        )
+                    })
+                    .collect();
+                format!(
+                    "(Nobody has spoken. News from {how_many} pieces of work you handed over for the person. {} \
+                     Tell them now, together, in one turn: one plain spoken sentence for each, starting with something like \
+                     \"Oh, {first} just finished…\" (\"earlier\" for one a while ago), each with the gist of its result. \
+                     No code, lists, file paths or links.{} No question.)",
+                    each.join(" "),
+                    if cut {
+                        " Where an answer goes on, give its gist in one plain line from that beginning, \
+                         then that the rest is on their computer: never only that."
+                    } else {
+                        ""
+                    }
+                )
+            };
+            let longest = parts.iter().map(|part| part.answer.chars().count()).max()?;
+            let mut answer_most = longest;
+            loop {
+                let text = say(answer_most);
+                let over = text.len().saturating_sub(lamp_gemini::wire::MAX_NOTE_BYTES);
+                if over == 0 {
+                    return Some(text);
+                }
+                answer_most = answer_most.saturating_sub(over.div_ceil(parts.len()));
+                if answer_most < TOGETHER_ANSWER_LEAST.min(longest) {
+                    return None;
+                }
+            }
+        }
+
+        pub fn waiting(who: &str, computer: &str, answer: &str) -> String {
+            let tell = format!(
+                "Tell them once, in one short sentence, that {who} is waiting for them on {computer} and that they can answer it there."
+            );
+            if answer.is_empty() {
+                format!(
+                    "{tell} It did not say what it is asking: do not ask a question for it or guess one."
+                )
+            } else {
+                format!(
+                    "{tell} If what it last said is a question to them, you may pass it on in your own words; otherwise do not ask a question for it or guess one."
+                )
+            }
+        }
+
+        fn sign_words(sign: Sign) -> &'static str {
+            match sign {
+                Sign::TestsPass => "the tests pass",
+                Sign::BuildWorks => "the build works",
+                Sign::Fixed => "something was fixed",
+                Sign::Found => "something was found",
+                Sign::Done => "a part was done",
+                Sign::PullRequest => "a pull request was opened",
+            }
+        }
+
+        pub fn note_progress(
+            task: &Value,
+            about: &str,
+            signs: &BTreeSet<Sign>,
+            working_s: Option<u64>,
+        ) -> Option<String> {
+            let who = who(task);
+            let (asked, _) = quoted(task["text"].as_str()?, MOST_TASK_CHARS);
+            let (about, cut) = quoted(about, MOST_ABOUT_CHARS);
+            if about.is_empty() {
+                return None;
+            }
+            let signs = if signs.is_empty() {
+                String::new()
+            } else {
+                let words: Vec<&str> = signs.iter().map(|sign| sign_words(*sign)).collect();
+                format!(" Signs of a step forward in it: {}.", words.join(", "))
+            };
+            let time = match working_s.map(|s| (s + 30) / 60) {
+                None => String::new(),
+                Some(0 | 1) => " It has been at it for about a minute.".to_owned(),
+                Some(minutes) => format!(" It has been at it for about {minutes} minutes."),
+            };
+            let say = |asked: &str, about: &str, more: &str| {
+                format!(
+                    "(Nobody has spoken. Progress on work you handed over for the person: {who} is still working on the task they gave it: \"{asked}\". \
+                     Its latest progress line: \"{about}{more}\".{signs}{time} \
+                     Tell them how it is going in one short, natural sentence, the way a good chief of staff mentions it in passing, \
+                     starting with something like \"Oh, {who} has…\". Do not read the line out word for word, and no code, file paths or links. \
+                     No question at the end.)"
+                )
+            };
+            fitted(&asked, &about, cut, say)
+        }
+
+        /// `made_skill::note`, as it was.
+        pub fn made(
+            who: &str,
+            when: &str,
+            computer: &str,
+            made: &Result<crate::made_skill::Made, crate::made_skill::Refused>,
+        ) -> String {
+            use crate::made_skill::{ASK_TO_PUT_ON, PUT_ON, Refused};
+            let opening = "(Nobody has spoken. News from work you handed over for the person.";
+            match made {
+                Ok(made) => format!(
+                    "{opening} {who} {when} made the skill they asked for, \"{}\": {} It would use {}. \
+                     Tell them in one or two short sentences what it would do and what it would use, then ask exactly: \
+                     \"{ASK_TO_PUT_ON}\" It is not on the lamp yet. Put it on only if they then say yes ({PUT_ON}). No file names.)",
+                    made.name,
+                    made.description,
+                    made.uses.spoken()
+                ),
+                Err(Refused(why)) => format!(
+                    "{opening} {who} {when} made a skill for them, but the lamp can't keep it: {why}. \
+                     Tell them so in one short sentence, and that the rest is on {computer}. No question.)"
+                ),
+            }
+        }
+    }
+
+    /// #940's move of Task news' words is a move, not a change: its
+    /// `[news.words]`, filled from their slots, are what the voice said
+    /// before, byte for byte, for every line: done, whole and cut; waiting,
+    /// with and without what it said; stopped and failed; a hand-over that
+    /// did not, or may not have, reached its agent; two and three told
+    /// together, cut or not, just or a while ago; progress with and
+    /// without signs and time; a made skill kept or not; each for each
+    /// agent, Devin Cloud's question among them, just and a while ago.
+    #[test]
+    fn task_news_words_are_what_the_voice_said_before_byte_for_byte() {
+        let words = own();
+        assert_eq!(words, NewsWords::built_in());
+        let mut all = String::new();
+        let mut said = |new: Option<String>, old: Option<String>| {
+            assert_eq!(new, old);
+            if let Some(new) = new {
+                all.push_str(&new);
+                all.push('\n');
+            }
+        };
+        let long = "an answer that goes on {and} on ".repeat(60);
+        let all_signs: BTreeSet<Sign> = [
+            Sign::TestsPass,
+            Sign::BuildWorks,
+            Sign::Fixed,
+            Sign::Found,
+            Sign::Done,
+            Sign::PullRequest,
+        ]
+        .into();
+        for engine in ["claude", "codex", "opencode", "devin", "devin-cloud"] {
+            for text in ["Write a \"story\" about {who}", &"a long task ".repeat(40)] {
+                let task =
+                    json!({"text":text,"target":{"engine":engine},"target_alias":"macbook-air"});
+                for (state, answer, truncated) in [
+                    ("idle", "Done: it {works} now.", false),
+                    ("idle", long.as_str(), false),
+                    ("idle", "Short.", true),
+                    ("needs-input", "", false),
+                    ("needs-input", "", true),
+                    ("needs-input", "Which one, A or B?", false),
+                    ("stopped", "I stopped here.", false),
+                    ("failed", "", false),
+                    ("working", "x", false),
+                    ("idle", "", false),
+                ] {
+                    for age_ms in [0, JUST_MS + 1] {
+                        let data = json!({"state":state,"answer":answer,"truncated":truncated});
+                        said(
+                            note(&words, &task, &data, age_ms),
+                            before::note(&task, &data, age_ms),
+                        );
+                    }
+                }
+                for unsure in [false, true] {
+                    said(
+                        note_failed(&words, &task, unsure),
+                        before::note_failed(&task, unsure),
+                    );
+                }
+                for signs in [BTreeSet::new(), [Sign::Fixed].into(), all_signs.clone()] {
+                    for working_s in [None, Some(20), Some(600)] {
+                        for about in ["Running the {tests}", long.as_str(), " "] {
+                            said(
+                                note_progress(&words, &task, about, &signs, working_s),
+                                before::note_progress(&task, about, &signs, working_s),
+                            );
+                        }
+                    }
+                }
+                let made = crate::made_skill::Made {
+                    name: "evening-dim".into(),
+                    version: "1.0.0".into(),
+                    sha256: "ab".repeat(32),
+                    description: "Dims the light {a} shade at 10 pm.".into(),
+                    uses: crate::made_skill::Uses {
+                        light: true,
+                        body: false,
+                        topics: vec!["voice/state".into()],
+                    },
+                    package: PathBuf::from("/x"),
+                };
+                let not_kept = Err(crate::made_skill::Refused("its name isn't one".into()));
+                for when in [&words.just, &words.while_ago] {
+                    for made in [Ok(made.clone()), not_kept.clone()] {
+                        let computer = their_computer(&task);
+                        said(
+                            Some(crate::made_skill::note(
+                                &words,
+                                who(&task),
+                                when,
+                                &computer,
+                                &made,
+                            )),
+                            Some(before::made(who(&task), when, &computer, &made)),
+                        );
+                    }
+                }
+            }
+        }
+        let part = |who: &'static str, answer: &str, cut: bool, just: bool| Finished {
+            who,
+            asked: "Name {three} \"cats\"".into(),
+            answer: answer.into(),
+            cut,
+            just,
+        };
+        for answer in ["Tom, Kit and Mo.", long.as_str()] {
+            for (cut, just) in [(false, true), (true, false)] {
+                let one = part("Claude Code", answer, cut, just);
+                let two = part("Codex", "Done.", false, !just);
+                let three = part("Devin", answer, false, true);
+                for parts in [
+                    vec![&one, &two],
+                    vec![&one, &two, &three],
+                    vec![&one],
+                    vec![&one, &two, &three, &one],
+                ] {
+                    said(note_together(&words, &parts), before::note_together(&parts));
+                }
+            }
+        }
+        for answer in ["", "Which one?"] {
+            let new = waiting(&words, "Codex", "their computer", answer);
+            said(
+                Some(new),
+                Some(before::waiting("Codex", "their computer", answer)),
+            );
+        }
+        // Every line was said at least once.
+        for line in [
+            "What it came back with:",
+            "Its answer is long; it begins:",
+            "It did not say what it is asking",
+            "If what it last said is a question to them",
+            "has stopped and is waiting for them",
+            "What it last said: \"Which one, A or B?\"",
+            "stopped without finishing",
+            " just finished the task",
+            "a while ago, and you have not told them yet:",
+            "No question at the end.)",
+            "and no question.)",
+            "No question of your own at the end. If its answer asks them something",
+            "and no question of your own. If its answer asks",
+            "did not reach Codex: it could not be started just now",
+            "may not have reached Codex: you cannot tell whether it started",
+            "News from two pieces of work",
+            "News from three pieces of work",
+            "\" just now: \"",
+            "\" a while ago: \"",
+            "Where an answer goes on, give its gist",
+            "Progress on work you handed over",
+            " Signs of a step forward in it: something was fixed.",
+            "the tests pass, the build works, something was fixed, something was found, a part was done, a pull request was opened",
+            " It has been at it for about a minute.",
+            " It has been at it for about 10 minutes.",
+            "made the skill they asked for, \"evening-dim\"",
+            "but the lamp can't keep it: its name isn't one.",
+        ] {
+            assert!(all.contains(line), "{line}");
+        }
+    }
 
     /// The reviewer's P3 1 on #2137: the sign-in question heard whole is
     /// told to the tasks part with the very request it was heard in, the
@@ -2123,7 +2541,7 @@ mod tests {
     #[test]
     fn the_note_names_the_agent_quotes_safely_and_says_how_fresh_it_is() {
         let finished = json!({"state":"idle","answer":"Here are three:\n\n1. **Lumi**\n2. \"Sunny\"\n3. Archie","truncated":false});
-        let note = note(&task("claude", json!([])), &finished, 60_000).unwrap();
+        let note = note(&own(), &task("claude", json!([])), &finished, 60_000).unwrap();
         assert!(
             note.contains("Claude Code just finished the task"),
             "{note}"
@@ -2137,13 +2555,13 @@ mod tests {
             "{note}"
         );
         assert!(!note.contains("(it goes on)"));
-        let later = super::note(&task("codex", json!([])), &finished, JUST_MS + 1).unwrap();
+        let later = super::note(&own(), &task("codex", json!([])), &finished, JUST_MS + 1).unwrap();
         assert!(later.contains("Codex a while ago"), "{later}");
         // Asking, and stopped.
         // Asking with words: waiting on their computer, by name; what it
         // last said may be passed on only if it is a question.
         let asking = json!({"state":"needs-input","answer":"Which folder?"});
-        let waits = super::note(&task("claude", json!([])), &asking, 0).unwrap();
+        let waits = super::note(&own(), &task("claude", json!([])), &asking, 0).unwrap();
         assert!(
             waits.contains("Claude Code is waiting for them on their computer")
                 && waits.contains("What it last said: \"Which folder?\"")
@@ -2152,11 +2570,12 @@ mod tests {
             "{waits}"
         );
         let stopped = json!({"state":"stopped","answer":"I could not reach the repository.","truncated":true});
-        let told = super::note(&task("claude", json!([])), &stopped, 0).unwrap();
+        let told = super::note(&own(), &task("claude", json!([])), &stopped, 0).unwrap();
         assert!(told.contains("stopped without finishing") && told.contains("(it goes on)"));
         // An idle agent with nothing to say, or one at work: nothing to tell.
         assert_eq!(
             super::note(
+                &own(),
                 &task("claude", json!([])),
                 &json!({"state":"idle","answer":" "}),
                 0
@@ -2165,6 +2584,7 @@ mod tests {
         );
         assert_eq!(
             super::note(
+                &own(),
                 &task("claude", json!([])),
                 &json!({"state":"working","answer":"x"}),
                 0
@@ -2173,7 +2593,7 @@ mod tests {
         );
         // A long answer is cut and says so.
         let long = json!({"state":"idle","answer":"word ".repeat(400)});
-        let long = super::note(&task("claude", json!([])), &long, 0).unwrap();
+        let long = super::note(&own(), &task("claude", json!([])), &long, 0).unwrap();
         assert!(
             long.contains("(it goes on)") && long.len() <= lamp_gemini::wire::MAX_NOTE_BYTES,
             "{}",
@@ -2207,7 +2627,7 @@ mod tests {
                     for age_ms in [0, JUST_MS + 1] {
                         let task = json!({"text": asked, "target": {"engine": "claude"}});
                         let data = json!({"state": state, "answer": answer});
-                        let told = note(&task, &data, age_ms).unwrap();
+                        let told = note(&own(), &task, &data, age_ms).unwrap();
                         assert!(
                             told.len() <= lamp_gemini::wire::MAX_NOTE_BYTES,
                             "{state}: {} bytes",
@@ -2228,6 +2648,7 @@ mod tests {
             "The build spends most of its time compiling the same dependencies again. ".repeat(8);
         assert!(answer.chars().count() < MOST_ANSWER_CHARS);
         let told = note(
+            &own(),
             &json!({"text": asked, "target": {"engine": "claude"}}),
             &json!({"state": "idle", "answer": answer}),
             0,
@@ -2239,7 +2660,7 @@ mod tests {
         // A note that fits is exactly as before.
         let finished = json!({"state":"idle","answer":"Lumi, Sunny and Archie.","truncated":false});
         assert_eq!(
-            note(&task("claude", json!([])), &finished, 0).unwrap(),
+            note(&own(), &task("claude", json!([])), &finished, 0).unwrap(),
             "(Nobody has spoken. News from work you handed over for the person. Claude Code just finished the task they gave it: \
              \"Suggest three 'friendly' names for a desk lamp\". What it came back with: \"Lumi, Sunny and Archie.\". \
              Tell them now, the way a good chief of staff tells the person they work for: one or two natural spoken sentences, \
@@ -2260,7 +2681,7 @@ mod tests {
             ("codex", "Codex"),
             ("opencode", "OpenCode"),
         ] {
-            let told = note(&task(engine, json!([])), &waiting, 0).unwrap();
+            let told = note(&own(), &task(engine, json!([])), &waiting, 0).unwrap();
             assert_eq!(
                 told,
                 format!(
@@ -2281,7 +2702,7 @@ mod tests {
         for state in ["stopped", "failed"] {
             let data = json!({"state":state,"answer":"I could not reach the repository.","truncated":false});
             assert_eq!(
-                note(&task("claude", json!([])), &data, 0).unwrap(),
+                note(&own(), &task("claude", json!([])), &data, 0).unwrap(),
                 "(Nobody has spoken. News from work you handed over for the person. Claude Code stopped without finishing the task they gave it: \
                  \"Suggest three 'friendly' names for a desk lamp\". What it last said: \"I could not reach the repository.\". \
                  Tell them in one short, plain sentence, without alarm.)"
@@ -2310,6 +2731,7 @@ mod tests {
         for asked in [long_task.as_str(), "Write a story about a lamp"] {
             for age_ms in [0, JUST_MS + 1] {
                 let told = note(
+                    &own(),
                     &json!({"text": asked, "target": {"engine": "claude"}}),
                     &json!({"state": "idle", "answer": story}),
                     age_ms,
@@ -2351,6 +2773,7 @@ mod tests {
         // A question or a stop that is cut is as it was: the task first,
         // then the answer, by the same rule.
         let asking = note(
+            &own(),
             &json!({"text": long_task, "target": {"engine": "codex"}}),
             &json!({"state": "needs-input", "answer": story}),
             0,
@@ -2742,13 +3165,13 @@ mod tests {
             failed_hand_over(&item("accepted", true, "boot-a", NOW), &now()),
             None
         );
-        let told = note_failed(&task("claude", json!([])), false).unwrap();
+        let told = note_failed(&own(), &task("claude", json!([])), false).unwrap();
         assert!(
             told.contains("did not reach Claude Code") && told.contains("offer to try again"),
             "{told}"
         );
         assert!(
-            note_failed(&task("codex", json!([])), true)
+            note_failed(&own(), &task("codex", json!([])), true)
                 .unwrap()
                 .contains("may not have reached Codex")
         );
@@ -2935,6 +3358,7 @@ mod tests {
     fn a_progress_note_says_who_what_how_far_and_fits_in_one_written_turn() {
         let signs = BTreeSet::from([Sign::TestsPass, Sign::PullRequest]);
         let short = note_progress(
+            &own(),
             &task("claude", json!([])),
             "Fixed the tokenizer / all 118 tests pass",
             &signs,
@@ -2952,6 +3376,7 @@ mod tests {
         );
         // No signs, a minute, Codex; nothing to say without a line.
         let bare = note_progress(
+            &own(),
             &task("codex", json!([])),
             "Reading the parser",
             &BTreeSet::new(),
@@ -2963,7 +3388,7 @@ mod tests {
                 && bare.contains("about a minute.")
                 && !bare.contains("Signs")
         );
-        assert!(note_progress(&task("claude", json!([])), "  ", &signs, None).is_none());
+        assert!(note_progress(&own(), &task("claude", json!([])), "  ", &signs, None).is_none());
         let english =
             "Read src/parser.rs and the failing test, fixed the end index, ran the suite. "
                 .repeat(20);
@@ -2978,6 +3403,7 @@ mod tests {
         for asked in &asks {
             for about in [&english, &vietnamese] {
                 let told = note_progress(
+                    &own(),
                     &json!({"text": asked, "target": {"engine": "claude"}}),
                     about,
                     &BTreeSet::from([
@@ -3251,7 +3677,7 @@ mod tests {
         let data = json!({"state":state,"answer":answer,"truncated":false});
         News {
             key: format!("s:{id}:1"),
-            note: note(&task, &data, 0).unwrap(),
+            note: note(&own(), &task, &data, 0).unwrap(),
             until: None,
             progress: None,
             finished: finished(&task, &data, 0),
@@ -3790,7 +4216,7 @@ mod tests {
         let task =
             |engine: &str| json!({"text":"Reply in the release thread","target":{"engine":engine}});
         let done = json!({"state":"idle","answer":"Which release do you mean, 2.1 or 2.2?"});
-        let cloud = note(&task("devin-cloud"), &done, 0).unwrap();
+        let cloud = note(&own(), &task("devin-cloud"), &done, 0).unwrap();
         assert!(
             cloud.contains("If its answer asks them something"),
             "{cloud}"
@@ -3799,7 +4225,7 @@ mod tests {
             cloud.contains("answer it in the Devin session in Harness"),
             "{cloud}"
         );
-        let plain = note(&task("claude"), &done, 0).unwrap();
+        let plain = note(&own(), &task("claude"), &done, 0).unwrap();
         assert!(!plain.contains("asks them something"), "{plain}");
         // Devin Cloud's work is on no computer of theirs.
         assert_eq!(

@@ -11089,6 +11089,51 @@ fn a_history_from_before_its_words_says_the_built_in_ones_for_one_release() {
     );
 }
 
+/// #940's next move: Task news' and Reminders' words are their own
+/// `[news.words]` and `[reminder.words]`, which the voice reads from the
+/// installed file. lamp-skills holds them to the voice's own check: a copy
+/// from before them still loads (the voice says its built-in words, for
+/// one release), a line with a slot not its own is refused, and so is the
+/// table in a skill whose say is not from its source.
+#[test]
+fn news_and_reminder_words_are_checked_as_the_voice_reads_them() {
+    let dir = tempfile::tempdir().unwrap();
+    for (name, toml, section, line, broken, from) in [
+        (
+            "task-news",
+            include_str!("../../../../skills/task-news/skill.toml"),
+            "news",
+            "two = \"two\"",
+            "two = \"{who}\"",
+            "say = { from = \"tasks\" }",
+        ),
+        (
+            "reminders",
+            include_str!("../../../../skills/reminders/skill.toml"),
+            "reminder",
+            "day = \"about {count} day\"",
+            "day = \"about one day\"",
+            "say = { from = \"schedule\" }",
+        ),
+    ] {
+        load(&skill_with(&dir.path().join("own"), name, toml)).unwrap();
+        let older = &toml[..toml.find("\n# What it says (#940)").unwrap()];
+        load(&skill_with(&dir.path().join("older"), name, older)).unwrap();
+        let bad = toml.replace(line, broken);
+        assert_ne!(bad, toml);
+        let why = load(&skill_with(&dir.path().join("bad"), name, &bad)).unwrap_err();
+        assert!(why.contains(&format!("[{section}.words] ")), "{why}");
+        // The same words in a skill whose say is a note of its own.
+        let noted = toml.replace(from, "say = \"Tell them.\"");
+        assert_ne!(noted, toml);
+        let why = load(&skill_with(&dir.path().join("noted"), name, &noted)).unwrap_err();
+        assert!(
+            why.contains(&format!("[{section}] is the words of a say")),
+            "{why}"
+        );
+    }
+}
+
 #[test]
 fn an_installable_or_addon_declaring_a_core_grant_is_refused() {
     let dir = tempfile::tempdir().unwrap();
