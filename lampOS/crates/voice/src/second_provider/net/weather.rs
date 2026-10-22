@@ -33,8 +33,9 @@ pub const KEPT_FOR: Duration = Duration::from_secs(10 * 60);
 pub const MOST_PLACES: usize = 16;
 /// Where a place's name was found is kept this long: a place doesn't move,
 /// so a second look for it, or the first after its midnight, asks only its
-/// forecast (one request, about half of a look's 2.3–2.4 s on lamp-4ace on
-/// 22 Oct, the owner's try).
+/// forecast. One request in place of two: an estimate of about half a
+/// look's 2.3–2.4 s on lamp-4ace on 22 Oct (the owner's try), not yet timed
+/// on a lamp.
 pub const PLACE_KEPT_FOR: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 /// At most this many places' names are kept with where they are.
 const MOST_FOUND: usize = 32;
@@ -558,7 +559,7 @@ impl Weather {
         if let Some((forecast, today)) = self.kept_by_place(&place, &key, now) {
             return (
                 answer_for(&place, &forecast, day, today),
-                "its place looked up, its weather from what was kept".into(),
+                "its place known, its weather from what was kept".into(),
             );
         }
         let Some(url) = forecast_url(place.latitude, place.longitude) else {
@@ -1091,6 +1092,47 @@ mod tests {
         let later = weather.answer(&json!({"place": "Hanoi"})).await;
         assert_eq!(later.how, "fetched, its place known");
         assert_eq!(canned.count(), 3, "its forecast again, not where it is");
+    }
+
+    /// Where a place is is kept a week and no longer, and at most 32 names:
+    /// the 33rd puts out the oldest (El's P3 on #2996). Read straight from
+    /// what is kept, since a canned week's forecast has no today a week on.
+    #[tokio::test(start_paused = true)]
+    async fn where_a_place_is_is_kept_a_week_and_32_names() {
+        let (canned, fetch) = Canned::new();
+        let weather = Weather::new(None, fetch, tuesday_noon());
+        weather.answer(&json!({"place": "Hanoi"})).await;
+        assert_eq!(canned.count(), 2);
+        assert!(weather.found_before("hanoi").is_some());
+        tokio::time::advance(PLACE_KEPT_FOR - Duration::from_secs(1)).await;
+        assert!(
+            weather.found_before("hanoi").is_some(),
+            "just before the week"
+        );
+        tokio::time::advance(Duration::from_secs(2)).await;
+        assert!(
+            weather.found_before("hanoi").is_none(),
+            "a week on, asked again"
+        );
+        let place = || Place {
+            name: "Town".into(),
+            latitude: 1.0,
+            longitude: 2.0,
+        };
+        weather.remember_place("hanoi".into(), place());
+        for n in 1..=MOST_FOUND {
+            weather.remember_place(format!("town {n}"), place());
+        }
+        assert!(
+            weather.found_before("hanoi").is_none(),
+            "the oldest put out"
+        );
+        assert!(
+            weather
+                .found_before(&format!("town {MOST_FOUND}"))
+                .is_some()
+        );
+        assert!(weather.found_before("town 1").is_some());
     }
 
     /// At most 16 places are kept: a seventeenth puts out the oldest.
