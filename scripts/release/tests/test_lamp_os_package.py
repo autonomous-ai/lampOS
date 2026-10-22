@@ -131,6 +131,42 @@ class PackageTest(unittest.TestCase):
         self.assertNotIn('lamp-body-measure', manifest['binaries'])
         self.assertTrue({'SERVO_DEVICE', 'MOTOR_LOCK_DIR', 'LAMP_USER'} <= set(placeholders))
 
+    def test_generic_carries_setup_when_the_source_and_build_have_it(self):
+        # lampOS #2937: setup and its recovery (lampOS #3020), the product
+        # units' twins, only from a source with them and a build with lamp-setup.
+        self.write_generic_units()
+        recover = ('[Unit]\nConditionHost=@UNIT_ID@\nConditionPathExists=/var/lib/lampos-setup/done\n'
+                   '[Service]\nUser=root\nRuntimeDirectory=lampos-setup-recover\n'
+                   'ExecStart=/opt/lampOS/setup/@SETUP_SHA256@/lamp-setup recover '
+                   '--config /etc/lampOS/setup/serve.json --enable\n')
+        setup = ('[Unit]\nConditionHost=@UNIT_ID@\nConditionPathExists=!/var/lib/lampos-setup/done\n'
+                 '[Service]\nUser=root\nExecStart=/opt/lampOS/setup/@SETUP_SHA256@/lamp-setup serve '
+                 '--config /etc/lampOS/setup/serve.json --plan /etc/lampOS/setup/reset-plan.json --enable\n')
+        self.write_source('deploy/units/' + pkg.RECOVER_UNIT, recover.encode())
+        self.write_source('deploy/units/lamp-setup.service', setup.encode())
+        for unit in pkg.GENERIC_SETUP_UNITS:
+            self.write_source('deploy/product/' + unit, b'[Service]\nExecStart=/opt/lampOS/setup/current/lamp-setup x\n')
+        # No lamp-setup built: as before.
+        manifest = self.build_generic()
+        self.assertFalse(set(pkg.GENERIC_SETUP_UNITS) & set(manifest['units']))
+        (self.binaries / 'lamp-setup').write_bytes(self.adapter.read_bytes() + b'lamp-setup')
+        manifest = self.build_generic()
+        self.assertTrue(set(pkg.GENERIC_SETUP_UNITS) <= set(manifest['units']))
+        setup_sha = manifest['binaries']['lamp-setup']
+        with zipfile.ZipFile(self.output) as archive:
+            unit = archive.read('units/lamp-setup.service').decode()
+            recover_unit = archive.read('units/' + pkg.RECOVER_UNIT).decode()
+            self.assertIn(f'runtime/setup/{setup_sha}/lamp-setup', archive.namelist())
+        self.assertIn(f'@RELEASE_ROOT@/runtime/setup/{setup_sha}/lamp-setup serve --config /etc/lampOS/setup/serve.json', unit)
+        self.assertIn('ConditionPathExists=!/var/lib/lampos-setup/done', unit)
+        self.assertIn(f'@RELEASE_ROOT@/runtime/setup/{setup_sha}/lamp-setup recover --config /etc/lampOS/setup/serve.json', recover_unit)
+        self.assertNotIn('--bus-root', recover_unit)
+        # A source with only one of them, or neither, lamp-setup built: as before too.
+        for unit in pkg.GENERIC_SETUP_UNITS:
+            (self.source / 'deploy/units' / unit).unlink()
+            manifest = self.build_generic()
+            self.assertFalse(set(pkg.GENERIC_SETUP_UNITS) & set(manifest['units']))
+
     def test_generic_runs_the_first_stand_when_the_source_has_it(self):
         # lampOS #2396: a seated lamp's first stand, confirmed at the lamp, runs
         # the tool beside lamp-body as root, and takes no bus from a product unit.

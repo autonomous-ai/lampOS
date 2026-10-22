@@ -158,9 +158,26 @@ impl Systemd for RealSystemd {
 /// V1's web, which a lamp moved to V2 no longer serves (lampOS #2396, the
 /// lead): its nginx held port 80 at every boot with V1's routes to a stopped
 /// os-server and HAL. It is disabled and stopped while V2 runs, its files
-/// untouched, and put back as it was by `cleanup` on a rollback. The generic
-/// package carries no `lamp-setup`, so nothing starts it on V2.
+/// untouched, and put back as it was by `cleanup` on a rollback. A package
+/// with setup (lampOS #2937) serves its own page on port 80 while the lamp is
+/// not set up, and stops nginx itself first; nginx stays disabled.
 const V1_WEB: &[&str] = &["nginx.service"];
+/// Setup's unit (lampOS #2937): it runs only while the lamp is not set up,
+/// started by `install` then, so it is neither one of the target's parts nor
+/// waited for as one.
+const SETUP_UNIT: &str = "lamp-setup.service";
+/// Setup's recovery (lampOS #3020): a part of the target, but off unless
+/// `LAMP_WIFI_RECOVERY=on`, when it says so and exits at once, and skipped
+/// on a lamp not set up; so it is never waited for. A moved lamp has no 5 s
+/// reset, so this is its way to a new Wi-Fi (Fourteen's P2 on #2977).
+const RECOVER_UNIT: &str = "lamp-setup-recover.service";
+/// Whether health waits for this unit to be active.
+fn waited_for(unit: &str) -> bool {
+    unit.ends_with(".service") && unit != SETUP_UNIT && unit != RECOVER_UNIT
+}
+/// Setup's marker, which lamp-setup writes once the lamp is set up and a
+/// reset removes (a product lamp's; a moved lamp has none).
+const SETUP_MARKER: &str = "/var/lib/lampos-setup/done";
 fn keeper_command(release: &Path) -> Command {
     let mut command = Command::new(release.join("bin/lamp-keeper"));
     command
@@ -168,6 +185,19 @@ fn keeper_command(release: &Path) -> Command {
         .env_remove("AUTONOMOUS_SERVICE_NAME")
         .env_remove("AUTONOMOUS_SERVICE_DATA");
     command
+}
+/// While a lamp is in setup (`install` started setup alone), each turn of
+/// the serve loop looks for setup's marker; once it is there, the lamp is
+/// started, once, as `lampos-setup-done.path` does on a product lamp. The
+/// keeper runs here without the updater's variables, so its own
+/// `--setup-marker` would not act (El on #2977). Returns whether the lamp is
+/// still in setup.
+fn setup_done(systemd: &impl Systemd, in_setup: bool, set_up: bool) -> Result<bool> {
+    if !in_setup || !set_up {
+        return Ok(in_setup);
+    }
+    systemd.run("start", &["lampos.target".into()])?;
+    Ok(false)
 }
 /// The release's own preflight (lamp-voice #1094). It must not see the
 /// updater's service variables, or it would act as the installed service.
@@ -412,7 +442,7 @@ fn plan(layout: &Layout, hostname: &str) -> Result<Journal> {
                 ),
             });
         }
-        if unit.ends_with(".service") {
+        if unit.ends_with(".service") && unit != SETUP_UNIT {
             services.push(unit.clone());
         }
     }
@@ -623,7 +653,7 @@ fn configure_bus(layout: &Layout, journal: &Journal) -> Result<()> {
     }
     fs::set_permissions(path, fs::Permissions::from_mode(0o2770)).map_err(|e| e.to_string())
 }
-fn install(layout: &Layout, hostname: &str, systemd: &impl Systemd) -> Result<Journal> {
+fn install(layout: &Layout, hostname: &str, systemd: &impl Systemd) -> Result<(Journal, bool)> {
     cleanup(layout, systemd)?;
     let mut journal = plan(layout, hostname)?;
     // Recorded before it is changed, so a cut-short install is put back too.
@@ -666,8 +696,22 @@ fn install(layout: &Layout, hostname: &str, systemd: &impl Systemd) -> Result<Jo
     if STOP.load(Ordering::SeqCst) {
         return Err("cancelled before starting children".into());
     }
-    systemd.run("start", &["lampos.target".into()])?;
-    Ok(journal)
+    // Read once: what was started is what health and the one start of the
+    // lamp follow (El's P3 on #2977).
+    let first = first_start(&journal.units, Path::new(SETUP_MARKER).exists());
+    systemd.run("start", &[first.into()])?;
+    Ok((journal, first == SETUP_UNIT))
+}
+/// What an install starts: the lamp, or, for a package with setup on a lamp
+/// with no marker (put back into setup), setup alone, as a product lamp
+/// does (lampOS #2937); the serve loop starts the lamp once the marker is
+/// back ([`setup_done`]).
+fn first_start(units: &[String], set_up: bool) -> &'static str {
+    if !set_up && units.iter().any(|unit| unit == SETUP_UNIT) {
+        SETUP_UNIT
+    } else {
+        "lampos.target"
+    }
 }
 fn run() -> Result<()> {
     let release = env::current_exe()
@@ -721,7 +765,7 @@ fn run() -> Result<()> {
             }
             let hostname = read(Path::new("/etc/hostname"))?;
             let result = (|| {
-                let journal = install(&layout, hostname.trim(), &RealSystemd)?;
+                let (journal, mut in_setup) = install(&layout, hostname.trim(), &RealSystemd)?;
                 let version = read(&layout.release.join("VERSION"))?.trim().to_owned();
                 let mut keeper = KeeperChild(
                     keeper_command(&layout.release)
@@ -730,23 +774,31 @@ fn run() -> Result<()> {
                 );
                 while !STOP.load(Ordering::SeqCst) {
                     keeper.check()?;
+                    in_setup =
+                        setup_done(&RealSystemd, in_setup, Path::new(SETUP_MARKER).exists())?;
                     let services: Vec<_> = journal
                         .units
                         .iter()
-                        .filter(|u| u.ends_with(".service"))
+                        .filter(|u| waited_for(u))
                         .cloned()
                         .collect();
                     let states = RealSystemd.states(&services);
-                    let waiting_for: Vec<_> = services
-                        .into_iter()
-                        .filter(|u| {
-                            !states
-                                .as_ref()
-                                .ok()
-                                .and_then(|s| s.get(u))
-                                .is_some_and(|s| s.1)
-                        })
-                        .collect();
+                    // In setup the parts are not started: it waits for setup,
+                    // as the keeper says it (`waiting_for: ["setup"]`).
+                    let waiting_for: Vec<_> = if in_setup {
+                        vec!["setup".to_owned()]
+                    } else {
+                        services
+                            .into_iter()
+                            .filter(|u| {
+                                !states
+                                    .as_ref()
+                                    .ok()
+                                    .and_then(|s| s.get(u))
+                                    .is_some_and(|s| s.1)
+                            })
+                            .collect()
+                    };
                     let answer = Health {
                         ready: waiting_for.is_empty(),
                         version: version.clone(),
@@ -852,7 +904,7 @@ mod tests {
             enabled: vec!["nginx.service"],
             ..Fake::default()
         };
-        let journal = install(&f.0, "lamp-test", &systemd).unwrap();
+        let (journal, _) = install(&f.0, "lamp-test", &systemd).unwrap();
         assert_eq!(journal.v1_web, ["nginx.service"]);
         let saved: Journal = serde_json::from_str(&read(&journal_path(&f.0)).unwrap()).unwrap();
         assert_eq!(saved.v1_web, ["nginx.service"], "recorded in the journal");
@@ -881,7 +933,7 @@ mod tests {
 
         let f = Fixture::new();
         let systemd = Fake::default();
-        let journal = install(&f.0, "lamp-test", &systemd).unwrap();
+        let (journal, _) = install(&f.0, "lamp-test", &systemd).unwrap();
         assert!(journal.v1_web.is_empty());
         assert!(!systemd.calls.borrow().iter().any(|c| c.contains("nginx")));
 
@@ -943,6 +995,106 @@ mod tests {
         cleanup(&f.0, &fake).unwrap();
         assert!(!journal_path(&f.0).exists());
         assert!(!f.0.runtime.join("lamp-voice.service").exists());
+    }
+    /// lampOS #2937: a package with setup renders lamp-setup.service bound to
+    /// this service as the parts are, but not as one of the target's parts:
+    /// `install` starts it, and only while the lamp is not set up.
+    #[test]
+    fn setup_is_rendered_but_not_one_of_the_targets_parts() {
+        let f = Fixture::new();
+        fs::write(f.0.release.join("package-manifest.json"), r#"{"format":1,"unit_id":"lamp-test","units":["lampos.target","lamp-voice.service","lamp-setup.service"]}"#).unwrap();
+        fs::write(
+            f.0.release.join("units/lamp-setup.service"),
+            "[Unit]\nConditionPathExists=!/var/lib/lampos-setup/done\n[Service]\nUser=root\nExecStart=@RELEASE_ROOT@/runtime/setup serve\n",
+        )
+        .unwrap();
+        let journal = plan(&f.0, "lamp-test").unwrap();
+        let file = |name: &str| {
+            journal
+                .files
+                .iter()
+                .find(|entry| entry.path == f.0.runtime.join(name))
+                .map(|entry| entry.content.clone())
+        };
+        assert!(file("lamp-setup.service").is_some());
+        assert!(file("lamp-setup.service.d/99-ota-owner.conf").is_some());
+        let parts = file("lampos.target.d/98-ota-parts.conf").unwrap();
+        assert!(parts.contains("lamp-voice.service"), "{parts}");
+        assert!(!parts.contains("lamp-setup"), "{parts}");
+    }
+    /// lampOS #3020, Fourteen's P2 on #2977: recovery is one of the target's
+    /// parts, so it starts with the lamp, but health never waits for it: off,
+    /// or on a lamp not set up, it isn't active.
+    #[test]
+    fn recovery_is_a_part_but_never_waited_for() {
+        let f = Fixture::new();
+        fs::write(f.0.release.join("package-manifest.json"), r#"{"format":1,"unit_id":"lamp-test","units":["lampos.target","lamp-voice.service","lamp-setup.service","lamp-setup-recover.service"]}"#).unwrap();
+        for unit in [SETUP_UNIT, RECOVER_UNIT] {
+            fs::write(
+                f.0.release.join("units").join(unit),
+                "[Service]\nUser=root\nExecStart=@RELEASE_ROOT@/runtime/setup x\n",
+            )
+            .unwrap();
+        }
+        let journal = plan(&f.0, "lamp-test").unwrap();
+        let parts = journal
+            .files
+            .iter()
+            .find(|entry| entry.path == f.0.runtime.join("lampos.target.d/98-ota-parts.conf"))
+            .map(|entry| entry.content.clone())
+            .unwrap();
+        assert!(parts.contains(RECOVER_UNIT), "{parts}");
+        assert!(!parts.contains(SETUP_UNIT), "{parts}");
+        assert!(waited_for("lamp-voice.service"));
+        assert!(!waited_for(SETUP_UNIT));
+        assert!(!waited_for(RECOVER_UNIT));
+        assert!(!waited_for("lampos.target"));
+    }
+    /// lampOS #2937: set up, or with no setup in the package, an install
+    /// starts the lamp; a lamp put back into setup starts setup alone.
+    #[test]
+    fn a_lamp_in_setup_starts_setup_alone() {
+        let with: Vec<String> = ["lampos.target", "lamp-voice.service", SETUP_UNIT]
+            .map(String::from)
+            .into();
+        let without: Vec<String> = ["lampos.target", "lamp-voice.service"]
+            .map(String::from)
+            .into();
+        assert_eq!(first_start(&with, true), "lampos.target");
+        assert_eq!(first_start(&with, false), SETUP_UNIT);
+        assert_eq!(first_start(&without, false), "lampos.target");
+    }
+    /// lampOS #2937 (El's P1 on #2977): a lamp in setup is started once
+    /// setup writes its marker, by the serve loop itself, once; nothing is
+    /// started while the marker is absent, and a lamp not in setup is left.
+    #[test]
+    fn the_lamp_starts_once_setup_writes_its_marker() {
+        let fake = Fake::default();
+        let mut in_setup = first_start(&[SETUP_UNIT.to_owned()], false) == SETUP_UNIT;
+        for _ in 0..3 {
+            in_setup = setup_done(&fake, in_setup, false).unwrap();
+        }
+        assert!(in_setup);
+        assert!(fake.calls.borrow().is_empty());
+        in_setup = setup_done(&fake, in_setup, true).unwrap();
+        assert!(!in_setup);
+        for _ in 0..3 {
+            in_setup = setup_done(&fake, in_setup, true).unwrap();
+        }
+        assert_eq!(*fake.calls.borrow(), ["start lampos.target"]);
+        let set_up = Fake::default();
+        assert!(!setup_done(&set_up, false, true).unwrap());
+        assert!(set_up.calls.borrow().is_empty());
+    }
+    /// The keeper runs as the adapter's child without the updater's
+    /// variables and with no setup option, even with setup in the package:
+    /// the adapter watches the marker itself.
+    #[test]
+    fn the_keeper_is_given_no_setup_option() {
+        let f = Fixture::new();
+        fs::write(f.0.release.join("units").join(SETUP_UNIT), "[Service]\n").unwrap();
+        let command = keeper_command(&f.0.release);
+        assert_eq!(command.get_args().collect::<Vec<_>>(), vec!["serve"]);
     }
     #[test]
     fn start_failure_can_be_cleaned_from_journal() {

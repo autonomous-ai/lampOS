@@ -1481,10 +1481,31 @@ V1's web (lampOS #2396): when the `lamp-os` adapter installs, it records V1's
 `nginx.service` in its journal if that unit is enabled at boot, then disables
 and stops it. A moved lamp then has port 80 free after V2 starts, and no V1
 route (`/monitor`, `/setting`, the `/api` proxy to os-server, `/hw`) answers.
-Nginx's files are left untouched. The generic ZIP carries no `lamp-setup`, so
-nothing starts nginx on V2. `cleanup`, which runs on a rollback before
-recovery, enables and starts it again, so V1 comes back with its whole site.
-A lamp whose nginx was not enabled is left as it is.
+Nginx's files are left untouched, and nothing on V2 enables it again: a ZIP
+with `lamp-setup` (lampOS #2937, below) serves setup's own page on port 80
+while the lamp is not set up, and stops nginx itself first. `cleanup`, which
+runs on a rollback before recovery, enables and starts it again, so V1 comes
+back with its whole site. A lamp whose nginx was not enabled is left as it is.
+
+Setup (lampOS #2937): with a generic ZIP that carries `lamp-setup.service`
+(see the generic units below), the adapter looks for setup's marker,
+`/var/lib/lampos-setup/done`. `lamp-keeper prepare` writes that marker at the
+move, since a moved lamp is already on its Wi-Fi, so a moved lamp starts as
+before. A moved lamp has no 5 s reset (lampOS #2975: its line 100 may be a
+head pad), so the marker goes only if removed by hand; then an install
+starts `lamp-setup.service` alone instead of `lampos.target`: the
+hotspot and setup's page, as on a product lamp. Meanwhile the adapter's
+health answers `waiting_for: ["setup"]`, and its serve loop starts
+`lampos.target` once, when setup writes the marker, as the product's
+`lampos-setup-done.path` does. The keeper's own `--setup-marker` acts only
+when the updater installs the keeper, which it does not here.
+`lamp-setup.service` is rendered and bound to the `lamp-os` service like the
+parts, but it is not in `98-ota-parts.conf` and is not waited for in the
+adapter's health. `lamp-setup-recover.service` (lampOS #3020) is a moved
+lamp's way to a new Wi-Fi: with `LAMP_WIFI_RECOVERY=on`, a set-up lamp whose
+saved network is gone opens setup's hotspot after 90 s. It is one of the
+target's parts, but never waited for in health: off, it exits at once, and
+on a lamp not set up it is skipped.
 
 The `lamp-os` ZIP built on main carries `SERVICE_PREFLIGHT=1` and
 `SERVICE_CLEANUP=1`. Its `bin/service prepare` execs the release's own
@@ -1681,7 +1702,15 @@ beside `lamp-body`. The unit runs `lamp-body-measure first-stand` as root.
 - Once someone is near a seated lamp, the lamp asks for its first stand.
 - A touch held a second is the yes. The arm then stands as the factory's
   steps stand it, and `/etc/lampOS/body/lamp.env` is written.
-- Nothing moves without the yes. The unit takes no bus from a product unit. `lamp-memory-fixture`,
+- Nothing moves without the yes. The unit takes no bus from a product unit.
+
+Built from a source that has `deploy/units/lamp-setup.service` and
+`lamp-setup-recover.service` (lampOS #2937, #3020), and with `lamp-setup`
+built, the generic ZIP also carries both. They are the product units' twins,
+rendered with `@SETUP_SHA256@` like the parts. Then a moved lamp whose
+network is gone opens setup's hotspot (with `LAMP_WIFI_RECOVERY=on`), and
+joins a new Wi-Fi through the app. There is no reset unit: a moved lamp has
+no 5 s reset. Without either unit, the ZIP is as before. `lamp-memory-fixture`,
 `lamp-records-fixture`, `lamp-policy-replay` and the current
 `lamp-same-voice pairs` measurement CLI are development tools and are excluded. `lamp-station` (the production station's bench tool) is excluded the same way. `lamp-body-mood` is a factory tool carried with `lamp-body-measure` under `tools/`, and `lamp-peek` is carried without a unit. A lampOS source with `lampOS/deploy/package-binaries.json` (lamp-voice #2481) classifies its own binaries there (`core`, `optional`, `provisioning`, `development`), and the packager follows it. Then a new binary needs no change on main. The lists above are kept only for sources from before that file. A name in two lists, or a `core` part the packager cannot place yet, still fails packaging.
 Unknown binaries still fail packaging so a new runtime cannot be silently

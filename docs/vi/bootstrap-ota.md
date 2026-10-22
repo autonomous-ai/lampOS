@@ -1444,9 +1444,29 @@ Web của V1 (lampOS #2396): khi adapter `lamp-os` cài, nếu `nginx.service` c
 V1 đang bật lúc boot thì nó ghi unit này vào journal, rồi disable và stop. Lamp
 đã chuyển vì vậy có cổng 80 trống sau khi V2 chạy, và không còn route V1 nào
 (`/monitor`, `/setting`, proxy `/api` sang os-server, `/hw`) trả lời. File của
-nginx giữ nguyên. ZIP chung không mang `lamp-setup`, nên trên V2 không gì bật
-nginx. `cleanup`, chạy khi rollback trước recovery, enable và start lại nó, nên
-V1 trở về với đủ site. Lamp có nginx không bật lúc boot thì giữ nguyên.
+nginx giữ nguyên, và trên V2 không gì enable lại nó: ZIP có `lamp-setup` (lampOS
+#2937, xem dưới) phục vụ trang setup riêng trên cổng 80 khi lamp chưa được cài
+đặt, và tự stop nginx trước. `cleanup`, chạy khi rollback trước recovery, enable
+và start lại nó, nên V1 trở về với đủ site. Lamp có nginx không bật lúc boot thì
+giữ nguyên.
+
+Setup (lampOS #2937): với ZIP chung mang `lamp-setup.service` (xem các unit
+chung bên dưới), adapter theo dõi marker của setup, `/var/lib/lampos-setup/done`.
+`lamp-keeper prepare` ghi marker đó lúc chuyển, vì lamp đã chuyển vốn đang ở
+trên Wi-Fi của nó, nên lamp đã chuyển khởi động như trước. Lamp đã chuyển không
+có reset 5 s (lampOS #2975: line 100 của nó có thể là pad trên đầu), nên marker
+chỉ mất khi bị xoá bằng tay; khi đó lần cài chỉ start `lamp-setup.service` thay cho
+`lampos.target`: hotspot và trang setup, như trên lamp sản phẩm. Trong lúc đó
+health của adapter trả lời `waiting_for: ["setup"]`, và vòng serve của nó start
+`lampos.target` một lần khi setup ghi marker, như `lampos-setup-done.path` của
+sản phẩm. `--setup-marker` của keeper chỉ có tác dụng khi updater cài keeper,
+điều không xảy ra ở đây. `lamp-setup.service` được render và gắn với service
+`lamp-os` như các part, nhưng không nằm trong `98-ota-parts.conf` và không được
+chờ trong health của adapter. `lamp-setup-recover.service` (lampOS #3020) là
+đường để lamp đã chuyển vào một Wi-Fi mới: với `LAMP_WIFI_RECOVERY=on`, một lamp
+đã setup mà mạng đã lưu không còn sẽ mở hotspot của setup sau 90 s. Nó là một
+part của target, nhưng không bao giờ được chờ trong health: khi tắt, nó thoát
+ngay, và trên lamp chưa setup thì nó bị bỏ qua.
 
 ZIP `lamp-os` build trên main có `SERVICE_PREFLIGHT=1` và `SERVICE_CLEANUP=1`.
 `bin/service prepare` exec chính `bin/lamp-keeper prepare` của release (hợp đồng
@@ -1624,6 +1644,14 @@ chung mang thêm unit đó, với cùng công cụ đặt cạnh `lamp-body`. Un
 - Chạm giữ một giây là đồng ý. Khi đó tay lamp đứng như bước nhà máy và ghi
   `/etc/lampOS/body/lamp.env`.
 - Không có đồng ý thì không gì cử động. Unit không lấy bus từ unit sản phẩm.
+
+Khi build từ source có `deploy/units/lamp-setup.service` và
+`lamp-setup-recover.service` (lampOS #2937, #3020), và `lamp-setup` đã được
+build, ZIP chung mang thêm cả hai. Chúng là bản sao của unit sản phẩm, render với
+`@SETUP_SHA256@` như các part. Khi đó lamp đã chuyển mà mạng không còn sẽ mở
+hotspot của setup (với `LAMP_WIFI_RECOVERY=on`), và vào một Wi-Fi mới qua app.
+Không có unit reset: lamp đã chuyển không có reset 5 s. Thiếu một trong hai unit
+thì ZIP như trước.
 `lamp-memory-fixture`, `lamp-records-fixture`, `lamp-policy-replay` và CLI đo
 `lamp-same-voice pairs` hiện là công cụ phát triển nên không đưa vào gói. `lamp-station` (công cụ bench của trạm sản xuất) cũng không đưa vào. `lamp-body-mood` là công cụ nhà máy, mang cùng `lamp-body-measure` trong `tools/`, còn `lamp-peek` được mang nhưng không có unit. Source lampOS có `lampOS/deploy/package-binaries.json` (lamp-voice #2481) tự phân loại binary của nó ở đó (`core`, `optional`, `provisioning`, `development`), và packager làm theo. Khi đó binary mới không cần sửa gì trên main. Các danh sách trên chỉ còn dùng cho source cũ chưa có file này. Một tên nằm ở hai danh sách, hoặc một part `core` mà packager chưa biết đặt, vẫn làm đóng gói thất bại. Binary
 chưa phân loại vẫn làm packaging báo lỗi để không âm thầm bỏ sót runtime mới.

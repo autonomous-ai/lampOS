@@ -41,6 +41,14 @@ SEATED_MEASURE_UNIT = 'lamp-body-measure.service'
 FIRST_STAND_UNIT = 'lamp-first-stand.service'
 # Units of the generic package's own, with no product unit to take a bus from.
 GENERIC_ONLY_UNITS = (SEATED_MEASURE_UNIT, FIRST_STAND_UNIT)
+# From a source with them (lampOS #2937), the generic package also carries setup
+# and its recovery (lampOS #3020), the product units' twins, when lamp-setup is
+# built: a lamp moved from V1 has no 5 s reset, so recovery's hotspot is its way
+# to a new Wi-Fi. lamp-setup.service runs only while the lamp is not set up; the
+# adapter starts it then.
+SETUP_UNIT = 'lamp-setup.service'
+RECOVER_UNIT = 'lamp-setup-recover.service'
+GENERIC_SETUP_UNITS = (SETUP_UNIT, RECOVER_UNIT)
 PROVISION_SETTINGS = ('voice-provider.json', 'controls.json', 'controls-pins.json')
 # The adapter's prepare runs `lamp-keeper prepare` (lamp-voice #1094); its usage
 # line is the build's own statement that the command exists.
@@ -177,6 +185,11 @@ def package(source, binaries, assets, profile, version, output, adapter, librari
     generic = profile is None
     if generic:
         seated = [unit for unit in GENERIC_ONLY_UNITS if (Path(source) / 'deploy/units' / unit).exists()]
+        # Setup without recovery leaves a moved lamp no way into it, and
+        # recovery without setup has no page to serve: both or neither.
+        if (Path(binaries) / 'lamp-setup').exists() and all(
+                (Path(source) / 'deploy/units' / unit).exists() for unit in GENERIC_SETUP_UNITS):
+            seated += list(GENERIC_SETUP_UNITS)
         profile = {'substitutions': {}, 'units': list(DEFAULT_UNITS) + seated,
                    'required_paths': ['/etc/lampOS/voice/provider.json',
                        '/etc/lampOS/controls/controls.json', '/etc/lampOS/controls/controls-pins.json']}
