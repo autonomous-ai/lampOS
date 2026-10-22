@@ -1487,7 +1487,12 @@ fn run_call_with_scope(
             if call.name == crate::known_faces::FORGET {
                 crate::follows_face::forgot();
             }
-            let told = crate::known_faces::run_for(socket, call, *switches, person);
+            // Who the eyes saw saying this line: a room's "forget my face"
+            // forgets only a face seen saying it (El's P2 on #3018).
+            let line = (call.name == crate::known_faces::FORGET && person.is_none())
+                .then(|| crate::speaking_faces::line_seen(request))
+                .flatten();
+            let told = crate::known_faces::run_for(socket, call, *switches, person, line.as_ref());
             // "Forget my face" by the known person whose line it is: their
             // memory goes with it (`LAMP_MEMORY_FORGET_ALL`, #2850).
             let told = match lease {
@@ -1836,9 +1841,10 @@ mod tests {
             assert!(!answered);
             assert!(listener.accept().is_err(), "{name} reached the eyes");
         }
-        // Heard, on a room's line: Sam's face must be at the lamp (the first
-        // builder on #2602); then it goes to the eyes (here nobody answers,
-        // which is told).
+        // Heard, on a room's line: Sam's own face must have been seen saying
+        // it (the first builder on #2602, El's P2 on #3018); then it goes to
+        // the eyes (here nobody answers, which is told). Sam at the lamp with
+        // no line seen, or another face seen saying it, is refused.
         let call = ToolCall {
             id: String::new(),
             name: crate::known_faces::FORGET.into(),
@@ -1847,12 +1853,30 @@ mod tests {
         let (_, (told, answered)) = run_call(&route, &call, 2, true);
         assert_eq!(told["error"], crate::known_faces::NOT_THEIRS);
         assert!(answered);
+        let known = crate::known_faces::known_file_of(&socket);
+        std::fs::write(&known, "Sam\n").unwrap();
+        std::fs::write(crate::speaking_faces::known_face_of(&known), "f1\n").unwrap();
+        let (_, (told, _)) = run_call(&route, &call, 2, true);
+        assert_eq!(told["error"], crate::known_faces::NOT_THEIRS);
+        // Request numbers of this test's own: the lines seen are the
+        // process's.
+        let request = 3_018_001;
+        let seen = |request, speaker: &str| {
+            crate::speaking_faces::saw_line(crate::speaking_faces::LineSeen {
+                request,
+                speakers: vec![speaker.to_owned()],
+                known: crate::speaking_faces::known_with_face(&known),
+            })
+        };
+        seen(request, "f2");
+        let (_, (told, _)) = run_call(&route, &call, request, true);
+        assert_eq!(told["error"], crate::known_faces::NOT_THEIRS);
         assert!(
             listener.accept().is_err(),
-            "a forget of nobody at the lamp reached the eyes"
+            "a forget not said by that face reached the eyes"
         );
-        std::fs::write(crate::known_faces::known_file_of(&socket), "Sam\n").unwrap();
-        let asking = std::thread::spawn(move || run_call(&route, &call, 2, true));
+        seen(request + 1, "f1");
+        let asking = std::thread::spawn(move || run_call(&route, &call, request + 1, true));
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
         let reached = loop {
             if let Ok((stream, _)) = listener.accept() {

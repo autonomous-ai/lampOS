@@ -3257,23 +3257,35 @@ async fn spoken(
             }
         }
     }
-    // A forget held for a yes: who the eyes saw saying this line, kept for
-    // its answer ([`take_held_forget`], #2377). Read only while one is held.
-    if let Some((eyes, known)) = &shared.forget_sight
-        && shared
+    // Who the eyes saw saying this line, with the known person and their
+    // face as they were when it was heard: for a forget held for a yes
+    // ([`take_held_forget`], #2377), and for a line asking to forget, whose
+    // "forget my face" on a room's line forgets only a face seen saying it
+    // (`known_faces::forget_name`, El's P2 on #3018). Read only then.
+    if let Some((eyes, known)) = &shared.forget_sight {
+        let held = shared
             .held_forget
             .lock()
-            .is_ok_and(|hold| hold.held.is_some())
-    {
-        let speakers = eyes.speakers(begun, finishing);
-        let known = known.clone();
-        let pair =
-            tokio::task::spawn_blocking(move || crate::speaking_faces::known_with_face(&known))
-                .await
-                .ok()
-                .flatten();
-        if let Ok(mut hold) = shared.held_forget.lock() {
-            hold.sight = Some((request, speakers, pair));
+            .is_ok_and(|hold| hold.held.is_some());
+        let asks = crate::remember::asks_to_forget(&text);
+        if held || asks {
+            let speakers = eyes.speakers(begun, finishing);
+            let known = known.clone();
+            let pair =
+                tokio::task::spawn_blocking(move || crate::speaking_faces::known_with_face(&known))
+                    .await
+                    .ok()
+                    .flatten();
+            if asks {
+                crate::speaking_faces::saw_line(crate::speaking_faces::LineSeen {
+                    request,
+                    speakers: speakers.clone(),
+                    known: pair.clone(),
+                });
+            }
+            if held && let Ok(mut hold) = shared.held_forget.lock() {
+                hold.sight = Some((request, speakers, pair));
+            }
         }
     }
     // Onboarding's sentence (#1803): its words go to the coordinator to
