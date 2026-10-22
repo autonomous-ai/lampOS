@@ -196,7 +196,7 @@ pub fn call_as_heard(
 /// Its `on` (#1693) stays: by now an `on` is left only when these same heard
 /// words name that day ([`super::on::call_as_heard`]), so the heard line is
 /// exactly what dates it (reviewer-lead P3 on #2680).
-pub(super) fn call_with(
+pub(crate) fn call_with(
     call: &ToolCall,
     heard: Option<&str>,
     replaced: impl FnOnce() -> Option<String>,
@@ -238,6 +238,29 @@ pub fn told(mut told: Value, kept: &str) -> Value {
         told["note"] = json!(
             "Your sentence had words they did not say, so I kept what they said. Say back what was kept."
         );
+    }
+    told
+}
+
+/// What the model is told for its `remember` call `model`: [`told`] when
+/// `as_heard`, the heard line, was sent instead. With `replaces`
+/// (`LAMP_MEMORY_REPLACES`), a correction sent so went without its
+/// `replaces` ([`call_with`]): the old fact stays, and the answer says
+/// `not_replaced` with its id, so the model doesn't say it changed (the
+/// reviewer-lead's P3 at #2590's merge).
+pub fn answered(
+    told: Value,
+    model: &ToolCall,
+    as_heard: Option<&(ToolCall, String)>,
+    replaces: bool,
+) -> Value {
+    let Some((_, kept)) = as_heard else {
+        return told;
+    };
+    let mut told = self::told(told, kept);
+    let old = model.args.get("replaces").and_then(Value::as_u64);
+    if let Some(old) = old.filter(|_| replaces && told["remembered"] == true) {
+        told["not_replaced"] = json!(old);
     }
     told
 }
@@ -474,5 +497,65 @@ mod tests {
             (Some(4), Some("They said: y"))
         );
         assert!(told["note"].is_string());
+    }
+
+    /// The reviewer-lead's P3 at #2590's merge: a correction kept as heard
+    /// went without its `replaces`, so the old fact stays; the model is
+    /// told `not_replaced` with the old id, so it doesn't say it changed.
+    #[test]
+    fn a_correction_kept_as_heard_answers_not_replaced() {
+        const GREEN_NOW: &str = "it's green now";
+        let call = |text: &str, replaces: Option<u64>| {
+            let mut args = json!({"text": text});
+            if let Some(id) = replaces {
+                args["replaces"] = json!(id);
+            }
+            ToolCall {
+                id: String::new(),
+                name: super::super::REMEMBER.into(),
+                args,
+            }
+        };
+        let dark = call("Her favourite colour is dark green", Some(8));
+        let fallback = call_with(&dark, Some(GREEN_NOW), || None);
+        let kept = json!({"remembered": true});
+        let told = answered(kept.clone(), &dark, fallback.as_ref(), true);
+        assert_eq!(told["not_replaced"], 8);
+        assert_eq!(told["kept"], "They said: it's green now");
+        assert!(told.get("replaced").is_none());
+        // Already kept as heard (#2298): still not replaced.
+        let existing = json!({"remembered": true, "existing": true});
+        assert_eq!(
+            answered(existing.clone(), &dark, fallback.as_ref(), true)["not_replaced"],
+            8
+        );
+        // Checkable (#2704): sent with `replaces`, answered as before.
+        let green = call("Her favourite colour is green.", Some(8));
+        let violet = || Some("Her favourite colour is violet".to_owned());
+        let checked = call_with(&green, Some(GREEN_NOW), violet);
+        assert_eq!(checked, None);
+        let replaced = json!({"remembered": true, "replaced": 8, "id": 10});
+        assert_eq!(
+            answered(replaced.clone(), &green, checked.as_ref(), true),
+            replaced
+        );
+        // No `replaces`, or a failed call: no `not_replaced`.
+        let plain = call("Her favourite colour is dark green", None);
+        let heard = call_with(&plain, Some(GREEN_NOW), || None);
+        assert!(
+            answered(kept.clone(), &plain, heard.as_ref(), true)
+                .get("not_replaced")
+                .is_none()
+        );
+        let error = json!({"error": "x"});
+        assert_eq!(
+            answered(error.clone(), &dark, fallback.as_ref(), true),
+            error
+        );
+        // `LAMP_MEMORY_REPLACES` off: as before, the heard line's answer.
+        assert_eq!(
+            answered(kept.clone(), &dark, fallback.as_ref(), false),
+            super::told(kept, "They said: it's green now")
+        );
     }
 }

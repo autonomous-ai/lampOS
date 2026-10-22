@@ -374,6 +374,17 @@ pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io:
     {
         println!("{line}");
     }
+    if crate::remember::replaces_on() {
+        println!(
+            "tools: that correction kept as heard, without its replaces, told before and now (not_replaced), {runs} runs each"
+        );
+        for (arm, before) in [("before", true), ("now", false)] {
+            let tallies = super::kept_earlier::ask_fallback(&today, &character, runs, before).await;
+            for line in super::kept_earlier::fallback_verdict(arm, &tallies) {
+                println!("{line}");
+            }
+        }
+    }
     Ok(())
 }
 

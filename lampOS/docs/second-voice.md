@@ -3526,7 +3526,18 @@ the keep lines, and `control-false-calls=N/M`, the controls that called
 `replaces` and its answer carries the kept id, so the only id the model
 can name is the one that answer gave. Each line prints how many requests
 called `remember`, gave `replaces=8`, gave any `replaces`, and claimed a
-keeping with no call.
+keeping with no call. With the switch on, a fallback arm follows: the
+correction's `remember` ("Favourite colour changed to green.", `replaces`
+8) has a word neither violet's nor heard, so `LAMP_MEMORY_KEEP_HEARD`
+keeps the heard line without `replaces`, answered as before (`before`)
+and with `not_replaced` (`now`); each line prints how many replies said
+the old fact changed (`kept_earlier::CHANGED`, unless they say it stays)
+and how many said it stays. Lamp-06c1's relay, 22 Oct, 20 runs a line:
+`before` 20/20 English and 20/20 Vietnamese said it changed, `now` 18/20
+and 13/20; most of the rest called `remember` again with `replaces` and a
+checkable sentence. A line in `replaces`' description ("If the answer says
+not_replaced, don't say the old one changed.") measured 17/20 and 12/20,
+no better, and is not in.
 
 Run it like `probe-cache`, where lamp-actions runs:
 

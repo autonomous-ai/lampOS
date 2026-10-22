@@ -703,13 +703,18 @@ the unchanged legacy client, used unless the new Days client is selected.
     when each of its key words is the old fact's or was heard, compared
     without accents on both sides: "Her favourite colour is green." for
     "it's green now" against 8 "Her favourite colour is violet" replaces 8;
-    "... dark green" keeps the heard line beside violet. The old fact's
+    "... dark green" keeps the heard line beside violet, and its answer
+    says `not_replaced` with the old id, so the model doesn't say the old
+    fact changed (the reviewer-lead's P3 at #2590's merge; the probe's
+    fallback arm, `second-voice.md`). The old fact's
     words are those this session was shown (the session note as it
     opened, a hit, recall, a follow-up, or one it kept), each in its own
     scope, never asked of the store; one it was not shown checks nothing.
     The note matters most: a fact kept on an earlier day is shown only
     there, and corrected the next turn. Tests: `remember::heard::tests::a_correction_keeps_the_models_words_when_each_is_the_old_facts_or_heard`
-    (lamp-06c1, 21 Oct, #2602: "it's green now" kept beside violet) and
+    (lamp-06c1, 21 Oct, #2602: "it's green now" kept beside violet),
+    `remember::heard::tests::a_correction_kept_as_heard_answers_not_replaced`,
+    `remember::noted::tests::a_correction_kept_as_heard_is_journalled_not_replaced` and
     `remember::tests::a_fact_shown_only_in_the_note_is_corrected_with_replaces`.
   - **With `LAMP_MEMORY_REMEMBER_ONCE`:** a correction is never `once`; it
     always writes its new version.
@@ -728,7 +733,8 @@ the unchanged legacy client, used unless the new Days client is selected.
       count is of the words not heard, for an id it was not shown);
       `keep_heard` only with `LAMP_MEMORY_KEEP_HEARD`, whose words were
       sent; `answer` the store's kind: `kept`, `existing`, `replaced`,
-      `refused:<reason code>`, `error:<code>`, or `none` (no answer). A
+      `refused:<reason code>`, `error:<code>`, or `none` (no answer), and
+      `not_replaced` for a correction kept as heard without its `replaces`. A
       code that is not lower-case letters and `_` is `other`.
     - One line per second-route turn:
       `lamp-voice second: request N: tools: remember_offered=y|n|? calls=none|NAME:N,… prepared=y|n`:
