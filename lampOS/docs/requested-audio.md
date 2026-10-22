@@ -421,7 +421,16 @@ protocol and retirement deterministically, not independent monitor scheduling
 or real elapsed renewal latency. Separate tests retain terminal cancellation
 on contention before and after playback starts. Production uses the original
 monotonic clock and parking; permission guards and real IPC timeouts are
-unchanged. Qualification follows the current plan: Mac formatting, Clippy
+unchanged. The digest-mismatch and revoked-renewal fixture uses the same
+acknowledged worker steps. A bad digest must finish cancelled after Start,
+without prepared samples. With a valid recording, no renewal is allowed
+before 200 ms; at that boundary the fixture waits for the exact Renew and
+Cancelled finish, then worker completion. It leaves prepared samples
+unconsumed and the original grant unexpired, proving that revocation still
+prevents playback and sample access. A separately scheduled monitor can
+legitimately cancel on cache contention or missed freshness before Renew;
+this fixture isolates the denial path without retrying that cancellation.
+Qualification follows the current plan: Mac formatting, Clippy
 and changed-crate tests, then new-head PR ARM64 CI. The historical records
 below qualify their own source maps only. The [retained five-crate Mac gate](verification/requested-audio-mac-20261021-3/README.md) on base `4d932488e`
 passed **4,665 tests, zero failed and 14 ignored**, plus formatting and strict
