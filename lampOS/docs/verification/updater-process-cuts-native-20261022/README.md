@@ -122,3 +122,19 @@ First reports that integration needs #3044's fmt correction. Reviewer-lead's
 merge order puts that and #3042 ahead of #3012. The next rebase is deliberately
 waiting for those merges, rather than running a gate on the known fmt-broken
 base. This is a merge-order dependency, not a failure in the updater patch.
+
+## Corrected-base replacement, 21:24 +07
+
+The clean local branch was rebased onto `2297f0f3d` as `a0cc8b9c3` after
+reading the current builder protocol. [mac-2297.json](mac-2297.json) records
+strict all-target Update Clippy (**33.002 s**) and full Update tests
+(**247.880 s**): **306 passed / 0 failed / 3 ignored / 0 filtered**.
+The 35 bound inputs were unchanged before/after these commands and from the
+prior completed local gate. Global fmt still failed only in the upstream Voice
+own_echo.rs:317 test; the receipt retains that failure instead of hiding it.
+
+After #3044 merged, the equal-range final rebase became `d4d5e5a66` on
+`c6d50559a`. All 35 tested inputs remain identical, and global fmt passed on
+that final head. That own branch is pushed. Its new ARM64 run39795365169 and
+Clippy run39795365207 are pending, so no earlier native green qualifies it.
+The PR remains draft pending its replacement checks and latest-base guard.
