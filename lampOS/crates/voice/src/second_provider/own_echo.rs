@@ -187,7 +187,11 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
         Some("it began after the lamp's words and their 1.5 s tail")
     } else if line.called || crate::attention::called_by_name_on(line.heard, true) {
         Some("it has the lamp's name")
-    } else if m < n && crate::remarks::questions(line.heard) {
+    } else if (m < n || !line.over_the_lamps_voice) && crate::remarks::questions(line.heard) {
+        // A question that adds a word, or one begun after the lamp's voice
+        // even if it only repeats it ("Did you say five o'clock?"), is the
+        // person's; over its voice, a question of only its words may be
+        // its own question heard back.
         Some("it is a question of its own")
     } else if !line.over_the_lamps_voice && said.words.trim_end().ends_with('?') {
         Some("it began after the lamp's question")
@@ -376,6 +380,34 @@ mod tests {
         // "I can't" is no offer.
         assert!(!offers(&keys("I can't set a reminder.")));
         assert!(offers(&keys("Would you like a reminder?")));
+    }
+
+    #[test]
+    fn a_two_word_full_repeat_is_answered_as_heard_never_empty() {
+        // El's P2 on #3019: all the lamp's words but under HELD_LEAST, over
+        // its voice and in the tail, goes as heard, nothing taken out.
+        let five = Said {
+            words: "It's five o'clock.",
+            ..said()
+        };
+        for (began_us, over) in [(9_000_000, true), (UNTIL_US + 1_000_000, false)] {
+            assert_eq!(
+                judge(&line("five o'clock", began_us, over), Some(&five)),
+                Echo::Answered(None)
+            );
+        }
+    }
+
+    #[test]
+    fn a_repeat_back_question_in_the_tail_is_the_persons() {
+        let at = Said {
+            words: "The meeting starts at six today.",
+            ..said()
+        };
+        assert!(matches!(
+            judge(&line("starts at six today?", UNTIL_US + 1_000_000, false), Some(&at)),
+            Echo::Answered(Some(journal)) if journal.contains("a question of its own")
+        ));
     }
 
     #[test]
