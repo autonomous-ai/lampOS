@@ -105,8 +105,9 @@ put_back() {
   lamp "sudo -n rm -f $DROPIN; sudo -n systemctl daemon-reload; sudo -n systemctl restart lamp-voice; systemctl is-active lamp-voice"
   loan "desk kit $LABEL done, lamp-voice back without $DROPIN, face closed; loan ended"
 }
+# On any exit, interrupts included, the drop-in comes off (on 75c9 an interrupt left it, Ten 17:3x).
 trap put_back EXIT
-trap 'exit 130' INT TERM HUP
+trap 'put_back; exit 130' INT TERM HUP
 
 lamp "ls ${DROPIN%/*}/ 2>/dev/null" | grep -v "^${DROPIN##*/}\$" && { echo "desk-kit.sh: another /run drop-in on lamp-voice; not starting" >&2; trap - EXIT; exit 3; }
 pgrep -f "user-data-dir=$PROFILE" >/dev/null && { echo "desk-kit.sh: a face is already shown; not starting" >&2; trap - EXIT; exit 3; }
@@ -119,6 +120,29 @@ if [[ -n $VOICE_BIN ]]; then
 fi
 osascript -e "set volume output volume 50"
 mkdir -p "$OUT"
+
+# The level first (the first builder, 17:42 on #2964): one named ask from where a person sits must reach the speech to
+# text with words and must not read as said close (the last line's local_endpoint, just after the voice's restart);
+# else the kit refuses, since it would score the speaker's level.
+level_check() {
+  local s; s=$(lamp "date +%s")
+  python3 ./scenario.py "desk-kit-$LABEL-level" "${DESK_KIT_ASKER:-Daniel}|Hey Lamp, what time is it in Tokyo?|10" >/dev/null 2>&1
+  local words close
+  words=$(lamp "sudo -n journalctl -u lamp-voice --since @$s --no-pager" | grep -oE 'request [0-9]+ heard [0-9]+ words' | head -1 | grep -oE '[0-9]+ words' | cut -d' ' -f1)
+  close=$(lamp "S=\$(sudo -n ls -t /var/lib/lampOS/voice/sessions | head -1); sudo -n sh -c \"cat /var/lib/lampOS/voice/sessions/\$S/metadata/events-*.jsonl\"" |
+    python3 -c 'import json,sys
+n=None
+for l in sys.stdin:
+    try: r=json.loads(l)
+    except Exception: continue
+    nsp=r.get("not_speech") if r.get("kind")=="local_endpoint" else None
+    if nsp: n=nsp.get("said_close")
+print("" if n is None else n)')
+  echo "level: the marked ask heard ${words:-0} words; said close: ${close:-no}" | tee -a "$LOG"
+  [[ ${words:-0} -ge 3 ]] || { echo "desk-kit.sh: the level line reached the speech to text with ${words:-0} words: the speaker is too far or too quiet for a person's level; not scoring" | tee -a "$LOG"; exit 8; }
+  [[ -z $close ]] || { echo "desk-kit.sh: the level line read as said close ($close loud blocks): the speaker is nearer or louder than a person at about 1 m; not scoring" | tee -a "$LOG"; exit 8; }
+  LEVELLED=yes
+}
 
 arm() { # arm NAME:ENV=v,...
   local name=${1%%:*} envs="$BASE ${1#*:}" e
@@ -134,6 +158,7 @@ arm() { # arm NAME:ENV=v,...
   echo "preflight $name: $got" | tee -a "$LOG"
   for e in $envs; do [[ " $got " == *" $e "* ]] || { echo "preflight: $e not set" | tee -a "$LOG"; exit 6; }; done
   [[ -z $VOICE_BIN || $got == "$VOICE_BIN"* ]] || { echo "preflight: lamp-voice is not $VOICE_BIN" | tee -a "$LOG"; exit 6; }
+  [[ -n ${LEVELLED:-} ]] || level_check
   local s; s=$(lamp "date +%s")
   local files=() t steps plan f
   for t in $(seq 1 "$TRIALS"); do
