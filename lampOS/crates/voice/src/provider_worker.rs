@@ -2974,6 +2974,19 @@ async fn serve_with_visual<C: Connect>(
                                 }
                                 None => going_on,
                             };
+                            // `LAMP_NAME_OR_FOLLOW_UP`: a line in another
+                            // voice than the conversation's is a second
+                            // person at the lamp, so the room is busy now,
+                            // for this line's verdict as well as the next
+                            // ones'.
+                            let room = if face_or_window && other_voice {
+                                if crate::room_told::room().lock().is_ok_and(|mut told| told.two_people(monotonic_us())) {
+                                    eprintln!("lamp-voice provider: request {request}: another voice than the conversation's: the room is busy (LAMP_NAME_OR_FOLLOW_UP)");
+                                }
+                                crate::room_told::Room::Busy
+                            } else {
+                                room
+                            };
                             if attention.judges_by_day() && night_read.is_none_or(|(of, _)| of != request) {
                                 night_read = Some((request, crate::local_time::night_here()));
                             }
