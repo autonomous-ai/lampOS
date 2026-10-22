@@ -801,6 +801,10 @@ struct Shared {
     name_carries: bool,
     /// That line, while its answer waits ([`NameWait`]).
     name_waits: Mutex<Option<NameWait>>,
+    /// The name whose words wait as words cut short because the line after
+    /// it was not shown to be its person's ([`said_by_the_name`]): they are
+    /// never joined to that line ([`name_refused`]).
+    name_refused: Mutex<Option<u64>>,
     /// Whether one person said the name and the line after it, and where
     /// a line not judged yet is kept for that ([`Engine::telling_one_speaker`]).
     one_speaker: Option<(SameSpeaker, LineKept)>,
@@ -1230,16 +1234,30 @@ const NAME_FIRST_MORE: usize = 3;
 /// call ([`crate::attention::begins_with_the_name`]), with at most
 /// [`NAME_FIRST_MORE`] words after it: "Lamp. So", "Lamp, can", "Hey Lamp,
 /// what's"; and the name alone ([`name_alone`]). Not "Lamp is broken.",
-/// nor a question its words end ("Hey Lamp, what's the time?"), which is
-/// whole and answered at once (`LAMP_SECOND_NAME_CARRIES`).
+/// nor a line whole as it is ([`whole_already`]), which is answered at
+/// once (`LAMP_SECOND_NAME_CARRIES`).
 fn name_first(text: &str) -> bool {
     let words = past_a_greeting(text);
     words
         .first()
         .is_some_and(|first| first.eq_ignore_ascii_case(net::key_terms::NAME))
         && words.len() <= 1 + NAME_FIRST_MORE
-        && (words.len() == 1 || !text.trim_end().ends_with('?'))
+        && !whole_already(text)
         && crate::attention::begins_with_the_name(text)
+}
+
+/// Whether a line is whole as it is, so never waits for the line after it
+/// (`LAMP_SECOND_NAME_CARRIES`, El's P2 on the branch: "Lamp, stop."
+/// waited 2.5 s): a stop or "never mind" ([`says_stop`], the stop words'
+/// one list); a question past the name ("Lamp, what?"); or two words or
+/// more past the name ending a sentence ("Lamp, lights off."). This route
+/// has no turn-end verdict for its lines, and no verb list: a sentence's
+/// end over two words is the simplest bound that keeps "Lamp. So",
+/// "Lamp, can" and "Lamp. So." waiting.
+fn whole_already(text: &str) -> bool {
+    let past = past_a_greeting(text).len().saturating_sub(1);
+    let end = text.trim_end();
+    says_stop(text) || past >= 1 && end.ends_with('?') || past >= 2 && end.ends_with(['.', '!'])
 }
 
 impl Shared {
@@ -1404,6 +1422,7 @@ impl Engine {
                 open_name: false,
                 name_carries: false,
                 name_waits: Mutex::new(None),
+                name_refused: Mutex::new(None),
                 one_speaker: None,
                 own_echo: false,
                 spare: Mutex::new(None),
@@ -3814,7 +3833,10 @@ async fn spoken(
     // drops this request; with none, the name alone is answered as a call,
     // a short line as it is (`LAMP_SECOND_NAME_CARRIES`). A line said by a
     // name waits no more.
-    let name_waits = shared.name_carries && name_of.is_none() && (called || name_first(&text));
+    let name_waits = shared.name_carries
+        && name_of.is_none()
+        && !whole_already(&text)
+        && (called || name_first(&text));
     if name_waits {
         let left = NAME_CARRIES_FOR.saturating_sub(finishing.elapsed());
         if called || name_alone(&text) {
@@ -4032,7 +4054,7 @@ async fn spoken(
             // The same person going on: its own words after them
             // (`LAMP_JOIN_CUT_WORDS`), so a request's second half held on
             // its own is not lost either.
-            let (words, said_by) = if empty {
+            let (words, said_by) = if empty || name_refused(&shared, request, &carried) {
                 (carried.text.clone(), carried.said_by)
             } else {
                 // While the join waits for a print, the carried words are
@@ -4134,6 +4156,7 @@ async fn spoken(
     // Words cut short by this line, the same person's: asked before its
     // own, as one line (`LAMP_JOIN_CUT_WORDS`).
     let (text, carried) = match carried {
+        Some(carried) if name_refused(&shared, request, &carried) => (text, Some(carried)),
         Some(carried) => {
             // While the join waits for a print, this line's own words are
             // where a newer line's cut finds them, as an answered line's are
@@ -4353,6 +4376,25 @@ fn says_stop(text: &str) -> bool {
         || (words.len() <= 3 && crate::stop_words::stop_phrase(text))
 }
 
+/// Whether `carried` are the lamp's name's words that `request`, the line
+/// after it, was not shown to be said by (`LAMP_SECOND_NAME_CARRIES`, El's
+/// P3): never joined to it (`joined_with_cut`, whose no sign of a second
+/// person takes one face in view at each in a busy room), only answered
+/// in its place if it is held, else let go.
+fn name_refused(shared: &Shared, request: u64, carried: &Carried) -> bool {
+    let refused = shared
+        .name_refused
+        .lock()
+        .is_ok_and(|refused| *refused == Some(carried.request));
+    if refused {
+        eprintln!(
+            "lamp-voice second: request {request}: not joined with request {}'s words: they are the lamp's name it was not shown to be said by (LAMP_SECOND_NAME_CARRIES)",
+            carried.request
+        );
+    }
+    refused
+}
+
 /// With `LAMP_JOIN_CUT_WORDS`, the words a line holds while its join waits
 /// for a print, put in flight before the wait: a third line begun during
 /// it is a cut, as any line's is, and carries them. Before, they were out
@@ -4473,6 +4515,9 @@ async fn said_by_the_name(
                     at: Instant::now(),
                     said_by: name.request,
                 });
+                if let Ok(mut refused) = shared.name_refused.lock() {
+                    *refused = Some(name.request);
+                }
             }
             None
         }
