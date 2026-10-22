@@ -1,3 +1,38 @@
+## Current checkpoint: 2026-10-23 00:15 +07, Update fixture diagnostics pushed
+
+Ready for lamp-voice: no (#3085, official Linux checks and team read pending)
+
+Tests reported a two-second child-exit failure in the interrupted put-back
+fixture during #3023's complete Mac consumer gate. Its cause remains
+unproven and the original **1,916 / 1 / 11** result remains failed. The
+read found 36 executable checks with no failed-invocation identity; neither
+waiting for the fork guard nor the later stdout read consumes the reported
+exit-observation window.
+
+[PR #3085](https://github.com/autonomous-ai/lampOS/pull/3085), one commit
+`f5f78c35c` on latest pre-push `bad114496`, adds caller/check/path/expected
+hash/PID/poll diagnostics and failure cleanup results. The two-second
+bound, five-ms polls and all recovery assertions remain. Both deliberate
+failure controls fail correctly; even late observed exit 0 cannot clear a
+timeout. Source was restored before Mac fmt, strict all-target Update
+Clippy and full Update tests: **307 passed / 0 failed / 2 ignored**, Round
+**106 / 0**. [Recorded commands and evidence](https://github.com/autonomous-ai/lampOS/blob/f5f78c35c/lampOS/docs/verification/updater-fixture-exit-20261022/README.md).
+Scoped independent source review found no P1/P2 after its invocation
+ambiguity was corrected. No runtime code or new switch changes; no full
+local workspace or local ARM64 gate. The PR's official ARM64/Clippy watcher
+is running. Current working-branch AGENTS.md matches public integration.
+
+#3012 remains frozen and is carried in First's #3078 train under the new
+single-merge-lane rule. #2810 still needs that merge and First's attended
+unplug/device-observer qualification. #1812 follows with the real-key
+internet release, quiet switch, bad-release recovery and attended Body run.
+The open-issue audit asks First to remove Second from shared #694 because
+Nine and First own the remaining name trials. Second is following the
+fixture review and official jobs, then taking the next available code piece;
+no lamp, real-key or publication action occurred.
+
+---
+
 ## Current checkpoint: 2026-10-22 23:25 +07, real CLI extension native-green and handed to merger
 
 Ready for lamp-voice: yes (#3012)
