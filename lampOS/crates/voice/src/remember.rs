@@ -1907,14 +1907,66 @@ pub fn told_for_fresh_session(
 pub struct SessionNote {
     pub text: String,
     pub complete: bool,
+    /// Why it is incomplete; none when complete.
+    pub cause: Option<NoteCause>,
 }
 
 impl SessionNote {
     pub(crate) fn unavailable() -> Self {
+        Self::failed(NoteCause::NoClient)
+    }
+
+    fn failed(cause: NoteCause) -> Self {
         Self {
             text: UNAVAILABLE.into(),
             complete: false,
+            cause: Some(cause),
         }
+    }
+}
+
+/// Why a memory note read was incomplete, as the second route's journal
+/// names it (`cause=`): a code, never the store's words or the note's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NoteCause {
+    /// Not in within the note's time (its 300 ms).
+    Timeout,
+    /// The store said no, or gave no answer.
+    Refused,
+    /// An answer without a valid snapshot.
+    Invalid,
+    /// The room's snapshot read, the known person's own not.
+    OwnMissing,
+    /// The memory client's context could not be had (`try_lock`).
+    Busy,
+    /// No Days client for the socket.
+    NoClient,
+}
+
+impl NoteCause {
+    /// Its journal code.
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::Timeout => "timeout",
+            Self::Refused => "refused",
+            Self::Invalid => "invalid",
+            Self::OwnMissing => "own_missing",
+            Self::Busy => "busy",
+            Self::NoClient => "no_client",
+        }
+    }
+}
+
+/// Why a read whose room snapshot came back as `opened` is incomplete,
+/// for `person` (none for the room alone): none when it is complete.
+fn opened_cause<T, U>(
+    opened: &Result<(T, Option<U>), NoteCause>,
+    person: Option<&str>,
+) -> Option<NoteCause> {
+    match opened {
+        Err(cause) => Some(*cause),
+        Ok((_, None)) if person.is_some() => Some(NoteCause::OwnMissing),
+        Ok(_) => None,
     }
 }
 
@@ -1930,6 +1982,7 @@ pub(crate) fn fresh_session_note(
         return SessionNote {
             text: theirs_too(socket, told(), person, FIRST_READ),
             complete: true,
+            cause: None,
         };
     }
     match DAYS
@@ -2021,11 +2074,11 @@ impl DaysClient {
         let started = Instant::now();
         let room_not_asker = self.room_not_asker.load(Ordering::Acquire);
         let mut counted = None;
-        let opened = self.open_fresh_session_within(session, deadline, person, fresh);
-        let complete = opened
-            .as_ref()
-            .is_some_and(|(_, theirs)| person.is_none() || theirs.is_some());
+        let opened = self.open_fresh_session_why(session, deadline, person, fresh);
+        let cause = opened_cause(&opened, person);
+        let complete = cause.is_none();
         let mut note = opened
+            .ok()
             .map(|(snapshot, theirs)| {
                 let (note, room) = opened_note(room_not_asker, &snapshot, theirs.as_ref());
                 counted = room;
@@ -2044,11 +2097,12 @@ impl DaysClient {
                 return SessionNote {
                     text: note,
                     complete,
+                    cause,
                 };
             };
             let said = match self.context.lock() {
                 Ok(mut context) => take_rules(&mut context, person, &room, theirs.as_deref()),
-                Err(_) => return SessionNote::unavailable(),
+                Err(_) => return SessionNote::failed(NoteCause::Busy),
             };
             say(said);
             note.push_str(&crate::rules::note(&room, theirs.as_deref()));
@@ -2059,6 +2113,7 @@ impl DaysClient {
         SessionNote {
             text: note,
             complete,
+            cause,
         }
     }
 
@@ -2415,6 +2470,8 @@ pub struct NoteRead {
     held: Option<ReadHeld>,
     text: String,
     complete: bool,
+    /// Why it is incomplete; none when complete.
+    cause: Option<NoteCause>,
 }
 
 /// What a read keeps for its turn: the client's shared state it is taken
@@ -2469,16 +2526,27 @@ impl NoteStamp {
 impl NoteRead {
     /// Without the Days client: the unavailable note, nothing held.
     pub(crate) fn unavailable() -> Self {
+        Self::failed(NoteCause::NoClient)
+    }
+
+    /// Nothing read, for `cause`, nothing held.
+    pub(crate) fn failed(cause: NoteCause) -> Self {
         Self {
             held: None,
             text: UNAVAILABLE.into(),
             complete: false,
+            cause: Some(cause),
         }
     }
 
     /// Whether every snapshot asked for was had.
     pub fn complete(&self) -> bool {
         self.complete
+    }
+
+    /// Why it is incomplete; none when complete.
+    pub fn cause(&self) -> Option<NoteCause> {
+        self.cause
     }
 
     /// What it was read under, for its note once told ([`NoteStamp`]);
@@ -2535,9 +2603,13 @@ impl NoteRead {
     /// hold what was forgotten, and it is never told.
     pub fn adopt(mut self) -> Option<SessionNote> {
         let text = std::mem::take(&mut self.text);
-        let complete = self.complete;
+        let (complete, cause) = (self.complete, self.cause);
         let Some(held) = self.held.as_mut() else {
-            return Some(SessionNote { text, complete });
+            return Some(SessionNote {
+                text,
+                complete,
+                cause,
+            });
         };
         let changes = held.changes?;
         let Ok(mut context) = held.context.lock() else {
@@ -2593,7 +2665,11 @@ impl NoteRead {
         if let Some(said) = followed {
             follow_up_told(said);
         }
-        Some(SessionNote { text, complete })
+        Some(SessionNote {
+            text,
+            complete,
+            cause,
+        })
     }
 }
 
@@ -4002,13 +4078,26 @@ impl DaysClient {
         person: Option<&str>,
         fresh: bool,
     ) -> Option<(Value, Option<Value>)> {
+        self.open_fresh_session_why(session, deadline, person, fresh)
+            .ok()
+    }
+
+    /// [`Self::open_fresh_session_within`], and why the room's could not be
+    /// had ([`NoteCause`]).
+    fn open_fresh_session_why(
+        &self,
+        session: u64,
+        deadline: Duration,
+        person: Option<&str>,
+        fresh: bool,
+    ) -> Result<(Value, Option<Value>), NoteCause> {
         if session == 0 {
-            return None;
+            return Err(NoteCause::Invalid);
         }
         let started = Instant::now();
         let name = format!("{}-{session:x}", self.prefix);
         let (previous, previous_person, resumable) = {
-            let mut context = self.context.try_lock().ok()?;
+            let mut context = self.context.try_lock().map_err(|_| NoteCause::Busy)?;
             // Stopped before this open began, with what was then uncertain.
             let resumable = (fresh
                 && (context.journal_inhibited || context.lost_writes > 0)
@@ -4029,15 +4118,14 @@ impl DaysClient {
         close_replaced(&self.jobs, &name, previous, previous_person);
         let until = started + deadline;
         let room = self.open_one(&name, None, until)?;
-        let theirs = person.and_then(|person| self.open_one(&name, Some(person), until));
+        let theirs = person.and_then(|person| self.open_one(&name, Some(person), until).ok());
         // What each note line says is worked out before the context is held.
         let mut opened = self.opened(room, theirs);
         let mut said = None;
         let mut resumed = None;
         let accepted = match self.context.try_lock() {
-            Ok(mut context)
-                if context.session.as_ref() == Some(&name) && started.elapsed() < deadline =>
-            {
+            Ok(_) if started.elapsed() >= deadline => Err(NoteCause::Timeout),
+            Ok(mut context) if context.session.as_ref() == Some(&name) => {
                 (said, resumed) = take_opened(
                     &mut context,
                     &mut opened,
@@ -4045,22 +4133,23 @@ impl DaysClient {
                     resumable,
                     (self.replaces.load(Ordering::Acquire), &self.fresh_tried),
                 );
-                true
+                Ok(())
             }
-            _ => false,
+            // Held, or its session replaced by another read meanwhile.
+            _ => Err(NoteCause::Busy),
         };
         say(resumed);
         say(said);
-        if !accepted {
+        if let Err(cause) = accepted {
             let _ = self.jobs.try_send(DaysJob::Close(name.clone(), None));
             if opened.theirs.is_some() {
                 let _ = self
                     .jobs
                     .try_send(DaysJob::Close(name, person.map(str::to_owned)));
             }
-            return None;
+            return Err(cause);
         }
-        Some((opened.room, opened.theirs.map(|(snapshot, _)| snapshot)))
+        Ok((opened.room, opened.theirs.map(|(snapshot, _)| snapshot)))
     }
 
     /// What one open gave, with what each of its note lines says when
@@ -4149,6 +4238,7 @@ impl DaysClient {
                 held: Some(held),
                 text: UNAVAILABLE.into(),
                 complete: false,
+                cause: Some(NoteCause::Busy),
             };
         }
         // A fresh read tried: until one resumes, none is asked for again for
@@ -4160,17 +4250,29 @@ impl DaysClient {
             *tried = Some(Instant::now());
         }
         let until = started + deadline;
-        held.opened = self
+        let opened = self
             .open_one(&name, None, until)
             .map(|room| {
-                let theirs = person.and_then(|person| self.open_one(&name, Some(person), until));
+                let theirs =
+                    person.and_then(|person| self.open_one(&name, Some(person), until).ok());
                 self.opened(room, theirs)
             })
-            .filter(|_| started.elapsed() < deadline);
-        let complete = held
-            .opened
-            .as_ref()
-            .is_some_and(|opened| person.is_none() || opened.theirs.is_some());
+            .and_then(|opened| {
+                if started.elapsed() < deadline {
+                    Ok(opened)
+                } else {
+                    Err(NoteCause::Timeout)
+                }
+            });
+        let cause = match &opened {
+            Err(cause) => Some(*cause),
+            Ok(opened) if person.is_some() && opened.theirs.is_none() => {
+                Some(NoteCause::OwnMissing)
+            }
+            Ok(_) => None,
+        };
+        held.opened = opened.ok();
+        let complete = cause.is_none();
         let mut text = match &held.opened {
             Some(opened) => {
                 let (text, counted) = opened_note(
@@ -4213,16 +4315,18 @@ impl DaysClient {
             held: Some(held),
             text,
             complete,
+            cause,
         }
     }
 
-    /// One person's snapshot for this session, validated, before `until`.
+    /// One person's snapshot for this session, validated, before `until`,
+    /// or why not ([`NoteCause`]).
     fn open_one(
         &self,
         name: &str,
         person: Option<&str>,
         until: Instant,
-    ) -> Option<(Value, Vec<u64>)> {
+    ) -> Result<(Value, Vec<u64>), NoteCause> {
         let close = || {
             let _ = self
                 .jobs
@@ -4230,7 +4334,7 @@ impl DaysClient {
         };
         let Some(left) = until.checked_duration_since(Instant::now()) else {
             close();
-            return None;
+            return Err(NoteCause::Timeout);
         };
         let answer = bounded_exchange(
             &self.socket,
@@ -4245,14 +4349,19 @@ impl DaysClient {
         } else {
             ROOM_SCOPE
         };
-        let snapshot = answer.as_ref().and_then(|answer| {
-            if answer["ok"] != true {
-                return None;
-            }
-            let snapshot = answer.get("snapshot")?;
-            snapshot_ids(snapshot, name, scope).map(|ids| (snapshot.clone(), ids))
-        });
-        if snapshot.is_none() {
+        let snapshot = match &answer {
+            // No answer: past the note's time, or none came.
+            None if Instant::now() >= until => Err(NoteCause::Timeout),
+            None => Err(NoteCause::Refused),
+            Some(answer) if answer["ok"] != true => Err(NoteCause::Refused),
+            Some(answer) => answer
+                .get("snapshot")
+                .and_then(|snapshot| {
+                    snapshot_ids(snapshot, name, scope).map(|ids| (snapshot.clone(), ids))
+                })
+                .ok_or(NoteCause::Invalid),
+        };
+        if snapshot.is_err() {
             // An open may commit after our deadline. Closing is best effort;
             // the store's 32-session/24-hour bounds cover a lost close.
             close();
@@ -14501,13 +14610,15 @@ mod tests {
             _ => dylan(request),
         });
         let client = resumes_test_client(socket.clone(), false);
-        for session in [1, 2] {
+        for (session, cause) in [(1, NoteCause::Refused), (2, NoteCause::Invalid)] {
             let note = client.session_note_within(session, None, false, FIRST_READ, true);
             assert!(!note.complete, "session {session}");
+            assert_eq!(note.cause, Some(cause), "session {session}");
             assert_eq!(note.text, UNAVAILABLE);
         }
         let recovered = client.session_note_within(3, None, false, FIRST_READ, true);
         assert!(recovered.complete && recovered.text.contains("Their name is Dylan"));
+        assert_eq!(recovered.cause, None);
         let requests = served.join().unwrap();
         assert_eq!(
             requests
@@ -14542,6 +14653,7 @@ mod tests {
         for session in [1, 2] {
             let note = client.session_note_within(session, Some(PERSON), false, FIRST_READ, true);
             assert!(!note.complete, "session {session}");
+            assert_eq!(note.cause, Some(NoteCause::OwnMissing), "session {session}");
             assert!(note.text.contains("Their name is Dylan"));
             assert!(!note.text.contains("Their name is Minh"));
         }
@@ -14556,6 +14668,59 @@ mod tests {
             assert!(pair[0]["person"].is_null());
             assert_eq!(pair[1]["person"], PERSON);
         }
+        std::fs::remove_file(socket).unwrap();
+    }
+
+    /// #1693: a note read with the client's context held is `busy`, one
+    /// read ahead the same; one with no Days client for its socket is
+    /// `no_client`. Nothing is asked of the store.
+    #[test]
+    fn session_note_a_held_client_is_busy_and_none_is_no_client() {
+        let (socket, served) = memory("note-busy", 0, empty_session_note);
+        let client = resumes_test_client(socket.clone(), false);
+        let held = client.context.lock().unwrap();
+        let note = client.session_note_within(1, None, false, FIRST_READ, true);
+        assert_eq!((note.complete, note.cause), (false, Some(NoteCause::Busy)));
+        drop(held);
+        let elsewhere = socket.with_extension("elsewhere");
+        let read = fresh_note_read(&elsewhere, 1, None, FIRST_READ, false);
+        assert_eq!(
+            (read.complete(), read.cause()),
+            (false, Some(NoteCause::NoClient))
+        );
+        assert!(served.join().unwrap().is_empty());
+        drop(client);
+        std::fs::remove_file(socket).unwrap();
+    }
+
+    /// #1693: a note read ahead names why it is incomplete as the one read
+    /// in place does: refused, invalid, and a known person's own missing.
+    #[test]
+    fn a_note_read_ahead_names_its_cause() {
+        const PERSON: &str = "p-0123456789abcdef";
+        let (socket, served) = memory("note-ahead-cause", 4, |request| {
+            match request["session"].as_str().unwrap() {
+                "voice-test-1" => json!({"ok":false,"error":"Their name is Pippa"}),
+                "voice-test-2" => json!({"ok":true}),
+                _ if request["person"].is_string() => json!({"ok":false}),
+                _ => empty_session_note(request),
+            }
+        });
+        let client = resumes_test_client(socket.clone(), false);
+        for (session, person, cause) in [
+            (1, None, NoteCause::Refused),
+            (2, None, NoteCause::Invalid),
+            (3, Some(PERSON), NoteCause::OwnMissing),
+        ] {
+            let read = client.read_note_within(session, person, false, FIRST_READ, (true, false));
+            assert_eq!(
+                (read.complete(), read.cause()),
+                (false, Some(cause)),
+                "{session}"
+            );
+        }
+        assert_eq!(served.join().unwrap().len(), 4);
+        drop(client);
         std::fs::remove_file(socket).unwrap();
     }
 
@@ -14608,6 +14773,7 @@ mod tests {
                 elapsed.as_micros()
             );
             assert!(!note.complete);
+            assert_eq!(note.cause, Some(NoteCause::Timeout));
             assert_eq!(note.text, UNAVAILABLE);
             assert!(
                 elapsed >= FIRST_READ - Duration::from_millis(20),
@@ -14662,6 +14828,9 @@ mod tests {
                 elapsed.as_micros()
             );
             assert!(!note.complete);
+            // Past the 300 ms, the room's is let go too: the whole read
+            // timed out.
+            assert_eq!(note.cause, Some(NoteCause::Timeout));
             assert!(
                 elapsed >= FIRST_READ - Duration::from_millis(20),
                 "{elapsed:?}"

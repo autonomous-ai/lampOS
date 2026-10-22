@@ -1544,7 +1544,13 @@ order is kept. A written turn is the same from the chat on.
     `memory note incomplete again; retry after 30000 ms`, `memory note
     retry complete`, `memory note let go: the memory changed while it was
     read; asked again` and `the memory changed since the note was read: it
-    is asked again`; they contain no note, name or person id. The
+    is asked again`; they contain no note, name or person id. The late and
+    incomplete lines end with `; cause=` and one code (#1693): `timeout`
+    (not in within the 300 ms; every late line), `refused` (the store said
+    no, or gave no answer), `invalid` (no valid snapshot), `own_missing`
+    (the room's read, the known person's own not), `busy` (the memory
+    client's context could not be had) or `no_client` (no Days client);
+    a code only, never the store's words. The
     host regressions are `worker::memory_note_retries` (among them the
     loop's longest gap with an answer 350 ms after the ask on a 1 s line,
     a late answer taken on the next turn, lines never answered asking
