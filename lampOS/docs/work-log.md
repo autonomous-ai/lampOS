@@ -1,3 +1,32 @@
+## Current checkpoint: 2026-10-22 07:49 +07, installer pushed as #2767; Music rebase in its gate
+
+**Exit-note installer #2767:** pushed `19d1a46d952d8301871a69caf48c04d5c21c0bfa`
+on `fc800db6f`. Mac **471 passed / 0 failed / 3 ignored / 0 filtered**;
+rebase integration **76/0/0/0** installation and **177/0/1/0** Cloud.
+Fmt and strict Update/Cloud Clippy passed. Controls and initial failures are
+retained in the PR's [verification record](https://github.com/autonomous-ai/lampOS/blob/19d1a46d952d8301871a69caf48c04d5c21c0bfa/lampOS/docs/verification/install-exit-notes-20261022/README.md).
+Linux Clippy **39701589363** is green; ARM64 **39701589308** continues.
+Ready for lamp-voice: **no**, awaiting this head's ARM64 result and review.
+
+**Music #1757:** second rebase resolved at `bd1d79a5a` on `fc800db6f`,
+not pushed until its current Mac gate ends. The sole new conflict keeps
+both upstream speech-hold fields and Music's skipped-speech field. The
+new Voice and Voice-eval source is being tested; Msgs, Actions and Skills
+Git trees are identical to the previous passing gate (167, 120 and 452
+passes respectively). All five crates passed strict Clippy again.
+The [successful prior head's native receipt](verification/requested-audio-rebase-native-20261022/README.md)
+records **10071 passed / 0 failed / 63 skipped** (one leaky pass), four
+doctests, relay and twelve custom-harness tests, with both CI runs green.
+It is explicitly historical and does not qualify the new head.
+
+**#2764 remains ready**, with exact native evidence in the previous entry.
+Both implementation PRs are in #2602. No device action; First or the
+assigned reader owns merging. No local workspace or ARM64 gate.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 07:41 +07, failed-unit reports ready; Music rebase and installer checks active
 
 **Ready for lamp-voice: yes (#2764, `99d920738`).** ARM64 **39698837988**
