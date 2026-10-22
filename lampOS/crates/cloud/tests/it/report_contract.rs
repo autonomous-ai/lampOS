@@ -227,6 +227,10 @@ fn health_with_timer(name: &str, update_self: bool, timer: &str) -> Value {
     std::fs::set_permissions(&systemctl, std::fs::Permissions::from_mode(0o755)).unwrap();
     let mut lamp = Lamp::new(None);
     lamp.systemctl = systemctl;
+    // The stand-in shell took up to 1.7 s to start on a loaded Mac, near
+    // the product's 2 s, so a late query read as none and no `waits`
+    // (#1569): give it as long as it needs.
+    lamp.systemctl_within = std::time::Duration::from_secs(30);
     lamp.update_self = update_self;
     let seen = Seen {
         waits: lamp.waits(),
