@@ -1,0 +1,139 @@
+{
+  "schema": 1,
+  "scope": "focused host fixtures; full updater gate and ARM64 qualification pending",
+  "integration_base": "f71a62f559619c996d6a85f253ed88e367549722",
+  "source_identity": "base plus the test/document bytes bound by source_sha256; no claim that base alone contains the new fixtures",
+  "started_at": "2026-10-22T10:38:36.672017+07:00",
+  "baseline_finished_at": "2026-10-22T10:39:33.785156+07:00",
+  "restored_finished_at": "2026-10-22T10:45:24.608115+07:00",
+  "status": "six-passed-before-controls-and-six-passed-after-restoration",
+  "raw_receipts": {
+    "baseline.json": {
+      "sha256": "59105fec6aaf922863b81c753a8f6aa76c2880219cb67517812e6dc9b499ab83",
+      "published": false
+    },
+    "controls.json": {
+      "sha256": "237d3b5438f031415e5e8679a9340b01c1af8b487812c63acc59bad63c4d6f61",
+      "published": false
+    }
+  },
+  "source_sha256": {
+    "lampOS/crates/update/src/apply.rs": "89db5a74e01e2ce5419ef4de9c6c0c87001941a4de36ea39c7805573de497274",
+    "lampOS/crates/update/src/check_units.rs": "1c5cde0249f9d15ed566af3bd90bf490900b6184e2f81c77954fe89723d3d5f5",
+    "lampOS/crates/update/src/fetch.rs": "752e1e2f5e09256b58fc3f9c9cf139dab0e09d3ed0bdcf230118edc882f3b881",
+    "lampOS/crates/update/src/image.rs": "638716079df7e1770cb9c778814ae857a7e242b23519ed8bf490fe1f99a5466c",
+    "lampOS/crates/update/src/install.rs": "e787eb48d239e0dc12b1a9ac39da7d839015bf1e0002e25343453f95c5952009",
+    "lampOS/crates/update/src/judge.rs": "3a5670311ae6741a8c08620bfa1591c886b4a1165d45688ba4ea996357fc830f",
+    "lampOS/crates/update/src/lib.rs": "0dee46c6481bdd66b01b692bf3b37b01d9501a1d2b051e8d739491062fac63a0",
+    "lampOS/crates/update/src/main.rs": "f841cce11f5583b06d5c4d695feb506d1455ced2338f62de34bbfabbbcc91277",
+    "lampOS/crates/update/src/manifest.rs": "1eb17a3675d99f3c9fbb9c6a80d65c06b640dfb5ac35963500e022b5c84e8548",
+    "lampOS/crates/update/src/models.rs": "246d7ea10b652ec6265253c2a4af5df61e2c09b77963ff602087d4ffe5cd8384",
+    "lampOS/crates/update/src/own.rs": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7",
+    "lampOS/crates/update/src/product_skills.rs": "140bab39dd74570a3329210178d9c02db4da78e6417b7f0664891cfdf644bf1f",
+    "lampOS/crates/update/src/publish.rs": "90af8f48962c22d163b1f1cb19c1e1a32e307b2f1269c7715d3ed743a3e05ad6",
+    "lampOS/crates/update/src/quiet.rs": "8de6893ad64de665957effcd3a8236190ad6d53494fc8b7ae0968cdb01b7e6e5",
+    "lampOS/crates/update/src/records.rs": "e74440211d5a86ef0a69e4686e528c77dbbc53cfe44f9b5d1a9c6f4dc1866859",
+    "lampOS/crates/update/src/round.rs": "a9119a26010d799cb85a2a5f99a4509204e9b8f92f6fb2f10006cfdf314b49b9",
+    "lampOS/crates/update/src/status.rs": "3b4d0ab9ffcd0f77084f47f2627c2d4517a4e31d5ca3b21093aa695959e7126b",
+    "lampOS/crates/update/src/unit.rs": "85c25d8ca0322a86c7a3b13bcef97957ef239355d9158714fde0ffd0ec6b04cb",
+    "lampOS/crates/update/src/world.rs": "e33a959f95b787be18810533dfd62b3ed3a459b2998dd8d75934f3b00c84f571",
+    "lampOS/crates/update/tests/functions.rs": "41c7a9f602bdc10367602eeeb50772ed070feebfc10a37305672fb5e3bdd31aa",
+    "lampOS/crates/update/tests/install.rs": "b26913f2df4c82ab13d93707c3bd91de253f26b9993902c4e83ada02803f821d",
+    "lampOS/crates/update/tests/it/ci_paths.rs": "da2d09282d8c6ee4248f61bdfc904d21eb2b28f89e72d9639d88b8777c5e4725",
+    "lampOS/crates/update/tests/it/image_journal.rs": "415143feed902d28f9a88a8bb85c209efacc8babfd6c53f9f0f9492907688ea2",
+    "lampOS/crates/update/tests/it/image_ramlog.rs": "2d60293fcf7fe5ab17c639a115654110e55205bf4b72f693d0aea89ba6f08e7e",
+    "lampOS/crates/update/tests/it/main.rs": "7b486c660aa349e676019b3f55ae292947be9381241ae5436c7ee86225683535",
+    "lampOS/crates/update/tests/it/scratch_paths.rs": "40749f7cf74a1f5bcb11ebce3ba36866710fdf2d3ad13eb85fa1d75169b62554",
+    "lampOS/crates/update/tests/round/self_cuts.rs": "9ce086ae4ca867c1c7383c59aac34d91feee45a652e88a066659b6b37513550c",
+    "lampOS/crates/update/tests/round/self_recovery.rs": "2cce3692a1376a60cec1752c8fbcd3e760561f38f3988648ed32013da45363de",
+    "lampOS/crates/update/tests/round.rs": "758fc43beab86a1635d25f4e0ba68c1e8b9cc3e6d2d6aeed0c33ac292789ed35",
+    "lampOS/crates/update/Cargo.toml": "18b88d969259eee19cf3303a8fcbd3856b995be2f00eaeffb95a90cf762fbb0b",
+    "lampOS/Cargo.lock": "c794022c8517e5f2da9ba6446b7b26cd65e8ec6ee2eebf5442f511b983a48c28",
+    "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+    "lampOS/docs/updates.md": "da78ddffa480d41360e843c59f6bd4abfaef99576b7c32c8ab370b4e76ee2c72"
+  },
+  "source_checks": {
+    "source_count": 33,
+    "baseline_before_equals_after": true,
+    "controls_before_equals_after": true,
+    "both_runs_identical": true,
+    "current_files_match_restored_map": true
+  },
+  "stages": [
+    {
+      "name": "baseline",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--test",
+        "round",
+        "self_cuts::",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 57.09,
+      "log_name": "baseline.log",
+      "log_sha256": "7c92deb52ca766bfd91ee36b3b7a1369ed7f1c888c5ab13ea9c5295e830c0ee0",
+      "counts": {
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 99
+      },
+      "test_seconds": 32.05,
+      "summary": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 99 filtered out; finished in 32.05s",
+      "compiled": true,
+      "compile_finished_log_line": 24,
+      "summary_log_line": 45,
+      "warnings": [],
+      "expected_caught_cut_panics": 3
+    },
+    {
+      "name": "restored",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--test",
+        "round",
+        "self_cuts::",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 36.439,
+      "log_name": "restored.log",
+      "log_sha256": "87c6c12e8fd35cd4e56fec515053c0b56599bd8b35f063322b33acad89e4b1d1",
+      "counts": {
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 99
+      },
+      "test_seconds": 31.14,
+      "summary": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 99 filtered out; finished in 31.14s",
+      "compiled": true,
+      "compile_finished_log_line": 3,
+      "summary_log_line": 24,
+      "warnings": [],
+      "expected_caught_cut_panics": 3
+    }
+  ],
+  "expected_cut_panic_note": "Three typed Cut sentinel panics are caught by the fixture in each six-test run; they are not failed tests."
+}

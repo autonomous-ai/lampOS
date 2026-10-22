@@ -1,0 +1,12 @@
+--- a/lampOS/crates/update/src/round.rs
++++ b/lampOS/crates/update/src/round.rs
+@@ -2290,8 +2290,7 @@
+                 let _ = fs::remove_dir_all(&temporary);
+                 return Err(outcome.to_string());
+             }
+-            fs::rename(&temporary, &there)
+-                .and_then(|()| sync_parent(&there))
++            sync_parent(&temporary)
+                 .map_err(|error| format!("{new_folder} cannot be named: {error}"))?;
+             let mut state = self
+                 .records

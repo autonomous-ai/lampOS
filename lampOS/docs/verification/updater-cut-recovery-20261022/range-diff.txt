@@ -1,0 +1,1 @@
+1:  282e56938 = 1:  c64302472 lampOS: cover updater recovery at persisted switch steps
