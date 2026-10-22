@@ -271,6 +271,14 @@ pub struct Words {
     pub visit: String,
     /// A visit that came in by a door or footsteps (#2562): the same slots.
     pub came_in: String,
+    /// `visit` when `{who}` is more than one person, by name and beside
+    /// them (#2562): "Minh and Lan were at your desk…". A file from before
+    /// it says the built-in.
+    #[serde(default = "built_in_visit_many")]
+    pub visit_many: String,
+    /// `came_in` for more than one: "…came in at 18:10 and were here…".
+    #[serde(default = "built_in_came_in_many")]
+    pub came_in_many: String,
     /// `{who}`: a face the eyes know...
     pub known: String,
     /// ...a face they don't...
@@ -324,6 +332,8 @@ impl Words {
             hours: "{hours} hours".into(),
             visit: "{who} was at your desk{at}, {long}.".into(),
             came_in: "{who} came in{at} and was here {long}.".into(),
+            visit_many: built_in_visit_many(),
+            came_in_many: built_in_came_in_many(),
             known: "Someone you've introduced me to".into(),
             unknown: "Someone I don't know".into(),
             someone: "Someone".into(),
@@ -370,6 +380,8 @@ impl Words {
                 ("hours", &self.hours, &["hours"]),
                 ("visit", &self.visit, &["at", "long", "who"]),
                 ("came_in", &self.came_in, &["at", "long", "who"]),
+                ("visit_many", &self.visit_many, &["at", "long", "who"]),
+                ("came_in_many", &self.came_in_many, &["at", "long", "who"]),
                 ("known", &self.known, &[]),
                 ("unknown", &self.unknown, &[]),
                 ("someone", &self.someone, &[]),
@@ -383,6 +395,16 @@ impl Words {
         )?;
         Ok(self)
     }
+}
+
+/// `visit_many` for a `[watch.words]` from before it (#2562).
+fn built_in_visit_many() -> String {
+    "{who} were at your desk{at}, {long}.".into()
+}
+
+/// `came_in_many` for a `[watch.words]` from before it (#2562).
+fn built_in_came_in_many() -> String {
+    "{who} came in{at} and were here {long}.".into()
 }
 
 /// `named_and_known` for a `[watch.words]` from before it (#2562).
@@ -538,6 +560,9 @@ impl Visit {
             .filter(|name| tellable.contains(name))
             .map(String::as_str)
             .collect();
+        // Two or more named, or one named beside someone known: more than
+        // one person, so the line says "were".
+        let many = !named.is_empty() && self.names.len() > 1;
         let who = match named.split_last() {
             Some((last, rest)) => {
                 let names = if rest.is_empty() {
@@ -571,10 +596,11 @@ impl Visit {
             minutes => words.minutes.replace("{minutes}", &minutes.to_string()),
         };
         // The parts have no slots of their own, so none is filled twice.
-        let text = if self.came_in {
-            &words.came_in
-        } else {
-            &words.visit
+        let text = match (self.came_in, many) {
+            (true, false) => &words.came_in,
+            (true, true) => &words.came_in_many,
+            (false, false) => &words.visit,
+            (false, true) => &words.visit_many,
         };
         text.replace("{who}", &who)
             .replace("{at}", &at)
@@ -2764,7 +2790,7 @@ mod tests {
         assert_eq!(
             sent(&outs),
             [(
-                "Minh and someone the lamp knows came in at 18:10 and was here for about 2 minutes.",
+                "Minh and someone the lamp knows came in at 18:10 and were here for about 2 minutes.",
                 true
             )]
         );
@@ -2797,7 +2823,7 @@ mod tests {
         );
         assert_eq!(
             sent(&outs)[0].0,
-            "Minh and someone the lamp knows came in at 18:10 and was here for about 2 minutes."
+            "Minh and someone the lamp knows came in at 18:10 and were here for about 2 minutes."
         );
         let mut watches = naming(dir.path(), "Minh\n");
         let outs = came_in(&mut watches, &[Some("Minh")], |_| Vec::new());
@@ -2810,7 +2836,7 @@ mod tests {
         let outs = came_in(&mut watches, &[Some("Minh"), Some("Lan")], |_| Vec::new());
         assert_eq!(
             sent(&outs)[0].0,
-            "Minh and Lan came in at 18:10 and was here for about 2 minutes."
+            "Minh and Lan came in at 18:10 and were here for about 2 minutes."
         );
         // Neither did: as without names.
         let mut watches = naming(dir.path(), "Thu\n");
@@ -2821,6 +2847,68 @@ mod tests {
                 "Someone you've introduced me to came in at 18:10 and was here for about 2 minutes.",
                 false
             )]
+        );
+    }
+
+    /// #2562, seen on lamp-06c1 on 22 Oct with names on: "Bramble and
+    /// someone the lamp knows was at your desk at 19:34". More than one
+    /// person in `{who}` says "were"; one, or no name, says "was" as before.
+    #[test]
+    fn more_than_one_person_at_the_desk_were_one_was() {
+        let words = Words::built_in();
+        let visit = |names: &[&str]| Visit {
+            began_us: 0,
+            began_minute: Some(19 * 60 + 34),
+            seen_us: 2 * MINUTE,
+            face: true,
+            known: true,
+            names: names.iter().map(|name| (*name).to_owned()).collect(),
+            came_in: false,
+            turned: false,
+        };
+        let yes = |names: &[&str]| {
+            names
+                .iter()
+                .map(|name| (*name).to_owned())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            visit(&["Bramble", "Lan"]).text(&words, &yes(&["Bramble"])),
+            "Bramble and someone the lamp knows were at your desk at 19:34, for about 2 minutes."
+        );
+        assert_eq!(
+            visit(&["Bramble"]).text(&words, &yes(&["Bramble"])),
+            "Bramble was at your desk at 19:34, for about 2 minutes."
+        );
+        assert_eq!(
+            visit(&["Bramble", "Lan"]).text(&words, &yes(&["Bramble", "Lan"])),
+            "Bramble and Lan were at your desk at 19:34, for about 2 minutes."
+        );
+        // Nobody named: the words with names off, two known or one.
+        for names in [&["Bramble", "Lan"][..], &["Bramble"], &[]] {
+            assert_eq!(
+                visit(names).text(&words, &[]),
+                "Someone you've introduced me to was at your desk at 19:34, for about 2 minutes."
+            );
+        }
+        let mut stranger = visit(&[]);
+        stranger.known = false;
+        assert_eq!(
+            stranger.text(&words, &[]),
+            "Someone I don't know was at your desk at 19:34, for about 2 minutes."
+        );
+        stranger.face = false;
+        stranger.came_in = true;
+        assert_eq!(
+            stranger.text(&words, &[]),
+            "Someone came in at 19:34 and was here for about 2 minutes."
+        );
+        // The door's line for two: "were" there too.
+        let mut two = visit(&["Bramble", "Lan"]);
+        two.came_in = true;
+        assert_eq!(
+            two.text(&words, &yes(&["Bramble", "Lan"])),
+            "Bramble and Lan came in at 19:34 and were here for about 2 minutes."
         );
     }
 

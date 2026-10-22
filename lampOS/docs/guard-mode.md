@@ -170,9 +170,11 @@ yet seen on a lamp.
   their known file, the same yes Who was here reads
   (`lamp_skills::known::tellable_in`). "Minh came in at 18:10 and was here
   for about 2 minutes." Two known people at one visit, one who said yes
-  and one who didn't: "Minh and someone the lamp knows came in at 18:10…"
-  (`[watch.words]`' `named_and_known`; two names or three are joined by
-  `and`, "Minh and Lan"; a visit keeps at most 3). Known but no yes stays
+  and one who didn't: "Minh and someone the lamp knows came in at 18:10
+  and were here…" (`[watch.words]`' `named_and_known`; two names or three
+  are joined by `and`, "Minh and Lan"; a visit keeps at most 3). More than
+  one person says "were" (`visit_many`, `came_in_many`): "Minh and Lan were
+  at your desk…"; one says "was", as before. Known but no yes stays
   "someone you've introduced me to", a stranger "someone I don't know".
   **Read as the text goes,** never as the face was seen: a yes taken back,
   or a forget, before the visit's text is sent names nobody in it. A name
