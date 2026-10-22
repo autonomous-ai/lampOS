@@ -1068,8 +1068,8 @@ pub fn search_for(
 /// turn's name signal: the lamp's ([`crate::tools::uncut`]),
 /// [`crate::tools::THE_TIME`] only for elsewhere (the time here is told in
 /// every request), then the search's, and with `look` (a spoken turn with a
-/// full look) the look's ([`look_tool`]), within Live's bound of
-/// [`lamp_gemini::MAX_TOOLS`] ([`crate::tools::fit`]): cut by
+/// full look) the look's ([`look_tool`]), within this route's own bound of
+/// [`crate::second_provider::MAX_TOOLS`] ([`crate::tools::fit_within`]): cut by
 /// [`chat_cut`], never a core skill's function nor the look, which is one
 /// of the core (the first builder on #2602, 22 Oct 12:3x: added after the
 /// bound, a list already at it left the look out, and nothing said so).
@@ -1086,7 +1086,12 @@ pub fn chat_tools(
         told.push(look_tool());
         core.insert(crate::second_provider::LOOK_CALL.to_owned());
     }
-    crate::tools::fit(told, &chat_cut(skills), &core)
+    crate::tools::fit_within(
+        told,
+        &chat_cut(skills),
+        &core,
+        crate::second_provider::MAX_TOOLS,
+    )
 }
 
 /// The order the bound cuts this route's functions in (the first builder
@@ -1220,13 +1225,13 @@ pub(crate) fn look_tool() -> lamp_gemini::Tool {
 }
 
 /// `tools`, already fitted, with the look's after them (the probe's list):
-/// within Live's bound of [`lamp_gemini::MAX_TOOLS`], the last that isn't
+/// within this route's bound of [`crate::second_provider::MAX_TOOLS`], the last that isn't
 /// the lamp's own leaves for it, never the look, and it is said.
 pub(crate) fn with_look(tools: Vec<lamp_gemini::Tool>) -> Vec<lamp_gemini::Tool> {
     let mut tools = tools;
     tools.push(look_tool());
     let core = [crate::second_provider::LOOK_CALL.to_owned()].into();
-    crate::tools::fit(tools, &[], &core)
+    crate::tools::fit_within(tools, &[], &core, crate::second_provider::MAX_TOOLS)
 }
 
 /// A search begun from a request's words before the model asks (#1712):

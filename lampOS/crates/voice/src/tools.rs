@@ -559,14 +559,20 @@ pub fn uncut(settings: &Settings) -> (Vec<Tool>, Vec<String>, BTreeSet<String>) 
 /// the error is the list as it then is: the lamp's own and its core
 /// skills' functions alone are over (the owner's rule, on #2614: at the
 /// bound a core skill's function is never the one cut).
-pub fn within_bound(mut tools: Vec<Tool>, cut: &[String]) -> Result<Vec<Tool>, Vec<Tool>> {
+pub fn within_bound(tools: Vec<Tool>, cut: &[String]) -> Result<Vec<Tool>, Vec<Tool>> {
+    within(tools, cut, lamp_gemini::MAX_TOOLS)
+}
+
+/// [`within_bound`] past `bound` functions, not Live's: the second route's
+/// own ([`crate::second_provider::MAX_TOOLS`]).
+pub fn within(mut tools: Vec<Tool>, cut: &[String], bound: usize) -> Result<Vec<Tool>, Vec<Tool>> {
     for name in cut {
-        if tools.len() <= lamp_gemini::MAX_TOOLS {
+        if tools.len() <= bound {
             break;
         }
         tools.retain(|tool| tool.name != *name);
     }
-    if tools.len() <= lamp_gemini::MAX_TOOLS {
+    if tools.len() <= bound {
         Ok(tools)
     } else {
         Err(tools)
@@ -578,14 +584,25 @@ pub fn within_bound(mut tools: Vec<Tool>, cut: &[String]) -> Result<Vec<Tool>, V
 /// rest fit, and named on an error line, never silently. Whatever is cut
 /// is said once, on a plain line naming each ([`said_cut`]).
 pub fn fit(tools: Vec<Tool>, cut: &[String], core: &BTreeSet<String>) -> Vec<Tool> {
+    fit_within(tools, cut, core, lamp_gemini::MAX_TOOLS)
+}
+
+/// [`fit`] past `bound` functions, not Live's: the second route's own
+/// ([`crate::second_provider::MAX_TOOLS`]).
+pub fn fit_within(
+    tools: Vec<Tool>,
+    cut: &[String],
+    core: &BTreeSet<String>,
+    bound: usize,
+) -> Vec<Tool> {
     let before: Vec<String> = tools.iter().map(|tool| tool.name.clone()).collect();
-    let kept = past_bound(tools, cut, core);
+    let kept = past_bound(tools, cut, core, bound);
     let left: Vec<String> = before
         .iter()
         .filter(|name| !kept.iter().any(|tool| tool.name == **name))
         .map(|name| said_name(name))
         .collect();
-    if let Some(line) = said_cut(&left) {
+    if let Some(line) = said_cut(&left, bound) {
         eprintln!("{line}");
     }
     kept
@@ -597,7 +614,7 @@ pub fn fit(tools: Vec<Tool>, cut: &[String], core: &BTreeSet<String>) -> Vec<Too
 /// the cut said once, at start.
 // ponytail: one process-wide last cut; a cut that changes and changes
 // back is said again, which is then a start of its own.
-fn said_cut(left: &[String]) -> Option<String> {
+fn said_cut(left: &[String], bound: usize) -> Option<String> {
     static LAST: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
     let mut last = LAST.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     if left.is_empty() || *last == left {
@@ -606,15 +623,20 @@ fn said_cut(left: &[String]) -> Option<String> {
     *last = left.to_vec();
     Some(format!(
         "lamp-voice: past the bound of {}, left out: {}",
-        lamp_gemini::MAX_TOOLS,
+        bound,
         left.join(", ")
     ))
 }
 
-fn past_bound(tools: Vec<Tool>, cut: &[String], core: &BTreeSet<String>) -> Vec<Tool> {
-    within_bound(tools, cut).unwrap_or_else(|mut over| {
+fn past_bound(
+    tools: Vec<Tool>,
+    cut: &[String],
+    core: &BTreeSet<String>,
+    bound: usize,
+) -> Vec<Tool> {
+    within(tools, cut, bound).unwrap_or_else(|mut over| {
         let mut past = Vec::new();
-        while over.len() > lamp_gemini::MAX_TOOLS {
+        while over.len() > bound {
             let last = over
                 .iter()
                 .rposition(|tool| !core.contains(&tool.name))
@@ -623,7 +645,7 @@ fn past_bound(tools: Vec<Tool>, cut: &[String], core: &BTreeSet<String>) -> Vec<
         }
         eprintln!(
             "lamp-voice: error: the lamp's own and its core skills' functions alone are past the bound of {}; left out: {}",
-            lamp_gemini::MAX_TOOLS,
+            bound,
             past.join(", ")
         );
         over
