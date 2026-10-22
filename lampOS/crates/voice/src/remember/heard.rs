@@ -485,8 +485,8 @@ mod tests {
         // With #2298's one-entry check: a match already kept stays as told.
         for answer in [
             json!({"remembered": true, "existing": true}),
-            json!({"remembered": true, "note": "That was already kept."}),
-            json!({"remembered": true, "existing": true, "note": "That was already kept."}),
+            json!({"remembered": true, "note": crate::remember::ALREADY_KEPT}),
+            json!({"remembered": true, "existing": true, "note": crate::remember::ALREADY_KEPT}),
         ] {
             assert_eq!(super::told(answer.clone(), "They said: y"), answer);
         }

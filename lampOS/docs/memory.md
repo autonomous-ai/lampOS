@@ -663,8 +663,12 @@ the unchanged legacy client, used unless the new Days client is selected.
   mark) is that kept thing, no entry is written, it gains this
   conversation's exchanges as sources (so forgetting it with
   `LAMP_MEMORY_FORGET_ALL` removes both conversations'), and the model is told
-  `{"remembered":true,"note":"That was already kept."}`, so it doesn't
-  promise to remember it a second time. Off, the request is as before.
+  `{"remembered":true,"note":"Already kept before this session. Tell them
+  you already knew it."}`, so it doesn't promise to remember it a second
+  time, and says it knew already. With "That was already kept.", a repeat
+  in a new session was said to be known already 1 time in 20 (10 English,
+  10 Vietnamese, the relay's DeepSeek); with this note, 20 in 20. Off, the
+  request is as before.
   Tests: `days_protocol::tests::a_remember_once_the_same_person_already_keeps_word_for_word_is_that_kept_thing`,
   `days::tests::a_remember_once_passes_over_a_kept_thing_no_longer_active`,
   `days::tests::a_remember_once_links_its_sources_to_the_kept_thing_it_finds`,
