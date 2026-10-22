@@ -366,6 +366,10 @@ fn a_package_signed_with_the_update_channels_key_installs_and_is_listed() {
     );
     assert_eq!(store.join().unwrap(), 1);
     assert_eq!(left(&skills), ["dance", "desk-tutor"]);
+    // The skill keeps the package's sha256, the catalogue's, for the app.
+    let kept = package::installed_from(&skills.join("desk-tutor")).unwrap();
+    assert_eq!(kept.sha256, sha256_hex(&bytes));
+    assert_eq!(kept.manifest.version, "1.0.0");
     let listed = package::list(&skills).unwrap();
     assert!(
         listed

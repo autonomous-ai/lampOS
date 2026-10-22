@@ -301,6 +301,11 @@ pub struct Listed {
     pub group: Group,
     /// Its `skill.toml`'s version, if it says one.
     pub version: Option<String>,
+    /// The SHA-256 of the package it was put on from, as the Store's
+    /// catalogue names it ([`lamp_skills::package::installed_from`]); null
+    /// for a core skill, one put on from a folder, or one whose folder no
+    /// longer says that package's version.
+    pub sha256: Option<String>,
     /// False for a core skill: it comes with the lamp.
     pub can_remove: bool,
     /// It loads and is not part of the lamp itself
@@ -586,6 +591,7 @@ fn row(
         description: cut(&description, DESCRIPTION_MOST),
         group,
         version: version.map(|version| cut(&version, 32)),
+        sha256: lamp_skills::package::installed_from(folder).map(|installed| installed.sha256),
         can_remove: kind != SkillKind::Core,
         can_turn_off,
         off: can_turn_off
@@ -786,6 +792,7 @@ pub mod tests {
                 "description": "What stretch does.",
                 "group": "core",
                 "version": "1.0.0",
+                "sha256": null,
                 "can_remove": false,
                 "can_turn_off": true,
                 "off": false,
