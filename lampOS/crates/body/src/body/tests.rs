@@ -3243,6 +3243,15 @@ fn rest_glances(
     set: impl FnOnce(&mut Lamp, &mut Limits),
     glances: Vec<(Duration, Duration, f32)>,
 ) -> (BodyReport, Vec<(Duration, u16, u16)>) {
+    rest_glances_watched(set, glances, |_, _| {})
+}
+
+/// The same fixture, with each full step available to reporting tests.
+fn rest_glances_watched(
+    set: impl FnOnce(&mut Lamp, &mut Limits),
+    glances: Vec<(Duration, Duration, f32)>,
+    mut watch: impl FnMut(Duration, &Glimpse),
+) -> (BodyReport, Vec<(Duration, u16, u16)>) {
     let (mut lamp, mut clock) = folded(Duration::from_secs(16));
     lamp.arm_moves = true;
     lamp.overload_clears = 1;
@@ -3295,9 +3304,62 @@ fn rest_glances(
             asleep: false,
             woken: false,
         },
-        |glimpse| seen.push((seen_at.get(), glimpse.goals[0], glimpse.positions[0])),
+        |glimpse| {
+            let at = seen_at.get();
+            seen.push((at, glimpse.goals[0], glimpse.positions[0]));
+            watch(at, glimpse);
+        },
     );
     (report, seen)
+}
+
+/// A stationary hand can cross the pitch's contact floor while a glance
+/// permits a higher motion load. Contact still pins it, and the hand must
+/// be reported throughout that hold before sustained pressure makes it slump.
+#[test]
+fn a_pitch_contact_during_glance_cooling_is_said_as_a_hand_before_it_slumps() {
+    let ms = Duration::from_millis;
+    let pressed = GLANCE_UNTIL;
+    let load = 675;
+    let mut seen = Vec::new();
+    let (report, _) = rest_glances_watched(
+        |lamp, limits| {
+            assert!(limits.load[0] < load);
+            assert!(CONTACT_FLOOR[0] < load && load <= GESTURE_LOAD);
+            limits.give_way = Some(GiveWay::Return);
+            limits.limp = true;
+            lamp.strains
+                .push((pressed, pressed + ms(2_000), PITCH, load));
+        },
+        vec![(GLANCE_FROM, pressed + ms(3_000), 40.0)],
+        |at, glimpse| seen.push((at, *glimpse)),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.expression_steps > 0, "{report:?}");
+    assert_eq!(report.eased, [1, 0, 0], "{report:?}");
+    assert_eq!(report.released_by_hand, [1, 0, 0], "{report:?}");
+    assert_eq!(report.released.len(), 1, "{report:?}");
+    assert_eq!(report.released[0].joint, Joint::WristPitch.name());
+    assert_eq!(report.released[0].load, load);
+
+    // Contact's three reads pin it before the ordinary load guard's six.
+    let first = seen.iter().find(|(_, g)| g.eased[0] == 1).unwrap();
+    assert!(
+        first.0 >= pressed && first.0 < pressed + TICK * u32::from(Limits::FOLDED.load_steps),
+        "first contact at {:?}, pressed at {pressed:?}",
+        first.0
+    );
+    let window = pressed + ms(200)..pressed + ms(900);
+    assert!(Duration::from_secs_f32(report.released[0].seconds) > window.end);
+    let held: Vec<_> = seen.iter().filter(|(at, _)| window.contains(at)).collect();
+    assert!(!held.is_empty(), "no steps before the slump");
+    for (_, g) in held {
+        assert!(!g.limp && g.released == 0 && g.eased == [1, 0, 0], "{g:?}");
+        assert_eq!(g.loads[0], load, "{g:?}");
+        assert!(g.positions[0].abs_diff(first.1.positions[0]) <= HAND_MOVED);
+        assert!(g.goals[0].abs_diff(g.positions[0]) <= HAND_MOVED);
+        assert!(g.hand, "the pinned contact was not reported: {g:?}");
+    }
 }
 
 /// A head that stops short only when it lifts, as lamp-52e6's does (26
@@ -5377,6 +5439,365 @@ fn a_step_says_a_hand_while_a_joint_is_held_where_it_gave_way_and_never_without_
             .all(|g| !g.hand)
     );
     assert!(ran(false).iter().all(|g| !g.hand));
+}
+
+/// lamp-06c1's head on 2026-10-23: resting, nobody at the lamp, it pushed
+/// at its own rest for a moment (a load over its bound, without moving) and
+/// gave way; held where it gave, it went on reading its own weight (124 to
+/// 136, over the 100 a hand under its bound reads) and jittered a few counts,
+/// and every step said a hand (`body/hand pushed`, 969 in 120 s). A joint
+/// resting inside its band, whatever its rest and its resting load, never
+/// says a hand. A real one, moving it or pressing past its bound, still does.
+#[test]
+fn a_resting_joint_jittering_inside_its_band_never_says_a_hand() {
+    let ms = Duration::from_millis;
+    // Pitch resting at `rest` counts from its default place, reading `load`
+    // at rest; `push` is what else is done to it from 1 s to 3 s.
+    let ran = |rest: f32, load: u16, push: Option<(f32, u16)>| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(12));
+        let at = lamp.servos[PITCH].position + rest;
+        lamp.servos[PITCH].position = at;
+        lamp.servos[PITCH].goal = at as u16;
+        lamp.strains = match push {
+            // Its own push at its rest, 300 ms, then its weight.
+            None => vec![
+                (ms(0), ms(1_000), PITCH, load),
+                (ms(1_000), ms(1_300), PITCH, 300),
+                (ms(1_300), ms(12_000), PITCH, load),
+            ],
+            Some((_, pressed)) => vec![
+                (ms(0), ms(1_000), PITCH, load),
+                (ms(1_000), ms(3_000), PITCH, pressed),
+                (ms(3_000), ms(12_000), PITCH, load),
+            ],
+        };
+        if let Some((by, _)) = push
+            && by != 0.0
+        {
+            lamp.hand = Some((ms(1_000), ms(3_000), PITCH, at + by));
+        }
+        // Read a few counts either side of where it rests, every 100 ms,
+        // unless a hand moves it.
+        let moved = push.is_some_and(|(moved, _)| moved != 0.0);
+        lamp.misreads = (0..if moved { 0 } else { 120u32 })
+            .map(|tick| {
+                let by = [3, -3, 2, -1, 0, -2][tick as usize % 6];
+                (ms(u64::from(tick) * 100), PITCH, (at as i32 + by) as u16, 1)
+            })
+            .collect();
+        let mut seen = Vec::new();
+        let report = run(
+            &mut lamp,
+            &mut clock,
+            Limits {
+                limp: true,
+                ..giving_way(GiveWay::Return)
+            },
+            None,
+            || Some((Mood::Resting, 0)),
+            |glimpse| seen.push(*glimpse),
+        );
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        (report, seen)
+    };
+    for rest in [0.0, 12.0, -14.0] {
+        for load in [130, 68, 160] {
+            let (report, seen) = ran(rest, load, None);
+            // It did give way to its own push, and is held where it gave.
+            assert!(report.eased[0] >= 1, "{rest} {load} {report:?}");
+            let said: Vec<&Glimpse> = seen
+                .iter()
+                .filter(|g| clock_of(g) > ms(2_500) && g.hand)
+                .collect();
+            assert!(
+                said.is_empty(),
+                "rest {rest}, load {load}: {} steps said a hand, first {:?}",
+                said.len(),
+                said.first()
+            );
+        }
+    }
+    // A hand moving the head 40 counts, and one pressing it past its bound
+    // without moving it, each still say a hand while they are on it.
+    for push in [(-40.0, 130), (0.0, 300)] {
+        let (_, seen) = ran(12.0, 130, Some(push));
+        assert!(
+            seen.iter()
+                .any(|g| g.hand && (ms(1_000)..ms(3_000)).contains(&clock_of(g))),
+            "{push:?}"
+        );
+    }
+}
+
+/// A hand that moves the head 40 counts and keeps it there, pressing
+/// gently (130, under the head's bound), is a hand for as long as it stays:
+/// re-held where it is each second, the head is still that far from where
+/// it first gave, so every step of the hold says a hand, and none does once
+/// the hand has gone and the hold has run out (held where it is, its goal
+/// where it is, it reads next to nothing: lamp-06c1's pitch read 0 a count
+/// off its goal).
+#[test]
+fn a_hand_holding_a_joint_off_where_it_gave_says_a_hand_until_it_lets_go() {
+    let ms = Duration::from_millis;
+    let (mut lamp, mut clock) = folded(Duration::from_secs(12));
+    let at = lamp.servos[PITCH].position + 12.0;
+    lamp.servos[PITCH].position = at;
+    lamp.servos[PITCH].goal = at as u16;
+    lamp.strains = vec![
+        (ms(0), ms(1_000), PITCH, 130),
+        (ms(1_000), ms(6_000), PITCH, 130),
+    ];
+    lamp.hand = Some((ms(1_000), ms(6_000), PITCH, at - 40.0));
+    let mut seen = Vec::new();
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            limp: true,
+            ..giving_way(GiveWay::Return)
+        },
+        None,
+        || Some((Mood::Resting, 0)),
+        |glimpse| seen.push(*glimpse),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.eased[0] >= 1, "{report:?}");
+    let late: Vec<&Glimpse> = seen
+        .iter()
+        .filter(|g| (ms(2_500)..ms(6_000)).contains(&clock_of(g)))
+        .collect();
+    assert!(!late.is_empty());
+    let dropped: Vec<Duration> = late
+        .iter()
+        .filter(|g| !g.hand)
+        .map(|g| clock_of(g))
+        .collect();
+    assert!(
+        dropped.is_empty(),
+        "{} of {} steps in the hold said no hand, first at {:?}",
+        dropped.len(),
+        late.len(),
+        dropped.first()
+    );
+    assert!(
+        seen.iter()
+            .filter(|g| clock_of(g) > ms(8_500))
+            .all(|g| !g.hand),
+        "a hand said after it let go"
+    );
+}
+
+/// The release acceptance rule: once both load and displacement are gone,
+/// the hand report clears within one control tick. This is a new reporting
+/// requirement, not a claim about how long the earlier body kept a hand.
+#[test]
+fn stationary_pressure_clears_within_one_tick_after_load_and_displacement_clear() {
+    let ms = Duration::from_millis;
+    let (mut lamp, mut clock) = folded(Duration::from_secs(7));
+    // Above pitch's ordinary bound, below its contact floor: no motion,
+    // no physical hand displacement and no contact-floor slump. Releasing
+    // the pressure restores the fixture's quiet load of 25 at the goal.
+    lamp.strains = vec![(ms(1_500), ms(4_500), PITCH, 300)];
+    let mut seen = Vec::new();
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            limp: true,
+            ..giving_way(GiveWay::Return)
+        },
+        Some(HOME),
+        || Some((Mood::Resting, 0)),
+        |glimpse| seen.push(*glimpse),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let pressed: Vec<_> = seen
+        .iter()
+        .filter(|g| (ms(2_500)..ms(4_400)).contains(&clock_of(g)))
+        .collect();
+    assert!(!pressed.is_empty());
+    assert!(
+        pressed
+            .iter()
+            .all(|g| { g.loads[0] == 300 && g.positions[0] == g.goals[0] && g.hand }),
+        "stationary pressure was not reported: {pressed:?}"
+    );
+    let first_pressed = seen.iter().position(|g| g.loads[0] == 300).unwrap();
+    let quiet_at = seen
+        .iter()
+        .enumerate()
+        .skip(first_pressed + 1)
+        .find(|(_, g)| g.loads[0] == 25 && g.positions[0] == g.goals[0])
+        .map(|(index, _)| index)
+        .expect("the pressure never cleared at the pinned goal");
+    let quiet = &seen[quiet_at..];
+    assert!(
+        quiet.len() >= 2,
+        "no observation after the first quiet read"
+    );
+    assert_eq!(quiet[1].step, quiet[0].step + 1);
+    // `Glimpse` may precede this step's hand decision. Allow that first
+    // quiet row, then require every subsequent row to report no hand.
+    assert!(
+        quiet[1..]
+            .iter()
+            .all(|g| { g.loads[0] == 25 && g.positions[0] == g.goals[0] && !g.hand }),
+        "hand outlasted the first quiet read by more than one tick: {:?}",
+        quiet.iter().take(3).collect::<Vec<_>>()
+    );
+}
+
+/// The hysteresis acceptance rule: a push admitted above the ordinary
+/// bound remains a hand above half that bound, even without displacement.
+/// This specifies the new retention rule, not the earlier body's policy.
+#[test]
+fn stationary_pressure_remains_a_hand_when_it_eases_above_half_the_bound() {
+    let ms = Duration::from_millis;
+    let (mut lamp, mut clock) = folded(Duration::from_secs(10));
+    // Pitch's bound is 240. First qualify at 300, then hold at 130: below
+    // entry but above retention at 120. Its position never leaves its goal.
+    lamp.strains = vec![
+        (ms(1_500), ms(3_000), PITCH, 300),
+        (ms(3_000), ms(7_000), PITCH, 130),
+    ];
+    let mut seen = Vec::new();
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            limp: true,
+            ..giving_way(GiveWay::Return)
+        },
+        Some(HOME),
+        || Some((Mood::Resting, 0)),
+        |glimpse| seen.push(*glimpse),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    for (from, until, load) in [(ms(2_000), ms(2_900), 300), (ms(5_000), ms(6_900), 130)] {
+        let held: Vec<_> = seen
+            .iter()
+            .filter(|g| (from..until).contains(&clock_of(g)))
+            .collect();
+        assert!(!held.is_empty(), "no observations at load {load}");
+        assert!(
+            held.iter()
+                .all(|g| g.loads[0] == load && g.positions[0] == g.goals[0] && g.hand),
+            "stationary pressure at load {load} was not retained: {held:?}"
+        );
+    }
+}
+
+/// Once contact has pinned a joint, thirteen counts of displacement keep
+/// its limp guard held even without load: above LIMP_LAG, below HAND_MOVED.
+/// That continuing physical hold must not disappear from the hand report.
+#[test]
+fn a_pinned_pitch_held_thirteen_counts_away_still_says_a_hand_before_slump() {
+    let ms = Duration::from_millis;
+    let pressed = GLANCE_UNTIL;
+    let moved = 13;
+    let mut pinned_at = 0;
+    let mut seen = Vec::new();
+    let (report, _) = rest_glances_watched(
+        |lamp, limits| {
+            assert!(LIMP_LAG < moved && moved <= HAND_MOVED);
+            limits.give_way = Some(GiveWay::Return);
+            limits.limp = true;
+            pinned_at = lamp.servos[PITCH].position.round() as u16;
+            lamp.strains = vec![
+                (pressed, pressed + ms(200), PITCH, 675),
+                (pressed + ms(200), Duration::from_secs(16), PITCH, 0),
+            ];
+            // After contact stops it, a hand moves the real simulated
+            // joint; this is not a changed goal or an injected misreading.
+            lamp.hand = Some((
+                pressed + ms(600),
+                pressed + ms(2_500),
+                PITCH,
+                f32::from(pinned_at + moved),
+            ));
+        },
+        vec![(GLANCE_FROM, pressed + ms(3_000), 0.0)],
+        |at, glimpse| seen.push((at, *glimpse)),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.eased, [1, 0, 0], "{report:?}");
+    assert_eq!(report.released_by_hand, [1, 0, 0], "{report:?}");
+    assert_eq!(report.released.len(), 1, "{report:?}");
+    assert_eq!(report.released[0].joint, Joint::WristPitch.name());
+    assert_eq!(report.released[0].load, 0, "the slump must be from lag");
+
+    let first = seen.iter().find(|(_, g)| g.eased[0] == 1).unwrap();
+    assert!(first.0 >= pressed && first.0 < pressed + ms(100));
+    assert_eq!(first.1.positions[0], pinned_at);
+    // Establish that contact itself was reported before the later move.
+    let contact: Vec<_> = seen
+        .iter()
+        .filter(|(at, _)| (pressed + ms(100)..pressed + ms(180)).contains(at))
+        .collect();
+    assert!(!contact.is_empty());
+    assert!(contact.iter().all(|(_, g)| {
+        g.hand && g.eased == [1, 0, 0] && g.loads[0] == 675 && g.positions[0] == pinned_at
+    }));
+
+    // The initial load evidence is more than a second old. The real joint
+    // remains held thirteen counts from the pinned goal until the slump.
+    let window = pressed + ms(1_300)..pressed + ms(1_600);
+    assert!(Duration::from_secs_f32(report.released[0].seconds) > window.end);
+    let held: Vec<_> = seen.iter().filter(|(at, _)| window.contains(at)).collect();
+    assert!(!held.is_empty(), "no held steps before the slump");
+    for (_, g) in held {
+        assert!(!g.limp && g.released == 0 && g.eased == [1, 0, 0], "{g:?}");
+        assert_eq!(g.goals[0], pinned_at, "{g:?}");
+        assert_eq!(g.positions[0], pinned_at + moved, "{g:?}");
+        assert_eq!(g.loads[0], 0, "{g:?}");
+        assert!(g.hand, "the continuing limp hold disappeared: {g:?}");
+    }
+}
+
+/// A gentle hand that stays on the base is still said after the joint has
+/// repeatedly adopted its position. Reporting must not time out while
+/// the same physical push still holds it there under its load bound.
+#[test]
+fn a_sustained_gentle_push_is_said_until_the_hand_lets_go() {
+    let ms = Duration::from_millis;
+    let (mut lamp, mut clock) = folded(Duration::from_secs(14));
+    let held_at = HOME[2] + 40;
+    lamp.hand = Some((ms(1_500), ms(9_500), YAW, f32::from(held_at)));
+    lamp.strains = vec![(ms(1_500), ms(9_500), YAW, 120)];
+    let mut seen = Vec::new();
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        giving_way(GiveWay::Return),
+        Some(HOME),
+        || Some((Mood::Listening, 100)),
+        |glimpse| seen.push(*glimpse),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.eased[2] >= 1, "the push never gave way: {report:?}");
+    // This window begins well after both the first give-way and the
+    // subsequent one-second observations of the continuing hand.
+    let held: Vec<_> = seen
+        .iter()
+        .filter(|g| (ms(5_000)..ms(9_400)).contains(&clock_of(g)))
+        .collect();
+    assert!(!held.is_empty());
+    assert!(
+        held.iter()
+            .all(|g| g.positions[2] == held_at && g.loads[2] == 120),
+        "the fixture did not maintain the physical push: {held:?}"
+    );
+    assert!(
+        held.iter().all(|g| g.hand),
+        "the continuing hand disappeared: {:?}",
+        held.iter().find(|g| !g.hand)
+    );
+    let released: Vec<_> = seen
+        .iter()
+        .filter(|g| (ms(13_000)..ms(13_900)).contains(&clock_of(g)))
+        .collect();
+    assert!(!released.is_empty());
+    assert!(released.iter().all(|g| !g.hand), "{released:?}");
 }
 
 /// Told to come back, a base turned by a hand gives way though it reads
