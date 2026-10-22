@@ -1,3 +1,39 @@
+## Current checkpoint: 2026-10-22 09:18 +07, failed-unit rebase and Music regression control
+
+**#2764:** Pushed `fa63fa363c18d4f66e82af602b7924eb4660d194` on
+`d747ebb0f25d26996c6d273e8e3f8b8af6a477e5`, verifying that base immediately
+before push. The [equal range-diff and input identity](verification/report-failed-units-rebase-d747-20261022/README.md)
+show the complete Cloud tree unchanged; upstream changed only Skills tests
+and docs, with every crate source, manifest, build script and Cargo.lock
+unchanged. Fresh fmt passed in **4.803 s**. Strict Cloud Clippy and
+**177 passed / 0 failed / 1 ignored / 0 filtered out** are retained from
+`87154f053`, not rerun. New-head Clippy **39710010002** is green;
+ARM64 **39710009811** is still running. Ready for lamp-voice: **no**,
+new-head native qualification pending. Reviewer-two owns the merge.
+
+The [prior native receipt](verification/report-failed-units-rebase-2d953-native-20261022/README.md)
+qualifies only superseded `87154f053`: **10002 passed / 0 failed /
+63 skipped** (one leaky pass), four doc tests, twelve custom-harness tests,
+relay and all three Cloud regressions. It is historical, not a qualification
+of this new head. The base has advanced again to `9e7eec6e5` during CI;
+the requested merge window remains with First and Reviewer-two.
+
+**Music P3 follow-up:** Preparing the assigned voice/state regression on
+`second/requested-audio-voice-state`, without moving #1757. The new test
+passed **1/0/0/3183**; adding RequestedAudio to unshown failed **0/1/0/3183**
+at the required Resting-versus-Thinking assertion. The mutant is restored
+byte-for-byte and the restored run passed **1/0/0/3183**. Full Voice fmt,
+strict Clippy and tests plus focused Skills/Ears consumer checks are running.
+Its PR follows Music's merge as assigned.
+
+**#1757** `bd1d79a5a` and **#2767** `19d1a46d9` remain green and
+mergeable with First for Music merge and installer source read/merge.
+No device action, full local workspace gate or local ARM64 build.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 08:55 +07, failed-unit head includes Controls base
 
 **#2764:** Pushed `87154f0530c1b1cf3519f748cc9d5919424cf72e` on
