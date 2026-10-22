@@ -955,10 +955,28 @@ fn with_the_switch_the_lamp_speaking_begins_the_fifteen_minutes_again() {
     });
 }
 
+/// The body's `body/hand`, pushed or not.
+fn hand(pushed: bool) -> serde_json::Value {
+    serde_json::json!({"pushed": pushed, "since_us": u64::from(pushed)})
+}
+
+/// `body/hand` said every second until local `hour:minute`, as lamp-body
+/// says it steadily (every 100 ms on a lamp).
+fn hand_until(night: &mut Night, pushed: bool, hour: u64, minute: u64) {
+    let mut at = hour * 60 + minute;
+    if at < START_MINUTE {
+        at += 1_440;
+    }
+    let until = START + (at - START_MINUTE) * MINUTE;
+    while night.now < until {
+        night.observe("body/hand", &hand(pushed), None);
+        night.run(SECOND);
+    }
+}
+
 /// A push begins it again; the body saying no hand does not.
 #[test]
 fn with_the_switch_a_push_begins_the_fifteen_minutes_again_and_no_push_does_not() {
-    let hand = |pushed: bool| serde_json::json!({"pushed": pushed, "since_us": u64::from(pushed)});
     begun_again_at_twenty_eight(|night| night.observe("body/hand", &hand(true), None));
     let mut night = gone_at_twenty_past(true);
     night.until(23, 28);
@@ -966,4 +984,44 @@ fn with_the_switch_a_push_begins_the_fifteen_minutes_again_and_no_push_does_not(
     night.until(23, 37);
     let at = night.rests.first().copied().expect("no rest by 23:37");
     assert!(clock(at).as_str() < "23:36:00.0", "rested at {}", clock(at));
+}
+
+/// A push held from 23:28 to 23:50, said at every message: it begins the 15
+/// minutes again once, as it begins, so the rest comes at 23:43, not never
+/// (#1672's lamp row on lamp-06c1: a push held or reported steadily
+/// restarted the clock at every message).
+#[test]
+fn with_the_switch_a_push_held_begins_the_fifteen_minutes_again_once_at_its_start() {
+    let mut night = gone_at_twenty_past(true);
+    night.until(23, 28);
+    hand_until(&mut night, true, 23, 43);
+    assert_eq!(first_rest(&night), None);
+    hand_until(&mut night, true, 23, 50);
+    let at = night.rests.first().copied().expect("no rest by 23:50");
+    let due = START + (23 * 60 + 43 - START_MINUTE) * MINUTE;
+    assert!(
+        (due..=due + LOOK + SECOND).contains(&at),
+        "rested at {}",
+        clock(at)
+    );
+}
+
+/// A push, let go, then a push again at 23:30: the second begins it again
+/// too, so no rest until 23:45.
+#[test]
+fn with_the_switch_a_push_let_go_and_pushed_again_begins_it_again() {
+    let mut night = gone_at_twenty_past(true);
+    night.until(23, 28);
+    hand_until(&mut night, true, 23, 29);
+    hand_until(&mut night, false, 23, 30);
+    hand_until(&mut night, true, 23, 31);
+    hand_until(&mut night, false, 23, 32);
+    night.until(23, 45);
+    assert_eq!(first_rest(&night), None);
+    night.until(23, 47);
+    assert!(
+        first_rest(&night).is_some_and(|at| at.as_str() >= "23:45:00.0"),
+        "{:?}",
+        first_rest(&night)
+    );
 }
