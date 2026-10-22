@@ -6704,6 +6704,62 @@ Ready for lamp-voice: no
   look and remeasure actual product declarations. No score increase:
   memory build row remains0.40 pending First's product acceptance.
 
+## 22 October, 19:17: known-name draft checked; photo speaker P2 blocks acceptance
+
+Ready for lamp-voice: no
+
+- #2539 product preparation is draft #3014, one commit
+  a77af5e85acffd138a2025f4cee68a6e85bb0709 on
+  8e274b5e394b09ef5e5f18cb0d2382fbaddec95a, branch
+  fourth/face-name-product-20261022. Initial rebase range-diff=;
+  First's18:56 installed-unit assertion folded before first push.
+  Six files: unit, existing helper timing, existing installed-unit test,
+  two English references, verification README. No runtime change or
+  additional tool. First6340187664 confirmed Fourth owns product half;
+  Friday6340186253 owns the20-run EN/VI product probe after First's row.
+- Local exact-head gate completed656/0/0, eight disjoint test commands:
+  known-name1, known-faces17, speaking-faces8, Second environment1,
+  started-worker roles1, actual product-functions4, installed-speaking
+  census1, full Voice-Eval623. All0failed/0ignored. cargo fmt --all --check,
+  cargo clippy --workspace --all-targets -- -D warnings and
+  cargo build --workspace pass. Source/unit/reference hashes match.
+  Helper first169us/repeat43us, each1call/1note; under5ms synthetic local
+  file-read boundary, not cold storage/provider/acoustic/device latency.
+  Exact commands and hashes in PR6340474918 and private scoped.json.
+- Interrupted289 draft gate had fmt only; ownedPGID13097 terminated
+  and143 observed before adding First's census assertion. No test/Clippy
+  pass taken from it. Revised complete gate64498exit0. Shared target free.
+- CI Clippy39774976453green, bound to a77; ARM6439774976573 running.
+  Watches70038/64077 retain terminal receipts. First6340295716 says
+  owner4ace name row is running; no result yet. Product name switch on
+  there since18:58 per First, not a Fourth device action. Head frozen
+  while ARM64 runs. Committed README captures draft-publication status;
+  PR body/comment hold current checks. Row remains0.40, Ready:no.
+- Photo #2988 remaining consumers complete at b78: Memory296/0/6,
+  Keeper37/0/1, Skills488/0/1, Setup162/0/1, Eval623/0/0,
+  Update306/0/2, Cloud docs0/0/0. Root33427exit0; Update1100.176s.
+  PR6340241733 records exact commands/head/platform/log hashes.
+  Voice3340/1/14 and Cloud196/1/2 failed full stages remain failures,
+  despite exact diagnostics/native cases passing; First/Tests disposition
+  remains open. No full-gate rerun-for-green or waiver inferred.
+- New peer P2 Jarvis6340212157: currentheardlease+pendingface does not
+  bind Yes to the person seen saying it. Previous no-finding reread was
+  limited to the three prior corrections. Product acceptance of b78 is
+  blocked, acknowledged PR6340319174/Queue6340320511. Mobile6340437044
+  moved0c89 to product full-look build and keeps photo off until nexthead;
+  b78's earlier installed/native result is not product acceptance.
+- Exact source audit: pending faces are not known memory persons;
+  photo_here has label/asked but no passing identity; Said is only text.
+  No-speaker scope stays unchanged, so no safe positive join exists in
+  current dispatcher fields. Proposed Eyes boot/passing-face identity,
+  actual request-audio SpeakingFaces proof sealed once in request context,
+  exact nonempty match on shared+legacy Yes and Eyes mutation recheck.
+  Old/missing proof fails closed; both admitted pinned No paths unchanged.
+  Two tool names/two RPCs retained. First explicit Eyes/Voice task-scope
+  extension or Eyes-owner assignment requested once at#2856
+  6340386816, Queue6340388130; no code/device change for this proposal.
+  Cleanup-help and no-tellable P3s recorded for that Eyes slice.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
