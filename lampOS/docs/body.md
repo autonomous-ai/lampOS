@@ -1474,6 +1474,7 @@ What the body does with the request:
   lamp-body: step N gesture stretching dropped: held by a hand (asked by skill:stretch-break)
   lamp-body: step N gesture stretching dropped: busy, conversation (asked by skill:stretch-break)
   lamp-body: step N gesture stretching ended: by conversation
+  lamp-body: step N gesture stretching ended: by a hand
   lamp-body: dropped from the mood socket, not a mood or a gesture this body has: {"gesture":"dance"}
   ```
 
@@ -1624,7 +1625,8 @@ Any other priority, or any other field, is not read and is dropped as `not
 a mood or a gesture this body has`. Callers may stamp always; each body
 decides by its own switch: only with `--arbitration on` (off unless given)
 is who asks weighed, and off, `source` and `priority` (even `null`) are
-read and ignored, so a stamped gesture plays exactly as an unstamped one.
+read and not weighed, so a stamped gesture plays as an unstamped one; off,
+`priority` is kept only for an unprompted gesture to give way (below).
 So the callers' stamping and every lamp's switch need not flip together.
 `lamp-skills` stamps `skill:<name>` at `skill` with `LAMP_BODY_REQUESTS=on`
 ([skills.md](skills.md), #1252); the voice sends its gestures unstamped,
@@ -1665,6 +1667,23 @@ so they are the conversation's.
   its place, as before.
 - A shift at rest (`--idle`) never starts while a gesture plays or waits,
   as before, and any gesture asked ends one.
+- An unprompted gesture, asked at `skill` or `idle`, is an invitation: it
+  ends the moment a conversation begins, the mood turning from anything
+  else to `listening`, `thinking` or `speaking` (a call taken counts),
+  `ended: by conversation`; or a hand comes on the head (a joint gave way
+  and is held), `ended: by a hand`. Whatever `--arbitration`. Checked every
+  motor step, no wait: the step that reads the mood is the first of the
+  same 0.7 s ease out as above, and `body/gesture` says it as any `ended`.
+  One of the conversation's, safety's or a person's plays on; one at
+  `skill` or `idle` still waiting to begin is dropped as `busy,
+  conversation`. It is the turn into a conversation that ends it: a
+  gesture a skill starts while the lamp already listens, or on the very
+  step it turns to listen, plays on, which no skill does, since they ask
+  only at rest. One still waiting when a hand comes is dropped with it, so
+  it never begins after the ease out. On lamp-c0a4 on 21 October a
+  skill's `stretching` played on 3 s after the person spoke. A hand on the arm is left to the arm's
+  own rules (in the tests the lamp folds away from it, which ends the
+  gesture with no `ended` line).
 
 The journal line says who asked, when the datagram said (`(asked by
 skill:stretch-break)`). Without the switch, a gesture asked while another
