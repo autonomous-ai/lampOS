@@ -2328,12 +2328,13 @@ pub fn serve(
         ),
         (false, _) => {}
     }
-    // A dated follow-up the session was offered, asked first in a greeting
-    // turn's own instructions (`LAMP_MEMORY_EVENTS`, the first builder on
-    // #2805, 22 Oct 20:28): whose the turn is, as memory's hits read it.
+    // A dated follow-up the session was offered, asked about in its first
+    // turn's own instructions when that line only greets
+    // (`LAMP_MEMORY_EVENTS`, the first builder on #2805, 22 Oct 20:28, and
+    // on #2602, 22 Oct 22:17): whose the turn is, as memory's hits read it.
     if crate::remember::events_on() {
         eprintln!(
-            "lamp-voice second: a greeting from someone offered a dated follow-up is told to ask how it went first ({})",
+            "lamp-voice second: a session that opens with only a greeting from someone offered a dated follow-up is told to ask about it now; one that opens with a request takes the offer back ({})",
             crate::remember::EVENTS_ENVIRONMENT
         );
         engine = engine.asking_after_events(Arc::new(move |request, heard, lease| {
