@@ -1,0 +1,13 @@
+{
+  "source_pr": 3085,
+  "source_head": "996511111e195d455cd7f41b1542a2699e35c1bf",
+  "train_pr": 3100,
+  "train_head": "e8dc2ba471e674d43825f3fba36a2783092dc84a",
+  "landed_head": "3989219969f2460e6cfd69d32d06a58dd5c2e269",
+  "observed_lamp_voice": "3989219969f2460e6cfd69d32d06a58dd5c2e269",
+  "landed_carry": "b49e8f099b4134fef107e3dbeb321f8f9e730e69",
+  "range_diff": "1:  996511111 = 1:  b49e8f099 lampOS: report which updater fixture timed out",
+  "train_tree": "2ac60589ea1ab7cd9a1fe99bc5129c8b0ddbffdc",
+  "landed_tree": "2ac60589ea1ab7cd9a1fe99bc5129c8b0ddbffdc",
+  "source_sha256": "9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013"
+}

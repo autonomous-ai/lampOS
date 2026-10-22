@@ -1,0 +1,468 @@
+{
+  "head": "82fbaf42e5de03cd8abe99b5553b116551a7369e",
+  "base": "1b5f7a78b86a0aac64a87950100e09d1bda6e42b",
+  "status": "passed",
+  "source_files": 51,
+  "source_before": {
+    "AGENTS.md": {
+      "sha256": "5d9413a003aedb606556d344fba846f930804e5a9d5296fd472e8478bf496dfe",
+      "mode": "100644"
+    },
+    "CLAUDE.md": {
+      "sha256": "0d9ed0e1d48f9f4b04540427bd2be4c2ba708e92558afbf0062a1f5826211914",
+      "mode": "100644"
+    },
+    "scripts/release/.dockerignore": {
+      "sha256": "e9679f3017e25bea2c876ee733927bf3f06d0cb3cc7a9b74c0be9a91e4e153ad",
+      "mode": "100644"
+    },
+    "scripts/release/build-aec-wheel.sh": {
+      "sha256": "74379e6609132b0e5849b53907b3072fa7a0780cf2eb85d79b155b2c59802b59",
+      "mode": "100755"
+    },
+    "scripts/release/build-webrtcvad-wheel.sh": {
+      "sha256": "d8a0e7e2cf8cc602be73035100575c9714cd16168cf1b24d385686bd761b23d4",
+      "mode": "100755"
+    },
+    "scripts/release/fetch_lamp_os_assets.py": {
+      "sha256": "3db03fbcf415bcb086f1bb4ce22b6bc7ebe5a3bce54960a139ea8fb6f81e8929",
+      "mode": "100644"
+    },
+    "scripts/release/lamp-os-adapter/.gitignore": {
+      "sha256": "b53ee26e6ff1da219b0563333a76d2c9ec19eec713d6ee54e11a1edacb0e9f3d",
+      "mode": "100644"
+    },
+    "scripts/release/lamp-os-adapter/Cargo.lock": {
+      "sha256": "c64dae6c4f6d11edf1fe51c1066bdb4c70ad88b51bc24164f1699bb157026793",
+      "mode": "100644"
+    },
+    "scripts/release/lamp-os-adapter/Cargo.toml": {
+      "sha256": "527ad727143cc91d9e3a2f539128f8fa5a77d4bac261711bd807a675d66c39ad",
+      "mode": "100644"
+    },
+    "scripts/release/lamp-os-adapter/src/main.rs": {
+      "sha256": "cf3f4712428be13a77cdd92b6ad1ba721e9f8cd7989a8fac7da47016e101362e",
+      "mode": "100644"
+    },
+    "scripts/release/lamp-os-adapter/tests/prepare.rs": {
+      "sha256": "d33d4b66a0fa262c14a7a40f64300dac4882ac69d25b573c31fa4a5685d4e531",
+      "mode": "100644"
+    },
+    "scripts/release/lamp-os-build-container.sh": {
+      "sha256": "9c7ab594d3e7c73ef633248d46e2c6fcf78424af9907d492f39d5ad6b44d7b12",
+      "mode": "100644"
+    },
+    "scripts/release/lamp-os-builder.Dockerfile": {
+      "sha256": "8b0ff2c821eef183b8f6b3ca8e85ad594284699f2df78c5df765e27d851fcfe6",
+      "mode": "100644"
+    },
+    "scripts/release/lamp_os_package.py": {
+      "sha256": "583932a4a67cb997ae81b93d2294561a9236113a4a02c4672d2ba314ff90c23a",
+      "mode": "100644"
+    },
+    "scripts/release/ota-config.sh": {
+      "sha256": "80f2fc27b795df46d9059ec3f6dc68a9250575021d097bc47b9f54893cc955fd",
+      "mode": "100644"
+    },
+    "scripts/release/ota-metadata.sh": {
+      "sha256": "c2ffa52338b335a3929b88fc50ec76566e73c9353d38c50eefe0909278423326",
+      "mode": "100644"
+    },
+    "scripts/release/promote-ota.sh": {
+      "sha256": "957870828ae9cc2252b6b5af335c264ce4a444ecf45748cdf4369625cec639e6",
+      "mode": "100755"
+    },
+    "scripts/release/tag-release.sh": {
+      "sha256": "8a77d8b434a65cc4999a2450676a34c442527574d739fe1f64b95fc22013851c",
+      "mode": "100755"
+    },
+    "scripts/release/tests/test_fetch_lamp_os_assets.py": {
+      "sha256": "08ecaec60605293205646d31eadc9351f6b64606a251e5a89352bb740b03d643",
+      "mode": "100644"
+    },
+    "scripts/release/tests/test_lamp_os_package.py": {
+      "sha256": "5aa06fc7b7eea23d84d977fca74485f6719a8246a85335cce584f076dbc86d32",
+      "mode": "100644"
+    },
+    "scripts/release/tests/test_promote_service.py": {
+      "sha256": "347c334616693df1504a7975a8a7b3c8fbd5c6aebdb0700bff6cf7d342e194e0",
+      "mode": "100644"
+    },
+    "scripts/release/tests/test_service_metadata_trust.py": {
+      "sha256": "55701ce5cc6235d7806472e3f9e71a9fbfae198b37c3fda506a64c8ec32e1134",
+      "mode": "100644"
+    },
+    "scripts/release/tests/test_upload_autonomous_buddy.py": {
+      "sha256": "f51c85a59f4489d0e58c62dfa9a69d3b63598757a7184807037fd5b70de0f028",
+      "mode": "100644"
+    },
+    "scripts/release/tests/test_upload_hal_archive.py": {
+      "sha256": "8dba868d0dc0cc314ec892ef7e9c08494eec228110a8d48ec9b9a1fd639ba86c",
+      "mode": "100644"
+    },
+    "scripts/release/tests/test_upload_lamp_os.py": {
+      "sha256": "eea637dbfdb05632617117a640f15613c7ab736c4589da2a8202e1dd7f4372ac",
+      "mode": "100644"
+    },
+    "scripts/release/tests/test_upload_service.py": {
+      "sha256": "14cb7e0e55cee8af4c0623f148ccd7aefce4b3bb8c59986f903c853913b8b083",
+      "mode": "100644"
+    },
+    "scripts/release/upload-aec-wheel.sh": {
+      "sha256": "48a11de0361524b4b26bc7be182d3b3160171be2c5746e32bacf45c41052c35a",
+      "mode": "100755"
+    },
+    "scripts/release/upload-autonomous-buddy.sh": {
+      "sha256": "2c938c73f1b347b586bb1d39e3e920e12b0653fd4e8357500643191777523229",
+      "mode": "100755"
+    },
+    "scripts/release/upload-autonomous-chat.sh": {
+      "sha256": "749f38734aecde0c06cbe2e53108ad3e018356f3968ef7bb1c416109cce7382d",
+      "mode": "100755"
+    },
+    "scripts/release/upload-bootstrap.sh": {
+      "sha256": "eab5183ca3cabf634316e170ccb3c20c5ea369c2a9cacbe77f3c37c7d5bbb9f3",
+      "mode": "100755"
+    },
+    "scripts/release/upload-cad.sh": {
+      "sha256": "d530079aad4d490f9e81ca52f109ee0abca974c8c8307e312477d8940e6108ad",
+      "mode": "100755"
+    },
+    "scripts/release/upload-claude-desktop-buddy.sh": {
+      "sha256": "69d41288af463b0081468b34c3f7d640c463099f32320956c68fe69c5407e752",
+      "mode": "100755"
+    },
+    "scripts/release/upload-claudecode.sh": {
+      "sha256": "460c79ea2c79cf3c4cf52f905e1ac415932f859ed8faf3114744a31509378796",
+      "mode": "100755"
+    },
+    "scripts/release/upload-codex.sh": {
+      "sha256": "da312d8e78aef595db92271a6a4619fe49a18c7ddeec18c3fdb9ce4a0020a79f",
+      "mode": "100755"
+    },
+    "scripts/release/upload-device.sh": {
+      "sha256": "eb81b1ee7dfd5eeafffe4d00bebfc9c22924453ee2ce783dea646162136ee582",
+      "mode": "100644"
+    },
+    "scripts/release/upload-hal.sh": {
+      "sha256": "f9e06707b0a64e69351d76256dcdc04d8d117cd7ff0c98a1d02e725fb0fdf411",
+      "mode": "100755"
+    },
+    "scripts/release/upload-hermes.sh": {
+      "sha256": "4b78328fefb4ec2e6d6283358e3769514b698c942f2a8d658612e57dcb0e1afd",
+      "mode": "100755"
+    },
+    "scripts/release/upload-hooks.sh": {
+      "sha256": "2cd174299683f74a1a13a726389f5aab96c124e5bfba313d48d7471d90a0211d",
+      "mode": "100755"
+    },
+    "scripts/release/upload-lamp-os.sh": {
+      "sha256": "44bf84ba26e8e713de9e9bc9514ce3c97aa643061a486e416fae75b0762c05c4",
+      "mode": "100644"
+    },
+    "scripts/release/upload-openclaw.sh": {
+      "sha256": "baf0a7b4def04dff7faa592b360e0c547fbd35289d9a3a7e165ba993074f4a06",
+      "mode": "100755"
+    },
+    "scripts/release/upload-opencode.sh": {
+      "sha256": "72c3694b80a97b5b5a45089be6681943f4f784cd735264d5a9450e995e0e3147",
+      "mode": "100755"
+    },
+    "scripts/release/upload-os-server.sh": {
+      "sha256": "6914a9430e669f81425eef0d01fa7d2b08b09ce43d244f59c7354a6a7a858ded",
+      "mode": "100755"
+    },
+    "scripts/release/upload-picoclaw.sh": {
+      "sha256": "ccae42fc4773804da7bc0038133b1c7254c51b352997a7d80c98b932129ec1be",
+      "mode": "100755"
+    },
+    "scripts/release/upload-service.sh": {
+      "sha256": "6bc3e74adb5fc1d8b5c088f6ee216c19313f4f73fd7fe9348c550a5fa82f5d9c",
+      "mode": "100644"
+    },
+    "scripts/release/upload-setup-ap.sh": {
+      "sha256": "f31b4d0418d619307047f2d0052d3fe37ff6af2433d76f1ccebc6ee11dd21286",
+      "mode": "100755"
+    },
+    "scripts/release/upload-setup-remote-hermes.sh": {
+      "sha256": "50ed240e28c0cae0c12fa50750d4fafb216ceaf23e010e5c54febe2e324f21ed",
+      "mode": "100755"
+    },
+    "scripts/release/upload-setup.sh": {
+      "sha256": "d5d61805c7f9dfa876a840b964ad5f4b2219ee08f9cbfa2fc87c8c40db097344",
+      "mode": "100755"
+    },
+    "scripts/release/upload-skills.sh": {
+      "sha256": "6b327600c7a7b4a61dd8e951e84981faba44df4ced6c762e9606ab321baf27ee",
+      "mode": "100755"
+    },
+    "scripts/release/upload-twitch-irc.sh": {
+      "sha256": "fa2061c192882f7e19c03c780547ed881aecc5ec633483dad73581e5e50e19cb",
+      "mode": "100755"
+    },
+    "scripts/release/upload-web.sh": {
+      "sha256": "b1c6aca3faad6c7d9ab774e6e43c1a36ed57661de0391b9ac8ef1e2fde85cd6e",
+      "mode": "100755"
+    },
+    "scripts/release/upload-webrtcvad-wheel.sh": {
+      "sha256": "36cd012c65ec29dcb36fc4c9447107af1959cbce821ba739c55c17ccb7482b8a",
+      "mode": "100755"
+    }
+  },
+  "python": "3.14.7",
+  "commands": [
+    {
+      "command": [
+        "bash",
+        "-n",
+        "scripts/release/upload-lamp-os.sh"
+      ],
+      "started_at": "2026-10-22T18:44:34.773654+00:00",
+      "seconds": 0.007,
+      "exit": 0,
+      "log": "affected-0.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log_bytes": 0,
+      "summary": []
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "scripts.release.tests.test_lamp_os_package",
+        "scripts.release.tests.test_upload_lamp_os",
+        "-q"
+      ],
+      "started_at": "2026-10-22T18:44:34.780900+00:00",
+      "seconds": 14.83,
+      "exit": 0,
+      "log": "affected-1.log",
+      "log_sha256": "37b385aa86391681ee1f358a8f234a767edc6eca9205bed891f65c6384c48712",
+      "log_bytes": 223,
+      "summary": [
+        "Fetching notice provider-unavailable.en-US.wav",
+        "Fetching notice provider-unavailable.en-US.wav",
+        "Fetching notice manifest.json",
+        "----------------------------------------------------------------------",
+        "Ran 41 tests in 14.669s",
+        "",
+        "OK"
+      ]
+    }
+  ],
+  "source_binding_sha256": "1cdbae67912d86cc616c8d0057ff17c5d103333f9a3a08c4b79ae27daa4e6e54",
+  "limits": "Only affected package/upload unit tests and shell parsing. External release tools are mocked. No asset download, ARM build, real key, publication, installation or device action.",
+  "unit_tests": {
+    "passed": 41,
+    "failed": 0,
+    "reported_seconds": 14.669
+  },
+  "source_after": {
+    "AGENTS.md": {
+      "sha256": "5d9413a003aedb606556d344fba846f930804e5a9d5296fd472e8478bf496dfe",
+      "mode": "100644"
+    },
+    "CLAUDE.md": {
+      "sha256": "0d9ed0e1d48f9f4b04540427bd2be4c2ba708e92558afbf0062a1f5826211914",
+      "mode": "100644"
+    },
+    "scripts/release/.dockerignore": {
+      "sha256": "e9679f3017e25bea2c876ee733927bf3f06d0cb3cc7a9b74c0be9a91e4e153ad",
+      "mode": "100644"
+    },
+    "scripts/release/build-aec-wheel.sh": {
+      "sha256": "74379e6609132b0e5849b53907b3072fa7a0780cf2eb85d79b155b2c59802b59",
+      "mode": "100755"
+    },
+    "scripts/release/build-webrtcvad-wheel.sh": {
+      "sha256": "d8a0e7e2cf8cc602be73035100575c9714cd16168cf1b24d385686bd761b23d4",
+      "mode": "100755"
+    },
+    "scripts/release/fetch_lamp_os_assets.py": {
+      "sha256": "3db03fbcf415bcb086f1bb4ce22b6bc7ebe5a3bce54960a139ea8fb6f81e8929",
+      "mode": "100644"
+    },
+    "scripts/release/lamp-os-adapter/.gitignore": {
+      "sha256": "b53ee26e6ff1da219b0563333a76d2c9ec19eec713d6ee54e11a1edacb0e9f3d",
+      "mode": "100644"
+    },
+    "scripts/release/lamp-os-adapter/Cargo.lock": {
+      "sha256": "c64dae6c4f6d11edf1fe51c1066bdb4c70ad88b51bc24164f1699bb157026793",
+      "mode": "100644"
+    },
+    "scripts/release/lamp-os-adapter/Cargo.toml": {
+      "sha256": "527ad727143cc91d9e3a2f539128f8fa5a77d4bac261711bd807a675d66c39ad",
+      "mode": "100644"
+    },
+    "scripts/release/lamp-os-adapter/src/main.rs": {
+      "sha256": "cf3f4712428be13a77cdd92b6ad1ba721e9f8cd7989a8fac7da47016e101362e",
+      "mode": "100644"
+    },
+    "scripts/release/lamp-os-adapter/tests/prepare.rs": {
+      "sha256": "d33d4b66a0fa262c14a7a40f64300dac4882ac69d25b573c31fa4a5685d4e531",
+      "mode": "100644"
+    },
+    "scripts/release/lamp-os-build-container.sh": {
+      "sha256": "9c7ab594d3e7c73ef633248d46e2c6fcf78424af9907d492f39d5ad6b44d7b12",
+      "mode": "100644"
+    },
+    "scripts/release/lamp-os-builder.Dockerfile": {
+      "sha256": "8b0ff2c821eef183b8f6b3ca8e85ad594284699f2df78c5df765e27d851fcfe6",
+      "mode": "100644"
+    },
+    "scripts/release/lamp_os_package.py": {
+      "sha256": "583932a4a67cb997ae81b93d2294561a9236113a4a02c4672d2ba314ff90c23a",
+      "mode": "100644"
+    },
+    "scripts/release/ota-config.sh": {
+      "sha256": "80f2fc27b795df46d9059ec3f6dc68a9250575021d097bc47b9f54893cc955fd",
+      "mode": "100644"
+    },
+    "scripts/release/ota-metadata.sh": {
+      "sha256": "c2ffa52338b335a3929b88fc50ec76566e73c9353d38c50eefe0909278423326",
+      "mode": "100644"
+    },
+    "scripts/release/promote-ota.sh": {
+      "sha256": "957870828ae9cc2252b6b5af335c264ce4a444ecf45748cdf4369625cec639e6",
+      "mode": "100755"
+    },
+    "scripts/release/tag-release.sh": {
+      "sha256": "8a77d8b434a65cc4999a2450676a34c442527574d739fe1f64b95fc22013851c",
+      "mode": "100755"
+    },
+    "scripts/release/tests/test_fetch_lamp_os_assets.py": {
+      "sha256": "08ecaec60605293205646d31eadc9351f6b64606a251e5a89352bb740b03d643",
+      "mode": "100644"
+    },
+    "scripts/release/tests/test_lamp_os_package.py": {
+      "sha256": "5aa06fc7b7eea23d84d977fca74485f6719a8246a85335cce584f076dbc86d32",
+      "mode": "100644"
+    },
+    "scripts/release/tests/test_promote_service.py": {
+      "sha256": "347c334616693df1504a7975a8a7b3c8fbd5c6aebdb0700bff6cf7d342e194e0",
+      "mode": "100644"
+    },
+    "scripts/release/tests/test_service_metadata_trust.py": {
+      "sha256": "55701ce5cc6235d7806472e3f9e71a9fbfae198b37c3fda506a64c8ec32e1134",
+      "mode": "100644"
+    },
+    "scripts/release/tests/test_upload_autonomous_buddy.py": {
+      "sha256": "f51c85a59f4489d0e58c62dfa9a69d3b63598757a7184807037fd5b70de0f028",
+      "mode": "100644"
+    },
+    "scripts/release/tests/test_upload_hal_archive.py": {
+      "sha256": "8dba868d0dc0cc314ec892ef7e9c08494eec228110a8d48ec9b9a1fd639ba86c",
+      "mode": "100644"
+    },
+    "scripts/release/tests/test_upload_lamp_os.py": {
+      "sha256": "eea637dbfdb05632617117a640f15613c7ab736c4589da2a8202e1dd7f4372ac",
+      "mode": "100644"
+    },
+    "scripts/release/tests/test_upload_service.py": {
+      "sha256": "14cb7e0e55cee8af4c0623f148ccd7aefce4b3bb8c59986f903c853913b8b083",
+      "mode": "100644"
+    },
+    "scripts/release/upload-aec-wheel.sh": {
+      "sha256": "48a11de0361524b4b26bc7be182d3b3160171be2c5746e32bacf45c41052c35a",
+      "mode": "100755"
+    },
+    "scripts/release/upload-autonomous-buddy.sh": {
+      "sha256": "2c938c73f1b347b586bb1d39e3e920e12b0653fd4e8357500643191777523229",
+      "mode": "100755"
+    },
+    "scripts/release/upload-autonomous-chat.sh": {
+      "sha256": "749f38734aecde0c06cbe2e53108ad3e018356f3968ef7bb1c416109cce7382d",
+      "mode": "100755"
+    },
+    "scripts/release/upload-bootstrap.sh": {
+      "sha256": "eab5183ca3cabf634316e170ccb3c20c5ea369c2a9cacbe77f3c37c7d5bbb9f3",
+      "mode": "100755"
+    },
+    "scripts/release/upload-cad.sh": {
+      "sha256": "d530079aad4d490f9e81ca52f109ee0abca974c8c8307e312477d8940e6108ad",
+      "mode": "100755"
+    },
+    "scripts/release/upload-claude-desktop-buddy.sh": {
+      "sha256": "69d41288af463b0081468b34c3f7d640c463099f32320956c68fe69c5407e752",
+      "mode": "100755"
+    },
+    "scripts/release/upload-claudecode.sh": {
+      "sha256": "460c79ea2c79cf3c4cf52f905e1ac415932f859ed8faf3114744a31509378796",
+      "mode": "100755"
+    },
+    "scripts/release/upload-codex.sh": {
+      "sha256": "da312d8e78aef595db92271a6a4619fe49a18c7ddeec18c3fdb9ce4a0020a79f",
+      "mode": "100755"
+    },
+    "scripts/release/upload-device.sh": {
+      "sha256": "eb81b1ee7dfd5eeafffe4d00bebfc9c22924453ee2ce783dea646162136ee582",
+      "mode": "100644"
+    },
+    "scripts/release/upload-hal.sh": {
+      "sha256": "f9e06707b0a64e69351d76256dcdc04d8d117cd7ff0c98a1d02e725fb0fdf411",
+      "mode": "100755"
+    },
+    "scripts/release/upload-hermes.sh": {
+      "sha256": "4b78328fefb4ec2e6d6283358e3769514b698c942f2a8d658612e57dcb0e1afd",
+      "mode": "100755"
+    },
+    "scripts/release/upload-hooks.sh": {
+      "sha256": "2cd174299683f74a1a13a726389f5aab96c124e5bfba313d48d7471d90a0211d",
+      "mode": "100755"
+    },
+    "scripts/release/upload-lamp-os.sh": {
+      "sha256": "44bf84ba26e8e713de9e9bc9514ce3c97aa643061a486e416fae75b0762c05c4",
+      "mode": "100644"
+    },
+    "scripts/release/upload-openclaw.sh": {
+      "sha256": "baf0a7b4def04dff7faa592b360e0c547fbd35289d9a3a7e165ba993074f4a06",
+      "mode": "100755"
+    },
+    "scripts/release/upload-opencode.sh": {
+      "sha256": "72c3694b80a97b5b5a45089be6681943f4f784cd735264d5a9450e995e0e3147",
+      "mode": "100755"
+    },
+    "scripts/release/upload-os-server.sh": {
+      "sha256": "6914a9430e669f81425eef0d01fa7d2b08b09ce43d244f59c7354a6a7a858ded",
+      "mode": "100755"
+    },
+    "scripts/release/upload-picoclaw.sh": {
+      "sha256": "ccae42fc4773804da7bc0038133b1c7254c51b352997a7d80c98b932129ec1be",
+      "mode": "100755"
+    },
+    "scripts/release/upload-service.sh": {
+      "sha256": "6bc3e74adb5fc1d8b5c088f6ee216c19313f4f73fd7fe9348c550a5fa82f5d9c",
+      "mode": "100644"
+    },
+    "scripts/release/upload-setup-ap.sh": {
+      "sha256": "f31b4d0418d619307047f2d0052d3fe37ff6af2433d76f1ccebc6ee11dd21286",
+      "mode": "100755"
+    },
+    "scripts/release/upload-setup-remote-hermes.sh": {
+      "sha256": "50ed240e28c0cae0c12fa50750d4fafb216ceaf23e010e5c54febe2e324f21ed",
+      "mode": "100755"
+    },
+    "scripts/release/upload-setup.sh": {
+      "sha256": "d5d61805c7f9dfa876a840b964ad5f4b2219ee08f9cbfa2fc87c8c40db097344",
+      "mode": "100755"
+    },
+    "scripts/release/upload-skills.sh": {
+      "sha256": "6b327600c7a7b4a61dd8e951e84981faba44df4ced6c762e9606ab321baf27ee",
+      "mode": "100755"
+    },
+    "scripts/release/upload-twitch-irc.sh": {
+      "sha256": "fa2061c192882f7e19c03c780547ed881aecc5ec633483dad73581e5e50e19cb",
+      "mode": "100755"
+    },
+    "scripts/release/upload-web.sh": {
+      "sha256": "b1c6aca3faad6c7d9ab774e6e43c1a36ed57661de0391b9ac8ef1e2fde85cd6e",
+      "mode": "100755"
+    },
+    "scripts/release/upload-webrtcvad-wheel.sh": {
+      "sha256": "36cd012c65ec29dcb36fc4c9447107af1959cbce821ba739c55c17ccb7482b8a",
+      "mode": "100755"
+    }
+  },
+  "source_unchanged": true
+}

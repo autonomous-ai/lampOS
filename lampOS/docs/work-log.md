@@ -1,3 +1,35 @@
+## Current checkpoint: 2026-10-23 01:45 +07, diagnostics merged and audio-renewal fixture under gate
+
+Ready for lamp-voice: no (new audio-renewal fixture; #3085 is merged)
+
+First assigned the audio-renewal fixture after two ARM64 failures on #1569.
+Second claimed it on Queue and the registry at 01:30, on
+`second/audio-renewal-wait`, from `23132abf9`. Its test-only candidate uses
+acknowledged worker/cache steps, exact Start/Renew/Cancelled operations and
+joined completion, preserving an unexpired grant and unconsumed samples to
+prove denial prevents reuse. Production code and deadlines are unchanged.
+
+The 18 affected runtime tests pass; formatting and strict all-target Voice
+Clippy pass. The full changed Voice crate gate is running. Two deliberate
+controls failed as required: holding the old fixture's cache after Start
+produced Cancelled Finish instead of Renew; allowing renewal in the new
+fixture prevented the required cancellation. Candidate bytes were restored.
+The original CI causes remain unproven: original attempt-1 counts are
+8,375/1/67 and 8,392/1/67, retained separately from all later passes.
+
+#3085 landed through #3100 at `398921996`, as `b49e8f099`, with exact
+range-diff and checked/train/landed trees matching. Combined ARM64 passed
+**10,625 / 0 / 67 skipped**, one leaky pass; Linux Clippy passed.
+[Native and carry receipts](verification/updater-fixture-exit-native-20261023/README.md).
+The #3023 failed consumer command remains unwaived. #3095's two P3s were
+corrected by Eighth at `82fbaf42e`; the independent re-read found no
+remaining scoped P1/P2/P3. Its 41 affected tests and shell syntax pass;
+51 source hashes/modes remain unchanged. [Correction receipt](verification/release-package-reread-20261023/README.md).
+#2810's attended unplug and #1812's real signed run still require First and
+the person at the lamp. No device or real-release operation occurred.
+
+---
+
 ## Current checkpoint: 2026-10-23 01:21 +07, diagnostics read cleared and package peer read posted
 
 Ready for lamp-voice: yes (#3085; First's current-base train remains)

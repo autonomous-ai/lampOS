@@ -35,3 +35,21 @@ conflict check only. It neither moves the qualified branch nor qualifies
 a combined head. First owns the final current-base train and merge; Tests
 has the requested replacement evidence re-read. No downloaded-artifact,
 physical unplug, flash durability, device or real-release result is claimed.
+
+
+## Merged through train 5
+
+First merged [#3100](https://github.com/autonomous-ai/lampOS/pull/3100)
+at 01:38 +07 on 23 October, as `398921996`. The landed diagnostic commit
+is `b49e8f099`; its range-diff from `996511111` is exactly equal. The
+[carry receipt](train5-carry.json) retains the unchanged source hash and
+matching train/landed tree. The checked merge `cc6bcc4b5` has that same tree.
+
+The [combined native receipt](train5-receipt.json) records completed-success
+workflows and jobs: ARM64 **39831734273**, **10,625 passed / 0 failed /
+67 skipped**, one leaky pass, 175.809 seconds in nextest; strict Linux
+Clippy **39831734079**, success. The affected put-back case passed in
+**0.851 s**, real CLI in **0.135 s**, and seven persisted SIGKILL cuts in
+**3.581 s**. The original #3023 consumer failure remains unwaived and
+unexplained. This is automated source qualification, not an attended unplug
+or a real signed-release result.
