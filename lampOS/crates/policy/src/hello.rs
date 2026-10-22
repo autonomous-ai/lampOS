@@ -1,11 +1,10 @@
 //! The decision "say hello now?" (`docs/policy.md`, "Hello on arrival").
 //!
-//! The voice says hello to someone who comes back and sits down
-//! (`speak_up`), by a fixed rule: someone there for three seconds after five
-//! minutes away, half a minute of quiet, no hello in twenty minutes. With
-//! `LAMP_HELLO_ASKS_POLICY=on` it says so on `voice/arrival` when a hello
-//! is due and holds it up to 2 s for this decision: `say_now` says it,
-//! `wait` keeps quiet, and no answer in time leaves it to its rule.
+//! The Welcome back skill says hello to someone who comes back and sits
+//! down, and asks this decision first (`skills/ask`, put as an arrival,
+//! #939). The voice's own hello, which asked on `voice/arrival` and held its
+//! hello up to 2 s for this decision, was removed (#2825): nothing publishes
+//! `voice/arrival` now, and the reading of it here is left unfed.
 //!
 //! Two hard rules sit around the decider and are not left to it: never
 //! while anyone is talking to the lamp (the voice listening, thinking or

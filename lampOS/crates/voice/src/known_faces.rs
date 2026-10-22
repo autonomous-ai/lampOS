@@ -3,7 +3,7 @@
 //! The eyes keep the prints of the people who asked, and nobody else's. The
 //! voice gives the model two functions that ask the eyes to remember or
 //! forget the face in front of the lamp, and reads which of those people is
-//! at the lamp from the eyes' small file, so that a hello and what a person
+//! at the lamp from the eyes' small file, so that a skill's note and what a person
 //! says can carry their name.
 use lamp_gemini::{Tool, ToolCall};
 use serde_json::{Value, json};
@@ -1380,15 +1380,6 @@ pub fn note(name: &str) -> String {
     format!("(The person at the lamp now is {name}: you know their face.)")
 }
 
-/// The hello for someone the lamp knows, in place of `speak_up::NOTE`.
-pub fn hello(name: &str) -> String {
-    format!(
-        "(Nobody has spoken. {name}, whose face you know, has just come and sat down in front of you after being \
-         away for a while. Say hello to them by name the way a friend at the next desk would: a few warm words and no \
-         question they have to answer.)"
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1598,7 +1589,7 @@ mod tests {
         std::fs::write(&path, "Minh\nSam\n").unwrap();
         assert_eq!(known_now(&path), None);
         std::fs::remove_file(&path).unwrap();
-        assert!(hello("Minh").contains("Minh") && note("Minh").contains("Minh"));
+        assert!(note("Minh").contains("Minh"));
         assert_eq!(
             known_file_of(Path::new("/run/lampos-eyes/who.sock")),
             PathBuf::from("/run/lampos-eyes/known")

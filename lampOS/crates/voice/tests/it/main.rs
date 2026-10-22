@@ -12,7 +12,6 @@ mod expression_out;
 mod first_control_message;
 mod first_words;
 mod fixture_provider;
-mod hello_asks;
 mod light_call;
 mod music_turns;
 mod news_told;

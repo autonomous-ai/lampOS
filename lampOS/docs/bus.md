@@ -608,7 +608,7 @@ order. Without `LAMP_ADDONS=on` the topic is never made.
 
 | Topic | Kind | Published by | Intended reader |
 |---|---|---|---|
-| `voice/arrival` | event, no period, no lifespan | `lamp-voice` with `LAMP_HELLO_ASKS_POLICY=on` | The policy's hello question (`lamp-policy --hello`) |
+| `voice/arrival` | event, no period, no lifespan | nobody since #2825 (`lamp-voice` with `LAMP_HELLO_ASKS_POLICY=on` before; the voice's own hello was removed) | The policy's hello question (`lamp-policy --hello`) |
 
 The [`VoiceArrival` message](msgs.md#the-arrival-contract) says that a
 hello is due and held, with counts and times only. The answer comes back on

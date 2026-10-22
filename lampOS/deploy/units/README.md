@@ -36,8 +36,7 @@ each skill is a folder copied from `lampOS/skills/` into
 reloads within two seconds. lamp-4ace's folder has it; copied and enabled,
 it greets with Welcome back. It speaks through the voice's say service,
 which needs `LAMP_SAY=on` and `LAMP_SAY_GROUP=@LAMP_USER@` in the voice's
-unit (#954), and the voice's own hello (`LAMP_SPEAK_FIRST`) off, so only one
-greets. It sets `LAMP_SKILLS_ASK=skip` until the Policy's gate exists
+unit (#954); it is the lamp's only hello, the voice's own removed (#2825). It sets `LAMP_SKILLS_ASK=skip` until the Policy's gate exists
 (#939): without it every skill is refused. It reads the lamp's zone from
 `/etc/lampOS/zone.env` (`LAMP_UTC_OFFSET_MINUTES`; 420 on lamp-4ace) and
 does not start without it: a skill's quiet hours (Stuffy air's night,

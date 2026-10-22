@@ -460,7 +460,7 @@ Added by the second builder on 2026-10-15 (#752), in `src/arrival.rs`;
 |---|---|---|---|---|
 | `VoiceArrival` | `voice/arrival` | event | none / none | A hello is due and the voice holds it for the policy ([speaking-first.md](speaking-first.md#asking-the-policy-752)): the arrival's number, minutes away, seconds there, seconds of quiet, minutes since the last hello if any. No picture, no face, no identity |
 
-Published by the voice only with `LAMP_HELLO_ASKS_POLICY=on`. `check()`
+Published by nobody since #2825 (by the voice with `LAMP_HELLO_ASKS_POLICY=on` until its own hello was removed); the policy still puts a skill's hello ask as one. `check()`
 asks only for a positive number. `Decision` has the optional `arrival` the
 policy's `hello` decision names it by; it is left out of every other
 decision, so their bytes are as they were (a test).

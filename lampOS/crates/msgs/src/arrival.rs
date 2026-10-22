@@ -5,8 +5,10 @@ use crate::Invalid;
 use lamp_bus::{Declaration, Kind};
 use serde::{Deserialize, Serialize};
 
-/// A hello is due, and the voice holds it a moment for the policy to say
-/// whether now is the time (`LAMP_HELLO_ASKS_POLICY=on`).
+/// A hello is due, and the asker holds it a moment for the policy to say
+/// whether now is the time. The voice asked on `voice/arrival` until its own
+/// hello was removed (#2825); the policy now puts a skill's hello ask
+/// (Welcome back's) as one.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VoiceArrival {
     /// This arrival's number, which the policy's decision names

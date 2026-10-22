@@ -164,7 +164,7 @@ must not leave a step silently undone)*.
 | `trigger.yields_to` | no | `{ skill = "NAME", trigger = "NAME" }`, with `when = "appears"` on the whole topic (#1672, the first builder's ruling): after a night the lamp rested, this trigger's chance waits for that skill's daily trigger to be judged first, so one greeting comes, not two (Welcome back: `{ skill = "bedtime-morning", trigger = "morning" }`). It waits while, at its moment, the routine manager says a routine's rest began the local day before today, the named skill is loaded and enabled, its named `once_per_day` trigger's `during` contains now, and that trigger's day is neither claimed in the daily journal nor dropped, and only while that trigger holds with its chance still to come (in its `for` or its `wait`), unbroken since this trigger first waited (the reviewer's P2 on #2757): a face it does not hold for, or a hold it lost (a face glancing down past its own `gap`), is not waited for until its window ends. Waiting, the chance is kept, not spent, while the trigger holds, as the `[quiet]` hours keep one; the journal says once `waits: the <trigger> greeting comes first`. When the other trigger takes its chance while this face is there, this face's run is done: `done: <skill>'s <trigger> greeting was this face's hello`. When that chance is dropped (its conditions did not hold within its `wait`) or let go (`unless_heard`), or its window or day passes, the kept chance is taken at the trigger's next message as before. A run taken in that window on that day, by the other trigger's not holding or its chance dropped, claims the other trigger's day in the daily journal, as its own greeting would (the first builder on #2757: one morning moment a day), and the journal says once `<skill> <trigger> chance let go: <this skill> already greeted this morning`; a later face is given this skill's ordinary run, never the other's. A later face, after `absent_for`, is greeted as always. No rested night (or `LAMP_SKILL_ROUTINES` off, which leaves no rest manager), the named skill disabled or not loaded (a routine with `LAMP_SKILL_ROUTINES` off), turned off, snoozed, or unable to act (no ask mode, no journal, a journal fault): it does not wait. A `yields_to` naming no loaded daily trigger is ignored, and the journal says so at each load: `<skill>: yields_to <skill>'s <trigger>, which is not a loaded daily trigger: ignored, it does not wait`. When it was judged is in memory; the night rested is kept with `--state-dir` in `DIR/rested` (the routine manager's, below). After a restart a day claimed in the journal is judged, with no record of when, so nothing waits and nothing is marked done: a face there at the start is no news to an `appears` trigger, and one that comes later is greeted as on any day. Tests (`crates/skills/tests/it/daily_engine.rs`): `a_rested_night_and_a_first_face_greet_once_with_the_morning`, `a_dropped_morning_lets_welcome_back_greet_after_it`, `a_face_the_morning_never_holds_for_is_greeted_by_welcome_back_at_once`, `welcome_backs_hello_after_a_dropped_morning_claims_the_morning`, `a_restart_after_the_morning_greets_nobody_twice`, `a_restart_before_the_morning_still_greets_with_it`, `without_a_rested_night_*`, `without_bedtime_morning_*`, `yields_to_goes_with_an_appears_trigger` |
 | `trigger.field` with one of `equals`, `above`, `below` | yes, except on `humans/faces/tracked` | What a message must show for the trigger to hold. A number is compared as a number, anything else exactly. A dot steps into an object: `scores.music` is the `music` of `scores` (#1669, `ears/classes`); an empty step (`scores.`, `.music`) is refused. A field that is not there is null: it never holds for `equals`, `above` or `below`, and holds for `not_equals`. The same goes for `each`, `key`, `rise` and a `[[while]]` field. On `humans/faces/tracked` without them, it holds while a face is in view |
 | `trigger.when` | no | `present` (the default): it holds, and has held for `for`. `appears`: it holds where it did not just before, once each time. `leaves` and `changes` are refused for now |
-| `trigger.near` | no | On `humans/faces/tracked` alone: only a face at least this share of the picture's height counts (Welcome back: 0.14, the voice's Arrival's line for someone at the desk) |
+| `trigger.near` | no | On `humans/faces/tracked` alone: only a face at least this share of the picture's height counts (Welcome back: 0.14, the voice's Presence line for someone at the desk) |
 | `trigger.for` | no | It has held this long |
 | `trigger.gap` | no | A dropout shorter than this does not break `for` |
 | `trigger.absent_for` | no | `appears` only: at least this long before, it did not hold. At the program's start nothing has been away: someone there at the first message is not greeted |
@@ -578,7 +578,7 @@ disabled until their lamp checks or replays, `install::PRODUCT_SKILLS_OFF`;
 Desk tutor and its marks wait for the full look in the product, and the
 other installable skills and the parked Laugh glance are left out,
 `install::NOT_PRODUCT_SKILLS`), and the product voice with the say service
-on, its own hello off, and its reminders and task news waiting for their
+on, no hello of its own (#2825), and its reminders and task news waiting for their
 skills (`LAMP_SCHEDULE_SPEAK=skill`, `LAMP_TASK_NEWS=skill`; install.md).
 A skill with a tool costs one of the 32 functions a session takes, after
 the voice's own and the actions part's: a product lamp's are 31
@@ -605,13 +605,20 @@ summer time (#1384). lamp-4ace's passes neither yet, so there a skill with
 `[quiet]` hours never starts itself. Install puts Stuffy air on a home lamp;
 lamp-4ace's folder doesn't have it.
 lamp-4ace's folder carries `lamp-skills.service`, and its voice unit has the
-voice's own hello (`LAMP_SPEAK_FIRST`) off and the say service on, so only
-one greets. Elsewhere the voice's hello (`speak_up.rs`, Arrival) still
-greets where it is switched on, and a lamp that ran both would greet twice.
+say service on. Welcome back is the lamp's only hello on an arrival: the
+voice's own (`speak_up.rs`, Arrival, `LAMP_SPEAK_FIRST`) was removed (#2825),
+so no lamp can greet one arrival twice, and a test fails if the voice grows
+one again ([speaking-first.md](speaking-first.md#one-hello-from-the-skill-2825)).
+While someone is at the lamp, its note is told after it a known face's name
+and, for someone Mood calls `regular` or `close`, to greet them one beat
+warmer, as every skill's note is (`person::at_the_lamp`); the typed name is
+in the model's instruction. The voice's one hello an hour for someone
+`close` (#1670) was not carried: `lamp-skills` has no cooldown by
+familiarity, and the 20 minutes hold for everyone.
 
-Welcome back carries Arrival's rules as data: a face at least 0.14 of the
+Welcome back carries the voice's old Arrival rules as data: a face at least 0.14 of the
 picture's height (`near`), there three seconds (`for`), after five minutes
-with nobody near. Where Arrival counts the time since anything was said to the
+with nobody near. Where Arrival counted the time since anything was said to the
 lamp or by it, Welcome back has two conditions on `voice/state` (#1140):
 nothing heard or said for 5 s (resting), and the lamp itself not speaking for
 30 s (`not_equals = "speaking"`). Its quiet was Arrival's 30 s until lamp-06c1
@@ -620,7 +627,7 @@ someone sits down (its own talk passes in 1 to 4 s every 5 to 60 s), so nobody
 arriving was greeted; but a hello right after the lamp spoke would greet
 someone it has just talked with, so its own speech still counts 30 s. The
 chance waits up to a minute while the person stays (`wait = "60s"`, with a 3 s
-`gap` for a look down) and is taken once both hold. Arrival forgives a face
+`gap` for a look down) and is taken once both hold. Arrival forgave a face
 lost for under 20 s before it counts an absence; Welcome back counts the
 absence from the last near face, which comes to the same for an arrival after
 five minutes.
@@ -1831,7 +1838,7 @@ where it goes:
 
 | Behaviour today | Where it lives now | Becomes |
 |---|---|---|
-| Hello when someone comes back to the desk | The Welcome back skill on a product lamp and on lamp-4ace; the voice's own (`speak_up.rs`, asking the Policy, #883) is off on both and only records when one was due | Skill: Welcome back |
+| Hello when someone comes back to the desk | The Welcome back skill on a product lamp and on lamp-4ace; the voice's own (`speak_up.rs`, asking the Policy, #883) was removed (#2825) | Skill: Welcome back |
 | A reminder or timer coming due | The Reminders skill on a product lamp (`LAMP_SCHEDULE_SPEAK=skill`), asking while the voice rests, so one due during a talk is said when it ends, with the look: the voice says it in the skill's words (`[reminder.words]`, #940), and itself when no ask comes within 10 s. The voice's reminder consumer, timing it too, on lamp-4ace (`on`) | Skill: Reminders (setting one stays a voice tool) |
 | News of a task handed to Claude Code or Codex, and progress news | The Task news skill on a product lamp for done and failed (`LAMP_TASK_NEWS=skill`): the voice tells it in the skill's words (`[news.words]`, #940), and itself when no ask comes within 10 s of having it (at once, without the sway, for news that settled while nobody was there: the skill's ask is gone 20 s after the work settles, and an item's run cannot wait), and for stopped and asking news too (#1722: a look, and a curious tilt for a question). The voice (`task_news.rs`) on lamp-4ace; progress news is the Policy's act, off in the product | Skill: Task news |
 | Sleep at night, waking in the morning | [Bedtime and Morning](bedtime-morning.md), disabled until measured | Skill selects local windows and fresh absence/arrival; Expression keeps the owned renderer and reflexes |
@@ -1909,7 +1916,7 @@ in [Bedtime and Morning](bedtime-morning.md).
 
 | Skill | Trigger | What it does | Replaces |
 |---|---|---|---|
-| Welcome back | A face arrives after 5 minutes with nobody | Policy; turns to them, the light warms, a short hello, by name if known | The hello (#883, `speak_up.rs`) |
+| Welcome back | A face arrives after 5 minutes with nobody | Policy; turns to them, the light warms, a short hello, by name if known | The voice's hello (#883, `speak_up.rs`), removed (#2825) |
 | Reminders | `schedule/due`, while the voice rests (`wait`: one due during a talk is asked for when it ends) | Looks at the person, says it: `say = { from = "schedule" }`, in its own `[reminder.words]` (#940), the voice keeping the reminder and the acknowledgement (#939, (c); `skills/reminders`). The ring's pulse waits for a light step that can pulse | The reminder consumer's timing in the voice (`LAMP_SCHEDULE_SPEAK=skill`, on a product lamp since 19 October); its delivery stays there |
 | Task news (#1021) | `tasks/status`: a task comes into `settled` (#1048) as `idle` (done), `failed`, `stopped` or `needs_input` (asking, #1722), each task on its own; a question followed by the end (#2543) turns the entry to `idle`, so each is told once | Policy (`news`); done: looks at the person if a face is in view, `happy`, and the voice's own news of it (`say = { from = "tasks" }`); failed: `caring`, its own light a step dimmer until the droop and the words end, and the news, asking whether to try again; stopped: the look and the news; asking: the look, `curious` and the news. No red ring | The timing of task news in the voice (`task_news.rs`): on a product lamp since 19 October, installed with `LAMP_TASK_NEWS=skill`, so the voice waits up to 10 s for its ask and tells each task once, in the skill's own `[news.words]` (#940); the voice's own timing is removed once it has done 5 of 5 on lamp-4ace. Written by jarvis; the per-item trigger (`each`), steps by trigger (`on`) and the waiting of item runs were added to `lamp-skills` for it. Its cases are replays; it has not run on a lamp |
 | Stretch break | Someone at the desk for 50 minutes | Stretches itself as an invitation, never a lecture (creature.md); one an hour with the wellbeing skills (`[budget] group = "wellbeing"`, #1685), when any is on the lamp | New |
