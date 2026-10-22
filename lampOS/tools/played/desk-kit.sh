@@ -108,6 +108,7 @@ arm() { # arm NAME:ENV=v,...
   sleep 20
   local names; names=$(for e in $envs; do printf '%s|' "${e%%=*}"; done)
   local got; got=$(lamp "p=\$(systemctl show -p MainPID --value lamp-voice); sudo -n readlink /proc/\$p/exe; sudo -n cat /proc/\$p/environ | tr '\\0' '\\n' | grep -E '^(${names%|})=' | sort | tr '\\n' ' '")
+  got=${got//$'\n'/ }  # readlink's line ends in a newline, not the space the check looks for
   echo "preflight $name: $got" | tee -a "$LOG"
   for e in $envs; do [[ " $got " == *" $e "* ]] || { echo "preflight: $e not set" | tee -a "$LOG"; exit 6; }; done
   [[ -z $VOICE_BIN || $got == "$VOICE_BIN"* ]] || { echo "preflight: lamp-voice is not $VOICE_BIN" | tee -a "$LOG"; exit 6; }
