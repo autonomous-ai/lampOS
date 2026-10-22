@@ -38,6 +38,11 @@ topic = "voice/state"
 field = "state"
 equals = "resting"
 
+[[while]]                 # never to the lamp's own music (#2833): what it plays itself is not music in the room
+topic = "ears/classes"
+field = "own_voice"
+not_equals = "present"    # "unknown" (no evidence yet) and "clear" pass
+
 [quiet]                   # not at night: the night is the lamp's sleep (Expression's 23:00 to 06:00)
 from = "23:00"
 to = "06:00"

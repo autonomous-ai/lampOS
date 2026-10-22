@@ -1,0 +1,4 @@
+# Five minutes of music the lamp plays itself (own_voice present), the voice
+# resting: nothing (#2833).
+clock = "10:00"
+none = true

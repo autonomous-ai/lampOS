@@ -176,7 +176,9 @@ case made of that run's own scores.
 
 The first of them, the music sway, is built and held out of the product
 (`skills/music-sway`, installed disabled, `install::PRODUCT_SKILLS_OFF`); it reads
-`scores.music` and does nothing without this topic.
+`scores.music` and does nothing without this topic. A window with
+`own_voice` `present` holds it back, as it holds Laugh glance: it never sways
+to the lamp's own music (#2833).
 
 Only after this evidence do the `kind = "core"` skills use the topic: a small
 rare music sway, and following a departing person with Nine's presence
@@ -220,8 +222,8 @@ patches take 15,712 real samples. A window's `start_us`/`end_us` are whole
 last block's read completion), so they cover the patch's full FFT extent.
 `own_voice` is `present` for a window with a block captured while the
 voice said, freshly, that the lamp was speaking (ears' speaking flag, the
-one its sudden sounds use), so Laugh glance's `own_voice` guard holds at the
-lamp's own sound (#1757's read, 22 Oct). Otherwise it is `unknown`, never
+one its sudden sounds use), so Laugh glance's and Music sway's `own_voice`
+guards hold at the lamp's own sound (#1757's read, 22 Oct). Otherwise it is `unknown`, never
 `clear`: the flag turns a stale voice state into "not speaking", which is
 not evidence of a quiet lamp. A `voice/state` of `listening` while the lamp
 plays something (#1757's music, its input kept open for "stop") is not
