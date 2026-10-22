@@ -2868,9 +2868,11 @@ pub fn greets(heard: &str) -> bool {
 /// are you", "I'm home", "chào"), whose other words are [`HELLO_FILLERS`]
 /// ("lamp" among them) but for at most one, a name ("Hello Lumi").
 /// [`Opening::Nothing`]: no words, or no greeting and nothing but fillers
-/// and at most one other word ("Lamp?", "Lumi", "hmm"): the lamp's name
-/// alone, or an echo cut to a word. [`Opening::Asks`]: anything more ("Good
-/// morning, what's the weather?", "Hi, what time is it?").
+/// and known noise ([`NOISE`]: "hmm", "Thank you"), or the lamp's name
+/// alone ("Lamp?", "Lynn.", [`crate::attention::only_the_name`]).
+/// [`Opening::Asks`]: anything more, one word of a request among them
+/// ("Weather?", reviewer-two's P2 on #3059; "Good morning, what's the
+/// weather?", "Hi, what time is it?").
 pub fn opening(heard: &str) -> Opening {
     let words: Vec<String> = heard
         .to_lowercase()
@@ -2904,12 +2906,20 @@ pub fn opening(heard: &str) -> Opening {
         .zip(&greeting)
         .filter(|(word, greeting)| !**greeting && !HELLO_FILLERS.contains(&word.as_str()))
         .count();
+    let noise = words
+        .iter()
+        .all(|word| HELLO_FILLERS.contains(&word.as_str()) || NOISE.contains(&word.as_str()));
     match (greeting.contains(&true), others <= 1) {
         (true, true) if words.len() <= HELLO_MOST => Opening::Greets,
-        (false, true) => Opening::Nothing,
+        (false, _) if noise || crate::attention::only_the_name(heard) => Opening::Nothing,
         _ => Opening::Asks,
     }
 }
+
+/// Sounds and thanks that open nothing ([`opening`]): "hmm", "Thank you".
+const NOISE: &[&str] = &[
+    "hmm", "hm", "mm", "mhm", "um", "uh", "uhm", "huh", "ah", "thank", "thanks", "cảm", "ơn",
+];
 
 /// Whether the switch is on in this process's environment.
 pub fn hits_on() -> bool {
@@ -8110,6 +8120,9 @@ mod tests {
             "How are you so bright today lamp light",
             "Hello hello hello hello hello hello hello hello hello",
             "Turn it off",
+            "Weather?",
+            "Lights",
+            "Lumi?",
         ] {
             assert_eq!(opening(request), Opening::Asks, "{request}");
             assert!(!greets(request), "{request}");
@@ -8119,10 +8132,11 @@ mod tests {
             " ",
             "...",
             "Lamp.",
-            "Lumi?",
+            "Lynn.",
             "hmm",
+            "Um, uh",
             "Thank you",
-            "Highway",
+            "Cảm ơn",
         ] {
             assert_eq!(opening(nothing), Opening::Nothing, "{nothing:?}");
             assert!(!greets(nothing), "{nothing:?}");
