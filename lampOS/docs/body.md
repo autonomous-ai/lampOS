@@ -1287,7 +1287,12 @@ rule 8). Without it, a lamp at rest is not stirred, exactly as before.
   the head and the base came to rest, not on home, and the head goes back
   there when the requests run out, at the speed the pose follows at, and
   rests again. The base is not written. Rising or folding, or a mood other
-  than rest, ends the glance and the lamp goes on as before.
+  than rest, ends the glance and the lamp goes on as before. Where it
+  rested is where it has rested for a second, or, as a glance begins,
+  where a head already still at rest is held: the factory's self-test may
+  begin before that second and asks its next move within it, and laid on
+  the pose instead, lamp-52e6's head was not led back (no lead in the
+  journal) and rested 17 below (#2818).
 - **Led from below.** A head lifting from rest has its goal 40 counts
   ahead (`GLANCE_LIFT_LEAD`), never past its bounds: from below,
   lamp-52e6's head did not start for a goal 30 ahead. So is a head coming
