@@ -337,4 +337,33 @@ mod tests {
             assert!(all.contains(line), "{line}");
         }
     }
+
+    /// Words at the very edge of what the load check passes still make a
+    /// note of at most `MAX_NOTE_BYTES` for any 300-byte text with no `"`
+    /// or `\`, said on time, late by up to an hour, or earlier: the check's
+    /// data is the real most (the reviewer's P3 on #2819).
+    #[test]
+    fn words_the_check_passes_fit_the_longest_reminder() {
+        let most = lamp_gemini::wire::MAX_NOTE_BYTES;
+        let text = "t".repeat(lamp_schedule::engine::MAX_TEXT_BYTES);
+        let mut words = ReminderWords::built_in();
+        let mut more = words.clone();
+        while {
+            more.tell.push('w');
+            more.clone().checked().is_ok()
+        } {
+            words = more.clone();
+        }
+        let hour = crate::reminders::OVERDUE_MS;
+        for (late, late_by) in [
+            (false, Some(0)),
+            (true, Some(10 * 60_000)),
+            (true, Some(hour - 1)),
+            (true, Some(2 * hour)),
+            (true, None),
+        ] {
+            let said = super::note(&words, &text, late, late_by);
+            assert!(said.len() <= most, "{late} {late_by:?}: {}", said.len());
+        }
+    }
 }

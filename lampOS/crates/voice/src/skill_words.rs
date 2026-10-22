@@ -44,15 +44,16 @@ pub fn checked_words(section: &str, lines: &[(&str, &String, &[&str])]) -> Resul
 }
 
 /// Each note joined from a skill's lines (`notes`, `section`) fits one
-/// written turn, `lamp_gemini::wire::MAX_NOTE_BYTES`, with every slot of
-/// data empty: each line is bounded alone, and several near that bound
+/// written turn, `lamp_gemini::wire::MAX_NOTE_BYTES`, with the data its
+/// caller fills in (news: every slot of data empty; a reminder: its data
+/// at the most): each line is bounded alone, and several near that bound
 /// would make a note too long to send (the reviewer's P3 on #2781).
 fn joined_fit(section: &str, notes: &[(&str, String)]) -> Result<(), String> {
     let most = lamp_gemini::wire::MAX_NOTE_BYTES;
     for (name, note) in notes {
         if note.len() > most {
             return Err(format!(
-                "{section} {name}, joined with its parts and no data, is {} bytes, over the {most} one note carries",
+                "{section} {name}, joined with its parts, is {} bytes, over the {most} one note carries",
                 note.len()
             ));
         }
@@ -530,7 +531,14 @@ impl ReminderWords {
                 ("days", &self.days, &["count"]),
             ],
         )?;
-        let late_by = emptied(
+        // Each note with its data at the most a reminder has (the
+        // reviewer's P3 on #2819; empty data let words pass that no real
+        // reminder fits): a text of the 300 bytes Schedule and the voice
+        // allow, and for `late` the longest `late_by` line at 60, as a
+        // delay of an hour or more is said as `earlier`, with none. A `"`
+        // or `\` in the text is two bytes in its JSON, which is not counted.
+        let text = "t".repeat(lamp_schedule::engine::MAX_TEXT_BYTES);
+        let late_by = fill(
             &longest(&[
                 &self.minute,
                 &self.minutes,
@@ -539,14 +547,17 @@ impl ReminderWords {
                 &self.day,
                 &self.days,
             ]),
-            &[],
+            &[("count", "60")],
         );
+        let on_time = serde_json::json!({"text": text, "late": false});
+        let late = serde_json::json!({"text": text, "late": true, "late_by": late_by});
+        let earlier = serde_json::json!({"text": text, "earlier": true});
         joined_fit(
             "[reminder.words]",
             &[
-                ("on_time", self.note(&self.on_time, "")),
-                ("late", self.note(&self.late, &late_by)),
-                ("earlier", self.note(&self.earlier, "")),
+                ("on_time", self.note(&self.on_time, &on_time.to_string())),
+                ("late", self.note(&self.late, &late.to_string())),
+                ("earlier", self.note(&self.earlier, &earlier.to_string())),
             ],
         )?;
         Ok(self)
@@ -649,6 +660,20 @@ mod tests {
         reminder.tell = long("");
         reminder.never = long("");
         let why = reminder.checked().unwrap_err();
+        assert!(why.contains("[reminder.words] on_time, joined"), "{why}");
+    }
+
+    /// A reminder's note is checked with its data at the most, not empty:
+    /// words that fit only with no data are refused, as no real reminder
+    /// would fit them (the reviewer's P3 on #2819).
+    #[test]
+    fn a_reminders_note_is_checked_with_its_most_data() {
+        let most = lamp_gemini::wire::MAX_NOTE_BYTES;
+        let mut words = ReminderWords::built_in();
+        let empty = words.note(&words.earlier, "").len();
+        words.tell.push_str(&" w".repeat((most - empty) / 2));
+        assert!(words.note(&words.earlier, "").len() <= most);
+        let why = words.checked().unwrap_err();
         assert!(why.contains("[reminder.words] on_time, joined"), "{why}");
     }
 }
