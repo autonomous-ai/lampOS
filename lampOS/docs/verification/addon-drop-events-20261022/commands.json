@@ -1,0 +1,761 @@
+{
+  "controls": [
+    {
+      "label": "before-clean-compile",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 122.33646288886666,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "694cea835cf83710b9db6b6e85d5232b5a32492645793408506f13236d6418e6",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "stderr_sha256": "3a4e938e41d6b7b2a407f8069868c762228eda19d8550173e1ddf6960de287ce"
+    },
+    {
+      "label": "before-clean-1",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 9.256148505955935,
+      "parent_pid": 15978,
+      "test_pid": 26882,
+      "fixture_child_pid": null,
+      "fixture_gate": null,
+      "release_after_marker_seconds": null,
+      "resumed": null,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "694cea835cf83710b9db6b6e85d5232b5a32492645793408506f13236d6418e6",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "executable_sha256": "c4b95eea650c00c35e28455c47e8e53ab2fa6631ee7ba6bdaa9462d7338cc4f4",
+      "raw_bytes": 178,
+      "raw_sha256": "09bc58e472f4adf0258a8dc73c1af6920ec42f7ed5ee8b8633047d53f316ab9d"
+    },
+    {
+      "label": "before-clean-2",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 6.799269049894065,
+      "parent_pid": 15978,
+      "test_pid": 27838,
+      "fixture_child_pid": null,
+      "fixture_gate": null,
+      "release_after_marker_seconds": null,
+      "resumed": null,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "694cea835cf83710b9db6b6e85d5232b5a32492645793408506f13236d6418e6",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "executable_sha256": "c4b95eea650c00c35e28455c47e8e53ab2fa6631ee7ba6bdaa9462d7338cc4f4",
+      "raw_bytes": 178,
+      "raw_sha256": "51b41641df557be336d0ddce98597d62c294a0781147bb472f1a06cd1f6c54b4"
+    },
+    {
+      "label": "before-clean-3",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 6.359140924178064,
+      "parent_pid": 15978,
+      "test_pid": 28142,
+      "fixture_child_pid": null,
+      "fixture_gate": null,
+      "release_after_marker_seconds": null,
+      "resumed": null,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "694cea835cf83710b9db6b6e85d5232b5a32492645793408506f13236d6418e6",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "executable_sha256": "c4b95eea650c00c35e28455c47e8e53ab2fa6631ee7ba6bdaa9462d7338cc4f4",
+      "raw_bytes": 178,
+      "raw_sha256": "d5cac7e0d9c7c69374a49663162651b309b566033f336f87f7c43d3eb87b1dba"
+    },
+    {
+      "label": "before-pause-compile",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 9.738728505093604,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "0374db9b4c4c718dee803660352a692ffd8597ae78ea807aed44e4067781c500",
+        "lampOS/crates/skills/src/main.rs": "4df47183bf14e6778a4dc1fedbc7401f520cb92698d0018e348a2535567e3a59",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "stderr_sha256": "49fe38b2356853b70e8cf669d8f4c85b5d7d2b851d9ce77d579f904a720f849a"
+    },
+    {
+      "label": "before-pause-1",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "expected_exit": 101,
+      "seconds": 7.6103820241987705,
+      "parent_pid": 15978,
+      "test_pid": 29441,
+      "fixture_child_pid": 29488,
+      "fixture_gate": "/tmp/adBNfRF7/decision-gate",
+      "release_after_marker_seconds": 2.0276536610908806,
+      "resumed": {
+        "held_seconds": 2.027895012,
+        "pid": 29488
+      },
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "0374db9b4c4c718dee803660352a692ffd8597ae78ea807aed44e4067781c500",
+        "lampOS/crates/skills/src/main.rs": "4df47183bf14e6778a4dc1fedbc7401f520cb92698d0018e348a2535567e3a59",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "executable_sha256": "1eead4612e5fbcd2a4089f1389583f6fb363e00d79f27028258efcc0a31f7922",
+      "raw_bytes": 2846,
+      "raw_sha256": "fc23088ab197da9cd6fd1bdf6c0f9ca525a749eddd0a42ccf54413e2af93b1ca"
+    },
+    {
+      "label": "before-pause-2",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "expected_exit": 101,
+      "seconds": 6.234402434900403,
+      "parent_pid": 15978,
+      "test_pid": 29722,
+      "fixture_child_pid": 29731,
+      "fixture_gate": "/tmp/adDKyZVw/decision-gate",
+      "release_after_marker_seconds": 2.0329557796940207,
+      "resumed": {
+        "held_seconds": 2.03648697,
+        "pid": 29731
+      },
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "0374db9b4c4c718dee803660352a692ffd8597ae78ea807aed44e4067781c500",
+        "lampOS/crates/skills/src/main.rs": "4df47183bf14e6778a4dc1fedbc7401f520cb92698d0018e348a2535567e3a59",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "executable_sha256": "1eead4612e5fbcd2a4089f1389583f6fb363e00d79f27028258efcc0a31f7922",
+      "raw_bytes": 2845,
+      "raw_sha256": "4c5f0e1ee0ad6e6252389e73b9dae57e6a56be22b1f694db92b5bf90f0220cf8"
+    },
+    {
+      "label": "before-pause-3",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "expected_exit": 101,
+      "seconds": 5.7470169281587005,
+      "parent_pid": 15978,
+      "test_pid": 30008,
+      "fixture_child_pid": 30009,
+      "fixture_gate": "/tmp/adbb78dg/decision-gate",
+      "release_after_marker_seconds": 2.028095491696149,
+      "resumed": {
+        "held_seconds": 2.034052741,
+        "pid": 30009
+      },
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "0374db9b4c4c718dee803660352a692ffd8597ae78ea807aed44e4067781c500",
+        "lampOS/crates/skills/src/main.rs": "4df47183bf14e6778a4dc1fedbc7401f520cb92698d0018e348a2535567e3a59",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "executable_sha256": "1eead4612e5fbcd2a4089f1389583f6fb363e00d79f27028258efcc0a31f7922",
+      "raw_bytes": 2846,
+      "raw_sha256": "2beeb262af3ec11e03f94d7b634b58aa080502d7535b69eaccaa7d9728627562"
+    },
+    {
+      "label": "after-pause-compile",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 8.296512857079506,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "47e11cdabfb4efa721ff1fe2840d589a1fb6a8215143ccc40f86de629269bb7a",
+        "lampOS/crates/skills/src/main.rs": "4df47183bf14e6778a4dc1fedbc7401f520cb92698d0018e348a2535567e3a59",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "stderr_sha256": "8ae4e078fb3b918a5d9c76b5a905adb639b9376d101cd1987de893bb48a646ff"
+    },
+    {
+      "label": "after-pause-1",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 7.883680556900799,
+      "parent_pid": 15978,
+      "test_pid": 30538,
+      "fixture_child_pid": 30592,
+      "fixture_gate": "/tmp/adIa1wZJ/decision-gate",
+      "release_after_marker_seconds": 2.043879533186555,
+      "resumed": {
+        "held_seconds": 2.00998738,
+        "pid": 30592
+      },
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "47e11cdabfb4efa721ff1fe2840d589a1fb6a8215143ccc40f86de629269bb7a",
+        "lampOS/crates/skills/src/main.rs": "4df47183bf14e6778a4dc1fedbc7401f520cb92698d0018e348a2535567e3a59",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "executable_sha256": "dbb7a9bc86cc0cdf3bc56bfa453f67d4a1d2a89907a5684e0ea3f02303f7ef01",
+      "raw_bytes": 299,
+      "raw_sha256": "3cd059853ba92f55dd582130047b438d023d238487821c42a1802605a7a31bd0"
+    },
+    {
+      "label": "after-pause-2",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 6.062122572213411,
+      "parent_pid": 15978,
+      "test_pid": 30885,
+      "fixture_child_pid": 30887,
+      "fixture_gate": "/tmp/adhHS693/decision-gate",
+      "release_after_marker_seconds": 2.0073332167230546,
+      "resumed": {
+        "held_seconds": 2.026083873,
+        "pid": 30887
+      },
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "47e11cdabfb4efa721ff1fe2840d589a1fb6a8215143ccc40f86de629269bb7a",
+        "lampOS/crates/skills/src/main.rs": "4df47183bf14e6778a4dc1fedbc7401f520cb92698d0018e348a2535567e3a59",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "executable_sha256": "dbb7a9bc86cc0cdf3bc56bfa453f67d4a1d2a89907a5684e0ea3f02303f7ef01",
+      "raw_bytes": 300,
+      "raw_sha256": "a6c4b1a8abddd38b8458bdfdc90c40152e5861384427aaf9b4b589d31e3f56db"
+    },
+    {
+      "label": "after-pause-3",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 6.013860873878002,
+      "parent_pid": 15978,
+      "test_pid": 31155,
+      "fixture_child_pid": 31184,
+      "fixture_gate": "/tmp/adLO415f/decision-gate",
+      "release_after_marker_seconds": 2.005116370972246,
+      "resumed": {
+        "held_seconds": 2.008370605,
+        "pid": 31184
+      },
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "47e11cdabfb4efa721ff1fe2840d589a1fb6a8215143ccc40f86de629269bb7a",
+        "lampOS/crates/skills/src/main.rs": "4df47183bf14e6778a4dc1fedbc7401f520cb92698d0018e348a2535567e3a59",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "executable_sha256": "dbb7a9bc86cc0cdf3bc56bfa453f67d4a1d2a89907a5684e0ea3f02303f7ef01",
+      "raw_bytes": 300,
+      "raw_sha256": "f0ead74c47ca5533c9536bedba6f5eae53c419c8243be601c2ac512edf1d6ae4"
+    },
+    {
+      "label": "after-clean-compile",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 8.266193232964724,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "46f570304cda5772f510eed12599a97e781db9f96d9ba258fe518cb02e0187bb",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "stderr_sha256": "192b0b7005e63b75521e775ff3e3b1c147791190daca712259feea60ffd1d933"
+    },
+    {
+      "label": "after-clean-1",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 5.813432369381189,
+      "parent_pid": 15978,
+      "test_pid": 33458,
+      "fixture_child_pid": null,
+      "fixture_gate": null,
+      "release_after_marker_seconds": null,
+      "resumed": null,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "46f570304cda5772f510eed12599a97e781db9f96d9ba258fe518cb02e0187bb",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "executable_sha256": "a98e9218e1bc4cd836317d6a5f5eab5d6048e9cb497814f3a2cbfe4fac7f7830",
+      "raw_bytes": 178,
+      "raw_sha256": "cda181461a4f5795f4c6dc82a06bc06e7cbbcdb7323746e43acdefadf0f7b0b7"
+    },
+    {
+      "label": "after-clean-2",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 3.7540618157945573,
+      "parent_pid": 15978,
+      "test_pid": 33730,
+      "fixture_child_pid": null,
+      "fixture_gate": null,
+      "release_after_marker_seconds": null,
+      "resumed": null,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "46f570304cda5772f510eed12599a97e781db9f96d9ba258fe518cb02e0187bb",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "executable_sha256": "a98e9218e1bc4cd836317d6a5f5eab5d6048e9cb497814f3a2cbfe4fac7f7830",
+      "raw_bytes": 178,
+      "raw_sha256": "e16bed1340d431a7b7d98f862233ff77a7cba1f78cda8990bc4fdb96e859b397"
+    },
+    {
+      "label": "after-clean-3",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "expected_exit": 0,
+      "seconds": 3.801745363045484,
+      "parent_pid": 15978,
+      "test_pid": 33917,
+      "fixture_child_pid": null,
+      "fixture_gate": null,
+      "release_after_marker_seconds": null,
+      "resumed": null,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "46f570304cda5772f510eed12599a97e781db9f96d9ba258fe518cb02e0187bb",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "executable_sha256": "a98e9218e1bc4cd836317d6a5f5eab5d6048e9cb497814f3a2cbfe4fac7f7830",
+      "raw_bytes": 178,
+      "raw_sha256": "ae7f75a5775ac1402dfcc8b968067cdcb45463a266525d000951f661f624e29d"
+    },
+    {
+      "label": "refund-disabled-compile",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 19.3528516869992,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "46f570304cda5772f510eed12599a97e781db9f96d9ba258fe518cb02e0187bb",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "d00aeaa38cbb576477ea86a6d7ef98116aed2d6204188b85569b937a6d85a3fb"
+      },
+      "stderr_sha256": "c9aad8119046690dd4998f1bb1ff3dd3e7abbc2cc0661085d493e421398fde43"
+    },
+    {
+      "label": "refund-disabled",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "expected_exit": 101,
+      "seconds": 5.460686114151031,
+      "parent_pid": 15978,
+      "test_pid": 35401,
+      "fixture_child_pid": null,
+      "fixture_gate": null,
+      "release_after_marker_seconds": null,
+      "resumed": null,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "46f570304cda5772f510eed12599a97e781db9f96d9ba258fe518cb02e0187bb",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "d00aeaa38cbb576477ea86a6d7ef98116aed2d6204188b85569b937a6d85a3fb"
+      },
+      "executable_sha256": "60b5ebc745f91f0183a9d33aa966d03f62c0f3aa316ab63673e761a7cce02d8c",
+      "raw_bytes": 3231,
+      "raw_sha256": "63568a21bef1c9c91fc0c928ed008db2abe5aebb929ad888e677f1db058c58a2"
+    },
+    {
+      "label": "hold-disabled-compile",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 19.132855210918933,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "46f570304cda5772f510eed12599a97e781db9f96d9ba258fe518cb02e0187bb",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "860c4d7927d52f7c58a5141eaedef4fed61b8bd51f92876f480c22e8c89cf1bf"
+      },
+      "stderr_sha256": "6ce1a7b48529386088912351f3a505c6f800caf7bed9b5831b6428e2ab0921e8"
+    },
+    {
+      "label": "hold-disabled",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "expected_exit": 101,
+      "seconds": 10.286130753345788,
+      "parent_pid": 15978,
+      "test_pid": 36701,
+      "fixture_child_pid": null,
+      "fixture_gate": null,
+      "release_after_marker_seconds": null,
+      "resumed": null,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "46f570304cda5772f510eed12599a97e781db9f96d9ba258fe518cb02e0187bb",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "860c4d7927d52f7c58a5141eaedef4fed61b8bd51f92876f480c22e8c89cf1bf"
+      },
+      "executable_sha256": "a98e9218e1bc4cd836317d6a5f5eab5d6048e9cb497814f3a2cbfe4fac7f7830",
+      "raw_bytes": 1662561,
+      "raw_sha256": "dbaa46202d430ced5ddcd2769fb624b10c7240e01b9427ed52875b2f29384054"
+    },
+    {
+      "label": "original-hold-disabled-compile",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 8.726718594320118,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "694cea835cf83710b9db6b6e85d5232b5a32492645793408506f13236d6418e6",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "860c4d7927d52f7c58a5141eaedef4fed61b8bd51f92876f480c22e8c89cf1bf"
+      },
+      "stderr_sha256": "197802d65402d6e22ef74dd014e40020d96f6022e441525ffd3cc16e12cf0c6d"
+    },
+    {
+      "label": "original-hold-disabled",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "expected_exit": 101,
+      "seconds": 3.856450312305242,
+      "parent_pid": 15978,
+      "test_pid": 38176,
+      "fixture_child_pid": null,
+      "fixture_gate": null,
+      "release_after_marker_seconds": null,
+      "resumed": null,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "694cea835cf83710b9db6b6e85d5232b5a32492645793408506f13236d6418e6",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "860c4d7927d52f7c58a5141eaedef4fed61b8bd51f92876f480c22e8c89cf1bf"
+      },
+      "executable_sha256": "c4b95eea650c00c35e28455c47e8e53ab2fa6631ee7ba6bdaa9462d7338cc4f4",
+      "raw_bytes": 2717,
+      "raw_sha256": "83af1cbc5b40b2063521dcad2ce515984131d26352d0dfa670103d36f50aed2e"
+    },
+    {
+      "label": "hour-cap-bypassed-compile",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 26.321730078198016,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "46f570304cda5772f510eed12599a97e781db9f96d9ba258fe518cb02e0187bb",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "c32cbdceea1842ef4a3cac707ec003257a1ae8a0c73356382d652b0a3a6905da"
+      },
+      "stderr_sha256": "fff3806ba534493ca98ce3789cb0d40b103a3543e3bc2d6c67578f8a7530411f"
+    },
+    {
+      "label": "hour-cap-bypassed",
+      "argv": [
+        "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-c76acda4a5a47002",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "expected_exit": 101,
+      "seconds": 3.515808549243957,
+      "parent_pid": 15978,
+      "test_pid": 40900,
+      "fixture_child_pid": null,
+      "fixture_gate": null,
+      "release_after_marker_seconds": null,
+      "resumed": null,
+      "sources": {
+        "lampOS/crates/skills/tests/it/addon.rs": "46f570304cda5772f510eed12599a97e781db9f96d9ba258fe518cb02e0187bb",
+        "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "lampOS/crates/skills/src/addon.rs": "c32cbdceea1842ef4a3cac707ec003257a1ae8a0c73356382d652b0a3a6905da"
+      },
+      "executable_sha256": "a836e3ef591b96faf6a8ea1c5d8d80d0d20cdcf60393640136f321ebffda260f",
+      "raw_bytes": 2717,
+      "raw_sha256": "cbb942c7a9e31e6bd3735a9f9e321fa878415ecbcf427ce7850d2177ac3ec4b9"
+    }
+  ],
+  "gates": {
+    "source_sha256": "dbf031419cbb93a180d984f7055a210fe9c1ecb29c91602f0c3bf7eaed0a8fbf",
+    "commands": [
+      {
+        "label": "fmt",
+        "argv": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit": 0,
+        "seconds": 11.75818884326145,
+        "log": "gate-fmt.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "summaries": []
+      },
+      {
+        "label": "clippy",
+        "argv": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-skills",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "seconds": 61.820057759061456,
+        "log": "gate-clippy.txt",
+        "bytes": 2560,
+        "sha256": "02189aee1d6deb559c16a360c44fd73823fac3adc3027257b4a2104259fa2d52",
+        "summaries": []
+      },
+      {
+        "label": "addon-focused",
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-skills",
+          "--test",
+          "it",
+          "addon::",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit": 0,
+        "seconds": 42.24925189372152,
+        "log": "gate-addon-focused.txt",
+        "bytes": 1146,
+        "sha256": "ad08eb4dfaf45b20187a408e6ecb3977a3e83db60f177eaffd7d4628a3ff9b60",
+        "summaries": [
+          "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 282 filtered out; finished in 17.83s"
+        ]
+      },
+      {
+        "label": "skills-serial",
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-skills",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit": 0,
+        "seconds": 329.35867119114846,
+        "log": "gate-skills-serial.txt",
+        "bytes": 91715,
+        "sha256": "734c4a4004092314a2c8eea829d345b90a3771ff7fc63381bd894f2c9273fa5f",
+        "summaries": [
+          "test result: ok. 155 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.91s",
+          "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.85s",
+          "test result: ok. 290 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 270.90s",
+          "test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.76s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "label": "workspace-build",
+        "argv": [
+          "cargo",
+          "build",
+          "--locked",
+          "--offline",
+          "--workspace"
+        ],
+        "exit": 0,
+        "seconds": 112.14403789164498,
+        "log": "gate-workspace-build.txt",
+        "bytes": 5472,
+        "sha256": "bf6d75849e510e3957786c99df76c11515a6c44e8edcfd72ac46977b2ef9b98f",
+        "summaries": []
+      },
+      {
+        "label": "diff",
+        "argv": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "exit": 0,
+        "seconds": 1.9705048007890582,
+        "log": "gate-diff.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "summaries": []
+      }
+    ],
+    "source_unchanged": true,
+    "status": "passed",
+    "after_source_sha256": "dbf031419cbb93a180d984f7055a210fe9c1ecb29c91602f0c3bf7eaed0a8fbf"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "base": "464438fc549e528f1d812e25c14c459e4d609379",
+  "platform": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+  "machine": "x86_64",
+  "source_sha256": "dbf031419cbb93a180d984f7055a210fe9c1ecb29c91602f0c3bf7eaed0a8fbf",
+  "tracked_lampos_files": 6422,
+  "toolchain": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "scoped_files": {
+    "lampOS/crates/skills/tests/it/addon.rs": "46f570304cda5772f510eed12599a97e781db9f96d9ba258fe518cb02e0187bb",
+    "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+    "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af",
+    "lampOS/docs/skills.md": "f84c772c70ab5c82a2a5571ebb144ce2a372b3b23109afb84f641924a4332a8e"
+  },
+  "production_restored": {
+    "lampOS/crates/skills/tests/it/addon.rs": "46f570304cda5772f510eed12599a97e781db9f96d9ba258fe518cb02e0187bb",
+    "lampOS/crates/skills/src/main.rs": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+    "lampOS/crates/skills/src/addon.rs": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+  },
+  "tracked_source_unchanged_through_gates": true,
+  "freshness": {
+    "base": "464438fc549e528f1d812e25c14c459e4d609379",
+    "target": "/private/tmp/tests-codex-small-native-20261022",
+    "tracked_lampos_files": 6422,
+    "before_sha256": "27de167950929f8da5ee7b4345111911d44cd9ebf30f444a81f923c7d1ab9515",
+    "after_sha256": "27de167950929f8da5ee7b4345111911d44cd9ebf30f444a81f923c7d1ab9515",
+    "content_unchanged": true,
+    "new_mtime_ns": 1792685300281370000
+  },
+  "outside_helper_bytes_identical": true,
+  "qualification": "Uncommitted source overlay on the stated base, qualified by the file hashes. The commit carrying these exact bytes and its Linux runs are recorded by the PR."
+}

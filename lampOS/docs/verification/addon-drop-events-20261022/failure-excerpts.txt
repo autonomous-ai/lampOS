@@ -1,0 +1,96 @@
+before-pause-1 (normalized line excerpts; full bytes in raw-output.json)
+
+thread 'addon::says_the_judge_dropped_do_not_spend_the_hour' (698960361) panicked at crates/skills/tests/it/addon.rs:671:5:
+lamp-skills: skills from /tmp/adBNfRF7/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["says-a", "says-b", "says-c", "says-d", "says-e"]
+lamp-skills: says-a Triggered: voice/state has held for 0 s
+failures:
+
+failures:
+    addon::says_the_judge_dropped_do_not_spend_the_hour
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 290 filtered out; finished in 6.73s
+
+
+before-pause-2 (normalized line excerpts; full bytes in raw-output.json)
+
+thread 'addon::says_the_judge_dropped_do_not_spend_the_hour' (698960961) panicked at crates/skills/tests/it/addon.rs:671:5:
+lamp-skills: skills from /tmp/adDKyZVw/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["says-a", "says-b", "says-c", "says-d", "says-e"]
+lamp-skills: says-a Triggered: voice/state has held for 0 s
+failures:
+
+failures:
+    addon::says_the_judge_dropped_do_not_spend_the_hour
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 290 filtered out; finished in 6.21s
+
+
+before-pause-3 (normalized line excerpts; full bytes in raw-output.json)
+
+thread 'addon::says_the_judge_dropped_do_not_spend_the_hour' (698961585) panicked at crates/skills/tests/it/addon.rs:671:5:
+lamp-skills: skills from /tmp/adbb78dg/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["says-a", "says-b", "says-c", "says-d", "says-e"]
+lamp-skills: says-a Triggered: voice/state has held for 0 s
+failures:
+
+failures:
+    addon::says_the_judge_dropped_do_not_spend_the_hour
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 290 filtered out; finished in 5.73s
+
+
+refund-disabled (normalized line excerpts; full bytes in raw-output.json)
+test addon::says_the_judge_dropped_do_not_spend_the_hour ...
+thread 'addon::says_the_judge_dropped_do_not_spend_the_hour' (698974004) panicked at crates/skills/tests/it/addon.rs:719:5:
+lamp-skills: skills from /tmp/adVSOQhs/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["says-a", "says-b", "says-c", "says-d", "says-e"]
+lamp-skills: says-a Triggered: voice/state has held for 0 s
+failures:
+
+failures:
+    addon::says_the_judge_dropped_do_not_spend_the_hour
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 290 filtered out; finished in 4.57s
+
+
+hold-disabled (normalized line excerpts; full bytes in raw-output.json)
+test addon::says_the_judge_dropped_do_not_spend_the_hour ...
+thread 'addon::says_the_judge_dropped_do_not_spend_the_hour' (698977794) panicked at crates/skills/tests/it/addon.rs:610:13:
+waiting for the four drop refusals: child None, completions []; journal:
+lamp-skills: skills from /tmp/adDPCGq3/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["says-a", "says-b", "says-c", "says-d", "says-e"]
+failures:
+
+failures:
+    addon::says_the_judge_dropped_do_not_spend_the_hour
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 290 filtered out; finished in 9.61s
+
+
+original-hold-disabled (normalized line excerpts; full bytes in raw-output.json)
+test addon::says_the_judge_dropped_do_not_spend_the_hour ...
+thread 'addon::says_the_judge_dropped_do_not_spend_the_hour' (698980774) panicked at crates/skills/tests/it/addon.rs:664:5:
+proposed by says-e
+lamp-skills: skills from /tmp/adj3sZGy/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["says-a", "says-b", "says-c", "says-d", "says-e"]
+failures:
+
+failures:
+    addon::says_the_judge_dropped_do_not_spend_the_hour
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 290 filtered out; finished in 3.22s
+
+
+hour-cap-bypassed (normalized line excerpts; full bytes in raw-output.json)
+test addon::says_the_judge_dropped_do_not_spend_the_hour ...
+thread 'addon::says_the_judge_dropped_do_not_spend_the_hour' (698988869) panicked at crates/skills/tests/it/addon.rs:726:5:
+proposed by says-e
+lamp-skills: skills from /tmp/adMbduuV/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["says-a", "says-b", "says-c", "says-d", "says-e"]
+failures:
+
+failures:
+    addon::says_the_judge_dropped_do_not_spend_the_hour
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 290 filtered out; finished in 2.64s

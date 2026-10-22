@@ -1,0 +1,5 @@
+{
+  "bytes": 356,
+  "sha256": "a7ab05e536a8880b287d37c1810d958da71ee9ccb3b2fe71a4d4d83ef753a495",
+  "utf8": "--- a/lampOS/crates/skills/src/addon.rs\n+++ b/lampOS/crates/skills/src/addon.rs\n@@ -102,7 +102,7 @@\n         else {\n             return;\n         };\n-        let (_, addon, _) = self.says.remove(at).expect(\"found above\");\n+        let (_, addon, _) = self.says.get(at).cloned().expect(\"found above\");\n         self.dropped.insert(addon, now_us);\n     }\n }\n"
+}
