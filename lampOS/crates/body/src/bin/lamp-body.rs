@@ -1268,7 +1268,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
             waiting_said = glimpse.waiting;
             match waiting_said {
                 Some(say) => eprintln!(
-                    "lamp-body: step {} let go, torque off, waiting to be set straight: {say}",
+                    "lamp-body: step {} let go of what its weight does not pull (a head tipped up stays held), waiting to be set straight: {say}",
                     glimpse.step
                 ),
                 None => eprintln!(
