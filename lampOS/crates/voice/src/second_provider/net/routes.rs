@@ -25,14 +25,16 @@ const MOST_TTL: u64 = 3600;
 /// The near addresses the relay gave, each the same kind of value its
 /// variable takes: `chat` [`crate::second_config::DEEPSEEK_BASE_URL_ENV`]'s
 /// (ending `/deepseek`), `speech` [`crate::second_config::SPEECH_BASE_URL_ENV`]'s,
-/// `listening` [`crate::second_config::LISTENING_BASE_URL_ENV`]'s. `None`:
-/// the service's own address. The relay's `gemini` is read past (no Live
-/// route here).
+/// `listening` [`crate::second_config::LISTENING_BASE_URL_ENV`]'s, `gemini`
+/// [`crate::second_config::GEMINI_BASE_URL_ENV`]'s: the second route's own
+/// Gemini, its chat and its voice, never Live's (Backend on #2882). `None`:
+/// the service's own address.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Routes {
     pub chat: Option<String>,
     pub speech: Option<String>,
     pub listening: Option<String>,
+    pub gemini: Option<String>,
 }
 
 impl Routes {
@@ -40,10 +42,11 @@ impl Routes {
     pub fn told(&self) -> String {
         let near = |route: &Option<String>| if route.is_some() { "near" } else { "normal" };
         format!(
-            "routes: chat {}, speech {}, listening {}",
+            "routes: chat {}, speech {}, listening {}, gemini {}",
             near(&self.chat),
             near(&self.speech),
-            near(&self.listening)
+            near(&self.listening),
+            near(&self.gemini)
         )
     }
 }
@@ -95,6 +98,7 @@ pub fn read(answer: Result<Value>) -> Read {
         chat: route("chat"),
         speech: route("speech"),
         listening: route("listening"),
+        gemini: route("gemini"),
     };
     let ttl = data["ttl_seconds"].as_u64().map_or(TTL, |seconds| {
         Duration::from_secs(seconds.clamp(LEAST_TTL, MOST_TTL))
@@ -288,15 +292,15 @@ mod tests {
     const NEAR: &str = "https://near.example.invalid/api/v1/ai";
 
     /// #2882: every route null is every service at its own address; each
-    /// one set is that one near; `gemini` is read past.
+    /// one set is that one near, the second route's Gemini among them.
     #[test]
     fn each_route_set_is_near_and_null_is_normal() {
         let all_null = json!({"status": 1, "data": {"chat": null, "speech": null,
             "listening": null, "gemini": null, "ttl_seconds": 600}});
         assert_eq!(routes(all_null), (Routes::default(), TTL, Vec::new()));
-        for name in ["chat", "speech", "listening"] {
+        for name in ["chat", "speech", "listening", "gemini"] {
             let mut data = json!({"chat": null, "speech": null, "listening": null,
-                "gemini": NEAR, "ttl_seconds": 600});
+                "gemini": null, "ttl_seconds": 600});
             data[name] = json!(format!("{NEAR}/{name}"));
             let (got, _, refused) = routes(json!({"status": 1, "data": data}));
             assert!(refused.is_empty());
@@ -310,8 +314,12 @@ mod tests {
                     speech: near,
                     ..Routes::default()
                 },
-                _ => Routes {
+                "listening" => Routes {
                     listening: near,
+                    ..Routes::default()
+                },
+                _ => Routes {
+                    gemini: near,
                     ..Routes::default()
                 },
             };
@@ -448,7 +456,10 @@ mod tests {
             ..Routes::default()
         }
         .told();
-        assert_eq!(told, "routes: chat near, speech normal, listening normal");
+        assert_eq!(
+            told,
+            "routes: chat near, speech normal, listening normal, gemini normal"
+        );
         assert_eq!(
             url("https://campaign-api.autonomous.ai/api/v1/ai"),
             "https://campaign-api.autonomous.ai/api/v1/ai/v1/relay/routes"

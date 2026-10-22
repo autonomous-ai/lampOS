@@ -905,7 +905,7 @@ pub fn services(
     let key = (route.chat == Some(ChatRoute::Gemini) || route.gemini_speech())
         .then(|| gemini_key(provider, credentials))
         .transpose()?;
-    let routable = relay_routable(&config, route);
+    let routable = relay_routable(&config, route, key.as_ref());
     let mut net = Net::new(config, declare).map_err(io::Error::other)?;
     let call = |model| {
         key.as_ref().map(|key| super::services::GeminiCall {
@@ -1045,11 +1045,14 @@ pub fn services(
 /// not DeepSeek's own API) with its key, speech when
 /// the configured voice speaks, listening when it is the relay's; speech and
 /// listening only with the relay's key, so a key of another service's in
-/// `second.json` never goes to the relay's near address; for none whose
-/// address the voice unit's environment gave.
+/// `second.json` never goes to the relay's near address; the route's own
+/// Gemini, chat or voice, only when it already goes through the relay with
+/// the relay's key (`gemini_key`, never a Google key); for none whose address
+/// the voice unit's environment gave.
 pub(crate) fn relay_routable(
     config: &crate::second_config::SecondConfig,
     route: RouteFlags,
+    gemini_key: Option<&crate::second_config::Key>,
 ) -> super::services::Routable {
     super::services::Routable {
         chat: route.chat == Some(ChatRoute::DeepSeek)
@@ -1059,6 +1062,10 @@ pub(crate) fn relay_routable(
         speech: !route.gemini_speech() && config.tts_key == config.llm_key && !config.pinned.speech,
         listening: matches!(&config.stt, crate::second_config::Stt::Autonomous { key, .. } if *key == config.llm_key)
             && !config.pinned.listening,
+        gemini: (route.chat == Some(ChatRoute::Gemini) || route.gemini_speech())
+            && gemini_key == Some(&config.llm_key)
+            && config.gemini.base_url != crate::second_config::GEMINI_BASE_URL
+            && !config.pinned.gemini,
     }
 }
 
