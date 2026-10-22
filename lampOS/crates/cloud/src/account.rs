@@ -193,6 +193,56 @@ mod tests {
         .unwrap()
     }
 
+    /// The login a ping rotated, as this build keeps it: setup's made-up
+    /// account with a made-up reply's broker, through `rotated` and `keep`.
+    fn rotated_sample() -> Account {
+        sample()
+            .rotated(&PingMqtt {
+                mqtt_server: "broker-2.test".into(),
+                mqtt_port: "8883".into(),
+                mqtt_usr: "lamp-2".into(),
+                mqtt_pwd: "n3w-test-pw".into(),
+                fa_channel: String::new(),
+                fd_channel: String::new(),
+            })
+            .unwrap()
+    }
+
+    /// The rotated login as earlier builds kept it (`docs/updates.md`,
+    /// "Every part's saved data, one version ahead",
+    /// `tests/fixtures/stores/README.md`): read at a start as it was kept,
+    /// and taken in place of setup's for the same device. It is in
+    /// `STATE_DIRECTORY` (`/var/lib`), so a restart in the same boot and one
+    /// after a reboot read the same bytes: both are this read.
+    #[test]
+    fn each_kept_rotated_login_reads_as_it_was_kept() {
+        let kept_days: [(&str, &str); 1] = [(
+            "2026-10-22",
+            include_str!("../tests/fixtures/stores/rotated-2026-10-22.json"),
+        )];
+        for (day, text) in kept_days {
+            let path =
+                std::env::temp_dir().join(format!("lcrot-{day}-{}.json", std::process::id()));
+            std::fs::write(&path, text).unwrap();
+            let read = kept(&path);
+            let _ = std::fs::remove_file(&path);
+            let read = read.unwrap_or_else(|| panic!("{day}: not read"));
+            assert_eq!(read, rotated_sample(), "{day}");
+            assert!(read.complete(), "{day}");
+            assert_eq!(read.device_id, sample().device_id, "{day}: the same device");
+        }
+    }
+
+    /// Writes the rotated login as this build keeps it to
+    /// `LAMP_CLOUD_ROTATED_FIXTURE`, for the kept stores.
+    #[test]
+    #[ignore = "writes a fixture"]
+    fn write_a_rotated_fixture() {
+        let target =
+            std::env::var_os("LAMP_CLOUD_ROTATED_FIXTURE").expect("LAMP_CLOUD_ROTATED_FIXTURE");
+        keep(Path::new(&target), &rotated_sample()).unwrap();
+    }
+
     #[test]
     fn a_kept_account_is_complete_and_its_secret_is_never_printed() {
         let account = sample();
