@@ -430,6 +430,14 @@ unconsumed and the original grant unexpired, proving that revocation still
 prevents playback and sample access. A separately scheduled monitor can
 legitimately cancel on cache contention or missed freshness before Renew;
 this fixture isolates the denial path without retrying that cancellation.
+
+The Live-worker handoff fixture takes the shared worker-state guard before
+starting its fake Skills peer. Its three-second accept budget therefore does
+not run while another parallel fixture owns that state. It retains the real
+socket exchange, the original tool reply before the private offer, both direct
+and wrapped calls, and confirmation audio for the same request. Production
+deadlines and the fake peer's timeouts are unchanged.
+
 Qualification follows the current plan: Mac formatting, Clippy
 and changed-crate tests, then new-head PR ARM64 CI. The historical records
 below qualify their own source maps only. The [retained five-crate Mac gate](verification/requested-audio-mac-20261021-3/README.md) on base `4d932488e`
