@@ -863,6 +863,8 @@ struct Ears {
     words: Option<&'static str>,
     asked: bool,
     heard: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    /// Blocks after the ask before the words come: the relay's answer.
+    wait: usize,
 }
 
 impl crate::stop_words::Ears for Ears {
@@ -875,6 +877,10 @@ impl crate::stop_words::Ears for Ears {
         self.asked = true;
     }
     fn words(&mut self) -> Option<String> {
+        if self.asked && self.wait > 0 {
+            self.wait -= 1;
+            return None;
+        }
         self.asked
             .then_some(self.words)
             .flatten()
@@ -920,6 +926,19 @@ fn a_short_word(
     holds: bool,
     vietnamese: bool,
 ) -> (u64, usize, bool, Value) {
+    a_short_word_after("", 0, words, word, holds, vietnamese)
+}
+
+/// [`a_short_word`] with the lamp having just `said` that, and its words
+/// coming `wait` blocks after they are asked for.
+fn a_short_word_after(
+    said: &str,
+    wait: usize,
+    words: Option<&'static str>,
+    word: Word,
+    holds: bool,
+    vietnamese: bool,
+) -> (u64, usize, bool, Value) {
     let heard = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut h = Harness::new(TurnTaking::Duplex, 400);
     h.stop_words = Some(
@@ -927,6 +946,7 @@ fn a_short_word(
             words,
             asked: false,
             heard: std::sync::Arc::clone(&heard),
+            wait,
         }))
         .with_language(vietnamese.then_some("vi")),
     );
@@ -934,6 +954,10 @@ fn a_short_word(
         h.mask.hold_backchannels();
     }
     let old = h.old();
+    if !said.is_empty() {
+        let words = h.stop_words.as_mut().unwrap();
+        words.lamp_said(said, monotonic_us(), false);
+    }
     h.blocks(20, 0.99, Some(evidence(0, OWN)));
     // "Stop.", 120 ms over the lamp.
     let shares = match word {
@@ -1029,7 +1053,41 @@ fn with_backchannel_holds_a_backchannel_resumes_the_reply_on_either_rule() {
 
 /// #2939: a stop phrase, "wait", a question and three words still commit
 /// with the switch on, at once once their words come; with no words the
-/// hold ends at its 500 ms bound, or at the yield's deadline if sooner.
+/// hold ends 500 ms after they were asked for, or at the yield's deadline
+/// if sooner.
+/// The reviewer-lead on #2959: a 250 ms "Yeah." on the speech rule is due
+/// 60 ms into it, and its words come after 100 ms of stillness and the
+/// relay's 350 ms, some 0.7 s later: held to them, not to a fixed 500 ms
+/// from the commit falling due. Resumed at the later of the fortieth still
+/// block and the words, at the forty-fifth.
+#[test]
+fn with_backchannel_holds_a_backchannel_whose_words_come_late_still_resumes() {
+    let (at, _, committed, event) =
+        a_short_word_after("", 35, Some("Yeah."), Word::Speech, true, false);
+    assert_eq!((at, committed), (2 + 29 + 25 + 10 + 35 + 1, false));
+    assert_eq!(event["backchannel"], true);
+}
+
+/// The reviewer-lead on #2959: the lamp asks "Shall I go on?" and the
+/// person says "Yes.": an answer, not a backchannel, so it commits as
+/// today. One after a statement still resumes, as does one after a
+/// question the lamp has since finished a sentence after.
+#[test]
+fn with_backchannel_holds_an_answer_to_the_lamps_question_commits() {
+    for (said, words, resumed) in [
+        ("It rained all day. Shall I go on?", "Yes.", false),
+        ("Shall I go on? Well", "Sure.", false),
+        ("Do you want more? ", "Mm-hm.", false),
+        ("It rained all day.", "Yes.", true),
+        ("Shall I go on? Okay. Then", "Yeah.", true),
+    ] {
+        let (_, _, committed, event) =
+            a_short_word_after(said, 0, Some(words), Word::Plain, true, false);
+        assert_eq!(committed, !resumed, "{said:?} {words}");
+        assert_eq!(event["backchannel"], resumed, "{said:?} {words}");
+    }
+}
+
 #[test]
 fn with_backchannel_holds_anything_else_commits() {
     for words in ["Stop.", "Wait, I", "What was that?", "Why?"] {
@@ -1049,16 +1107,18 @@ fn with_backchannel_holds_anything_else_commits() {
         assert_eq!(event["held_ms"], 300);
         assert_eq!(event["backchannel"], false);
     }
-    // No words: the speech rule's hold ends at 500 ms (50 blocks from the
-    // sixth of speech); the quiet rule's at the deadline, 110 blocks from
-    // the yield, so the request is never kept past it.
-    let (at, _, committed, event) = a_short_word(None, Word::Speech, true, false);
-    assert_eq!((at, committed), (37 + 50, true));
-    assert_eq!(event["held_ms"], 500);
-    assert_eq!(event["backchannel"], Value::Null);
+    // No words: the hold ends 500 ms after they were asked for, at the
+    // tenth still block (the quiet rule: 2 + 29 + 60, held from the
+    // fortieth), or at the yield's deadline, 110 blocks from it, if sooner
+    // (the speech rule: held from the sixth block of speech, 37), so the
+    // request is never kept past it.
     let (at, _, committed, event) = a_short_word(None, Word::Plain, true, false);
+    assert_eq!((at, committed), (2 + 29 + 60, true));
+    assert_eq!(event["held_ms"], 200);
+    assert_eq!(event["backchannel"], Value::Null);
+    let (at, _, committed, event) = a_short_word(None, Word::Speech, true, false);
     assert_eq!((at, committed), (110, true));
-    assert_eq!(event["held_ms"], 390);
+    assert_eq!(event["held_ms"], 730);
     // The switch off: no words commit as today.
     let (at, _, committed, event) = a_short_word(None, Word::Speech, false, false);
     assert_eq!((at, committed), (37, true));
@@ -1076,6 +1136,7 @@ fn with_backchannel_holds_two_backchannels_leave_the_reply_yielding() {
         words: Some("Mm-hm."),
         asked: false,
         heard: std::sync::Arc::default(),
+        wait: 0,
     })));
     h.mask.hold_backchannels();
     yields_over_a_story(&mut h, 2, &[(ONSET + 2, Some((10, 0)))], (0, 0.0, None), 5);

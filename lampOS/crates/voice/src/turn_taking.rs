@@ -485,9 +485,12 @@ impl PlaybackMask {
     /// the yield's deadline (1.1 s) keeps its pre-roll and onset with it,
     /// more than [`MAX_HEARD`] remembers: as much is kept as for a waited
     /// sound ([`WAITED_HEARD`]).
+    /// The words are asked for after `crate::stop_words::FINALIZE_AFTER_STILL_BLOCKS`.
     pub fn hold_backchannels(&mut self) {
         if let Some(duplex) = self.duplex.as_mut() {
-            duplex.interruption.hold_backchannels();
+            duplex
+                .interruption
+                .hold_backchannels(crate::stop_words::FINALIZE_AFTER_STILL_BLOCKS);
             duplex.max_heard = duplex.max_heard.max(WAITED_HEARD);
         }
     }

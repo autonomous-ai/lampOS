@@ -896,20 +896,31 @@ backchannels aren't held, and nothing changes. On lamp-52e6 on 22 October,
   plainly. With the switch, while its words are awaited, that commit is
   held (`Interruption::hold_backchannels` in `audio/src/duplex.rs`): on the
   quiet rule until they come, on the speech rule only while the speech is
-  under 400 ms (`BACKCHANNEL_SPEECH_BLOCKS`). No hold lasts over 500 ms
-  (`BACKCHANNEL_HOLD_BLOCKS`) or past the yield's 1.1 s deadline, so the
+  under 400 ms (`BACKCHANNEL_SPEECH_BLOCKS`). The hold is tied to when
+  the words are asked for, after 100 ms of stillness, not to when the
+  commit fell due: it lasts until 500 ms after the ask
+  (`BACKCHANNEL_WORDS_WAIT_BLOCKS`; the relay answers in about 250-350 ms),
+  so a 300 ms "Yeah." on the speech rule, due 60 ms into it and heard
+  some 0.7 s later, is still held (the reviewer-lead on #2959). It never
+  lasts past the yield's 1.1 s deadline, so the
   request kept for the commit is never older than the duplex hold allows;
   the mask remembers as many blocks as for a waited sound (`WAITED_HEARD`).
 - **A backchannel resumes.** Words of one or two, all on the list, with no
   "?" and no stop phrase (`stop_words::backchannel`, read after hyphens are
   joined and NFC): mm, mhm, mmhm, mmhmm, hm, hmm, uhhuh, yeah, yes, yep,
   yup, ok, okay, alright, right, oh, ah, sure; with `stt_language` vi, ừ,
-  ừm, ờ, à, ồ, dạ, vâng, ok, đúng, rồi. Left out, so they commit: uh, so,
-  no, what, huh, hả. The resume wait (400 ms of stillness) then resumes the
+  ừm, ờ, à, ồ, dạ, vâng, ok. Left out, so they commit: uh, so, no, what,
+  huh, hả, and "rồi" and "đúng", as often a reply as an acknowledgment.
+  Nor are they a backchannel when the lamp's last finished sentence
+  before the yield was a question (`stop_words::lamp_asked`, from the
+  lamp's words stamped by when they play): "Yes." to "Shall I go on?" is
+  an answer and commits, as today. The resume wait (400 ms of stillness) then resumes the
   answer, and the candidate is suppressed, so no turn starts. A backchannel
   commits only if its speech reaches 400 ms, a sentence.
 - **Anything else commits at once**, empty words included; no words commit
-  at the bound. A stop phrase ("wait" is one) and a forced `stop/heard` are
+  at the bound, and the journal says so ("a yield's words had not come
+  after its commit was held 200 ms: committed"), since words that come
+  after are dropped with the yield. A stop phrase ("wait" is one) and a forced `stop/heard` are
   never held.
 - **A backchannel resume is not fruitless**, nor other-fruitless: two
   "mm-hm"s don't stop the reply yielding for 20 s.
