@@ -362,6 +362,8 @@ pub struct HealthBody {
     pub selftest: Option<SelfTestSummary>,
     /// Each unit's restarts since boot, [`UNITS`] only.
     pub restarts: BTreeMap<&'static str, u32>,
+    /// Units still in systemd's failed state, sorted and unique, [`UNITS`] only.
+    pub failed_units: Vec<&'static str>,
     /// A unit that waits, and why, both fixed text ([`update_waits`]).
     /// Left out when nothing waits, so a report without it is unchanged.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
@@ -506,6 +508,61 @@ pub fn restarts(text: &str) -> BTreeMap<&'static str, u32> {
     found
 }
 
+/// A failed unit is named only by one unambiguous Id/ActiveState record.
+/// Unknown names and states are omitted; duplicate records cannot make a
+/// recovered unit appear failed. Restart counts have their existing parser.
+fn failed_units(text: &str) -> Vec<&'static str> {
+    let mut found = BTreeMap::new();
+    for block in text.split("\n\n") {
+        let mut id = None;
+        let mut state = None;
+        let mut names = Vec::new();
+        let mut malformed = false;
+        for line in block.lines() {
+            let Some((key, value)) = line.split_once('=') else {
+                malformed = true;
+                continue;
+            };
+            match key {
+                "Id" => {
+                    if let Some(name) = unit(value) {
+                        names.push(name);
+                    }
+                    malformed |= id.replace(value).is_some();
+                }
+                "ActiveState" => malformed |= state.replace(value).is_some(),
+                _ => {}
+            }
+        }
+        let failed = !malformed && state == Some("failed");
+        for name in names {
+            found
+                .entry(name)
+                .and_modify(|failed| *failed = false)
+                .or_insert(failed);
+        }
+    }
+    found
+        .into_iter()
+        .filter_map(|(name, failed)| failed.then_some(name))
+        .collect()
+}
+
+#[derive(Clone, Default)]
+struct UnitStates {
+    restarts: BTreeMap<&'static str, u32>,
+    failed_units: Vec<&'static str>,
+}
+
+impl UnitStates {
+    fn of(text: &str) -> Self {
+        Self {
+            restarts: restarts(text),
+            failed_units: failed_units(text),
+        }
+    }
+}
+
 /// `program args…`'s output, within [`SYSTEMCTL_WITHIN`], or nothing:
 /// killed when late.
 pub fn bounded_output(program: &Path, args: &[&str]) -> Option<String> {
@@ -547,12 +604,21 @@ pub struct Seen {
     pub selftest: Option<SelfTest>,
     /// `systemctl show`'s output for the units.
     pub restarts: BTreeMap<&'static str, u32>,
+    /// Units observed failed; canonicalized again by [`health_body`].
+    pub failed_units: Vec<&'static str>,
     /// What waits ([`HealthBody::waits`]).
     pub waits: BTreeMap<&'static str, &'static str>,
 }
 
 /// The health part of a report, from what was seen: names by the lists only.
 pub fn health_body(seen: &Seen) -> HealthBody {
+    let mut failed_units: Vec<_> = seen
+        .failed_units
+        .iter()
+        .filter_map(|name| unit(name))
+        .collect();
+    failed_units.sort_unstable();
+    failed_units.dedup();
     let mut parts = Vec::new();
     let mut other_parts = 0u32;
     let mut missing = Vec::new();
@@ -626,6 +692,7 @@ pub fn health_body(seen: &Seen) -> HealthBody {
         down_for_s: seen.online.as_ref().and_then(|online| online.down_for_s),
         selftest,
         restarts: seen.restarts.clone(),
+        failed_units,
         waits: seen.waits.clone(),
     }
 }
@@ -1692,11 +1759,21 @@ pub fn write_exit_note(exits: &Path, note: &ExitNote) -> io::Result<PathBuf> {
 
 /// What the driver reads from the lamp.
 pub trait Sources {
-    /// The bus's values now, without the restarts.
+    /// The bus's values now, without the systemd observations.
     fn seen(&mut self) -> Seen;
     /// The units' restarts since boot, asked of systemd.
     fn restarts(&mut self) -> BTreeMap<&'static str, u32> {
         BTreeMap::new()
+    }
+    /// Units still failed, from the same observation as the restart counts.
+    fn failed_units(&mut self) -> Vec<&'static str> {
+        Vec::new()
+    }
+    /// Restart counts and failures for one health report. The lamp reads
+    /// one cached snapshot, even at its expiry boundary; other sources
+    /// retain the defaults or their existing field implementations.
+    fn unit_health(&mut self) -> (BTreeMap<&'static str, u32>, Vec<&'static str>) {
+        (self.restarts(), self.failed_units())
     }
     /// The units that wait, and why ([`HealthBody::waits`]).
     fn waits(&mut self) -> BTreeMap<&'static str, &'static str> {
@@ -1791,7 +1868,7 @@ pub fn step(
             if now >= timing.next_health {
                 timing.next_health = now + HEALTH_EVERY;
             }
-            seen.restarts = sources.restarts();
+            (seen.restarts, seen.failed_units) = sources.unit_health();
             seen.waits = sources.waits();
             put |= shared
                 .with(|reports| reports.health(now_s, build, &seen))
@@ -1849,7 +1926,7 @@ pub struct Lamp {
     requests: Option<lamp_bus::Subscriber>,
     requests_refused: bool,
     state: Option<lamp_bus::Publisher>,
-    restarts_read: Option<(Instant, BTreeMap<&'static str, u32>)>,
+    units_read: Option<(Instant, UnitStates)>,
 }
 
 impl Lamp {
@@ -1861,13 +1938,30 @@ impl Lamp {
             requests: None,
             requests_refused: false,
             state: None,
-            restarts_read: None,
+            units_read: None,
         }
     }
 
     fn latest<T: serde::de::DeserializeOwned>(&self, topic: &str) -> Option<(T, bool)> {
         let message = self.bus.as_ref()?.latest(topic).ok().flatten()?;
         Some((message.parse().ok()?, message.expired))
+    }
+
+    /// Both fields share the existing one-minute success/failure cache and
+    /// bounded systemctl query. No second query is added for failed units.
+    fn unit_states(&mut self) -> UnitStates {
+        if let Some((at, found)) = &self.units_read
+            && at.elapsed() < Duration::from_secs(60)
+        {
+            return found.clone();
+        }
+        let mut args = vec!["show", "-p", "Id", "-p", "NRestarts", "-p", "ActiveState"];
+        args.extend(UNITS.iter().copied());
+        let found = bounded_output(&self.systemctl, &args)
+            .map(|text| UnitStates::of(&text))
+            .unwrap_or_default();
+        self.units_read = Some((Instant::now(), found.clone()));
+        found
     }
 }
 
@@ -1887,6 +1981,7 @@ impl Sources for Lamp {
                 .latest::<SelfTest>(SelfTest::TOPIC)
                 .map(|(test, _)| test),
             restarts: BTreeMap::new(),
+            failed_units: Vec::new(),
             waits: BTreeMap::new(),
         }
     }
@@ -1919,18 +2014,16 @@ impl Sources for Lamp {
     /// Asked of systemd at most once a minute, within
     /// [`SYSTEMCTL_WITHIN`].
     fn restarts(&mut self) -> BTreeMap<&'static str, u32> {
-        if let Some((at, found)) = &self.restarts_read
-            && at.elapsed() < Duration::from_secs(60)
-        {
-            return found.clone();
-        }
-        let mut args = vec!["show", "-p", "Id", "-p", "NRestarts"];
-        args.extend(UNITS.iter().copied());
-        let found = bounded_output(&self.systemctl, &args)
-            .map(|text| restarts(&text))
-            .unwrap_or_default();
-        self.restarts_read = Some((Instant::now(), found.clone()));
-        found
+        self.unit_states().restarts
+    }
+
+    fn failed_units(&mut self) -> Vec<&'static str> {
+        self.unit_states().failed_units
+    }
+
+    fn unit_health(&mut self) -> (BTreeMap<&'static str, u32>, Vec<&'static str>) {
+        let found = self.unit_states();
+        (found.restarts, found.failed_units)
     }
 
     fn voice_resting(&mut self) -> bool {
@@ -1997,6 +2090,203 @@ impl Sources for Lamp {
 pub(crate) mod tests {
     use super::*;
     use lamp_msgs::{HealthItem, PartResult};
+
+    #[test]
+    fn failed_units_are_current_allowlisted_and_unambiguous() {
+        let failed = "Id=lamp-update.service\nNRestarts=0\nActiveState=failed\n";
+        let recovered = failed.replace("ActiveState=failed", "ActiveState=inactive");
+        let before = UnitStates::of(failed);
+        let after = UnitStates::of(&recovered);
+        assert_eq!(before.failed_units, ["lamp-update.service"]);
+        assert!(after.failed_units.is_empty());
+        assert_eq!(before.restarts, after.restarts);
+        assert_eq!(before.restarts.get("lamp-update.service"), Some(&0));
+
+        let mixed = format!(
+            "{failed}\nId=PRIVATE_FAILED_UNIT\nActiveState=failed\n\n\
+             Id=lamp-voice.service\nNRestarts=7\nActiveState=active\n\n\
+             Id=lamp-eyes.service\nNRestarts=2\nActiveState=failed\n"
+        );
+        assert_eq!(
+            failed_units(&mixed),
+            ["lamp-eyes.service", "lamp-update.service"]
+        );
+
+        for ambiguous in [
+            "Id=lamp-update.service\nNRestarts=0\n".to_owned(),
+            "ActiveState=failed\n".to_owned(),
+            "Id=lamp-update.service\nActiveState=PRIVATE_FAILED_UNIT\n".to_owned(),
+            "Id=lamp-update.service\nActiveState= failed\n".to_owned(),
+            "Id=lamp-update.service \nActiveState=failed\n".to_owned(),
+            format!("{failed}ActiveState=inactive\n"),
+            format!("{failed}ActiveState=failed\n"),
+            format!("{failed}Id=PRIVATE_FAILED_UNIT\n"),
+            format!("{failed}Id=lamp-eyes.service\n"),
+            format!("{failed}not a property\n"),
+            format!("{failed}\n{recovered}"),
+            format!("{recovered}\n{failed}"),
+            format!("{failed}\n{failed}"),
+        ] {
+            assert!(failed_units(&ambiguous).is_empty(), "{ambiguous:?}");
+            // A bad record cannot hide an unrelated, unambiguous failure.
+            let with_other = format!("{ambiguous}\nId=lamp-actions.service\nActiveState=failed\n");
+            assert_eq!(failed_units(&with_other), ["lamp-actions.service"]);
+        }
+    }
+
+    /// The real production source calls a local command, never the host's
+    /// systemd. Only the driver's clock and the cache's age are advanced;
+    /// a oneshot's failure and recovery leave its restart count at zero.
+    #[test]
+    fn failed_units_share_the_gated_restart_query_and_cached_recovery() {
+        use std::os::unix::fs::PermissionsExt;
+
+        struct Observation {
+            lamp: Lamp,
+            resting: bool,
+            seen: usize,
+        }
+        impl Sources for Observation {
+            fn seen(&mut self) -> Seen {
+                self.seen += 1;
+                self.lamp.seen()
+            }
+            fn restarts(&mut self) -> BTreeMap<&'static str, u32> {
+                self.lamp.restarts()
+            }
+            fn failed_units(&mut self) -> Vec<&'static str> {
+                self.lamp.failed_units()
+            }
+            fn unit_health(&mut self) -> (BTreeMap<&'static str, u32>, Vec<&'static str>) {
+                self.lamp.unit_health()
+            }
+            fn waits(&mut self) -> BTreeMap<&'static str, &'static str> {
+                self.lamp.waits()
+            }
+            fn voice_resting(&mut self) -> bool {
+                self.resting
+            }
+            fn requests(&mut self) -> Vec<lamp_msgs::ReportsRequest> {
+                Vec::new()
+            }
+            fn tell(&mut self, _: &lamp_msgs::ReportsState) {}
+        }
+
+        let places = places("failed-cache");
+        let root = places.own.parent().unwrap();
+        let program = root.join("systemctl");
+        let called = root.join("called");
+        let states = root.join("states");
+        let record_call = format!("printf '%s\\n' \"$@\" >> '{}'\n", called.display());
+        fs::write(
+            &program,
+            format!("#!/bin/sh\n{record_call}cat '{}'\n", states.display()),
+        )
+        .unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o700)).unwrap();
+        let failed = "Id=lamp-update.service\nNRestarts=0\nActiveState=failed\n\n\
+                      Id=lamp-voice.service\nNRestarts=7\nActiveState=active\n\n\
+                      Id=PRIVATE_FAILED_UNIT\nNRestarts=99\nActiveState=failed\n";
+        fs::write(&states, failed).unwrap();
+        let mut source = Observation {
+            lamp: Lamp::new(None),
+            resting: false,
+            seen: 0,
+        };
+        source.lamp.systemctl = program.clone();
+        source.lamp.update_self = false;
+        let shared = Shared::new(Reports::open(places.clone()));
+        let start = Instant::now();
+        let mut timing = Timing::new(start);
+
+        // No consent, even when due: neither bus health nor systemd is read.
+        assert!(!step(
+            &shared,
+            &mut source,
+            &mut timing,
+            None,
+            start + FIRST_HEALTH,
+            NOW
+        ));
+        assert_eq!(source.seen, 0);
+        assert!(!called.exists());
+        yes(&places);
+        let due = timing.next_health;
+        for at in [
+            due - Duration::from_secs(1),
+            due,
+            due + VOICE_WAIT - Duration::from_secs(1),
+        ] {
+            assert!(!step(&shared, &mut source, &mut timing, None, at, NOW));
+            assert!(
+                !called.exists(),
+                "no systemd query before the due voice wait ends"
+            );
+        }
+        assert!(step(
+            &shared,
+            &mut source,
+            &mut timing,
+            None,
+            due + VOICE_WAIT,
+            NOW
+        ));
+        let first = shared.with(sent);
+        assert_eq!(first.len(), 1);
+        assert_eq!(first[0]["failed_units"], json!(["lamp-update.service"]));
+        assert_eq!(
+            first[0]["restarts"],
+            json!({"lamp-update.service": 0, "lamp-voice.service": 7})
+        );
+        assert!(!first[0].to_string().contains("PRIVATE_FAILED_UNIT"));
+        shared.with(|reports| reports.acked(first[0]["seq"].as_u64().unwrap()));
+        let mut args = vec!["show", "-p", "Id", "-p", "NRestarts", "-p", "ActiveState"];
+        args.extend(UNITS.iter().copied());
+        let invocation = format!("{}\n", args.join("\n"));
+        assert_eq!(fs::read_to_string(&called).unwrap(), invocation);
+
+        fs::write(
+            &states,
+            failed.replace("ActiveState=failed", "ActiveState=inactive"),
+        )
+        .unwrap();
+        assert_eq!(source.lamp.failed_units(), ["lamp-update.service"]);
+        assert_eq!(source.lamp.restarts().get("lamp-update.service"), Some(&0));
+        assert_eq!(fs::read_to_string(&called).unwrap(), invocation);
+        source.lamp.units_read.as_mut().unwrap().0 = Instant::now() - Duration::from_secs(61);
+        source.resting = true;
+        let next = timing.next_health;
+        assert!(step(
+            &shared,
+            &mut source,
+            &mut timing,
+            None,
+            next,
+            NOW + 900
+        ));
+        let recovered = shared.with(sent);
+        assert_eq!(recovered.len(), 1);
+        assert_eq!(recovered[0]["failed_units"], json!([]));
+        assert_eq!(recovered[0]["restarts"], first[0]["restarts"]);
+        assert_eq!(fs::read_to_string(&called).unwrap(), invocation.repeat(2));
+
+        // A command failure is cached too; it does not retain a success
+        // or start another process when the second field is read.
+        fs::write(&program, format!("#!/bin/sh\n{record_call}exit 7\n")).unwrap();
+        assert_eq!(source.lamp.restarts().get("lamp-voice.service"), Some(&7));
+        source.lamp.units_read.as_mut().unwrap().0 = Instant::now() - Duration::from_secs(61);
+        assert!(source.lamp.failed_units().is_empty());
+        assert!(source.lamp.restarts().is_empty());
+        assert_eq!(fs::read_to_string(&called).unwrap(), invocation.repeat(3));
+
+        shared.with(|reports| reports.stop(NOW + 901, false).unwrap());
+        let reads = source.seen;
+        let next = timing.next_health;
+        step(&shared, &mut source, &mut timing, None, next, NOW + 1_800);
+        assert_eq!(source.seen, reads);
+        assert_eq!(fs::read_to_string(&called).unwrap(), invocation.repeat(3));
+        let _ = fs::remove_dir_all(root);
+    }
 
     /// Through a real bus, as the voice's `reports_stop` sends it: a no on
     /// `reports/request` reaches `lamp-cloud` (lamp-06c1, 19 Oct: it didn't).
@@ -2311,7 +2601,7 @@ pub(crate) mod tests {
     const ID: &str = "d-42";
 
     /// Strings no report may ever carry, planted in every input.
-    const SECRETS: [&str; 9] = [
+    const SECRETS: [&str; 10] = [
         "Alice",
         "HomeWiFi-5G",
         "192.168.1.42",
@@ -2321,6 +2611,7 @@ pub(crate) mod tests {
         "remind me",
         "deadbeefcafe-Alice",
         "journal line",
+        "PRIVATE_FAILED_UNIT",
     ];
 
     fn planted() -> Seen {
@@ -2387,6 +2678,11 @@ pub(crate) mod tests {
             restarts: restarts(
                 "Id=lamp-voice.service\nNRestarts=0\n\nId=Alice.service\nNRestarts=4\n\nId=lamp-eyes.service\nNRestarts=1\n",
             ),
+            failed_units: vec![
+                "PRIVATE_FAILED_UNIT",
+                "lamp-update.service",
+                "lamp-update.service",
+            ],
             waits: BTreeMap::new(),
         }
     }
@@ -2438,7 +2734,8 @@ pub(crate) mod tests {
                 "online": true, "down_for_s": null,
                 "selftest": {"verdict": "fail", "failed": ["ring"], "other_failed": 1,
                              "not_checked": 1, "build": null},
-                "restarts": {"lamp-eyes.service": 1, "lamp-voice.service": 0}
+                "restarts": {"lamp-eyes.service": 1, "lamp-voice.service": 0},
+                "failed_units": ["lamp-update.service"]
             })
         );
     }
@@ -2907,7 +3204,14 @@ pub(crate) mod tests {
         let sent = sent(&mut reports);
         assert_eq!(sent[0]["parts"].as_array().unwrap().len(), MOST_PARTS);
         assert_eq!(sent[0]["other_parts"], 64 - MOST_PARTS + 1);
+        assert_eq!(sent[0]["failed_units"], json!(["lamp-update.service"]));
         assert!(sent[0].to_string().len() <= MOST_BYTES);
+        reports.acked(sent[0]["seq"].as_u64().unwrap());
+        seen.failed_units = UNITS.to_vec();
+        seen.health.as_mut().unwrap().0.missing = vec!["voice".into(); MOST_BYTES];
+        assert_eq!(reports.health(NOW + 1, None, &seen), None);
+        assert_eq!(reports.dropped().too_big, 1);
+        assert!(reports.due(ID).is_empty());
     }
 
     #[test]

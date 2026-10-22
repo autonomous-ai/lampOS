@@ -777,8 +777,11 @@ Every report has:
   are only on the board's own diagnostic), `online` and `down_for_s`
   (`lamp/online`), `selftest` (`{verdict, failed, other_failed,
   not_checked, build}`, part names only, never a reason or a value) and
-  `restarts` (each unit's `NRestarts` since boot, asked of `systemctl show`
-  within 2 s, at most once a minute), and `waits`, only when something waits
+  `restarts` (each unit's `NRestarts` since boot) and `failed_units` (a sorted,
+  unique list of units whose `ActiveState` is `failed`, always `[]` when none
+  are observed). Both use one `systemctl show` query within the existing 2 s
+  command budget, with its success or failure cached for 60 s. Health also
+  adds `waits`, only when something waits
   (`{unit: why}`, both fixed text): with `LAMP_UPDATE_SELF=on` in
   `lamp-cloud`'s own environment too, `systemctl show` of
   `lamp-update-back.timer` within 2 s, and unless it is loaded, persistently
@@ -802,6 +805,20 @@ Every report has:
 by name, plus `skills` and `cloud`. Units: the product's `lamp-*.service`
 files, held the same by a test. Self-test parts: those `lamp-selftest`
 names.
+
+`failed_units` is a current observation, not a count or a crash history. A
+failed oneshot appears even with `NRestarts=0`; after it recovers, it leaves
+the list on the next fresh successful systemd sample. The usual health
+cadence and 60 s query cache still apply. Names must exactly match `UNITS`;
+unknown names, unknown states, missing fields, malformed records and
+duplicate `Id` or `ActiveState` fields do not name a failed unit. Repeated
+records for a listed unit are ambiguous and omit that unit. The health
+builder filters, sorts and deduplicates the names again. A failed query
+produces an empty list and restart map, so `[]` alone does not certify that
+every service is healthy. This additive field keeps `lamp-report/1`, needs
+no extra switch or query, and is read only for a due or urgent health report
+after the existing consent check and voice deferral. The separate `waits`
+query and its self-update switch are unchanged.
 
 **Never sent:** sound, pictures, anything said or typed, any name (the
 person's, a face's, a speaker's), Wi-Fi names or passwords, addresses, the
@@ -1223,6 +1240,13 @@ line; the lists against the product's units; `reports.get` and
 report on `fd/…/report` with `info`'s id leaving the queue on the ack, and
 sent again after a dropped connection. `tests/it/report_contract.rs` pins the
 fields by name and type, the topic, and `sent_at` kept on a send again.
+The failed-unit fixtures cover a failed oneshot becoming inactive while its
+restart count stays zero; one shared restart/state query, cached success
+and failure, no query without consent or before the due voice wait ends;
+ambiguous records and an unknown-name canary; canonical names, recovery,
+unchanged waits, retransmission, schema `/1` and the 4 KiB limit. The source
+fixture runs a local stand-in command through the production query path;
+it does not exercise a live systemd or a lamp.
 One release forward (#2052): a choice it can't read (cut short, garbage,
 empty, no boolean `share`, spoiled while running) is off, kept whole and
 said once; a newer build's choice, own or setup's, reads off and is left
