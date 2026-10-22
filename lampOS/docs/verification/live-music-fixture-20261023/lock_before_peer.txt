@@ -1,0 +1,9 @@
+
+running 1 test
+SECOND_QUEUE_CONTROL: worker state is held; original accept bound is three seconds
+SECOND_QUEUE_CONTROL: releasing worker state after five seconds
+lamp-voice provider: request 1 asked for play_relaxing_music; the executive answered in 2 ms; the answer was sent
+lamp-voice provider: request 1 asked for use_skill; the executive answered in 0 ms; the answer was sent
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3498 filtered out; finished in 5.10s
+

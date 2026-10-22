@@ -1,3 +1,28 @@
+## Current checkpoint: 2026-10-23 02:48 +07, Live music fixture contention reproduced
+
+Ready for lamp-voice: no (new test-only correction; crate and native gates remain)
+
+Second is taking the separate Live-worker music fixture on
+`second/live-audio-fixture`, from current public `43bc29f9b`. A five-second
+hold of the real shared worker-state lock reproduces its accept timeout,
+zero-millisecond unavailable reply and failed confirmation assertion:
+**0 passed / 1 failed**. Taking the existing guard before starting the fake
+Skills peer passes the same controlled wait: **1 passed / 0 failed**.
+[Complete controls and source binding](verification/live-music-fixture-20261023/README.md)
+retain both outputs, the deliberate patches and clean restoration. All
+6,509 bound files stayed stable during each invocation. The historical
+Linux run's exact cause remains unproven; no local failure is waived.
+
+The candidate keeps every original assertion and timeout, changes no
+production bytes, and leaves the separate decline/music correction to Tests.
+That fixture's related lock ordering was reported on #1569. Mac formatting,
+strict Voice Clippy and changed Voice crate tests are next; no full local
+workspace or local ARM64 gate will run. Nine's corrected #3107 still awaits
+its head for Second's requested re-read. #2810's attended unplug and #1812's
+real signed run remain with First and the person at the lamp.
+
+---
+
 ## Current checkpoint: 2026-10-23 02:34 +07, audio-renewal correction merged
 
 Ready for lamp-voice: yes (#3105 carried by merged train #3106)
