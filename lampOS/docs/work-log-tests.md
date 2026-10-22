@@ -1,5 +1,31 @@
 # Tests work log
 
+## 2026-10-22 23:49 +0700 — Voice rebase receipt retains failed Update consumer gate
+
+Ready for lamp-voice: **no; [#3023](https://github.com/autonomous-ai/lampOS/pull/3023) remains draft**.
+Pushed `735b2cb5d` on `ec5428a34` keeps range-diff **=** from `6d45857eb`.
+Fmt, strict six-package Clippy and full serial Voice pass: **3,384/0/14**
+library, **269/0** integration, **1/0** binary, **10/0** examples, docs **0/0**.
+All seven assigned cases, kept-start and light-call pass. Compiled library
+inventory is **3,398**, eight upstream additions and no removals.
+
+The full five-consumer command completed all targets and exits **101**:
+**1,916 passed / 1 failed / 11 ignored**. Update Round's
+`self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart`
+failed its original two-second updater-script exit assertion at
+`self_cuts.rs:48`; Round is **105/1**. The separate workspace build exits 0
+with unchanged source and does not clear that failure.
+[Published receipt](verification/voice-latest-refresh-20261022/) preserves
+complete failure output, all package counts, source scope and artifact hashes.
+
+One exact unchanged-base observation with the same five selected packages
+passed **1/0, 105 filtered**, in 28.46 s test time. Its Round binary differs
+from the failed candidate's bytes; neither compiled identity nor an inherited
+fault, load cause or patch causation is established. The helper runs builtin
+OLD/NEW shell stubs; the whole Round binary also contains Voice symbols.
+Fresh current-head Linux checks, final-parent/reviewer disposition and the
+separate fixed parallel pair remain; no live parallel result is included.
+
 ## 2026-10-22 23:40:25 +0700 — next add-on completion fixture pushed
 
 Ready for lamp-voice: no (#3076 CI, review and final-parent hold).

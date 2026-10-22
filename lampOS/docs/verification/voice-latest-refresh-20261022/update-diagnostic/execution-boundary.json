@@ -1,0 +1,57 @@
+{
+  "candidate_head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+  "baseline_head": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+  "source_path": "lampOS/crates/update/tests/round/self_cuts.rs",
+  "source_sha256": "9ce086ae4ca867c1c7383c59aac34d91feee45a652e88a066659b6b37513550c",
+  "source_identical_between_heads": true,
+  "update_and_root_cargo_delta": [],
+  "source_excerpt": {
+    "lines_1_based": [
+      14,
+      66
+    ],
+    "raw_text": "const OLD: &str = \"#!/bin/sh\\nprintf 'old-updater\\\\n'\\n\";\nconst NEW: &str = \"#!/bin/sh\\nprintf 'new-updater\\\\n'\\n\";\n\n/// Only the two immediate, builtin-only scripts above are run here. Reap\n/// on both assertion failure and timeout; neither script creates children.\nstruct Running(Child);\n\nimpl Drop for Running {\n    fn drop(&mut self) {\n        let _ = self.0.kill();\n        let _ = self.0.wait();\n    }\n}\n\nfn executable(path: &Path, script: &str) {\n    assert_eq!(fs::read(path).unwrap(), script.as_bytes());\n    let metadata = fs::symlink_metadata(path).unwrap();\n    assert!(metadata.is_file(), \"the executable must be a regular file\");\n    assert_eq!(metadata.permissions().mode() & 0o777, 0o755);\n    let _forking = forking();\n    let mut child = Running(\n        Command::new(path)\n            .env_clear()\n            .stdin(Stdio::null())\n            .stdout(Stdio::piped())\n            .stderr(Stdio::null())\n            .spawn()\n            .expect(\"the selected updater must execute\"),\n    );\n    let deadline = Instant::now() + Duration::from_secs(2);\n    let status = loop {\n        if let Some(status) = child.0.try_wait().unwrap() {\n            break status;\n        }\n        assert!(Instant::now() < deadline, \"updater fixture did not exit\");\n        // Polling bounds the child; it does not choose a cut or order writes.\n        std::thread::sleep(Duration::from_millis(5));\n    };\n    assert!(status.success(), \"{status}\");\n    let mut output = String::new();\n    child\n        .0\n        .stdout\n        .take()\n        .unwrap()\n        .take(128)\n        .read_to_string(&mut output)\n        .unwrap();\n    assert_eq!(\n        output,\n        if script == OLD {\n            \"old-updater\\n\"\n        } else {\n"
+  },
+  "observed_assertion": "crates/update/tests/round/self_cuts.rs:48: updater fixture did not exit",
+  "boundary": "The helper verifies exact OLD/NEW shell-script bytes and mode, acquires the fixture fork guard, spawns the chosen updater, then starts a two-second Instant deadline. It polls try_wait every five milliseconds. Success and exact stdout are asserted after exit. The deadline excludes time before it is created (including guard acquisition and spawn call); it bounds later exit observation, not a voice latency measurement.",
+  "cleanup": "Running Drop kills and waits for the child; the exact builtin-only scripts create no children. No cleanup failure was reported here.",
+  "unknowns": "The test invokes this helper repeatedly. The failure output does not identify which OLD/NEW boundary invocation timed out or establish why it did so.",
+  "voice_scope": "The candidate Round binary has 179 globally defined lamp_voice symbols. It is false to claim the whole binary excludes Voice. This specific executable helper runs the two builtin-only /bin/sh printf stubs; static source and symbol evidence do not establish a process-wide cause.",
+  "symbol_scan_selected": {
+    "argv": [
+      "/usr/bin/nm",
+      "-gU",
+      "/private/tmp/tests-codex-1569-target/debug/deps/round-dfc8ec2a48b28ab1"
+    ],
+    "exit": 0,
+    "wall_seconds": 0.245608,
+    "before_binary_sha256": "5bb29df8755ad7caddbeaae7e8af054d866bad5774be93840e9d229f333dad57",
+    "after_binary_sha256": "5bb29df8755ad7caddbeaae7e8af054d866bad5774be93840e9d229f333dad57",
+    "binary_unchanged": true,
+    "stdout_sha256": "38024b4bbf57274ba1ac209da792c3233b5238b1bae604e151d7c529d14460e9",
+    "stdout_bytes": 2881074,
+    "global_defined_symbol_lines": 21422,
+    "voice_symbol_match_count": 179,
+    "stderr": "",
+    "limit": "A literal lamp_voice symbol scan of global defined symbols; absence is supporting evidence, not proof covering stripped/local/inlined code."
+  },
+  "symbol_scan_original": {
+    "source": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022/candidate-round-symbol-scan.json",
+    "bytes": 43048,
+    "sha256": "a49722544f373a33e7ca1a9497d57159089ee31f12f368045a904a998e6eb98c"
+  },
+  "artifact_comparison": "Candidate and baseline compiled Round hashes differ; no compiled-byte identity, inherited fault, host-load cause or patch causation is established.",
+  "baseline_freshness": {
+    "file_count": 6422,
+    "before": "8c59389b2c0fb07a380de40df2cd8dcf922df731078529eb800f231b17f49881",
+    "after": "8c59389b2c0fb07a380de40df2cd8dcf922df731078529eb800f231b17f49881",
+    "content_identical": true
+  },
+  "baseline_full_source_map_external": {
+    "source": "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022/before-prepared-source.json",
+    "bytes": 924365,
+    "sha256": "012deb4395c0c8ce076c6ee19b0e4c8acf68f97b9ec08a70d5768ff2578391a5"
+  },
+  "fingerprint_limit": "The preserved baseline Cargo fingerprint gives target features, rustflags and 17 dependency entries; it is not a complete resolver graph.",
+  "focused_limit": "The unchanged-base exact test passed once with the same five selected packages; it is not the same whole-consumer invocation and does not clear candidate exit 101."
+}

@@ -1,0 +1,16 @@
+{
+  "head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+  "argv": [
+    "cargo",
+    "build",
+    "--workspace",
+    "--offline"
+  ],
+  "started": "2026-10-22T16:33:57.877484+00:00",
+  "seconds": 67.41669882694259,
+  "exit": 0,
+  "sha256": "f2c20e09196b3f324333e4a8ee3aa5eb5320d129443fc3a069ebba0f8448dfac",
+  "bytes": 4813,
+  "source_unchanged": true,
+  "note": "Separate build after failed consumer gate; does not turn that failure into a passing gate."
+}

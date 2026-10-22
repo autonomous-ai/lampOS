@@ -1,0 +1,19 @@
+{
+  "head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+  "binary": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+  "binary_sha256": "3b1a1e4233d456984a3011b02db9281ff87b12bece8ddc584856bc7f99803cf0",
+  "list_sha256": "3193568c3decdd2880965bf02ad941d8c566f35c51e783e563075bb0b6e9ffcd",
+  "compiled_test_count": 3398,
+  "previous_test_count": 3390,
+  "added_since_6d45857eb": [
+    "coordinator::tests::endpoint_session::words_end_holds_the_lines_end_only_with_the_switch",
+    "person::tests::a_says_record_keeps_the_level_its_note_was_told_and_no_name",
+    "second_provider::tests::the_words_so_far_are_told_only_with_the_switch",
+    "unfinished_words::tests::a_decomposed_word_is_its_composed_one",
+    "unfinished_words::tests::a_finished_line_has_no_class",
+    "unfinished_words::tests::a_question_word_last_is_a_whole_request",
+    "unfinished_words::tests::the_journal_line_has_counts_only",
+    "unfinished_words::tests::the_last_word_is_classed"
+  ],
+  "removed_since_6d45857eb": []
+}

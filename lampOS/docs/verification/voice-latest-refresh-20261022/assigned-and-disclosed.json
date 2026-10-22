@@ -1,0 +1,24 @@
+{
+  "head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+  "argv": [
+    "cargo",
+    "test",
+    "-p",
+    "lamp-voice",
+    "--offline",
+    "--",
+    "--test-threads=1"
+  ],
+  "raw_log_sha256": "e704589ab0f2dd10a8ee1dc042d3d46d8bcc73018b8af46621ed96005515b462",
+  "passed": {
+    "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply": true,
+    "provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet": true,
+    "provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by": true,
+    "remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked": true,
+    "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply": true,
+    "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going": true,
+    "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news": true,
+    "provider_worker::tests::kept_start::with_no_first_answer_the_patience_ends_in_the_strict_timeout_and_no_end": true,
+    "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them": true
+  }
+}

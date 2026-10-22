@@ -1,0 +1,12 @@
+{
+  "recorded_utc": "2026-10-22T16:34:31.336556+00:00",
+  "candidate_head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+  "source_log": "/private/tmp/tests-voice-latest-refresh-20261022/consumers-serial.txt",
+  "source_log_sha256": "f34508439300c9d60472bcb333970854870d6d4bbac0ccde9a892eb9cdefcd73",
+  "source_log_bytes": 230969,
+  "artifact": "/private/tmp/tests-codex-1569-target/debug/deps/round-dfc8ec2a48b28ab1",
+  "artifact_sha256": "5bb29df8755ad7caddbeaae7e8af054d866bad5774be93840e9d229f333dad57",
+  "artifact_bytes": 14283596,
+  "artifact_mtime_ns": 1792684332991359532,
+  "scope": "Read-only receipt of Cargo-selected candidate Round artifact before baseline compilation; root workspace build may update normal binaries but not this test artifact."
+}

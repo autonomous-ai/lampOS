@@ -1,0 +1,39 @@
+{
+  "head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+  "parent": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+  "verified_source_files": 1382,
+  "aggregate_sha256": "d7d92c248fd049a3d471e99a06b96a535bd2a17eff9cce17368c683a18bdd9a0",
+  "aggregate_algorithm": "SHA256 of json.dumps(path_to_sha256_map, sort_keys=True).encode(), using Python default JSON separators/ASCII escaping. The map is source.json.",
+  "scope": "Files enumerated under lampOS/crates plus lampOS/Cargo.toml, Cargo.lock and rust-toolchain.toml; not the full repository or all include_str docs, fixtures, vendor trees, tools or services.",
+  "commit_blob_verification": "All 1,382 file bytes match the corresponding committed 735b2cb5 blobs via git cat-file --batch.",
+  "working_tree_verification": "The initial preparation verified all 1,382 scoped files against the committed 735 head and clean worktree; the separate terminal workspace-build receipt additionally reports source_unchanged true.",
+  "runner_source_checks": "The runner asserted byte equality after its mtime refresh and after each command, including the failed consumer command before saving results. It exited 101 before workspace build. A separate workspace-build receipt exits 0 with source_unchanged true.",
+  "range_diff": {
+    "argv": [
+      "git",
+      "range-diff",
+      "6d45857eb3015e4963e186fdb50c8b77747b57e6^..6d45857eb3015e4963e186fdb50c8b77747b57e6",
+      "ec5428a34c0f66688e54200473cf26e6c3dd2b88..735b2cb5db21176a0ad80fcb42c48e739f8362fe"
+    ],
+    "result": "=",
+    "raw": "range-diff.txt.json"
+  },
+  "compiled_inventory": {
+    "current_list_external": {
+      "source": "/private/tmp/tests-voice-latest-refresh-20261022/compiled-library-list.txt",
+      "bytes": 315532,
+      "sha256": "3193568c3decdd2880965bf02ad941d8c566f35c51e783e563075bb0b6e9ffcd"
+    },
+    "prior_list_external": {
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/compiled-library-list.txt",
+      "bytes": 314985,
+      "sha256": "7d51866cb13464a836ccaf1df3f2f5f2c6330809cb48b3cef9313d674fafeeb6"
+    },
+    "current_names": 3398,
+    "prior_names": 3390,
+    "added": 8,
+    "removed": 0,
+    "verified_against_both_raw_lists": true,
+    "limits": "Complete name lists and binary stay external; compiled-inventory.json includes exact eight additions and their source head. Binary hash is a retained original observation, not a later rehash of the shared target."
+  }
+}

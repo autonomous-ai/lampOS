@@ -1,0 +1,9 @@
+{
+  "format": "Lossless UTF-8, including trailing whitespace and line endings.",
+  "provenance": {
+    "source": "/private/tmp/tests-voice-latest-refresh-20261022/range-diff.txt",
+    "bytes": 79,
+    "sha256": "6292a0353baa3febb54e953acafa97ffdabd7adcab6aec376d494f60854ce85f"
+  },
+  "raw_text": "1:  6d45857eb3 = 1:  735b2cb5db lampOS: make Voice fixture waits deterministic\n"
+}

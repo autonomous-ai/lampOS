@@ -1,0 +1,54 @@
+{
+  "status": "failed_consumer_qualification",
+  "ready_for_lamp_voice": false,
+  "source_head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+  "source_parent": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+  "source_pushed": true,
+  "pr": "https://github.com/autonomous-ai/lampOS/pull/3023",
+  "draft": true,
+  "native": {
+    "fmt_exit": 0,
+    "strict_six_package_clippy_exit": 0,
+    "voice_serial_exit": 0,
+    "voice_library": {
+      "passed": 3384,
+      "failed": 0,
+      "ignored": 14
+    },
+    "voice_integration": {
+      "passed": 269,
+      "failed": 0
+    },
+    "voice_binary_passed": 1,
+    "voice_examples_passed": 10,
+    "voice_docs_passed": 0,
+    "consumer_exit": 101,
+    "consumer": {
+      "passed": 1916,
+      "failed": 1,
+      "ignored": 11
+    },
+    "workspace_build_separate_exit": 0,
+    "whole_native_gate_passed": false
+  },
+  "focused_base_diagnostic": {
+    "head": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+    "exit": 0,
+    "passed": 1,
+    "failed": 0,
+    "round_filtered": 105,
+    "test_seconds": 28.46,
+    "wall_seconds": 135.987934,
+    "candidate_binary_sha256": "5bb29df8755ad7caddbeaae7e8af054d866bad5774be93840e9d229f333dad57",
+    "base_binary_sha256": "693a8bc43fd1a54151317badb2d94774cb5e0ba061d6003f692e5b908887b1f4",
+    "compiled_identity": false,
+    "cause": "unproven"
+  },
+  "current_ci": "Fresh735 jobs started/requested after push; no terminal current-head result is part of this receipt.",
+  "parallel_pair": "A fixed one-before/one-after default-parallel Voice library pair is in progress separately. No live pair output or counts included.",
+  "remaining": [
+    "Resolve/disposition the failed Update consumer observation with the responsible reviewer.",
+    "Fresh exact-head Linux checks, latest-parent window and reviewer read."
+  ],
+  "no_new_gates_during_packaging": true
+}

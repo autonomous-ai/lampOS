@@ -1,0 +1,19 @@
+{
+  "base": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+  "platform": "Darwin x86_64",
+  "cpu_count": 16,
+  "target": "/private/tmp/tests-codex-1569-target",
+  "source_files": 1382,
+  "source_sha256": "d7d92c248fd049a3d471e99a06b96a535bd2a17eff9cce17368c683a18bdd9a0",
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "0"
+  },
+  "rust_test_threads": "unset in environment; --test-threads=1 on each test command",
+  "commands": []
+}

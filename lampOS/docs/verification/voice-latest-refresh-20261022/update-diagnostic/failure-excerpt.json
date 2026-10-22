@@ -1,0 +1,14 @@
+{
+  "source": {
+    "source": "/private/tmp/tests-voice-latest-refresh-20261022/consumers-serial.txt",
+    "bytes": 230969,
+    "sha256": "f34508439300c9d60472bcb333970854870d6d4bbac0ccde9a892eb9cdefcd73"
+  },
+  "source_lines_1_based": [
+    2104,
+    2115
+  ],
+  "raw_text": "---- self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart stdout ----\n\nthread 'self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart' (699003657) panicked at crates/update/tests/round/self_cuts.rs:48:9:\nupdater fixture did not exit\n\n\nfailures:\n    self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart\n\ntest result: FAILED. 105 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 752.07s\n\nerror: test failed, to rerun pass `-p lamp-update --test round`\n",
+  "bytes": 552,
+  "sha256": "b5d20fe32079c2d205e98e3003b24234b7da3de25b8bbc3da6342add12a17f07"
+}

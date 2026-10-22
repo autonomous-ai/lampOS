@@ -1,0 +1,414 @@
+{
+  "head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+  "command_exit": 101,
+  "watchdog_timeout": false,
+  "wall_seconds": 2213.501157956198,
+  "raw": {
+    "source": "/private/tmp/tests-voice-latest-refresh-20261022/consumers-serial.txt",
+    "bytes": 230969,
+    "sha256": "f34508439300c9d60472bcb333970854870d6d4bbac0ccde9a892eb9cdefcd73"
+  },
+  "target_result_count": 36,
+  "aggregate": {
+    "passed": 1916,
+    "failed": 1,
+    "ignored": 11
+  },
+  "by_package": {
+    "lamp-cloud": {
+      "passed": 193,
+      "failed": 0,
+      "ignored": 2
+    },
+    "lamp-memory": {
+      "passed": 298,
+      "failed": 0,
+      "ignored": 6
+    },
+    "lamp-skills": {
+      "passed": 496,
+      "failed": 0,
+      "ignored": 1
+    },
+    "lamp-update": {
+      "passed": 306,
+      "failed": 1,
+      "ignored": 2
+    },
+    "lamp-voice-eval": {
+      "passed": 623,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "rows": [
+    {
+      "source_line_1_based": 201,
+      "package": "lamp-cloud",
+      "target": "Running unittests src/lib.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-2690e4ad5cefe8ed)",
+      "result": "ok",
+      "passed": 163,
+      "failed": 0,
+      "ignored": 2,
+      "raw_summary": "test result: ok. 163 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 50.16s"
+    },
+    {
+      "source_line_1_based": 207,
+      "package": "lamp-cloud",
+      "target": "Running unittests src/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-18c76daa32578ac4)",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "source_line_1_based": 243,
+      "package": "lamp-cloud",
+      "target": "Running tests/it/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/it-4053bc13577bd447)",
+      "result": "ok",
+      "passed": 30,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.63s"
+    },
+    {
+      "source_line_1_based": 345,
+      "package": "lamp-memory",
+      "target": "Running unittests src/lib.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-94dd54385ee49181)",
+      "result": "ok",
+      "passed": 95,
+      "failed": 0,
+      "ignored": 1,
+      "raw_summary": "test result: ok. 95 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 46.72s"
+    },
+    {
+      "source_line_1_based": 363,
+      "package": "lamp-memory",
+      "target": "Running unittests src/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-8df4145e234a6ee2)",
+      "result": "ok",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s"
+    },
+    {
+      "source_line_1_based": 377,
+      "package": "lamp-memory",
+      "target": "Running unittests src/bin/lamp-memory-eval.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory_eval-e3a1b5bf22c00560)",
+      "result": "ok",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+    },
+    {
+      "source_line_1_based": 386,
+      "package": "lamp-memory",
+      "target": "Running tests/forget_person.rs (/private/tmp/tests-codex-1569-target/debug/deps/forget_person-0baa03b8deba96b5)",
+      "result": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.33s"
+    },
+    {
+      "source_line_1_based": 393,
+      "package": "lamp-memory",
+      "target": "Running tests/forgot.rs (/private/tmp/tests-codex-1569-target/debug/deps/forgot-0c056ee352039d59)",
+      "result": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s"
+    },
+    {
+      "source_line_1_based": 422,
+      "package": "lamp-memory",
+      "target": "Running tests/health_control.rs (/private/tmp/tests-codex-1569-target/debug/deps/health_control-acc682c0c268f332)",
+      "result": "ok",
+      "passed": 23,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s"
+    },
+    {
+      "source_line_1_based": 579,
+      "package": "lamp-memory",
+      "target": "Running tests/it/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/it-d204263de2013653)",
+      "result": "ok",
+      "passed": 146,
+      "failed": 0,
+      "ignored": 5,
+      "raw_summary": "test result: ok. 146 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 284.46s"
+    },
+    {
+      "source_line_1_based": 586,
+      "package": "lamp-memory",
+      "target": "Running tests/paraphrase_fixture.rs (/private/tmp/tests-codex-1569-target/debug/deps/paraphrase_fixture-ac6df351bbe5e529)",
+      "result": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "source_line_1_based": 593,
+      "package": "lamp-memory",
+      "target": "Running tests/voice_early_words.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_early_words-7be3afb67f766235)",
+      "result": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.68s"
+    },
+    {
+      "source_line_1_based": 600,
+      "package": "lamp-memory",
+      "target": "Running tests/voice_follows_face.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_follows_face-4b30c2ababa583b9)",
+      "result": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.86s"
+    },
+    {
+      "source_line_1_based": 610,
+      "package": "lamp-memory",
+      "target": "Running tests/voice_forget.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_forget-e550be1633d1ad40)",
+      "result": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.61s"
+    },
+    {
+      "source_line_1_based": 618,
+      "package": "lamp-memory",
+      "target": "Running tests/voice_forget_about.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_forget_about-c268e98640c1ed63)",
+      "result": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.93s"
+    },
+    {
+      "source_line_1_based": 626,
+      "package": "lamp-memory",
+      "target": "Running tests/voice_link_used.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_link_used-18cc5e8616816a4b)",
+      "result": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.61s"
+    },
+    {
+      "source_line_1_based": 633,
+      "package": "lamp-memory",
+      "target": "Running tests/voice_observe.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_observe-101594c218095598)",
+      "result": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.42s"
+    },
+    {
+      "source_line_1_based": 641,
+      "package": "lamp-memory",
+      "target": "Running tests/voice_since_until.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_since_until-b89d75d73c205b05)",
+      "result": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.87s"
+    },
+    {
+      "source_line_1_based": 802,
+      "package": "lamp-skills",
+      "target": "Running unittests src/lib.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-8104fc26ce56967f)",
+      "result": "ok",
+      "passed": 155,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 155 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.10s"
+    },
+    {
+      "source_line_1_based": 828,
+      "package": "lamp-skills",
+      "target": "Running unittests src/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-371d58a2cd3caa88)",
+      "result": "ok",
+      "passed": 20,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.43s"
+    },
+    {
+      "source_line_1_based": 1720,
+      "package": "lamp-skills",
+      "target": "Running tests/it/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/it-67a38ca700330bc8)",
+      "result": "ok",
+      "passed": 290,
+      "failed": 0,
+      "ignored": 1,
+      "raw_summary": "test result: ok. 290 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 211.26s"
+    },
+    {
+      "source_line_1_based": 1757,
+      "package": "lamp-skills",
+      "target": "Running tests/requested_audio.rs (/private/tmp/tests-codex-1569-target/debug/deps/requested_audio-6ab71a82e86d3325)",
+      "result": "ok",
+      "passed": 31,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.55s"
+    },
+    {
+      "source_line_1_based": 1876,
+      "package": "lamp-update",
+      "target": "Running unittests src/lib.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-9029a4694ded781b)",
+      "result": "ok",
+      "passed": 111,
+      "failed": 0,
+      "ignored": 2,
+      "raw_summary": "test result: ok. 111 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 11.67s"
+    },
+    {
+      "source_line_1_based": 1882,
+      "package": "lamp-update",
+      "target": "Running unittests src/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-40862d3277d6efc2)",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "source_line_1_based": 1892,
+      "package": "lamp-update",
+      "target": "Running tests/functions.rs (/private/tmp/tests-codex-1569-target/debug/deps/functions-92af8661138433ef)",
+      "result": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s"
+    },
+    {
+      "source_line_1_based": 1976,
+      "package": "lamp-update",
+      "target": "Running tests/install.rs (/private/tmp/tests-codex-1569-target/debug/deps/install-903b09c5968b662b)",
+      "result": "ok",
+      "passed": 78,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 531.20s"
+    },
+    {
+      "source_line_1_based": 1990,
+      "package": "lamp-update",
+      "target": "Running tests/it/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/it-ed9bb0f43c3dbf90)",
+      "result": "ok",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.80s"
+    },
+    {
+      "source_line_1_based": 2113,
+      "package": "lamp-update",
+      "target": "Running tests/round.rs (/private/tmp/tests-codex-1569-target/debug/deps/round-dfc8ec2a48b28ab1)",
+      "result": "FAILED",
+      "passed": 105,
+      "failed": 1,
+      "ignored": 0,
+      "raw_summary": "test result: FAILED. 105 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 752.07s"
+    },
+    {
+      "source_line_1_based": 2500,
+      "package": "lamp-voice-eval",
+      "target": "Running unittests src/lib.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice_eval-10a0d1b7c6ac7683)",
+      "result": "ok",
+      "passed": 378,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 378 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.94s"
+    },
+    {
+      "source_line_1_based": 2513,
+      "package": "lamp-voice-eval",
+      "target": "Running unittests src/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice_eval-17ed0b2985308ef7)",
+      "result": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.61s"
+    },
+    {
+      "source_line_1_based": 2757,
+      "package": "lamp-voice-eval",
+      "target": "Running tests/it/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/it-633215702aeab45e)",
+      "result": "ok",
+      "passed": 238,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 238 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 105.32s"
+    },
+    {
+      "source_line_1_based": 2763,
+      "package": "lamp-cloud",
+      "target": "Doc-tests lamp_cloud",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "source_line_1_based": 2769,
+      "package": "lamp-memory",
+      "target": "Doc-tests lamp_memory",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "source_line_1_based": 2775,
+      "package": "lamp-skills",
+      "target": "Doc-tests lamp_skills",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "source_line_1_based": 2781,
+      "package": "lamp-update",
+      "target": "Doc-tests lamp_update",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "source_line_1_based": 2787,
+      "package": "lamp-voice-eval",
+      "target": "Doc-tests lamp_voice_eval",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    }
+  ],
+  "mapping": "Package ownership follows each Running unittests src/lib.rs boundary and subsequent targets until the next package library, then explicit Doc-tests labels. lamp-memory-eval is a binary target of lamp-memory, not a sixth selected package.",
+  "all_five_doc_targets_completed": true,
+  "only_failed_target": "lamp-update --test round",
+  "round": {
+    "passed": 105,
+    "failed": 1,
+    "ignored": 0
+  }
+}

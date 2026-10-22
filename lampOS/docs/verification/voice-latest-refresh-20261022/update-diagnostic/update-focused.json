@@ -1,0 +1,52 @@
+{
+  "label": "update-focused",
+  "argv": [
+    "cargo",
+    "test",
+    "-p",
+    "lamp-skills",
+    "-p",
+    "lamp-cloud",
+    "-p",
+    "lamp-memory",
+    "-p",
+    "lamp-update",
+    "-p",
+    "lamp-voice-eval",
+    "--offline",
+    "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+    "--",
+    "--exact",
+    "--test-threads=1"
+  ],
+  "cwd": "/private/tmp/tests-codex-voice-ec-parallel-control-20261022/lampOS",
+  "timeout_seconds": 1200,
+  "started_utc": "2026-10-22T16:37:57.807636+00:00",
+  "started_epoch_ns": 1792687077807907000,
+  "load_average_before": [
+    7.458984375,
+    9.13134765625,
+    10.47216796875
+  ],
+  "stdout": "update-focused.stdout",
+  "stderr": "update-focused.stderr",
+  "pid": 23954,
+  "exit": 0,
+  "timed_out": false,
+  "cleanup": {
+    "initial_members": [],
+    "signals": [],
+    "final_members": [],
+    "no_live_owned_children": true
+  },
+  "wall_seconds": 135.987934,
+  "load_average_after": [
+    6.85400390625,
+    8.42578125,
+    9.99658203125
+  ],
+  "stdout_sha256": "800b7a428d601dc99d0b012041d810cb0ab53d065accff46c5021f60948553a8",
+  "stdout_bytes": 3618,
+  "stderr_sha256": "92fb01fd689b6df2dcf36d957a4f2673df1838a289a1fbbe1e575551f41c3fec",
+  "stderr_bytes": 7345
+}
