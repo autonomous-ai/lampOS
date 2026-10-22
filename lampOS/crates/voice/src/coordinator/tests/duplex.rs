@@ -1799,21 +1799,7 @@ fn story_after_two_asides(keeps_listening: bool, gap_s: usize) -> Harness {
     if keeps_listening {
         h.mask.keep_listening();
     }
-    h.blocks(200, 0.99, Some(evidence(0, OWN)));
-    for aside in 0..2 {
-        h.blocks(ONSET + 2, 0.9, Some(evidence(0, OVER)));
-        for quiet in 1..=29 {
-            h.block(0.1, Some(evidence(quiet, None)));
-        }
-        h.blocks(40, 0.1, Some(evidence(40, None)));
-        let spent = ONSET + 2 + 29 + 40;
-        let story = if aside == 0 {
-            2 * BLOCKS_A_SECOND
-        } else {
-            gap_s * BLOCKS_A_SECOND
-        };
-        h.blocks(story - spent, 0.99, Some(evidence(0, OWN)));
-    }
+    yields_over_a_story(&mut h, 2, &[(ONSET + 2, OVER)], (0, 0.0, None), gap_s);
     let (counts, fallen_back) = h.mask.duplex_summary().unwrap();
     assert_eq!(counts, (2, 0, 2));
     assert_eq!(
@@ -1821,6 +1807,38 @@ fn story_after_two_asides(keeps_listening: bool, gap_s: usize) -> Harness {
         gap_s * 1_000_000 < FORGIVE_FRUITLESS_US as usize
     );
     h
+}
+
+/// `count` yields over a long story that the lamp went on after: each `over`'s
+/// runs of blocks heard over the lamp with their shares, then `after` (that
+/// many blocks at that score and shares, the lamp still sounding), then
+/// its sound dies away and stillness resumes it. They are 2 s apart, and
+/// the last is `gap_s` before the story's end here.
+fn yields_over_a_story(
+    h: &mut Harness,
+    count: usize,
+    over: &[(usize, Option<(u8, u8)>)],
+    after: (usize, f32, Option<(u8, u8)>),
+    gap_s: usize,
+) {
+    h.blocks(200, 0.99, Some(evidence(0, OWN)));
+    for aside in 0..count {
+        for &(blocks, shares) in over {
+            h.blocks(blocks, 0.9, Some(evidence(0, shares)));
+        }
+        h.blocks(after.0, after.1, Some(evidence(0, after.2)));
+        for quiet in 1..=29 {
+            h.block(0.1, Some(evidence(quiet, None)));
+        }
+        h.blocks(40, 0.1, Some(evidence(40, None)));
+        let spent = over.iter().map(|run| run.0).sum::<usize>() + after.0 + 29 + 40;
+        let story = if aside + 1 < count {
+            2 * BLOCKS_A_SECOND
+        } else {
+            gap_s * BLOCKS_A_SECOND
+        };
+        h.blocks(story - spent, 0.99, Some(evidence(0, OWN)));
+    }
 }
 
 /// Someone speaks `blocks` blocks over the story at `score`. Its sound dies
@@ -1933,4 +1951,92 @@ fn with_keeps_listening_a_voice_that_is_never_a_line_pauses_the_story_twice_more
     assert_eq!(h.events("duplex_resume").len(), 2 + 2);
     assert_eq!(h.old(), old);
     assert!(h.events("turn_finished").is_empty());
+}
+
+/// A person's short aside, heard mostly plainly: eight blocks the render
+/// explains a tenth of, then four it explains 40% of as the lamp's sound
+/// dies away. Fewer than ten plain blocks, so stillness resumes it
+/// (`Confirmation::plain_blocks`); a person outnumbers the lamp's own voice.
+const PLAIN_ASIDE: &[(usize, Option<(u8, u8)>)] = &[(8, Some((10, 0))), (4, OVER)];
+
+/// A story with two yields over it, with `LAMP_CUT_IN_COUNTS_REAL` as
+/// `counts_real` says; then a third line 5 s after the second, and whether
+/// it was let in.
+fn a_third_line_after(
+    counts_real: bool,
+    over: &[(usize, Option<(u8, u8)>)],
+    after: (usize, f32, Option<(u8, u8)>),
+) -> (bool, Harness) {
+    let mut h = Harness::new(TurnTaking::Duplex, 40_000);
+    if counts_real {
+        h.mask.count_real_cut_ins();
+    }
+    yields_over_a_story(&mut h, 2, over, after, 5);
+    assert_eq!(h.mask.duplex_summary().unwrap().0, (2, 0, 2));
+    let heard = a_line_over_the_story(&mut h, 200);
+    (heard, h)
+}
+
+/// #2602, "Cutting in" (Seventh's design, Third's 08:13): with
+/// `LAMP_CUT_IN_COUNTS_REAL=on`, two asides heard plainly over the story
+/// are a person, not the lamp's own voice, and cost no fruitless yield: a
+/// third line 5 s after the second commits and stops the story. Off, as
+/// today, it is not heard at all.
+#[test]
+fn with_counts_real_two_plain_asides_leave_a_third_line_heard() {
+    let (heard, h) = a_third_line_after(true, PLAIN_ASIDE, (0, 0.0, None));
+    assert!(heard, "on: the third line was not heard");
+    assert_eq!(h.events("duplex_yield").len(), 3);
+    assert_eq!(h.events("duplex_commit").len(), 1);
+    assert_eq!(h.events("turn_finished")[0]["outcome"], "user_interrupted");
+    drop(h);
+    let (heard, h) = a_third_line_after(false, PLAIN_ASIDE, (0, 0.0, None));
+    assert!(!heard, "off: the third line was heard");
+    assert_eq!(h.events("duplex_yield").len(), 2);
+    assert!(h.events("turn_finished").is_empty());
+}
+
+/// With the switch, the lamp's own voice twice still trips the cap: two
+/// yields whose windows the render mostly explains (an onset run 40%
+/// explained, then the lamp's own voice let through) count, and a third
+/// line within 20 s makes no yield and no candidate.
+#[test]
+fn with_counts_real_the_lamps_own_voice_twice_still_falls_back() {
+    let (heard, h) = a_third_line_after(true, &[(ONSET + 2, OVER)], (20, 0.99, OWN));
+    assert!(!heard);
+    assert_eq!(h.events("duplex_yield").len(), 2);
+    assert!(h.mask.duplex_summary().unwrap().1, "not fallen back");
+    assert!(h.events("turn_finished").is_empty());
+}
+
+/// With the switch, `Unknown` is no evidence of the lamp's own voice
+/// (Third on #2602): two yields whose onset runs were heard mostly plainly, and
+/// whose windows then held 60 blocks of speech with no alignment to judge
+/// by, more than all the rest, do not count, and a third line commits. The
+/// design note's first rule ("Own or Unknown dominated") would have counted
+/// them and left it unheard.
+#[test]
+fn with_counts_real_unknown_alone_is_not_the_lamps_own_voice() {
+    let (heard, h) = a_third_line_after(true, PLAIN_ASIDE, (60, 0.9, None));
+    assert!(heard, "the third line was not heard");
+    assert_eq!(h.events("duplex_commit").len(), 1);
+}
+
+/// With the switch, a sound that is never a line (a television's short
+/// bursts, heard mostly plainly, then voice with nothing to judge it by)
+/// is no fruitless yield of the lamp's own voice, but it has a bound of its
+/// own (`OTHER_FRUITLESS_YIELDS`, the Reviewer-lead's P2 on #2779): after
+/// three that resume, a fourth within 20 s makes no yield and no candidate.
+#[test]
+fn with_counts_real_a_sound_that_is_never_a_line_stops_pausing_after_three() {
+    let mut h = Harness::new(TurnTaking::Duplex, 40_000);
+    h.mask.count_real_cut_ins();
+    yields_over_a_story(&mut h, 3, PLAIN_ASIDE, (20, 0.9, None), 3);
+    assert_eq!(h.mask.duplex_summary().unwrap(), ((3, 0, 3), true));
+    let old = h.old();
+    let candidates = h.events("input_candidate").len();
+    assert!(!a_line_over_the_story(&mut h, 200));
+    assert_eq!(h.events("duplex_yield").len(), 3);
+    assert_eq!(h.events("input_candidate").len(), candidates);
+    assert_eq!(h.old(), old);
 }

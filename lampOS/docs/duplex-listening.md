@@ -437,6 +437,39 @@ never a line (a television) may cost at most two more fruitless yields
 back as without the switch. `duplex_policy` gives both numbers
 (`keeps_listening`).
 
+**With `LAMP_CUT_IN_COUNTS_REAL=on` (#2602, off unless set), only the
+lamp's own voice counts as a fruitless yield.** A resume counts toward
+`FRUITLESS_YIELDS` only when its yield's evidence window points at the
+lamp's own voice (`YieldEvidence` in `turn_taking.rs`). The window is
+bounded: the consecutive `Over` blocks that made the yield (its onset run,
+7 or 10 blocks) and every block heard while the yield is in force, through
+the block that settles it, at most 120 blocks (1.2 s). In it, `Own` and an
+`Over` block that is not plain (the render explains more than 20% of it)
+are the lamp's own voice; a plain `Over` block and `Clear` are a person;
+`Unknown`, `Under`, `Still` and a block without evidence are neither
+(Third on #2602: `Unknown` or words that never came cannot show the lamp's
+own voice made it yield). The resume counts only when the lamp's own voice
+outnumbers a person; a tie or no evidence does not count there. Any other
+resume (not forced) counts on a bound of its own instead
+(`OTHER_FRUITLESS_YIELDS`, three; the Reviewer-lead's P2 on #2779). What
+bounds what:
+
+- Two resumes of the lamp's own voice (`FRUITLESS_YIELDS`), or three that
+  were not its own voice (`OTHER_FRUITLESS_YIELDS`), make the mask fall
+  back for the rest of the reply, as before.
+- The 20 s with no yield gives one back to each count (`FORGIVE_FRUITLESS_US`),
+  and a commit clears both.
+- With `LAMP_CUT_IN_KEEPS_LISTENING` too, a voice that keeps going costs at
+  most two more of either count before the 20 s gives one back.
+
+So two asides heard plainly leave a third line within 20 s heard, the
+lamp's own voice twice still falls back, and a television, a radio or
+someone else's short words pause a story at most three times in 20 s
+(with the keeps-listening switch, five). The 30/40/110-block bounds, the
+own-voice cap of two and the 20 s are unchanged. `duplex_policy` gives the
+window (`fruitless_counts_own_voice_only`). It stays off until `tools/played/cutin.sh`
+has measured the false yields and the asides (#2602, piece 1).
+
 What that means for a person in the room:
 
 - Someone who starts a new question over the lamp is heard from their
@@ -1209,6 +1242,10 @@ functions:
 | `without_keeps_listening_a_third_line_within_twenty_seconds_is_not_heard` | The switch off: 5 and 19 s after, no yield and no candidate; 21 s after, heard (the forgiven yield) |
 | `with_keeps_listening_the_lamps_own_voice_is_never_a_cut_in` | With the switch: 3,000 blocks of the lamp's own voice, a 25-block word, and 1,000 blocks of voice unexplained before the lamp's sound is found again after a third aside, none a yield |
 | `with_keeps_listening_a_voice_that_is_never_a_line_pauses_the_story_twice_more` | With the switch: four tries that resume cost two more yields, then none |
+| `with_counts_real_two_plain_asides_leave_a_third_line_heard` | `LAMP_CUT_IN_COUNTS_REAL=on`: two asides heard plainly, then a third line 5 s after, which commits and ends the story; off, not heard |
+| `with_counts_real_the_lamps_own_voice_twice_still_falls_back` | With the switch: two yields whose windows the render mostly explains count, and a third line 5 s after makes no yield |
+| `with_counts_real_unknown_alone_is_not_the_lamps_own_voice` | With the switch: two yields with plain onsets and 60 `Unknown` blocks after don't count as the lamp's own voice, and the third line commits |
+| `with_counts_real_a_sound_that_is_never_a_line_stops_pausing_after_three` | With the switch: three yields that resume and are not the lamp's own voice fall back (`OTHER_FRUITLESS_YIELDS`); a fourth line within 20 s makes no yield and no candidate |
 | `without_echo_evidence_duplex_decides_as_the_conservative_baseline_does` | Same masked blocks, candidates and rejections as `v1-baseline` |
 | `a_microphone_that_stops_arriving_does_not_hold_the_reply_back` | Dispatch resumes after 100 ms without a block |
 | `a_person_who_speaks_once_the_lamp_is_silent_is_an_ordinary_turn` | Six blocks and admitted, as ever |
