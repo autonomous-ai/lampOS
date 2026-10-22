@@ -152,7 +152,10 @@ package is signed and installed, and a running add-on cannot compose words.
 
 **Rate and lease** (to be measured on a lamp): per add-on, at most one
 proposal every 10 s and 20 an hour; at most 4 `say` proposals an hour
-across all add-ons (built, `crates/skills/src/addon.rs`); at most 2
+across all add-ons (built, `crates/skills/src/addon.rs`), a say the judge
+drops not counted, so a talking room, where every say is dropped, never
+spends the hour before its quiet (lamp-75c9, 22 Oct 07:25), and after a
+drop that add-on proposes nothing for 5 minutes (`AFTER_A_DROP_US`); at most 2
 waiting for a decision (with the judge). A proposal over a limit is not
 published, and the run's `skills/events` says why. A kept proposal holds
 for its `holds_ms`, and its claim then lapses by itself.
