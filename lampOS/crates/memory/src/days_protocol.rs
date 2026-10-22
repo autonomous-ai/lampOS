@@ -91,6 +91,18 @@ enum Extra {
         /// it, first (`Days::follow_up_with`). Without it, as before.
         #[serde(default)]
         events: bool,
+        /// #1693 (the first builder on #2602, 22 Oct 09:4x): with
+        /// `events`, a dated one is marked asked by `follow_up_asked`, not
+        /// when given (`Days::follow_up_until_asked`). Without it, as before.
+        #[serde(default)]
+        until_asked: bool,
+    },
+    /// #1693: the lamp asked about follow-up `id`, given with `until_asked`
+    /// (`Days::follow_up_asked`).
+    FollowUpAsked {
+        #[serde(default)]
+        person: Who,
+        id: u64,
     },
     ConversationEnd {
         #[serde(default)]
@@ -393,8 +405,15 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             store.session_close(&one(person)?, &session)?;
             json!({"ok":true})
         }
-        Extra::FollowUp { person, events } => {
-            json!({"ok":true,"follow_up":store.follow_up_with(&one(person)?,events)?})
+        Extra::FollowUp {
+            person,
+            events,
+            until_asked,
+        } => {
+            json!({"ok":true,"follow_up":store.follow_up_until_asked(&one(person)?,events,until_asked)?})
+        }
+        Extra::FollowUpAsked { person, id } => {
+            json!({"ok":true,"asked":store.follow_up_asked(&one(person)?,id)?})
         }
         Extra::ConversationEnd {
             person,
@@ -462,6 +481,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "session_open",
             "session_close",
             "follow_up",
+            "follow_up_asked",
             "conversation_end",
             "tidy_apply",
             "adopt",

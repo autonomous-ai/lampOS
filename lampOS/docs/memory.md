@@ -1031,10 +1031,28 @@ the unchanged legacy client, used unless the new Days client is selected.
   conversation, never the whole pass lost. A dated observation is kept,
   even unused, until 14 days after its day, so one 31 to 60 days out is
   not expired before it is asked about; then it expires as usual.
-  The session's `follow_up` sends `"events": true`, so the memory gives a
-  dated one only after its day, with its `"on"`, and the session is told
-  "(it was on Saturday 24 October: ask how it went)" after its words, so
-  the model asks how it went, not how it's coming along. Off, the prompt,
+  The session's `follow_up` sends `"events": true` and `"until_asked":
+  true`, so the memory gives a dated one only after its day, with its
+  `"on"`, and the session's note tells it under its own heading after the
+  kept facts (the first builder on #2602, 22 Oct 09:4x, after lamp-c0a4
+  on 22 Oct told the old sentence once and the second route never asked
+  in three exchanges): "Something they mentioned", then "Earlier, they
+  mentioned: "<their words>" (it was on Saturday 24 October). If it fits,
+  ask once, briefly, how it went, never at the start of an answer to
+  something else.", their words quoted as untrusted. An undated thread is
+  told the old sentence. **Marked when the lamp asks:** a dated one is
+  given unmarked (`"until_asked": true`), and the voice watches that
+  person's exchanges: when the lamp's own reply shares two of the event's
+  key words, or one with a question mark ("how was your sister's
+  wedding?", "how was Saturday?"; `remember::asks_about`), it sends
+  `follow_up_asked` once and the memory never gives it again. Not seen
+  (a paraphrase with none of its words, "how did the big day go?", or a
+  reply in another language than its words), it is offered again on a
+  later day, in at most three sessions in all, the last recorded as given,
+  never more than one follow-up a day; a reply that names it without
+  asking ("your sister's wedding sounds lovely") counts, as it was brought
+  up. An older memory refuses `until_asked` and the session is told none,
+  as it refuses `events`. Off, the prompt,
   the job, what goes to `tidy_apply` (every `on` stripped, so an older
   memory never sees it) and the note are byte for byte as before. Either
   way, nothing dated is asked about before its day: with the switch turned
@@ -1043,6 +1061,14 @@ the unchanged legacy client, used unless the new Days client is selected.
   `remember::tests::with_events_the_observe_job_has_its_day_and_the_prompt_asks_for_one`,
   `remember::tests::an_event_s_day_reaches_the_memory_only_with_the_switch`,
   `remember::tests::with_events_a_dated_follow_up_is_told_with_its_day`,
+  `remember::tests::a_reply_asks_about_an_event_by_its_words`,
+  `remember::tests::the_lamp_asking_about_a_dated_follow_up_sends_the_mark_once`,
+  `remember::tests::with_events_a_held_follow_up_is_waited_on_for_the_lamp_to_ask`,
+  `remember::tests::the_writer_sends_the_mark_as_follow_up_asked`,
+  `days::a_dated_one_given_until_asked_is_offered_again_until_marked_asked`,
+  `days::a_dated_one_never_asked_is_offered_at_most_three_times`,
+  `days::until_asked_holds_back_only_a_dated_one`,
+  `days::the_follow_up_asked_request_marks_and_a_forget_takes_the_offer`,
   `local_time::tests::a_named_day_is_read_back_and_said_as_a_person_would`,
   `days::a_bad_event_day_is_dropped_and_the_observation_kept`,
   `days::a_past_event_day_keeps_the_observation_and_its_batch`,
