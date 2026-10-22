@@ -6,7 +6,7 @@ description: Meet the lamp through short invitations, its physical privacy switc
 The core onboarding skill invites; the system runner verifies physical evidence
 and keeps progress. It never changes microphone or camera permission.
 
-Its `skill.toml` contains the eight-step `order`, every first and re-offer
+Its `skill.toml` contains the nine-step `order`, every first and re-offer
 note, the re-offer interval, optional nudge notes and answer counts, and the
 coaching and outcome notes under `[onboarding]`. The shipped notes and order
 match the previous runner word for word. Voice checks and snapshots this data
@@ -45,5 +45,6 @@ hand let go. The skill asks nothing of the body; the model can only skip it.
 
 Consent is a code-checked boundary in the editable notes. Keep the exact
 `only after a clear yes call remember_my_face` clause in both `who_you_are`
-notes, and `done only after a clear yes` in both `room_sounds` notes. Voice
+notes, and `done only after a clear yes` in both `room_sounds` and both
+`face_expressions` notes. Voice
 and Skills refuse loading or packaging if any of these clauses changes.

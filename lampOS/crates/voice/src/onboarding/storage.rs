@@ -449,14 +449,13 @@ fn atomic_progress(paths: &Paths, progress: &Progress) -> io::Result<()> {
     if bytes.len() > MAX_PROGRESS {
         return Err(io::Error::other("progress exceeds bound"));
     }
-    // Whether the progress this write replaces already held the yes: the
+    // Whether the progress this write replaces already held each yes: a
     // record is written only by the write that first keeps it, so a forget
     // that removed it is not undone by a later write.
-    let was_yes = read_bounded(path, MAX_PROGRESS)
+    let before = read_bounded(path, MAX_PROGRESS)
         .ok()
         .flatten()
-        .and_then(|bytes| serde_json::from_slice::<Progress>(&bytes).ok())
-        .is_some_and(|before| kept_yes(&before).is_some());
+        .and_then(|bytes| serde_json::from_slice::<Progress>(&bytes).ok());
     let next = path.with_extension("storage-next");
     let mut file = fs::OpenOptions::new()
         .create_new(true)
@@ -473,28 +472,49 @@ fn atomic_progress(paths: &Paths, progress: &Progress) -> io::Result<()> {
         let _ = fs::remove_file(next);
         return result;
     }
-    room_sounds(paths, progress, !was_yes)
+    for step in YES_STEPS {
+        let was_yes = before
+            .as_ref()
+            .is_some_and(|before| kept_yes(before, step).is_some());
+        consent(paths, progress, step, !was_yes)?;
+    }
+    Ok(())
 }
 
-/// When `room_sounds`'s kept outcome is a yes (`done`), the time it was kept.
-fn kept_yes(progress: &Progress) -> Option<u64> {
+/// The steps whose yes another part reads, each kept in a file named for it.
+const YES_STEPS: [&str; 2] = [super::ROOM_SOUNDS, super::FACE_EXPRESSIONS];
+
+/// Where `step`'s yes is kept: room sounds at [`Paths::room_sounds`], face
+/// expressions beside it.
+fn consent_path(paths: &Paths, step: &str) -> PathBuf {
+    if step == super::ROOM_SOUNDS {
+        paths.room_sounds.clone()
+    } else {
+        super::face_expressions_beside(&paths.room_sounds)
+    }
+}
+
+/// When `step`'s kept outcome is a yes (`done`), the time it was kept.
+fn kept_yes(progress: &Progress, step: &str) -> Option<u64> {
     progress
         .steps
-        .get(super::ROOM_SOUNDS)
+        .get(step)
         .filter(|kept| kept.outcome == super::Outcome::Done)
         .map(|kept| kept.at_unix_s)
 }
 
-/// The room sounds answer for lamp-ears (`docs/onboarding.md`), from the
-/// progress just written or read: removed unless the step's kept outcome is
-/// a yes (`done`); written, when `new` (the write that first keeps the
-/// yes), whole, 0640 and the reader group's (0600 with no group). Never
-/// written again from the progress: a forget of everything removes it for
-/// good (`remember.rs`). Only the answer and its time, never words or sound.
-fn room_sounds(paths: &Paths, progress: &Progress, new: bool) -> io::Result<()> {
+/// A yes for another part (room sounds for lamp-ears, face expressions for
+/// lamp-eyes; `docs/onboarding.md`), from the progress just written or
+/// read: removed unless the step's kept outcome is a yes (`done`); written,
+/// when `new` (the write that first keeps the yes), whole as
+/// `{"version":1,STEP:"yes","at_unix_s":..}`, 0640 and the reader group's
+/// (0600 with no group). Never written again from the progress: a forget of
+/// everything removes it for good (`remember.rs`). Only the answer and its
+/// time, never words, sound or a face.
+fn consent(paths: &Paths, progress: &Progress, step: &str, new: bool) -> io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
-    let path = &paths.room_sounds;
-    let Some(at) = kept_yes(progress) else {
+    let path = &consent_path(paths, step);
+    let Some(at) = kept_yes(progress, step) else {
         return match fs::remove_file(path) {
             Err(e) if e.kind() != io::ErrorKind::NotFound => Err(e),
             _ => Ok(()),
@@ -505,10 +525,9 @@ fn room_sounds(paths: &Paths, progress: &Progress, new: bool) -> io::Result<()> 
     }
     let folder = path
         .parent()
-        .ok_or_else(|| io::Error::other("room sounds has no folder"))?;
-    let bytes =
-        serde_json::to_vec(&serde_json::json!({"version":1,"room_sounds":"yes","at_unix_s":at}))
-            .map_err(io::Error::other)?;
+        .ok_or_else(|| io::Error::other("a consent file has no folder"))?;
+    let bytes = serde_json::to_vec(&serde_json::json!({"version":1,step:"yes","at_unix_s":at}))
+        .map_err(io::Error::other)?;
     let next = path.with_extension("storage-next");
     let _ = fs::remove_file(&next);
     let result = (|| {
@@ -531,11 +550,11 @@ fn room_sounds(paths: &Paths, progress: &Progress, new: bool) -> io::Result<()> 
         fs::rename(&next, path)?;
         fs::File::open(folder)?.sync_all()
     })();
-    // Not kept is no to lamp-ears, the safe side; the progress stands.
+    // Not kept is no to the reader, the safe side; the progress stands.
     if let Err(error) = result {
         let _ = fs::remove_file(next);
         eprintln!(
-            "lamp-voice: the room sounds yes was not kept at {}: {error}",
+            "lamp-voice: the {step} yes was not kept at {}: {error}",
             path.display()
         );
     }
@@ -558,7 +577,9 @@ fn execute(paths: &Paths, operation: Operation) -> io::Result<Update> {
                 .transpose()?
                 .unwrap_or_default();
             progress.check()?;
-            room_sounds(paths, &progress, false)?;
+            for step in YES_STEPS {
+                consent(paths, &progress, step, false)?;
+            }
             update.progress = Some(progress);
             update.checkpoint = Some(None);
         }
@@ -742,7 +763,7 @@ mod tests {
     /// is not undone by a later write or start; a progress without the yes
     /// removes it.
     #[test]
-    fn the_room_sounds_yes_is_group_readable_and_a_forget_stays_forgotten() {
+    fn the_yeses_for_ears_and_eyes_are_group_readable_and_a_forget_stays_forgotten() {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
         let files = Files::new();
         let mut paths = files.paths();
@@ -751,17 +772,20 @@ mod tests {
         paths.room_sounds_group = Some(group);
         let yes = |at_unix_s| {
             let mut progress = Progress::default();
-            progress.steps.insert(
-                super::super::ROOM_SOUNDS.into(),
-                super::super::Kept {
-                    outcome: super::super::Outcome::Done,
-                    at_unix_s,
-                    framing: None,
-                    offered_at_unix_s: None,
-                },
-            );
+            for step in YES_STEPS {
+                progress.steps.insert(
+                    step.into(),
+                    super::super::Kept {
+                        outcome: super::super::Outcome::Done,
+                        at_unix_s,
+                        framing: None,
+                        offered_at_unix_s: None,
+                    },
+                );
+            }
             progress
         };
+        let face = super::super::face_expressions_beside(&paths.room_sounds);
         let progress = yes(7);
         execute(&paths, Operation::Commit(progress.clone(), false)).unwrap();
         let kept = fs::metadata(&paths.room_sounds).unwrap();
@@ -771,10 +795,20 @@ mod tests {
             fs::read(&paths.room_sounds).unwrap(),
             br#"{"at_unix_s":7,"room_sounds":"yes","version":1}"#
         );
+        // The face expressions yes, kept the same way for lamp-eyes.
+        let kept = fs::metadata(&face).unwrap();
+        assert_eq!(kept.permissions().mode() & 0o777, 0o640);
+        assert_eq!(kept.gid(), group);
+        assert_eq!(
+            fs::read(&face).unwrap(),
+            br#"{"at_unix_s":7,"face_expressions":"yes","version":1}"#
+        );
         fs::remove_file(&paths.room_sounds).unwrap();
+        fs::remove_file(&face).unwrap();
         execute(&paths, Operation::Commit(progress, false)).unwrap();
         execute(&paths, Operation::Initialize).unwrap();
         assert!(!paths.room_sounds.exists());
+        assert!(!face.exists());
         // No group known: root's alone.
         paths.room_sounds_group = None;
         execute(&paths, Operation::Commit(Progress::default(), false)).unwrap();
@@ -786,6 +820,7 @@ mod tests {
         assert_eq!(mode & 0o777, 0o600);
         execute(&paths, Operation::Commit(Progress::default(), false)).unwrap();
         assert!(!paths.room_sounds.exists());
+        assert!(!face.exists());
     }
 
     #[test]
