@@ -1,0 +1,430 @@
+{
+  "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+  "host": {
+    "platform": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+    "machine": "x86_64",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2"
+  },
+  "source_sha256": {
+    "crates/voice/src/remember.rs": "d3f23358431e4dd5e33b8007faa7390162db1be896d0d9759e1bffea6c212925",
+    "crates/voice/src/second_provider/worker.rs": "3cddd0bf7b23f24d26fd6932747123b6c34842d69088814d153e0d2713e12d72",
+    "crates/voice/src/second_provider/worker/memory_note_retries.rs": "5c43fbc2456498115ddeedb36d8117767c9d2a2017198accd98ccae22bc4ce08"
+  },
+  "final_passing_counts": {
+    "passed": 5144,
+    "failed": 0,
+    "ignored": 23
+  },
+  "counting": "Each passing target group counted once; focused repetitions and failed attempts excluded. Voice and Voice-eval integration targets passed with one test thread after their parallel attempts failed.",
+  "passing_test_groups": [
+    {
+      "targets": "Cloud, Memory, Skills, Update unit and integration targets",
+      "log": "affected-tests.log",
+      "counts": {
+        "passed": 1169,
+        "failed": 0,
+        "ignored": 9
+      }
+    },
+    {
+      "targets": "Voice library",
+      "log": "voice-and-eval.log",
+      "counts": {
+        "passed": 3092,
+        "failed": 0,
+        "ignored": 14
+      }
+    },
+    {
+      "targets": "Voice binary",
+      "log": "voice-and-eval.log",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "targets": "Voice integration, serial",
+      "log": "voice-integration-serial.log",
+      "counts": {
+        "passed": 264,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "targets": "Voice-eval library",
+      "log": "voice-eval.log",
+      "counts": {
+        "passed": 367,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "targets": "Voice-eval binary",
+      "log": "voice-eval.log",
+      "counts": {
+        "passed": 7,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "targets": "voice-eval-integration-serial",
+      "log": "voice-eval-integration-serial.log",
+      "counts": {
+        "passed": 234,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "targets": "voice-examples",
+      "log": "voice-examples.log",
+      "counts": {
+        "passed": 10,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "targets": "remaining-doctests",
+      "log": "remaining-doctests.log",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      }
+    }
+  ],
+  "commands_as_run": [
+    {
+      "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+      "stage": "fmt",
+      "command": "cargo fmt --all --check",
+      "exit_code": 0,
+      "elapsed_seconds": 11.317
+    },
+    {
+      "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+      "stage": "clippy",
+      "command": "cargo clippy --workspace --all-targets -- -D warnings",
+      "exit_code": 0,
+      "elapsed_seconds": 84.223
+    },
+    {
+      "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+      "stage": "build",
+      "command": "cargo build --workspace",
+      "exit_code": 0,
+      "elapsed_seconds": 237.987
+    },
+    {
+      "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+      "stage": "worker-focused-final",
+      "command": "cargo test -p lamp-voice --lib memory_note_retries -- --nocapture",
+      "exit_code": 0,
+      "elapsed_seconds": 100.457,
+      "counts": {
+        "passed": 9,
+        "failed": 0,
+        "ignored": 0
+      },
+      "test_binaries_and_doc_groups": 1
+    },
+    {
+      "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+      "stage": "client-focused-final",
+      "command": "cargo test -p lamp-voice --lib session_note_ -- --nocapture",
+      "exit_code": 0,
+      "elapsed_seconds": 1.325,
+      "counts": {
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0
+      },
+      "test_binaries_and_doc_groups": 1
+    },
+    {
+      "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+      "stage": "affected-tests",
+      "command": "cargo test -p lamp-voice -p lamp-memory -p lamp-voice-eval -p lamp-cloud -p lamp-skills -p lamp-update",
+      "exit_code": 101,
+      "elapsed_seconds": 1206.034,
+      "counts": {
+        "passed": 4260,
+        "failed": 2,
+        "ignored": 23
+      },
+      "test_binaries_and_doc_groups": 28
+    },
+    {
+      "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+      "stage": "fmt-final",
+      "command": "cargo fmt --all --check",
+      "exit_code": 0,
+      "elapsed_seconds": 10.469
+    },
+    {
+      "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+      "stage": "clippy-final",
+      "command": "cargo clippy --workspace --all-targets -- -D warnings",
+      "exit_code": 0,
+      "elapsed_seconds": 58.954
+    },
+    {
+      "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+      "stage": "voice-and-eval",
+      "command": "cargo test -p lamp-voice -p lamp-voice-eval",
+      "exit_code": 101,
+      "elapsed_seconds": 306.325,
+      "counts": {
+        "passed": 3356,
+        "failed": 1,
+        "ignored": 14
+      },
+      "test_binaries_and_doc_groups": 3
+    },
+    {
+      "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+      "stage": "voice-integration-serial",
+      "command": "cargo test -p lamp-voice --test it -- --test-threads=1",
+      "exit_code": 0,
+      "elapsed_seconds": 30.18,
+      "counts": {
+        "passed": 264,
+        "failed": 0,
+        "ignored": 0
+      },
+      "test_binaries_and_doc_groups": 1
+    },
+    {
+      "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+      "stage": "voice-eval",
+      "command": "cargo test -p lamp-voice-eval",
+      "exit_code": 101,
+      "elapsed_seconds": 127.267,
+      "counts": {
+        "passed": 607,
+        "failed": 1,
+        "ignored": 0
+      },
+      "test_binaries_and_doc_groups": 3
+    },
+    {
+      "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+      "stage": "voice-eval-integration-serial",
+      "command": "cargo test -p lamp-voice-eval --test it -- --test-threads=1",
+      "exit_code": 0,
+      "elapsed_seconds": 99.055,
+      "counts": {
+        "passed": 234,
+        "failed": 0,
+        "ignored": 0
+      },
+      "test_binaries_and_doc_groups": 1
+    },
+    {
+      "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+      "stage": "voice-examples",
+      "command": "cargo test -p lamp-voice --example render_line_second --example stop_words_stt_replay",
+      "exit_code": 0,
+      "elapsed_seconds": 1.854,
+      "counts": {
+        "passed": 10,
+        "failed": 0,
+        "ignored": 0
+      },
+      "test_binaries_and_doc_groups": 2
+    },
+    {
+      "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+      "stage": "remaining-doctests",
+      "command": "cargo test --doc -p lamp-voice -p lamp-cloud -p lamp-memory -p lamp-skills -p lamp-update -p lamp-voice-eval",
+      "exit_code": 0,
+      "elapsed_seconds": 45.394,
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      "test_binaries_and_doc_groups": 6
+    }
+  ],
+  "command_notes": [
+    "The original affected-tests command stopped at one Voice fixture failure; its raw count includes that failing child test and its parent. The other four packages passed before that failure.",
+    "The Voice memory-switch fixture incorrectly labeled a room snapshot as personal. It was corrected to return the requested scope, then the entire Voice library and strict workspace Clippy passed.",
+    "Workspace build passed before that test-only fixture correction. Production sources were unchanged afterward.",
+    "The parallel Voice integration attempt failed its existing light-call latency test: median 56.693456 ms against an unchanged 25 ms limit. All 264 integration tests passed serially without source or limit changes.",
+    "The parallel Voice-eval integration attempt failed its existing relay teardown test when read_pid parsed an empty PID file. All 234 integration tests passed serially without source changes.",
+    "Earlier sandbox socket-binding restrictions were resolved by authorized execution outside the sandbox. Four needless-borrow Clippy findings in the new tests were corrected before the final strict pass."
+  ],
+  "latency_microseconds": {
+    "first_socket_note": 560,
+    "refused_refresh": 104,
+    "recovery_read": 270,
+    "cached_note_lookup": 1,
+    "held_room_timeout": 300192,
+    "room_200ms_then_held_person_timeout": 300434,
+    "configured_total_io_budget": 300000,
+    "test_scheduler_tolerance": 100000
+  },
+  "negative_control": {
+    "mutation": "disable incomplete-note retry",
+    "test": "second_provider::worker::memory_note_retries::a_kept_name_recovers_after_a_failed_refresh_without_another_keep",
+    "exit_code": 101,
+    "killed": true,
+    "restored_byte_exact": true,
+    "elapsed_seconds": 92.085,
+    "base": "e2b2f596d71dcc8112cdb1ee508667a4ee4b0bbe"
+  },
+  "lamp_retention_receipt": {
+    "source": "https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6330190386",
+    "lamp": "lamp-52e6",
+    "build": "403b444d4",
+    "interval_ict": "2026-10-22 07:56–08:07",
+    "chat_requests": 12,
+    "refresh_markers": 0,
+    "continued_talk_seconds": 368,
+    "recall_passed": false,
+    "note": "Void as Days proof: effective Days flag absent. Missing Days marker is expected on the legacy path, and a confirmed keep result is not present in the journal. Its legacy recall failure remains unexplained. Raw journal and words remain on the lamp.",
+    "reported_keeps": 1,
+    "days_enabled": false,
+    "mode_audit_source": "https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6330442424"
+  },
+  "limitations": [
+    "Host fixture controls store replies; no real-store benchmark or acoustic/device latency measurement.",
+    "Negative control ran before the clean rebase; final positive tests cover the rebased source.",
+    "Queued authority test does not establish an exact scheduler interleaving inside the mutex call.",
+    "Memory quality remains 0.40 pending First’s product-evidence decision.",
+    "Fresh native ARM64 and Clippy results on the PR head are required before readiness; their final run links and counts belong in the PR body."
+  ],
+  "days_on_lamp_receipt": {
+    "source": "https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6330610361",
+    "build": "403b444d4",
+    "interval_ict": "2026-10-22 08:28–08:40",
+    "days_enabled": true,
+    "rules_enabled": true,
+    "reported_keeps": 1,
+    "refresh_markers": 1,
+    "marker_ict": "08:31:49",
+    "recall_request": 16,
+    "second_round_messages": 18,
+    "final_capture_seconds": 14,
+    "qualification": "Next-turn marker passes. Six-minute recall remains unproven; putback replaced the worker, so Seventh queued a fresh full sequence for about 09:20 with a 60 s final observation and process identity checks.",
+    "repeat_source": "https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6330704311"
+  },
+  "lamp_receipt_final": {
+    "source": "https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6331136109",
+    "acceptance_source": "https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6331423960",
+    "lamp": "lamp-52e6",
+    "build": "403b444d4",
+    "interval_ict": "2026-10-22 09:08–09:21",
+    "days_enabled": true,
+    "rules_enabled": true,
+    "same_main_pid_and_invocation": true,
+    "keeps": 1,
+    "next_turn_refresh_markers": 1,
+    "marker_ict": "09:12:27",
+    "continued_talk_seconds": 377,
+    "recall_request": 49,
+    "result": "pass",
+    "evidence": "Session events and person at the lamp; Mac mic captured nothing in its 60 s window and is not evidence. First accepted the case at 09:45. No words copied.",
+    "limits": "No outage recovery, conflicting-name ordering or whole 0.90 matrix qualification."
+  },
+  "prior_native_attempts": {
+    "head": "b18ff0bc686bc5b7db08880e52ea7654e7b91a70",
+    "base": "6bb802490dba09b1f648057223381080acfc2eac",
+    "run": 39705015937,
+    "attempts": [
+      1,
+      2
+    ],
+    "conclusion": "failure",
+    "per_attempt_counts": {
+      "passed": 7877,
+      "failed": 1,
+      "skipped": 63,
+      "not_run": 2131
+    },
+    "test": "remember::tests::with_follows_face_a_forget_while_waiting_for_the_print_moves_nothing",
+    "qualification": "Both failed the unchanged follows-face fixture; no artifact. The helper and writer path bypass this PR and match the base byte-for-byte. The exact-base native run 39704488712 passed it. Friday owns the deterministic fixture correction. No third retry on this head.",
+    "clippy_run": 39705015774,
+    "clippy_conclusion": "success"
+  },
+  "rebase_after_fixture_fix": {
+    "base": "fc082681a2937d324a428e5f0063956da623c8f7",
+    "fixture_fix_pr": 2780,
+    "source_range_diff": "b18ff0bc6 = 28b1c3eaa",
+    "source_sha256": {
+      "crates/voice/src/remember.rs": "32a1655855664876ccd34ecceb04f6de0af4fc3a894216a3aa6ac97248a41224",
+      "crates/voice/src/second_provider/worker.rs": "b5f24e11747503840e7cc7be48e2cd826afa8bbefe0bcb94e4b8ee624c8269ea",
+      "crates/voice/src/second_provider/worker/memory_note_retries.rs": "5c43fbc2456498115ddeedb36d8117767c9d2a2017198accd98ccae22bc4ce08",
+      "docs/memory.md": "36e05f5b74027f5592b2d1a3b4f02af35b113f4900c5b62c5661d428b7e9cce7",
+      "docs/second-voice.md": "ee2bc66513cab6243ba04df1649c7da3b4dbc4a9cf913dc3dd34b788cc1f7449"
+    },
+    "host_commands": [
+      {
+        "stage": "post-rebase-fmt",
+        "command": "cargo fmt --all --check",
+        "exit_code": 0,
+        "elapsed_seconds": 14.502,
+        "source_head_before_evidence_amend": "28b1c3eaaebd3ca6d881a509b12b7031366d52b7"
+      },
+      {
+        "stage": "post-rebase-clippy",
+        "command": "cargo clippy --workspace --all-targets -- -D warnings",
+        "exit_code": 0,
+        "elapsed_seconds": 89.993,
+        "source_head_before_evidence_amend": "28b1c3eaaebd3ca6d881a509b12b7031366d52b7"
+      },
+      {
+        "stage": "post-rebase-worker",
+        "command": "cargo test -p lamp-voice --lib memory_note_retries -- --nocapture",
+        "exit_code": 0,
+        "elapsed_seconds": 117.515,
+        "counts": {
+          "passed": 9,
+          "failed": 0,
+          "ignored": 0
+        },
+        "test_binaries_and_doc_groups": 1,
+        "source_head_before_evidence_amend": "28b1c3eaaebd3ca6d881a509b12b7031366d52b7"
+      },
+      {
+        "stage": "post-rebase-client",
+        "command": "cargo test -p lamp-voice --lib session_note_ -- --nocapture",
+        "exit_code": 0,
+        "elapsed_seconds": 0.859,
+        "counts": {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        },
+        "test_binaries_and_doc_groups": 1,
+        "source_head_before_evidence_amend": "28b1c3eaaebd3ca6d881a509b12b7031366d52b7"
+      },
+      {
+        "stage": "fixture-integration",
+        "command": "cargo test -p lamp-voice --lib with_follows_face_a_forget_while_waiting_for_the_print_moves_nothing -- --nocapture",
+        "exit_code": 0,
+        "elapsed_seconds": 0.701,
+        "counts": {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        "test_binaries_and_doc_groups": 1,
+        "source_head_before_evidence_amend": "28b1c3eaaebd3ca6d881a509b12b7031366d52b7"
+      }
+    ],
+    "focused_counts": {
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0
+    },
+    "qualification": "Clean source rebase after the separately owned deterministic fixture correction merged. The amended docs clarify existing scope and retain accepted lamp evidence and both previous native failures. Original full host totals remain historical; these focused repeats are not added. Fresh exact-head native gates are required."
+  }
+}

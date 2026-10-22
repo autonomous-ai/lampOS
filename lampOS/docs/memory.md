@@ -1109,6 +1109,23 @@ the unchanged legacy client, used unless the new Days client is selected.
   at most once a day, so a later quiet asks again but tells nothing new.
   It costs that turn what a person change costs: one note within 300 ms
   ([second-voice.md](second-voice.md), "Each turn is one person's").
+- **Recovering a failed note in the same conversation** (second route,
+  Days memory, no new switch). A successful `remember` refreshes the next
+  turn's note (#2627/#2540). If that read fails, or only its room snapshot
+  succeeds while the requested personal snapshot fails, Voice retains a
+  typed incomplete result and retries on the first context built at least
+  30 s after the attempt. Each retry opens a new session within the same
+  total 300 ms budget; nothing polls between turns. Valid empty snapshots
+  are complete and stay cached. Keeps and person changes still force a
+  fresh read immediately. Confirmed forgets retain the existing
+  `LAMP_MEMORY_JOURNAL_RESUMES` policy and its backoff; when it requests a
+  fresh read, this note backoff does not delay it. The old note is not used
+  as a fallback. For either memory mode, a leased context is checked after
+  taking the session lock and again after it is built; revocation or
+  narrowing discards it. The legacy note loader gains no retry, and
+  unleased contexts keep their existing behavior. This closes a source-level
+  failure path; host recovery tests do not establish the lamp's six-minute spoken recall or
+  raise the “Remembers you” quality score.
 
 ### Told on each turn (`LAMP_SECOND_MEMORY_HITS=on`, #2176 row 5c)
 

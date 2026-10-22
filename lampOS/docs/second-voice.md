@@ -1057,7 +1057,30 @@ order is kept. A written turn is the same from the chat on.
   - **Its journal** says "something was kept: this turn asks the memory's
     note again", once for each turn that asks again.
   - **Not asked again:** a `remember` the store refused, and a recall. A
-    confirmed forget already opens a fresh session (`wants_fresh_session`).
+    confirmed forget follows the existing journal-resume policy
+    (`wants_fresh_session`, `LAMP_MEMORY_JOURNAL_RESUMES` and its backoff).
+  - **After a failed note read:** a refusal, timeout, or invalid snapshot
+    leaves the note incomplete. A room snapshot beside a failed personal
+    snapshot is also incomplete. The next context built at least 30 s
+    after that attempt asks again, with a new Days session and the same
+    total 300 ms read budget. There is no background poll; repeated
+    failures get at most one attempt per 30 s for the same scope. Keeps
+    and person changes still invalidate immediately. A fresh read requested
+    by the existing journal-resume policy also bypasses this note backoff.
+    Successful empty snapshots are cached normally. An incomplete result
+    replaces the previous note, so a failed refresh cannot bring back a
+    forgotten fact or another person's note. A held person change also
+    clears the cache even though that held turn reads no memory. Context
+    whose lease is revoked or narrowed during the read is discarded before
+    being handed to either a prepared or ordinary chat. This authority guard
+    covers leased contexts in both Days and legacy memory modes, after the
+    session-lock wait and after composition. Legacy note loading gains no
+    retry; unleased contexts retain their existing behavior.
+    Counts-only journal lines say `memory note incomplete; retry on a later
+    context after 30000 ms` and `memory note retry complete`; they contain
+    no note, name or person id. The host regressions are
+    `worker::memory_note_retries`; the six-minute spoken name-retention
+    check on #2540 is a separate lamp gate.
   - **Nothing is split by it** (the first builder's P2 on #2615): the ask
     opens the run's next Days session and closes the one before, as a
     person change does, since the store has no ask that reads a session's
