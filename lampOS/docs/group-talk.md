@@ -617,6 +617,55 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
     room;
   - the cut-in test of a person speaking over one, unchanged.
 
+**Talk over the lamp's own line in a busy room isn't a cut-in
+(`LAMP_OWN_LINE_OVER_TALK=on`, #2602's design; off unless set).**
+- **The fault:** on lamp-a63e on 22 Oct a skill's say ended `dropped` as
+  `user_interrupted` under office talk. `LAMP_OWN_LINE_KEEPS` keeps an own
+  line only until it sounds; once it is audible, talk over it is a cut-in.
+  `LAMP_CUT_INS_NOT_TALK` doesn't reach this: it only stops the provider
+  worker counting cut-ins toward its busy room.
+- **With the switch,** while one of the lamp's own lines (the same lines as
+  above: a skill's say, a reminder, news, its hello, a setup line) is
+  sounding, talk over it is let go and the line goes on
+  (`while_own_line_waits`, `why` `busy_room`) when all of these hold:
+  - the room was busy as the line began
+    (`body_link::Attention::busy_lately`: busy now, or within the last
+    180 s, room_told's `BUSY_ENDS_AFTER_US`, borrowed, not measured). It is
+    taken once per turn, before the line's own audio counts as an answer
+    and clears `busy`;
+  - the lamp's name wasn't heard as it began (`name_began_us`, up to
+    `CALL_BEFORE_US` before its trigger);
+  - the eyes saw no face speaking through it turned to the lamp
+    (`turned_speakers`, as above; the eyes' reader runs with either switch);
+  - `lamp-name` heard no stop word as it began (`stop/heard`, only when
+    `LAMP_STOP_HEARD` runs that listener).
+- **Still stops it:** "Lamp, …", a person turned to the lamp and speaking, a
+  head tap or the button, and any talk in a room that wasn't busy. An answer
+  to a person keeps today's rules. Needs no other switch.
+- **Fruitless counts:** unchanged. A let-go is a resume, so the existing caps
+  apply (2 in 20 s, 3 with `LAMP_CUT_IN_COUNTS_REAL`), and then the line
+  plays through: office talk can pause a say a few times but can't end it.
+- **Record:** `input_let_go_own_line` with `why` `busy_room`; the journal
+  says `talk over the lamp's own line in a busy room, with no name or face
+  turned to it, was let go; the line goes on`.
+- **Its cost:** a bare "Stop." in a busy room no longer stops a say. The
+  name, a face turned to it, or a tap still does, and once the sixth
+  builder's stop-words fix (#2863) is on, `stop/heard` covers the bare
+  "Stop" again (`LAMP_STOP_HEARD` is off in the product today). Where the
+  lamp answers office talk, `Attention` is rarely busy and the rule rarely
+  bites. A let-go still pauses the line for the resume wait.
+- **The busy window:** the 180 s is borrowed from room_told
+  (`BUSY_ENDS_AFTER_US`), not measured for this rule; it is to be measured
+  on lamp-52e6 in the lamp run.
+- **Tested:** `talk_over_the_lamps_own_line_in_a_busy_room_is_let_go` (the
+  table: name, face, stop word, a room not busy, an answer to a person, not
+  yet sounding); `a_room_busy_lately_stays_so_for_three_minutes_after_it_was_last_busy`
+  (30 s and 181 s); and on the loop,
+  `talk_over_a_say_in_a_busy_room_is_let_go_with_the_switch`: the say ends
+  `spoken` with the switch in a busy room, and `dropped` without it or in a
+  room not busy. "Lamp, wait" over it is covered by the table only: the
+  loop harness hears no name.
+
 **With `LAMP_ASKER_FIRST=on`, the person asked comes first while the
 answer is awaited** (`crates/voice/src/asker_first.rs`, #829; off unless
 set, and `record` to judge it without acting). On lamp-4ace in the busy

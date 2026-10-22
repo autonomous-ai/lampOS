@@ -4000,6 +4000,73 @@ fn a_skills_say_is_said_and_answered_spoken_on_the_second_route_as_on_live() {
     }
 }
 
+/// `LAMP_OWN_LINE_OVER_TALK` (#2602's design): a skill's say spoken over by
+/// room talk, with no name and no face turned to the lamp, in a room busy as
+/// it began, is let go as the room's (`busy_room`) and said whole: `spoken`.
+/// Without the switch, or in a room that isn't busy, the talk cuts it as
+/// before and it is `dropped`.
+#[test]
+fn talk_over_a_say_in_a_busy_room_is_let_go_with_the_switch() {
+    use crate::say::{Answer, Outcome};
+    let _one = super::pilot_faults::one_session();
+    let said = |on: bool, busy: bool| {
+        let (says, answered) = crate::say::Says::note_for_test(
+            "stretch",
+            "Remind the person to stretch.",
+            crate::say::URGENT_FROM,
+        );
+        TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+        TEST_OWN_LINE_OVER_TALK.with(|over| over.set(on));
+        TEST_ROOM_BUSY.with(|room| room.set(busy));
+        let run = run(Script {
+            second: false,
+            only: true,
+            // The person's answer is 48 chunks, the say 120: the room's
+            // talk begins 30 chunks into the say.
+            written: Written::Said(30),
+            speak_again: Some(When::Accepted(78)),
+            turn_taking: TurnTaking::VadOnly,
+            mute_at_frame: Some(1_200),
+            limit: Duration::from_secs(20),
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_ROOM_BUSY.with(|room| room.set(false));
+        TEST_OWN_LINE_OVER_TALK.with(|over| over.set(false));
+        TEST_SAYS.with(|given| given.borrow_mut().take());
+        (run, answered.try_iter().collect::<Vec<_>>())
+    };
+    for (on, busy) in [(false, true), (true, false), (true, true)] {
+        let (run, answered) = said(on, busy);
+        run.assert_clean();
+        let let_go = run
+            .events("input_let_go_own_line")
+            .into_iter()
+            .filter(|event| event["why"] == "busy_room")
+            .count();
+        if on && busy {
+            assert!(let_go > 0, "{}", run.summary());
+            assert!(
+                matches!(
+                    answered.as_slice(),
+                    [Answer::Begun(_), Answer::Done(Outcome::Spoken)]
+                ),
+                "{answered:?}: {}",
+                run.summary()
+            );
+        } else {
+            assert_eq!(let_go, 0, "on {on}, busy {busy}");
+            assert!(
+                matches!(
+                    answered.as_slice(),
+                    [Answer::Begun(_), Answer::Done(Outcome::Dropped(_))]
+                ),
+                "on {on}, busy {busy}: {answered:?}: {}",
+                run.summary()
+            );
+        }
+    }
+}
+
 /// The holding answers on the second route (the first builder's 22:54 on
 /// #1722), as on Live: with `LAMP_HOLDING_ANSWER=on`, an answer that only
 /// asked the person to wait is followed, once the room is quiet, by one
