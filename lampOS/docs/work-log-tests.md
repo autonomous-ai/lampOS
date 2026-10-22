@@ -1,5 +1,36 @@
 # Tests work log
 
+## 2026-10-22 23:40:25 +0700 — next add-on completion fixture pushed
+
+Ready for lamp-voice: no (#3076 CI, review and final-parent hold).
+
+[PR #3076](https://github.com/autonomous-ai/lampOS/pull/3076), owned head
+`273f8fb96`, replaces only a_fifth_say's completion sleeps with existing
+Done events. Every original assertion, the full three-second no-proposal
+observation and all product durations remain. The fixed two-second
+pre-consumption decision-worker control fails the original assertion 3/3
+before and passes 3/3 after. Refund/hour-cap faults still fail the original
+assertions; absent drop hold fails the positive barrier and, separately,
+the original helper's journal assertion. Product control hooks were restored
+byte-for-byte. Complete raw failures, patches and hashes are in its
+[verification folder](https://github.com/autonomous-ai/lampOS/tree/273f8fb96/lampOS/docs/verification/addon-drop-events-20261022).
+
+Native x86 Mac: fmt, strict Skills Clippy, nine focused cases, full serial
+Skills 496/0/1 and workspace build pass. First samples and shared-host limits
+are retained. Fresh ARM64 39815285950 and Clippy 39815286125 are pending;
+prior ARM timing is not an after result. The draft has builder:tests.
+
+The final frozen #3023 rebase passes full serial Voice 3,384/0/14 plus
+269 integration, binary/examples/docs, fmt, strict six-package Clippy and
+workspace build. Its complete dependent-package command exits 101:
+1,916 passed / 1 failed / 11 ignored. Update Round's
+`self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart`
+hit its original two-second updater-script exit watchdog. That failure
+remains; an exact unchanged-base observation and compiled-artifact comparison
+are being made before attribution. A fixed one-before/one-after parallel
+Voice library pair follows; no failed full suite is rerun for green.
+#2693 remains on the explicit latest-parent and independent-review hold.
+
 ## 2026-10-22 23:13 +0700 — Skills add-on terminal CI recorded; parent/review hold remains
 
 Ready for lamp-voice: **no, #2693**. Both actual required jobs and final
