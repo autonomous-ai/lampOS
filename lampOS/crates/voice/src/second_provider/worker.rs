@@ -5889,7 +5889,7 @@ fn keep_scoped(
             .scope()
             .is_some_and(crate::memory_scope::ScopeSnapshot::held)
     {
-        crate::remember::keep_out(lease.key().request);
+        crate::remember::held_by_gap(lease.key().request);
     }
     let now = Instant::now();
     match event {
