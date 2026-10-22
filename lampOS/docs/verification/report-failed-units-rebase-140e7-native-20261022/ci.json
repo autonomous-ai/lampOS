@@ -1,0 +1,844 @@
+{
+  "schema": 1,
+  "kind": "compact-normalized-native-receipt",
+  "head": "0b125f49b20d8a48c45eca0507383076482865d5",
+  "runs": {
+    "arm64": {
+      "databaseId": 39723810115,
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "0b125f49b20d8a48c45eca0507383076482865d5",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39723810115",
+      "event": "pull_request",
+      "createdAt": "2026-10-22T04:41:51Z",
+      "updatedAt": "2026-10-22T04:54:12Z",
+      "jobs": [
+        {
+          "databaseId": 119643063993,
+          "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-22T04:41:57Z",
+          "completedAt": "2026-10-22T04:54:11Z",
+          "steps": [
+            {
+              "completedAt": "2026-10-22T04:41:59Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-22T04:41:57Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:42:19Z",
+              "conclusion": "success",
+              "name": "system packages",
+              "number": 2,
+              "startedAt": "2026-10-22T04:41:59Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:42:25Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v4",
+              "number": 3,
+              "startedAt": "2026-10-22T04:42:19Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:42:26Z",
+              "conclusion": "success",
+              "name": "publication failure tests (offline, no signing secret)",
+              "number": 4,
+              "startedAt": "2026-10-22T04:42:25Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:42:31Z",
+              "conclusion": "success",
+              "name": "Rust 1.96.0",
+              "number": 5,
+              "startedAt": "2026-10-22T04:42:26Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:42:32Z",
+              "conclusion": "success",
+              "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+              "number": 6,
+              "startedAt": "2026-10-22T04:42:31Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:42:55Z",
+              "conclusion": "success",
+              "name": "restore the cache",
+              "number": 7,
+              "startedAt": "2026-10-22T04:42:32Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:42:56Z",
+              "conclusion": "success",
+              "name": "unchanged source files get the cached build's times back",
+              "number": 8,
+              "startedAt": "2026-10-22T04:42:55Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:42:56Z",
+              "conclusion": "skipped",
+              "name": "record fresh source times for a cold publication build",
+              "number": 9,
+              "startedAt": "2026-10-22T04:42:56Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:42:57Z",
+              "conclusion": "success",
+              "name": "Run taiki-e/install-action@v2",
+              "number": 10,
+              "startedAt": "2026-10-22T04:42:56Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:45:09Z",
+              "conclusion": "success",
+              "name": "build (release, the lamps' binaries)",
+              "number": 11,
+              "startedAt": "2026-10-22T04:42:57Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:45:09Z",
+              "conclusion": "success",
+              "name": "every built lamp-* binary is classified for the lamp-os package",
+              "number": 12,
+              "startedAt": "2026-10-22T04:45:09Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:46:28Z",
+              "conclusion": "success",
+              "name": "build the two selected artifact examples without filename collisions",
+              "number": 13,
+              "startedAt": "2026-10-22T04:45:09Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:46:28Z",
+              "conclusion": "success",
+              "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+              "number": 14,
+              "startedAt": "2026-10-22T04:46:28Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:46:28Z",
+              "conclusion": "success",
+              "name": "which crates a pull request tests",
+              "number": 15,
+              "startedAt": "2026-10-22T04:46:28Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:53:48Z",
+              "conclusion": "success",
+              "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+              "number": 16,
+              "startedAt": "2026-10-22T04:46:28Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:54:02Z",
+              "conclusion": "success",
+              "name": "doc tests and the own-harness tests (nextest runs neither)",
+              "number": 17,
+              "startedAt": "2026-10-22T04:53:48Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:54:02Z",
+              "conclusion": "success",
+              "name": "export only current Cargo targets and their SHA-256",
+              "number": 18,
+              "startedAt": "2026-10-22T04:54:02Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:54:09Z",
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v4",
+              "number": 19,
+              "startedAt": "2026-10-22T04:54:02Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:54:09Z",
+              "conclusion": "skipped",
+              "name": "discard the isolated example target before saving the cache",
+              "number": 20,
+              "startedAt": "2026-10-22T04:54:09Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:54:09Z",
+              "conclusion": "skipped",
+              "name": "save the cache",
+              "number": 21,
+              "startedAt": "2026-10-22T04:54:09Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:54:10Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v4",
+              "number": 42,
+              "startedAt": "2026-10-22T04:54:09Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:54:10Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 43,
+              "startedAt": "2026-10-22T04:54:10Z",
+              "status": "completed"
+            }
+          ]
+        },
+        {
+          "databaseId": 119646646106,
+          "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-10-22T04:54:11Z",
+          "completedAt": "2026-10-22T04:54:11Z",
+          "steps": []
+        },
+        {
+          "databaseId": 119646646630,
+          "name": "report-full-run-failure",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-10-22T04:54:12Z",
+          "completedAt": "2026-10-22T04:54:11Z",
+          "steps": []
+        }
+      ]
+    },
+    "clippy": {
+      "databaseId": 39723810122,
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "0b125f49b20d8a48c45eca0507383076482865d5",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39723810122",
+      "event": "pull_request",
+      "createdAt": "2026-10-22T04:41:51Z",
+      "updatedAt": "2026-10-22T04:44:43Z",
+      "jobs": [
+        {
+          "databaseId": 119643064133,
+          "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-22T04:41:54Z",
+          "completedAt": "2026-10-22T04:44:42Z",
+          "steps": [
+            {
+              "completedAt": "2026-10-22T04:41:55Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-22T04:41:54Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:42:07Z",
+              "conclusion": "success",
+              "name": "system packages",
+              "number": 2,
+              "startedAt": "2026-10-22T04:41:55Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:42:12Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v4",
+              "number": 3,
+              "startedAt": "2026-10-22T04:42:07Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:42:19Z",
+              "conclusion": "success",
+              "name": "Rust 1.96.0",
+              "number": 4,
+              "startedAt": "2026-10-22T04:42:12Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:43:32Z",
+              "conclusion": "success",
+              "name": "restore the cache",
+              "number": 5,
+              "startedAt": "2026-10-22T04:42:19Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:43:39Z",
+              "conclusion": "success",
+              "name": "unchanged source files get the cached build's times back",
+              "number": 6,
+              "startedAt": "2026-10-22T04:43:32Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:44:41Z",
+              "conclusion": "success",
+              "name": "clippy (every crate and target, warnings as errors)",
+              "number": 7,
+              "startedAt": "2026-10-22T04:43:39Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:44:41Z",
+              "conclusion": "skipped",
+              "name": "save the cache",
+              "number": 8,
+              "startedAt": "2026-10-22T04:44:41Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:44:41Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v4",
+              "number": 16,
+              "startedAt": "2026-10-22T04:44:41Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-22T04:44:41Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 17,
+              "startedAt": "2026-10-22T04:44:41Z",
+              "status": "completed"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "tested_integration": {
+    "checkout": "2192cb3101ab6e0743a1265c8b0fe96ec2bf2ccf",
+    "parents": [
+      "140e7ac066062d7fe4700c257cac9db866efa220",
+      "0b125f49b20d8a48c45eca0507383076482865d5"
+    ]
+  },
+  "nextest": {
+    "summary_line": 10875,
+    "summary": "Summary [ 174.429s] 10192 tests run: 10192 passed (1 leaky), 63 skipped",
+    "elapsed_seconds": 174.429,
+    "passed": 10192,
+    "failed": 0,
+    "leaky_in_passed": 1,
+    "skipped": 63,
+    "primary_rows_verified": 10192,
+    "ordinary_pass_rows": 10191,
+    "unique_names_and_complete_ordinals": true,
+    "identities_sha256": "0a45159a6b3a7a34da7ef44175aece854cf8c099d04ef33462addcb9271098eb",
+    "selected_tests": [
+      {
+        "line": 1917,
+        "status": "PASS",
+        "seconds": 0.004,
+        "ordinal": 1236,
+        "name": "lamp-cloud reports::tests::failed_units_are_current_allowlisted_and_unambiguous"
+      },
+      {
+        "line": 1918,
+        "status": "PASS",
+        "seconds": 0.039,
+        "ordinal": 1237,
+        "name": "lamp-cloud reports::tests::failed_units_share_the_gated_restart_query_and_cached_recovery"
+      },
+      {
+        "line": 1995,
+        "status": "PASS",
+        "seconds": 0.006,
+        "ordinal": 1314,
+        "name": "lamp-cloud::it report_contract::failed_units_are_canonical_in_schema_one_and_kept_on_retransmit"
+      }
+    ],
+    "leaky_results": [
+      {
+        "line": 8964,
+        "status": "LEAK",
+        "seconds": 0.233,
+        "ordinal": 8283,
+        "name": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+      }
+    ],
+    "skip_names": "not emitted in log"
+  },
+  "doc_tests": {
+    "targets": 45,
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0,
+    "results": [
+      {
+        "target": "lamp_actions",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11306
+      },
+      {
+        "target": "lamp_addons",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11312
+      },
+      {
+        "target": "lamp_air",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11318
+      },
+      {
+        "target": "lamp_audio",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11324
+      },
+      {
+        "target": "lamp_body",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11330
+      },
+      {
+        "target": "lamp_bus",
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11338
+      },
+      {
+        "target": "lamp_camera",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11345
+      },
+      {
+        "target": "lamp_cloud",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11351
+      },
+      {
+        "target": "lamp_controls",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11357
+      },
+      {
+        "target": "lamp_ears",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11363
+      },
+      {
+        "target": "lamp_environment",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11369
+      },
+      {
+        "target": "lamp_expression",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11375
+      },
+      {
+        "target": "lamp_eyes",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11381
+      },
+      {
+        "target": "lamp_gemini",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11387
+      },
+      {
+        "target": "lamp_health",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11393
+      },
+      {
+        "target": "lamp_ipc",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11400
+      },
+      {
+        "target": "lamp_keeper",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11407
+      },
+      {
+        "target": "lamp_lean",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11413
+      },
+      {
+        "target": "lamp_local_time",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11419
+      },
+      {
+        "target": "lamp_memory",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11425
+      },
+      {
+        "target": "lamp_mood",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11431
+      },
+      {
+        "target": "lamp_msgs",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11438
+      },
+      {
+        "target": "lamp_name",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11445
+      },
+      {
+        "target": "lamp_near_call",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11451
+      },
+      {
+        "target": "lamp_observer",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11457
+      },
+      {
+        "target": "lamp_peek",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11463
+      },
+      {
+        "target": "lamp_policy",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11469
+      },
+      {
+        "target": "lamp_records",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11475
+      },
+      {
+        "target": "lamp_ring",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11481
+      },
+      {
+        "target": "lamp_same_voice",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11487
+      },
+      {
+        "target": "lamp_schedule",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11493
+      },
+      {
+        "target": "lamp_selftest",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11499
+      },
+      {
+        "target": "lamp_settings",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11505
+      },
+      {
+        "target": "lamp_skills",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11512
+      },
+      {
+        "target": "lamp_sound_fixtures",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11523
+      },
+      {
+        "target": "lamp_station",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11529
+      },
+      {
+        "target": "lamp_surround",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11535
+      },
+      {
+        "target": "lamp_tasks",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11541
+      },
+      {
+        "target": "lamp_turn_end",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11547
+      },
+      {
+        "target": "lamp_turn_end_wire",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11553
+      },
+      {
+        "target": "lamp_turn_owner",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11559
+      },
+      {
+        "target": "lamp_update",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11565
+      },
+      {
+        "target": "lamp_voice",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11571
+      },
+      {
+        "target": "lamp_voice_eval",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11577
+      },
+      {
+        "target": "lamp_voice_processes",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "line": 11583
+      }
+    ]
+  },
+  "custom_harness": {
+    "passed": 12,
+    "failed": 0,
+    "line": 11604
+  },
+  "relay_passed": true,
+  "warnings": {
+    "arm64": [
+      {
+        "line": 135,
+        "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+      },
+      {
+        "line": 421,
+        "text": "(node:8568) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+      },
+      {
+        "line": 424,
+        "text": "(node:8568) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      },
+      {
+        "line": 505,
+        "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost"
+      },
+      {
+        "line": 510,
+        "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+      },
+      {
+        "line": 515,
+        "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost"
+      },
+      {
+        "line": 520,
+        "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp"
+      },
+      {
+        "line": 652,
+        "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost"
+      },
+      {
+        "line": 657,
+        "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+      },
+      {
+        "line": 662,
+        "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost"
+      },
+      {
+        "line": 667,
+        "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp"
+      },
+      {
+        "line": 11620,
+        "text": "(node:47869) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+      },
+      {
+        "line": 11626,
+        "text": "(node:47869) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      },
+      {
+        "line": 11662,
+        "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+      }
+    ],
+    "clippy": [
+      {
+        "line": 176,
+        "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+      },
+      {
+        "line": 373,
+        "text": "(node:8340) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+      },
+      {
+        "line": 376,
+        "text": "(node:8340) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+      },
+      {
+        "line": 468,
+        "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+      }
+    ]
+  },
+  "clippy_rust_warnings": 0,
+  "artifacts": [
+    {
+      "id": 12402771958,
+      "name": "lampos-arm64-0b125f49b20d8a48c45eca0507383076482865d5",
+      "size_in_bytes": 113682172,
+      "digest": "sha256:87c09c681eb26f3ea978aabf1e9cd9d64b02adf842788ec433ab77c56c7d41aa",
+      "expired": false,
+      "created_at": "2026-10-22T04:54:09Z",
+      "expires_at": "2026-10-29T04:54:02Z"
+    }
+  ],
+  "artifact_payload_downloaded": false,
+  "raw_inputs": {
+    "arm64.api.json": {
+      "sha256": "94193a7eb90d3a0fff9cc36d77647dd2b00b909343078f55bf3b7f9cfdace953",
+      "bytes": 12217
+    },
+    "arm64.log": {
+      "sha256": "6dedd4e5f0769b079e4643ddc45490943c8d66dbc2a0c0a1fe772c39a76ce9f0",
+      "bytes": 2448217
+    },
+    "arm64.merge.json": {
+      "sha256": "ab61a64fd8c121d8ce25ad42ec16db641c3bd9c52735598927faa0c37a2ef255",
+      "bytes": 43844
+    },
+    "arm64.run.json": {
+      "sha256": "7ae78cc872c962dc2ed3d7d9f48180ba684ccb3b63ee0b2d16236a441f4ca6a9",
+      "bytes": 5350
+    },
+    "artifacts.json": {
+      "sha256": "0a1a4d4bc98641a9c963bd1f75e1dd0910eb07578936023b0cb1c6833d25a400",
+      "bytes": 778
+    },
+    "clippy.api.json": {
+      "sha256": "0dab5929aee60b7b1088c8d41b16adc47bbcd78a49bbf4d8a16f21bdc7e63496",
+      "bytes": 12684
+    },
+    "clippy.log": {
+      "sha256": "f99906e2c57aa6569b241045b88af01b7cc93705bcc1173c1adad71d65ed3369",
+      "bytes": 72638
+    },
+    "clippy.merge.json": {
+      "sha256": "ab61a64fd8c121d8ce25ad42ec16db641c3bd9c52735598927faa0c37a2ef255",
+      "bytes": 43844
+    },
+    "clippy.run.json": {
+      "sha256": "b4d65d2cf5d49369fbcd035ec648356b38695bf0678f535894690c5e28cfccb5",
+      "bytes": 2235
+    }
+  }
+}

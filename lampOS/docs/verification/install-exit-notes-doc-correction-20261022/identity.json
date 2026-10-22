@@ -1,0 +1,19 @@
+{
+  "old_head": "19d1a46d952d8301871a69caf48c04d5c21c0bfa",
+  "head": "daa23b2832cd7460a4fd5c7d87461bb4b523092d",
+  "changed_files": [
+    "lampOS/deploy/product/README.md",
+    "lampOS/deploy/product/own-keys-voice.conf",
+    "lampOS/docs/install.md"
+  ],
+  "rust_and_tests_unchanged": true,
+  "unit_directives_unchanged": "only a comment changed in own-keys-voice.conf",
+  "verification": "diff-check; exact three-file scope; existing execution remains historical",
+  "unchanged_crates_git_tree": "1337b69d19c3253f2b5c6d17c43dfbeb3a4d1da4",
+  "unit_directives_equal": true,
+  "ci": {
+    "status": "pending-at-checkpoint",
+    "arm64": 39744451280,
+    "clippy": 39744451308
+  }
+}

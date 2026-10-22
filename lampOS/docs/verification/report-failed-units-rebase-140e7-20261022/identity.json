@@ -1,0 +1,15 @@
+{
+  "started_at": "2026-10-22T11:40:19.375481+07:00",
+  "old_local_head": "27ab70a2c6dbf1e4769de767082fc66291a87c8d",
+  "old_local_base": "3095487ad6330c89566e7d6db6208dcc882f47e9",
+  "old_published_head": "27ab70a2c6dbf1e4769de767082fc66291a87c8d",
+  "old_published_base": "3095487ad6330c89566e7d6db6208dcc882f47e9",
+  "head": "0b125f49b20d8a48c45eca0507383076482865d5",
+  "base": "140e7ac066062d7fe4700c257cac9db866efa220",
+  "cloud_tree": "df643415a4ba38a75c584c0a825b54f86cc6d785",
+  "range_diff": "1:  27ab70a2c = 1:  0b125f49b lampOS: report currently failed product units\n",
+  "status": "pushed",
+  "gate_exit": 0,
+  "remote_base_before_push": "140e7ac066062d7fe4700c257cac9db866efa220",
+  "finished_at": "2026-10-22T11:41:48.008513+07:00"
+}

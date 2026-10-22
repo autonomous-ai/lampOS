@@ -1,0 +1,16 @@
+{
+  "status": "reviewed-before-gate",
+  "initial_guard": "whole Update tree changed; stopped before Cargo or push",
+  "upstream_change": "#2860 adds only the_product_sees_who_speaks in Update tests/install.rs, asserting two product unit environment defaults",
+  "changed_update_paths": [
+    "lampOS/crates/update/tests/install.rs"
+  ],
+  "production_update_source_changes": false,
+  "owned_files_byte_identical": [
+    "lampOS/crates/update/tests/round.rs",
+    "lampOS/crates/update/tests/round/self_cuts.rs",
+    "lampOS/docs/updates.md"
+  ],
+  "old_update_tree": "cf9d90761582be2b6a2d72a85f7f393f8affdc04",
+  "new_update_tree": "43174f47792de31b6f467664b6c9411ff96aabf5"
+}
