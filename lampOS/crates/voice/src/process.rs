@@ -1023,10 +1023,27 @@ fn worker_command(
             role,
             var(lamp_body::unplug::ENVIRONMENT).as_deref(),
         ))
+        .envs(workers_other_worker_environment(
+            role,
+            var(crate::worker_policy::ENVIRONMENT).as_deref(),
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
     command
+}
+
+// The workers' scheduling switch (#1608), the exact `on`, to every worker
+// on the voice's list: each decides from `worker_policy::policy` whether it
+// leaves the voice's round-robin, and logs which. The command clears the
+// environment, so without this no worker, the ring included, would see it.
+fn workers_other_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (lamp_voice_processes::WorkerRole::parse(role).is_some()
+        && crate::worker_policy::switched_on(value))
+    .then_some((crate::worker_policy::ENVIRONMENT, "on"))
 }
 
 // Keep the voice routes' one opt-in explicit (the Live provider and the
@@ -1616,6 +1633,47 @@ mod tests {
                 "{role}"
             );
         }
+    }
+
+    /// #1608: with only `LAMP_WORKERS_OTHER=on` set, every started worker
+    /// gets it through the cleared environment (the ring and the second
+    /// route too, and capture, which logs that it keeps round-robin); any
+    /// other value reaches none.
+    #[test]
+    fn the_workers_other_switch_reaches_every_started_worker_only_as_on() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = SessionDirectory::create().unwrap();
+        let script = home.path.join("worker.sh");
+        std::fs::write(&script, "#!/bin/sh\n/usr/bin/env > \"$3/env-$2.txt\"\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let boot = new_boot().unwrap();
+        for (value, passed) in [("on", true), ("ON", false), ("off", false), ("", false)] {
+            let only = |name: &str| {
+                (name == crate::worker_policy::ENVIRONMENT).then(|| std::ffi::OsString::from(value))
+            };
+            for role in lamp_voice_processes::WorkerRole::ALL.map(|role| role.as_str()) {
+                let status = status_of_fresh(&mut worker_command(
+                    &script,
+                    &home.path,
+                    role,
+                    (boot, boot),
+                    &[],
+                    only,
+                ));
+                assert!(status.success(), "{role}");
+                let written =
+                    std::fs::read_to_string(home.path.join(format!("env-{role}.txt"))).unwrap();
+                assert_eq!(
+                    written.lines().any(|line| line == "LAMP_WORKERS_OTHER=on"),
+                    passed,
+                    "{role}, {value:?}"
+                );
+            }
+        }
+        assert_eq!(
+            workers_other_worker_environment("unknown", Some(std::ffi::OsStr::new("on"))),
+            None
+        );
     }
 
     /// The voice unit's credentials' directory goes to the second route's

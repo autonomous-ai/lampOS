@@ -231,6 +231,42 @@ SD card), ended nothing at the default scheduling, so those two faults are
 not explained by that load alone. They have not recurred since; that is a
 few hours.
 
+### The workers that leave round-robin: `LAMP_WORKERS_OTHER=on`
+
+The unit has no `CPUSchedulingResetOnFork`, so every `lamp-voice worker
+ROLE` the voice starts, and every thread of one, is `RR 20` (#1608,
+twelve's audit of 21 Oct). Only capture and the speaker need it. With
+`LAMP_WORKERS_OTHER=on` (off unless exactly `on`; named after the workers
+it acts on, as `LAMP_TURN_END_PRIORITY` and `LAMP_CAPTURE_CORES` are), the
+provider, second-route, camera, privacy and ring workers take `SCHED_OTHER`
+at nice 0 as the first thing their `main` does, before the log relay's
+thread or any of their own, so every thread they start inherits it
+(`crates/voice/src/worker_policy.rs`). Capture, the speaker and the
+`probe` fixture keep the voice's round-robin, as does `serve` itself. The
+switch reaches the workers through their cleared environment
+(`worker_command`), the ring's and the second route's re-runs included.
+
+Nice 0, not the same-voice print's 10 (#1445) or the schedule consumer's
+19: these workers carry the reply (the routes' sockets, the ring's light)
+and their work is short, so they take their turn beside the eyes and the
+body, not behind them. The change goes through `thread-priority` with no
+unsafe code of ours, and is read back: `SCHED_OTHER`, static priority 0,
+and a nice of 0 or more (one already nicer stays so). Each worker logs one
+line: `lamp-voice: worker second: took SCHED_OTHER nice 0
+(LAMP_WORKERS_OTHER)`, or `... keeps the voice's real-time scheduling ...`
+for capture and the speaker. A refused change logs `could not take
+SCHED_OTHER (...); runs on with the voice's scheduling` and the worker runs
+on; it never stops the voice. Unset, nothing is called and nothing logged.
+
+`lamp-turn-end` is not a `lamp-voice worker`: it lowers itself only with
+`LAMP_TURN_END_PRIORITY` (round-robin N), which with
+`LAMP_TURN_END_NO_SPIN` is in lamp-4ace's unit alone, not the product's or
+the template's, until its own verdict-time row (`switches.md`). The lamp
+check: `ps -L -o pid,tid,cls,rtprio,ni,comm -p "$(pgrep -d, -f 'lamp-voice
+worker')"` with the switch off and on, every thread of the five roles `TS`
+with no real-time priority and nice 0 when on, capture's and the speaker's
+`RR 20` both times, and a played conversation still answered.
+
 ## Log lines never block or end the voice
 
 Every process of the voice (`serve` and each `worker`), and since the same

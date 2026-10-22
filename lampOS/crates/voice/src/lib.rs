@@ -152,6 +152,7 @@ pub mod visual_context;
 pub mod voice_tone;
 pub mod wait_words;
 pub mod wire;
+pub mod worker_policy;
 
 #[cfg(target_os = "linux")]
 pub mod audio_workers;

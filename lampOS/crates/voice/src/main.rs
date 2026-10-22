@@ -3,12 +3,22 @@ use std::{io, path::Path};
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 fn main() {
+    // A worker that leaves the voice's round-robin with LAMP_WORKERS_OTHER
+    // (#1608) does so before anything else, the relay's thread included, so
+    // every thread it has takes the new policy. Its line is logged below.
+    let scheduling = lamp_voice::worker_policy::at_start(
+        std::env::args().nth(1).as_deref(),
+        std::env::args().nth(2).as_deref(),
+    );
     // The service and its workers: a log line never blocks them or ends
     // them (`lamp_voice::log_relay`), and their last lines are passed on.
     let relayed = matches!(std::env::args().nth(1).as_deref(), Some("serve" | "worker"))
         && lamp_voice::log_relay::install()
             .map_err(|error| eprintln!("lamp-voice: log lines go straight to the journal: {error}"))
             .is_ok();
+    if let Some(line) = scheduling {
+        eprintln!("lamp-voice: {line}");
+    }
     // The stall recorders (#1178) finish their lines once every device is
     // closed: after `run`, or while a panic unwinds out of it.
     let stalls_end = lamp_voice::stalls::Finishing(std::time::Duration::from_millis(300));
