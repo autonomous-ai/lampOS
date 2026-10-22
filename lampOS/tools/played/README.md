@@ -133,6 +133,72 @@ These you can run on their own:
   (`/run/lampos-eyes/present`, a face on a screen too) and stops there. Its stand-in test is
   `full-look-row-test.sh` (zsh needed).
 
+## The desk kit
+
+`desk-kit.sh LABEL` compares sets of the voice's switches ("arms") on a
+person at a desk who asks the lamp things hesitantly, between colleagues'
+side talk. About 7 minutes a scene, TRIALS scenes an arm (default 2).
+
+```sh
+export LAMP_HOST=<your lamp's address>
+ARMS="off:LAMP_X=off on:LAMP_X=on,LAMP_Y=500" BASE="LAMP_SPOKEN_TO=on" \
+  lampOS/tools/played/desk-kit.sh d1500
+ARMS="off:LAMP_X=off" lampOS/tools/played/desk-kit.sh --dry [SCENARIO ...]
+```
+
+- **Where the Mac is.** Put the Mac about 1 m from the lamp, where a
+  person would sit, and leave its volume at 50 (the kit sets 50 and puts
+  50 back). Never louder and closer: the lamp would hear a voice no person
+  makes.
+- **The asks** are `hesitant.tsv`: 12 asks to the lamp (mark `L`), each in
+  2 or 3 variants with pauses of 0.2 to 0.9 s in different places, "uh"
+  and "um", a restart ("what's a… a good name") or trailing off, and 3
+  un-named follow-ups ("And a soft one?") said about 7 s after their ask,
+  inside the lamp's answer's 8 s. Scene N plays each ask's variant N.
+  Every line is one wav made before the scene starts, its pauses exact
+  silences inside it: two `scenario.py` steps are 3 to 10 s apart, since
+  each step makes its speech and reads the lamp's clock over ssh.
+- **The side talk** (mark `C`) after each ask: a clip of a real meeting
+  from the AMI Meeting Corpus, CC BY 4.0,
+  https://groups.inf.ed.ac.uk/ami/corpus/, listed in
+  `$DESK_KIT_AMI/clips.tsv` (default `~/lamp-played/ami`; columns `file
+  meeting start_s end_s speakers overlap text`, `file` relative to that
+  folder). Without that file, two `say` voices talk about work. AMI audio
+  stays on your Mac, outside the repo: never commit it.
+- **Each arm** is `NAME:ENV=v,ENV=v`, put on lamp-voice with `BASE` through
+  a `/run` drop-in (`zz-desk-kit.conf`), the voice restarted and its
+  environment checked before anything is played; `VOICE_BIN` runs another
+  lamp-voice for the run. It refuses to start when another `/run` drop-in
+  is on lamp-voice or its face is already shown, stops on an HTTP 429 from
+  the relay, and on any exit removes the drop-in, restarts the voice and
+  closes the face.
+- **The face**: `FACE`, an image or page on your Mac (never in the repo),
+  shown full screen on the built-in display for the whole run (`FACE_SIZE`,
+  default `1728,1117`), as a person facing the lamp. Without it no face is
+  shown.
+- **Who holds the lamp**: a line `HH:MM LOAN_NAME: ...` goes to `LOANS` on
+  the lamp at the start and the end (default `~/loans.txt` and this Mac's
+  user; `LOANS=` writes none). If your team keeps a lamp lock, run under it.
+
+What it scores, per arm (`desk_kit.py score`, printed and appended to
+`$PLAYED_OUT/scenarios/desk-kit.tsv`; each scene's `.plan` beside it says
+which line was which). From an ask's PLAY line to the next line's:
+
+| Score | Means |
+|---|---|
+| answered whole | the lamp said something after a heard request that holds all the ask's key words (`hesitant.tsv`'s keys) |
+| split | the ask came out as 2 or more heard requests |
+| first words lost | the last request heard lacks the ask's first part (its longest word before the first pause, or "lamp"); of the asks with a pause that were heard |
+| side talk let out | the lamp said something after a colleague's line, before the next line |
+| answer time | from the end of the ask's wav to the lamp's first words, ms, median and max; the start is read just before the clip begins, so 0.1 to 0.3 s long. Below zero: the lamp answered before the ask ended |
+
+Empty heard and said lines are not counted. `desk_kit.py score SCENARIO`
+also scores any scenario file without a plan: a line not ending in . ? !
+goes on into the next, and it is `L` when it names the lamp (or give
+`--marks LCC...`). `desk_kit.py selftest` checks the scorer on a fixture;
+`--dry` runs it, prints the drop-ins and the scenes, and scores the
+SCENARIO files given, with no lamp and nothing played.
+
 ## What it needs
 
 - A Mac beside the lamp, its speaker where the lamp can hear it.
