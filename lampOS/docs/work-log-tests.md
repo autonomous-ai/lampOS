@@ -1,5 +1,59 @@
 # Tests work log
 
+## 2026-10-22 07:48:39  — add-ons and Tasks ready; Skills correction pushed
+
+#2703 and #2646 are merged (`0566796d7` and `515e43d3a` respectively);
+their unchanged range-diffs and native results are already on #2602.
+
+#2647 is ready at `83cdeab8c`: [ARM64 #5433](https://github.com/autonomous-ai/lampOS/actions/runs/39699444617)
+passed 9,924 tests (one leaky), 63 skipped, nextest 163.787 s, plus doc
+tests and 12 own-harness tests. The job took 16m01s; CI checked merge
+`2e655e0` onto `a503d70f0`. Clippy #1441 passed. The last amend corrected
+only the evidence hash description; source hashes match the local gates.
+The superseded ARM64 run was cancelled, not counted as passed.
+[Ready request to Reviewer-two](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6329918538).
+
+#2637 is ready at `0950fc4ad`: [ARM64 #5418](https://github.com/autonomous-ai/lampOS/actions/runs/39697687205)
+passed 9,907 tests (one leaky), 63 skipped, nextest 170.443 s; doc and
+own-harness tests passed. The job took 20m18s; Clippy #1426 passed.
+The original 600 ms signed-out observation and completed owner pass remain.
+
+#2693's quiet-say correction is pushed at `bc8d8605e`, with 417 local
+Skills tests, strict Clippy, formatting, workspace build and all three
+compiled controls verified. An optional twelve-package host suite timed
+out at 600 s; its buffered partial output was not retained by that runner,
+so no counts or cause are claimed. It is not a passed check.
+[Final source/doc range-diff](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6329917212)
+is `!` for the necessary rename correction, following the earlier plain
+`=` rebase. [ARM64 #5444](https://github.com/autonomous-ai/lampOS/actions/runs/39701618635)
+and Clippy #1452 are running; draft until both pass.
+
+#2653 preserves every failed Mood observation. Three complete actual-base
+Mood suites passed, but final exact samples again reported `Mood bus I/O
+did not stop`. The actual-base and final Mood production and integration
+binaries are byte-identical; full-suite and exact execution differed.
+A fixed three-sample exact baseline comparison is next, without claiming
+a cause or discarding any failure. Expression natural success and Mood's
+600 ms run remain restored. Only Body, Controls and Name speedups remain.
+
+#2625's four guard fixtures passed three before and three after samples
+each. Both mark-suppression controls failed as intended; formatting and
+strict Clippy passed. Full Skills stopped at four unchanged routine library
+tests (133 passed, four failed), each lacking a request in its 50 ms receive.
+An actual-base comparison is in progress; integration and workspace gates
+remain outstanding. No inherited-failure claim yet.
+
+The photo-faces constructor seam is already merged in #2628; the current
+source blob matches its reviewed head and both native gates were green.
+#2647 completes the other requested seam.
+[Row 72 was claimed](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6329689990)
+on `tests/1569-early-end-capture-clock`: the candidate shares acquisition
+time between the provider conversion and scripted Gemini connector; a
+controlled 3 s host pause will test it. Sixth's original panic lacked its
+diagnostic, so this probe cannot establish that original failure's cause.
+No Cargo run for row 72 yet. Cloud confirmation remains on hold.
+No ARM64 build on the Mac or device access.
+
 ## 2026-10-22 07:21:55 +0700 — two rebases green; add-ons conflict published; Skills drift reproduced
 
 #2703 at `37305d9ce` passed [ARM64 #5407](https://github.com/autonomous-ai/lampOS/actions/runs/39696025998)
