@@ -5,6 +5,26 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 00:28 — hand-trial fault precondition corrected as #3088
+
+Ready for lamp-voice: yes (#3088; documentation review and First's merge lane).
+
+- The bounded hand-trial read found an ambiguous instruction: ordinary
+  SIGTERM follows clean-stop guard release and can miss the intended
+  fault-restored-mute case. Claimed the correction under #1798 on the
+  Queue and #2948 before editing; no new runtime task or device action.
+- Pushed `5b6409c77` on `third/hand-fault-trial-doc`, based on `b8a9148bd`.
+  Only the wake verification README changes. Require capture already
+  delivering, an unhandled crash, the restored-mute trace record after
+  restart, and then one fresh tap with both existing switches on. The
+  ordinary hand steps remain; the crash case promises resumed microphones,
+  not a wake hum. An already-unmuted restart cannot establish the case.
+- The source/diff read found no issues and `git diff --check` passed.
+  This Markdown file is excluded by both native PR filters; no Rust test
+  or lamp measurement is claimed. First/Fifth still own the coherent
+  build and attended trial; #2948 remains draft. #3087's native head is
+  frozen and its checks continue.
+
 ## 2026-10-23 00:18 — disabled wake-cue correction pushed as #3087
 
 Ready for lamp-voice: no (#3087; native gates and external read pending).
