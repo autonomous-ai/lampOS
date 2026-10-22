@@ -2022,6 +2022,89 @@ fn the_follow_up_asked_request_marks_and_a_forget_takes_the_offer() {
     assert_eq!(offer_rows(&scratch), 0);
 }
 
+/// The first builder on #2602, 22 Oct 22:17: an offer whose session began
+/// with a request is taken back (`follow_up_unoffered`): not counted, so
+/// three offers are still made, each on its own day; the last one's record
+/// as given goes with it. Only its own person's, only while offered; one
+/// asked about is never taken back.
+#[test]
+fn an_offer_taken_back_is_not_counted() {
+    let scratch = Scratch::new("event-unoffered");
+    let mut store = scratch.open(30, NOW);
+    let (minh, mai) = (person("p-minh"), person("p-mai"));
+    let id = wedding(&mut store, &minh);
+    assert!(
+        !store.follow_up_unoffered(&minh, id).unwrap(),
+        "never offered"
+    );
+    let held = json!(true);
+    // Day 6 offered and taken back, day 7 offered and taken back: the
+    // three offers are still to come, on days 8, 9 and 10.
+    for day in [6, 7] {
+        store.maintain(MONDAY + day * DAY).unwrap();
+        let given = store.follow_up_until_asked(&minh, true, true).unwrap();
+        assert_eq!(given.unwrap()["until_asked"], held, "day {day}");
+        assert!(!store.follow_up_unoffered(&mai, id).unwrap(), "not hers");
+        assert!(store.follow_up_unoffered(&minh, id).unwrap(), "day {day}");
+        assert!(!store.follow_up_unoffered(&minh, id).unwrap(), "once");
+        // Still one a day.
+        store.maintain(MONDAY + day * DAY + 3_600_000).unwrap();
+        assert_eq!(
+            store.follow_up_until_asked(&minh, true, true).unwrap(),
+            None
+        );
+    }
+    for (day, until_asked) in [(8, Some(&held)), (9, Some(&held)), (10, None)] {
+        store.maintain(MONDAY + day * DAY).unwrap();
+        let given = store
+            .follow_up_until_asked(&minh, true, true)
+            .unwrap()
+            .expect("offered");
+        assert_eq!(given.get("until_asked"), until_asked, "day {day}");
+    }
+    // The last, recorded as given, taken back: offered again the next day,
+    // and recorded again.
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"follow_up_unoffered","person":"p-minh","id":id}),
+        MONDAY + 10 * DAY,
+    );
+    assert_eq!(answer, json!({"ok":true,"unoffered":true}));
+    store.maintain(MONDAY + 11 * DAY).unwrap();
+    let given = store.follow_up_until_asked(&minh, true, true).unwrap();
+    assert_eq!(given.unwrap().get("until_asked"), None);
+    store.maintain(MONDAY + 12 * DAY).unwrap();
+    assert_eq!(
+        store.follow_up_until_asked(&minh, true, true).unwrap(),
+        None
+    );
+}
+
+/// The first builder on #2602, 22 Oct 22:17: one the lamp asked about is
+/// never taken back.
+#[test]
+fn an_offer_asked_about_is_not_taken_back() {
+    let scratch = Scratch::new("event-unoffered-asked");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    let id = wedding(&mut store, &minh);
+    store.maintain(MONDAY + 6 * DAY).unwrap();
+    assert!(
+        store
+            .follow_up_until_asked(&minh, true, true)
+            .unwrap()
+            .is_some()
+    );
+    store.maintain(MONDAY + 6 * DAY + 60_000).unwrap();
+    assert!(store.follow_up_asked(&minh, id).unwrap());
+    assert!(!store.follow_up_unoffered(&minh, id).unwrap());
+    store.maintain(MONDAY + 7 * DAY).unwrap();
+    assert_eq!(
+        store.follow_up_until_asked(&minh, true, true).unwrap(),
+        None
+    );
+}
+
 /// #2894 (a read): a kept thing said again for a later day (`once`) loses
 /// its offers with its day, so the new day is offered afresh, the full
 /// `FOLLOW_UP_OFFERS` times; kept, a third offer would be its last.

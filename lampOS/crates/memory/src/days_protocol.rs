@@ -105,6 +105,14 @@ enum Extra {
         person: Who,
         id: u64,
     },
+    /// The voice's `LAMP_MEMORY_EVENTS` (the first builder on #2602, 22 Oct
+    /// 22:17): the session follow-up `id` was offered in began with a
+    /// request, so the offer is taken back (`Days::follow_up_unoffered`).
+    FollowUpUnoffered {
+        #[serde(default)]
+        person: Who,
+        id: u64,
+    },
     ConversationEnd {
         #[serde(default)]
         person: Who,
@@ -416,6 +424,9 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
         Extra::FollowUpAsked { person, id } => {
             json!({"ok":true,"asked":store.follow_up_asked(&one(person)?,id)?})
         }
+        Extra::FollowUpUnoffered { person, id } => {
+            json!({"ok":true,"unoffered":store.follow_up_unoffered(&one(person)?,id)?})
+        }
         Extra::ConversationEnd {
             person,
             conversation,
@@ -483,6 +494,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "session_close",
             "follow_up",
             "follow_up_asked",
+            "follow_up_unoffered",
             "conversation_end",
             "tidy_apply",
             "adopt",
