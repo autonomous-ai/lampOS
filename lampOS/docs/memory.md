@@ -1068,11 +1068,14 @@ the unchanged legacy client, used unless the new Days client is selected.
   day and the question in different sentences, and does not count). An
   undated thread is stricter (reviewer-two's P2 on #3000): a word a
   greeting has (the memory's common words, and "new", "good",
-  "anything", "how", "going", "today", "mới", "gì" and the like,
-  `remember::GREETING_WORDS`) never counts, so the question holds one of
-  its other key words, or every one of them: "Morning! Anything new?"
-  and "Có gì mới không?" leave "Starting a new job" offered, "How's the
-  new job going?" and "Công việc mới thế nào?" mark it. The
+  "anything", "doing", "mới", "việc" and the like,
+  `remember::GREETING_WORDS`) or a when word never counts, so the
+  question holds one of its other key words, or, for a thread of one key
+  word, that word: "Morning! Anything new?" and "Có gì mới không?" leave
+  "Starting a new job" offered, "How's the new job going?" and "Công
+  việc mới thế nào?" mark it; "Morning! Any plans for tomorrow?" leaves
+  "Exam tomorrow" offered, and "Có việc gì mới không?" leaves "Có việc
+  mới". The
   mark is apart from the journal: a remember or forget turn's reply,
   kept out of the journal, still marks it ("I'll remember that. How was
   your sister's wedding?"), but a reply in a request admitted held only

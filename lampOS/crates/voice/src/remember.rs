@@ -2736,10 +2736,12 @@ fn plural_off(word: &str) -> &str {
 /// `dated` one, two of the event's key words, or one that is the event's
 /// own ([`WHEN_WORDS`] excluded: a weekday, a month, a time word, or a word
 /// with a digit). For an undated thread (reviewer-two's P2 on #3000) a word
-/// a greeting has ([`GREETING_WORDS`]) never counts: the question holds
-/// one of its other key words, or every one of them. "Morning! Anything
-/// new?" does not ask about "Starting a new job"; "How's the new job
-/// going?" does. "How was your sister's wedding?" and "Did the wedding go
+/// a greeting has ([`GREETING_WORDS`]) or a [`WHEN_WORDS`] one never
+/// counts: the question holds one of its other key words, or, for a
+/// thread of one key word, that word. "Morning! Anything new?" does not
+/// ask about "Starting a new job"; "How's the new job going?" does.
+/// "Morning! Any plans for tomorrow?" does not ask about "Exam tomorrow";
+/// "How did the exam go?" does. "How was your sister's wedding?" and "Did the wedding go
 /// well?" ask; "Saturday should be sunny. Anything else I can help with?"
 /// does not, as its question and the event's day are in different
 /// sentences. Deterministic, on the reply alone. Its limits: a paraphrase with none
@@ -2768,8 +2770,10 @@ fn asks_about(said: &str, event: &[String], dated: bool) -> bool {
         let asks = if dated {
             shared.len() >= 2 || shared.iter().any(|word| !is_when_word(word))
         } else {
-            shared.iter().any(|word| !is_greeting_word(word))
-                || (!shared.is_empty() && shared.len() == event.len())
+            shared
+                .iter()
+                .any(|word| !is_greeting_word(word) && !is_when_word(word))
+                || (event.len() == 1 && shared.len() == 1)
         };
         if asks {
             return true;
@@ -2791,7 +2795,6 @@ const GREETING_WORDS: &[&str] = &[
     "told",
     "của",
     "tôi",
-    "và",
     "không",
     "này",
     "thì",
@@ -2812,9 +2815,6 @@ const GREETING_WORDS: &[&str] = &[
     "nothing",
     "thing",
     "things",
-    "how",
-    "going",
-    "today",
     "doing",
     "done",
     "lately",
@@ -2836,7 +2836,6 @@ const GREETING_WORDS: &[&str] = &[
     "life",
     "stuff",
     "mới",
-    "gì",
     "thế",
     "sao",
     "bạn",
@@ -2849,7 +2848,6 @@ const GREETING_WORDS: &[&str] = &[
     "tốt",
     "chuyện",
     "việc",
-    "ổn",
     "sáng",
     "chiều",
     "tối",
@@ -7772,8 +7770,8 @@ mod tests {
     }
 
     /// The session's note with events: a dated one the memory gives
-    /// `until_asked` is held to be marked; one given without it (marked
-    /// when given) is not.
+    /// `until_asked` is held to be marked, dated by its `"on"` (El's P3 on
+    /// #3025); one given without it (marked when given) is not.
     #[test]
     fn with_events_a_held_follow_up_is_waited_on_for_the_lamp_to_ask() {
         const MINH: &str = "p-be9688998f085098";
@@ -7800,7 +7798,9 @@ mod tests {
             let asking = client.context.lock().unwrap().asking.clone();
             drop(client);
             std::fs::remove_file(&socket).unwrap();
-            asking.first().map(|(whose, id, _, _)| (whose.clone(), *id))
+            asking
+                .first()
+                .map(|(whose, id, _, dated)| (whose.clone(), *id, *dated))
         };
         assert_eq!(
             held("events-held", |request| match request["op"].as_str() {
@@ -7808,7 +7808,7 @@ mod tests {
                     json!({"ok":true,"follow_up":{"id":12,"category":"thread","text":"Sister's wedding is on Saturday","on":"2026-10-24","until_asked":true}}),
                 _ => opened(request),
             }),
-            Some((MINH.to_owned(), 12))
+            Some((MINH.to_owned(), 12, true))
         );
         assert_eq!(
             held("events-last", |request| match request["op"].as_str() {
@@ -7824,7 +7824,8 @@ mod tests {
     /// an undated thread told at "good morning" was spent, never asked):
     /// with threads and without events, an undated thread the memory gives
     /// `until_asked` is told the thread's sentence and held to be marked,
-    /// the same as a dated one; given without it, it is not held.
+    /// the same as a dated one but not dated, as it has no `"on"`; given
+    /// without it, it is not held.
     #[test]
     fn an_undated_thread_held_until_asked_is_waited_on_without_events() {
         const MINH: &str = "p-be9688998f085098";
@@ -7854,7 +7855,9 @@ mod tests {
             let asking = client.context.lock().unwrap().asking.clone();
             drop(client);
             std::fs::remove_file(&socket).unwrap();
-            asking.first().map(|(whose, id, _, _)| (whose.clone(), *id))
+            asking
+                .first()
+                .map(|(whose, id, _, dated)| (whose.clone(), *id, *dated))
         };
         assert_eq!(
             held("thread-held", |request| match request["op"].as_str() {
@@ -7862,7 +7865,7 @@ mod tests {
                     json!({"ok":true,"follow_up":{"id":12,"category":"thread","text":"Tired of the commute","until_asked":true}}),
                 _ => opened(request),
             }),
-            Some((MINH.to_owned(), 12))
+            Some((MINH.to_owned(), 12, false))
         );
         assert_eq!(
             held("thread-last", |request| match request["op"].as_str() {
@@ -7947,10 +7950,25 @@ mod tests {
             false
         ));
         assert!(asks_about("Công việc mới thế nào?", &viec, false));
-        // Only greeting words: asked by the whole of them.
-        let news = content_words("Good news");
-        assert!(!asks_about("Anything good?", &news, false));
-        assert!(asks_about("Any good news?", &news, false));
+        // Two greeting words are never asked by both (El's P3 on #3025:
+        // "việc" is both "job" and "thing"); one is asked by its word.
+        let moi = content_words("Có việc mới");
+        assert!(!asks_about("Có việc gì mới không?", &moi, false));
+        let life = content_words("Life");
+        assert!(!asks_about("Anything good?", &life, false));
+        assert!(asks_about("How's life?", &life, false));
+        // A when word never asks either (El's P2 on #3025), nor a day
+        // with events off, where the memory sends no "on".
+        let exam = content_words("Exam tomorrow");
+        assert!(!asks_about(
+            "Morning! Any plans for tomorrow?",
+            &exam,
+            false
+        ));
+        assert!(asks_about("How did the exam go?", &exam, false));
+        let wedding = content_words("Sister's wedding is on Saturday");
+        assert!(!asks_about("How was your Saturday?", &wedding, false));
+        assert!(asks_about("How was the wedding?", &wedding, false));
         // Dated: as before.
         let car = content_words("New car on Friday");
         assert!(asks_about("Anything new?", &car, true));
