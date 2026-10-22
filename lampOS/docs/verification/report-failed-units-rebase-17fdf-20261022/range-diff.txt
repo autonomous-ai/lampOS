@@ -1,0 +1,1 @@
+1:  c37fe695c = 1:  a50f88224 lampOS: report currently failed product units
