@@ -7390,3 +7390,62 @@ keys (both targets answered 401), not on a lamp.
 Native Linux ARM64 execution so far is on GitHub runners, not on a lamp.
 The log contains no unanswered question requiring
 the owner to relay a message.
+
+
+## 2026-10-23 05:56 +07: sealed-request continuation published, native and review held
+
+#3064 is one commit `470b4ac8c` on main `4f20e7b39`, exact tree
+`ae32b368c`, pushed with the explicit previous-head `8a8d46d76` lease.
+Private disclosure initially needs the original current-piece and combined
+positive speaker proof. A typed Eyes source adds a random producer lifecycle
+and persistent revocation generation; explicit fresh successful NoDetection
+can continue only that already pinned request at the same epoch, within its
+original audio-end-plus-30-second deadline. It cannot admit a new request.
+Missing/stale/invalid source, another observed subject, forget/privacy/errors
+and restart remain denial, with no same-request revival. Visible unaligned
+or unmatched faces remain refused: the policy question and El's P2 re-read
+are still open. Live's unchanged visible-person name-note limit is restored.
+Exactly two original sole-positive-face looks can qualify short speech;
+legacy three-look narrowing and the longer-window rule remain unchanged.
+Skipped empty-room inference neither invents absence nor revokes proof; an
+enabled source asks for an actual detection at its two-second refresh cadence.
+No extra RPC, wait, model function, bus field, tool/write or Photo authority.
+
+On this development Mac, exact-source fmt, strict workspace/all-target
+clippy and workspace build passed. Full package Voice: 3,880 passed,
+0 failed, 14 ignored (library 3,599, binary 1, integrations 270/4/6).
+Eyes: 300 passed, 0 failed, 5 ignored, one explicitly filtered Linux-only
+fixture. The unchanged `seems_log::tests::a_failed_write_is_said_once`
+opens `/dev/full`, absent on this Mac; its first full-library 286/1/5 and
+NotFound result remain recorded. Fresh ARM64 must execute it; an old native
+pass is not this head's qualification. The first callback attempt also
+remains recorded: a cancelled Unix peer returned macOS NotConnected, crashed
+the fake server and prevented the next note. Its existing disconnect helper
+now also accepts NotConnected; all semantic/privacy assertions are unchanged,
+and the complete callback group then passed 24/0.
+
+Focused overlap passed: seven continuation/actual Engine/HTTP/credit tests,
+one 15-case short-line Engine test, retries 25, private context 26, scope25,
+Services24, name carry15/near4, gaps2, credited output1 and source13.
+All 6,520 source hashes stayed unchanged. Warm synthetic name-helper
+first/repeat279/59us (prior236/55us, no statistical claim); typed matcher
+initial/NoDetection continuation411/87us, target under5ms. No cold-file,
+model, camera, acoustic, lamp or whole-turn timing is claimed. Commands,
+exits, raw retained attempts and manifests live in
+`/private/tmp/fourth-speaker-foundation-checks-20261022/lookaway-shortline-20261023/`.
+
+Exact-head ARM6439867711888 and Linuxclippy39867711870 are running; #3064
+stays draft pending those and First/El's policy/source decision. Name's
+five-path and Photo's31-path object previews are refreshed against this
+exact Common tree, with all outside-scope blobs/types/modes identical and
+all new guards retained; actual product branches remain unchanged and no
+preview count is qualification. First owns the combined latest-main train,
+merge and physical acceptance. Nine follows the same guarded dependency.
+Writer core is already delivered in main; runtime activation stays separate.
+
+#2540 is already closed on the historical lamp-52e6 retention observation:
+1 keep,1 next-turn refresh marker, correct request49 after377seconds on
+`403b444d4` (22 October09:08–09:21). That older observation does not qualify
+this corrected name/privacy source. No lamp access, device install, model
+spend or quality-row increase; the row stays0.40 for First's decision.
+Queue status/review requests use #3126 after #2602 hit its comment limit.
