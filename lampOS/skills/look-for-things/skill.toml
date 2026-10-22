@@ -41,6 +41,15 @@ give_up = "That was the last look. Say kindly, in a few words, that you can't se
 # The model says it sees the thing by calling with found (#1871): nothing
 # moves, no look is counted, and the head stays on the place it was seen.
 found = "Say where it is by something near it, as \"there, by the mug\", in a few words. You stay looking at it; do not look again."
+# On the second voice route (docs/second-voice.md): a look the model leaves
+# with no call is told `note` once, and one left after it is walked on by
+# the lamp to the next place in `walk` not yet looked at, each look's turn
+# saying where it looked (`looked`). The desk comes last, for a search the
+# person began at a place they named; one begun at the desk has already
+# looked there.
+note = "Not found yet? Call look_for with the next place: left, right, far_left, then far_right. If you can see it, say where and stop."
+walk = ["left", "right", "far_left", "far_right", "desk"]
+looked = { desk = "at the desk", left = "to the left", right = "to the right", far_left = "far to the left", far_right = "far to the right" }
 
 # Every look: the head down over the desk, held two minutes or until
 # someone speaks (a look again holds it again); the desk lit white for as

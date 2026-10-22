@@ -406,6 +406,12 @@ struct SearchFile {
     give_up: String,
     #[serde(default)]
     found: Option<String>,
+    #[serde(default)]
+    note: Option<String>,
+    #[serde(default)]
+    walk: Vec<String>,
+    #[serde(default)]
+    looked: BTreeMap<String, String>,
 }
 
 /// A search a person asked for, as loaded: its calls are the looks of one
@@ -421,7 +427,18 @@ pub struct Search {
     /// the thing is seen, so nothing is looked at again, nothing moves and
     /// nothing is counted, and the head stays held where it found it.
     pub found: Option<String>,
+    /// What the second voice route tells the model, once a search, of a
+    /// look it left with no call (docs/second-voice.md, the look's note).
+    pub note: Option<String>,
+    /// The places the second route's walk goes on to after the note, in
+    /// order, each once a search: a place already looked at is skipped.
+    pub walk: Vec<String>,
+    /// By place, where a walked look's turn says it looked ("to the left").
+    pub looked: BTreeMap<String, String>,
 }
+
+/// The longest a search's `looked` may say a place in: a few words.
+const LOOKED_AT_MOST: usize = 64;
 
 /// The choice a search's model calls with once it sees the thing (#1871):
 /// a place that is no place, so the search can tell "found" from a look
@@ -3530,10 +3547,56 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                     ));
                 }
             }
+            if let Some(note) = &search.note
+                && (note.trim().is_empty() || note.len() > 256)
+            {
+                return Err("[search] note is what the model is told, in at most 256 bytes".into());
+            }
+            if !search.walk.is_empty() && search.note.is_none() {
+                return Err("[search] walk goes on after its note: a note with it".into());
+            }
+            let places = file
+                .choice
+                .as_ref()
+                .map(|choice| choice.one_of.as_slice())
+                .unwrap_or_default();
+            let is_place = |place: &String| place != FOUND && places.contains(place);
+            for (at, place) in search.walk.iter().enumerate() {
+                if !is_place(place) || search.walk[..at].contains(place) {
+                    return Err(format!(
+                        "[search] walk names each place once, from its choice's one_of: {place:?}"
+                    ));
+                }
+            }
+            for (place, words) in &search.looked {
+                if !is_place(place) || words.trim().is_empty() || words.len() > LOOKED_AT_MOST {
+                    return Err(format!(
+                        "[search] looked says a place of its choice's one_of in at most {LOOKED_AT_MOST} bytes: {place:?}"
+                    ));
+                }
+            }
+            let default = file
+                .choice
+                .as_ref()
+                .and_then(|choice| choice.default.as_ref());
+            if !search.walk.is_empty()
+                && let Some(place) = search
+                    .walk
+                    .iter()
+                    .chain(default)
+                    .find(|place| !search.looked.contains_key(*place))
+            {
+                return Err(format!(
+                    "[search] looked says each place of its walk and its default: {place:?}"
+                ));
+            }
             Some(Search {
                 looks: search.looks,
                 give_up: search.give_up,
                 found: search.found,
+                note: search.note,
+                walk: search.walk,
+                looked: search.looked,
             })
         }
     };
@@ -6343,6 +6406,9 @@ fn calls(
 /// `core` names the tools of core skills ([`SkillKind::Core`]), when any:
 /// at a session's bound of functions the voice never cuts one of them, and
 /// cuts others first (the owner's rule, on #2614).
+/// `searches` gives, by tool, a search's note and walk, when any says them
+/// (`[search]`'s `note`, `walk` and `looked`, and its choice's `default`):
+/// the second voice route's note and walk read them (docs/second-voice.md).
 /// The lists include enabled skills only, even when given the inventory.
 pub fn tools_file(skills: &[Skill]) -> Value {
     tools_file_with(
@@ -6370,6 +6436,7 @@ pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) ->
     let mut tools: Vec<Value> = Vec::new();
     let mut moving: Vec<&str> = Vec::new();
     let mut core: Vec<&str> = Vec::new();
+    let mut searches = serde_json::Map::new();
     for skill in skills.iter().filter(|skill| skill.enabled) {
         if skill.requested_audio().is_some() && !enabled {
             continue;
@@ -6382,6 +6449,18 @@ pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) ->
             }
             if skill.kind == SkillKind::Core {
                 core.push(name);
+            }
+            if let Some(search) = &skill.search
+                && let Some(note) = &search.note
+            {
+                let default = skill
+                    .choice
+                    .as_ref()
+                    .and_then(|choice| choice.default.clone());
+                searches.insert(
+                    name.clone(),
+                    json!({"note": note, "walk": search.walk, "looked": search.looked, "default": default}),
+                );
             }
             let reworded = guard_words_v2 && skill.name == watch::GUARD;
             let description = if reworded {
@@ -6471,6 +6550,9 @@ pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) ->
     }
     if !core.is_empty() {
         file["core"] = json!(core);
+    }
+    if !searches.is_empty() {
+        file["searches"] = Value::Object(searches);
     }
     file
 }

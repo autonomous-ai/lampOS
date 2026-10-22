@@ -964,7 +964,7 @@ impl Peers {
                                         .copied()
                                         .unwrap_or(LookAnswer::Other),
                                 )
-                            } else if text == super::look_note::NOTE {
+                            } else if *text == super::look_note::look_for_things().note {
                                 Some(self.script.note_answer)
                             } else {
                                 None
@@ -2066,7 +2066,9 @@ fn look_notes(run: &Run) -> Vec<u64> {
         .second
         .iter()
         .filter_map(|input| match input {
-            ProviderInput::Written { request, text, .. } if text == super::look_note::NOTE => {
+            ProviderInput::Written { request, text, .. }
+                if *text == super::look_note::look_for_things().note =>
+            {
                 Some(*request)
             }
             _ => None,

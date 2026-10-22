@@ -5583,7 +5583,17 @@ fn conversation_with_gate(
         == Some("on");
     #[cfg(test)]
     let look_walk_on = look_walk_on || TEST_LOOK_WALK.with(std::cell::Cell::get);
-    let mut look_note = look_note::LookNote::new(look_note_on).with_walk(look_walk_on);
+    // A search's note and walk are its skill's file's, as the skills'
+    // tools file gives them; a loop test's are look-for-things' own file's.
+    let search_walks = look_note::skills_walks();
+    #[cfg(test)]
+    let search_walks = {
+        drop(search_walks);
+        look_note::look_for_things_walks()
+    };
+    let mut look_note = look_note::LookNote::new(look_note_on)
+        .with_walk(look_walk_on)
+        .with_walks(search_walks);
     let walk_skill = look_note::skills_caller();
     #[cfg(test)]
     let walk_skill = TEST_WALK_SKILL
