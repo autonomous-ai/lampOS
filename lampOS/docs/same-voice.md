@@ -55,6 +55,11 @@ until its model is put there and the voice is told where.
   but a recording with no loss counts 0 lost at any offset. `at_unix_ms`
   is when a block was published, not when it was heard, so one constant
   `--offset-ms` can't take out a delay that varies.
+  `tools/mic2-voice-table.sh` does the whole run from the computer that
+  plays a night-kit round: `lamp-bus record` of `mic2/audio` on the lamp
+  over ssh, the round, the clocks' offset from `date` before and after,
+  then this table at 300 and 600 ms end silence. The recording is removed
+  from the lamp and from that computer at the end.
 
 ## Measured (fourth builder's Intel Mac, 2026-10-15)
 
