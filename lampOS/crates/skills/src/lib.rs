@@ -277,6 +277,77 @@ pub const STOP_ABOUT_MOST_BYTES: usize = 512;
 /// The file in `--state-dir` that keeps the skills turned off: one line
 /// each, the skill's name, and nothing else.
 pub const OFF_FILE: &str = "off";
+/// The file in `--state-dir` beside [`OFF_FILE`] that keeps the core skills
+/// shipped off that the person turned on (#2585, `lamp-update`'s
+/// `product_skills::ON`): one name a line, kept on through a round.
+pub const ON_FILE: &str = "on";
+
+/// The names kept in `file` ([`OFF_FILE`] or [`ON_FILE`]), one a line; a
+/// line that is not a skill's name is passed over, and no file is none.
+/// The one reader of both, for the running program and the manage helper.
+/// Never read through a link (`O_NOFOLLOW`: one is refused).
+pub fn read_names(file: &Path) -> std::io::Result<BTreeSet<String>> {
+    use std::{io::Read, os::unix::fs::OpenOptionsExt};
+    let read = || -> std::io::Result<String> {
+        let mut text = String::new();
+        fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(file)?
+            .read_to_string(&mut text)?;
+        Ok(text)
+    };
+    match read() {
+        Ok(text) => Ok(text
+            .lines()
+            .map(str::trim)
+            .filter(|name| plain_name(name))
+            .map(str::to_owned)
+            .collect()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(BTreeSet::new()),
+        Err(error) => Err(error),
+    }
+}
+
+/// `names` written whole to `file`, one a line: a file beside it, synced,
+/// then moved over it, and the folder synced, so a power cut leaves the
+/// old file or the new one whole, never an empty one, and the move itself
+/// holds (the reviewer's P3 on #1837, as #1732's daily journal does). The
+/// one writer of [`OFF_FILE`] and [`ON_FILE`]: a `[stop]`'s off and on,
+/// and the app's ([`package::turn`]). Root's helper writes it in a folder
+/// another user owns (the reviewer's P2 on #2878), so the file beside is
+/// only ever made new (`O_CREAT | O_EXCL`, which never follows a link): a
+/// file left there by a cut-off run is removed first, and a link there is
+/// refused, its target untouched.
+pub fn keep_names(file: &Path, names: &BTreeSet<String>) -> std::io::Result<()> {
+    use std::os::unix::fs::OpenOptionsExt;
+    let lines: String = names.iter().map(|name| format!("{name}\n")).collect();
+    let new = file.with_extension("new");
+    match fs::symlink_metadata(&new) {
+        Ok(meta) if meta.file_type().is_symlink() => {
+            return Err(std::io::Error::other(format!(
+                "{} is a link: refused",
+                new.display()
+            )));
+        }
+        Ok(_) => fs::remove_file(&new)?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+    }
+    let mut out = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .mode(0o644)
+        .open(&new)?;
+    std::io::Write::write_all(&mut out, lines.as_bytes())?;
+    out.sync_all()?;
+    fs::rename(&new, file)?;
+    if let Some(folder) = file.parent() {
+        fs::File::open(folder)?.sync_all()?;
+    }
+    Ok(())
+}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -4447,48 +4518,46 @@ impl Engine {
 
     /// The skills turned off are kept in `dir` (`--state-dir`), one line
     /// each in [`OFF_FILE`], its skill's name and nothing else, and read
-    /// from it now: off stays off across a restart, a snooze does not. A
-    /// line that is not a skill's name is passed over, and the names read
-    /// returned. Without it, off lasts until the program stops.
+    /// from it now ([`read_names`]): off stays off across a restart, a
+    /// snooze does not. The names read are returned. Without it, off lasts
+    /// until the program stops.
     pub fn keep_off_in(&mut self, dir: &Path) -> Result<Vec<String>, String> {
         let file = dir.join(OFF_FILE);
-        let text = match fs::read_to_string(&file) {
-            Ok(text) => text,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
-            Err(error) => return Err(format!("{}: {error}", file.display())),
-        };
-        self.off = text
-            .lines()
-            .map(str::trim)
-            .filter(|name| plain_name(name))
-            .map(str::to_owned)
-            .collect();
+        self.off = read_names(&file).map_err(|error| format!("{}: {error}", file.display()))?;
         self.off_file = Some(file);
         Ok(self.off.iter().cloned().collect())
     }
 
-    /// The skills turned off, written whole where they are kept: a file
-    /// beside it, synced, then moved over it, and the folder synced, so a
-    /// power cut leaves the old file or the new one whole, never an empty
-    /// one, and the move itself holds (the reviewer's P3 on #1837, as
-    /// #1732's daily journal does). False when they are not kept, or could
-    /// not be.
+    /// The skills turned off read again from where they are kept, which
+    /// the app's off and on change there ([`package::turn`], #2815): true
+    /// when they changed. Kept as they were when the file can't be read.
+    pub fn reread_off(&mut self) -> bool {
+        let Some(file) = &self.off_file else {
+            return false;
+        };
+        match read_names(file) {
+            Ok(off) if off != self.off => {
+                self.off = off;
+                true
+            }
+            Ok(_) => false,
+            Err(error) => {
+                eprintln!(
+                    "lamp-skills: the skills off not read again from {}: {error}",
+                    file.display()
+                );
+                false
+            }
+        }
+    }
+
+    /// The skills turned off, written whole where they are kept
+    /// ([`keep_names`]). False when they are not kept, or could not be.
     fn keep_off(&self) -> bool {
         let Some(file) = &self.off_file else {
             return false;
         };
-        let lines: String = self.off.iter().map(|name| format!("{name}\n")).collect();
-        let new = file.with_extension("new");
-        let kept = (|| -> std::io::Result<()> {
-            let mut out = fs::File::create(&new)?;
-            std::io::Write::write_all(&mut out, lines.as_bytes())?;
-            out.sync_all()?;
-            fs::rename(&new, file)?;
-            if let Some(folder) = file.parent() {
-                fs::File::open(folder)?.sync_all()?;
-            }
-            Ok(())
-        })();
+        let kept = keep_names(file, &self.off);
         if let Err(error) = &kept {
             eprintln!(
                 "lamp-skills: the skills off not kept in {}: {error}",
@@ -4551,6 +4620,10 @@ impl Engine {
             (true, [one]) => format!("the {} nudges", one.replace('-', " ")),
             (true, _) => format!("the {} nudges", group.as_deref().unwrap_or("wellbeing")),
         };
+        // What the app turned since is kept: read again before writing.
+        if matches!(how, Some("off" | "on")) {
+            self.reread_off();
+        }
         let note = match how {
             Some("snooze") => {
                 let until = next_morning_us(self.clock, now_us);

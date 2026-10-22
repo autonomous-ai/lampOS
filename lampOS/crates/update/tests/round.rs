@@ -2047,6 +2047,117 @@ fn a_skill_the_build_removes_leaves_the_turned_on_record_with_one_line() {
     assert_eq!(fs::read_to_string(state_dir.join("on")).unwrap(), "dance\n");
 }
 
+/// The app's off or on for `name` (#2815), asked of the manage helper's own
+/// code over this lamp's skills folder and lamp-skills' state folder.
+fn app_turns(lamp: &Lamp, way: &str, name: &str) -> String {
+    let skills = lamp.root.join(PRODUCT_SKILLS);
+    let mut answer = Vec::new();
+    lamp_skills::package::asked(
+        &skills,
+        &skills.join("no-made"),
+        &lamp.root.join("var/lib/lampos-skills-state"),
+        std::time::Duration::from_secs(1),
+        None,
+        format!("{{\"{way}\": \"{name}\"}}\n").as_bytes(),
+        &mut answer,
+    )
+    .unwrap();
+    let answer: serde_json::Value = serde_json::from_slice(&answer).unwrap();
+    answer["done"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{answer}"))
+        .to_owned()
+}
+
+/// lamp-skills started again over this lamp's folders: the skills it runs,
+/// and the ones it holds turned off.
+fn restarted(lamp: &Lamp) -> (Vec<String>, Vec<String>) {
+    let (skills, errors) = lamp_skills::load_all(&lamp.root.join(PRODUCT_SKILLS));
+    assert!(errors.is_empty(), "{errors:?}");
+    let mut engine = lamp_skills::Engine::new(skills, true);
+    let off = engine
+        .keep_off_in(&lamp.root.join("var/lib/lampos-skills-state"))
+        .unwrap();
+    let names = engine
+        .skills()
+        .iter()
+        .map(|skill| skill.name.clone())
+        .collect();
+    (names, off)
+}
+
+/// #2815: the app's off and on are the person's own choice, kept through a
+/// round and a restart. An off is kept in lamp-skills' `off`, which a round
+/// never touches. A core skill the build ships off, turned on in the app,
+/// is on in its file and in `on`, so the round keeps it on (#2585); turned
+/// off again, its file is the build's again, it leaves `on`, and it stays
+/// off through the next round and a restart.
+#[test]
+fn the_apps_off_and_on_hold_through_a_round_and_a_restart() {
+    let repo = |path: &str| {
+        fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../skills")
+                .join(path),
+        )
+        .unwrap()
+    };
+    let dance_on = repo("dance/skill.toml");
+    let dance_off = format!("{}{dance_on}", lamp_update::install::OFF_LINE);
+    let files = [
+        ("dance/skill.toml", dance_off.clone()),
+        ("dance/SKILL.md", repo("dance/SKILL.md")),
+        ("reminders/skill.toml", repo("reminders/skill.toml")),
+        ("reminders/SKILL.md", repo("reminders/SKILL.md")),
+    ];
+    let files: Vec<(&str, &str)> = files
+        .iter()
+        .map(|(path, text)| (*path, text.as_str()))
+        .collect();
+    let mut lamp = Lamp::new().with_skills(&skills_with_checks("1", ""), &[]);
+    for (path, text) in &files {
+        lamp.put_skill_file(path, text);
+    }
+    lamp.record_as_installs(&files);
+    let state_dir = lamp.root.join("var/lib/lampos-skills-state");
+    fs::create_dir_all(&state_dir).unwrap();
+    let product = bundle(&files);
+    let names = |text: &str| -> Vec<String> { text.lines().map(str::to_owned).collect() };
+
+    assert_eq!(app_turns(&lamp, "on", "dance"), "turned dance on");
+    assert_eq!(app_turns(&lamp, "off", "reminders"), "turned reminders off");
+    let checks = skills_with_checks("2", "");
+    build_with_product_skills(&mut lamp, 2, "voice 1", &checks, &product);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), dance_on);
+    assert_eq!(fs::read_to_string(state_dir.join("on")).unwrap(), "dance\n");
+    assert_eq!(
+        fs::read_to_string(state_dir.join("off")).unwrap(),
+        "reminders\n"
+    );
+    let (running, off) = restarted(&lamp);
+    assert_eq!(
+        (running, off),
+        (names("dance\nreminders"), names("reminders"))
+    );
+
+    // On again and off again, the other way round.
+    assert_eq!(app_turns(&lamp, "on", "reminders"), "turned reminders on");
+    assert_eq!(app_turns(&lamp, "off", "dance"), "turned dance off");
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), dance_off);
+    let checks = skills_with_checks("3", "");
+    build_with_product_skills(&mut lamp, 3, "voice 1", &checks, &product);
+    assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), dance_off);
+    assert_eq!(fs::read_to_string(state_dir.join("on")).unwrap(), "");
+    assert_eq!(
+        fs::read_to_string(state_dir.join("off")).unwrap(),
+        "dance\n"
+    );
+    let (running, off) = restarted(&lamp);
+    assert_eq!((running, off), (names("reminders"), names("dance")));
+}
+
 /// The guard stays the net: a skill of the person's that the new
 /// lamp-skills would not load refuses the build, judged on the folder as
 /// the round would leave it, and nothing of the lamp's is written.

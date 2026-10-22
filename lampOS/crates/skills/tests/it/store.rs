@@ -315,6 +315,7 @@ fn ask_waiting(
         skills,
         // No skill the lamp made is asked for here.
         &skills.with_extension("made"),
+        &skills.with_extension("state"),
         wait,
         Some(Store {
             key_file: key_file.to_path_buf(),

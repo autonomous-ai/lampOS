@@ -272,7 +272,7 @@ fn a_normal_cli_usage_error_reaches_stderr_before_skills_exits() {
     assert!(said.starts_with("usage: lamp-skills "), "{said:?}");
     assert!(said.contains("lamp-skills test SKILL_DIR...\n"), "{said:?}");
     assert!(
-        said.ends_with("lamp-skills asked [--dir DIR] [--key-file PATH]\n"),
+        said.ends_with("lamp-skills asked [--dir DIR] [--state-dir DIR] [--key-file PATH]\n"),
         "{said:?}"
     );
 }

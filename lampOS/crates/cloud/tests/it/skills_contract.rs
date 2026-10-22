@@ -249,11 +249,13 @@ fn removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope() {
     let manage = root.join("m.sock");
     let listener = UnixListener::bind(&manage).unwrap();
     let served = folder.clone();
+    let state = root.clone();
     std::thread::spawn(move || {
         for stream in listener.incoming().flatten() {
             let _ = lamp_skills::package::asked(
                 &served,
                 &served.join("no-made"),
+                &state,
                 lamp_skills::package::ASKED_LOCK_WAIT,
                 None,
                 &stream,

@@ -3,7 +3,9 @@
 //! `lamp-skills` loads it, each with its group, whether it can be removed or
 //! turned off, and what it may use in plain words; and `skills.remove`, an
 //! installed or made-here skill taken off on the person's tap, through
-//! `lamp-skills`' own remove ([`remove`]), never a core one; and, with
+//! `lamp-skills`' own remove ([`remove`]), never a core one; `skills.off`
+//! and `skills.on`, a skill turned off or on as the person's own choice
+//! ([`turn`], #2815); and, with
 //! `LAMP_SKILLS_STORE=on` too, `skills.install`, a package from the Skills
 //! Store at a URL, which root's manage helper fetches, checks against the
 //! update channel's key and installs ([`install`]). Nothing here writes the
@@ -24,7 +26,7 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-/// `on` answers `skills.list` and `skills.remove`, with `LAMP_CLOUD=on`. Anything else: the
+/// `on` answers `skills.list`, `skills.remove`, `skills.off` and `skills.on`, with `LAMP_CLOUD=on`. Anything else: the
 /// kind is one this lamp lacks.
 pub const ENVIRONMENT: &str = "LAMP_SKILLS_PAGE";
 
@@ -95,9 +97,9 @@ pub fn on_from_environment() -> bool {
 pub struct Places {
     /// `lamp-skills`' folder, core and installable skills side by side.
     pub folder: PathBuf,
-    /// The skills a person turned off by voice, a name a line, kept by
-    /// `lamp-skills --state-dir` (#1886); a snooze is kept only in its
-    /// memory, so it is never known here.
+    /// The skills a person turned off by voice or in the app, a name a
+    /// line, kept by `lamp-skills --state-dir` (#1886, #2815); a snooze is
+    /// kept only in its memory, so it is never known here.
     pub off: PathBuf,
     /// The manage helper's socket, root's, which removes a skill for the
     /// page ([`lamp_skills::package::MANAGE_SOCKET`]): `lamp-cloud` never
@@ -251,11 +253,14 @@ pub struct Listed {
     pub version: Option<String>,
     /// False for a core skill: it comes with the lamp.
     pub can_remove: bool,
-    /// It has a `[stop]` (#1837) and loads: a person can turn it off.
+    /// It loads and is not part of the lamp itself
+    /// ([`lamp_skills::package::cannot_turn_off`]): the app may turn it
+    /// off and on (`skills.off`, `skills.on`, #2815).
     pub can_turn_off: bool,
-    /// With a `[stop]`: true when it is turned off, false when it is not
-    /// (it may be snoozed until the morning, which is not kept where this
-    /// reads); null without one, or when the off file can't be read.
+    /// When it can be turned off: true when it is off (in the off file, or
+    /// shipped off and not turned on), false when it is not (it may be
+    /// snoozed until the morning, which is not kept where this reads);
+    /// null otherwise, or when the off file can't be read.
     pub off: Option<bool>,
     /// Whether the running `lamp-skills` loads it.
     pub loads: bool,
@@ -312,16 +317,52 @@ pub fn remove(places: &Places, data: &Value) -> Result<Value, String> {
             "{name} is a core skill: it comes with the lamp, so it can't be removed"
         ));
     }
-    match ask_helper(&places.manage, &json!({ "remove": name }), ASK_TIMEOUT) {
-        Ok(said) => eprintln!("lamp-cloud: skills.remove from the app: {said}"),
+    changed(
+        places,
+        "skills.remove",
+        &json!({ "remove": name }),
+        ASK_TIMEOUT,
+    )
+}
+
+/// `skills.off {"name"}` and `skills.on {"name"}` (#2815): a skill turned
+/// off or on on the person's tap in the app, kept as their own choice
+/// where a `[stop]`'s off is (`--state-dir`'s `off`), so a round and a
+/// restart keep it. As a remove, asked of the manage helper, which turns
+/// it ([`lamp_skills::package::turn`]) and refuses one that is part of
+/// the lamp itself with why ([`lamp_skills::package::cannot_turn_off`]),
+/// or a core skill shipped off turned on in its file and kept in `on`
+/// (#2585). The reply is the page as it now is, [`list`]'s.
+pub fn turn(places: &Places, data: &Value, off: bool) -> Result<Value, String> {
+    let name = data
+        .get("name")
+        .and_then(Value::as_str)
+        .filter(|name| lamp_skills::package::skill_name_ok(name))
+        .ok_or(NOT_A_NAME)?;
+    let (kind, way) = if off {
+        ("skills.off", "off")
+    } else {
+        ("skills.on", "on")
+    };
+    changed(places, kind, &json!({ way: name }), ASK_TIMEOUT)
+}
+
+/// `request` asked of the manage helper for the app's `kind`, waiting at
+/// most `within`: the page as it now is, or why not in one line.
+fn changed(
+    places: &Places,
+    kind: &str,
+    request: &Value,
+    within: std::time::Duration,
+) -> Result<Value, String> {
+    match ask_helper(&places.manage, request, within) {
+        Ok(said) => eprintln!("lamp-cloud: {kind} from the app: {said}"),
         Err(Asked::Refused(why)) => {
-            eprintln!("lamp-cloud: skills.remove {name} from the app refused: {why}");
+            eprintln!("lamp-cloud: {kind} from the app refused: {why}");
             return Err(cut(&one_line(&why), WHY_MOST));
         }
         Err(Asked::Unanswered(error)) => {
-            eprintln!(
-                "lamp-cloud: skills.remove {name}: the manage helper did not answer: {error}"
-            );
+            eprintln!("lamp-cloud: {kind}: the manage helper did not answer: {error}");
             return Err(NOT_CHANGED.to_owned());
         }
     }
@@ -392,18 +433,7 @@ pub fn install(places: &Places, data: &Value) -> Result<Value, String> {
     if let Some(why) = asked.refused() {
         return Err(why.to_owned());
     }
-    match ask_helper(&places.manage, &asked.request(), INSTALL_TIMEOUT) {
-        Ok(said) => eprintln!("lamp-cloud: skills.install from the app: {said}"),
-        Err(Asked::Refused(why)) => {
-            eprintln!("lamp-cloud: skills.install from the app refused: {why}");
-            return Err(cut(&one_line(&why), WHY_MOST));
-        }
-        Err(Asked::Unanswered(error)) => {
-            eprintln!("lamp-cloud: skills.install: the manage helper did not answer: {error}");
-            return Err(NOT_CHANGED.to_owned());
-        }
-    }
-    list(places)
+    changed(places, "skills.install", &asked.request(), INSTALL_TIMEOUT)
 }
 
 /// Why the manage helper did not remove or install a skill.
@@ -459,15 +489,19 @@ fn row(
     let toml = read_small(&folder.join("skill.toml"))
         .and_then(|text| text.parse::<toml::Table>().ok())
         .unwrap_or_default();
-    let has_stop = toml.contains_key("stop");
+    // Shipped off and not turned on: off as the page shows it.
+    let mut disabled = false;
     let (kind, version, permissions, description, why) = match loaded {
-        Ok(skill) => (
-            skill.kind,
-            skill.version,
-            skill.permissions,
-            skill.description,
-            None,
-        ),
+        Ok(skill) => {
+            disabled = !skill.enabled;
+            (
+                skill.kind,
+                skill.version,
+                skill.permissions,
+                skill.description,
+                None,
+            )
+        }
         // What a folder that does not load says of itself, read on its own,
         // as `lamp-skills list` does.
         Err(why) => (
@@ -495,7 +529,8 @@ fn row(
         // the app's groups stay as they are (docs/addons.md).
         SkillKind::Installable | SkillKind::Addon => Group::Installed,
     };
-    let can_turn_off = has_stop && loads;
+    let can_turn_off =
+        loads && lamp_skills::package::cannot_turn_off(&name, &permissions).is_none();
     Listed {
         title: heading(&card).unwrap_or_else(|| name.clone()),
         description: cut(&description, DESCRIPTION_MOST),
@@ -504,7 +539,7 @@ fn row(
         can_remove: kind != SkillKind::Core,
         can_turn_off,
         off: can_turn_off
-            .then(|| off.map(|off| off.contains(&name)))
+            .then(|| off.map(|off| disabled || off.contains(&name)))
             .flatten(),
         loads,
         why,
@@ -614,11 +649,14 @@ pub mod tests {
         let _ = fs::remove_file(&places.manage);
         let listener = std::os::unix::net::UnixListener::bind(&places.manage).unwrap();
         let folder = places.folder.clone();
+        // Where the running program keeps `off`, the off file's folder.
+        let state = places.off.parent().unwrap().to_path_buf();
         std::thread::spawn(move || {
             for stream in listener.incoming().flatten() {
                 let _ = lamp_skills::package::asked(
                     &folder,
                     &folder.join("no-made"),
+                    &state,
                     lock_wait,
                     None,
                     &stream,
@@ -680,8 +718,8 @@ pub mod tests {
                 "group": "core",
                 "version": "1.0.0",
                 "can_remove": false,
-                "can_turn_off": false,
-                "off": null,
+                "can_turn_off": true,
+                "off": false,
                 "loads": true,
                 "why": null,
                 "may_use": [{"name": "body", "says": "moves the lamp", "privacy": null}],
@@ -868,11 +906,11 @@ pub mod tests {
         assert_eq!(rows[0]["may_use"][0]["name"], "camera");
     }
 
-    /// #1837's `[stop]` is not on `lamp-voice` yet, so a skill with one does
-    /// not load here and is offered no switch. Once one loads, the off file
-    /// says whether it is off.
+    /// A skill that does not load (here, its `[stop]` is refused) is
+    /// offered no switch; one that loads is (#2815), and the off file says
+    /// whether it is off.
     #[test]
-    fn only_a_skill_with_a_stop_that_loads_can_be_turned_off() {
+    fn only_a_skill_that_loads_can_be_turned_off() {
         let places = places("stop");
         let with_stop = "[permissions]\nbody = true\n[stop]\ntool = \"stop_sip\"";
         skill(&places, "sip", "Sip", "", with_stop);
@@ -883,10 +921,11 @@ pub mod tests {
             (&sip["loads"], &sip["can_turn_off"], &sip["off"]),
             (&json!(false), &json!(false), &Value::Null)
         );
+        // Any skill that loads, `[stop]` or not, has the app's switch (#2815).
         let plain = rows.iter().find(|row| row["name"] == "plain").unwrap();
         assert_eq!(
             (&plain["can_turn_off"], &plain["off"]),
-            (&json!(false), &Value::Null)
+            (&json!(true), &json!(false))
         );
         // As it will be once a `[stop]` loads: a loaded skill in the folder
         // whose `skill.toml` has one.
@@ -1011,6 +1050,52 @@ pub mod tests {
         assert_eq!(
             remove(&places, &json!({"name": "plant-water"})),
             Err("no skill plant-water on this lamp".to_owned())
+        );
+    }
+
+    /// #2815: the app's off and on through the manage helper, the page as
+    /// it now is each time, the skill off in it and then on again; a skill
+    /// that is part of the lamp itself is offered no switch and refused
+    /// with why.
+    #[test]
+    fn a_skill_is_turned_off_and_on_and_one_of_the_lamp_itself_is_refused() {
+        let places = three("turn");
+        // lampOS's own night sleep, granted the core `sleep`.
+        let sleep = places.folder.join("night-sleep");
+        fs::create_dir_all(&sleep).unwrap();
+        let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../skills/night-sleep");
+        for file in ["skill.toml", "SKILL.md"] {
+            fs::copy(repo.join(file), sleep.join(file)).unwrap();
+        }
+        let row = |reply: &Value, name: &str| {
+            let row = reply["skills"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row["name"] == name)
+                .unwrap()
+                .clone();
+            (row["can_turn_off"].clone(), row["off"].clone())
+        };
+        let reply = turn(&places, &json!({"name": "tutor"}), true).unwrap();
+        assert_eq!(reply, list(&places).unwrap());
+        assert_eq!(row(&reply, "tutor"), (json!(true), json!(true)));
+        assert_eq!(row(&reply, "dance"), (json!(true), json!(false)));
+        assert_eq!(fs::read_to_string(&places.off).unwrap(), "tutor\n");
+        let reply = turn(&places, &json!({"name": "tutor"}), false).unwrap();
+        assert_eq!(row(&reply, "tutor"), (json!(true), json!(false)));
+        assert_eq!(row(&reply, "night-sleep"), (json!(false), Value::Null));
+        assert_eq!(
+            turn(&places, &json!({"name": "night-sleep"}), true),
+            Err(
+                "night-sleep is part of how the lamp itself works, so it can't be turned off"
+                    .to_owned()
+            )
+        );
+        assert_eq!(fs::read_to_string(&places.off).unwrap(), "");
+        assert_eq!(
+            turn(&places, &json!({"name": "../tutor"}), true),
+            Err(NOT_A_NAME.to_owned())
         );
     }
 
@@ -1231,6 +1316,7 @@ pub mod tests {
                 let _ = lamp_skills::package::asked(
                     &folder,
                     &folder.join("no-made"),
+                    &folder.join("no-state"),
                     lamp_skills::package::ASKED_LOCK_WAIT,
                     Some(store),
                     &stream,

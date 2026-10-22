@@ -376,6 +376,12 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let places = lamp.skills().ok_or_else(|| not_here(kind))?;
             crate::skills::remove(&places, data).map(Some)
         }
+        // A skill turned off or on on the person's tap (#2815), kept as
+        // their own choice: the page as it now is.
+        "skills.off" | "skills.on" if lamp.skills().is_some() => {
+            let places = lamp.skills().ok_or_else(|| not_here(kind))?;
+            crate::skills::turn(&places, data, kind == "skills.off").map(Some)
+        }
         // Guard mode on or off from the owner's app (#2562), as
         // `skills.remove` goes: handed to lamp-skills' call socket, which
         // holds it to the watch's own rules, its mark among them.

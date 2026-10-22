@@ -1114,6 +1114,116 @@ fn removed_said(name: &str) -> String {
     format!("removed {name}: a running lamp-skills lets it go within 2 s")
 }
 
+/// The running program's state folder on a product lamp (its unit's
+/// `--state-dir`), where the skills turned off and the core skills turned
+/// on are kept ([`super::OFF_FILE`], [`super::ON_FILE`]).
+pub const STATE_DIR: &str = "/var/lib/lampos-skills-state";
+
+/// Why the skill `name`, granted `permissions`, can't be turned off, or
+/// nothing: one granted a core operation ([`super::CORE_GRANTS`]: night
+/// sleep, onboarding, prepare-to-unplug) is part of the lamp itself. The
+/// one rule, for the app's page and for [`turn`].
+pub fn cannot_turn_off(name: &str, permissions: &super::Permissions) -> Option<String> {
+    (!permissions.core.is_empty())
+        .then(|| format!("{name} is part of how the lamp itself works, so it can't be turned off"))
+}
+
+/// The skill `name` in `skills` turned off or on for the app (#2815), as
+/// a `[stop]`'s off and on keep it: in `state`'s [`super::OFF_FILE`],
+/// written whole by the same writer ([`super::keep_names`]), which the
+/// running program reads again within 2 s and at a start, and which a
+/// round never touches. A core skill shipped off is turned on in its own
+/// `skill.toml`, as by hand, and kept in [`super::ON_FILE`] so a round
+/// keeps it on (#2585); turned off again, its name leaves `on`, its file
+/// is off again, and it is in `off`. A skill that is part of the lamp
+/// itself is refused ([`cannot_turn_off`]), and so is one that does not
+/// load. The folder's lock is waited for at most `wait`.
+pub fn turn(
+    skills: &Path,
+    state: &Path,
+    name: &str,
+    off: bool,
+    wait: Duration,
+) -> Result<String, String> {
+    if !skill_name_ok(name) {
+        return Err(format!(
+            "{name:?} is not a skill's name: 1 to 64 lowercase letters, digits and hyphens"
+        ));
+    }
+    let _held = locked_within(skills, wait)?;
+    let skill = load_each(skills)
+        .into_iter()
+        .find(|(folder, _)| folder.file_name() == Some(std::ffi::OsStr::new(name)))
+        .ok_or_else(|| format!("no skill {name} on this lamp"))?
+        .1
+        .map_err(|why| format!("{name} does not load, so it can't be turned off or on: {why}"))?;
+    let failed = |path: &Path, error: io::Error| format!("{}: {error}", path.display());
+    let off_file = state.join(super::OFF_FILE);
+    let on_file = state.join(super::ON_FILE);
+    let toml = skills.join(name).join("skill.toml");
+    let mut offs = super::read_names(&off_file).map_err(|error| failed(&off_file, error))?;
+    let mut ons = super::read_names(&on_file).map_err(|error| failed(&on_file, error))?;
+    let rewrite = |text: String| {
+        lamp_update::records::write_whole(&toml, text.as_bytes(), 0o644)
+            .map_err(|error| failed(&toml, error))
+    };
+    if off {
+        if let Some(why) = cannot_turn_off(name, &skill.permissions) {
+            return Err(why);
+        }
+        if ons.remove(name) {
+            if skill.enabled {
+                let text = fs::read_to_string(&toml).map_err(|error| failed(&toml, error))?;
+                rewrite(turned_off(&text))?;
+            }
+            super::keep_names(&on_file, &ons).map_err(|error| failed(&on_file, error))?;
+        }
+        if offs.insert(name.to_owned()) {
+            super::keep_names(&off_file, &offs).map_err(|error| failed(&off_file, error))?;
+        }
+        return Ok(format!("turned {name} off"));
+    }
+    if offs.remove(name) {
+        super::keep_names(&off_file, &offs).map_err(|error| failed(&off_file, error))?;
+    }
+    if !skill.enabled {
+        if skill.kind == SkillKind::Core && ons.insert(name.to_owned()) {
+            super::keep_names(&on_file, &ons).map_err(|error| failed(&on_file, error))?;
+        }
+        let text = fs::read_to_string(&toml).map_err(|error| failed(&toml, error))?;
+        rewrite(lamp_update::product_skills::turned_on(&text))?;
+    }
+    Ok(format!("turned {name} on"))
+}
+
+/// A `skill.toml` turned on by [`lamp_update::product_skills::turned_on`]
+/// turned off again: a top-level `enabled = true` made `false`, or, with
+/// none, install's off line above it, so the build's own file comes back.
+fn turned_off(toml: &str) -> String {
+    let mut tables = false;
+    let mut found = false;
+    let mut out = String::with_capacity(toml.len());
+    for line in toml.split_inclusive('\n') {
+        tables |= line.trim_start().starts_with('[');
+        if !tables
+            && !found
+            && let Some((key, value)) = line.split_once('=')
+            && key.trim() == "enabled"
+            && value.trim() == "true"
+        {
+            found = true;
+            out.push_str(&line.replacen("true", "false", 1));
+        } else {
+            out.push_str(line);
+        }
+    }
+    if found {
+        out
+    } else {
+        format!("{}{toml}", lamp_update::install::OFF_LINE)
+    }
+}
+
 /// [`remove`]'s steps, the folder's lock waited for at most `wait` (always,
 /// when `None`). Once the skill is renamed aside it is gone for the running
 /// program: `Some` says where it was set aside and why that was not then
@@ -1444,7 +1554,7 @@ pub const ASKED_MOST: u64 = 4_096;
 /// What the manage helper says of a line that is no request.
 pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
     {\"install\": {\"url\": URL, \"sha256\": HASH, \"name\": NAME, \"version\": VERSION}}, all but url optional, \
-    or {\"install_made\": SHA256}";
+    {\"install_made\": SHA256}, {\"off\": NAME} or {\"on\": NAME}";
 
 /// One request to the manage helper, read from `input`, done in `skills`,
 /// and answered on `output` in one line: `{"done": WHAT}` or
@@ -1463,7 +1573,10 @@ pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
 ///   Without a `store`, refused;
 /// - `{"install_made": SHA256}`, a skill made here by voice put on from the
 ///   voice's made-skills folder `made`, at its person's spoken yes
-///   ([`install_made`]).
+///   ([`install_made`]);
+/// - `{"off": NAME}` or `{"on": NAME}`, the app's off and on (#2815), kept
+///   in `state` (the running program's `--state-dir`) by [`turn`]: a skill
+///   that is part of the lamp itself is refused with why.
 ///
 /// Each waits at most `lock_wait` ([`ASKED_LOCK_WAIT`] on the lamp,
 /// shorter only in a test) for the folder, then refuses with [`BUSY`]
@@ -1471,6 +1584,7 @@ pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
 pub fn asked(
     skills: &Path,
     made: &Path,
+    state: &Path,
     lock_wait: Duration,
     store: Option<Store<'_>>,
     input: impl Read,
@@ -1494,6 +1608,16 @@ pub fn asked(
                 install_made(skills, made, sha256, lock_wait)
             }
             _ => Err("a made skill is asked for as {\"install_made\": SHA256}".to_owned()),
+        },
+        // The app's off and on (#2815), kept where a `[stop]`'s are.
+        _ if only("off").or(only("on")).is_some() => match (only("off"), only("on")) {
+            (Some(serde_json::Value::String(name)), None) => {
+                turn(skills, state, name, true, lock_wait)
+            }
+            (None, Some(serde_json::Value::String(name))) => {
+                turn(skills, state, name, false, lock_wait)
+            }
+            _ => Err(NOT_A_REQUEST.to_owned()),
         },
         // Renamed aside is removed: where it was set aside, and why it
         // was not then deleted, go to the journal alone.

@@ -110,6 +110,7 @@ lamp says so.
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
 | `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on` and `LAMP_SKILLS_STORE=on` ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the update channel's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without `LAMP_SKILLS_STORE`, V1's "not on this lamp" |
 | `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder), on a lamp installed before #2429 only after `lamp-update install` once; the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
+| `skills.off`, `skills.on` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` (#2815, "Turning a skill off and on" below): a skill turned off or on on the person's tap, asked of root's manage helper as a remove is, and kept in `lamp-skills`' `off` (a core skill shipped off turned on in its file and kept in `on`, #2585), so a round and a restart keep it; the reply is `skills.list`'s, read after it. A skill that is part of the lamp itself (a core grant), one that doesn't load, a name that is not a skill's and one not on the lamp are refused with why. Without the switch, V1's "not on this lamp" |
 | `guard.on`, `guard.off` | with `LAMP_GUARD_FROM_APP=on` (#2562, [guard-mode.md](guard-mode.md)): guard mode turned on or off from the owner's app, handed to `lamp-skills`' call socket (`/run/lampos-skills/call.sock`) as `{"op":"guard","turn":"on"\|"off","deadline_us":...}`, which takes it only with the same switch in its own unit and only from `lamp-cloud`'s unit (by `SO_PEERCRED` and cgroup); `lamp-cloud` turns nothing itself. `deadline_us` is the moment `lamp-cloud` sent the op plus the 2 s it waits (`watch::FROM_APP_WAIT`, shared), on the host's shared monotonic clock (`lamp_ipc::monotonic_us`): that socket answers one connection at a time, so an op read at or past it, behind a voice call, is let go ("guard.on let go: it waited N ms behind another call, past the app's 2 s") and nothing is turned, as the app was told; one with no `deadline_us`, from an older `lamp-cloud`, is let go too. `{"guard": "on"}` or `{"guard": "off"}`, or `lamp-skills`' reason (the privacy switch closed, its mark not showable, paused under the person's light, not installed), or "guard mode can't be reached on the lamp now". The faint mark still shows, and nothing is counted until the ring confirms it. Without the switch, V1's "not on this lamp" |
 | `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
@@ -408,12 +409,13 @@ then not to be believed. Tests: `app_contract.rs`'s
 `the_software_update_is_answered_from_lamp_updates_status`, and
 `lamp-update`'s `status` tests and `a_round_with_nothing_to_change_only_checks`.
 
-## The skills page (#1722, `skills.list`, `skills.remove`, `skills.install`)
+## The skills page (#1722, `skills.list`, `skills.remove`, `skills.off`, `skills.on`, `skills.install`)
 
 The Autonomous app's Lamp 2 skills page (mobile's design on #1722, the
 first builder's yes at 17:21 on 19 Oct): the lamp's skills as a phone's
-home screen of apps. Three of its four kinds are built: `skills.list`, read
-only, `skills.remove` ("Removing a skill" below) and, behind a switch of
+home screen of apps. All its kinds but `catalog` are built: `skills.list`, read
+only, `skills.remove` ("Removing a skill" below), `skills.off` and
+`skills.on` ("Turning a skill off and on" below) and, behind a switch of
 its own, `skills.install` ("Installing from the Skills Store" below);
 `catalog` comes with the Store's server, and is refused as a kind this lamp
 lacks until then.
@@ -447,7 +449,7 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   {"name": "dance", "title": "Dance",
    "description": "When someone asks the lamp to dance (…)",
    "group": "core", "version": "1.0.0",
-   "can_remove": false, "can_turn_off": false, "off": null,
+   "can_remove": false, "can_turn_off": true, "off": false,
    "loads": true, "why": null,
    "may_use": [
      {"name": "speak", "says": "speaks, or plays a short sound", "privacy": null},
@@ -456,7 +458,7 @@ build; not yet timed on a lamp). A folder that can't be read is answered
      {"name": "hearing", "says": "hears what is said to it", "privacy": "the privacy switch stops it"}]},
   {"name": "desk-tutor", "title": "Desk tutor", "description": "…",
    "group": "installed", "version": "1.0.0",
-   "can_remove": true, "can_turn_off": false, "off": null,
+   "can_remove": true, "can_turn_off": true, "off": true,
    "loads": true, "why": null,
    "may_use": [
      {"name": "speak", "says": "speaks, or plays a short sound", "privacy": null},
@@ -480,14 +482,18 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   core. Nothing writes `made: here` yet: the lamp skill creator will, when
   it makes one.
 - **`can_remove`**: false for a core skill, true for the others.
-- **`can_turn_off`**: the skill has a `[stop]` (#1886) and loads; the
-  app's switch on a core row. No product skill has one, so it is false for
-  every product skill; the wellbeing skills (#1685, installable) share one.
-- **`off`**: with a `[stop]`, true when the skill is turned off, as
-  `lamp-skills --state-dir` keeps it (#1886, `/var/lib/lampos-skills-state/off`,
-  a name a line), false when it is not; it may be snoozed until the morning
-  then, which `lamp-skills` keeps only in memory. Null without a `[stop]`,
-  or when the off file can't be read.
+- **`can_turn_off`**: the skill loads and is not part of the lamp itself
+  (#2815): true for every one but those granted a core operation (`core =
+  [...]` in `[permissions]`: Night sleep, Onboarding, Prepare to unplug,
+  `lamp_skills::package::cannot_turn_off`), which `skills.off` refuses.
+  The app's switch, on a core row and an added one alike.
+- **`off`**: when it can be turned off, true when it is off: in the off
+  file `lamp-skills --state-dir` keeps (#1886, #2815,
+  `/var/lib/lampos-skills-state/off`, a name a line), or shipped off
+  (`enabled = false`) and not turned on; false when it is not (it may be
+  snoozed until the morning then, which `lamp-skills` keeps only in
+  memory). Null when it can't be turned off, or when the off file can't
+  be read.
 - **`loads`** and **`why`**: whether the running `lamp-skills` loads it, and
   if not, why, in its words on one line (at most 300 bytes). A skill that
   doesn't load stays in its group, with its kind, version and permissions
@@ -579,7 +585,7 @@ should ever remove one is a separate decision, not taken.
   the skill go within 2 s of the reply.
 - **A refusal from the helper** is its own words on one line (at most 300
   bytes), and the skill stays whole; the journal says it in full
-  (`lamp-cloud: skills.remove NAME from the app refused: …`), and a remove
+  (`lamp-cloud: skills.remove from the app refused: …`), and a remove
   done says `lamp-cloud: skills.remove from the app: removed NAME: …`, and
   the helper's own journal line (`lamp-skills: asked: …`). A helper that
   can't be reached, or answers nothing a helper would, is `the lamp's
@@ -613,6 +619,44 @@ should ever remove one is a separate decision, not taken.
   and the next `lamp-update install` writes it back. Taking "core" from
   `lamp-update`'s list of shipped names instead would close it; not done
   here.
+
+### Turning a skill off and on (`skills.off`, `skills.on`)
+
+`{"name": "dance"}`, sent by the app when the person flips a skill's
+switch on the My skills page (#2815, for #2816). The person's own choice,
+kept as a `[stop]`'s off is, so an update round and a restart keep it.
+
+- **The same path as a remove.** `lamp-cloud` checks the name (`name must
+  be a skill's name: …`, not said back) and asks root's manage helper
+  `{"off": NAME}` or `{"on": NAME}` over its socket, waiting at most 5 s;
+  it writes nothing itself ([skills.md](skills.md), "The manage helper").
+  The reply is `skills.list`'s, read after it, the skill's `off` now true
+  or false.
+- **What is kept.** Off puts the name in `lamp-skills`' `off`
+  (`/var/lib/lampos-skills-state/off`, a name a line), which a round never
+  touches; the running `lamp-skills` reads it again within 2 s and stops
+  what the skill does by itself, as a `[stop]`'s off does (asked for by
+  name in a talk, its function still answers). On takes it out. A core
+  skill the build ships off is turned on in its `skill.toml` and kept in
+  `on` beside `off`, so a round keeps it on (#2585); turned off again its
+  file is the build's again, it leaves `on` and it is in `off`.
+- **Refused, with why.** A skill that is part of the lamp itself, granted
+  a core operation, `night-sleep is part of how the lamp itself works, so
+  it can't be turned off` (its row says `can_turn_off: false`); one that
+  doesn't load (`NAME does not load, so it can't be turned off or on: …`);
+  one not on the lamp (`no skill NAME on this lamp`). A helper that can't
+  be reached is `the lamp's skills can't be changed now`, as for a remove.
+  The journal says `lamp-cloud: skills.off from the app: turned NAME off`,
+  or its refusal.
+- **On a product lamp** the helper reaches `lamp-skills`' state folder
+  (`lampos`'s, 0700, as the daily journal requires) with one capability,
+  `CAP_DAC_OVERRIDE`, and a writable path in its unit, both from
+  `lamp-update install`'s units: a lamp whose helper unit is from before
+  #2815 fails closed, answering an off or
+  an on with the helper's `Permission denied` (or the folder's read-only
+  error) until `sudo lamp-update install …` once.
+- Without `LAMP_SKILLS_PAGE=on`, `not on this lamp: skills.off` (and
+  `skills.on`).
 
 ### Installing from the Skills Store (`skills.install`)
 
@@ -1194,7 +1238,7 @@ queued report, an exit note and a newer `by` never reaches the journal.
 The skills page (#1722): the reply's shape; a core skill never removable
 and an installed one removable; a skill made here in its own group; each
 permission's line and the privacy switch's; a skill that does not load, with
-why; `[stop]` and the off file; the bounds; a folder that can't be read; the
+why; the switch for a skill that loads and the off file; the bounds; a folder that can't be read; the
 switch's two gates and the refusal's exact words. `skills.remove`: a core
 skill refused and left whole; a made-here skill removed, the reply the page
 as it now is, and asked again, not there; an installed skill removed, and
@@ -1206,7 +1250,11 @@ removing nothing; and off, `not on this lamp: skills.remove`. Each remove
 goes through the manage helper's own code on a real Unix socket on a short
 `/tmp` path. `tests/it/skills_contract.rs` pins the fields as sent, and
 removes Desk tutor from a copy of `lampOS/skills/` through `Real`, the
-socket and the envelope.
+socket and the envelope. `skills.off` and `skills.on` (#2815): an installed
+skill turned off, the page as it now is with it off and the off file
+saying so, then on again; Night sleep, granted a core operation, offered
+no switch and refused with why; a name that is not a skill's
+(`a_skill_is_turned_off_and_on_and_one_of_the_lamp_itself_is_refused`).
 
 Changes after setup (#1959): the switch's two words; each kind refused as
 one this lamp lacks without it, `device.rename` included; each kind's line for
