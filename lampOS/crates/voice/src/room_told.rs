@@ -377,7 +377,8 @@ impl RoomTold {
     /// their talk let the room end a minute after the call, and from then on
     /// every line of it was answered). With [`Self::end_busy_sooner`] a line
     /// held only because the room is busy and it wasn't called
-    /// (`BUSY_UNCALLED`, `BUSY_NAMED_UNTURNED`) is the same: two people
+    /// (`BUSY_UNCALLED`, `BUSY_NAMED_UNTURNED`, and with
+    /// `LAMP_NAME_OR_FOLLOW_UP` `BUSY_TURNED_ALONE`) is the same: two people
     /// talking on keep the room busy, and its minute runs from their last
     /// line (the reviewer's P2 on #2372, the first builder at 04:36).
     pub fn judged(
@@ -395,7 +396,8 @@ impl RoomTold {
                 if why == crate::going_on_asks::NOT_THE_LAMPS
                     || self.ends_sooner
                         && (why == crate::attention::BUSY_UNCALLED
-                            || why == crate::attention::BUSY_NAMED_UNTURNED) =>
+                            || why == crate::attention::BUSY_NAMED_UNTURNED
+                            || why == crate::attention::BUSY_TURNED_ALONE) =>
             {
                 if self.talk_only {
                     self.held_by_policy = Some(request);
