@@ -92,12 +92,13 @@ def scene(trial, plan_out):
     steps, plan = [], []
     for j, (name, a) in enumerate(asks.items()):
         lines = [a['variants'][(trial - 1) % len(a['variants'])]] + ([a['then']] if a['then'] else [])
-        for mark, keys, wait, text in lines:
+        # The follow-up is an ask of its own, so its request is never counted as the first's split.
+        for (mark, keys, wait, text), ask_name in zip(lines, (name, f'{name}-then')):
             path, dur = make_wav(ASKER, text)
             label = re.sub(r'\s*\{[\d.]+\}\s*', ' ', text)
             first = first_word(text.split('{')[0]) if '{' in text else ''
             steps.append(f'wav|{path}|{wait}|{label}')
-            plan.append((mark, name, keys, first, '%.2f' % dur, f'wav: {label}'))
+            plan.append((mark, ask_name, keys, first, '%.2f' % dur, f'wav: {label}'))
         k = (trial - 1) * len(asks) + j
         if clips:
             path, meeting, start, end = clips[k % len(clips)]
