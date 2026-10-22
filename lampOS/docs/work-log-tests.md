@@ -6,6 +6,9 @@ Ready for lamp-voice: no; draft [#3023](https://github.com/autonomous-ai/lampOS/
 
 Part of #1569, branch `tests/1569-voice-full-run-events`, head
 `ebbb25cb1f836b5db9529116655e13c2d50359a4`, rebased onto `d7492ca743`.
+Evidence-only correction `141336d93` fixes the light-call bound description;
+its Rust tree is identical. The actual bound is upper median below25ms, not
+a maximum below100ms. Required PR CI is refreshed for that corrected head.
 The range-diff is unchanged from the measured e223 patch (`4aab7c749 = ebbb25cb1`).
 All seven assigned cases use fixture events/clocks or the existing conversation
 guard. All 142 original coordinator assertions and product timing bounds stay.
@@ -16,8 +19,9 @@ At the pinned e223 comparison base the unchanged x86 full library passed
 cases passing; its three child/scenario watchdog failures are retained and not
 called inherited. An unchanged comparison passed those cases. The required
 package run later passed the complete library 3,355/0/14 and binary unit 1/0,
-then failed integration 265/1: light-call maximum 136.91273 ms beyond its
-unchanged 100 ms assertion. Doc tests did not run after that failure.
+then failed integration 265/1: all 20 light calls completed, but their upper
+median 43.437335 ms exceeded the unchanged 25 ms assertion; maximum
+136.91273 ms is descriptive only. Doc tests did not run after that failure.
 Fmt, strict Voice Clippy and native workspace build pass at that base.
 The branch contains the full failed observations and compact raw controls.
 
