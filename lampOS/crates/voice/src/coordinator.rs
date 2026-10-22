@@ -186,6 +186,12 @@ fn playout_for(unit: PlayoutStart, second: Option<PlayoutStart>, role: &str) -> 
 /// leaves nearly nothing to wait).
 const WAIT_KEEPS_FOR_US: u64 = 1_000_000;
 const WAIT_DECIDES_BEFORE_US: u64 = 100_000;
+/// How long after its trigger talk over a busy room's own line stays
+/// pending for the lamp's name before it is let go (`busy_room`):
+/// `lamp-name` says a name only once it is over, and on lamp-52e6 on 22 Oct
+/// "Lamp, wait." was said 482 ms after it began, after its talk had been
+/// let go on its first blocks, and the say went on `spoken`.
+const OWN_LINE_NAME_LAG_US: u64 = 600_000;
 /// A sound quiet this long when its wait is over has ended: it is let go.
 /// In the detector's blocks of 10 ms, as its pause is counted.
 const WAIT_QUIET_BLOCKS: u16 = 30;
@@ -313,6 +319,11 @@ enum WhileOwnLineWaits {
     Theirs,
     /// Not yet: it stays pending.
     Wait,
+    /// Talk over a busy room's own line, sounding, with no name, stop word
+    /// or face in it yet: it stays pending, the line playing on, until
+    /// `lamp-name` has had time to say a name begun in it
+    /// ([`OWN_LINE_NAME_LAG_US`]). Never a wait that lets it go as `sounded`.
+    ForName,
     /// The line began to sound, or the sound's own deadline came, or it is
     /// a sound let go before going on ([`LetGoSound`]): let go as
     /// the room's, and the line goes on.
@@ -394,7 +405,9 @@ fn own_line_awaited(current: Option<&Reply>, on: bool, lamp_began: Option<u64>) 
 /// is a cut-in over the lamp's voice, judged as before, so words said over
 /// the lamp still stop it, unless the room was `busy` as the line began
 /// (`LAMP_OWN_LINE_OVER_TALK`): then talk with no name, no stop word and no
-/// face turned to the lamp in it is let go as the room's (`busy_room`), once
+/// face turned to the lamp in it is let go as the room's (`busy_room`), kept
+/// pending first for [`OWN_LINE_NAME_LAG_US`] after its trigger so a name
+/// `lamp-name` says late still counts ([`WhileOwnLineWaits::ForName`]), once
 /// the line has reached the speaker ([`Reply::reached_speaker`]: the speaker
 /// accepted some of it, so a line paused since still counts): audio queued,
 /// or handed over and not yet accepted, is no sounding line yet. While it
@@ -442,7 +455,22 @@ fn while_own_line_waits(
             && !theirs
             && !in_it(stop_began_us)
         {
-            WhileOwnLineWaits::LetGo("busy_room")
+            // The name or a stop word is said once it is over: until it
+            // could have been, the talk stays pending.
+            if at_us
+                < candidate
+                    .trigger_read_at_us
+                    .saturating_add(OWN_LINE_NAME_LAG_US)
+                    .min(
+                        candidate
+                            .decision_deadline_us
+                            .saturating_sub(WAIT_DECIDES_BEFORE_US),
+                    )
+            {
+                WhileOwnLineWaits::ForName
+            } else {
+                WhileOwnLineWaits::LetGo("busy_room")
+            }
         } else {
             WhileOwnLineWaits::AsBefore
         };
@@ -8376,6 +8404,9 @@ fn conversation_with_gate_inner(
                             )?;
                             continue;
                         }
+                        // Pending for the name, the line playing on: not
+                        // `own_kept_for`, which would let it go as `sounded`.
+                        WhileOwnLineWaits::ForName => continue,
                         WhileOwnLineWaits::Wait => {
                             if own_kept_for != Some(candidate.id) {
                                 own_kept_for = Some(candidate.id);

@@ -636,7 +636,12 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
     taken once per turn, before the line's own audio counts as an answer
     and clears `busy`;
   - the lamp's name wasn't heard as it began (`name_began_us`, up to
-    `CALL_BEFORE_US` before its trigger);
+    `CALL_BEFORE_US` before its trigger). `lamp-name` says a name only once
+    it is over, so the talk stays pending (`ForName`, the line playing on)
+    until `OWN_LINE_NAME_LAG_US` (600 ms) after its trigger, or 100 ms
+    before its decision deadline if sooner, and only then is let go. On
+    lamp-52e6 on 22 Oct "Lamp, wait." was said 482 ms after it began, its
+    talk had been let go on its first blocks, and the say went on `spoken`;
   - the eyes saw no face speaking through it turned to the lamp
     (`turned_speakers`, as above; the eyes' reader runs with either switch);
   - `lamp-name` heard no stop word as it began (`stop/heard`, only when
@@ -682,7 +687,11 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
   `talk_over_a_say_in_a_busy_room_is_let_go_with_the_switch`: the say ends
   `spoken` with the switch in a busy room, and `dropped` without it or in a
   room not busy. "Lamp, wait" over it is covered by the table only: the
-  loop harness hears no name.
+  loop harness hears no name. A name said late:
+  `a_name_said_late_in_talk_over_the_lamps_own_line_in_a_busy_room_still_stops_it`
+  (pending on its first blocks, the name or a stop word said 600 ms after
+  the talk began takes it as before, none by then lets it go, a short
+  hold's deadline lets it go first).
 
 **With `LAMP_ASKER_FIRST=on`, the person asked comes first while the
 answer is awaited** (`crates/voice/src/asker_first.rs`, #829; off unless
