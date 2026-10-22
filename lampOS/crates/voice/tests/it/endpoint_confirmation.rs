@@ -565,6 +565,87 @@ fn the_name_alone_still_waits_for_the_rest_with_a_lower_floor() {
     );
 }
 
+/// The Reviewer-lead's P3 on #2756: the lamp's-name sign may come late on
+/// the bus, after the pause after "Hey Lamp," has begun. `name_heard` takes
+/// the name's own start (`began_us`), so a late sign still finds the line
+/// it belongs to, sets the wait, and the wait counts the pause from its own
+/// start (`silence_count` runs on; `call_wait_blocks` is reached at 2 s of
+/// quiet, not 2 s after the sign). A sign at 150 ms (before the verdict is
+/// asked at 200) or at 300 ms (after the complete verdict, before the
+/// 400 ms commit) holds the line as one heard before the pause does, and
+/// the question after a 1 s pause ends at its own commit. The bound: a sign
+/// after the commit, at 450 ms, comes after the End, so `name_heard` finds
+/// no line and says so; "Hey Lamp," was already committed alone.
+#[test]
+fn a_late_name_sign_in_the_pause_still_holds_the_name_alone_with_a_lower_floor() {
+    fn called() -> Rig {
+        let script = Scripted::default();
+        let detector = TurnDetector::v1_baseline()
+            .with_end_silence(60)
+            .unwrap()
+            .with_call_wait(200)
+            .unwrap()
+            .with_confirmation(
+                Box::new(script.clone()),
+                ConfirmPolicy::responsive().with_floor_ms(500),
+            )
+            .unwrap();
+        Rig {
+            detector,
+            script,
+            sequence: 0,
+        }
+    }
+    for sign_at in [15, 30] {
+        let mut rig = called();
+        // "Hey Lamp," (six start blocks and 54); its sign not yet in.
+        rig.speak(54);
+        if sign_at < 20 {
+            rig.quiet(sign_at);
+            // Late, but carrying when the name began, with the line.
+            assert!(rig.detector.name_heard(1_010_000), "sign at {sign_at}0 ms");
+            rig.quiet(20 - sign_at);
+            rig.script.reply(rig.script.submissions()[0], 0.99);
+        } else {
+            rig.quiet(20);
+            rig.script.reply(rig.script.submissions()[0], 0.99);
+            rig.quiet(sign_at - 20);
+            assert!(rig.detector.name_heard(1_010_000), "sign at {sign_at}0 ms");
+        }
+        // The rest of a second's pause: not ended at the 400 ms commit.
+        rig.quiet(100 - sign_at.max(20));
+        // The question, ended on its own complete verdict at its commit.
+        rig.speak(100);
+        rig.quiet(20);
+        let asked = rig.script.submissions();
+        assert_eq!(asked.len(), 2, "sign at {sign_at}0 ms");
+        rig.script.reply(asked[1], 0.99);
+        assert_eq!(rig.quiet_until_end(200), Some(20), "sign at {sign_at}0 ms");
+        let decision = rig.decision();
+        assert_eq!(
+            (decision.basis, decision.silence_ms, decision.call_wait_ms),
+            ("model_complete", 400, None),
+            "sign at {sign_at}0 ms"
+        );
+        assert_eq!(decision.speech_ms, Some(1_660), "sign at {sign_at}0 ms");
+    }
+    // After the commit (450 ms): "Hey Lamp," already ended alone, and the
+    // sign finds no line to hold.
+    let mut rig = called();
+    rig.speak(54);
+    rig.quiet(20);
+    rig.script.reply(rig.script.submissions()[0], 0.99);
+    assert_eq!(rig.quiet_until_end(200), Some(20));
+    assert_eq!(
+        (rig.decision().basis, rig.decision().silence_ms),
+        ("model_complete", 400)
+    );
+    for _ in 0..5 {
+        assert!(matches!(rig.push(QUIET), Activity::Quiet));
+    }
+    assert!(!rig.detector.name_heard(1_010_000));
+}
+
 /// #2135 (`ConfirmPolicy::recheck_uncertain`, off unless set; kept to
 /// measure, the first builder on #1722 at 07:48): an uncertain verdict is
 /// asked again at once with the pause so far. A complete second ends the
