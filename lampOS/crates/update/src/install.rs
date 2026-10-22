@@ -192,6 +192,30 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lampos-setup-done.path",
         include_str!("../../../deploy/product/lampos-setup-done.path"),
     ),
+    // Root's helpers for what the app changes after setup, without a reset
+    // (#1959, #2853): the names' and zone's, and the Wi-Fi's with its boot
+    // half, which puts the old network back after a cut change. Each socket
+    // is enabled and its template never, as the skills' manage helper's.
+    (
+        "lamp-setup-change.socket",
+        include_str!("../../../deploy/product/lamp-setup-change.socket"),
+    ),
+    (
+        "lamp-setup-change@.service",
+        include_str!("../../../deploy/product/lamp-setup-change@.service"),
+    ),
+    (
+        "lamp-setup-wifi.socket",
+        include_str!("../../../deploy/product/lamp-setup-wifi.socket"),
+    ),
+    (
+        "lamp-setup-wifi@.service",
+        include_str!("../../../deploy/product/lamp-setup-wifi@.service"),
+    ),
+    (
+        "lamp-setup-wifi-restore.service",
+        include_str!("../../../deploy/product/lamp-setup-wifi-restore.service"),
+    ),
     // The waking face, from power-on until the voice takes the ring
     // (#1681); off unless `LAMP_WAKING_FACE=on`.
     (
@@ -771,6 +795,8 @@ fn enabled() -> Vec<String> {
             "lamp-update-back.timer",
             "lampos-setup-done.path",
             "lamp-skills-manage.socket",
+            "lamp-setup-change.socket",
+            "lamp-setup-wifi.socket",
         ])
         .map(str::to_owned)
         .collect()
@@ -2555,11 +2581,12 @@ mod tests {
         for (name, text) in PRODUCT.iter().filter(|(name, _)| linked(name)) {
             assert!(part(text).is_some(), "{name} starts through a current link");
         }
-        // Setup, its reset and the waking face share one binary, and so do
-        // the air and its bus clock, and the skills and their manage helper;
-        // every other service is a part.
+        // Setup, its reset, the waking face and setup's three helpers (the
+        // names', the Wi-Fi's and its boot restore) share one binary, and so
+        // do the air and its bus clock, and the skills and their manage
+        // helper; every other service is a part.
         let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
-        assert_eq!(parts.len(), services - 4, "every product service is a part");
+        assert_eq!(parts.len(), services - 7, "every product service is a part");
         for part in &parts {
             let name = part.binary.trim_start_matches("lamp-");
             assert_eq!(part.folder, format!("/opt/lampOS/{name}/"), "{part:?}");
@@ -2586,6 +2613,51 @@ mod tests {
             "{:?}",
             enabled()
         );
+    }
+
+    /// #2853: every unit in `deploy/product/` is in the install list, so a
+    /// lamp gets it with an update and no hand step, or is named here with
+    /// why it is not yet; every socket installed is enabled.
+    #[test]
+    fn every_deploy_product_unit_is_installed_or_named_left_out() {
+        // Left out until their lamp check: the keeper's restart helper
+        // (#2193) and the own keys' helper (#2094).
+        const LEFT_OUT: &[&str] = &[
+            "lamp-keeper-restart.socket",
+            "lamp-keeper-restart@.service",
+            "lamp-setup-keys.socket",
+            "lamp-setup-keys@.service",
+        ];
+        let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+        let listed: Vec<&str> = PRODUCT.iter().map(|(name, _)| *name).collect();
+        let mut missing = Vec::new();
+        for entry in fs::read_dir(&folder).unwrap() {
+            let name = entry.unwrap().file_name().to_string_lossy().into_owned();
+            let unit = [
+                ".service", ".socket", ".timer", ".target", ".slice", ".path",
+            ]
+            .iter()
+            .any(|suffix| name.ends_with(suffix));
+            if unit && !listed.contains(&name.as_str()) && !LEFT_OUT.contains(&name.as_str()) {
+                missing.push(name);
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "in deploy/product but not installed: {missing:?}"
+        );
+        for name in LEFT_OUT {
+            assert!(
+                !listed.contains(name),
+                "{name} is installed: take it off LEFT_OUT"
+            );
+        }
+        for socket in listed.iter().filter(|name| name.ends_with(".socket")) {
+            assert!(
+                enabled().iter().any(|name| name == socket),
+                "{socket} is not enabled"
+            );
+        }
     }
 
     /// #1815: the cloud is enabled with the lamp, so a Lamp 2 set up from

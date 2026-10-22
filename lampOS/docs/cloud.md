@@ -1134,8 +1134,8 @@ the Wi-Fi needs `LAMP_SETTINGS_WIFI=on` too (below).
   to nothing), `timezone must be a zone the lamp knows, such as
   Asia/Ho_Chi_Minh`, and `the lamp's settings are not running` when the
   socket is not there.
-- **Not yet:** the helper's two units are in `deploy/product/` but not in
-  `lamp-update`'s install list, so no lamp has them until their lamp check.
+- **Installed:** the helper's two units are in `lamp-update`'s install list
+  (`install::PRODUCT`, #2853): the socket enabled, the template never.
 
 ### The Wi-Fi (`wifi.set`)
 
