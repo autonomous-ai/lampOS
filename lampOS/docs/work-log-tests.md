@@ -1,5 +1,25 @@
 # Tests work log
 
+## 2026-10-22 22:47 +0700 — Skills add-on current rebase native gate recorded
+
+Ready for lamp-voice: no; #2693 awaits fresh Linux checks and reviewer/base guard.
+
+Pushed head `381e5ce54` is on `ee832b293`, with range-diff **=** against
+`67079627b`. Every authored addition/deletion and historical evidence blob is
+preserved; current upstream fixtures/docs remain. Quiet-say completion,
+proposal limits and original negative observations are unchanged.
+
+Native fmt, strict all-target Skills Clippy, full serial Skills **496/0/1**
+and workspace build pass. The package covers library **155/0**, binary unit
+**20/0**, `it` **290/0/1**, requested-audio integration **31/0** and docs **0/0**.
+Both changed add-on cases pass. [Receipts](verification/skills-addon-refresh-20261022/)
+keep exact commands, lossless raw output, the equal range and all **1,380**
+source hashes verified against the pushed commit. Those hashes cover crates
+and Cargo/toolchain inputs, not the complete repository or fixture closure.
+The only source diff-check findings remain the two historical blank-EOF
+warnings; neither is hidden or called fixed. No fresh Linux success, merge,
+new control execution, device action or local ARM64 build is claimed here.
+
 ## 2026-10-22 22:40 +0700 — Voice serial and consumer completion receipts
 
 Ready for lamp-voice: no; #3023 remains draft pending latest-parent and reviewer hold.

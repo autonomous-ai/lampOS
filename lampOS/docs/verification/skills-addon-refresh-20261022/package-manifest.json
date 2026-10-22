@@ -1,0 +1,108 @@
+{
+  "packaged_at": "2026-10-22 22:47 +0700",
+  "source_head": "381e5ce544c2514f5c93808313a05124024803e2",
+  "original_records": [
+    {
+      "path": "manifest.json",
+      "source": "/private/tmp/tests-skills-addon-refresh-20261022/manifest.json",
+      "kind": "unchanged JSON receipt",
+      "sha256": "5d81d92bae044b3a42c0979fcf732ab1c452f5d9b781300b65f2efce66fbc12e",
+      "bytes": 661
+    },
+    {
+      "path": "source.json",
+      "source": "/private/tmp/tests-skills-addon-refresh-20261022/source.json",
+      "kind": "unchanged JSON receipt",
+      "sha256": "f11280a92c6a962296dba491110a4333e5e416587d48f65bf274db0761a3c82e",
+      "bytes": 160254
+    },
+    {
+      "path": "results.json",
+      "source": "/private/tmp/tests-skills-addon-refresh-20261022/results.json",
+      "kind": "unchanged JSON receipt",
+      "sha256": "30fd87e0fe61ce5ec1d0e3274e3f142a62f67c7a52b86cafc1c49454437b4c82",
+      "bytes": 3077
+    },
+    {
+      "path": "fmt.txt.json",
+      "source": "/private/tmp/tests-skills-addon-refresh-20261022/fmt.txt",
+      "kind": "lossless UTF-8 JSON wrapper",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "clippy.txt.json",
+      "source": "/private/tmp/tests-skills-addon-refresh-20261022/clippy.txt",
+      "kind": "lossless UTF-8 JSON wrapper",
+      "sha256": "3efb7dcb909e3b679f0720b640847cdc7868a4938918d9df95c173f9a7003920",
+      "bytes": 2743
+    },
+    {
+      "path": "package-serial.txt.json",
+      "source": "/private/tmp/tests-skills-addon-refresh-20261022/package-serial.txt",
+      "kind": "lossless UTF-8 JSON wrapper",
+      "sha256": "d2e5a1bff389156ecef8b12c1a862f8dec4feb967963b71bc7be23481b0ffaf5",
+      "bytes": 93896
+    },
+    {
+      "path": "workspace-build.txt.json",
+      "source": "/private/tmp/tests-skills-addon-refresh-20261022/workspace-build.txt",
+      "kind": "lossless UTF-8 JSON wrapper",
+      "sha256": "c044ec97c58e1215596f4d263aa6e1c02a9cc889de7be79fcf7cf1f80b1f99a1",
+      "bytes": 5039
+    }
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "5c4b0f0e031683f443c0787032aa4e0c4393701f4afc5fa27de28d1bab6aad8f",
+      "bytes": 2905
+    },
+    {
+      "path": "clippy.txt.json",
+      "sha256": "03e825e4599e75d79ce5a22fc3cce879f812594dcde5afa54406a5c3cb97a435",
+      "bytes": 3007
+    },
+    {
+      "path": "fmt.txt.json",
+      "sha256": "f4a7d83a330f7dd15d80da12f557da16778ed2093a37826abbbfd679e26cb100",
+      "bytes": 222
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "5d81d92bae044b3a42c0979fcf732ab1c452f5d9b781300b65f2efce66fbc12e",
+      "bytes": 661
+    },
+    {
+      "path": "package-serial.txt.json",
+      "sha256": "2cc22f7b00414f499536f08e9ae26578806faf0e64775057bb2da43a5a625a7e",
+      "bytes": 95674
+    },
+    {
+      "path": "rebase.json",
+      "sha256": "8eb0ed8dd53c61069713a3ec597763d01719b53a336ec794983b523c26eac618",
+      "bytes": 1508
+    },
+    {
+      "path": "results.json",
+      "sha256": "30fd87e0fe61ce5ec1d0e3274e3f142a62f67c7a52b86cafc1c49454437b4c82",
+      "bytes": 3077
+    },
+    {
+      "path": "source-scope.json",
+      "sha256": "cea6f808a6cc41b62bd4cf8415d0ebc33ff638707212cc744a96a34d34ec8271",
+      "bytes": 1137
+    },
+    {
+      "path": "source.json",
+      "sha256": "f11280a92c6a962296dba491110a4333e5e416587d48f65bf274db0761a3c82e",
+      "bytes": 160254
+    },
+    {
+      "path": "workspace-build.txt.json",
+      "sha256": "cda761602762a085e7ba8fecdeb123ade1eb04b56e4838ebc5b719c093b7d18e",
+      "bytes": 5333
+    }
+  ],
+  "note": "Manifest excludes its own self-hash; raw wrappers recover the original bytes. No test or source changes were made while packaging."
+}

@@ -1,0 +1,19 @@
+{
+  "base": "381e5ce544c2514f5c93808313a05124024803e2",
+  "platform": "Darwin x86_64",
+  "cpu_count": 16,
+  "target": "/private/tmp/tests-codex-small-native-20261022",
+  "source_files": 1380,
+  "source_sha256": "665ced931829760949861b7d1e98a2b4e7c25791ebbc7a48f5d49911866099fc",
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-small-native-20261022",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "0"
+  },
+  "rust_test_threads": "unset in environment; explicit --test-threads=1",
+  "commands": []
+}

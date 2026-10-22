@@ -1,0 +1,33 @@
+{
+  "old_head": "67079627b915ac1760615fe3f369b66c119f1ab6",
+  "old_base": "c6d50559aa54fe58699da5ba1c0e2d79f1a70dd8",
+  "new_head": "381e5ce544c2514f5c93808313a05124024803e2",
+  "new_base": "ee832b293c279cc2786f10eb111c85e3521830cd",
+  "range_diff_command": [
+    "git",
+    "range-diff",
+    "--no-color",
+    "c6d50559aa54fe58699da5ba1c0e2d79f1a70dd8..67079627b915ac1760615fe3f369b66c119f1ab6",
+    "ee832b293c279cc2786f10eb111c85e3521830cd..381e5ce544c2514f5c93808313a05124024803e2"
+  ],
+  "range_diff_utf8": "1:  67079627b9 = 1:  381e5ce544 lampOS: wait for add-on trigger completion in skills fixtures\n",
+  "range_diff_sha256": "0cb225032d06a8a290cf14e2653066427e536d7daec96f5eda964ba25f6d873e",
+  "authored_added_deleted_lines_identical": true,
+  "all_21_historical_evidence_blobs_identical": true,
+  "changed_non_evidence_paths": [
+    "lampOS/crates/skills/tests/it/addon.rs",
+    "lampOS/crates/skills/tests/it/skills.rs",
+    "lampOS/docs/skills.md"
+  ],
+  "diff_check_command": [
+    "git",
+    "diff",
+    "--check",
+    "ee832b293c279cc2786f10eb111c85e3521830cd",
+    "381e5ce544c2514f5c93808313a05124024803e2"
+  ],
+  "diff_check_exit": 2,
+  "diff_check_utf8": "lampOS/docs/verification/skills-addon-completion-20261021/gates.txt:637: new blank line at EOF.\nlampOS/docs/verification/skills-addon-completion-20261021/timings.txt:131: new blank line at EOF.\n",
+  "diff_check_sha256": "e522b7f601d5c1c7299c7025d4096a4b9242a97bf6eea2f48ecfd606dcba15dc",
+  "same_two_warnings_on_old_head": true
+}

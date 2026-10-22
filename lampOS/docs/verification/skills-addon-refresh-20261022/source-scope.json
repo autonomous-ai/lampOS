@@ -1,0 +1,14 @@
+{
+  "head": "381e5ce544c2514f5c93808313a05124024803e2",
+  "base": "ee832b293c279cc2786f10eb111c85e3521830cd",
+  "source_files": 1380,
+  "aggregate_sha256": "665ced931829760949861b7d1e98a2b4e7c25791ebbc7a48f5d49911866099fc",
+  "aggregate_algorithm": "SHA-256 of json.dumps(path-to-SHA256 mapping, sort_keys=True).encode() using Python defaults",
+  "selection": "git ls-files --cached --others --exclude-standard -z lampOS/crates lampOS/Cargo.toml lampOS/Cargo.lock lampOS/rust-toolchain.toml",
+  "all_1380_manifest_entries_match_committed_head_bytes": true,
+  "source_unchanged": true,
+  "scope_limit": "Crate files and root Cargo/toolchain inputs only; not a whole-repository or complete dependency/fixture closure. Vendor trees, fixtures outside those paths, system tools and environment are not hashed.",
+  "mtime_refresh": "The runner refreshed those input mtimes and proved their bytes unchanged before Cargo; it checked the same mapping after every stage.",
+  "test_target": "native x86_64 macOS; no ARM64 build on the Mac",
+  "linux_ci": "Fresh Linux checks and reviewer/base guard remain pending qualification in this receipt."
+}

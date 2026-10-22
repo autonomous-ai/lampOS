@@ -1,0 +1,100 @@
+{
+  "base": "381e5ce544c2514f5c93808313a05124024803e2",
+  "platform": "Darwin x86_64",
+  "cpu_count": 16,
+  "target": "/private/tmp/tests-codex-small-native-20261022",
+  "source_files": 1380,
+  "source_sha256": "665ced931829760949861b7d1e98a2b4e7c25791ebbc7a48f5d49911866099fc",
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-small-native-20261022",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "0"
+  },
+  "rust_test_threads": "unset in environment; explicit --test-threads=1",
+  "commands": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started": "2026-10-22T15:34:19.274773+00:00",
+      "seconds": 11.580164682120085,
+      "exit": 0,
+      "watchdog_timeout": false,
+      "log": "fmt.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": []
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started": "2026-10-22T15:34:31.005326+00:00",
+      "seconds": 50.98038045084104,
+      "exit": 0,
+      "watchdog_timeout": false,
+      "log": "clippy.txt",
+      "sha256": "3efb7dcb909e3b679f0720b640847cdc7868a4938918d9df95c173f9a7003920",
+      "summaries": []
+    },
+    {
+      "name": "package-serial",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--offline",
+        "--",
+        "--test-threads=1"
+      ],
+      "started": "2026-10-22T15:35:22.143765+00:00",
+      "seconds": 313.7458430239931,
+      "exit": 0,
+      "watchdog_timeout": false,
+      "log": "package-serial.txt",
+      "sha256": "d2e5a1bff389156ecef8b12c1a862f8dec4feb967963b71bc7be23481b0ffaf5",
+      "summaries": [
+        "test result: ok. 155 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.34s",
+        "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.39s",
+        "test result: ok. 290 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 198.02s",
+        "test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.26s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "name": "workspace-build",
+      "argv": [
+        "cargo",
+        "build",
+        "--workspace",
+        "--offline"
+      ],
+      "started": "2026-10-22T15:40:36.039082+00:00",
+      "seconds": 182.32053573103622,
+      "exit": 0,
+      "watchdog_timeout": false,
+      "log": "workspace-build.txt",
+      "sha256": "c044ec97c58e1215596f4d263aa6e1c02a9cc889de7be79fcf7cf1f80b1f99a1",
+      "summaries": []
+    }
+  ],
+  "source_unchanged": true,
+  "status": "refresh-gates-completed"
+}
