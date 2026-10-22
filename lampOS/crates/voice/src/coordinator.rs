@@ -5362,6 +5362,12 @@ fn conversation_with_gate(
     } else {
         None
     };
+    // A skill typed in the app, handed over and told aloud as the voice's
+    // own (#2813, `LAMP_APP_MAKE_SKILL=on`): a socket for lamp-cloud.
+    #[cfg(not(test))]
+    if lifetime.continuous() {
+        crate::app_make::start_from_environment();
+    }
     // The level under which sound is not speech, which may follow the room;
     // the speech blocks of the turn in hand and of the moment before it,
     // until it is known whether they were for the lamp; and the turn they

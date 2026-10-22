@@ -1654,6 +1654,71 @@ Tests:
 - `task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out`.
 - `crates/skills/tests/it/made.rs`, with the real `lamp-skills`: checked, packed and kept 0700 by its SHA-256; a step it doesn't declare refused; at most five kept.
 
+#### Asked for in the app (#2813, off unless `LAMP_APP_MAKE_SKILL=on`)
+
+The same maker, from words typed in the app; put on only as above, by a
+spoken yes at the lamp (the lead's ruling on #1711; the first builder on
+#2602, 22 Oct 10:3x). It needs `LAMP_MAKE_SKILL=on` and the tasks part too
+(`crate::app_make`).
+
+1. `lamp-voice` listens at `LAMP_APP_MAKE_SOCKET`
+   (`/run/lampos-app-make/make.sock` unset), opened to
+   `LAMP_APP_MAKE_GROUP`, `lampos` unset, for `lamp-cloud`: one JSON line
+   in, one out. A group not known starts nothing (`app_make::group_named`).
+2. `{"make": {"words", "request_id"}}`: the words become the same brief
+   (`made_skill::brief`, at most 180 bytes) and are handed over at once on
+   a thread of their own (`agent_tasks::hand_over`: prepared and confirmed,
+   the voice's own two steps). Typing them in the app is the person's ask,
+   so there is no "shall I start it?". With `LAMP_TASKS_TARGET` unset, a
+   default target the tasks part hasn't is replaced by its one Claude
+   target, as the voice's own hand-over does (#1390); none or several is
+   `not_kept`, "the computer's agent isn't set up for the lamp yet", never
+   guessed, and a target set is kept as set. A confirm whose answer is lost,
+   or answered `uncertain` on any try (even if a later try was `busy` or
+   `timeout`), is kept as handed, for the task's news to settle; only a
+   definite refusal is `not_kept`. The answer, before the
+   hand-over:
+   `{"making": true}`, or `{"refused": WHY}` in plain words (no request id,
+   or one not 1 to 64 letters, digits, `-`, `_`, `.` or `:`; the words too
+   long; an id sent before, of the newest 100; or one still being made: one
+   at a time, and one "making" for 30 minutes is let go).
+3. **Told aloud.** The hand-over is never kept as typed
+   (`task_news::keep_typed`), so its news ("… Shall I put it on the
+   lamp?") is told by the spoken task news at a good moment, with someone
+   there, and the ask is dated only when heard whole (`made_skill::asked`).
+   A spoken yes within 120 s puts it on (`put_on_made_skill`, and the
+   manage helper's own check, #2874); a no, a typed yes or silence leaves
+   it off. What the tasks part settles is settled here too, by the task's
+   own store and id, on every read, whether or not its news was told (so a
+   task that failed before its ask learned it is settled too): work it
+   confirmed but never sent (`not_sent`), and an agent that failed or
+   stopped (by the task's own states), are `not_kept` with why; work it may have
+   sent (`uncertain`) stays `making`, so another may start after 30
+   minutes.
+4. `{"made": {"request_id"}}` (or `{}` for the newest): the app's own ask
+   only, never a skill made by voice. `state` is `making`, `kept` (not yet
+   asked about aloud), `asked` (the offer a spoken yes would put on now:
+   the newest, within its 120 s, `made_skill::waiting`, #2874), `on`,
+   `left_off` (asked, and no longer that offer) or `not_kept` with `why` (the maker's plain words,
+   or why it wasn't handed over; never the agent's text). Once kept:
+   `name`, `description`, `version`, `uses` (`light`, `body`, `topics`) and
+   `sha256`, what the lamp asks about. `{"state": "none"}` with no ask.
+5. Kept beside the made skills, root's, 0700: `app.json`, the newest five
+   asks, each its request id, when, its task and why it wasn't kept. Never
+   the words. Every writer (the socket's admission, the hand-over's thread,
+   the task news' reader, the texts' reader in the worker) holds one lock
+   (`.app.lock`, `flock`) across its read, decision and write, and writes
+   through a file of its own, so no ask is lost.
+
+Tests: `app_make::tests` (the states, a superseded offer left off, not kept
+and why, one at a time and bounded, the socket's lines, a make through the
+real socket to a tasks part not there, overlapping writers losing nothing,
+and the socket's group),
+`task_news::tests::an_apps_ask_is_settled_when_its_work_never_reached_or_failed`,
+and
+`agent_tasks::tests::a_hand_over_prepares_and_confirms_at_once`. The app's
+side, `skills.make` and `skills.made` in `lamp-cloud`, follows.
+
 ## V1's moves and emotions: what we take
 
 The owner, 08:00: "evaluate carefully to pick the good stuff from V1, not
