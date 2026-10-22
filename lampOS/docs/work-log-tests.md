@@ -1,5 +1,48 @@
 # Tests work log
 
+## 2026-10-22 09:02:19 +0700 — all ordered heads green; waiting for their reviewers
+
+Ready for lamp-voice: yes (#2625, #2637, #2647, #2653, #2693, #2776).
+
+#2625's restored pause observation is ready at `093e80cc1` on `a498ecc03`.
+[ARM64 #5483](https://github.com/autonomous-ai/lampOS/actions/runs/39707690802)
+passed **9,999 tests (one leaky), 63 skipped**, nextest 172.581 s, job
+12m50s, plus doc/own-harness tests. Clippy #1491 passed. Checkout `b1e306b`
+merges into `2d953bb5a`; the corrected pause case passed in 1.556 s.
+It keeps 500 ms after light-on as a no-text observation and the original
+separate 300 ms after the visit. The earlier coverage claim is corrected,
+with fresh 427-test local gates and source proof. Back to Reviewer-lead.
+
+All remaining PRs have green ARM64 and Clippy at their published heads:
+
+| PR | Head | ARM64 run | Passed / skipped | Review owner |
+| --- | --- | --- | --- | --- |
+| #2625 | `093e80cc1` | #5483 / 39707690802 | 9,999 / 63 | Reviewer-lead |
+| #2637 | `1690f4c27` | #5452 / 39702646763 | 9,961 / 63 | Reviewer-two |
+| #2647 | `83cdeab8c` | #5433 / 39699444617 | 9,924 / 63 | Reviewer-lead |
+| #2653 | `04e891cd8` | #5473 / 39705891483 | 9,994 / 63 | Reviewer-lead |
+| #2693 | `6bf167a6c` | #5478 / 39706613131 | 9,995 / 63 | Reviewer-two |
+| #2776 | `1a6635772` | #5475 / 39706058790 | 9,994 / 63 | Reviewer-two |
+
+Each pass total includes one leaky pass. Native checkout bases, test durations,
+local failures and limitations are recorded in the PR bodies and earlier
+entries. Reviewer-two resumed #2693's correction read at 09:00. The queue
+was checked through 09:00:45; no new correction request had arrived. All
+six task worktrees are clean, match their pushed branches, and have one-line
+commits without attribution. No local build or CI watcher remains running.
+
+#2703 and #2646 are merged; their range-diffs and native receipts are on
+#2602. The photo-faces constructor seam was already merged as #2628;
+#2647 contains the approved add-on serve seam, with no duplicate PR.
+#2776 completes the row 72 controlled reproduction: 3/3 StaleInput before,
+3/3 passes after, full serial Voice 3,364 passed with 14 existing ignored,
+and 12 Gemini clock tests. The original report's missing provider error
+still prevents claiming its original cause was identified.
+
+The ordered work is now waiting only on Reviewer-lead and Reviewer-two's
+reads/merges. Cloud confirmation remains outside this ordered handoff.
+No ARM64 build on the Mac, device access, or own PR merge was performed.
+
 ## 2026-10-22 08:50:59 +0700 — row 72 and Small green; Skills refreshed; guard pause P3 published
 
 Ready for lamp-voice: yes (#2776, #2653, #2637, #2647); no (#2625 while its new native gates run). #2693's refreshed native gates are green; its ready handoff is being posted.
