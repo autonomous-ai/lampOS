@@ -1047,6 +1047,9 @@ chime, never a beep:
   A physical mute, a new hand sleep or an error cancels it with the
   conversation, recording one refused `head_wake_cue` with
   `why: conversation_ended` if no decision has yet been made.
+  If no hum is configured, the wake marker is consumed without scheduling
+  or recording a cue, including when a button clears a saved hand sleep
+  after head touch has been disabled.
   It is not held to the tap's 30 s, since the person asked for it. The ring
   shows the listening face with it. The trace row is `head_wake_cue`, with `acquired_at_us` (the
   waking input), `plays` and `why`. No sound comes for a mute the restart
