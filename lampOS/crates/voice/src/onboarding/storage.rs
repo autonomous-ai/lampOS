@@ -472,13 +472,25 @@ fn atomic_progress(paths: &Paths, progress: &Progress) -> io::Result<()> {
         let _ = fs::remove_file(next);
         return result;
     }
-    for step in YES_STEPS {
-        let was_yes = before
+    consents(paths, progress, |step| {
+        before
             .as_ref()
-            .is_some_and(|before| kept_yes(before, step).is_some());
-        consent(paths, progress, step, !was_yes)?;
+            .is_none_or(|before| kept_yes(before, step).is_none())
+    })
+}
+
+/// [`consent`] for every step in [`YES_STEPS`], each handled before the
+/// first error is returned, so a room sounds file that fails to go never
+/// leaves the face expressions yes behind (the reviewer's P3 on #2947).
+fn consents(paths: &Paths, progress: &Progress, new: impl Fn(&str) -> bool) -> io::Result<()> {
+    let mut first = Ok(());
+    for step in YES_STEPS {
+        let result = consent(paths, progress, step, new(step));
+        if first.is_ok() {
+            first = result;
+        }
     }
-    Ok(())
+    first
 }
 
 /// The steps whose yes another part reads, each kept in a file named for it.
@@ -577,9 +589,7 @@ fn execute(paths: &Paths, operation: Operation) -> io::Result<Update> {
                 .transpose()?
                 .unwrap_or_default();
             progress.check()?;
-            for step in YES_STEPS {
-                consent(paths, &progress, step, false)?;
-            }
+            consents(paths, &progress, |_| false)?;
             update.progress = Some(progress);
             update.checkpoint = Some(None);
         }
@@ -821,6 +831,24 @@ mod tests {
         execute(&paths, Operation::Commit(Progress::default(), false)).unwrap();
         assert!(!paths.room_sounds.exists());
         assert!(!face.exists());
+    }
+
+    /// A room sounds file that fails to go (here a folder in its place)
+    /// still lets the face expressions yes go, and the error is returned.
+    #[test]
+    fn a_failed_room_sounds_removal_still_removes_the_face_expressions_yes() {
+        let files = Files::new();
+        let paths = files.paths();
+        let face = super::super::face_expressions_beside(&paths.room_sounds);
+        fs::create_dir_all(paths.room_sounds.join("in-the-way")).unwrap();
+        for operation in [
+            Operation::Commit(Progress::default(), false),
+            Operation::Initialize,
+        ] {
+            fs::write(&face, br#"{"face_expressions":"yes"}"#).unwrap();
+            assert!(execute(&paths, operation).is_err());
+            assert!(!face.exists());
+        }
     }
 
     #[test]
