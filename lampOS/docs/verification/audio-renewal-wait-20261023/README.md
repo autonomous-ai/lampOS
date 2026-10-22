@@ -88,11 +88,36 @@ not passing product tests.
 This proves the targeted protocol and retirement checks under acknowledged
 steps, not independent monitor scheduling or real elapsed renewal latency.
 Production code is unchanged. No lamp, microphone, speaker, cloud service,
-real grant, device install or release operation was used. The official PR's
-Linux ARM64 and strict Linux Clippy runs remain required before integration.
+real grant, device install or release operation was used. The official PR's Linux ARM64 and strict Linux Clippy jobs passed as recorded
+below. First's combined latest-base integration gate is separate.
 
 Self-read checked wrong-person data paths, stop/forget cleanup, off-switch
 behavior and census impact: the implementation changes only the existing
 `#[cfg(test)]` module and adds no runtime data path, switch, unit, topic or
 message field. Revoked authority, retained samples, capacity release and
 worker exit are asserted explicitly. First owns integration and device work.
+
+## Official PR #3105 gates and integration carry
+
+Both official attempt-1 workflows and their required jobs completed successfully
+on source `f913461d9`, checked as merge `1f6f1e868` into `398921996`.
+
+- [ARM64 39836153263](https://github.com/autonomous-ai/lampOS/actions/runs/39836153263/job/120024921759):
+  **6,925 passed / 0 failed / 31 skipped**, one existing leaky journal pass,
+  nextest **127.964 s**. The workflow selected **12 of 46 crates**: Voice,
+  its dependents and the three file readers. This is the PR selection, not a
+  full-workspace test claim. Both affected runtime fixtures passed at **0.009 s**.
+- [Strict Linux Clippy 39836153301](https://github.com/autonomous-ai/lampOS/actions/runs/39836153301/job/120024921893): pass.
+- `native.json` binds source/base/checked merge, workflow and job terminal
+  statuses, original logs and SHA-256, named test results and native watcher
+  exit 0. Nested Cargo result lines are retained without double-counting them
+  into nextest totals. Publication was correctly skipped on this PR.
+
+The updated integration head `001a3d714` has a clean merge-tree preflight,
+with identical patch and both changed files (`carry-preflight.json`).
+First carried the exact commit as `75dfd7cb1` in [train 7, #3106](https://github.com/autonomous-ai/lampOS/pull/3106);
+`train7-carry.json` records an equal range-diff and matching hashes. The train's
+combined gate is running; this receipt does not pre-claim its result.
+Fourteen's source read found no P1/P2. Its service-admission scope note is
+retained in the PR: this fixture calls the worker directly, while adjacent
+service tests cover `Service::offer`. Original failed CI causes remain unproven.

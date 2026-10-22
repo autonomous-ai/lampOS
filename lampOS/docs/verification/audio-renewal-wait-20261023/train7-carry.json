@@ -1,0 +1,11 @@
+{
+  "source": "f913461d92b7928e5361c51de357ca7aef4b1a8d",
+  "train_head": "75dfd7cb1da943e10608308c8875afd6f5e73fde",
+  "train_base": "001a3d714db50aaac36c68a524ec0844c17c2090",
+  "carried_commit": "75dfd7cb1da943e10608308c8875afd6f5e73fde",
+  "range_diff": "1:  f913461d9 = 1:  75dfd7cb1 lampOS: step the requested audio renewal refusal fixture\n",
+  "file_hashes": {
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "f60824e541dec2689e96451a363e3cc7466140501f4a71aeeb90bd25d1eb3cfb",
+    "lampOS/docs/requested-audio.md": "134707e3bd0c1613f6cc8d79dbf495287b01ddefe579b822ad5d9c027d7e5b40"
+  }
+}

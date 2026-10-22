@@ -1,3 +1,23 @@
+## Current checkpoint: 2026-10-23 02:17 +07, audio-renewal fix qualified and carried
+
+Ready for lamp-voice: yes (#3105; First's combined train #3106 is running)
+
+`f913461d9` passed the full Mac Voice gate **3,728 / 0 / 14 ignored**, fmt
+and strict Clippy. Official PR ARM64 **39836153263** passed **6,925 / 0 /
+31 skipped**, one leaky journal pass, across its 12 selected crates; Linux
+Clippy **39836153301** passed. Both runtime fixtures passed at 0.009 s.
+[Exact native receipts and unchanged carry](verification/audio-renewal-wait-20261023/README.md)
+bind the checked merge and retain the two original failures. First's
+`75dfd7cb1` carry has an equal range-diff; train #3106 is still running.
+
+While CI finishes, Second is reading #3107's delayed fresh-chat request,
+including permission revocation and configured refusal fallback. No full
+local gate, lamp operation or real release is claimed for that peer read.
+#2810's attended unplug and #1812's real signed run remain with First and
+the person at the lamp.
+
+---
+
 ## Current checkpoint: 2026-10-23 01:58 +07, audio-renewal fixture pushed
 
 Ready for lamp-voice: no (official PR ARM64, Linux Clippy and external read pending)
