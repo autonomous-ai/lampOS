@@ -5403,6 +5403,9 @@ fn conversation_with_gate_inner(
     *waking = controls
         .as_mut()
         .and_then(|controls| controls.take_woken(monotonic_us()))
+        // Consume the marker even with no hum configured, but keep no cue
+        // whose cancellation the outer conversation would otherwise record.
+        .filter(|_| head_cue.is_some())
         .map(|woken_us| (woken_us, monotonic_us()));
     let mut last_hum_us: Option<u64> = None;
     let mut took_over_turn: Option<u64> = None;

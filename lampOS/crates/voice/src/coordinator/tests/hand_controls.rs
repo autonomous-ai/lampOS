@@ -3105,6 +3105,49 @@ fn refused_wake(ran: &Ran, why: &str) -> u64 {
     cues[0]["at_us"].as_u64().unwrap()
 }
 
+/// A saved hand sleep can be cleared by the button with head touch off.
+/// Without any configured hum, consuming that wake creates no cue decision.
+#[test]
+fn a_wake_without_a_hum_leaves_no_cue_record() {
+    let mut controls_sender = None;
+    let (mut ran, began) = wake_run(0, Some(100_000), |at| {
+        let (mut controls, sender) = HandControls::with_test_sender("test-hand-clock", at).unwrap();
+        controls_sender = Some(sender);
+        assert!(!controls.head_touch());
+        controls.set_woken_for_test(at);
+        controls
+    });
+    assert!(
+        controls_sender.is_some(),
+        "the Controls channel stayed open"
+    );
+    no_wake_sound(&ran);
+    let capture = ran.capture.as_ref().expect("capture peer");
+    assert!(capture.granted_at_us.is_some(), "permission became ready");
+    assert!(capture.started_at_us.is_some(), "capture started");
+    assert!(!capture.frames.is_empty(), "capture produced fresh frames");
+    assert!(
+        (100_000..2_000_000).contains(&(ran.ended_us - began)),
+        "the loop ended before marker expiry: {} us, {}",
+        ran.ended_us - began,
+        ran.error
+    );
+    assert!(ran.trace.iter().any(|row| row["kind"] == "physical_mute"));
+    assert_eq!(
+        ran.controls.as_mut().unwrap().take_woken(ran.ended_us),
+        None,
+        "the marker was consumed before its two-second freshness expired"
+    );
+    assert!(
+        ran.trace.iter().all(|row| row["kind"] != "head_wake_cue"),
+        "an unconfigured hum has no decision row: {:?}",
+        ran.trace
+            .iter()
+            .filter(|row| row["kind"] == "head_wake_cue")
+            .collect::<Vec<_>>()
+    );
+}
+
 /// #2487: the first pass has no microphone permission. Keep the wake pending
 /// through the physical switch's real 60 ms stabilization, then require a
 /// retained frame from the new microphone generation before saying its hm.
