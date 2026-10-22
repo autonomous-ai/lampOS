@@ -2,7 +2,7 @@
 use super::{Sessions, Told, told_while_scope_holds};
 use crate::{
     memory_scope::{RequestKey, RequestScope, ScopeSnapshot},
-    remember::{DaysClient, FRESH_RETRY, SessionNote},
+    remember::{DaysClient, FRESH_RETRY, NoteCause, SessionNote},
 };
 use serde_json::{Value, json};
 use std::{
@@ -20,7 +20,101 @@ fn note(text: &str, complete: bool) -> SessionNote {
     SessionNote {
         text: text.into(),
         complete,
+        cause: (!complete).then_some(NoteCause::Refused),
     }
+}
+
+/// What the child's incomplete note says: never in the journal.
+const NOTE_WORDS: &str = "Their name is Pippa";
+const JOURNAL_CHILD: &str = "NOTE_CAUSE_TEST_CHILD";
+
+/// The journal's one "memory note incomplete" line for a note read that
+/// failed for `cause`, from this `test` run again in a child process (the
+/// line is its stderr); none in the child itself, which only asks.
+fn incomplete_line(test: &str, cause: NoteCause) -> Option<String> {
+    if std::env::var(JOURNAL_CHILD).ok().as_deref() == Some("1") {
+        let mut sessions = Sessions::default();
+        sessions.frozen(false, Instant::now(), |_| SessionNote {
+            text: NOTE_WORDS.into(),
+            complete: false,
+            cause: Some(cause),
+        });
+        return None;
+    }
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            &format!("second_provider::worker::memory_note_retries::{test}"),
+            "--nocapture",
+        ])
+        .env(JOURNAL_CHILD, "1")
+        .output()
+        .unwrap();
+    let (stdout, stderr) = (
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    assert!(
+        output.status.success() && stdout.contains("1 passed"),
+        "{stdout}\n{stderr}"
+    );
+    assert!(!stderr.contains(NOTE_WORDS), "{stderr}");
+    let lines: Vec<&str> = stderr
+        .lines()
+        .filter(|line| line.contains("memory note incomplete"))
+        .collect();
+    assert_eq!(lines.len(), 1, "{stderr}");
+    Some(lines[0].to_owned())
+}
+
+/// The line's existing words, then its cause's code, nothing else.
+fn says_cause(line: Option<String>, code: &str) {
+    if let Some(line) = line {
+        assert_eq!(
+            line,
+            format!(
+                "lamp-voice second: memory note incomplete; retry on the next turn; cause={code}"
+            )
+        );
+    }
+}
+
+/// #1693: the "memory note incomplete" line names why, as a code (lamp-4ace's
+/// r07/r08: 23 lines each, why unknown).
+#[test]
+fn the_incomplete_line_names_a_timeout() {
+    let test = "the_incomplete_line_names_a_timeout";
+    says_cause(incomplete_line(test, NoteCause::Timeout), "timeout");
+}
+
+#[test]
+fn the_incomplete_line_names_a_refusal() {
+    let test = "the_incomplete_line_names_a_refusal";
+    says_cause(incomplete_line(test, NoteCause::Refused), "refused");
+}
+
+#[test]
+fn the_incomplete_line_names_an_invalid_snapshot() {
+    let test = "the_incomplete_line_names_an_invalid_snapshot";
+    says_cause(incomplete_line(test, NoteCause::Invalid), "invalid");
+}
+
+#[test]
+fn the_incomplete_line_names_a_missing_own_snapshot() {
+    let test = "the_incomplete_line_names_a_missing_own_snapshot";
+    says_cause(incomplete_line(test, NoteCause::OwnMissing), "own_missing");
+}
+
+#[test]
+fn the_incomplete_line_names_a_busy_client() {
+    let test = "the_incomplete_line_names_a_busy_client";
+    says_cause(incomplete_line(test, NoteCause::Busy), "busy");
+}
+
+#[test]
+fn the_incomplete_line_names_no_client() {
+    let test = "the_incomplete_line_names_no_client";
+    says_cause(incomplete_line(test, NoteCause::NoClient), "no_client");
 }
 
 /// A memory slow once costs one turn its note, not the 30 s after it

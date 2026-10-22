@@ -6717,18 +6717,27 @@ impl Sessions {
 
     /// An attempt at the note begun at `at`, on line `line`, failed:
     /// incomplete, or `late` (not in by what was left of its 300 ms as the
-    /// line ended).
-    fn failed(&mut self, (at, line): (Instant, u64), late: bool) {
+    /// line ended), for `cause`, which the journal names by its code only
+    /// (#1693).
+    fn failed(
+        &mut self,
+        (at, line): (Instant, u64),
+        late: bool,
+        cause: crate::remember::NoteCause,
+    ) {
         self.failures = self.failures.saturating_add(1);
         self.failed_on = line;
         let what = if late { "late" } else { "incomplete" };
+        let cause = cause.code();
         if self.failures == 1 {
             self.note_retry_at = Some(at);
-            eprintln!("lamp-voice second: memory note {what}; retry on the next turn");
+            eprintln!(
+                "lamp-voice second: memory note {what}; retry on the next turn; cause={cause}"
+            );
         } else {
             self.note_retry_at = Some(at + crate::remember::FRESH_RETRY);
             eprintln!(
-                "lamp-voice second: memory note {what} again; retry after {} ms",
+                "lamp-voice second: memory note {what} again; retry after {} ms; cause={cause}",
                 crate::remember::FRESH_RETRY.as_millis()
             );
         }
@@ -6746,7 +6755,9 @@ impl Sessions {
             self.failures = 0;
             self.note_retry_at = None;
         } else if !counted {
-            self.failed(begun, false);
+            // A note made incomplete with no cause is one no store gave.
+            let cause = note.cause.unwrap_or(crate::remember::NoteCause::Invalid);
+            self.failed(begun, false, cause);
         }
         self.note = Some(note.text);
         self.note_stamp = None;
@@ -6818,9 +6829,10 @@ impl Sessions {
                 self.note_stamp = None;
             }
             Some((_, false, _, late, begun)) => {
-                self.asked = None;
+                let cause = self.asked.take().map(|asked| asked.cause());
                 if !late {
-                    self.failed(begun, false);
+                    let cause = cause.unwrap_or(crate::remember::NoteCause::Busy);
+                    self.failed(begun, false, cause);
                 }
             }
             Some(_) => self.asked = None,
@@ -6883,7 +6895,7 @@ impl Sessions {
                 // read goes on: a complete answer is the next turn's, and an
                 // incomplete one is asked again on the next line.
                 if !std::mem::replace(&mut asked.late, true) {
-                    self.failed(begun, true);
+                    self.failed(begun, true, crate::remember::NoteCause::Timeout);
                 }
                 if due || self.note.is_none() {
                     self.note = Some(unavailable());
@@ -7067,8 +7079,22 @@ impl NoteAsk {
                 .lock()
                 .ok()
                 .and_then(|mut read| read.take())
-                .unwrap_or_else(crate::remember::NoteRead::unavailable),
+                .unwrap_or_else(|| crate::remember::NoteRead::failed(Self::NO_READER)),
         )
+    }
+
+    /// Why a read with no answer is incomplete: no reader had it (its
+    /// thread could not be started).
+    const NO_READER: crate::remember::NoteCause = crate::remember::NoteCause::Busy;
+
+    /// Why its read, once done, is incomplete.
+    fn cause(&self) -> crate::remember::NoteCause {
+        self.answer
+            .lock()
+            .ok()
+            .and_then(|read| read.as_ref().map(crate::remember::NoteRead::cause))
+            .flatten()
+            .unwrap_or(Self::NO_READER)
     }
 }
 
@@ -12093,6 +12119,7 @@ mod tests {
                 crate::remember::SessionNote {
                     text: format!("note {session}"),
                     complete: true,
+                    cause: None,
                 }
             })
         };
@@ -12125,6 +12152,7 @@ mod tests {
                     crate::remember::SessionNote {
                         text: format!("note {session}"),
                         complete: true,
+                        cause: None,
                     }
                 });
             }
