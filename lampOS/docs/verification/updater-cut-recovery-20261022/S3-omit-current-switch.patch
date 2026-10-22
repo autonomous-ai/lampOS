@@ -1,0 +1,18 @@
+--- a/lampOS/crates/update/src/round.rs
++++ b/lampOS/crates/update/src/round.rs
+@@ -2310,13 +2310,8 @@
+         }
+         own::begin(self.records.folder(), &old, &file.sha256)
+             .map_err(|error| format!("self.json cannot be written: {error}"))?;
+-        replace_link(&link, &file.sha256).map_err(|error| {
+-            format!(
+-                "{} cannot be pointed at {}: {error}",
+-                own::CURRENT,
+-                file.sha256
+-            )
+-        })?;
++        // Mutation control: leave current on the old build.
++
+         self.say(&format!(
+             "lamp-update switches to its build {}; it must confirm itself within {} min",
+             &file.sha256[..12],

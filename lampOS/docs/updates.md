@@ -786,6 +786,28 @@ does. It does not enable or start the recovery timer. With the switch on in
 while the timer is not armed (`waits`, `cloud.md`, "Health and crash
 reports").
 
+**Restarting after a partial self-switch** (#2810). The host fixtures in
+`tests/round/self_cuts.rs` stop at five logical persisted prefixes: the
+candidate is synced and recorded, `self.json` is saved before the link
+moves, `current` names the new updater, confirmation has removed
+`self.json`, and put-back is interrupted before or after restoring the old
+link. Round and confirmation calls construct a fresh `World`; recovery
+reads the files left by the prior operation. Distinct old and new shell
+fixtures arrive through the signed install/build path; the tests execute
+the selected updater and the unchanged fixed fallback, check the
+pending/refused records, and finish the next round. They also keep parts
+updates working with self-update off.
+The cuts use existing journal callbacks and occupied atomic-file names;
+they do not add a production hook or wait for a real timer. A separate
+put-back subcase reconstructs the prefix after the new build's refusal is
+persisted but before `self.json` is removed: it lets the real put-back
+finish, then restores only the exact pending bytes captured beforehand.
+Retry must clear that record without duplicating the refusal or changing
+the selected old updater. This subcase does not interrupt execution at that
+prefix. These are logical filesystem-prefix checks, not physical power-loss
+or fsync durability proof, and the stubs do not exercise the daemon's `exec`
+handover.
+
 **A good build cut off from the channel is put back.** The confirmation
 needs the channel: a new lamp-update that cannot reach it for the 10 min of
 the deadline, a network down or a router restarting, is put back and its
@@ -1243,6 +1265,14 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   unchanged while recovery is unavailable. Off, unchanged and refused
   candidates do not query recovery. `world.rs` tests distinguish a running,
   persistently enabled timer from inactive or runtime-only enablement.
+- Self-switch cut fixtures (#2810, `tests/round/self_cuts.rs`): six tests
+  cover the five prefixes described above and the off switch. Recovery
+  completes through confirmation or put-back and a subsequent round;
+  interrupted put-back is retried without losing the runnable current
+  updater or changing the fixed fallback. A separately reconstructed
+  post-refusal prefix clears stale pending state without a duplicate
+  refusal. These are logical-prefix checks, not a lamp-storage power-cut
+  result.
 - The real HTTPS path, once, by hand (the ignored test
   `a_release_file_from_github`): 646 bytes of this repository's
   `models/ambernet` release, through GitHub's redirect to

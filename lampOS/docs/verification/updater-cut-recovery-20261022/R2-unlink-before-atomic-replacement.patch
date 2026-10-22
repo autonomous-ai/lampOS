@@ -1,0 +1,12 @@
+--- a/lampOS/crates/update/src/records.rs
++++ b/lampOS/crates/update/src/records.rs
+@@ -208,6 +208,9 @@
+ pub fn replace_link(path: &Path, target: &str) -> io::Result<()> {
+     if fs::read_link(path).is_ok_and(|now| now == Path::new(target)) {
+         return Ok(());
++    }
++    if fs::symlink_metadata(path).is_ok() {
++        fs::remove_file(path)?;
+     }
+     let beside = path.with_file_name(".current.lamp-update");
+     if fs::symlink_metadata(&beside).is_ok() {

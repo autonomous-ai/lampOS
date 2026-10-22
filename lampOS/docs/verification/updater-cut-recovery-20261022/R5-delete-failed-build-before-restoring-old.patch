@@ -1,0 +1,11 @@
+--- a/lampOS/crates/update/src/own.rs
++++ b/lampOS/crates/update/src/own.rs
+@@ -437,6 +437,8 @@
+         return Err(format!("{PENDING} does not name two builds"));
+     }
+     if link_names(root, &pending.new) {
++        fs::remove_file(on_root(root, CURRENT).join(BINARY))
++            .map_err(|error| format!("{CURRENT}: {error}"))?;
+         replace_link(&on_root(root, CURRENT), &pending.old)
+             .map_err(|error| format!("{CURRENT}: {error}"))?;
+     }

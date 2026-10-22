@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "issue": "https://github.com/autonomous-ai/lampOS/issues/2810",
+  "integration_base": "f71a62f559619c996d6a85f253ed88e367549722",
+  "qualification": {
+    "focused_baseline": "passed-6",
+    "mutation_controls": "12-intended-behavioral-failures",
+    "restored_baseline": "passed-6",
+    "full_updater_gate": "pending",
+    "arm64_ci": "pending",
+    "issue_acceptance": "under-review-not-claimed-complete"
+  },
+  "historical_proposal": {
+    "file": "proposed-manifest.json",
+    "sha256": "81c71a602450e70ebbde21b936a4382beb845ead0c199b175be9d1e62e2ca3f3",
+    "status_context": "byte-identical preparation artifact; its not-run statuses describe preparation time, not the executions recorded in controls.json"
+  },
+  "observed_execution": {
+    "baseline": "baseline.json",
+    "controls": "controls.json"
+  },
+  "selected_current_failure_scope": "R1-R5 remove or disconnect the selected current/lamp-update entrypoint. Other old/new build copies and the fixed fallback survive as described per control; no claim that all updater copies are absent.",
+  "limits": [
+    "Logical persisted-prefix recovery, not physical power-loss or fsync durability proof.",
+    "The post-refusal/pre-cleanup prefix is reconstructed from real put-back output and exact captured pending bytes; no actual cut is made at that point.",
+    "Known immediate shell stubs prove selected bytes, mode and execution; no daemon exec handover, real systemd timer, device test or network acceptance is exercised.",
+    "Full updater gate and exact-head ARM64 qualification are outside this focused receipt and remain pending."
+  ],
+  "patches": [
+    {
+      "file": "R1-prune-old-before-handover.patch",
+      "sha256": "4266171f0dd0c61ae01e6c8c9cd7f011743a07e66f196f2ca88dce6e620bedcd",
+      "control": "R1-prune-old-before-handover"
+    },
+    {
+      "file": "R2-unlink-before-atomic-replacement.patch",
+      "sha256": "892f59143342da1cc0813afd3588ebc1a03eef48245feb1dbfc527051dd886a5",
+      "control": "R2-unlink-before-atomic-replacement"
+    },
+    {
+      "file": "R3-select-renamed-away-temporary-build.patch",
+      "sha256": "7bd1cca9155066debfdf6281a4bd594245859939ae809d212b70564488daac19",
+      "control": "R3-select-renamed-away-temporary-build"
+    },
+    {
+      "file": "R4-remove-selected-build-during-confirmation.patch",
+      "sha256": "b5e9ca8c2e445eb4d100610a8cd5bd2bf2d68bc61971a3677b945966db6bc4e3",
+      "control": "R4-remove-selected-build-during-confirmation"
+    },
+    {
+      "file": "R5-delete-failed-build-before-restoring-old.patch",
+      "sha256": "5f01bcecefc497edb0af42ba49d65e4363d1a602976258441d90898ec46e0d80",
+      "control": "R5-delete-failed-build-before-restoring-old"
+    },
+    {
+      "file": "S1-omit-final-candidate-rename.patch",
+      "sha256": "71b8acf380e991ea8d20e3a5f686b56c432b7fecfdb238e2241d22cfe732dbae",
+      "control": "S1-omit-final-candidate-rename"
+    },
+    {
+      "file": "S2-omit-pending-record.patch",
+      "sha256": "422412060a91f7d1ec7d1c83d28865fa0684d2cff5ce6f9e649ba7a96c337325",
+      "control": "S2-omit-pending-record"
+    },
+    {
+      "file": "S3-omit-current-switch.patch",
+      "sha256": "19e79d4db2cbb364946cb858a40be1b75eceb1782c56d44cfad5c7dbe50e3ea8",
+      "control": "S3-omit-current-switch"
+    },
+    {
+      "file": "S4-retain-pending-after-confirmation.patch",
+      "sha256": "a0537e7137d6c4fdd5da998c7b44619aec4a2431e0740677b6f63ac076b029f1",
+      "control": "S4-retain-pending-after-confirmation"
+    },
+    {
+      "file": "S5-clear-pending-before-refusal.patch",
+      "sha256": "7051aca302b633b4c58a3a22bf4ebac461e18aec9a0d9a10b9f5b4ed5d58f410",
+      "control": "S5-clear-pending-before-refusal"
+    },
+    {
+      "file": "O1-bypass-self-opt-in.patch",
+      "sha256": "6df69ed779e8a856d9370769e3077ea1a05cbf9835654a60e913ecb496fec942",
+      "control": "O1-bypass-self-opt-in"
+    },
+    {
+      "file": "S6-skip-stale-pending-cleanup-after-refusal.patch",
+      "sha256": "2112b009cde4972e40d06e02d9506016af4bc9eec5535e2bea210e6d4906259e",
+      "control": "S6-skip-stale-pending-cleanup-after-refusal"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+--- a/lampOS/crates/update/src/own.rs
++++ b/lampOS/crates/update/src/own.rs
+@@ -340,6 +340,7 @@
+     if pending_now(&folder)?.is_none_or(|now| now.new != pending.new) {
+         return Ok(Confirm::NotOwn);
+     }
++    fs::remove_file(on_root(&config.root, CURRENT).join(BINARY)).map_err(failed)?;
+     end(&folder).map_err(failed)?;
+     records.log(
+         "self-confirmed",

@@ -31,6 +31,8 @@ use std::{
     time::Duration,
 };
 
+#[path = "round/self_cuts.rs"]
+mod self_cuts;
 #[path = "round/self_recovery.rs"]
 mod self_recovery;
 
@@ -548,6 +550,12 @@ impl Lamp {
     }
 
     fn round(&mut self) -> Outcome {
+        self.round_observing(&mut |_| {})
+    }
+
+    /// Observe the existing journal callback, including a logical stop at
+    /// a persisted self-update prefix. Every call constructs a fresh World.
+    fn round_observing(&mut self, observe: &mut dyn FnMut(&str)) -> Outcome {
         let _rounding = rounding();
         let clock = FakeClock(Rc::clone(&self.now));
         let talking = self.talking.take().unwrap_or_else(|| Box::new(|_| false));
@@ -558,7 +566,10 @@ impl Lamp {
         };
         let disk = FakeDisk(self.free);
         let said = &mut self.said;
-        let mut say = |line: &str| said.push(line.to_owned());
+        let mut say = |line: &str| {
+            said.push(line.to_owned());
+            observe(line);
+        };
         let phases = &mut self.phases;
         let mut phase = |now: &'static str| phases.push(now);
         let mut world = World {
@@ -2316,6 +2327,11 @@ impl Lamp {
     /// A blank lamp given build 1 by `lamp-update install`, every part
     /// running through its `current` link.
     fn installed() -> Self {
+        Self::installed_with_updater("lamp-update 1")
+    }
+
+    /// The same signed install, with an executable updater for cut tests.
+    fn installed_with_updater(updater: &str) -> Self {
         let mut lamp = Lamp::new();
         for folder in ["etc", "opt"] {
             fs::remove_dir_all(lamp.root.join(folder)).unwrap();
@@ -2333,7 +2349,7 @@ impl Lamp {
         )
         .unwrap();
         fs::write(lamp.root.join("etc/timezone"), "Asia/Ho_Chi_Minh\n").unwrap();
-        product_build(&mut lamp, 1);
+        product_build_with_updater(&mut lamp, 1, updater);
         let config = lamp_update::install::Install {
             root: lamp.root.clone(),
             channel: "lamp-voice".into(),

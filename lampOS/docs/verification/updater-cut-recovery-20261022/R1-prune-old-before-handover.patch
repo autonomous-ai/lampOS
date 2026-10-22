@@ -1,0 +1,11 @@
+--- a/lampOS/crates/update/src/round.rs
++++ b/lampOS/crates/update/src/round.rs
+@@ -2303,6 +2303,8 @@
+             self.records
+                 .save_state(&state)
+                 .map_err(|error| format!("the state cannot be written: {error}"))?;
++            fs::remove_dir_all(self.config.on(&unit::folder(own::FOLDER, &old)))
++                .map_err(|error| error.to_string())?;
+             self.say(&format!(
+                 "installed {new_folder} beside {}",
+                 unit::folder(own::FOLDER, &old)
