@@ -7449,3 +7449,37 @@ Writer core is already delivered in main; runtime activation stays separate.
 this corrected name/privacy source. No lamp access, device install, model
 spend or quality-row increase; the row stays 0.40 for First's decision.
 Queue status/review requests use #3126 after #2602 hit its comment limit.
+
+## 2026-10-23 06:07 +07: continuation native gates verified, review held
+
+Ready for lamp-voice: no. #3064 remains draft for the exact-head P2
+re-read and the policy decision on visible unaligned or unmatched faces.
+The conservative source still denies those states; a geometric track alone
+does not establish identity. Name and Photo activation remain separate.
+
+Both required jobs for authored head `470b4ac8c` succeeded: native ARM64
+39867711888 and strict Linux clippy 39867711870. Both executed merge
+`955637fa8`, whose parents are base `d4c6dbeeb` and that authored head; its
+tree is `ab27a26cc`. The author's locally checked tree remains `ae32b368c`.
+A unique-result recount of the native nextest log found 10,877 passed,
+0 failed and 67 skipped, including one leaky pass in
+`same_voice::tests::each_line_the_check_says_is_said_to_its_journal`.
+Four doc tests and 12 own-harness tests passed separately. All seven
+continuation controls, the 15-case actual Engine short-line control, the
+strict-two source control, five typed producer controls and the unchanged
+Linux `/dev/full` fixture have unique PASS lines. The explicit Mac fixture
+exclusion is therefore covered on this native checkout; the earlier Mac
+failure remains recorded.
+
+Artifact 12465751680 is named for the authored head. Its downloaded archive
+SHA256 is `4ebd9592f8c561e9eab4240bcf265a84fb7138ece3d7f569c4ddc08acc852660`,
+matching GitHub metadata, and all 49 SHA256SUMS members match their bytes.
+Raw logs, metadata, provenance, recount and individual control lines are in
+`/private/tmp/fourth-speaker-foundation-ci-20261023/final-470b4ac8c/`.
+The PR body and Queue #3126 carry these counts and the remaining hold.
+
+The original development branch is clean and was fast-forwarded to fetched
+main `ba3ff1e61`; its local builder instructions match. Name's staged
+pre-commit gate preparation continues while policy/review is outstanding;
+no actual Name or Photo product branch has been changed by these previews.
+No lamp, model, product acceptance or score increase is claimed.
