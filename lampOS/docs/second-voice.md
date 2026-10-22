@@ -1125,8 +1125,12 @@ order is kept. A written turn is the same from the chat on.
     the words written for "Lamp" on lamp-4ace, `HEARD_FOR_THE_NAME`); and lamp-name's near hearing reached 0.5
     (`NAME_NEAR_LEAST`) from 0.3 s before the line's first sound to 1.3 s
     after (`Heeding::near_name`). A word of the shape alone
-    (`LikeTheName::Shape`) also needs a face turned to the lamp in the
-    eyes' newest look (`Heeding::turned_to_the_lamp`): people's names
+    (`LikeTheName::Shape`) also needs a face turned to the lamp
+    (`Heeding::turned_to_the_lamp`): with the eyes reading speaking
+    (`LAMP_EYES_SPEAKING`), one turned to it and seen speaking the line,
+    as `LAMP_TURNED_SPEAKING` reads one, so the listener's face never
+    carries a colleague's "Leon, can you…"; without, the eyes' newest
+    look (reviewer-three's P3 on 1600b0a69). People's names
     have the shape ("Leon", "Lynne", "Laine", "Lon", "Lem"), and a list of
     them always trails (reviewer-three's P2 on 194accd24); the words
     written for "Lamp" need the near hearing alone. A line that begins
