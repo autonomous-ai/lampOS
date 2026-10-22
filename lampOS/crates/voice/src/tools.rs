@@ -1542,6 +1542,14 @@ fn run_call_with_scope(
                 }
                 _ => told,
             };
+            // A face saved: the face cache has not answered for it yet, so a
+            // line begun before it does may look later for its keeper (#2807).
+            if call.name == crate::known_faces::REMEMBER
+                && told.0["ok"] == true
+                && let Some(lease) = lease
+            {
+                lease.face_remembered();
+            }
             // A face saved in a line of the room's: the caller's own lines
             // before it follow them (`LAMP_MEMORY_FOLLOWS_FACE`, #2176).
             if call.name == crate::known_faces::REMEMBER

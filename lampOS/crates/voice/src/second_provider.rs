@@ -1939,8 +1939,10 @@ impl Engine {
         self.memory.as_ref().map(|(worker, cache)| {
             // A heard line with the camera allowed, its turn told and kept
             // by its own scope (`LAMP_SECOND_SCOPED_CONTEXT`): admitted as
-            // the room's only because no known face was cached yet, its
-            // keeper is decided at its end (#2807, `ScopeLease::face_at_end`).
+            // the room's before the face cache's first answer (after a
+            // restart, a privacy change or a face remembered), its keeper is
+            // decided at its end (#2807, `ScopeLease::face_at_end`); a warm
+            // cache that named nobody arms nothing (El's P2 on #3108).
             let late = heard && self.memory_camera_allowed && self.scopes_context();
             let scope = if heard && self.memory_camera_allowed {
                 let now = std::time::Instant::now();
@@ -4201,6 +4203,18 @@ async fn spoken(
     }
     let finishing = Instant::now();
     let times = Times::new(finishing);
+    // A line admitted as the room's only because no known face was cached
+    // yet (#2807): the known face the cache names as of its end is looked
+    // for from the end itself, not once the words are back, which on a lamp
+    // is often past the end plus `KEEPER_WAIT` (reviewer-three's P2 on
+    // #3108). Who was seen speaking it is checked once the words are in.
+    let late_face = scope
+        .as_ref()
+        .filter(|scope| scope.looks_later())
+        .map(|lease| {
+            let ends = lease.clone();
+            tokio::task::spawn_blocking(move || ends.face_at_end(finishing))
+        });
     let finish = listener.finish(request);
     tokio::pin!(finish);
     let finished = loop {
@@ -4305,21 +4319,17 @@ async fn spoken(
             }
         }
     }
-    // A line admitted as the room's only because no known face was cached
-    // yet (#2807): its keeper is the known face the cache names as of its
-    // end, waiting at most `KEEPER_WAIT` past it, and only if no other face
-    // was seen speaking it (the same evidence and rule as the guard above,
-    // Eighth's P1 on #3108). Decided beside the turn, never delaying it, and
-    // recorded for the keep (`ScopeLease::keeper_within`).
-    if let Some(lease) = scope.as_ref().filter(|scope| scope.looks_later()) {
+    // A late look's keeper (#2807): the known face named by the line's end
+    // (looked for from `finishing`, above), waiting at most `KEEPER_WAIT`
+    // past it, and only if no other face was seen speaking it (the same
+    // evidence and rule as the guard above, Eighth's P1 on #3108). Decided
+    // beside the turn, never delaying it, and recorded for the keep
+    // (`ScopeLease::keeper_within`).
+    if let (Some(lease), Some(late_face)) = (scope.as_ref(), late_face) {
         let lease = lease.clone();
         let speaking = shared.speaking.clone();
         tokio::spawn(async move {
-            let ends = lease.clone();
-            let found = tokio::task::spawn_blocking(move || ends.face_at_end(finishing))
-                .await
-                .ok()
-                .flatten();
+            let found = late_face.await.ok().flatten();
             let keeper = match (found, speaking) {
                 (Some(person), Some((eyes, known))) => {
                     let speakers = eyes.speakers(begun, finishing);
