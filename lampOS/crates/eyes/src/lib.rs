@@ -41,6 +41,7 @@ pub mod permit;
 pub mod photo;
 pub mod picture;
 pub mod reopen;
+pub mod repair_writer;
 pub mod seems;
 pub mod seems_log;
 pub mod sight;
