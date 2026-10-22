@@ -1373,9 +1373,8 @@ order is kept. A written turn is the same from the chat on.
   asked about an open thread (`LAMP_MEMORY_THREADS`). Quiet is counted from
   the last time a turn was told, so a long conversation, or one turn's
   several asks (its prepared chat, then its rounds), never reopens it. The
-  ask is the one a person change already makes: synchronous as the turn's
-  chat is built, within the note's 300 ms; the old session is closed by
-  the memory's own queue, off the turn. Tests:
+  ask is the one a person change already makes; the old session is closed
+  by the memory's own queue, off the turn. Tests:
   `worker::tests::after_ten_quiet_minutes_the_same_persons_next_turn_asks_the_note_again`,
   and the thread told after a quiet in
   `worker::memory_switches::with_the_memorys_switches_the_second_route_forgets_tells_a_thread_and_lists_rules`.
@@ -1390,14 +1389,44 @@ order is kept. A written turn is the same from the chat on.
   - **Not asked again:** a `remember` the store refused, and a recall. A
     confirmed forget follows the existing journal-resume policy
     (`wants_fresh_session`, `LAMP_MEMORY_JOURNAL_RESUMES` and its backoff).
+  - **Asked as the line begins, never on the worker's loop** (lamp-4ace,
+    22 Oct 17:45: asked as the line ended, the note held the worker's one
+    thread about 300 ms, missed its turn by 60 ms, and none was asked again
+    for 30 s). As a spoken line begins (the engine's `Start`), the run's
+    note is asked on a thread of its own when it is due: a new run
+    (`opens_anew`), the person changed, a failed note may be asked again,
+    it was quiet, or something was kept. It is asked for the person known
+    then, as memory's hits find it: the line's admitted scope with
+    `LAMP_SECOND_SCOPED_CONTEXT`, otherwise the session's person, the one
+    the turn's note is for (`Sessions::open_ahead`). The read may take up
+    to 2 s
+    (`NOTE_AHEAD_WITHIN`), so an answer that comes before the line ends is
+    the line's. At the line's end the turn waits for it off the loop, never
+    longer than what is left of 300 ms (`remember::FIRST_READ`) from the
+    ask, not 300 ms more from the end; building the context only takes the
+    answer (`Sessions::taken`). A scope that differs at the end (the line
+    narrowed to the room when another face was seen speaking it) lets the
+    early answer go and asks for the right one, and a turn with no line
+    (the lamp's own written ones) asks there, both waited for the same way.
+    Only one read runs at a time: while one is still going on no other
+    starts, and a turn whose person's read cannot start is told the
+    unavailable note. An answer is kept only for its scope, only until the
+    next line begins, and never after the camera or the microphone closes
+    or opens; a line held by a gap asks nothing, a revoked scope is told
+    nothing, and an answer read before a forget, while journalling waits
+    for a fresh context, is never told. A keep after a read began marks the
+    note again, so the next ask has it.
   - **After a failed note read:** a refusal, timeout, or invalid snapshot
-    leaves the note incomplete. A room snapshot beside a failed personal
-    snapshot is also incomplete. The next context built at least 30 s
-    after that attempt asks again, with a new Days session and the same
-    total 300 ms read budget. There is no background poll; repeated
-    failures get at most one attempt per 30 s for the same scope. Keeps
-    and person changes still invalidate immediately. A fresh read requested
-    by the existing journal-resume policy also bypasses this note backoff.
+    leaves the note incomplete, and so does a note still not in by what is
+    left of its 300 ms as the line ends (late). A room snapshot beside a
+    failed personal snapshot is also incomplete. The next turn asks again,
+    with a new Days session, as its line begins: a memory slow once costs
+    one turn its note. A second failure in a row is asked again no sooner
+    than 30 s (`FRESH_RETRY`) after that attempt began, and so on while
+    they fail back to back; a complete note ends the spacing. There is no
+    background poll. Keeps and person changes still invalidate immediately.
+    A fresh read requested by the existing journal-resume policy also
+    bypasses this note backoff.
     Successful empty snapshots are cached normally. An incomplete result
     replaces the previous note, so a failed refresh cannot bring back a
     forgotten fact or another person's note. A held person change also
@@ -1407,11 +1436,19 @@ order is kept. A written turn is the same from the chat on.
     covers leased contexts in both Days and legacy memory modes, after the
     session-lock wait and after composition. Legacy note loading gains no
     retry; unleased contexts retain their existing behavior.
-    Counts-only journal lines say `memory note incomplete; retry on a later
-    context after 30000 ms` and `memory note retry complete`; they contain
-    no note, name or person id. The host regressions are
-    `worker::memory_note_retries`; the six-minute spoken name-retention
-    check on #2540 is a separate lamp gate.
+    Counts-only journal lines say `memory note asked ahead as the line
+    began; ready in N ms` (or `incomplete in N ms`, and `asked as the turn
+    is told` for a read started at the end), `memory note late; retry on
+    the next turn`, `memory note incomplete; retry on the next turn`,
+    `memory note incomplete again; retry after 30000 ms` and `memory note
+    retry complete`; they contain no note, name or person id. The host
+    regressions are `worker::memory_note_retries`, among them
+    `a_note_asked_as_the_line_begins_is_in_by_its_end_and_the_loop_never_waits`
+    (an answer 350 ms after the ask, a 1 s line, the loop's longest gap
+    measured) and
+    `a_late_note_is_asked_again_on_the_next_turn_not_thirty_seconds_later`;
+    the six-minute spoken name-retention check on #2540 is a separate lamp
+    gate.
   - **Nothing is split by it** (the first builder's P2 on #2615): the ask
     opens the run's next Days session and closes the one before, as a
     person change does, since the store has no ask that reads a session's

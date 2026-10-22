@@ -243,24 +243,36 @@ fn payload(told: Told) -> String {
     serde_json::to_string(&told.messages()).unwrap()
 }
 
+/// The worker's context callback for one turn, with the Days note asked as
+/// the engine asks it: as the line begins, then waited for off the loop
+/// just before the turn is told (`super::Ahead`). The callback itself only
+/// takes the answer.
 fn context(
     socket: PathBuf,
 ) -> impl Fn(Option<&crate::memory_scope::ScopeLease>) -> Told + Send + Sync {
-    memory_context(
-        Arc::new(Mutex::new(Sessions::default())),
-        Some(socket),
-        None,
-        crate::remember::days_from_environment(),
-        |_, person, note| {
-            system_message(
-                "Synthetic character.\n",
-                None,
-                &note,
-                None,
-                person.as_deref(),
-            )
-        },
-    )
+    let sessions = Arc::new(Mutex::new(Sessions::default()));
+    let days = crate::remember::days_from_environment();
+    let ahead = days.then(|| super::Ahead::reading(sessions.clone(), None, socket.clone()));
+    let told = memory_context(sessions, Some(socket), None, days, |_, person, note| {
+        system_message(
+            "Synthetic character.\n",
+            None,
+            &note,
+            None,
+            person.as_deref(),
+        )
+    });
+    move |lease| {
+        if let Some(ahead) = &ahead {
+            ahead.begin(lease, Instant::now());
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(ahead.clone().ready(lease.cloned()));
+        }
+        told(lease)
+    }
 }
 
 fn evict_name(person: Option<&str>) {
