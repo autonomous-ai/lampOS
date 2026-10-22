@@ -2,11 +2,12 @@
 //! No global registry, polling, speaker inference, or session authorization;
 //! a lease is only ever narrowed to the room, never widened. The one late
 //! look is a keep's ([`ScopeLease::keeper_within`]): a line admitted as the
-//! room's before the face cache's first answer (a voice restart, a privacy
-//! change, a face remembered) keeps for the known face the eyes name by the
-//! line's end plus [`KEEPER_WAIT`], unless another face was seen speaking it
-//! (#2807); its reads stay the room's.
-use crate::known_faces::FaceObservation;
+//! room's while the face cache is cold ([`FaceCache::is_cold`]: within
+//! [`COLD_FOR`] of a voice start, a privacy change, a face remembered or a
+//! change in the eyes' known file, with no face named since) keeps for the
+//! known face the eyes name by the line's end plus [`KEEPER_WAIT`], unless
+//! another face was seen speaking it (#2807); its reads stay the room's.
+use crate::known_faces::{FaceObservation, KnownMark};
 use lamp_turn_owner::BootId;
 use std::{
     sync::{
@@ -93,10 +94,23 @@ struct CachedFace {
 /// refresh work, even if its filesystem read completes afterwards.
 pub struct RefreshToken {
     generation: u64,
-    /// [`FaceCache::asked`] when the refresh began: only a refresh begun
-    /// after the cache went cold gives its first answer.
+    /// [`FaceCache::asked`] when the refresh began (or when it read a
+    /// changed known file, [`FaceCache::known_file_read`]): only a refresh
+    /// begun after the cache went cold ends its coldness, by naming a face.
     asked: u64,
 }
+
+/// How long the face cache stays cold after it went cold (a voice start, a
+/// privacy change, a face remembered, a change in the eyes' known file)
+/// while its refreshes name nobody ([`FaceCache::is_cold`]); a refresh
+/// naming a face ends it sooner. A line admitted as the room's while it is
+/// cold looks later for its keeper (#2807). On lamp-c0a4 on 23 October a face
+/// remembered through the eyes' own socket about 1 s after a voice restart
+/// said its first line 1 to 2 s later, and the known file names a face for
+/// 3 s after the eyes write it ([`crate::known_faces::FRESH`]): 5 s covers
+/// both with room to spare. Past it, a cache that names nobody means nobody
+/// known is in view, so a room's line has no late look (El's P2 on #3108).
+pub const COLD_FOR: Duration = Duration::from_secs(5);
 
 /// The caller refreshes this slot off the audio path and owns that refresh's
 /// lifetime. Snapshot and invalidation never wait on the refresh mutex.
@@ -112,13 +126,18 @@ pub struct FaceCache {
     /// known. For the journal only ([`Self::gap_told`]).
     in_view: AtomicU64,
     /// How many times the cache went cold: at start (0), and once more at
-    /// each privacy change ([`Self::invalidate`]) and each face remembered
-    /// ([`Self::face_remembered`]).
+    /// each [`Self::went_cold`] (a privacy change, a face remembered, a
+    /// change in the eyes' known file).
     asked: AtomicU64,
-    /// The highest [`Self::asked`] a completed refresh began after, plus
-    /// one: the cache has given its first answer since it last went cold
-    /// when this is past `asked` ([`Self::answered_yet`]).
-    answered_after: AtomicU64,
+    /// The highest [`Self::asked`] a completed refresh naming a face began
+    /// after, plus one: a face has been named since the cache last went cold
+    /// when this is past `asked` ([`Self::is_cold`]).
+    named_after: AtomicU64,
+    /// When the cache last went cold; `None` until first stamped, cold.
+    cold_at: Mutex<Option<Instant>>,
+    /// The eyes' known file as the last refresh read it; `None` before the
+    /// first ([`Self::known_file_read`]).
+    known_mark: Mutex<Option<KnownMark>>,
 }
 impl FaceCache {
     /// The lamp has answered a turn of `scope`'s at `at`: a gap is held only
@@ -163,24 +182,71 @@ impl FaceCache {
                 Some(generation.saturating_add(1))
             });
         // Nothing known in the new generation until the next refresh.
-        self.asked.fetch_add(1, Ordering::AcqRel);
+        self.went_cold(Instant::now());
     }
 
-    /// A face was just remembered: the eyes' known file may name it at any
-    /// moment, so the cache has not answered for it until a refresh begun
-    /// after now completes (#2807). Never waits.
+    /// A face was just remembered by the voice's own tool: the eyes' known
+    /// file may name it at any moment (#2807). A face remembered any other
+    /// way is seen by the refresh ([`Self::known_file_read`]). Never waits.
     pub fn face_remembered(&self) {
-        self.asked.fetch_add(1, Ordering::AcqRel);
+        self.went_cold(Instant::now());
     }
 
-    /// Whether a refresh begun since the cache last went cold (its start, a
-    /// privacy change, a face remembered) has completed, naming someone or
-    /// nobody. A line begun before that first answer is the only one a
-    /// late look is armed for ([`RequestScope::looking_later`]): a warm
-    /// cache that names nobody means nobody known is in view (El's P2 on
-    /// #3108).
-    pub fn answered_yet(&self) -> bool {
-        self.answered_after.load(Ordering::Acquire) > self.asked.load(Ordering::Acquire)
+    /// The cache goes cold at `at` (the voice's start, a privacy change, a
+    /// face remembered, a change in the eyes' known file): until a refresh
+    /// begun after now names a face, or [`COLD_FOR`] past `at`
+    /// ([`Self::is_cold`]). Returns the new cold count. Never waits on a
+    /// refresh's read.
+    pub fn went_cold(&self, at: Instant) -> u64 {
+        let asked = self.asked.fetch_add(1, Ordering::AcqRel).saturating_add(1);
+        if let Ok(mut cold_at) = self.cold_at.lock() {
+            *cold_at = Some(cold_at.map_or(at, |was| was.max(at)));
+        }
+        asked
+    }
+
+    /// For tests: the cache last went cold at `at`, earlier than any
+    /// [`Self::went_cold`] since (a privacy change stamps now).
+    #[cfg(test)]
+    pub(crate) fn cold_since(&self, at: Instant) {
+        *self.cold_at.lock().unwrap() = Some(at);
+    }
+
+    /// A refresh read the eyes' known file as `mark` ([`KnownMark::read`]),
+    /// at `at`, after `token` began: a change from the last refresh's mark,
+    /// whoever wrote it, makes the cache cold (#2807: a face remembered
+    /// through the eyes' own socket after a voice restart). The refresh read
+    /// the change, so it may end that coldness by naming a face. The first
+    /// read only sets the mark. Returns whether it changed.
+    pub fn known_file_read(&self, token: &mut RefreshToken, mark: KnownMark, at: Instant) -> bool {
+        let Ok(mut last) = self.known_mark.lock() else {
+            return false;
+        };
+        let changed = last.as_ref().is_some_and(|last| *last != mark);
+        *last = Some(mark);
+        drop(last);
+        if changed {
+            token.asked = token.asked.max(self.went_cold(at));
+        }
+        changed
+    }
+
+    /// Whether the cache is cold at `now`: it went cold (its start, a
+    /// privacy change, a face remembered, a change in the eyes' known file)
+    /// within [`COLD_FOR`], and no refresh begun since has named a face. A
+    /// refresh naming nobody inside that window does not end it. A line
+    /// admitted while cold is the only one a late look is armed for
+    /// ([`RequestScope::looking_later`]): past it, a cache that names nobody
+    /// means nobody known is in view (El's P2 on #3108). A cache never
+    /// stamped ([`Self::went_cold`]) is cold until a face is named.
+    pub fn is_cold(&self, now: Instant) -> bool {
+        if self.named_after.load(Ordering::Acquire) > self.asked.load(Ordering::Acquire) {
+            return false;
+        }
+        match self.cold_at.lock() {
+            Ok(cold_at) => cold_at.is_none_or(|at| now < at + COLD_FOR),
+            Err(_) => false,
+        }
     }
 
     /// Only the off-path refresher calls replace. A token begun before a
@@ -245,6 +311,7 @@ impl FaceCache {
                 seen_until: was.seen_until,
             })
         };
+        let named = next.is_some();
         let next = next.or_else(held);
         *face = next;
         self.in_view.store(
@@ -254,8 +321,10 @@ impl FaceCache {
         // Invalidation racing the assignment is enforced by the entry's
         // generation at snapshot, and reported here when already observed.
         let answered = current();
-        if answered {
-            self.answered_after
+        // Only a fresh face named ends coldness ([`Self::is_cold`]); nobody,
+        // or a face held only by its gap, does not.
+        if answered && named {
+            self.named_after
                 .fetch_max(token.asked.saturating_add(1), Ordering::AcqRel);
         }
         answered
@@ -346,8 +415,8 @@ struct RequestContext {
     narrowed: AtomicBool,
     room: ScopeSnapshot,
     active: AtomicBool,
-    /// A line admitted as the room's with the camera allowed, before the
-    /// face cache's first answer: its late look (#2807).
+    /// A line admitted as the room's with the camera allowed, while the
+    /// face cache was cold: its late look (#2807).
     late: Option<LateLook>,
     /// The face cache a line with the camera allowed was admitted from, told
     /// when a face is remembered in it ([`ScopeLease::face_remembered`]).
@@ -391,16 +460,16 @@ impl RequestScope {
         }
     }
     /// A line admitted while the camera was allowed. Only one admitted as
-    /// the room's before `cache` gave its first answer
-    /// ([`FaceCache::answered_yet`]: right after a voice restart, a privacy
-    /// change or a face remembered) looks again for its keeps
-    /// ([`ScopeLease::keeper_within`]): a warm cache that named nobody
-    /// means nobody known was in view, and a known face first cached during
-    /// the line never takes the keep of a line someone off camera said (El's
+    /// the room's while `cache` is cold ([`FaceCache::is_cold`]: within
+    /// [`COLD_FOR`] of a voice restart, a privacy change, a face remembered
+    /// or a change in the eyes' known file, with no face named since) looks
+    /// again for its keeps ([`ScopeLease::keeper_within`]): a warm cache that
+    /// named nobody means nobody known was in view, and a known face first
+    /// cached during the line never takes the keep of a line someone off camera said (El's
     /// P2 on #3108). A person's or a held scope takes no late look, nor does
     /// anything once `cache`'s generation moves on (a privacy change).
     pub fn looking_later(key: RequestKey, scope: ScopeSnapshot, cache: Arc<FaceCache>) -> Self {
-        let cold = !cache.answered_yet();
+        let cold = cache.is_cold(Instant::now());
         let late = (cold && scope.person.is_none() && !scope.held).then(|| {
             let cache = cache.clone();
             let generation = cache.generation();
@@ -534,10 +603,10 @@ impl ScopeLease {
 
     /// Whose a keep in this line is (#2807): the keeper recorded at the
     /// line's end ([`Self::record_keeper`]), waiting up to `wait` for that
-    /// record, but only for a line admitted as the room's because no known
-    /// face was cached yet ([`RequestScope::looking_later`]): after a voice
+    /// record, but only for a line admitted as the room's while the face
+    /// cache was cold ([`RequestScope::looking_later`]): after a voice
     /// restart, or a face just remembered, the first line was admitted
-    /// before the eyes' first answer and its keep went to the room. `None`,
+    /// before the eyes named them and its keep went to the room. `None`,
     /// and the keep is the lease's own (the room's), for a person's line, a
     /// revoked one, a privacy change since admission, a face held only by
     /// its gap, another face seen speaking the line, nobody known by its end
@@ -1068,45 +1137,166 @@ mod tests {
         assert_eq!(line.lease().keeper_within(Duration::ZERO), None);
     }
 
-    /// El's P2 on #3108: a late look is armed only for a line begun before
-    /// the face cache's first answer since it went cold (start, a privacy
-    /// change, a face remembered). A warm cache that answered nobody arms
-    /// none, so a known face first cached during a line someone off camera
-    /// said never takes its keep. A refresh begun before the cache went cold
-    /// is not its first answer.
+    /// A fresh observation of `name`, read as the refresh reads the eyes'
+    /// known file.
+    fn observation(name: &str) -> FaceObservation {
+        let path = std::env::temp_dir().join(format!(
+            "observation-{name}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::write(&path, name).unwrap();
+        let observation = FaceObservation::read(&path).unwrap();
+        std::fs::remove_file(path).unwrap();
+        observation
+    }
+
+    /// El's P2 on #3108 and the #2807 run on lamp-c0a4: a late look is armed
+    /// only for a line begun while the face cache is cold: within
+    /// [`COLD_FOR`] of its going cold (start, a privacy change, a face
+    /// remembered, a change in the eyes' known file), with no face named by
+    /// a refresh begun since. A refresh naming nobody inside the window does
+    /// not end it; one naming a face does; past the window a cache that
+    /// named nobody arms none, so a known face first cached during a line
+    /// someone off camera said never takes its keep.
     #[test]
-    fn a_late_look_is_armed_only_before_the_caches_first_answer() {
+    fn a_late_look_is_armed_only_while_the_cache_is_cold() {
         let armed = |cache: &Arc<FaceCache>, request: u8| {
-            RequestScope::looking_later(key(request), cache.snapshot(Instant::now()), cache.clone())
+            RequestScope::looking_later(key(request), ScopeSnapshot::room(), cache.clone())
                 .lease()
                 .looks_later()
         };
+        let long_ago = || {
+            Instant::now()
+                .checked_sub(COLD_FOR + Duration::from_secs(1))
+                .unwrap()
+        };
         let cache = Arc::new(FaceCache::default());
-        assert!(armed(&cache, 1), "cold at start");
+        assert!(armed(&cache, 1), "cold before it is stamped");
+        cache.went_cold(Instant::now());
         assert!(cache.replace(cache.begin_refresh(), None));
-        assert!(!armed(&cache, 2), "warm: it answered nobody");
+        assert!(
+            armed(&cache, 2),
+            "naming nobody inside the window: still cold"
+        );
+        assert!(cache.replace(cache.begin_refresh(), Some(observation("Ann"))));
+        assert!(!cache.is_cold(Instant::now()), "a face named ends it");
+        assert!(!armed(&cache, 3));
 
-        // A face remembered: cold again, even when a refresh begun before
-        // it completes after it.
+        // The window passing with nobody named ends it too (El's case).
+        let cache = Arc::new(FaceCache::default());
+        cache.went_cold(long_ago());
+        assert!(cache.replace(cache.begin_refresh(), None));
+        assert!(
+            !armed(&cache, 4),
+            "warm: long after any change, nobody named"
+        );
+        assert!(cache.is_cold(Instant::now() - COLD_FOR - Duration::from_secs(1)));
+
+        // A face remembered by the voice's tool: cold again, and a refresh
+        // begun before it naming a face does not end it.
         let early = cache.begin_refresh();
-        let line = RequestScope::looking_later(key(3), ScopeSnapshot::room(), cache.clone());
+        let line = RequestScope::looking_later(key(5), ScopeSnapshot::room(), cache.clone());
         assert!(!line.lease().looks_later());
         line.lease().face_remembered();
-        assert!(cache.replace(early, None));
-        assert!(armed(&cache, 4), "cold after a face remembered");
-        assert!(cache.replace(cache.begin_refresh(), None));
-        assert!(!armed(&cache, 5), "warm again");
+        cache.replace(early, Some(observation("Ann")));
+        assert!(armed(&cache, 6), "cold after a face remembered");
 
-        // A privacy change: cold until the next refresh in the new generation.
-        cache.invalidate();
-        assert!(armed(&cache, 6), "cold after a privacy change");
-        assert!(cache.replace(cache.begin_refresh(), None));
+        // A privacy change: cold for the new generation.
+        let cache = Arc::new(FaceCache::default());
+        cache.went_cold(long_ago());
         assert!(!armed(&cache, 7));
+        cache.invalidate();
+        assert!(armed(&cache, 8), "cold after a privacy change");
 
         // A plain scope (camera not allowed) remembers into no cache.
-        RequestScope::new(key(8), ScopeSnapshot::room())
+        let cache = Arc::new(FaceCache::default());
+        cache.went_cold(long_ago());
+        RequestScope::new(key(9), ScopeSnapshot::room())
             .lease()
             .face_remembered();
-        assert!(!armed(&cache, 9));
+        assert!(!armed(&cache, 10));
+    }
+
+    /// The #2807 run on lamp-c0a4 at `39a68c91b`: a face remembered through
+    /// the eyes' own socket, not the voice's tool, changes the eyes' known
+    /// file; the refresh that reads the change makes the cache cold,
+    /// whoever wrote it. The first read only sets the mark; the known
+    /// file's mtime alone (rewritten each look) is no change; the eyes'
+    /// names file rewritten (a face remembered) is one.
+    #[test]
+    fn a_change_in_the_eyes_known_file_makes_the_cache_cold() {
+        let directory = std::env::temp_dir().join(format!(
+            "known-mark-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let known = directory.join("known");
+        let tellable = directory.join("tellable");
+        let _ = std::fs::remove_file(&known);
+        let _ = std::fs::remove_file(&tellable);
+        let long_ago = Instant::now()
+            .checked_sub(COLD_FOR + Duration::from_secs(1))
+            .unwrap();
+        let cache = Arc::new(FaceCache::default());
+        cache.went_cold(long_ago);
+        let read = |cache: &FaceCache| {
+            let mut token = cache.begin_refresh();
+            let changed = cache.known_file_read(
+                &mut token,
+                crate::known_faces::KnownMark::read(&known),
+                Instant::now(),
+            );
+            assert!(cache.replace(token, None));
+            changed
+        };
+        assert!(!read(&cache), "the first read sets the mark");
+        assert!(!read(&cache), "unchanged");
+        assert!(!cache.is_cold(Instant::now()), "warm, nobody named");
+
+        // Another writer names A: cold, though this refresh named nobody.
+        std::fs::write(&known, "A\n").unwrap();
+        assert!(read(&cache));
+        assert!(cache.is_cold(Instant::now()));
+        // The same words rewritten later: no change.
+        std::fs::write(&known, "A\n").unwrap();
+        assert!(!read(&cache));
+
+        // A refresh that read the change and names A ends it at once.
+        let cache = Arc::new(FaceCache::default());
+        cache.went_cold(long_ago);
+        cache.known_file_read(
+            &mut cache.begin_refresh(),
+            crate::known_faces::KnownMark::read(&known),
+            Instant::now(),
+        );
+        std::fs::remove_file(&known).unwrap();
+        let mut token_b = cache.begin_refresh();
+        assert!(cache.known_file_read(
+            &mut token_b,
+            crate::known_faces::KnownMark::read(&known),
+            Instant::now(),
+        ));
+        assert!(cache.replace(token_b, Some(observation("A"))));
+        assert!(
+            !cache.is_cold(Instant::now()),
+            "named by the refresh that saw it"
+        );
+
+        // The eyes' names file rewritten after a face remembered: a change.
+        let cache = Arc::new(FaceCache::default());
+        cache.went_cold(long_ago);
+        std::fs::write(&tellable, "A\n").unwrap();
+        assert!(!read(&cache));
+        let file = std::fs::File::options()
+            .write(true)
+            .open(&tellable)
+            .unwrap();
+        file.set_modified(std::time::SystemTime::now() + Duration::from_secs(5))
+            .unwrap();
+        assert!(read(&cache));
+        assert!(cache.is_cold(Instant::now()));
+        std::fs::remove_dir_all(&directory).unwrap();
     }
 }
