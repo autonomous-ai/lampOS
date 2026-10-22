@@ -1,5 +1,43 @@
 # Tests work log
 
+## 2026-10-22 07:01:13 +0700 — requested rebases pushed; review corrections continue
+
+Ready checks on rebased source are pending. At the owner's request, #2703,
+#2693 and #2646 are now based on `74b90c317`; all three range-diffs are `=`:
+`e61ca8015` -> `37305d9ce`, `bd53fd51c` -> `b564aa064`, and
+`ff6ced6c1` -> `304cac668`. [Range-diffs posted on #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6329188431).
+Linux all-target Clippy #1415, #1418 and #1416 passed on those respective
+heads. ARM64 #5407, #5410 and #5408 remain running. The Skills push was
+rejected once; a read confirmed its old remote head, and the same explicit
+force-with-lease push then succeeded. No patch changed during these rebases.
+Existing raw Skills logs' trailing-blank-line diagnostics were retained.
+
+#2679, #2698, #2699 and #2712 have merged. #2647's newer add-ons conflict
+is resolved locally at `adfcad8f6`, preserving policy/say/move behavior,
+all-input readiness, continuous privacy and captured journal diagnostics.
+The first privacy value is synchronous on the continuing publisher; all
+11 upstream integration tests remain, plus the CLI test. Refreshed controls
+and local/native gates are still required; it is not ready or pushed yet.
+
+#2637's first corrected gate passed formatting, strict Clippy, 209 Tasks
+tests (two existing ignored) and 3,238 serial Voice tests (14 existing
+ignored). The dependent stage stopped after 1,673 passes at the Skills daily
+journal restart test with WouldBlock. Three whole parallel Skills libraries
+on the actual pre-PR base `7a6c5d678` passed 119 tests each, so the failure
+remains unreproduced on that base and no cause is claimed. The complete
+failed dependent gate is running once more, with the initial failure kept.
+
+#2653 restores Expression's successful natural exit and Mood's 600 ms run;
+its remaining three speedups are unchanged. Its before/after and control
+runner now uses a separate fresh native Cargo target to avoid replacing
+binaries the Tasks gate uses. An attempted clone was too slow and stopped;
+that partial cache is unused. Compilation is excluded from fixture timings;
+concurrent Tasks execution on this shared host will be stated in the record.
+
+The owner ordered #2625 next after these reviews, then the two approved
+#1806 seams and #1569 row 72 with a control. Cloud confirmation work is
+frozen pending that list. No ARM64 build on the Mac or device access.
+
 ## 2026-10-22 02:15 +0700 — Voice bus ready; add-ons rebase pushed
 
 Ready for lamp-voice: [#2712](https://github.com/autonomous-ai/lampOS/pull/2712)
