@@ -5939,6 +5939,36 @@ Ready for lamp-voice: no (#2789 is starting; #2774 waits for Friday's fixture). 
   #2774 will rebase after that fixture merges. #2782's reviewer is reading
   its independently green `64282e440` head.
 
+## 2026-10-22 10:07 ICT: callback review rebase pushed; peek's narrow permission contract proposed
+
+Ready for lamp-voice: no (#2782 awaits its new exact-head gates; #2774 waits for the fixture; #2789 is in progress).
+
+- Reviewer-two found no P1/P2 in #2782 and requested a current-base
+  rebase over the seems-note integration and single-face correction.
+  Pushed `a8abee38d4a0f7f3f9d53d600306eeb1471923ea`, one commit on
+  `fourth/kept-name-callback`, base `fab69b0c4`. Source-only range-diff
+  was `64282e440 = d61a86763`; the final amend updates verification
+  receipts with the accepted full #2540 run and new source hashes.
+  Memory selection is byte-identical to the new base and prompt
+  composition matches ignoring indentation. Formatting, strict workspace
+  Clippy and all 3 callback checks passed (0 failed/ignored). Historical
+  full-host counts remain 5,194/0/23; repetitions are not added.
+- ARM64 39714810652 and Clippy 39714810633 run on the new head. The PR
+  stays draft until they pass; the earlier artifact is historical.
+  Range-diff and counts: https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6331665364.
+  Raw checks: `/private/tmp/fourth-kept-name-callback-checks/rebase-20261022/`.
+- #2789 piece 1 propagates typed missing/permission/other read failures,
+  marks retained rows stale and clears the state on recovery. Tests and
+  bounded, serialized asynchronous read handling are in progress.
+- Piece 2's proposed contract is on #2789: explicit matching Voice and
+  Records reader-group opt-ins, private defaults, only service events
+  readable, exact mode/GID validation and private quarantine. A dedicated
+  account also needs a separate bus-only subscriber grant: the general
+  lampos group exposes unrelated consent state. Voice and bus/keeper
+  owner confirmations are requested once, at
+  https://github.com/autonomous-ai/lampOS/issues/2789#issuecomment-6331681498.
+  No group, ACL, product default or device change has been made.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
