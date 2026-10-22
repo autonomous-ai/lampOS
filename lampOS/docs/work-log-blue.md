@@ -479,3 +479,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - **17:55, reviewer-two on #2889:** P1 none, P2 none at `07324d094`, and asked for a rebase onto the latest base. Rebased at 17:56 onto `fe49ed3c4`, now `d09034e1a` (range-diff `=`). lamp-cloud's tests and clippy pass.
 - **17:59, reviewer-two on #2889:** P1/P2 none at `d09034e1a`; the base moved to `69f222833`. Rebased at 18:01 to `d4d0873e1` (`=`). lamp-cloud's tests and clippy pass.
 - **18:0x, Fourteen:** the app's UUID v4 request ids pass. The app's field now counts UTF-8 bytes (ecm-sds-mobile#46), to match the 180-byte limit. No lamp-side change.
+- **18:02, reviewer-two on #2889:** P1/P2 none at `d4d0873e1`; the base moved again. Rebased at 18:06 onto `bf38a1890`, now `fd92eb059` (`=`). lamp-cloud passes.
