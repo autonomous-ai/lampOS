@@ -1265,7 +1265,7 @@ fn run_for_guarded(
     let Some(answer) = answer else {
         return (gone(), false);
     };
-    let told = answer_for(&call.name, &answer, now, zone);
+    let told = answer_for(&call.name, &answer, now, zone, person);
     if matches!(call.name.as_str(), REMEMBER | FORGET) && answer["ok"] == true {
         // The note a new session is told has changed.
         if let Some(jobs) = JOBS.get() {
@@ -1384,8 +1384,12 @@ fn marked(mut answer: Value) -> Value {
 }
 
 /// What the model is told for a `remember` the store answers `existing`
-/// (`LAMP_MEMORY_REMEMBER_ONCE`, #2176): that it knew already, to say so.
-pub const ALREADY_KEPT: &str = "Already kept before this session. Tell them you already knew it.";
+/// (`LAMP_MEMORY_REMEMBER_ONCE`, #2176) in a known person's own scope: that
+/// it knew already, to say so. No time it was kept: the store answers
+/// `existing` for a repeat in the same session as for one kept in an
+/// earlier one. In the room's scope it is told as a plain keep instead
+/// ([`answer_for`]).
+pub const ALREADY_KEPT: &str = "Already kept: tell them you already knew it.";
 
 /// `remember`'s kept answer as the model is told it: with `replaces`
 /// ([`REPLACES_ENVIRONMENT`], #2510), also the kept thing's `id` (the new
@@ -1399,13 +1403,15 @@ pub(crate) fn told_kept(mut told: Value, id: u64, replaces: bool) -> Value {
     told
 }
 
-/// What to tell the model for the memory's answer. `None` for one that is
-/// not the answer to that request.
+/// What to tell the model for the memory's answer, in `person`'s scope
+/// (`None`: the room's). `None` for one that is not the answer to that
+/// request.
 pub(crate) fn answer_for(
     name: &str,
     answer: &Value,
     now_unix_ms: u64,
     zone: Option<&LocalTime>,
+    person: Option<&str>,
 ) -> Option<Value> {
     if answer.get("ok").and_then(Value::as_bool)? {
         return Some(match name {
@@ -1413,8 +1419,12 @@ pub(crate) fn answer_for(
                 answer.get("id")?;
                 // #2176: `existing` comes only with `LAMP_MEMORY_REMEMBER_ONCE`'s
                 // `once`. Told plainly, the reply says it knew already in a
-                // new session too (the relay's DeepSeek, 20/20 against 1/20).
-                if answer["existing"] == true {
+                // new session too (the relay's DeepSeek, see docs/memory.md).
+                // In the room's scope (an unknown speaker, #2995's P2) the
+                // thing kept already may be another person's room entry:
+                // told as a plain keep, so a visitor is never told the lamp
+                // knew it, nor that someone here said it.
+                if answer["existing"] == true && person.is_some() {
                     json!({"remembered": true, "note": ALREADY_KEPT})
                 } else if let Some(old) = answer.get("replaced").and_then(Value::as_u64) {
                     // #2510: no note, so a kept heard line still says its own.
@@ -3643,7 +3653,7 @@ impl DaysClient {
             }
             // A refusal the store said is told as before, and settled at the
             // end; one with nothing to tell is settled here.
-            let Some(told) = answer_for(&call.name, &answer, now, zone) else {
+            let Some(told) = answer_for(&call.name, &answer, now, zone, person) else {
                 return if answer["ok"] == true {
                     lost((gone(), false))
                 } else {
@@ -10214,10 +10224,11 @@ mod tests {
     }
 
     /// #2176, `LAMP_MEMORY_REMEMBER_ONCE`: with the switch, `remember` asks
-    /// for `once`, and a thing kept already is told as such; off, the
-    /// request is as before.
+    /// for `once`, and a thing kept already in the person's own scope is
+    /// told as such; off, the request is as before.
     #[test]
     fn with_the_switch_remember_asks_once_and_says_what_was_kept_already() {
+        const MAI: &str = "p-0123456789abcdef";
         let (socket, served) = memory("remember-once", 2, |request| {
             if request["once"] == true {
                 json!({"ok":true,"id":24,"existing":true})
@@ -10228,7 +10239,13 @@ mod tests {
         let client = DaysClient::new(socket.clone()).unwrap();
         let remember = || {
             let args = json!({"text":"takes coffee black"});
-            client.run_at(&call(REMEMBER, args), FIRST_READ, NOW, Some(&EAST), None)
+            client.run_at(
+                &call(REMEMBER, args),
+                FIRST_READ,
+                NOW,
+                Some(&EAST),
+                Some(MAI),
+            )
         };
         assert!(!client.remember_once.load(Ordering::Acquire));
         assert_eq!(remember(), (json!({"remembered": true}), true));
@@ -10236,13 +10253,142 @@ mod tests {
         assert_eq!(
             remember(),
             (
-                json!({"remembered": true, "note": "Already kept before this session. Tell them you already knew it."}),
+                json!({"remembered": true, "note": "Already kept: tell them you already knew it."}),
                 true
             )
         );
         let read = served.join().unwrap();
         assert!(read[0].get("once").is_none(), "{}", read[0]);
         assert_eq!(read[1]["once"], true, "{}", read[1]);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2176 (reviewer-two's P2 on #2987): the store answers `existing` for
+    /// a repeat in the same session as for one kept in an earlier session,
+    /// so the note says it was kept already and claims no time it was kept.
+    #[test]
+    fn a_repeat_in_the_same_session_is_told_kept_already_claiming_no_earlier_session() {
+        const MAI: &str = "p-0123456789abcdef";
+        static ASKED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let (socket, served) = memory("remember-once-same-session", 2, |request| {
+            assert_eq!(request["once"], true, "{request}");
+            match ASKED.fetch_add(1, Ordering::AcqRel) {
+                0 => json!({"ok":true,"id":24}),
+                _ => json!({"ok":true,"id":24,"existing":true}),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.remember_once.store(true, Ordering::Release);
+        let remember = || {
+            let args = json!({"text":"takes coffee black"});
+            client.run_at(
+                &call(REMEMBER, args),
+                FIRST_READ,
+                NOW,
+                Some(&EAST),
+                Some(MAI),
+            )
+        };
+        assert_eq!(remember(), (json!({"remembered": true}), true));
+        let (told, kept) = remember();
+        assert_eq!(
+            (told.clone(), kept),
+            (
+                json!({"remembered": true, "note": "Already kept: tell them you already knew it."}),
+                true
+            )
+        );
+        let note = told["note"].as_str().unwrap().to_lowercase();
+        assert!(
+            !note.contains("session") && !note.contains("before"),
+            "{note}"
+        );
+        served.join().unwrap();
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2176 (#2995's P2): an unknown speaker's `remember` is the room's
+    /// scope, where the thing kept already may be another person's room
+    /// entry. A visitor repeating it is told a plain keep: never that the
+    /// lamp knew it already.
+    #[test]
+    fn a_repeat_in_the_rooms_scope_is_told_as_a_plain_keep() {
+        let (socket, served) = memory("remember-once-room", 1, |request| {
+            assert_eq!(request["once"], true, "{request}");
+            assert!(request.get("person").is_none(), "{request}");
+            json!({"ok":true,"id":31,"existing":true})
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.remember_once.store(true, Ordering::Release);
+        let args = json!({"text":"I'm pregnant"});
+        let (told, kept) = client.run_at(&call(REMEMBER, args), FIRST_READ, NOW, Some(&EAST), None);
+        assert_eq!((told.clone(), kept), (json!({"remembered": true}), true));
+        assert!(
+            !told.to_string().to_lowercase().contains("already"),
+            "{told}"
+        );
+        served.join().unwrap();
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2176: in a known person's own scope a repeat is still told as
+    /// known already, though the room's is a plain keep.
+    #[test]
+    fn a_repeat_in_a_persons_own_scope_is_told_known_already() {
+        const MAI: &str = "p-0123456789abcdef";
+        let (socket, served) = memory("remember-once-own", 1, |request| {
+            assert_eq!(request["once"], true, "{request}");
+            assert_eq!(request["person"], MAI, "{request}");
+            json!({"ok":true,"id":32,"existing":true})
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.remember_once.store(true, Ordering::Release);
+        let args = json!({"text":"takes coffee black"});
+        assert_eq!(
+            client.run_at(
+                &call(REMEMBER, args),
+                FIRST_READ,
+                NOW,
+                Some(&EAST),
+                Some(MAI)
+            ),
+            (json!({"remembered": true, "note": ALREADY_KEPT}), true)
+        );
+        served.join().unwrap();
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #2176: off, no `remember` asks `once`, in either scope, and each is
+    /// told a plain keep, as before.
+    #[test]
+    fn without_the_switch_a_remember_in_either_scope_is_as_before() {
+        const MAI: &str = "p-0123456789abcdef";
+        let (socket, served) = memory("remember-once-off", 2, |request| {
+            if request["once"] == true {
+                json!({"ok":true,"id":33,"existing":true})
+            } else {
+                json!({"ok":true,"id":34})
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        assert!(!client.remember_once.load(Ordering::Acquire));
+        for person in [None, Some(MAI)] {
+            let args = json!({"text":"takes coffee black"});
+            assert_eq!(
+                client.run_at(&call(REMEMBER, args), FIRST_READ, NOW, Some(&EAST), person),
+                (json!({"remembered": true}), true),
+                "{person:?}"
+            );
+        }
+        let read = served.join().unwrap();
+        assert!(
+            read.iter().all(|line| line.get("once").is_none()),
+            "{read:?}"
+        );
         drop(client);
         std::fs::remove_file(&socket).unwrap();
     }
@@ -10522,7 +10668,7 @@ mod tests {
             {"kind":"exchange","id":3,"at_unix_ms":NOW - 3_600_000,"heard":"And tea?","said":"No idea."}
         ]});
         assert_eq!(
-            answer_for(RECALL, &answer, NOW, Some(&EAST)),
+            answer_for(RECALL, &answer, NOW, Some(&EAST), None),
             Some(json!({"found":[
                 {"when":"2 weeks ago","heard":"How do I take my coffee?","you_said":"Black."},
                 {"when":"yesterday","asked_to_remember":"takes coffee black"},
@@ -10530,7 +10676,13 @@ mod tests {
             ]}))
         );
         assert_eq!(
-            answer_for(RECALL, &json!({"ok":true,"entries":[]}), NOW, Some(&EAST)),
+            answer_for(
+                RECALL,
+                &json!({"ok":true,"entries":[]}),
+                NOW,
+                Some(&EAST),
+                None
+            ),
             Some(json!({"found":[],"note":"Nothing about that in what I remember."}))
         );
         assert_eq!(
@@ -10549,7 +10701,7 @@ mod tests {
     #[test]
     fn keeping_and_forgetting_are_told_as_what_the_memory_established() {
         assert_eq!(
-            answer_for(REMEMBER, &json!({"ok":true,"id":4}), NOW, Some(&EAST)),
+            answer_for(REMEMBER, &json!({"ok":true,"id":4}), NOW, Some(&EAST), None),
             Some(json!({"remembered":true}))
         );
         assert_eq!(
@@ -10557,12 +10709,20 @@ mod tests {
                 FORGET,
                 &json!({"ok":true,"removed":{"kind":"kept","id":4,"at_unix_ms":1}}),
                 NOW,
-                Some(&EAST)
+                Some(&EAST),
+                None
             ),
             Some(json!({"forgotten":true}))
         );
         assert_eq!(
-            answer_for(FORGET, &json!({"ok":true,"removed":null}), NOW, Some(&EAST)).unwrap()["forgotten"],
+            answer_for(
+                FORGET,
+                &json!({"ok":true,"removed":null}),
+                NOW,
+                Some(&EAST),
+                None
+            )
+            .unwrap()["forgotten"],
             false
         );
         assert_eq!(
@@ -10570,7 +10730,8 @@ mod tests {
                 REMEMBER,
                 &json!({"ok":false,"error":"empty","message":"m"}),
                 NOW,
-                Some(&EAST)
+                Some(&EAST),
+                None
             ),
             Some(json!({"error":"There was nothing in that for me to keep."}))
         );
@@ -10583,7 +10744,7 @@ mod tests {
             json!("ok"),
         ] {
             assert_eq!(
-                answer_for(REMEMBER, &other, NOW, Some(&EAST)),
+                answer_for(REMEMBER, &other, NOW, Some(&EAST), None),
                 None,
                 "{other}"
             );
@@ -12410,14 +12571,11 @@ mod tests {
         assert_eq!(found["found"].as_array().unwrap().len(), 1, "{found}");
         assert_eq!(found["found"][0]["source_id"], 9, "{found}");
         // Kept already (remember-once): the kept one's id, so it too can be
-        // corrected.
+        // corrected. The room's scope: told as a plain keep (#2995's P2).
         client.remember_once.store(true, Ordering::Release);
         assert_eq!(
             run(json!({"text":"Her favourite colour is violet."})),
-            (
-                json!({"remembered":true,"note":"Already kept before this session. Tell them you already knew it.","id":8}),
-                true
-            )
+            (json!({"remembered":true,"id":8}), true)
         );
         // A second correction of 8 is the store's to refuse: it was replaced.
         assert_eq!(
@@ -12436,6 +12594,7 @@ mod tests {
     /// store answers one, and a kept-already one none either.
     #[test]
     fn without_the_replaces_switch_remember_is_told_no_id() {
+        const MAI: &str = "p-0123456789abcdef";
         let (socket, served) = memory("replaces-off-no-id", 2, |request| {
             if request["once"] == true {
                 json!({"ok":true,"id":24,"existing":true})
@@ -12447,14 +12606,20 @@ mod tests {
         assert!(!client.replaces.load(Ordering::Acquire));
         let run = || {
             let args = json!({"text":"takes coffee black"});
-            client.run_at(&call(REMEMBER, args), FIRST_READ, NOW, Some(&EAST), None)
+            client.run_at(
+                &call(REMEMBER, args),
+                FIRST_READ,
+                NOW,
+                Some(&EAST),
+                Some(MAI),
+            )
         };
         assert_eq!(run(), (json!({"remembered": true}), true));
         client.remember_once.store(true, Ordering::Release);
         assert_eq!(
             run(),
             (
-                json!({"remembered": true, "note": "Already kept before this session. Tell them you already knew it."}),
+                json!({"remembered": true, "note": "Already kept: tell them you already knew it."}),
                 true
             )
         );
