@@ -1,3 +1,22 @@
+## Current checkpoint: 2026-10-22 10:28 +07, metadata follow-up PR open
+
+**#2871**, `second/audio-metadata-diagnostics`, is open at `db7db7a5f` on
+Music's actual merge. [Fresh gate and equal rebase](verification/requested-audio-metadata-rebase-2d1d3-20261022/README.md):
+fmt, strict Skills Clippy and **467/0/0/0** passed. Native ARM64
+`39716702065` and Clippy `39716702114` are running; readiness is pending.
+
+#2792's fresh Voice gate on the same merged base is running. #2810's six
+logical-prefix fixtures are frozen for independent read and root validation.
+#2764's next local gate again passed **177/0/1/0**, but the guard withheld
+`beb1a4123` when main advanced from `5c8b03a2e` to `4f2df6bf6`.
+The failure receipt remains public; no withheld candidate was pushed or
+assigned native qualification. The next rebase will include the Body change.
+#2767 still waits for First's installer read.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 10:25 +07, Cloud failure retained and routed
 
 [Failed #2764 native evidence](verification/report-failed-units-rebase-fab69-native-failure-20261022/README.md)
