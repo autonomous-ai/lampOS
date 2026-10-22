@@ -142,7 +142,7 @@ must not leave a step silently undone)*.
 | `needs` | no | The parts it uses (`eyes`, `ears`, `air`, `voice`, `body`, `light`, ...): which bodies it suits, as V1's capabilities. Kept, not checked yet; what it may do is `[permissions]`, which is checked |
 | `kind` | no | `core` (comes with the lamp, always there, never removed), `installable` (its owner puts it on and takes it off), or `addon` (a partner's: it only proposes, [addons.md](addons.md)), `installable` without it (below, "Core and installable skills") |
 | `version` | no, but a package needs it | The skill's own version, `MAJOR.MINOR.PATCH`, three whole numbers without leading zeros (`"1.0.0"`) |
-| `[permissions]` | no, but without it a skill may do nothing | What it may read and use, and nothing else (below, "Permissions"): `topics`, the topics it reads; `actions`, the actions part's functions it may call by name beyond the light's own; and `speak`, `light`, `body`, `look`, `messages`, `known_faces`, `output_limits`, each `true` or left out; for an add-on alone, `propose`, the acts it may propose ([addons.md](addons.md)); and for a core skill alone, `core`, its core-only grants (below, "Permissions"). A key not listed refuses the skill, and so does a read or a step it does not give |
+| `[permissions]` | no, but without it a skill may do nothing | What it may read and use, and nothing else (below, "Permissions"): `topics`, the topics it reads; `actions`, the actions part's functions it may call by name beyond the light's own; and `speak`, `light`, `body`, `look`, `messages`, `known_faces`, `who`, `output_limits`, each `true` or left out; for an add-on alone, `propose`, the acts it may propose ([addons.md](addons.md)); and for a core skill alone, `core`, its core-only grants (below, "Permissions"). A key not listed refuses the skill, and so does a read or a step it does not give |
 | `[watch]` | no | The skill is a watch (below, "A watch"): `every`, `asked_within`, `if_heard`, `most` and `mark`, and `[watch.words]`, every line it says or tells the model, in its own words (#940): `on`, `on_unknown`, `already_on`, `on_again`, `off`, `was_off`, `not_asked`, `no_mark`, `closed`, `paused_from_app`, `blind`, `paused`, `off_guard`, `stopped` (with `{hours}`, from `an_hour` or `hours` with `{hours}`), and a visit's text, `visit` or `came_in` with `{who}`, `{at}` and `{long}` from `known`, `unknown`, `someone`, `at` (with `{time}`), `under_a_minute`, `a_minute` and `minutes` (with `{minutes}`). Each is words of 1 to 900 bytes with only its own slots, each once. A watch with no `[watch.words]`, a file from before them, says the words lamp-skills said before, for this release only, and the journal says so. Then it has a `tool` whose `[choice]` is exactly `on` and `off` with no default, and no trigger, `[[do]]`, `[flag]`, `[again]`, `still`, `[quiet]`, `[[while]]` or `[ask]` |
 | `[trigger]` or `[[trigger]]` | yes, unless it has a `tool` | When the skill runs: one table, or several, each checked on its own |
 | `tool` | no | A function the model may call, which runs the steps (below, "Tools for the model"). A lowercase letter, then at most 47 lowercase letters, digits and `_`. It is described to the model with `SKILL.md`'s description, which is then at most 1,024 bytes and says when to call it |
@@ -612,7 +612,9 @@ so no lamp can greet one arrival twice, and a test fails if the voice grows
 one again ([speaking-first.md](speaking-first.md#one-hello-from-the-skill-2825)).
 While someone is at the lamp, its note is told after it a known face's name
 and, for someone Mood calls `regular` or `close`, to greet them one beat
-warmer, as every skill's note is (`person::at_the_lamp`); the typed name is
+warmer (`person::at_the_lamp`), by its `who = true` permission, which no
+other skill has, so Guard mode and Who was here never name anyone; the
+voice refuses `who` on anything but a note; the typed name is
 in the model's instruction. The voice's one hello an hour for someone
 `close` (#1670) was not carried: `lamp-skills` has no cooldown by
 familiarity, and the 20 minutes hold for everyone.
@@ -1388,6 +1390,7 @@ body = true     # a face look, gesture, move, pose, or rest/wake/cancel intent
 look = true     # the full look's picture for the model (do.look)
 messages = true # a short text for the person's phone, unasked (a watch's)
 known_faces = true  # whether a face at the lamp is known, never whose (a watch's)
+who = true      # its note is told by the voice who is at the lamp (Welcome back alone, #2825)
 output_limits = true  # private declarative light/volume restrictions
 propose = []    # an add-on's alone (kind = "addon"): the acts it may propose
 actions = []    # the actions part's functions it may call by name

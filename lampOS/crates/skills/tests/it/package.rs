@@ -872,7 +872,7 @@ fn a_list_says_each_skills_name_kind_version_and_what_it_may_use() {
             "welcome-back",
             "core",
             "1.0.0",
-            "reads humans/faces/tracked, voice/state; speak, light, body"
+            "reads humans/faces/tracked, voice/state; speak, light, body, who is at the lamp"
         ]
     );
 }

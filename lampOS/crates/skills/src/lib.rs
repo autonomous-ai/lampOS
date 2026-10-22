@@ -1073,6 +1073,12 @@ pub struct Permissions {
     /// eyes' known file, read by the program).
     #[serde(default)]
     pub known_faces: bool,
+    /// Its note to the voice is told who is at the lamp, after it: a known
+    /// face's name, and to be one beat warmer to someone who comes by often
+    /// (#2825, Welcome back). The skill itself is never told. Off by
+    /// default, so no other skill's words can name anyone.
+    #[serde(default)]
+    pub who: bool,
     /// It may install declarative light and volume ceilings. This grants
     /// no presentation or generic action, and no restoration of a setting.
     #[serde(default)]
@@ -1266,6 +1272,7 @@ impl Permissions {
             ("look", self.look),
             ("messages", self.messages),
             ("known faces", self.known_faces),
+            ("who is at the lamp", self.who),
             ("output_limits", self.output_limits),
         ]
         .into_iter()
@@ -1390,6 +1397,7 @@ fn addon_file(file: &SkillFile, no_triggers: bool) -> Result<(), String> {
         (p.look, "look"),
         (p.messages, "messages"),
         (p.known_faces, "known_faces"),
+        (p.who, "who"),
         (p.output_limits, "output_limits"),
         (!p.actions.is_empty(), "actions"),
     ] {

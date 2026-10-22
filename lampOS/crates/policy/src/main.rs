@@ -57,8 +57,9 @@ acts on it. See docs/policy.md.\n\
                  and a zone setup changes while this runs; a zone that cannot be read ends the start\n\
   --act progress the progress decisions act: published with shadow false, so that the voice\n\
                  tells a say_now. Needs --progress. \"Is this said to the lamp?\" stays shadow\n\
-  --hello        also judge whether a hello the voice holds (voice/arrival) is said now, with\n\
-                 a connection of its own to the same model. Off unless set\n\
+  --hello        also judge whether a hello is said now, with a connection of its own to the\n\
+                 same model: a skill's (with --gate). Nothing publishes voice/arrival since the\n\
+                 voice's own hello was removed (#2825). Off unless set\n\
   --act hello    the hello decisions act: say_now says the hello, wait keeps it. Needs --hello\n\
   --hello-quiet to-the-lamp\n\
                  the hello's 15 s quiet counts only talk to the lamp or by it: a turn the voice held\n\
