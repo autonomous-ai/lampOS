@@ -12298,3 +12298,196 @@ fn the_gesture_pause_is_on_for_on_only() {
         assert!(!super::gesture_pause_from(value), "{value:?}");
     }
 }
+
+/// #2602: waking and `refused_let_go`, as the product's body runs.
+fn let_go_when_refused() -> Limits {
+    Limits {
+        refused_let_go: true,
+        ..waking()
+    }
+}
+
+/// A folded lamp whose head pitch a knock left at 2,500, 500 counts from
+/// home, more than waking brings back (as lamp-e82d's was), and a hand
+/// that moves it to `to` from `from` to `until` at 100 counts a second.
+fn knocked(cancel_at: Duration, hand: Option<(Duration, Duration, f32)>) -> (Lamp, Clock) {
+    let (mut lamp, clock) = folded(cancel_at);
+    lamp.may_take_hold = true;
+    lamp.servos[PITCH].position = 2_500.0;
+    lamp.servos[PITCH].goal = 2_500;
+    lamp.hand = hand.map(|(from, until, to)| (from, until, PITCH, to));
+    (lamp, clock)
+}
+
+/// Refused for a pose a hand can set straight, the lamp lets go of the
+/// three it commands (torque off, nothing else written, no goal), says
+/// what it asks on every step it is let go, and stays so until asked to
+/// stop while the pose stays out of range.
+#[test]
+fn refused_for_its_pose_it_lets_go_says_so_and_stays_let_go_while_out_of_range() {
+    let (mut lamp, mut clock) = knocked(Duration::from_secs(5), None);
+    let mut said = Vec::new();
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        let_go_when_refused(),
+        Some(HOME),
+        || None,
+        |glimpse| said.push(glimpse.waiting),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.refused_let_go, Some(SET_STRAIGHT[0]));
+    assert!(lamp.goals.is_empty(), "{:?}", lamp.goals);
+    let off: Vec<_> = COMMANDED
+        .iter()
+        .map(|joint| (joint.id(), 40, vec![0]))
+        .collect();
+    assert_eq!(lamp.registers, off);
+    for joint in COMMANDED {
+        assert_eq!(lamp.servos[usize::from(joint.id()) - 1].torque, 0);
+    }
+    // Read ten times a second for the five seconds, each said.
+    assert!((45..=51).contains(&said.len()), "{}", said.len());
+    assert!(said.iter().all(|say| *say == Some(SET_STRAIGHT[0])));
+
+    // Off, the same lamp is refused as before, nothing written.
+    let (mut lamp, mut clock) = knocked(Duration::from_secs(5), None);
+    let report = run(&mut lamp, &mut clock, waking(), Some(HOME), || None, |_| {});
+    assert_eq!(
+        report.stop,
+        Stop::Refused {
+            why: "wrist_pitch is 500 counts from its home, more than waking brings back (400)"
+                .into()
+        }
+    );
+    assert!(lamp.nothing_was_written() && report.refused_let_go.is_none());
+}
+
+/// Once a hand has set the head in range and it has stayed there a second,
+/// the lamp takes hold where it is and starts as it would have: the wake
+/// brings it home slowly and it runs.
+#[test]
+fn set_back_in_range_it_takes_hold_where_it_is_and_starts_by_itself() {
+    let hand = (Duration::from_secs(1), Duration::from_secs(6), 2_150.0);
+    let (mut lamp, mut clock) = knocked(Duration::from_secs(30), Some(hand));
+    let mut waited = false;
+    let mut running = false;
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        let_go_when_refused(),
+        Some(HOME),
+        || Some((Mood::Resting, 0)),
+        |glimpse| {
+            if glimpse.waiting.is_some() {
+                assert!(!running, "let go again after it started");
+                waited = true;
+            } else if waited {
+                running = true;
+            }
+        },
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(running && waited);
+    assert_eq!(report.refused_let_go, Some(SET_STRAIGHT[0]));
+    // Taken hold of where the hand left it, then woken home.
+    let woke = report.woke.as_ref().unwrap();
+    assert_eq!(woke.joints, vec!["wrist_pitch"]);
+    assert_eq!(woke.to[0], 2_000);
+    assert!((2_140..=2_160).contains(&woke.from[0]), "{woke:?}");
+    assert!((lamp.servos[PITCH].position - 2_000.0).abs() < 15.0);
+    for joint in COMMANDED {
+        assert_eq!(lamp.servos[usize::from(joint.id()) - 1].torque, 1);
+    }
+    // No goal beyond where the hand left it, and none faster than waking.
+    let pitch = goals_of(&lamp, Joint::WristPitch);
+    assert!(pitch.iter().all(|goal| *goal <= 2_160), "{pitch:?}");
+}
+
+/// A lamp found standing is never let go for its pose: it would fall.
+#[test]
+fn found_standing_out_of_range_it_is_refused_as_before_and_not_let_go() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(3));
+    lamp.may_take_hold = true;
+    lamp.arm_moves = true;
+    for (index, at) in [(1usize, 2_650.0f32), (2, 2_600.0), (PITCH, 2_500.0)] {
+        lamp.servos[index].position = at;
+        lamp.servos[index].goal = at as u16;
+        lamp.servos[index].status = 0;
+    }
+    let report = run_standing(
+        &mut lamp,
+        &mut clock,
+        let_go_when_refused(),
+        Some(HOME),
+        Some(standing(100, 60)),
+        || None,
+        |_| {},
+    );
+    assert!(matches!(report.stop, Stop::Refused { .. }), "{report:?}");
+    assert!(report.refused_let_go.is_none());
+    assert!(
+        !lamp
+            .registers
+            .iter()
+            .any(|(_, address, data)| *address == 40 && data == &[0]),
+        "{:?}",
+        lamp.registers
+    );
+}
+
+/// The ranges waited for are the start's own: in range by them, the start
+/// does not refuse for the pose; one count out, it does.
+#[test]
+fn the_ranges_waited_for_are_the_starts_own_bounds() {
+    let home = [2_000, 2_044, 2_015];
+    let at = home.map(f32::from);
+    // Not waking, beside the base: the head inside its start window and
+    // each joint within the start reach of home.
+    let limits = Limits::FOLDED;
+    let wait = pose_wait(
+        &limits,
+        home,
+        at,
+        [1_900, 2_044, 2_015],
+        (true, false),
+        false,
+    )
+    .unwrap();
+    assert_eq!(
+        wait.ranges,
+        [(1_940, 2_020), (1_984, 2_104), (1_955, 2_075)]
+    );
+    assert_eq!(wait.joints, COMMANDED.to_vec());
+    assert!(
+        pose_wait(
+            &limits,
+            home,
+            at,
+            [2_020, 2_104, 1_955],
+            (true, false),
+            false
+        )
+        .is_none()
+    );
+    // Waking: within WAKE_REACH, the window aside; the base said first
+    // when it alone is out, and all five let go for a lamp that stands.
+    let limits = waking();
+    let wait = pose_wait(&limits, home, at, [2_000, 2_044, 2_416], (true, true), true).unwrap();
+    assert_eq!(wait.ranges[2], (1_615, 2_415));
+    assert_eq!(wait.say, SET_STRAIGHT[2]);
+    assert_eq!(wait.joints, Joint::ALL.to_vec());
+    // A home given outside the window: no hand helps, so it is not waited for.
+    let outside = [1_700, 2_044, 2_015];
+    assert!(
+        pose_wait(
+            &limits,
+            outside,
+            at,
+            [1_000, 2_044, 2_015],
+            (true, true),
+            false
+        )
+        .is_none()
+    );
+}
