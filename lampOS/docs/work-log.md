@@ -1,3 +1,39 @@
+## Current checkpoint: 2026-10-22 19:37 +07, native qualification preserved; latest-base CI running
+
+Ready for lamp-voice: no
+
+Kind: tests/docs only. No lamp runtime source/default/timing changes; existing
+self-update remains off unless LAMP_UPDATE_SELF=on. #2810 stays open for the
+attended physical unplug.
+
+#3012 is now `53911e246558cfdfd7f7f371b51afdd235fdc5ea`, containing latest integration
+at its pre-push guard, `6f1123f69b33e352d5ba5e149a47fc68ea079d7a`. Range-diff from
+authored 33a43cdd2 is equal. Local intermediate head 38aab2919 on d749 passed
+fmt, strict Update Clippy and **306 passed / 0 failed / 3 ignored / 0 filtered**;
+the final upstream Skills-only rebase preserves all bound Update sources.
+
+[Native checkpoint](verification/updater-process-cuts-native-20261022/README.md)
+preserves authored-head ARM64 run39774177876: **10,451 passed / 0 failed /
+67 skipped**, including one leaky Voice pass; explicit new checker PASS3.755s,
+plus4doc/12process/relay success. Its tested merge is d4668ab93 with base8e274b5e3.
+Authored-head Clippy39774177794 passed. Artifact12425151983 is fully verified:
+GitHub archive digest, all49 payload hashes and updater ELF64 AArch64 identity.
+No binary/raw log is committed. These results do not qualify the rebased head.
+
+Fresh-head Clippy39778575540 is now green (after the checkpoint snapshot).
+Fresh ARM64 [39778575538](https://github.com/autonomous-ai/lampOS/actions/runs/39778575538)
+remains running. Both completion handles are retained; no failed run was retried
+or replaced for a green. First acknowledged #3012 in the Reviewer-lead's lane.
+
+First still needs to assign the #2810 lamp, attending person/window, approved
+candidate and exact trial/observer setup. No device connection or physical power
+interruption has happened. The run sheet explicitly marks its observer
+unimplemented and the physical results blank. #1812 follows that phase and still
+requires owner/key/publication and attended Body prerequisites; its readiness
+check is posted on the issue. No key or production publication was handled.
+
+---
+
 ## Current checkpoint: 2026-10-22 18:56 +07, #2810 process-death PR pushed
 
 Ready for lamp-voice: no — official PR qualification pending

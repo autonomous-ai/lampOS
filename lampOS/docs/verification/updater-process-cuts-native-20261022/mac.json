@@ -1,0 +1,219 @@
+{
+  "schema_version": 1,
+  "status": "passed; historical unpublished local head",
+  "tested_local_head": "38aab2919d47b42a8b27c95448ca8ab7201b8923",
+  "integration_base": "d7492ca743141d9c8afbefbd390407e1e58132aa",
+  "was_pushed": false,
+  "raw_base_field_note": "The original gate.json field named base stores the local commit 38aab2919, not its integration parent.",
+  "started_at": "2026-10-22T19:20:49.747317+07:00",
+  "finished_at": "2026-10-22T19:26:57.593659+07:00",
+  "stages": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 5.16,
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      },
+      "summaries": [],
+      "raw_log": {
+        "name": "second-process-cuts-mac-d749-20261022/fmt.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "ignored_rows": [],
+      "warning_rows": []
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 17.4,
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      },
+      "summaries": [],
+      "raw_log": {
+        "name": "second-process-cuts-mac-d749-20261022/clippy.log",
+        "bytes": 1325,
+        "sha256": "aca98cf97e9704925bc73808e55a801b5b3b30b26312dba1d0a2a52a912f45a0"
+      },
+      "ignored_rows": [],
+      "warning_rows": []
+    },
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--no-fail-fast",
+        "-p",
+        "lamp-update",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 345.358,
+      "counts": {
+        "passed": 306,
+        "failed": 0,
+        "ignored": 3,
+        "filtered out": 0
+      },
+      "summaries": [
+        {
+          "line": 130,
+          "text": "test result: ok. 110 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 3.53s"
+        },
+        {
+          "line": 136,
+          "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "line": 146,
+          "text": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s"
+        },
+        {
+          "line": 230,
+          "text": "test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 129.24s"
+        },
+        {
+          "line": 244,
+          "text": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s"
+        },
+        {
+          "line": 356,
+          "text": "test result: ok. 106 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 181.78s"
+        },
+        {
+          "line": 362,
+          "text": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out"
+        },
+        {
+          "line": 367,
+          "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        }
+      ],
+      "raw_log": {
+        "name": "second-process-cuts-mac-d749-20261022/tests.log",
+        "bytes": 26670,
+        "sha256": "1eedc438a89f55da96d387abeb7f7b03fa7dbcf6a411ff8cb8a36a71aad12f4a"
+      },
+      "ignored_rows": [
+        {
+          "line": 51,
+          "text": "test fetch::tests::a_release_file_from_github ... ignored"
+        },
+        {
+          "line": 110,
+          "text": "test records::tests::write_records_fixtures ... ignored, writes records fixtures: run by hand with LAMP_UPDATE_RECORDS_FIXTURE set"
+        },
+        {
+          "line": 360,
+          "text": "test persisted_self_switches_survive_sigkill ... ignored, requires Linux syscall tracing"
+        }
+      ],
+      "warning_rows": []
+    }
+  ],
+  "source_unchanged": true,
+  "source_file_count": 35,
+  "source_map_canonical_sha256": "8e35ded3447aef157dab4bb377ebd2b094a410e666f5260e0c1ec5c1a26de30f",
+  "source_map_serialization": "SHA-256 of UTF-8 JSON with sorted keys, compact separators, ensure_ascii=false; original keys relative to lampOS.",
+  "tested_source_sha256": {
+    "crates/update/Cargo.toml": "94da09ea98009c355f9b0086620103c25aa80065ef596f99c1c10b3b468044ba",
+    "crates/update/src/apply.rs": "89db5a74e01e2ce5419ef4de9c6c0c87001941a4de36ea39c7805573de497274",
+    "crates/update/src/check_units.rs": "1c5cde0249f9d15ed566af3bd90bf490900b6184e2f81c77954fe89723d3d5f5",
+    "crates/update/src/fetch.rs": "752e1e2f5e09256b58fc3f9c9cf139dab0e09d3ed0bdcf230118edc882f3b881",
+    "crates/update/src/image.rs": "638716079df7e1770cb9c778814ae857a7e242b23519ed8bf490fe1f99a5466c",
+    "crates/update/src/install.rs": "b993118ec50acd520ac8d39fb7c2fc870d161ea0173767b015be79f8c2400d7c",
+    "crates/update/src/judge.rs": "3a5670311ae6741a8c08620bfa1591c886b4a1165d45688ba4ea996357fc830f",
+    "crates/update/src/lib.rs": "0dee46c6481bdd66b01b692bf3b37b01d9501a1d2b051e8d739491062fac63a0",
+    "crates/update/src/main.rs": "f841cce11f5583b06d5c4d695feb506d1455ced2338f62de34bbfabbbcc91277",
+    "crates/update/src/manifest.rs": "1eb17a3675d99f3c9fbb9c6a80d65c06b640dfb5ac35963500e022b5c84e8548",
+    "crates/update/src/models.rs": "246d7ea10b652ec6265253c2a4af5df61e2c09b77963ff602087d4ffe5cd8384",
+    "crates/update/src/own.rs": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7",
+    "crates/update/src/product_skills.rs": "140bab39dd74570a3329210178d9c02db4da78e6417b7f0664891cfdf644bf1f",
+    "crates/update/src/publish.rs": "90af8f48962c22d163b1f1cb19c1e1a32e307b2f1269c7715d3ed743a3e05ad6",
+    "crates/update/src/quiet.rs": "8de6893ad64de665957effcd3a8236190ad6d53494fc8b7ae0968cdb01b7e6e5",
+    "crates/update/src/records.rs": "e74440211d5a86ef0a69e4686e528c77dbbc53cfe44f9b5d1a9c6f4dc1866859",
+    "crates/update/src/round.rs": "a9119a26010d799cb85a2a5f99a4509204e9b8f92f6fb2f10006cfdf314b49b9",
+    "crates/update/src/status.rs": "3b4d0ab9ffcd0f77084f47f2627c2d4517a4e31d5ca3b21093aa695959e7126b",
+    "crates/update/src/unit.rs": "62783c6e0bc42bde5d194d8716074652dafe99f566955e147e481a2069120004",
+    "crates/update/src/world.rs": "e33a959f95b787be18810533dfd62b3ed3a459b2998dd8d75934f3b00c84f571",
+    "crates/update/tests/functions.rs": "3448d8f0896888a5f424a82756818abc2f08b8ee2a05697e27392d3b2d15b5d5",
+    "crates/update/tests/install.rs": "bb89dd6334d22360c663ec631a3d10514495511974f56f44e2876564e42e8e12",
+    "crates/update/tests/it/ci_paths.rs": "da2d09282d8c6ee4248f61bdfc904d21eb2b28f89e72d9639d88b8777c5e4725",
+    "crates/update/tests/it/image_journal.rs": "415143feed902d28f9a88a8bb85c209efacc8babfd6c53f9f0f9492907688ea2",
+    "crates/update/tests/it/image_ramlog.rs": "2d60293fcf7fe5ab17c639a115654110e55205bf4b72f693d0aea89ba6f08e7e",
+    "crates/update/tests/it/main.rs": "7b486c660aa349e676019b3f55ae292947be9381241ae5436c7ee86225683535",
+    "crates/update/tests/it/scratch_paths.rs": "40749f7cf74a1f5bcb11ebce3ba36866710fdf2d3ad13eb85fa1d75169b62554",
+    "crates/update/tests/round.rs": "23b7fae1244704753731fc56b2f0b4e691cfda8f72061ae920e848a59a70cdd7",
+    "crates/update/tests/round/process_cuts.rs": "e5a04534cb6878c2f1656918d95677292167ddff1cee597800ed590ac6846d6c",
+    "crates/update/tests/round/self_cuts.rs": "9ce086ae4ca867c1c7383c59aac34d91feee45a652e88a066659b6b37513550c",
+    "crates/update/tests/round/self_recovery.rs": "2cce3692a1376a60cec1752c8fbcd3e760561f38f3988648ed32013da45363de",
+    "crates/update/tests/self_process_cuts.rs": "34e68d2c1964c42b12f9d5c88af041133c891737ff683c1c25118f50deacf8a3",
+    "Cargo.lock": "e0b90eda8204cb8176ea22aeac76321634aaaac0d6cd652bf9f348d73fd38f64",
+    "Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+    "docs/updates.md": "953715ec5a6f92cb5bba6a5219bfdcc7a395e3a7e1db056357eb24ffd72e1b61"
+  },
+  "current_updater_source_map_matches": true,
+  "current_source_comparison_scope": "The 35 recorded updater/workspace/docs files match at export; this does not qualify transitive dependencies on the later public head.",
+  "range_diff_from_qualified_head": {
+    "target_head": "38aab2919d47b42a8b27c95448ca8ab7201b8923",
+    "patch_relation": "=",
+    "text": "1:  33a43cdd2 = 1:  38aab2919 lampOS: test updater process death at persisted switch steps",
+    "raw_record": {
+      "name": "tmp/second-process-cuts-range-d749-20261022.txt",
+      "bytes": 91,
+      "sha256": "d7666198814dbbed2f2f0908c4272b38f46f62a40f3f93b389b892377b62c2f0"
+    }
+  },
+  "current_public_range_diff": {
+    "target_head": "53911e246558cfdfd7f7f371b51afdd235fdc5ea",
+    "patch_relation": "=",
+    "text": "1:  33a43cdd2 = 1:  53911e246 lampOS: test updater process death at persisted switch steps",
+    "raw_record": {
+      "name": "tmp/second-process-cuts-range-6f112-20261022.txt",
+      "bytes": 91,
+      "sha256": "2e07ce3982e7befaf501b7cc99442ffac10ca27414440bcf03cf3d06a93f8011"
+    }
+  },
+  "raw_receipt": {
+    "name": "second-process-cuts-mac-d749-20261022/gate.json",
+    "bytes": 10156,
+    "sha256": "aaad9fae2437b274e0459b8e525fddef966958e10b05418350d55cdb4722c7d5"
+  },
+  "limit": "Linux process tracing is ignored on macOS. The Mac run and equal patch range do not replace fresh native qualification of the later PR head."
+}

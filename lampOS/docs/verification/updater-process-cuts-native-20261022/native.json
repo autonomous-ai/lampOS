@@ -1,0 +1,277 @@
+{
+  "schema_version": 1,
+  "scope": "Successful earlier PR head; superseded by later rebase. No current-head readiness claim.",
+  "pr": 3012,
+  "issue": 2810,
+  "qualified_head": "33a43cdd245146bf674127b4792f28b3576de879",
+  "tested_merge": "d4668ab93d1fb89d8a535741b28da0b64ca3a268",
+  "tested_merge_parents": [
+    "8e274b5e394b09ef5e5f18cb0d2382fbaddec95a",
+    "33a43cdd245146bf674127b4792f28b3576de879"
+  ],
+  "merge_binding": {
+    "checkout_log": {
+      "line": 237,
+      "text": "HEAD is now at d4668ab Merge 33a43cdd245146bf674127b4792f28b3576de879 into 8e274b5e394b09ef5e5f18cb0d2382fbaddec95a"
+    },
+    "full_merge_sha_log": {
+      "line": 240,
+      "text": "d4668ab93d1fb89d8a535741b28da0b64ca3a268"
+    },
+    "ancestry_note": "Checkout log identifies head/base; full parent relation independently verified by the parent before export."
+  },
+  "arm64_run": {
+    "id": 39774177876,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39774177876",
+    "conclusion": "success"
+  },
+  "nextest": {
+    "passed": 10451,
+    "failed": 0,
+    "skipped": 67,
+    "leaky_passed": 1,
+    "seconds": 179.036,
+    "summary": {
+      "line": 11149,
+      "text": "Summary [ 179.036s] 10451 tests run: 10451 passed (1 leaky), 67 skipped"
+    },
+    "independently_counted_result_rows_before_summary": 10451,
+    "selected_checker": {
+      "line": 7226,
+      "text": "PASS [   3.755s] ( 6530/10451) lamp-update::self-process-cuts persisted_self_switches_survive_sigkill"
+    },
+    "leaky_rows": [
+      {
+        "line": 9163,
+        "text": "LEAK [   0.218s] ( 8467/10451) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+      }
+    ],
+    "failed_rows": [],
+    "skips_note": "The summary reports 67 skips; individual SKIP rows are not printed in this retained log.",
+    "filter": "not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))",
+    "captured_nested_test_summaries_excluded_from_counts": 35,
+    "counting_note": "Captured child-test stdout after the nextest summary is not another test suite and is not added to totals."
+  },
+  "doctests": {
+    "counts": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "filtered out": 0
+    },
+    "nonzero_test_rows": [
+      {
+        "line": 11611,
+        "text": "test crates/bus/src/lib.rs - (line 14) - compile ... ok"
+      },
+      {
+        "line": 11612,
+        "text": "test crates/bus/src/lib.rs - (line 34) - compile ... ok"
+      },
+      {
+        "line": 11674,
+        "text": "test crates/ipc/src/lib.rs - (line 12) ... ok"
+      },
+      {
+        "line": 11712,
+        "text": "test crates/msgs/src/lib.rs - (line 24) - compile ... ok"
+      }
+    ],
+    "crate_summary_count": 46
+  },
+  "custom_process": {
+    "passed": 12,
+    "failed": 0,
+    "summary": {
+      "line": 11880,
+      "text": "test result: 12 passed; 0 failed"
+    },
+    "test_rows": [
+      {
+        "line": 11867,
+        "text": "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2011 ms)"
+      },
+      {
+        "line": 11868,
+        "text": "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)"
+      },
+      {
+        "line": 11869,
+        "text": "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)"
+      },
+      {
+        "line": 11870,
+        "text": "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)"
+      },
+      {
+        "line": 11871,
+        "text": "test missing_model_is_final_and_never_restarted ... ok (162 ms)"
+      },
+      {
+        "line": 11872,
+        "text": "test missing_executable_fails_at_once ... ok (2 ms)"
+      },
+      {
+        "line": 11873,
+        "text": "test startup_failures_are_final ... ok (409 ms)"
+      },
+      {
+        "line": 11874,
+        "text": "test serving_failures_are_replaced_within_budget ... ok (513 ms)"
+      },
+      {
+        "line": 11875,
+        "text": "test protocol_violations_are_replaced ... ok (177 ms)"
+      },
+      {
+        "line": 11876,
+        "text": "test cancelled_answers_are_never_delivered ... ok (155 ms)"
+      },
+      {
+        "line": 11877,
+        "text": "test close_during_inference_never_waits ... ok (233 ms)"
+      },
+      {
+        "line": 11879,
+        "text": "test sustained_requests_stay_bounded ... ok (690 ms)"
+      }
+    ]
+  },
+  "relay_signals": {
+    "status": "passed",
+    "evidence": {
+      "line": 11863,
+      "text": "relay_signals: ok"
+    }
+  },
+  "warnings": [
+    {
+      "line": 467,
+      "text": "warning: output filename collision at lampOS/target/release/examples/replay_cost"
+    },
+    {
+      "line": 472,
+      "text": "warning: output filename collision at lampOS/target/release/examples/replay_cost.dwp"
+    },
+    {
+      "line": 477,
+      "text": "warning: output filename collision at lampOS/target/release/examples/progress_cost"
+    },
+    {
+      "line": 482,
+      "text": "warning: output filename collision at lampOS/target/release/examples/progress_cost.dwp"
+    },
+    {
+      "line": 643,
+      "text": "warning: output filename collision at lampOS/target/release/examples/replay_cost"
+    },
+    {
+      "line": 648,
+      "text": "warning: output filename collision at lampOS/target/release/examples/replay_cost.dwp"
+    },
+    {
+      "line": 653,
+      "text": "warning: output filename collision at lampOS/target/release/examples/progress_cost"
+    },
+    {
+      "line": 658,
+      "text": "warning: output filename collision at lampOS/target/release/examples/progress_cost.dwp"
+    },
+    {
+      "line": 11938,
+      "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+    }
+  ],
+  "warning_scope": "Eight Cargo example-output collisions plus one Node action-runtime deprecation annotation; the separately reported LEAK is a passing test with a retained descendant.",
+  "clippy": {
+    "id": 39774177794,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39774177794",
+    "head": "33a43cdd245146bf674127b4792f28b3576de879",
+    "status": "completed",
+    "conclusion": "success",
+    "job_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39774177794/job/119808850112",
+    "strict_step": "clippy (every crate and target, warnings as errors)",
+    "raw_record": {
+      "name": "tmp/second-updater-process-cuts-clippy-20261022.run.json",
+      "bytes": 2142,
+      "sha256": "9c6332471296eca35b92e4f461a0354178d145639705eac81936f16ef787b8a6"
+    },
+    "limit": "Run metadata verifies the strict all-target Clippy step succeeded; no Clippy raw log was supplied or warning audit claimed."
+  },
+  "artifact": {
+    "id": 12425151983,
+    "name": "lampos-arm64-33a43cdd245146bf674127b4792f28b3576de879",
+    "size_in_bytes": 114329291,
+    "digest": "sha256:df8de6db01be5d1424567818c43b7f0adaf87b3bc1e28a0802ce95a56497b6e1",
+    "created_at": "2026-10-22T12:18:20Z",
+    "expired": false,
+    "archive_sha256": "df8de6db01be5d1424567818c43b7f0adaf87b3bc1e28a0802ce95a56497b6e1",
+    "archive_size_bytes": 114329291,
+    "zip_member_count": 50,
+    "verified_payload_count": 49,
+    "workspace_binaries": 47,
+    "selected_examples": 2,
+    "inventory_canonical_sha256": "f0f502451f509003096ad3b4c365291e2e55c358ea199ce2e7fcf90e0bccfd9b",
+    "all_member_checksums_reverified": true,
+    "checksums_file": {
+      "name": "second-process-cuts-native-20261022/SHA256SUMS",
+      "bytes": 3924,
+      "sha256": "d027d606f95d5126e445832fd209eed00cd2042410a634cee884b7f37322ea14"
+    },
+    "updater": {
+      "sha256": "a42dbaade44bc19a65addcb18bd09d1dbdf764c55d571f0e05551c6200dce535",
+      "bytes": 4592680,
+      "format": "ELF64 little-endian AArch64",
+      "e_machine": 183,
+      "executed": false
+    },
+    "download_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39774177876/artifacts/12425151983",
+    "limit": "PR merge artifact, not a signed release or production-publication input. No binary is copied into this proof."
+  },
+  "raw_inputs": [
+    {
+      "name": "second-process-cuts-native-20261022/receipt.json",
+      "bytes": 22072,
+      "sha256": "e0e1797ec6c011821ee6d937d5edeb769709cf754f26d89a7198c7d11185ae9a"
+    },
+    {
+      "name": "second-process-cuts-native-20261022/run.log",
+      "bytes": 2508196,
+      "sha256": "993c81eccb2d99deb95586f411982226cf0d9e49d76205001e2e963a5db72003"
+    },
+    {
+      "name": "second-process-cuts-native-20261022/SHA256SUMS",
+      "bytes": 3924,
+      "sha256": "d027d606f95d5126e445832fd209eed00cd2042410a634cee884b7f37322ea14"
+    }
+  ],
+  "current_pr": {
+    "pr": 3012,
+    "head": "53911e246558cfdfd7f7f371b51afdd235fdc5ea",
+    "integration_base": "6f1123f69b33e352d5ba5e149a47fc68ea079d7a",
+    "status_at_checkpoint": "ARM64 and x86 Clippy running; not qualified by this checkpoint",
+    "arm64_run": {
+      "id": 39778575538,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39778575538"
+    },
+    "clippy_run": {
+      "id": 39778575540,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39778575540"
+    },
+    "observation_source": "Parent task handoff; no fresh network query was made for this checkpoint",
+    "range_diff_from_qualified_head": {
+      "target_head": "53911e246558cfdfd7f7f371b51afdd235fdc5ea",
+      "patch_relation": "=",
+      "text": "1:  33a43cdd2 = 1:  53911e246 lampOS: test updater process death at persisted switch steps",
+      "raw_record": {
+        "name": "tmp/second-process-cuts-range-6f112-20261022.txt",
+        "bytes": 91,
+        "sha256": "2e07ce3982e7befaf501b7cc99442ffac10ca27414440bcf03cf3d06a93f8011"
+      }
+    }
+  },
+  "remaining": [
+    "Attended physical unplug has not been performed.",
+    "The signed-release/device exercise in #1812 has not been performed; owner/person/key prerequisites remain."
+  ]
+}
