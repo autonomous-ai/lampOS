@@ -124,6 +124,13 @@ pub trait Lamp {
         None
     }
 
+    /// lamp-voice's app-make socket, for a skill typed in the owner's app
+    /// (`LAMP_APP_MAKE_SKILL=on` with the skills page, #2813,
+    /// `crate::make_skill`).
+    fn make_skill(&self) -> Option<std::path::PathBuf> {
+        None
+    }
+
     /// The lamp's timers and reminders (`LAMP_APP_SCHEDULE=on`, #2195,
     /// `crate::schedule`): there only with the switch.
     fn schedule(&self) -> Option<&lamp_actions::schedule::Adapter> {
@@ -163,7 +170,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 33] = [
+pub const KINDS: [(&str, Switch); 35] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -197,6 +204,8 @@ pub const KINDS: [(&str, Switch); 33] = [
     ("schedule.cancel", |lamp| lamp.schedule().is_some()),
     ("guard.on", |lamp| lamp.guard().is_some()),
     ("guard.off", |lamp| lamp.guard().is_some()),
+    ("skills.make", |lamp| lamp.make_skill().is_some()),
+    ("skills.made", |lamp| lamp.make_skill().is_some()),
     ("update.status", |lamp| lamp.update_page()),
     ("system.reboot", |lamp| lamp.restarts()),
 ];
@@ -389,6 +398,17 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let socket = lamp.guard().ok_or_else(|| not_here(kind))?;
             crate::guard::turn(&socket, kind)
         }
+        // A skill typed in the owner's app (#2813): handed to lamp-voice,
+        // which makes it as the voice's own; only a spoken yes at the lamp
+        // puts it on, never anything from the app.
+        "skills.make" if on(lamp, kind) => {
+            let socket = lamp.make_skill().ok_or_else(|| not_here(kind))?;
+            crate::make_skill::make(&socket, data)
+        }
+        "skills.made" if on(lamp, kind) => {
+            let socket = lamp.make_skill().ok_or_else(|| not_here(kind))?;
+            crate::make_skill::made(&socket, data)
+        }
         // A package from the Skills Store, from a URL (#1722), with
         // `LAMP_SKILLS_STORE=on` too: root's manage helper fetches it and
         // installs it only signed with the update channel's key.
@@ -447,6 +467,7 @@ pub mod tests {
         pub faces: Option<crate::faces::Eyes>,
         pub schedule: Option<lamp_actions::schedule::Adapter>,
         pub guard: Option<std::path::PathBuf>,
+        pub make_skill: Option<std::path::PathBuf>,
         pub update_page: bool,
         pub restart: bool,
     }
@@ -523,6 +544,9 @@ pub mod tests {
         }
         fn guard(&self) -> Option<std::path::PathBuf> {
             self.guard.clone()
+        }
+        fn make_skill(&self) -> Option<std::path::PathBuf> {
+            self.make_skill.clone()
         }
         fn update_page(&self) -> bool {
             self.update_page
@@ -825,6 +849,9 @@ pub mod tests {
             // Without LAMP_GUARD_FROM_APP=on (#2562).
             "guard.on",
             "guard.off",
+            // Without LAMP_APP_MAKE_SKILL=on (#2813).
+            "skills.make",
+            "skills.made",
         ] {
             assert_eq!(
                 answer(&mut lamp, kind, &Value::Null),
@@ -925,6 +952,11 @@ pub mod tests {
                 "guard",
                 |f| f.guard = Some(std::path::PathBuf::from("/nowhere/call.sock")),
                 &["guard.on", "guard.off"],
+            ),
+            (
+                "make skill",
+                |f| f.make_skill = Some(std::path::PathBuf::from("/nowhere/make.sock")),
+                &["skills.make", "skills.made"],
             ),
             ("update page", |f| f.update_page = true, &["update.status"]),
             ("restart", |f| f.restart = true, &["system.reboot"]),
