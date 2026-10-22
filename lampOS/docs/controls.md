@@ -1099,9 +1099,13 @@ Controls' report on `diagnostics` counts the loop's pace beside
 starts), `long_gaps` (gaps of 50 ms or more, past the switch's freshness) and
 `slow_steps` (service steps whose elapsed time took 1 ms or more, including
 waits but excluding the outer hand journal writes). Both service paths report
-these counts. A long gap is also said
-in the journal, at most once a second: "the loop didn't run for N ms, past the
-privacy reading's 50 ms".
+these counts. Count a run's long gaps by subtracting its starting `long_gaps`
+snapshot from its ending snapshot in the same Controls process; a restart
+resets the counter. A long gap is also said in the journal, at most once a
+second: "the loop didn't run for N ms, past the privacy reading's 50 ms".
+Suppressed gaps appear as "N more since the last line" only when a later
+long gap produces another warning. If none does, those gaps stay unprinted,
+so journal lines, even with their "more" counts, can undercount a run.
 
 The injected-clock regression covers the first and repeated delays: with
 30 ms elapsed and 0.2 ms CPU work, the old touch-loop sleep made consecutive readings
