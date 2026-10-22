@@ -1614,7 +1614,8 @@ Tests: `a_corrected_ask_replaces_the_one_waiting_and_only_it_starts`,
 `without_the_correct_switch_the_note_and_next_are_as_before`,
 `with_the_correct_switch_a_repeat_of_the_waiting_ask_is_not_a_yes`,
 `a_repeat_after_a_no_harness_refusal_is_refused_again_with_nothing_waiting`
-(a refused ask leaves nothing waiting, so no note follows it). The
+(when nothing was waiting, a refused ask leaves nothing waiting, so no
+note follows it; a refusal doesn't clear a task already waiting). The
 words only steer the model: the voice doesn't yet refuse a confirm on a line
 with no yes in it, which comes only if a run shows the words aren't enough.
 
