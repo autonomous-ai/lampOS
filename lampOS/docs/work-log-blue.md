@@ -484,3 +484,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - **18:37, reviewer-two on #2889:** everything was green at `f2af29ab6` (ARM64, Linux, the full local check and the fake suite), but the final guard caught the base moving to `f012c4725` (#2998). Rebased at 18:38 to `b4c7efdb1`; the only range-diff change is a base context row.
 - **18:42–18:44, #2889:** reviewer-two passed `b4c7efdb1` (P1/P2 none). The base moved again to `5e51ac016` (skills and switches docs), so rebased to `eaf6b9557` (`=`). Asked the first builder on #2602 for a carry or a merge in a quiet window, after six rebases.
 - **18:46, the first builder:** the Reviewer-lead carries #2889 in their serial queue; blue stops rebasing it. Its last head is `eaf6b9557` on `5e51ac016`.
+- **19:37, the Reviewer-lead:** #2889 is carried as #3031, the same patch (range-diff `=`, head `14670b37d`). It is first in their queue and merges on clippy, which is green. #2813's lamp check follows the merge.
