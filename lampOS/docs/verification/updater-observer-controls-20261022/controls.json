@@ -1,0 +1,288 @@
+{
+  "scope": "synthetic debugger attach/exec/identity/detach controls only",
+  "status": "passed",
+  "platform": {
+    "machine": "aarch64",
+    "python": "3.11.2",
+    "system": "Linux"
+  },
+  "artifact_sha256": "a42dbaade44bc19a65addcb18bd09d1dbdf764c55d571f0e05551c6200dce535",
+  "watchdog_seconds": 60,
+  "elapsed_seconds": 6.525,
+  "source_hashes": {
+    "observer.gdb": "d6e1d2593cb3ac18aa0c5ba229e61e2b5316515a7318c5acab869925808ea3c6",
+    "observer.py": "5acaf2045c613b7939913aa94c93712a0f4c379743184b4b1c72cf190e132d56",
+    "rehearse.py": "fbda78728831ed3222cc872ce0e24bee1c21197dfd9c92d62624ef05849bb260"
+  },
+  "not_run": [],
+  "limits": [
+    "No updater round or pending state is constructed.",
+    "No device, physical power loss, filesystem durability or installed handover proof.",
+    "Actual target prefix verification remains a required separate preflight.",
+    "No SIGCONT rescue is used; an observer death must release its target itself."
+  ],
+  "raw_receipt_sha256": "fa47cb02a474bd83465d0b8196c608047ebe2e4f98f867cd84933dcead5a3c91",
+  "image_id": "68f91ab3b51f238e492a18f579a9a1ee0b50a3c260804d9862c9dae6a4464192",
+  "cases": [
+    {
+      "case": "detach",
+      "status": "passed",
+      "elapsed_seconds": 3.141,
+      "target_exit_code": 0,
+      "debugger_exit_code": 0,
+      "target_resumed_without_SIGCONT": true,
+      "attached": {
+        "exec_catchpoint_armed": true,
+        "gdb_version": "13.1",
+        "initial_stopped": true,
+        "pid": 2,
+        "starttime": 97827
+      },
+      "ready": {
+        "argv_sha256": "4f4e979d7a0dacbc6e0e649475b30ee074a5f91c2a93824f8e09a13d387c637d",
+        "checks": {
+          "canonical_executable": true,
+          "exec_catchpoint": true,
+          "executable_sha256": true,
+          "expected_argv": true,
+          "same_pid": true,
+          "same_starttime": true,
+          "stopped": true
+        },
+        "executable_sha256": "a42dbaade44bc19a65addcb18bd09d1dbdf764c55d571f0e05551c6200dce535",
+        "hold_seconds": 3,
+        "pid": 2,
+        "ready_monotonic": 978.375758571,
+        "starttime": 97827,
+        "synthetic_fixture_only": true
+      },
+      "rejected": null,
+      "observer_final": {
+        "detached": true,
+        "exec_seen": true,
+        "phase": "hold_ready",
+        "ready": true,
+        "reason": "normal_detach",
+        "stop_kind": "BreakpointEvent"
+      },
+      "logs": [
+        {
+          "bytes": 296,
+          "file": "observer.log",
+          "sha256": "c757bad960a8467082b93a024985bae4073e1231f473034d92782dd334753544"
+        },
+        {
+          "bytes": 6404,
+          "file": "target.log",
+          "sha256": "995f79d30398ea3f84825e4b3a8cff051f1e3c1e56dd2c318458cfecf7728e45"
+        }
+      ],
+      "owned_processes_reaped": true,
+      "cleanup_kill": false
+    },
+    {
+      "case": "observer_term",
+      "status": "passed",
+      "elapsed_seconds": 0.111,
+      "target_exit_code": 0,
+      "debugger_exit_code": 2,
+      "target_resumed_without_SIGCONT": true,
+      "attached": {
+        "exec_catchpoint_armed": true,
+        "gdb_version": "13.1",
+        "initial_stopped": true,
+        "pid": 10,
+        "starttime": 98142
+      },
+      "ready": {
+        "argv_sha256": "4f4e979d7a0dacbc6e0e649475b30ee074a5f91c2a93824f8e09a13d387c637d",
+        "checks": {
+          "canonical_executable": true,
+          "exec_catchpoint": true,
+          "executable_sha256": true,
+          "expected_argv": true,
+          "same_pid": true,
+          "same_starttime": true,
+          "stopped": true
+        },
+        "executable_sha256": "a42dbaade44bc19a65addcb18bd09d1dbdf764c55d571f0e05551c6200dce535",
+        "hold_seconds": 3,
+        "pid": 10,
+        "ready_monotonic": 981.499247112,
+        "starttime": 98142,
+        "synthetic_fixture_only": true
+      },
+      "rejected": null,
+      "observer_final": {
+        "detached": true,
+        "exec_seen": true,
+        "phase": "hold_ready",
+        "ready": true,
+        "reason": "observer_error_KeyboardInterrupt",
+        "stop_kind": "BreakpointEvent"
+      },
+      "logs": [
+        {
+          "bytes": 296,
+          "file": "observer.log",
+          "sha256": "f2e57c3c59a875797d226b2f2fa7ac4b4900488beadf8370c64ebb10af4e72c4"
+        },
+        {
+          "bytes": 6404,
+          "file": "target.log",
+          "sha256": "995f79d30398ea3f84825e4b3a8cff051f1e3c1e56dd2c318458cfecf7728e45"
+        }
+      ],
+      "observer_signal": 15,
+      "owned_processes_reaped": true,
+      "cleanup_kill": false
+    },
+    {
+      "case": "observer_kill",
+      "status": "passed",
+      "elapsed_seconds": 0.089,
+      "target_exit_code": 0,
+      "debugger_exit_code": -9,
+      "target_resumed_without_SIGCONT": true,
+      "attached": {
+        "exec_catchpoint_armed": true,
+        "gdb_version": "13.1",
+        "initial_stopped": true,
+        "pid": 18,
+        "starttime": 98153
+      },
+      "ready": {
+        "argv_sha256": "4f4e979d7a0dacbc6e0e649475b30ee074a5f91c2a93824f8e09a13d387c637d",
+        "checks": {
+          "canonical_executable": true,
+          "exec_catchpoint": true,
+          "executable_sha256": true,
+          "expected_argv": true,
+          "same_pid": true,
+          "same_starttime": true,
+          "stopped": true
+        },
+        "executable_sha256": "a42dbaade44bc19a65addcb18bd09d1dbdf764c55d571f0e05551c6200dce535",
+        "hold_seconds": 3,
+        "pid": 18,
+        "ready_monotonic": 981.58970985,
+        "starttime": 98153,
+        "synthetic_fixture_only": true
+      },
+      "rejected": null,
+      "observer_final": null,
+      "logs": [
+        {
+          "bytes": 190,
+          "file": "observer.log",
+          "sha256": "2383c3b2cf65f108b037cb337980d6c6036142d3b1f717f32f6d7662f8b0214b"
+        },
+        {
+          "bytes": 6404,
+          "file": "target.log",
+          "sha256": "995f79d30398ea3f84825e4b3a8cff051f1e3c1e56dd2c318458cfecf7728e45"
+        }
+      ],
+      "observer_signal": 9,
+      "owned_processes_reaped": true,
+      "cleanup_kill": false
+    },
+    {
+      "case": "no_exec",
+      "status": "passed",
+      "elapsed_seconds": 3.105,
+      "target_exit_code": 0,
+      "debugger_exit_code": 2,
+      "target_resumed_without_SIGCONT": true,
+      "attached": {
+        "exec_catchpoint_armed": true,
+        "gdb_version": "13.1",
+        "initial_stopped": true,
+        "pid": 26,
+        "starttime": 98162
+      },
+      "ready": null,
+      "rejected": null,
+      "observer_final": {
+        "detached": true,
+        "exec_seen": false,
+        "phase": "wait_exec",
+        "ready": false,
+        "reason": "no_exec_timeout",
+        "stop_kind": "SignalEvent"
+      },
+      "logs": [
+        {
+          "bytes": 302,
+          "file": "observer.log",
+          "sha256": "c5d01669c86c11c88bf0ef81d49a46787c38b91596ecc4e48f0a1603b068c22a"
+        },
+        {
+          "bytes": 0,
+          "file": "target.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "observer_interrupt": 2,
+      "old_target_after_timeout": {
+        "starttime": 98162,
+        "state": "S"
+      },
+      "owned_processes_reaped": true,
+      "cleanup_kill": false
+    },
+    {
+      "case": "wrong_exec",
+      "status": "passed",
+      "elapsed_seconds": 0.066,
+      "target_exit_code": 0,
+      "debugger_exit_code": 2,
+      "target_resumed_without_SIGCONT": true,
+      "attached": {
+        "exec_catchpoint_armed": true,
+        "gdb_version": "13.1",
+        "initial_stopped": true,
+        "pid": 34,
+        "starttime": 98473
+      },
+      "ready": null,
+      "rejected": {
+        "argv_sha256": "9e44697a1718b7986fd04a1af01205543efa0e1988c32ba2131bb27a69398251",
+        "checks": {
+          "canonical_executable": false,
+          "exec_catchpoint": true,
+          "executable_sha256": false,
+          "expected_argv": false,
+          "same_pid": true,
+          "same_starttime": true,
+          "stopped": true
+        },
+        "executable_sha256": "dfd1b0241759344063bd5052622d90910c53084234a26f19527d150da3e43d4b",
+        "phase": "verify_exec",
+        "starttime": 98473
+      },
+      "observer_final": {
+        "detached": true,
+        "exec_seen": true,
+        "phase": "verify_exec",
+        "ready": false,
+        "reason": "exec_identity",
+        "stop_kind": "BreakpointEvent"
+      },
+      "logs": [
+        {
+          "bytes": 288,
+          "file": "observer.log",
+          "sha256": "aad9b1c5ae7c0640acb0e61a84b96d9ebfa08264421f20efd7216d22b1c56bab"
+        },
+        {
+          "bytes": 0,
+          "file": "target.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "owned_processes_reaped": true,
+      "cleanup_kill": false
+    }
+  ]
+}
