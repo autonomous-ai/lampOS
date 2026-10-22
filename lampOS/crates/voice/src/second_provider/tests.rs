@@ -6981,7 +6981,7 @@ async fn asked_after(
 /// telling whether one person said each link (`LAMP_JOIN_CUT_WORDS`), all
 /// let out; `between` runs before each later line begins, with the request
 /// before it.
-async fn asked_after_pieces(
+pub(super) async fn asked_after_pieces(
     lines: &[&'static str],
     gap: Duration,
     same: SameSpeaker,
@@ -7144,16 +7144,14 @@ async fn a_request_broken_into_four_pieces_is_asked_as_one_line() {
 /// the next line's verdict. Judged two people's there, the chain breaks.
 #[tokio::test]
 async fn a_piece_cut_before_it_was_asked_stays_in_the_chain() {
-    async fn asked(same: SameSpeaker) -> Message {
+    const TIRED: [&str; 3] = [
+        "I've been feeling a bit tired lately.",
+        "Like, every afternoon,",
+        "Why could that be?",
+    ];
+    async fn asked(lines: [&'static str; 3], same: SameSpeaker) -> Message {
         let script = Arc::new(Script {
-            heard: Mutex::new(
-                [
-                    Ok("I've been feeling a bit tired lately.".to_owned()),
-                    Ok("Like, every afternoon,".to_owned()),
-                    Ok("Why could that be?".to_owned()),
-                ]
-                .into(),
-            ),
+            heard: Mutex::new(lines.iter().map(|line| Ok((*line).to_owned())).collect()),
             chats: Mutex::new(
                 [
                     vec![
@@ -7197,7 +7195,9 @@ async fn a_piece_cut_before_it_was_asked_stays_in_the_chain() {
         engine.submit(start(1));
         engine.submit(audio(1, 1));
         engine.submit(end(1));
+        let until = std::time::Instant::now() + Duration::from_secs(5);
         while searched.try_recv().is_err() {
+            assert!(std::time::Instant::now() < until, "no search");
             let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
         }
         *now.lock().unwrap() += Duration::from_millis(1_500);
@@ -7210,7 +7210,7 @@ async fn a_piece_cut_before_it_was_asked_stays_in_the_chain() {
             let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
                 .await
                 .expect("the second piece's words");
-            if matches!(&event, ProviderOutput::Transcript { text, finished: true, .. } if text.contains("afternoon"))
+            if matches!(&event, ProviderOutput::Transcript { text, finished: true, .. } if text == lines[1])
             {
                 break;
             }
@@ -7232,22 +7232,41 @@ async fn a_piece_cut_before_it_was_asked_stays_in_the_chain() {
         asked[asked.len() - 1].last().unwrap().clone()
     }
     assert_eq!(
-        asked(Arc::new(|_, _| Joined::NoSecond(
-            "no sign of a second person".to_owned()
-        )))
+        asked(
+            TIRED,
+            Arc::new(|_, _| Joined::NoSecond("no sign of a second person".to_owned()))
+        )
         .await,
         Message::user(
             "I've been feeling a bit tired lately. Like, every afternoon, Why could that be?"
         )
     );
     assert_eq!(
-        asked(Arc::new(|cut, request| match (cut, request) {
-            (1, 2) => Joined::Not("two voices (cosine 0.12)".to_owned()),
-            _ => Joined::NoSecond("no sign of a second person".to_owned()),
-        }))
+        asked(
+            TIRED,
+            Arc::new(|cut, request| match (cut, request) {
+                (1, 2) => Joined::Not("two voices (cosine 0.12)".to_owned()),
+                _ => Joined::NoSecond("no sign of a second person".to_owned()),
+            })
+        )
         .await,
         Message::user("Like, every afternoon, Why could that be?"),
         "a two-person link no verdict judged breaks the chain"
+    );
+    // A reviewer's P2 on the chain (22 Oct): "never mind" cut short before
+    // it was asked withdraws what came before it.
+    assert_eq!(
+        asked(
+            [
+                "What's the weather like this weekend",
+                "never mind",
+                "what's the time?"
+            ],
+            Arc::new(|_, _| Joined::NoSecond("no sign of a second person".to_owned()))
+        )
+        .await,
+        Message::user("what's the time?"),
+        "a stop word mid-chain"
     );
 }
 

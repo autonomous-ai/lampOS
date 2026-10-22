@@ -12990,6 +12990,16 @@ mod tests {
         in_view: [Option<usize>; 2],
         room: crate::room_told::Room,
     ) -> Heeding {
+        judged_lines(name, &in_view, room)
+    }
+
+    /// [`judged_in_rooms`] for as many lines as `in_view` has, requests 1
+    /// on.
+    fn judged_lines(
+        name: &str,
+        in_view: &[Option<usize>],
+        room: crate::room_told::Room,
+    ) -> Heeding {
         use lamp_msgs::{Face, Faces};
         // A short root: a Unix socket's address holds 103 bytes.
         let root = std::path::PathBuf::from(format!("/tmp/lj{name}-{}", std::process::id()));
@@ -13018,7 +13028,7 @@ mod tests {
             None,
         );
         heeding.keeping_line_rooms();
-        for (request, faces) in [1, 2].into_iter().zip(in_view) {
+        for (request, faces) in (1..).zip(in_view.iter().copied()) {
             match faces {
                 Some(faces) => {
                     eyes.publish_json(
@@ -13164,6 +13174,40 @@ mod tests {
         assert_eq!(
             heeding.same_speaker(1, 2),
             Joined::Not(format!("{missing}; nothing kept of the room at request 1"))
+        );
+    }
+
+    /// A reviewer's P2 on the chain (22 Oct): a face two pieces apart is two
+    /// people as much as one beside it. One face in view at each of three
+    /// lines, a quiet room; X seen saying the first, nobody the short middle
+    /// one, Y the last: each link alone passes, but the first and the last
+    /// are two faces, so the chain breaks before the middle piece. The same
+    /// face at both ends, all three are asked as one. Through the rule's own
+    /// judgement.
+    #[tokio::test]
+    async fn a_chain_with_two_faces_seen_speaking_in_it_breaks_before_the_second() {
+        use crate::room_told::Room::Quiet;
+        use crate::second_provider::net::Message;
+        use crate::second_provider::tests::asked_after_pieces;
+        let pieces = ["I want the", "um, and", "weather in Saigon this weekend?"];
+        let rule = |name: &str, last: &str| -> crate::second_provider::SameSpeaker {
+            let mut heeding = judged_lines(name, &[Some(1), Some(1), Some(1)], Quiet);
+            heeding.spoke.push_back((1, vec!["x".to_owned()]));
+            heeding.spoke.push_back((2, Vec::new()));
+            heeding.spoke.push_back((3, vec![last.to_owned()]));
+            let heeding = Arc::new(Mutex::new(heeding));
+            Arc::new(move |cut, request| heeding.lock().unwrap().same_speaker(cut, request))
+        };
+        let soon = Duration::from_millis(1_500);
+        assert_eq!(
+            asked_after_pieces(&pieces, soon, rule("f1", "y"), |_, _| {}).await,
+            Message::user("um, and weather in Saigon this weekend?"),
+            "X then nobody then Y"
+        );
+        assert_eq!(
+            asked_after_pieces(&pieces, soon, rule("f2", "x"), |_, _| {}).await,
+            Message::user("I want the um, and weather in Saigon this weekend?"),
+            "X then nobody then X"
         );
     }
 
