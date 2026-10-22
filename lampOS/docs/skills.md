@@ -1483,6 +1483,20 @@ digits, `-`, `_` and `.`, none beginning with a dot (no `..`, no
 `._NAME`); at most 512 files and 16 MiB. Then the skill is loaded and moved
 in as from a folder.
 
+**What an installed package keeps** (#2801). A skill put on from a package
+(by hand, from the Skills Store or made by voice) keeps, in its own folder,
+`.package.json`: the SHA-256 of the package's bytes, the one the Store's
+catalogue names, and its `lamp-skill.json` as installed
+(`package::INSTALLED_FROM`, read by `package::installed_from`). It is
+written into the folder before the folder is moved in, so it comes and goes
+with the skill: the next install replaces it whole, and a remove deletes
+it. Hidden, so the loader, `pack` and an install from a folder pass over it,
+and a package can't carry one of its own (no path in a package begins with
+a dot). A core skill, one put on from a folder, and one installed before
+this keep none, and one whose `skill.toml` version no longer matches the
+kept manifest's (changed by hand) is no longer that package's: each lists
+no `sha256` ([cloud.md](cloud.md), "The skills page").
+
 **The signature.** `lamp-skill.sig`, beside the manifest, is one line of
 JSON, `{"key": FINGERPRINT, "signature": BASE64}`: Ed25519 over the
 manifest's exact bytes, which name every file's size and SHA-256, so it

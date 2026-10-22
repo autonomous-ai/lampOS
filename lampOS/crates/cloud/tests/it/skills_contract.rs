@@ -36,12 +36,13 @@ const REPLY: [(&str, &str); 3] = [
 ];
 
 /// Each skill's fields, and the types each may take.
-const SKILL: [(&str, &[&str]); 11] = [
+const SKILL: [(&str, &[&str]); 12] = [
     ("name", &["string"]),
     ("title", &["string"]),
     ("description", &["string"]),
     ("group", &["string"]),
     ("version", &["string", "null"]),
+    ("sha256", &["string", "null"]),
     ("can_remove", &["bool"]),
     ("can_turn_off", &["bool"]),
     ("off", &["bool", "null"]),
@@ -312,5 +313,81 @@ fn removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope() {
     assert!(!folder.join("desk-tutor").exists());
     let again = asked(&mut real, "skills.remove", &json!({"name": "desk-tutor"}));
     assert_eq!(again["error"], "no skill desk-tutor on this lamp");
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// A skill put on from a package is listed with the package's `sha256`
+/// beside its `version`, the two the Store's catalogue names (#2801), so
+/// the app can tell it is the package the Store lists; the next version's
+/// package replaces both. A core skill, and one put on from a folder, say
+/// null.
+#[test]
+fn a_skill_from_a_package_is_listed_with_its_sha256_and_version() {
+    use lamp_skills::package::{install, pack, sha256_hex};
+    let root = PathBuf::from(format!("/tmp/lcsh-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let folder = root.join("skills");
+    let ours = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../skills");
+    copied(&ours, &folder);
+    let mut real = real(Some(skills::Places {
+        folder: folder.clone(),
+        off: root.join("off"),
+        manage: root.join("m.sock"),
+        store: false,
+        addons: false,
+    }));
+    let rows = |real: &mut Real| sent(real)["data"]["skills"].as_array().unwrap().clone();
+    let tutor = |real: &mut Real| {
+        rows(real)
+            .into_iter()
+            .find(|row| row["name"] == "desk-tutor")
+            .unwrap()
+    };
+    // Copied in as folders: none says a package.
+    assert!(rows(&mut real).iter().all(|row| row["sha256"].is_null()));
+
+    // Put on from its package, as the manage helper puts one on.
+    let first = pack(&folder.join("desk-tutor"), &root.join("one")).unwrap();
+    install(&folder, &first).unwrap();
+    let row = tutor(&mut real);
+    assert_eq!(
+        (&row["version"], &row["sha256"]),
+        (
+            &json!("1.0.0"),
+            &json!(sha256_hex(&fs::read(&first).unwrap()))
+        ),
+        "{row}"
+    );
+    assert!(
+        rows(&mut real)
+            .iter()
+            .filter(|row| row["name"] != "desk-tutor")
+            .all(|row| row["sha256"].is_null())
+    );
+
+    // Its next version replaces it, with that package's sha256.
+    let source = root.join("two").join("desk-tutor");
+    copied(&ours.join("desk-tutor"), &source);
+    let toml = fs::read_to_string(source.join("skill.toml")).unwrap();
+    fs::write(
+        source.join("skill.toml"),
+        toml.replacen("version = \"1.0.0\"", "version = \"1.1.0\"", 1),
+    )
+    .unwrap();
+    let next = pack(&source, &root.join("two")).unwrap();
+    install(&folder, &next).unwrap();
+    let row = tutor(&mut real);
+    assert_eq!(
+        (&row["version"], &row["sha256"]),
+        (
+            &json!("1.1.0"),
+            &json!(sha256_hex(&fs::read(&next).unwrap()))
+        ),
+        "{row}"
+    );
+
+    // Put on again from a folder: no package, so none.
+    install(&folder, &source).unwrap();
+    assert!(tutor(&mut real)["sha256"].is_null());
     let _ = fs::remove_dir_all(&root);
 }

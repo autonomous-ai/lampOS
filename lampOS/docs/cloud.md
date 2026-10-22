@@ -520,7 +520,7 @@ build; not yet timed on a lamp). A folder that can't be read is answered
 {"version": 1, "left_out": 0, "skills": [
   {"name": "dance", "title": "Dance",
    "description": "When someone asks the lamp to dance (…)",
-   "group": "core", "version": "1.0.0",
+   "group": "core", "version": "1.0.0", "sha256": null,
    "can_remove": false, "can_turn_off": true, "off": false,
    "loads": true, "why": null,
    "may_use": [
@@ -530,6 +530,7 @@ build; not yet timed on a lamp). A folder that can't be read is answered
      {"name": "hearing", "says": "hears what is said to it", "privacy": "the privacy switch stops it"}]},
   {"name": "desk-tutor", "title": "Desk tutor", "description": "…",
    "group": "installed", "version": "1.0.0",
+   "sha256": "…",
    "can_remove": true, "can_turn_off": true, "off": true,
    "loads": true, "why": null,
    "may_use": [
@@ -553,6 +554,14 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   `installed` for any other. A core skill that says `made: here` is still
   core. Nothing writes `made: here` yet: the lamp skill creator will, when
   it makes one.
+- **`sha256`** (#2801): for a skill put on from a package (from the Skills
+  Store, by hand or made by voice), the SHA-256 of that package's bytes,
+  64 lowercase hex, the one the Store's catalogue names beside the same
+  `version`, so the app can tell the lamp runs the package the Store lists.
+  Kept in the skill's folder at install ([skills.md](skills.md), "What an
+  installed package keeps"); a newer package's replaces it. Null for a
+  core skill, one put on from a folder, one installed before the lamp kept
+  it, and one whose version was changed by hand since.
 - **`can_remove`**: false for a core skill, true for the others.
 - **`can_turn_off`**: the skill loads and is not part of the lamp itself
   (#2815): true for every one but those granted a core operation (`core =

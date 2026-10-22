@@ -107,14 +107,63 @@ pub struct Entry {
 pub type Files = BTreeMap<String, Vec<u8>>;
 
 /// A package read and checked: its manifest, the skill's files, each as the
-/// manifest says, the signature it carries, if any, and the fingerprint of
-/// the key it was checked against, when it was.
+/// manifest says, the signature it carries, if any, the fingerprint of the
+/// key it was checked against, when it was, and the SHA-256 of the whole
+/// package, the `.tar`'s own bytes, as the Store's catalogue names it.
 #[derive(Debug)]
 pub struct Package {
     pub manifest: Manifest,
     pub files: Files,
     pub signature: Option<Vec<u8>>,
     pub signed_by: Option<String>,
+    pub sha256: String,
+}
+
+/// What a skill put on from a package keeps of it, in its own folder: the
+/// package's SHA-256 and its `lamp-skill.json` as installed, so the app's
+/// list can say which package the skill is ([`installed_from`]). Hidden, so
+/// the loader, `pack` and an install from a folder pass over it, and a
+/// package can't carry one of its own (no path in a package begins with a
+/// dot): only an install from a package writes it, into the folder before
+/// the folder is moved in, so it comes and goes with the skill, replaced
+/// whole by the next install and deleted by a remove. A skill that comes
+/// with the lamp, or put on from a folder, has none.
+pub const INSTALLED_FROM: &str = ".package.json";
+
+/// [`INSTALLED_FROM`]'s contents.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Installed {
+    /// The SHA-256 of the package's bytes, lowercase hex.
+    pub sha256: String,
+    /// The package's `lamp-skill.json`.
+    pub manifest: Manifest,
+}
+
+/// The most bytes of [`INSTALLED_FROM`] read: a manifest of [`MOST_FILES`]
+/// files is under 100 KB.
+const MOST_INSTALLED_BYTES: u64 = 256 * 1024;
+
+/// The package the installable skill in `folder` was put on from, when it
+/// was and the folder is still as that install left it: the record names
+/// the folder's skill, its SHA-256 is one, and its version is the one
+/// `skill.toml` says now (a version changed by hand is no longer that
+/// package's). Otherwise none: a core skill, one put on from a folder, or
+/// one installed before skills kept this.
+pub fn installed_from(folder: &Path) -> Option<Installed> {
+    let mut bytes = Vec::new();
+    fs::File::open(folder.join(INSTALLED_FROM))
+        .ok()?
+        .take(MOST_INSTALLED_BYTES)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    let installed: Installed = serde_json::from_slice(&bytes).ok()?;
+    (kind_of(folder) != SkillKind::Core
+        && sha256_ok(&installed.sha256)
+        && folder.file_name().and_then(|name| name.to_str())
+            == Some(installed.manifest.name.as_str())
+        && version_of(folder).as_deref() == Some(installed.manifest.version.as_str()))
+    .then_some(installed)
 }
 
 /// `lamp-skill.sig`'s one line.
@@ -576,6 +625,7 @@ pub fn read_package_bytes(bytes: &[u8], key: Option<&[u8; 32]>) -> Result<Packag
         files,
         signature,
         signed_by,
+        sha256: sha256_hex(bytes),
     })
 }
 
@@ -999,6 +1049,16 @@ fn put_in(
             fs::write(&at, bytes).map_err(failed)?;
         }
         fs::create_dir_all(&folder).map_err(failed)?;
+        if let Some(package) = package {
+            let installed = Installed {
+                sha256: package.sha256.clone(),
+                manifest: package.manifest.clone(),
+            };
+            let mut json = serde_json::to_vec_pretty(&installed)
+                .map_err(|error| format!("not installed: {error}"))?;
+            json.push(b'\n');
+            fs::write(folder.join(INSTALLED_FROM), json).map_err(failed)?;
+        }
         open_to_parts(&folder).map_err(failed)?;
         moved_in(skills, &name, &folder, files.len(), package)
     })();
