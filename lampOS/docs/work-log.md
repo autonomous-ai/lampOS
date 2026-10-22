@@ -1,3 +1,42 @@
+## Current checkpoint: 2026-10-22 09:49 +07, Music rebase pushed with fresh five-crate gate
+
+**#1757:** Pushed `d96f484ec0567ecd66819cb45bd44f5c39961118`, rebased on
+`17fdfda1d757324b8437d997304e855e8ecbf9dd`. The worker conflict preserves
+both the upstream seems-note setup and requested-audio setup. Independent
+static review found no P1/P2 in the composition. All 34 reviewed proof files
+remain exact; the range-diffs are changed, not equal.
+[Rebase proof and both range-diffs](verification/requested-audio-rebase-17fdf-20261022/README.md)
+include the fresh Mac gate: fmt **4.989 s**, strict five-crate Clippy
+**36.034 s**, and **4854 passed / 0 failed / 14 ignored / 0 filtered out**
+in **713.929 s**. All 483 captured source hashes stayed fixed. These are
+Msgs, Actions, Skills, Voice and Voice-eval tests, not a full workspace run.
+A static merge check against subsequent base `a52357bb0` passed before push.
+
+New-head ARM64 **39713220661** and Clippy **39713220653** are running.
+Ready for lamp-voice: **no**, native qualification pending. First owns merge.
+The original 86 baseline audit results and earlier failures remain preserved.
+
+**#2764:** Published head `a50f88224` passed both native gates:
+**10007 passed / 0 failed / 63 skipped** (one leaky pass), **171.943 s**,
+four doc tests, twelve custom-harness tests, relay and all three added Cloud
+tests. [Native receipt](verification/report-failed-units-rebase-17fdf-native-20261022/README.md)
+binds merge `42dc45153` and parents `17fdfda1d` / `a50f88224`.
+A further local rebase on `a52357bb0` passed fresh fmt, strict Clippy and
+**177/0/1/0**, but the pre-push base check found another advance to
+`fab69b0c4`, so that candidate was not pushed. Body and Voice changed again;
+its next current-base gate is being prepared. First and Reviewer-two have
+been asked to reserve a merge window under the literal ancestry condition.
+No source correction is requested; the complete Cloud tree remains unchanged.
+
+**#2767** `19d1a46d9` remains with First for installer source read/merge.
+P3 `fb714e28c` and metadata diagnostics `1bdecb484` are pushed separately;
+their PRs follow Music's merge as assigned. No device action, local ARM64
+build or full local workspace gate.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 09:35 +07, fresh Cloud gate and renewed Music conflict
 
 **#2764:** Pushed `a50f88224132066826946c452b1a52fd44568459` on

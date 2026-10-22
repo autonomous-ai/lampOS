@@ -1,0 +1,194 @@
+1:  0a878cd4d ! 1:  d96f484ec lampOS: add requested local music with bounded speaker authority
+    @@ lampOS/crates/skills/src/lib.rs: pub fn load(dir: &Path) -> Result<Skill, String
+     +        toml::from_str(&manifest_text).map_err(|error| format!("skill.toml: {error}"))?;
+          let kind = SkillKind::read(file.kind.as_deref())?;
+          file.permissions.check_core(kind)?;
+    -     if kind == SkillKind::Addon {
+    +     file.permissions.check_say(kind)?;
+     @@ lampOS/crates/skills/src/lib.rs: pub fn load(dir: &Path) -> Result<Skill, String> {
+          } else if !file.permissions.propose.is_empty() {
+              return Err("[permissions] propose is an add-on's: kind = \"addon\"".into());
+    @@ lampOS/crates/skills/src/main.rs: fn serve(
+              Some(Glows {
+                  bus: bus.clone(),
+     @@ lampOS/crates/skills/src/main.rs: fn serve(
+    -     };
+    +     }
+          let (ask, asks) = waking::<ToolAsk>(&waker);
+          if let Some(tools) = tools {
+     -        listen(tools, ask.clone())?;
+    @@ lampOS/crates/skills/src/main.rs: fn serve(
+     +                }
+                      let names: Vec<&str> = skills.iter().map(|skill| skill.name.as_str()).collect();
+                      eprintln!("lamp-skills: loaded {names:?}");
+    -                 if let Some(manager) = &mut routines {
+    +                 // A changed folder may change night sleep's claim: said now.
+     @@ lampOS/crates/skills/src/main.rs: fn serve(
+                      }
+                  }
+    @@ lampOS/crates/skills/src/main.rs: fn serve(
+              }
+              if let Some((_, answers)) = &mut asking.gate {
+                  answer_asks(
+    -@@ lampOS/crates/skills/src/main.rs: fn watched(outs: Outs, watching: &mut Watching, out: &mut Publisher, runner: &Ru
+    +@@ lampOS/crates/skills/src/main.rs: fn privacy_now(watching: &mut Watching, runner: &Runner) -> Outs {
+    + /// told how, and what the watch does done. Held to lamp-cloud's deadline
+    + /// again first ([`watch::let_go`]): the op may have waited in the loop too,
+    + /// and one let go turns nothing.
+    +-fn app_call((name, args, reply, admission): ToolAsk, out: &mut Publisher, runner: &Runner) {
+    ++fn app_call((name, args, _, reply, admission): ToolAsk, out: &mut Publisher, runner: &Runner) {
+    +     let late = watch::let_go(
+    +         &name,
+    +         args[watch::DEADLINE].as_u64(),
+    +@@ lampOS/crates/skills/src/main.rs: fn app_call((name, args, reply, admission): ToolAsk, out: &mut Publisher, runner
+      /// A watch's tool called: committed first, so a caller that gave up turns
+      /// nothing; then turned on or off, the model told what to say, and what the
+      /// watch does done.
+    @@ lampOS/crates/skills/src/main.rs: type ToolAsk = (
+          if name == lamp_skills::unplug::STAY_TOOL {
+     -        return stay_call((name, args, reply, admission), engine, runner);
+     +        return stay_call((name, args, None, reply, admission), engine, runner);
+    +     }
+    +     // The owner's app's guard.on or guard.off (#2562): only ever from the
+    +     // call socket's `guard` op, which no tool's call can name.
+    +     if name == watch::APP_ON || name == watch::APP_OFF {
+    +-        return app_call((name, args, reply, admission), out, runner);
+    ++        return app_call((name, args, None, reply, admission), out, runner);
+          }
+          // A watch's tool turns its watch, with no steps (guard mode, #1685).
+          let watched_tool = runner.watching.borrow().watches.owner(&name).is_some();
+    @@ lampOS/crates/skills/src/main.rs: fn keep_tools(dir: &Path, asks: &Waking<ToolAs
+          write_tools(dir, engine);
+          eprintln!(
+              "lamp-skills: {} had no call.sock: made again",
+    -@@ lampOS/crates/skills/src/main.rs: fn keep_tools(dir: &Path, asks: &Waking<ToolAsk>, engine: &Engine) -> io::Result
+    +@@ lampOS/crates/skills/src/main.rs: fn from_the_app(stream: &UnixStream) -> bool {
+      /// Listens on `dir/call.sock` as the actions part does: one line in
+      /// (`{"op":"call","name":...,"args":{...}}`), one line out, the main loop
+    - /// answering.
+    + /// answering. And the owner's app's `{"op":"guard","turn":...}` ([`app_turn`]).
+     -fn listen(dir: &Path, asks: Waking<ToolAsk>) -> io::Result<()> {
+     +fn listen(dir: &Path, asks: Waking<ToolAsk>, audio: Arc<Mutex<Authority>>) -> io::Result<()> {
+          std::fs::create_dir_all(dir)?;
+    @@ lampOS/crates/skills/src/main.rs: fn listen(dir: &Path, asks: Waking<ToolAsk>) -
+     +                };
+                      let (reply, told) = mpsc::channel();
+                      let admission = Admission::default();
+    -                 let result = (call["op"] == "call")
+    +                 // A tool's call never names the app's kinds: those come by
+     @@ lampOS/crates/skills/src/main.rs: fn listen(dir: &Path, asks: Waking<ToolAsk>) -> io::Result<()> {
+    -                         asks.send((
+    -                             (*name).to_owned(),
+    -                             call["args"].clone(),
+    +                 };
+    +                 let result = name
+    +                     .filter(|name| {
+    +-                        asks.send((name.clone(), args.clone(), reply, admission.clone()))
+    +-                            .is_ok()
+    ++                        asks.send((
+    ++                            name.clone(),
+    ++                            args.clone(),
+     +                            context.clone(),
+    -                             reply,
+    -                             admission.clone(),
+    -                         ))
+    ++                            reply,
+    ++                            admission.clone(),
+    ++                        ))
+    ++                        .is_ok()
+    +                     })
+    +                     .and_then(|_| match told.recv_timeout(TOOL_TIMEOUT) {
+    +                         Ok(result) => Some(result),
+     @@ lampOS/crates/skills/src/main.rs: fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
+      /// "Never mind": refused at once unless the unplug skill is loaded with its
+      /// grants and the latch can be cancelled now; the line and the cancel follow
+    @@ lampOS/crates/voice/src/provider_worker.rs: pub(crate) mod tests {
+     +                            text: "Please play a recording.".into(),
+     +                            look: false,
+     +                            search: false,
+    ++                            quoted: false,
+     +                        },
+     +                        NOW,
+     +                        &sink,
+    @@ lampOS/crates/voice/src/second_provider.rs: impl Engine {
+                          // The task already failed the turn itself.
+                          Err(mpsc::error::TrySendError::Closed(_)) => turn.audio = None,
+     @@ lampOS/crates/voice/src/second_provider.rs: impl Engine {
+    -                         (request, lease),
+    -                         text,
+    -                         Asker::Written { looking, search },
+    +                             search,
+    +                             quoted,
+    +                         },
+     +                        None,
+                              picture,
+                              Vec::new(),
+    @@ lampOS/crates/voice/src/second_provider.rs: async fn spoken(
+          // with the words of the one it goes on from before them.
+          let text = match before {
+     @@ lampOS/crates/voice/src/second_provider.rs: async fn spoken(
+    -                     carried.text,
+    +                     words,
+                          Asker::Spoken,
+                          None,
+     +                    None,
+    @@ lampOS/crates/voice/src/second_provider.rs: impl Queue<'_> {
+     +                    text: "Please play relaxing music.".into(),
+     +                    look: false,
+     +                    search: false,
+    ++                    quoted: false,
+     +                });
+     +            } else {
+     +                engine.submit(ProviderInput::Start {
+    @@ lampOS/crates/voice/src/second_provider.rs: impl Queue<'_> {
+     +                    text: "Please play relaxing music.".into(),
+     +                    look: false,
+     +                    search: false,
+    ++                    quoted: false,
+     +                });
+     +            } else {
+     +                engine.submit(ProviderInput::Start {
+    @@ lampOS/crates/voice/src/second_provider/tests.rs: struct Script {
+          /// A chat stream that, after its script, never ends.
+          hold_chat: bool,
+          /// A chat's first event waits this long (on the test's clock).
+    -     first_event_after: Option<Duration>,
+    -     /// Speech of this sentence starts late.
+    -     slow: Option<&'static str>,
+    +@@ lampOS/crates/voice/src/second_provider/tests.rs: struct Script {
+    +     speech_hold: Mutex<Option<(&'static str, tokio::sync::oneshot::Receiver<()>)>>,
+    +     /// Each sentence whose speech packet is ready, before it is yielded.
+    +     speech_ready: Option<mpsc::UnboundedSender<String>>,
+     +    /// An empty successful stream, as speech skipped after bounded retries.
+     +    skipped: Option<&'static str>,
+          /// Speech of this sentence never ends.
+    @@ lampOS/crates/voice/src/second_provider/tests.rs: async fn bedtime_words_use_the
+              }
+          }
+      }
+    -@@ lampOS/crates/voice/src/second_provider/tests.rs: async fn a_looks_answer_with_no_call_is_told_to_the_coordinator() {
+    +@@ lampOS/crates/voice/src/second_provider/tests.rs: async fn an_add_ons_quoted_line_is_asked_with_no_functions_and_runs_no_call() {
+              }
+          }
+      }
+    @@ lampOS/crates/voice/src/second_provider/worker.rs: pub fn serve(
+          // The same calls with the admitted request's memory authority (#1794).
+          let scoped_runner = scoped_tool_runner(scoped_settings, search.clone(), early.clone(), policed);
+     @@ lampOS/crates/voice/src/second_provider/worker.rs: pub fn serve(
+    -         let (note, heard) = air_noting(told.clone(), busy, monotonic_us);
+    -         engine = engine.noting_the_air(note, heard);
+    +         let (note, heard) = seems_noting(told.clone(), busy, monotonic_us);
+    +         engine = engine.noting_how_they_seem(note, heard);
+          }
+     +    if let Some(runner) = audio_runner {
+     +        engine = engine.requesting_audio(boot, runner);
+    @@ lampOS/docs/switches.md: motion, since lamp-4ace's motors stay still until Monda
+      |---|---|---|---|---|---|---|---|---|
+     +| `LAMP_REQUESTED_AUDIO` (`lamp-voice`, `lamp-skills`, `lamp-actions`) | Exact `on`; off in all three processes. A spoken tool request may play one checked local recording after its confirmation retires, with Skills leases and optional `speaker/state`; [contract](requested-audio.md) | — (all three) | — (all three) | #1685 | Pending: first/repeated requests, Stop/interruption/privacy/capture loss, mute then unmute, stale/restarted Actions and Skills, asset/reload/deadline refusal, Written/Messages including speak=true refused, volume preserved; prepared confirmation-retirement to first accepted PCM target at most 250 ms; retained five-crate Mac gate 4,665 passed / 0 failed / 14 ignored; post-rebase Skills 421 / 0 / 0, formatting and strict Clippy passed; earlier integration failures and measurements retained in the contract; new-head PR native CI and lamp checks pending | off until these host and authorized lamp checks | Same spoken owner, fixed deadlines and terminal cancellation; no runtime renderer or new player, no device result claimed | until |
+      | LAMP_AIR_FACTS | `on`; off unless set. Tells the model, once per 3 h, that the air has been stuffy for 10 min | on | on | commit 56f25ed9d (direct) | none named in a PR; air.md: on lamp-4ace since 14 Oct 18:46, first told 19:45 with a window suggestion (shown) | on (already) | air.md records it shown on lamp-4ace 14 Oct; one quiet remark, only while a person is already talking | on |
+    + | LAMP_SECOND_SEEMS | `on` only; off. On the second voice route, with `LAMP_BUS=on`, a spoken request from a known person in view (not the room's scope, not one held only by a gap, so never with the camera closed to memory) is told they seem in good spirits from their face just now, after with exactly one face in view (`humans/seems` reads the nearest face, so with two the read may be the other's), two `positive` reads in a row by Blendshape V2 (distinct messages, fresh, 0.6 or over; an `unsure`, `negative` or FER+ read breaks the run), to shape its tone only and never be mentioned; not in a busy room, not a written turn, and not again for 10 min once an answer given it is heard. `negative` is left out: brows drawn down while concentrating read as low (`LAMP_SEEMS_BROW_LOW`); it waits for the labelled session's at-the-desk count (#2733) | — | — | #1671 (the conversation side) | Tests only: the run, the note's rules and one spoken turn of a known person told it, a written turn and the room's scope not; then on a lamp with `--seems-blendshapes`, a smiling person answered warmly and the mood never named; not run | off until the reads' measure passes (#2733's labelled session) | The lamp must never say "you look happy" unprompted; one read is noise, and the read is only a hint for its tone | until |
+      | LAMP_HEALTH_FACTS | `on`; off unless set. Tells the model, beside a person's turn, which parts are unwell (`error` 30 s, or quiet 5 min) by the names a person knows, to say only if asked; once a Live session for each set, every turn on the second route while it lasts (#1681, health.md) | — | — | #1681 | None run: on lamp-4ace with a part failed by hand, "how are you?" names it and an unrelated question does not | off until that check | Whether the model keeps quiet unasked is unmeasured | until |
+    - | LAMP_HELLO_ASKS_POLICY | `on`; off. A due voice hello waits up to 2 s for the Policy's `lamp-policy --hello` answer, then goes on without it | — | — | #883 | Shadow run on lamp-4ace: read `hello_due`/`hello_policy` waited_ms after the 11:00 and 16:00 sessions; speaking-first.md: no real person has yet made a hello due (not shown) | off | The product's hello is the Welcome back skill and the voice's own is off (install.md); without `--hello` in the policy unit it only makes a hello 2 s late | off |
+     
+      ## lampOS/docs/tools.md ##
+     @@ lampOS/docs/tools.md: the executive's, and the request counts as one in which the lamp acted.
