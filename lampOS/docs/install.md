@@ -960,6 +960,51 @@ Bedtime and Morning stores come as `LAMP_SKILLS_DAILY_FILE` and
 `ExecStart` to the options their binaries took before; a new option joins
 that list only once every channel carries a binary that takes it.
 
+## A hand install's skill folders (`deploy/sync-skills.sh`)
+
+A hand install swaps binaries but not skill folders, so a lamp installed
+that way lacks every product skill added since its install: on 23 Oct
+lamp-06c1 (build 1009) had no `startle`, and lamp-4ace, whose lamp-skills
+runs from its own `--dir`, had no `reminders` where the voice reads it
+(the first builder on #3126, 06:39). The product's update round carries
+them; a hand install runs this as well:
+
+```
+# the list, nothing written; REV is the build the lamp's parts run
+lampOS/deploy/sync-skills.sh --rev REV --lamp orangepi@lamp-XXXX.local
+# then write them (sudo's password given at run time, never stored)
+LAMP_SUDO=… lampOS/deploy/sync-skills.sh --apply --rev REV --lamp orangepi@lamp-XXXX.local
+```
+
+It writes each skill of `install::PRODUCT_SKILLS` at REV into
+`/var/lib/lampOS/skills` as install does: every file but the skill's
+`tests/` and hidden files, 0644 in 0755 folders, and the skills of
+`install::PRODUCT_SKILLS_OFF` with `install::OFF_LINE` above their
+`skill.toml`. A skill the build ships off (that line, or its own
+`enabled = false`, as Bedtime and Morning) that the lamp has turned on
+stays on, as a round keeps it (`product_skills::keep_turned_on`): when the
+lamp's `skill.toml` turns it on, or lamp-skills' `on` (in its
+`--state-dir`) names it and the lamp's file is missing or still the
+build's, it is written as the build's file turned on. A file the lamp
+turned off again (off, and not the build's) is the person's last choice
+and wins over `on`: it is left as it is, and said (`left off:`). It
+lists each file it adds or changes, and never deletes: a folder the build
+doesn't name, a skill the person installed, is never read or written, and
+a file in a product folder that the build lacks is left and listed. It
+never writes lamp-skills' state. Each file goes in by a rename from a copy
+unpacked beside the folder, so lamp-skills, which reloads the folder by
+itself, never reads half a file, and a changed file keeps its owner.
+`--dir` and `--state-dir` name other folders; without `--lamp` it runs
+here, on the lamp's own shell. Its ssh is key only (`BatchMode`);
+`LAMP_SSH="sshpass -e ssh"` with `SSHPASS` reaches a lamp by password. It
+runs on a Mac's bash 3.2 too. Then restart the parts that read the folders at start
+(lamp-voice, lamp-expression; lamp-skills reloads by itself) and check
+their journals for `skill.toml: No such file`. On lamp-75c9 (installed by
+`lamp-update install` of `ef1eb0cf2`), its dry run at that build found
+all 47 files the same, and at `ae4ab0022` eight to change.
+`deploy/sync-skills-test.sh` tests it with no lamp; run it by hand after a
+change (the ARM64 workflow does not run it).
+
 ## Checking a lamp runs the product's units (`lamp-update check-units`)
 
 After an install (Sunday's B8 on #806), whether the owner tests what
