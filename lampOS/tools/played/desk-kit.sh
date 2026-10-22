@@ -123,6 +123,8 @@ mkdir -p "$OUT"
 arm() { # arm NAME:ENV=v,...
   local name=${1%%:*} envs="$BASE ${1#*:}" e
   envs=${envs//,/ }
+  # An arm's value overrides BASE's for the same switch (systemd keeps the last), so only the last is checked.
+  envs=$(printf '%s\n' $envs | awk -F= '{v[$1]=$0; if (!($1 in o)) {o[$1]=++n; k[n]=$1}} END{for (i=1;i<=n;i++) print v[k[i]]}' | tr '\n' ' ')
   dropin "$1" "$exec_line" | "$LAMP_SSH" "sudo -n mkdir -p ${DROPIN%/*} && sudo -n tee $DROPIN >/dev/null && sudo -n systemctl daemon-reload && sudo -n systemctl restart lamp-voice" \
     || { echo "desk-kit.sh: the drop-in could not be put on (sudo -n)" | tee -a "$LOG"; exit 4; }
   sleep 20
