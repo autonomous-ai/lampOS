@@ -1,0 +1,70 @@
+{
+  "head": "97ca7b3223d22a3f0bf2d53b4e416d5f5063403b",
+  "integration_base": "b722fd212b561f4981c3185dc6ee9f2434b9f204",
+  "tested_merge_short": "0a29d38",
+  "tested_merge_base": "b722fd212b561f4981c3185dc6ee9f2434b9f204",
+  "arm64_run": 39800605261,
+  "clippy_run": 39800605346,
+  "conclusion": "success",
+  "required_jobs": [
+    {
+      "id": 119899888068,
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39800605261/job/119899888068",
+      "started_at": "2026-10-22T14:59:40Z",
+      "completed_at": "2026-10-22T15:19:07Z",
+      "active_step": [],
+      "run_id": 39800605261,
+      "head": "97ca7b3223d22a3f0bf2d53b4e416d5f5063403b",
+      "workflow_status": "completed",
+      "workflow_conclusion": "success"
+    },
+    {
+      "id": 119899888367,
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39800605346/job/119899888367",
+      "started_at": "2026-10-22T14:59:38Z",
+      "completed_at": "2026-10-22T15:02:14Z",
+      "active_step": [],
+      "run_id": 39800605346,
+      "head": "97ca7b3223d22a3f0bf2d53b4e416d5f5063403b",
+      "workflow_status": "completed",
+      "workflow_conclusion": "success"
+    }
+  ],
+  "nextest": {
+    "passed": 10496,
+    "failed": 0,
+    "skipped": 67,
+    "leaky_passes": 1,
+    "elapsed_seconds": 177.386
+  },
+  "checker": {
+    "name": "persisted_self_switches_survive_sigkill",
+    "internal_cuts": 7,
+    "passed": true,
+    "elapsed_seconds": 3.705
+  },
+  "separate_harnesses": {
+    "doc_passed": 4,
+    "process_passed": 12,
+    "process_failed": 0,
+    "relay": "ok"
+  },
+  "leak_rows": [
+    "2026-10-22T15:18:23.2237023Z         LEAK [   0.217s] ( 8500/10496) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+  ],
+  "raw_log_sha256": "1a4f050b8dbbbf70e972bff800a2eab7466d95668441f7f0628fa11a729473a0",
+  "artifact": {
+    "id": 12435629642,
+    "name": "lampos-arm64-97ca7b3223d22a3f0bf2d53b4e416d5f5063403b",
+    "size_in_bytes": 114395421,
+    "api_digest": "sha256:dca1953a55b44fa74845b0ab03fb90b40ef0f66a024d5ca5dcc52c86e0385a69",
+    "scope": "API metadata only. Archive not downloaded or independently verified; no updater binary digest is asserted."
+  },
+  "limits": "Exact historical qualified head. Latest integration advanced after CI, so the latest-base guard kept this PR draft. Does not qualify the new CLI regression, physical unplug or signed release."
+}
