@@ -66,6 +66,8 @@ struct Script {
     flushed: Arc<AtomicUsize>,
     /// The turns that settled the relay's routes (`Services::turn_begins`).
     turns_begun: AtomicUsize,
+    /// Each listener's results' words as they come ([`Listener::said`]).
+    said: Mutex<VecDeque<Vec<String>>>,
 }
 
 struct ScriptListener {
@@ -77,8 +79,16 @@ struct ScriptListener {
     drops_after: Option<usize>,
     sent: AtomicUsize,
     flushed: Arc<AtomicUsize>,
+    said: Vec<String>,
 }
 impl Listener for ScriptListener {
+    fn said(&mut self) -> Option<mpsc::UnboundedReceiver<String>> {
+        let (words, said) = mpsc::unbounded_channel();
+        for each in std::mem::take(&mut self.said) {
+            let _ = words.send(each);
+        }
+        Some(said)
+    }
     fn flush(&self) -> net::Result<()> {
         self.flushed.fetch_add(1, Ordering::Relaxed);
         Ok(())
@@ -135,6 +145,7 @@ impl Services for Script {
                 drops_after: self.drops_after.lock().unwrap().pop_front().flatten(),
                 sent: AtomicUsize::new(0),
                 flushed: self.flushed.clone(),
+                said: self.said.lock().unwrap().pop_front().unwrap_or_default(),
             }) as Box<dyn Listener>),
         };
         Box::pin(async move { result })
@@ -403,6 +414,9 @@ async fn turn_within(engine: &mut Engine, wait: Duration) -> Vec<String> {
             }
             ProviderOutput::NewsAnswered { request, key } => {
                 (format!("news:{request}:{key}"), false)
+            }
+            ProviderOutput::WordsEnd { unfinished, .. } => {
+                (format!("words_end:{unfinished:?}"), false)
             }
             other => panic!("the second route never sends {other:?}"),
         };
@@ -11935,5 +11949,67 @@ async fn the_lamps_own_words_heard_back_are_held_or_taken_out_only_with_the_swit
             })),
             "on {on}"
         );
+    }
+}
+
+/// #3026 (`LAMP_SECOND_UNFINISHED_WAIT`): while a line is heard, the
+/// coordinator is told when its words so far come to end unfinished and
+/// when they no longer do, the class only; without the switch, never.
+#[tokio::test(start_paused = true)]
+async fn the_words_so_far_are_told_only_with_the_switch() {
+    for on in [true, false] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Lamp, I'm thinking about going for a run.".to_owned())].into()),
+            said: Mutex::new(
+                [vec![
+                    "Lamp, I'm thinking".to_owned(),
+                    "about".to_owned(),
+                    "going for a run.".to_owned(),
+                ]]
+                .into(),
+            ),
+            chats: Mutex::new([vec![text("Sounds good."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let mut engine = engine.telling_unfinished_words(on);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        let mut told = Vec::new();
+        if on {
+            // Told while the line is still heard, before its End.
+            while told.len() < 2 {
+                match tokio::time::timeout(Duration::from_secs(2), engine.next())
+                    .await
+                    .expect("told")
+                {
+                    ProviderOutput::WordsEnd {
+                        request,
+                        unfinished,
+                    } => {
+                        assert_eq!(request, 1);
+                        told.push(unfinished);
+                    }
+                    ProviderOutput::Started { .. } => {}
+                    other => panic!("{other:?}"),
+                }
+            }
+        }
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        assert!(
+            !labels.iter().any(|label| label.starts_with("words_end:")),
+            "{labels:?}"
+        );
+        assert!(
+            labels.contains(&"said:Sounds good.".to_owned()),
+            "{labels:?}"
+        );
+        let expected: Vec<Option<crate::unfinished_words::Trailing>> = if on {
+            vec![Some(crate::unfinished_words::Trailing::Joining), None]
+        } else {
+            Vec::new()
+        };
+        assert_eq!(told, expected, "on: {on}");
     }
 }

@@ -773,6 +773,7 @@ fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::LookAsked { request, .. }
         | ProviderOutput::LookNoCall { request, .. }
         | ProviderOutput::NewsAnswered { request, .. }
+        | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,
     }

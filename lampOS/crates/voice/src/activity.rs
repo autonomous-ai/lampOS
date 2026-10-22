@@ -1,6 +1,7 @@
 //! Local neural speech activity with finite pre-roll and explicit endpointing.
 //! This detector does not identify a speaker or an addressee. Its thresholds
 //! are initial experiment settings, not socially qualified release defaults.
+use crate::unfinished_words::{Trailing, WAIT_BLOCKS as UNFINISHED_WAIT_BLOCKS, Waited};
 use lamp_audio::{CAPTURE_RATE, CAPTURE_SAMPLES, CaptureBlock, duplex, evidence::EchoEvidence};
 use lamp_turn_end_wire::{
     Availability, Classifier, Outcome, Submit, Token, Verdict, WINDOW_SAMPLES,
@@ -241,6 +242,23 @@ pub struct TurnDetector {
     speech_blocks: u16,
     waiting: bool,
     waited: bool,
+    /// The words so far end unfinished, as the second route last told
+    /// (`LAMP_SECOND_UNFINISHED_WAIT`, [`crate::unfinished_words`]).
+    unfinished: Option<Trailing>,
+    /// An end that was due while they did, held for [`UNFINISHED_WAIT_BLOCKS`]
+    /// more of quiet.
+    held_end: Option<HeldEnd>,
+    /// The last held end, for the journal, until taken.
+    held_told: Option<Waited>,
+}
+
+/// An end held for unfinished words: the pause when it was due, the
+/// trailing word's class, and the decision then.
+#[derive(Debug)]
+struct HeldEnd {
+    from: u16,
+    class: Trailing,
+    decision: EndpointDecision,
 }
 
 impl Default for TurnDetector {
@@ -267,6 +285,9 @@ impl Default for TurnDetector {
             speech_blocks: 0,
             waiting: false,
             waited: false,
+            unfinished: None,
+            held_end: None,
+            held_told: None,
         }
     }
 }
@@ -366,6 +387,69 @@ impl TurnDetector {
             self.waited = true;
         }
         applies
+    }
+
+    /// The words so far of the utterance in hand end on an unfinished word
+    /// of `class`, or on none (`LAMP_SECOND_UNFINISHED_WAIT`,
+    /// [`crate::unfinished_words`]): while they do, an end that comes due is
+    /// held for [`UNFINISHED_WAIT_BLOCKS`] more of quiet. Nothing with no
+    /// utterance in hand.
+    pub fn words_end(&mut self, class: Option<Trailing>) {
+        if self.active {
+            self.unfinished = class;
+        }
+    }
+
+    /// The last end held for unfinished words, once, for the journal.
+    pub fn take_unfinished_wait(&mut self) -> Option<Waited> {
+        self.held_told.take()
+    }
+
+    /// `decision`, held while the words so far end unfinished: at most
+    /// [`UNFINISHED_WAIT_BLOCKS`] of quiet past when it was due, and let go
+    /// at once when speech comes (the line goes on) or the words are told
+    /// finished after all. `quiet_before` is the pause before this block.
+    fn hold_unfinished(
+        &mut self,
+        decision: Option<EndpointDecision>,
+        speech: bool,
+        quiet_before: u16,
+    ) -> Option<EndpointDecision> {
+        if let Some(held) = self.held_end.take() {
+            let pause = if speech {
+                quiet_before
+            } else {
+                self.silence_count
+            };
+            let waited = pause.saturating_sub(held.from);
+            if !speech && waited < UNFINISHED_WAIT_BLOCKS && self.unfinished.is_some() {
+                self.held_end = Some(held);
+                return None;
+            }
+            self.held_told = Some(Waited {
+                class: held.class,
+                waited_ms: u64::from(waited) * 10,
+                went_on: speech,
+            });
+            if speech {
+                return decision;
+            }
+            let mut ended = held.decision;
+            ended.unfinished_wait_ms = Some(u64::from(waited) * 10);
+            return Some(ended);
+        }
+        match (decision, self.unfinished) {
+            // A call's wait that ran out has waited already.
+            (Some(due), Some(class)) if due.call_wait_ms.is_none() => {
+                self.held_end = Some(HeldEnd {
+                    from: self.silence_count,
+                    class,
+                    decision: due,
+                });
+                None
+            }
+            (decision, _) => decision,
+        }
     }
 
     pub fn endpoint_silence_ms(&self) -> u64 {
@@ -472,9 +556,13 @@ impl TurnDetector {
                     decision = Some(ran_out);
                 }
             }
+            // Words so far that can't end a request: the end waits a little
+            // longer (`LAMP_SECOND_UNFINISHED_WAIT`).
+            decision = self.hold_unfinished(decision, speech, quiet_before);
             if let Some(decision) = decision {
                 self.active = false;
                 self.waiting = false;
+                self.unfinished = None;
                 self.start_count = 0;
                 self.silence_count = 0;
                 self.abandoned = false;
@@ -511,6 +599,8 @@ impl TurnDetector {
             self.began_us = self.prefix.front().map_or(0, |first| first.captured_at_us);
             self.speech_blocks = self.start_count;
             self.waiting = false;
+            self.unfinished = None;
+            self.held_end = None;
             self.waited = false;
             if let Some(confirmation) = self.confirmation.as_mut() {
                 confirmation.begin(&self.prefix, self.speech_blocks);
@@ -630,6 +720,8 @@ impl TurnDetector {
         self.active = false;
         self.abandoned = false;
         self.waiting = false;
+        self.unfinished = None;
+        self.held_end = None;
         self.cancel_confirmation();
     }
 
@@ -645,6 +737,8 @@ impl TurnDetector {
         self.ignore_through_us = None;
         self.await_pause = false;
         self.waiting = false;
+        self.unfinished = None;
+        self.held_end = None;
         self.cancel_confirmation();
     }
 
@@ -684,6 +778,8 @@ impl TurnDetector {
         // cannot arm one for the same utterance (#891): only a new
         // utterance can wait again.
         self.waiting = false;
+        self.unfinished = None;
+        self.held_end = None;
         self.waited = true;
     }
 }
@@ -860,6 +956,10 @@ pub struct EndpointDecision {
     /// otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rechecked_from: Option<f32>,
+    /// The quiet waited past the end that was due, while the words so far
+    /// ended unfinished (`LAMP_SECOND_UNFINISHED_WAIT`). Absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unfinished_wait_ms: Option<u64>,
 }
 
 fn is_zero(count: &u16) -> bool {
@@ -878,6 +978,7 @@ impl EndpointDecision {
             short_asks: 0,
             speech_ms: None,
             rechecked_from: None,
+            unfinished_wait_ms: None,
         }
     }
 }
@@ -1163,6 +1264,7 @@ impl Confirmation {
             short_asks,
             speech_ms,
             rechecked_from,
+            unfinished_wait_ms: None,
         };
         match self.pause {
             Pause::Heard(heard)

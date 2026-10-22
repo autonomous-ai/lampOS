@@ -28,6 +28,7 @@ mod review_2026_10_14;
 mod ring_worker;
 mod speaker_lapse_worker;
 mod typed_memory;
+mod unfinished_wait;
 mod visual_options;
 #[path = "core.rs"]
 mod voice_core;

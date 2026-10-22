@@ -877,6 +877,16 @@ pub enum ProviderOutput {
         /// The answer's first audio was sent.
         audio_ms: Option<u64>,
     },
+    /// With `LAMP_SECOND_UNFINISHED_WAIT=on`, the second route only, while
+    /// `request`'s line is still heard: its words so far now end on an
+    /// unfinished word of this class, or no longer do (`None`)
+    /// ([`crate::unfinished_words`]). Sent only when that changes; the
+    /// words themselves never go. The coordinator's detector holds a due
+    /// end while they do.
+    WordsEnd {
+        request: u64,
+        unfinished: Option<crate::unfinished_words::Trailing>,
+    },
     TurnFailed {
         request: u64,
         stage: FailedStage,
@@ -1228,6 +1238,7 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
         | ProviderOutput::LookAsked { request, .. }
         | ProviderOutput::LookNoCall { request, .. }
         | ProviderOutput::NewsAnswered { request, .. }
+        | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         };
         request.is_none_or(|request| request > retired_through)
