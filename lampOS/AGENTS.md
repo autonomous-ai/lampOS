@@ -7,12 +7,14 @@ A session that opens with "you are <name>" is a builder's: read [joining.md](doc
 
 ## How builders work together
 
-This is the protocol in brief, current on 22 October 2026. [joining.md](docs/joining.md)
+This is the protocol in brief, current on 23 October 2026. [joining.md](docs/joining.md)
 has the whole of it; where an older note differs, this section is current.
 It replaces the three-agent `harness send` route of 12 October.
 
 - **Where.** Status, `free`, questions and proposals for the first builder go
-  as comments on the Queue issue (#2602 now, or the one your role file names).
+  as comments on the current Queue issue (#3126, continued from #2602).
+  If it fills, follow the continuation link in its body; an older role file
+  may still name a full Queue.
   A review and its answers go on the pull request. A fault in someone else's
   part goes on their pull request, or to the first builder on the Queue. There
   is no other channel: not `harness send`, not tmux, not the owner's chat.
