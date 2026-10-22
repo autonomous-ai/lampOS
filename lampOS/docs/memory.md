@@ -1459,8 +1459,11 @@ then use that person's scope:
   named that same person, and their face was the only one seen saying it
   (read at the line's end with its words, `speaking_faces::LineSeen`, and
   only for a line whose words ask to forget; each id with the eyes' boot,
-  so a passing id reused after the eyes start again is not theirs,
-  #3037). The second route only: Live (`LAMP_VOICE_ROUTE=gemini`) never
+  so a passing id reused after the eyes start again is not theirs: the
+  bare id in `known-face` binds to a boot only when written strictly after
+  its first frame the voice read, and in doubt is refused, #3037 and
+  Fourth's P2 on #3038; the eyes' own `known-speaker` file is to replace
+  it). The second route only: Live (`LAMP_VOICE_ROUTE=gemini`) never
   records who was seen saying a line, so there a room's forget is always
   refused. Then they are asked for under the eyes' name; else, with
   someone else's face speaking while they sit nearest, no face read

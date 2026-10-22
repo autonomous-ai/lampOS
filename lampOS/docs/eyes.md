@@ -854,9 +854,11 @@ this room" until someone asks to be recognised.
     one seen saying it. The ids are compared with the eyes' boot: the
     speaking faces' with the boot their frames came under, and
     `known-face`'s, which holds the bare id, with the newest boot the voice
-    read a frame of before the file was written (or up to 250 ms after), so after
-    the eyes start again a still-fresh file names none of the new faces
-    (#3037). The second route only: Live never records who was seen saying
+    read a frame of strictly before the file was written, with no tolerance:
+    after the eyes start again a still-fresh file, or one written at the new
+    boot's first frame, names none of the new faces, and in doubt the forget
+    is refused (#3037, Fourth's P2 on #3038). The eyes' own `known-speaker`
+    file (Fourth's) is to replace this binding. The second route only: Live never records who was seen saying
     a line, so there a room's forget is always refused. A visitor or a screen saying it while they sit
     nearest, two faces speaking, no face read speaking, a line not judged,
     or a known file stale when it was heard sends nothing, and the model
