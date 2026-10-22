@@ -2980,7 +2980,10 @@ weather, nor any older than it is kept. Each place's forecast is kept 10
 minutes, and never past that place's midnight, so a follow-up ("and
 Saturday?") is answered at once and the first call of the place's new day
 fetches again, with at most 16 places kept, the oldest out
-(`net::weather::Weather`). Nothing
+(`net::weather::Weather`). Where a place's name was found is kept a week
+(`PLACE_KEPT_FOR`), at most 32 names, the oldest out, so a later look at a
+place, or the first after its midnight, asks only its forecast: one request
+in place of two, never anything of who asked. Nothing
 is fetched ahead, no task runs, and the model's notes carry no weather.
 Before, the forecast of the lamp's own place was fetched every 15
 minutes and told in every request, so "what's the weather in Hanoi
@@ -2994,7 +2997,8 @@ from the app are not given it. Only the place's name and its coordinates
 leave the lamp. The journal: `the model may ask for the weather of any
 place and day, … here is Hanoi, Vietnam (LAMP_SECOND_WEATHER)` at start,
 and for each call `request N asked for weather for a place named,
-tomorrow; answered in N ms, fetched` (or `from what was kept`, `no such
+tomorrow; answered in N ms, fetched` (or `fetched, its place known`, `from
+what was kept`, `its place known, its weather from what was kept`, `no such
 place`, `the weather was not fetched: …`), never the place's name or any
 other word said. It reaches the second route's worker alone
 (`process.rs`).
