@@ -6329,6 +6329,23 @@ async fn a_cold_first_request_tells_the_model_nothing_of_the_event() {
     }
 }
 
+/// Reviewer-two's P2 on #3059: a one-word request opens the session as a
+/// request does: a greeting after it in the same session tells the model
+/// nothing of the dated follow-up either.
+#[tokio::test]
+async fn a_one_word_first_request_then_a_greeting_tells_nothing_of_the_event() {
+    let asked =
+        a_cold_session_asked("event-turn-engine-word", &["Weather?", "Good evening!"]).await;
+    assert_eq!(asked.len(), 2);
+    for messages in &asked {
+        assert!(!tells_the_event(messages), "{messages:?}");
+        assert!(
+            !format!("{messages:?}").contains("They only said hello"),
+            "{messages:?}"
+        );
+    }
+}
+
 /// The first builder on #2805, 22 Oct 20:28: a greeting held only by a
 /// face's gap is never asked for a dated follow-up's line, as it may be
 /// someone else's; the same greeting with the face seen is.
