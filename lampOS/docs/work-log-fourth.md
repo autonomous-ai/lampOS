@@ -6263,6 +6263,37 @@ Ready for lamp-voice: yes (#2899 for First's source read); no (#2782 replacement
   bypassed their dependencies. #2789's reader/bus contract remains pending.
   Fourth has no lamp and made no device actions.
 
+## 2026-10-22 14:05 ICT: callback qualified; onboarding consent P2 taken
+
+Ready for lamp-voice: yes (#2782); no (#2899 pending consent-wording correction).
+
+- #2782 `f0a5a12b7c1e464e4b9dcae92fff883262ae3541` passed ARM64
+  39735029328: 10,293 passed, zero failed, 66 skipped. All 24 focused
+  regressions, four doctests, 12 separate process checks and relay passed;
+  one unchanged same-voice leaky pass. Clippy39735029380 passed. No rerun.
+  Actual CI mergea0d13af02 usedd5b630ff2; authored parent07614f852.
+  Artifact12407369871 SHA-256
+  `353c2a9fd089821014cf9a713510d811978f67be3fae2f2677ec0f19fe99117f`.
+  Raw `/private/tmp/fourth-kept-name-callback-ci-20261022/rebase-f0a5a12b7/qualification.json`.
+  Ready receipt6334849552, Queue6334850257. Reviewer-two's cleared4451
+  extraction remains byte-identical through the audited plain source replay;
+  First retains merge/latest-base handoff. No new device proof is claimed.
+- Lead read #2899 at a3f13a013 and found one P2 (6334751365): installed
+  data could remove the face-keeping/room-sound consent clauses while
+  passing structural checks. PR is draft, correction taken6334837831.
+  The chosen correction requires the exact two code-owned clauses in both
+  first and re-offer notes. Removal/alteration across both steps/modes will
+  be refused by the installed loader and shared Skills load/package check;
+  surrounding prose remains editable. Shipped words stay byte-identical.
+  New local/native gates are required after folding the fix into one commit.
+- Lead's two P3 observations remain disclosed: startup diagnostics collapse
+  missing/disabled/malformed data into a fixed message, and absent/bad data
+  disables the walk without built-in fallback. Neither is silently changed.
+- The product unit sets only LAMP_ONBOARDING_FILE, explicitly without
+  enabling LAMP_ONBOARDING. Lead's off-unless-set lane note is consistent
+  with current product configuration. The requested52e6 same-steps proof
+  remains open; Fourth still has no lamp and has taken no device action.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
