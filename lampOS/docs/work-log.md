@@ -1,3 +1,23 @@
+## Current checkpoint: 2026-10-23 03:08 +07, Live music fixture current-base gate passed
+
+Ready for lamp-voice: no (PR ARM64, Linux Clippy and external read pending)
+
+The one-commit fixture correction `226c4e89b` contains current `7b3e6aef8`.
+Final Mac formatting and strict all-target Voice Clippy pass; full Voice
+passes **3,789 / 0 / 14 ignored**, six result lines and no filtering. All
+6,512 bound files stayed unchanged. [Controls, carry and final Mac receipt](verification/live-music-fixture-20261023/README.md).
+Production bytes, assertions and timeouts remain unchanged. Second is
+pushing the own branch and opening its draft PR to obtain official CI.
+
+#3107's corrected contracts pass **2 / 0** and its re-read is posted, with
+one diagnostic wording P3 and Fourth's common permission integration kept
+separate. Fourteen owns the decline fixture. The related #3115 pool-policy
+PR needs a read; Second is proposing that as the next repo-only read while
+own native CI runs. #2810's attended unplug and #1812's real signed run
+still require First and the person at the lamp.
+
+---
+
 ## Current checkpoint: 2026-10-23 03:03 +07, corrected chat contracts pass
 
 Ready for lamp-voice: no (Live music fixture current-base gate and native CI remain)

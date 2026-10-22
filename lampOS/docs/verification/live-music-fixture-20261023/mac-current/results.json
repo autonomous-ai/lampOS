@@ -1,0 +1,80 @@
+{
+  "base": "7b3e6aef8968963756151b9a0c7900eb0cd8680c",
+  "head": "226c4e89b7625d6dadcebd77053d91e057c3944b",
+  "clean_at_start": true,
+  "host": "Darwin arm64; rustc 1.96.0; aarch64-apple-darwin",
+  "candidate_patch_sha256": "db4c9181dc675a1d1bda2c340dee04c16b32fa103704a3e005dfd4148b5a38b9",
+  "bound_files": 6512,
+  "input_manifest_sha256": "6da472d60b7e710d88a465f64a3522d41b27e924b8c818c329b80aad2ed6de89",
+  "changed_files": {
+    "lampOS/crates/voice/src/provider_worker.rs": "c2a68501b617fd66877edd081a5a5080cc4bf83d990f47848640e86df70578e3",
+    "lampOS/docs/requested-audio.md": "e2098b5381f978155ed7a2515201ee595f4e6772636bf7ffbe3a31d0bd144393"
+  },
+  "commands": [
+    {
+      "label": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.257,
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result_lines": []
+    },
+    {
+      "label": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--offline",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 28.998,
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result_lines": []
+    },
+    {
+      "label": "voice-tests",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "-p",
+        "lamp-voice",
+        "--offline",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 332.739,
+      "log_bytes": 5086,
+      "log_sha256": "9484b5878e82de8fcde12be953b16b80075c01def1e0240c5fd2535828eb5138",
+      "result_lines": [
+        "test result: ok. 3508 passed; 0 failed; 14 ignored; 0 measured; 0 filtered out; finished in 271.52s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 270 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.42s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    }
+  ],
+  "inputs_unchanged": true
+}

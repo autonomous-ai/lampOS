@@ -87,6 +87,10 @@ outputs and source binding. All 6,509 bound files stayed unchanged.
 
 The patch was committed as `e488aa9ff`, then rebased onto the new integration
 head `7b3e6aef8` as `226c4e89b`. `rebase.json` retains the equal range-diff.
-Both changed files are byte-identical across that carry. A new current-base
-Mac gate is running; this earlier pass does not stand in for its result or
-the PR's official ARM64 and Linux Clippy gates.
+Both changed files are byte-identical across that carry. The final clean
+`226c4e89b` Mac gate also passes: **3,789 passed, 0 failed, 14 ignored**,
+six result lines and no filtering. Formatting took 5.257 s, strict all-target
+Voice Clippy 28.998 s, and the Voice command 332.739 s. All 6,512
+bound files stayed unchanged. `mac-current/` retains the exact commands,
+complete outputs and source binding. Official PR ARM64 and Linux Clippy
+remain required; neither Mac pass substitutes for them.
