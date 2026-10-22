@@ -30,8 +30,8 @@ What the voice's hello did, and where it went:
 | the keeper's pause | the say service's gates (below) |
 | the Policy asked first (`LAMP_HELLO_ASKS_POLICY`, `voice/arrival`) | Welcome back's `[ask] policy = "hello"`, through `lamp-skills`' ask (`LAMP_SKILLS_ASK=policy`) |
 | by the name typed at setup | the name is in the model's instruction (`person::told`, below), and the skill's note says "by name if you know it" |
-| by a known face's name | told with every skill's note while someone is at the lamp: "(The person at the lamp now is NAME: you know their face.)" (`person::at_the_lamp`, `known_faces::note`) |
-| one beat warmer for someone Mood calls `regular` or `close` (#1670) | told with every skill's note while someone is at the lamp: "(The person at the lamp comes by often: speak to them as you would someone you see most days, warmly and without fuss.)" (`person::OFTEN`) |
+| by a known face's name | told with Welcome back's note while someone is at the lamp, by its `who = true` permission, which no other skill has: "(The person at the lamp now is NAME: you know their face.)" (`person::at_the_lamp`, `known_faces::note`) |
+| one beat warmer for someone Mood calls `regular` or `close` (#1670) | told with Welcome back's note the same way: "(The person at the lamp comes by often: speak to them as you would someone you see most days, warmly and without fuss.)" (`person::OFTEN`) |
 | for someone `close`, no hello within the hour | **dropped**: `lamp-skills` has no cooldown by how familiar someone is, and Mood carries no identity, so the hour counted any hello, not one to this person; the 20 minutes hold for everyone |
 | a glance away under 20 s is the same arrival | Welcome back's `gap = "3s"` keeps a look down; a longer one ends the hold, and the absence counts from the last near face, which comes to the same for an arrival after five minutes |
 | `lamp_speaks_first` turn, `hello_due` and `hello_policy` records | the say service's `skill_says` record, naming `welcome-back`, and `lamp-skills`' journal |
@@ -47,18 +47,25 @@ be at the lamp from the eyes. From it the voice keeps one thing
 picture's height, for three seconds without a break. A reminder due long ago
 and the news wait for that, or for a person heard a moment ago.
 
-While someone is there, a skill's note (`note` on the say service, never
-exact `text`, an add-on's quoted line or what the voice keeps) is told who
-it is, after the note: a known face's name ([eyes.md](eyes.md)), and for a
+While someone is there, a note whose skill asked (`"who": true` on the say
+service, sent by `lamp-skills` only for a skill whose `[permissions]` say
+`who = true`: Welcome back alone; refused with exact `text`, an add-on's
+quoted line or what the voice keeps) is told who it is, after the note: a known face's name ([eyes.md](eyes.md)), and for a
 remembered person Mood calls `regular` or `close` (`familiar` in
 `mood/state`, from the eyes' `lamp-eyes --visits on`, [mood.md](mood.md)),
 the sentence above. The level is read with the presence file, four times a
 second, from source `mood` only and within its 2.5 s
 (`speak_up::familiar_in`); if the eyes have not recognised them yet, nothing
-is added. Tests: `person::tests::a_skills_note_is_told_who_is_at_the_lamp`,
+is added. Any other skill's note is never told: Guard mode and Who was here
+must name nobody (the reviewer-lead's P2 on #2923). Tests:
+`person::tests::a_skills_note_is_told_who_is_at_the_lamp`,
+`person::tests::only_a_note_that_asked_is_told_who_is_at_the_lamp` (the
+coordinator's call: another skill's note, or nobody at the lamp, is the
+turn as it came), `say::tests::who_goes_only_with_a_note`, lamp-skills'
+`only_a_skill_given_who_has_its_note_told_who_is_at_the_lamp` (Guard mode
+and Who was here are not given it),
 `speak_up::tests::the_familiar_level_is_read_from_moods_fresh_state_only`.
-The one line in `coordinator.rs` that adds it to a skill's turn has no test
-of its own.
+No test runs the whole loop with a presence file.
 
 What ends the quiet every unasked turn waits for is talk: the lamp's own
 words playing, any voice the detector calls speech (words or none: a line in

@@ -151,6 +151,21 @@ pub fn at_the_lamp(known: Option<&str>, familiar: Option<lamp_msgs::FamiliarLeve
     told
 }
 
+/// A say's turn, told who is at the lamp ([`at_the_lamp`]) only when its
+/// skill asked (`who`, #2825) and someone is `here`: their known name, if
+/// any, and Mood's level. Any other skill's note, exact words, a quoted
+/// line or nobody at the lamp: the turn as it came, so it names nobody.
+pub fn told_who(
+    turn: String,
+    who: bool,
+    here: Option<(Option<String>, Option<lamp_msgs::FamiliarLevel>)>,
+) -> String {
+    match here {
+        Some((known, familiar)) if who => turn + &at_the_lamp(known.as_deref(), familiar),
+        _ => turn,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,6 +186,21 @@ mod tests {
             );
             assert_eq!(at_the_lamp(None, Some(level)), format!("\n\n{OFTEN}"));
         }
+    }
+
+    /// #2825: only a note whose skill asked is told who is at the lamp,
+    /// and only while someone is there; another skill's note names nobody.
+    #[test]
+    fn only_a_note_that_asked_is_told_who_is_at_the_lamp() {
+        use lamp_msgs::FamiliarLevel;
+        let here = || Some((Some("Minh".to_owned()), Some(FamiliarLevel::Close)));
+        let told = told_who("Greet them.".into(), true, here());
+        assert!(told.starts_with("Greet them.") && told.contains("Minh") && told.contains(OFTEN));
+        assert_eq!(
+            told_who("Watch the room.".into(), false, here()),
+            "Watch the room."
+        );
+        assert_eq!(told_who("Greet them.".into(), true, None), "Greet them.");
     }
 
     fn file(name: &str, text: &[u8]) -> std::path::PathBuf {

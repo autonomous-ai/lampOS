@@ -10438,18 +10438,22 @@ fn conversation_with_gate(
                     trace,
                     json!({"kind":"skill_says","at_us":say_now_us,"skill":ticket.skill(),"priority":priority,"provider_session":provider_session}),
                 )?;
-                // A skill's note is told who is at the lamp: a known face
-                // by name, someone who comes by often one beat warmer, so
-                // Welcome back greets as the voice's own hello did (#2825).
-                let turn = match presence.as_ref() {
-                    Some(presence) if ticket.is_note() && presence.present(clock) => {
-                        turn + &crate::person::at_the_lamp(
-                            crate::known_faces::known_from_environment().as_deref(),
-                            presence.familiar(),
-                        )
-                    }
-                    _ => turn,
-                };
+                // A note whose skill asked (`who`, Welcome back alone) is
+                // told who is at the lamp: a known face by name, someone who
+                // comes by often one beat warmer (#2825). No other's is.
+                let turn = crate::person::told_who(
+                    turn,
+                    ticket.told_who(),
+                    presence
+                        .as_ref()
+                        .filter(|presence| presence.present(clock))
+                        .map(|presence| {
+                            (
+                                crate::known_faces::known_from_environment(),
+                                presence.familiar(),
+                            )
+                        }),
+                );
                 snapshot = commit_written_turn(
                     owner,
                     reply,
