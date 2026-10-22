@@ -12855,6 +12855,18 @@ mod tests {
     /// cuts the next in its order instead, `fetch_page` first. On lamp-75c9
     /// at 12:2x the head's list was cut so; one at the bound with the look
     /// added after it had left the look out, and said nothing.
+    /// The route's own bound is past Live's and within what the chat model
+    /// it asks takes: DeepSeek's API, up to 128 functions a request (the
+    /// Reviewer-lead's P3 on #2961). A chat provider with a lower limit
+    /// fails here first.
+    #[test]
+    fn the_routes_bound_is_past_lives_and_within_the_chat_models_own() {
+        const DEEPSEEK_MOST_FUNCTIONS: usize = 128;
+        let bound = crate::second_provider::MAX_TOOLS;
+        assert!(bound > lamp_gemini::MAX_TOOLS, "{bound}");
+        assert!(bound <= DEEPSEEK_MOST_FUNCTIONS, "{bound}");
+    }
+
     #[test]
     fn a_spoken_turns_look_is_never_the_one_the_bound_cuts() {
         let tool = |name: &str| lamp_gemini::Tool {
