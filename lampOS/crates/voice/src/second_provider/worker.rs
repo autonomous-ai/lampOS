@@ -2954,41 +2954,6 @@ pub fn serve(
                 }),
             );
         }
-        // A line's first word, set off and sounding like the lamp's name, is
-        // the name when lamp-name heard it near at the line's start
-        // (`LAMP_NAME_NEAR`): both signs, never one.
-        if std::env::var(lamp_msgs::NameHeard::NEAR_ENVIRONMENT).is_ok_and(|value| value == "on") {
-            if heeding
-                .lock()
-                .is_ok_and(|mut heeding| heeding.hearing_near())
-            {
-                eprintln!(
-                    "lamp-voice second: a line's first word, set off and sounding like the lamp's name, is the name when lamp-name heard it near (0.5 or more) within 1.3 s of the line's start (LAMP_NAME_NEAR)"
-                );
-                // Whose face is turned is read from the eyes' speaking faces
-                // when they read speaking (`LAMP_EYES_SPEAKING`).
-                if let Ok(mut heeding) = heeding.lock() {
-                    heeding.opening_the_eyes(files.bus_root.as_deref());
-                    heeding.turned_near_speaking(crate::speaking_faces::eyes_from_environment());
-                    if let Some(root) = files.bus_root.as_deref() {
-                        heeding.looking_for_near(root);
-                    }
-                }
-                let near = heeding.clone();
-                engine = engine.hearing_the_name_near(Arc::new(move |window: (u64, u64)| {
-                    near.lock().map_or((None, false), |mut heeding| {
-                        (
-                            heeding.near_name(window.0),
-                            heeding.turned_to_the_lamp(window),
-                        )
-                    })
-                }));
-            } else {
-                eprintln!(
-                    "lamp-voice second: a first word like the lamp's name is never taken as it: no bus to read lamp-name's near hearings from (LAMP_NAME_NEAR)"
-                );
-            }
-        }
         // The rule keeps the route's one reader of the Policy's decisions,
         // which a line going on reads too (`LAMP_GOING_ON_ASKS`, below).
         if let Some(verdicts) = verdicts {
@@ -3035,6 +3000,43 @@ pub fn serve(
             && let (Ok(mut heeding), Some(root)) = (heeding.lock(), files.bus_root.as_deref())
         {
             heeding.hear_levels(root, true);
+        }
+        // A line's first word, set off and sounding like the lamp's name, is
+        // the name when lamp-name heard it near at the line's start
+        // (`LAMP_NAME_NEAR`): both signs, never one. After `--addressed`'s
+        // own looks are set up, so one reader of the eyes keeps them for
+        // both (Sixth's P3 on c0890e8db).
+        if std::env::var(lamp_msgs::NameHeard::NEAR_ENVIRONMENT).is_ok_and(|value| value == "on") {
+            if heeding
+                .lock()
+                .is_ok_and(|mut heeding| heeding.hearing_near())
+            {
+                eprintln!(
+                    "lamp-voice second: a line's first word, set off and sounding like the lamp's name, is the name when lamp-name heard it near (0.5 or more) within 1.3 s of the line's start (LAMP_NAME_NEAR)"
+                );
+                // Whose face is turned is read from the eyes' speaking faces
+                // when they read speaking (`LAMP_EYES_SPEAKING`).
+                if let Ok(mut heeding) = heeding.lock() {
+                    heeding.opening_the_eyes(files.bus_root.as_deref());
+                    heeding.turned_near_speaking(crate::speaking_faces::eyes_from_environment());
+                    if let Some(root) = files.bus_root.as_deref() {
+                        heeding.looking_for_near(root);
+                    }
+                }
+                let near = heeding.clone();
+                engine = engine.hearing_the_name_near(Arc::new(move |window: (u64, u64)| {
+                    near.lock().map_or((None, false), |mut heeding| {
+                        (
+                            heeding.near_name(window.0),
+                            heeding.turned_to_the_lamp(window),
+                        )
+                    })
+                }));
+            } else {
+                eprintln!(
+                    "lamp-voice second: a first word like the lamp's name is never taken as it: no bus to read lamp-name's near hearings from (LAMP_NAME_NEAR)"
+                );
+            }
         }
         // In a busy room, a line going on waits for the Policy (#1522), as
         // on the Live route: with the rule and the bus.
@@ -4823,9 +4825,10 @@ impl Heeding {
     }
 
     /// `LAMP_NAME_NEAR`: the eyes' looks are kept for each line's window
-    /// ([`Self::turned_to_the_lamp`]): `--addressed`'s own when it runs, or
-    /// read here from the bus at `root` every [`LEVEL_EVERY`] on a thread of
-    /// its own, which ends with this rule.
+    /// ([`Self::turned_to_the_lamp`]): `--addressed`'s own when it was set
+    /// up first ([`Self::judging_addressed`], as `serve` does), so one
+    /// reader keeps them; else read here from the bus at `root` every
+    /// [`LEVEL_EVERY`] on a thread of its own, which ends with this rule.
     pub(crate) fn looking_for_near(&mut self, root: &Path) {
         if self.near_looks.is_some() {
             return;
@@ -13579,6 +13582,25 @@ mod tests {
             !unread.turned_to_the_lamp((0, 1)),
             "no speaking faces read and no bus: no face"
         );
+    }
+
+    /// Sixth's P3 on c0890e8db: with `--addressed` set up first, as `serve`
+    /// does, `LAMP_NAME_NEAR` keeps its looks, one reader of the eyes for
+    /// both; without it, its own.
+    #[test]
+    fn the_near_check_reads_the_eyes_through_addressed_when_it_runs() {
+        let root = std::path::PathBuf::from(format!("/tmp/lna-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let mut heeding = Heeding::new(true, true, Some(&root), None);
+        heeding.judging_addressed(&root);
+        heeding.looking_for_near(&root);
+        let (addressed, _) = heeding.addressed.as_ref().unwrap();
+        assert!(Arc::ptr_eq(addressed, heeding.near_looks.as_ref().unwrap()));
+        let mut alone = Heeding::new(true, true, Some(&root), None);
+        alone.looking_for_near(&root);
+        assert!(alone.near_looks.is_some() && alone.addressed.is_none());
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// Sixth's P2s and P3 on 1600b0a69, through the eyes' wiring
