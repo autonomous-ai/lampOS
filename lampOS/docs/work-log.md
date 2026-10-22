@@ -1,3 +1,33 @@
+## Current checkpoint: 2026-10-22 20:32 +07, observer controls complete; fifth native gate running
+
+Ready for lamp-voice: no — exact-head ARM64 gate pending
+
+Kind: tests/docs only. #3012 head `6c4088120df275d74341274cf91db0e4d3414e13`
+contains latest pre-push integration `b1b9174f84a916783918e9eac295b64de086ad81`.
+The patch remains equal to authored33a and all completed Mac-bound Update files
+are unchanged. Four historical heads passed ARM64 and Clippy; their exact
+results remain in the [native proof](verification/updater-process-cuts-native-20261022/README.md).
+Current Clippy39785883405 passed; ARM6439785883299 remains running.
+Reviewer-lead's unchanged-patch pre-read found no P1/P2. The next merge slot
+was requested to coordinate latest-base qualification with other merges.
+
+[Five debugger controls](verification/updater-observer-controls-20261022/README.md)
+passed in ARM64 Podman, 6.525s total. The verified updater ran `--help` only;
+normal detach, TERM cleanup, debugger KILL release, no-exec timeout and wrong-exec
+rejection all left owned targets exiting0 without SIGCONT or cleanup kills.
+The audit found no P1/P2 within that scope. No actual updater self-switch or
+pending state was exercised by these controls. The owned VM is stopped.
+
+The proposed attended cut is the actual service's exec into its new updater,
+before new main, with separately verified durable pending/current and fallback.
+That remains a proposal, not an executed device result. First still must provide
+the lamp, attending person/window and approved persistent trial configuration.
+Second has no lamp; no SSH or power action occurred. #1812 follows the attended
+phase and still needs owner/key/publication and attended Body inputs. A further
+repository-only task was requested from First while those inputs are arranged.
+
+---
+
 ## Current checkpoint: 2026-10-22 19:48 +07, second native green; newest integration qualifying
 
 Ready for lamp-voice: no

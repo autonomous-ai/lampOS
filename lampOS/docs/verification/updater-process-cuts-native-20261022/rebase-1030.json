@@ -1,0 +1,43 @@
+{
+  "head": "1030fb8ab5b05e25099e1946f83e4ab319919fd3",
+  "integration_base": "135f14957e4a8560b3f72fa785ed62f605f800dc",
+  "tested_merge_short": "f9b590d",
+  "tested_merge_base": "135f14957e4a8560b3f72fa785ed62f605f800dc",
+  "arm64_run": 39780978501,
+  "clippy_run": 39780978544,
+  "conclusion": "success",
+  "nextest": {
+    "passed": 10460,
+    "failed": 0,
+    "skipped": 67,
+    "leaky_passes": 1,
+    "elapsed_seconds": 179.299
+  },
+  "checker": {
+    "name": "persisted_self_switches_survive_sigkill",
+    "passed": true,
+    "elapsed_seconds": 3.888,
+    "internal_cuts": 7
+  },
+  "separate_harnesses": {
+    "doc_passed": 4,
+    "process_passed": 12,
+    "process_failed": 0,
+    "relay": "ok"
+  },
+  "leak_rows": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T12:53:00.4999624Z         LEAK [   0.218s] ( 8476/10460) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+  ],
+  "artifact_metadata": {
+    "id": 12427262563,
+    "name": "lampos-arm64-1030fb8ab5b05e25099e1946f83e4ab319919fd3",
+    "size_in_bytes": 114347547,
+    "digest": "sha256:b22129db96cebfd31cce0eaab59013ada3b12c91cea476eaa6411ea3bcb37588",
+    "created_at": "2026-10-22T12:53:41Z",
+    "expired": false
+  },
+  "artifact_verification": "API metadata only for this rebased head; archive not downloaded or independently verified. Authored-head archive verification is a separate receipt.",
+  "raw_receipt_sha256": "415f7c08807431d8e63d54b6e21b881d772706c1a206034f2c7d676a4b27218e",
+  "raw_log_sha256": "e47f7e7dd014726bcd28c46e3b352365f03c8cdac01141325152b8363e21cedc",
+  "limits": "Exact-head CI result; no device execution or signed publication. Historical greens do not qualify replacement heads."
+}

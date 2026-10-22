@@ -76,3 +76,32 @@ a Skills-only upstream change. Equal-range replacement
 files still match the completed Mac receipt. Its fresh ARM64 39780978501 and
 Clippy39780978544 are running; neither older green qualifies this replacement.
 Physical unplug and #1812 remain unexecuted, awaiting First/owner prerequisites.
+
+## Later checkpoint, 20:32 +07
+
+Two more unchanged-patch heads completed both native ARM64 and Clippy:
+
+| Head | ARM64 run | Clippy run | Passed / failed / skipped | Checker seconds |
+| --- | --- | --- | --- | ---: |
+| `1030fb8ab` | 39780978501 | 39780978544 | 10460 / 0 / 67 | 3.888 |
+| `d369b1d0c` | 39782710438 | 39782710190 | 10466 / 0 / 67 | 3.581 |
+
+[rebase-1030.json](rebase-1030.json) and [rebase-d369.json](rebase-d369.json)
+retain each exact head, tested merge/base, counts, leaky Voice pass, four
+standalone doctests, twelve process tests and relay result. For d369, CI tested
+merge736468b against **a11c53523**, newer than its branch base69f786892; those
+identities are deliberately distinguished. Both artifact records are API
+metadata only, not independently verified downloads. Captured nested test
+stdout is not added to the counts.
+
+The fifth head, `6c4088120df275d74341274cf91db0e4d3414e13`, contains
+`b1b9174f84a916783918e9eac295b64de086ad81`, the latest pre-push integration.
+Clippy39785883405 passed; ARM6439785883299 is still running at this checkpoint.
+Reviewer-lead's unchanged-patch pre-read found no P1/P2. A merge slot was
+requested because integration advanced during each earlier successful run.
+
+Separately, [five ARM64 observer controls](../updater-observer-controls-20261022/README.md)
+passed using the verified authored artifact's `--help` only. This is debugger
+preparation, not an installed self-switch or physical power-cut result. Its
+Podman VM was stopped after capturing the results. Actual lamp/person/trial
+inputs and #1812 publication prerequisites remain with First/owner.
