@@ -3015,11 +3015,13 @@ fn a_reading_lamp_looks_down_at_the_desk_holds_it_and_comes_back() {
 
 /// A lamp in `mood` from six seconds to twelve, listening before and after,
 /// asked to turn `toward` a place across the picture all the while, with
-/// `looking` as its gaze. Each step: when, and the glimpse.
+/// `looking` as its gaze and the eyes seeing a `face` that far across, if
+/// any, every step. Each step: when, and the glimpse.
 fn toward_run(
     mood: Mood,
     looking: Option<Looking>,
     toward: Option<f32>,
+    face: Option<f32>,
 ) -> (BodyReport, Vec<(Duration, Glimpse)>) {
     let (mut lamp, mut clock) = folded(Duration::from_secs(18));
     lamp.arm_moves = true;
@@ -3051,6 +3053,14 @@ fn toward_run(
         },
         move || Asked {
             toward,
+            seen: face.map(|x| Seen {
+                face: Some(crate::gaze::Sight {
+                    x,
+                    y: 0.0,
+                    size: 0.2,
+                    turned: 0.0,
+                }),
+            }),
             ..Asked::default()
         },
         |glimpse| seen.push((seen_at.get(), *glimpse)),
@@ -3071,9 +3081,9 @@ fn a_reading_lamp_turns_toward_the_place_it_is_asked_and_back() {
     let at = |seen: &[(Duration, Glimpse)], when: Duration| {
         seen.iter().rfind(|step| step.0 < when).unwrap().1
     };
-    let (report, seen) = toward_run(Mood::Reading, Some(looking), Some(-0.5));
+    let (report, seen) = toward_run(Mood::Reading, Some(looking), Some(-0.5), None);
     assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
-    let (_, plain) = toward_run(Mood::Reading, Some(looking), None);
+    let (_, plain) = toward_run(Mood::Reading, Some(looking), None, None);
     for when in [9_000, 11_900] {
         let (turned, straight) = (at(&seen, ms(when)), at(&plain, ms(when)));
         let by = i32::from(turned.goals[2]) - i32::from(straight.goals[2]);
@@ -3096,19 +3106,53 @@ fn a_reading_lamp_turns_toward_the_place_it_is_asked_and_back() {
         );
     }
     // Without a gaze, or listening: as if nothing were asked.
-    let (_, blind) = toward_run(Mood::Reading, None, Some(-0.5));
-    let (_, blind_plain) = toward_run(Mood::Reading, None, None);
+    let (_, blind) = toward_run(Mood::Reading, None, Some(-0.5), None);
+    let (_, blind_plain) = toward_run(Mood::Reading, None, None, None);
     assert_eq!(blind, blind_plain);
-    let (_, listening) = toward_run(Mood::Listening, Some(looking), Some(-0.5));
-    let (_, listening_plain) = toward_run(Mood::Listening, Some(looking), None);
+    let (_, listening) = toward_run(Mood::Listening, Some(looking), Some(-0.5), None);
+    let (_, listening_plain) = toward_run(Mood::Listening, Some(looking), None, None);
     assert_eq!(listening, listening_plain);
     // Past the reach (1.0 would be 239 counts): as far as a reach of 100.
     let near = Looking::new([342, 200], [100, 120]).unwrap();
-    let (_, far) = toward_run(Mood::Reading, Some(near), Some(1.0));
-    let (_, far_plain) = toward_run(Mood::Reading, Some(near), None);
+    let (_, far) = toward_run(Mood::Reading, Some(near), Some(1.0), None);
+    let (_, far_plain) = toward_run(Mood::Reading, Some(near), None, None);
     let by =
         i32::from(at(&far, ms(11_900)).goals[2]) - i32::from(at(&far_plain, ms(11_900)).goals[2]);
     assert!((98..=101).contains(&by.abs()), "{by}");
+}
+
+/// #1738, "look for my keys": a search never looks toward a person. A face
+/// seen on the left keeps a look to the left over the desk, as if none were
+/// asked, and says which place it refused; a face on the right refuses
+/// nothing to the left, and no face turns as before.
+#[test]
+fn a_search_does_not_turn_toward_the_side_a_face_is_seen_on() {
+    let ms = Duration::from_millis;
+    let looking = Looking::new([342, 200], [250, 120]).unwrap();
+    let at = |seen: &[(Duration, Glimpse)], when: Duration| {
+        seen.iter().rfind(|step| step.0 < when).unwrap().1
+    };
+    let run = |toward, face| toward_run(Mood::Reading, Some(looking), toward, face).1;
+    let (left, left_plain) = (run(Some(-0.5), Some(-0.5)), run(None, Some(-0.5)));
+    let (right, right_plain) = (run(Some(-0.5), Some(0.5)), run(None, Some(0.5)));
+    let (none, none_plain) = (run(Some(-0.5), None), run(None, None));
+    for when in [9_000, 11_900] {
+        let by = |turned: &[(Duration, Glimpse)], plain: &[(Duration, Glimpse)]| {
+            i32::from(at(turned, ms(when)).goals[2]) - i32::from(at(plain, ms(when)).goals[2])
+        };
+        assert_eq!(by(&left, &left_plain), 0, "at {when}");
+        assert_eq!(at(&left, ms(when)).toward_refused, Some(-0.5), "at {when}");
+        assert!(
+            (118..=121).contains(&by(&right, &right_plain).abs()),
+            "at {when}"
+        );
+        assert_eq!(at(&right, ms(when)).toward_refused, None, "at {when}");
+        assert!(
+            (118..=121).contains(&by(&none, &none_plain).abs()),
+            "at {when}"
+        );
+        assert_eq!(at(&none, ms(when)).toward_refused, None, "at {when}");
+    }
 }
 
 /// Without `rest_glance`, a lamp at rest writes exactly what it writes

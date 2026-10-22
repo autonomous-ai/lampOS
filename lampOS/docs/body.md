@@ -1093,6 +1093,19 @@ mood socket, and says it again at least once every 1.5 s
   with a 342-count half-picture turns the base 120 counts from where plain
   reading has it, at most 3 counts a step, and back after; nothing without
   a gaze or listening; past a reach of 100, 100. Not run on a lamp.
+- **Never toward a person** (#1738, "look for my keys"): a `toward` on the
+  side of the picture where the eyes last saw a face, within the 6 s the
+  gaze keeps a face before it lets go (`LOST_US`), is not turned to: the
+  base stays where plain reading has it, the head over the desk, and the
+  journal says once per refused place `not turned toward X: a face is seen
+  on that side; the head stays over the desk`. A face within 0.1 of the
+  middle (`FACE_SIDE`) is on neither side; a face on the other side, or
+  none, changes nothing (`Gaze::face_toward`). So the search skill's "never
+  looks a person over" is the body's rule, not only the model's note.
+  Against simulated servos
+  (`a_search_does_not_turn_toward_the_side_a_face_is_seen_on`): a face at
+  -0.5 keeps a -0.5 look exactly where plain reading is; a face at 0.5, or
+  none, turns it the same 120 counts. Not run on a lamp.
 
 While a skill says `reading`, the voice's own moods on the same socket
 (`resting` between turns, sent every 40 ms) do not take the pose from it,

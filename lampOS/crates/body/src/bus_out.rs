@@ -771,6 +771,7 @@ mod tests {
             tipping: Default::default(),
             gesture_fates: Default::default(),
             looks_dropped: None,
+            toward_refused: None,
             bad_reads: [0; 5],
             retreats: 0,
         }

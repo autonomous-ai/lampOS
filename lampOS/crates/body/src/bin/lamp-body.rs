@@ -1188,6 +1188,8 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     let mut reads_said = lamp_body::bus_out::ReadsSaid::default();
     let mut tipping_said = lamp_body::body::Tipping::default();
     let mut looks_said: Option<&'static str> = None;
+    // The place last said refused, so that a refused look is said once.
+    let mut refused_said: Option<f32> = None;
     let mut fate_said = Hush::default();
     let mut eased = [0u16; 3];
     let mut handled = ([0u16; 3], [0u16; 5]);
@@ -1351,6 +1353,16 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                     glimpse.step
                 ),
                 None => eprintln!("lamp-body: step {} a face is looked at", glimpse.step),
+            }
+        }
+        // A search's look kept off the side a face is on (#1738), once per look.
+        if glimpse.toward_refused != refused_said {
+            refused_said = glimpse.toward_refused;
+            if let Some(toward) = refused_said {
+                eprintln!(
+                    "lamp-body: step {} not turned toward {toward:.2}: a face is seen on that side; the head stays over the desk",
+                    glimpse.step
+                );
             }
         }
         lamp_body::bus_out::tell_told(&gestures, glimpse.step, bus.as_mut(), arbitration, |line| {

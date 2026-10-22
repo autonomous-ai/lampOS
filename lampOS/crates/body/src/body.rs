@@ -864,6 +864,9 @@ pub struct Glimpse {
     /// eyes: paused, folded, or neither listening nor speaking. `None`
     /// while one would be.
     pub looks_dropped: Option<&'static str>,
+    /// A place a skill asked the reading lamp to turn toward that is on the
+    /// side a face is seen on, so not turned to (#1738).
+    pub toward_refused: Option<f32>,
     /// Reads so far that each of the five joints gave and were not used
     /// (the exit report's `bad_reads`), and times so far the arm sat down
     /// for a strain (the exit report's `retreats`), for the journal while it
@@ -4849,9 +4852,18 @@ fn run_on<P: PortIo, R: Runtime>(
         // Reading toward a place a skill names (#1679): the base turned as
         // it would be to a face there, within the gaze's reach. Nothing
         // without a gaze, which alone knows how far a place in the picture is.
-        let aim = match (mood, asked_now.toward, gaze.as_ref()) {
-            (Mood::Reading, Some(toward), Some(gaze)) if !asked_now.paused => gaze.toward(toward),
-            _ => 0.0,
+        // Never toward the side a face is seen on (#1738): the head stays
+        // over the desk, and the glimpse says which place was refused.
+        let now_us = now.as_micros().try_into().unwrap_or(u64::MAX);
+        let (aim, toward_refused) = match (mood, asked_now.toward, gaze.as_ref()) {
+            (Mood::Reading, Some(toward), Some(gaze)) if !asked_now.paused => {
+                if gaze.face_toward(toward, now_us) {
+                    (0.0, Some(toward))
+                } else {
+                    (gaze.toward(toward), None)
+                }
+            }
+            _ => (0.0, None),
         };
         let offsets = if unplug_latched {
             [0.0; 3]
@@ -5274,6 +5286,7 @@ fn run_on<P: PortIo, R: Runtime>(
             tipping: report.tipping,
             gesture_fates: std::mem::take(&mut gesture_fates),
             looks_dropped,
+            toward_refused,
             bad_reads: bus.bad_reads,
             retreats: retreats.into(),
         };

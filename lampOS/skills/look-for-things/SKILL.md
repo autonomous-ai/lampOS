@@ -25,7 +25,8 @@ What it can and cannot do:
 - It keeps its head down over the desk the whole time and turns only its
   base, within the reach its gaze is given (`toward` in lamp-body's reading
   pose): it never lifts its head to sweep the room, and never looks a person
-  over.
+  over. The body holds the last: a look toward the side the eyes see a face
+  on is not turned to (docs/body.md, #1738).
 - It looks at most five times in one search, then lets it go; each look is
   asked for by the model after the one before, so a thing seen early ends
   the search early.
