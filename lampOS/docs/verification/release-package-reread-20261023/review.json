@@ -1,0 +1,39 @@
+{
+  "head": "82fbaf42e5de03cd8abe99b5553b116551a7369e",
+  "base": "1b5f7a78b86a0aac64a87950100e09d1bda6e42b",
+  "previous_head": "9694ec6333fc3e7461093a1a6723f0f2bd8b8960",
+  "findings": [],
+  "resolved": [
+    {
+      "severity": "P3",
+      "path": "scripts/release/lamp_os_package.py",
+      "line": 124,
+      "issue": "Cached notice now requires both declared size and digest.",
+      "coverage": "test_fetch_notices_checks_each_download_and_keeps_a_good_one: changed-size cached-entry subcase"
+    },
+    {
+      "severity": "P3",
+      "path": "scripts/release/tests/test_upload_lamp_os.py",
+      "line": 39,
+      "issue": "Distinct notice-fetch and final-packaging failure paths; Docker run ordering asserted.",
+      "coverage": "test_fetch_build_package_and_version_errors_never_publish: NOTICES_FAIL and PACKAGE_FAIL subcases"
+    }
+  ],
+  "verified_input_files": 51,
+  "source_unchanged": true,
+  "tests": {
+    "passed": 41,
+    "failed": 0,
+    "reported_seconds": 14.669
+  },
+  "shell_syntax_exit": 0,
+  "records": {
+    "source-binding.json": "1cdbae67912d86cc616c8d0057ff17c5d103333f9a3a08c4b79ae27daa4e6e54",
+    "affected-gate.json": "28d2597408503a84622b33a7ba44d0a16cad08bcbb76ae1e80b139b7c1b2256e",
+    "correction.diff": "20c8dac9ac7551c546a28ddd9fed37633e32bcedc86954088e0ca3f66e0743ba",
+    "pr.diff": "0f711f33332f29a8fcec445f63fad8199eff844308f532a235f0eaae21011505",
+    "affected-0.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "affected-1.log": "37b385aa86391681ee1f358a8f234a767edc6eca9205bed891f65c6384c48712"
+  },
+  "limitations": "Only affected package/upload unit tests and shell parsing. External release tools are mocked. No asset download, ARM build, real key, publication, installation or device action."
+}

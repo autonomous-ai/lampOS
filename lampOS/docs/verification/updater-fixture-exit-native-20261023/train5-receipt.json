@@ -1,0 +1,50 @@
+{
+  "pr": {
+    "baseRefOid": "23132abf97cc7a1d675039358aa07de694b3fa8d",
+    "headRefOid": "e8dc2ba471e674d43825f3fba36a2783092dc84a",
+    "mergeCommit": {
+      "oid": "3989219969f2460e6cfd69d32d06a58dd5c2e269"
+    },
+    "mergedAt": "2026-10-22T18:38:27Z",
+    "state": "MERGED"
+  },
+  "results": [
+    {
+      "run": 39831734273,
+      "job": 120009337633,
+      "head": "e8dc2ba471e674d43825f3fba36a2783092dc84a",
+      "status": "completed",
+      "conclusion": "success",
+      "log_bytes": 1816706,
+      "log_sha256": "a0029eda30669c5492b58b419f0b4c3fdecf1438527841bf6dc107e6229147a3",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39831734273/job/120009337633",
+      "selected_lines": [
+        "2026-10-22T18:29:20.3695927Z HEAD is now at cc6bcc4 Merge e8dc2ba471e674d43825f3fba36a2783092dc84a into 23132abf97cc7a1d675039358aa07de694b3fa8d",
+        "2026-10-22T18:36:39.5763896Z         PASS [   0.851s] ( 6217/10625) lamp-update::round self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+        "2026-10-22T18:36:40.5984257Z         PASS [   0.135s] ( 6237/10625) lamp-update::self-cli-exec actual_cli_exec_confirms_before_the_next_round",
+        "2026-10-22T18:36:44.0556955Z         PASS [   3.581s] ( 6607/10625) lamp-update::self-process-cuts persisted_self_switches_survive_sigkill",
+        "2026-10-22T18:37:18.8120784Z         LEAK [   0.232s] ( 8590/10625) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+        "2026-10-22T18:37:38.5123223Z      Summary [ 175.809s] 10625 tests run: 10625 passed (1 leaky), 67 skipped"
+      ],
+      "workflow_status": "completed",
+      "workflow_conclusion": "success"
+    },
+    {
+      "run": 39831734079,
+      "job": 120009337389,
+      "head": "e8dc2ba471e674d43825f3fba36a2783092dc84a",
+      "status": "completed",
+      "conclusion": "success",
+      "log_bytes": 37314,
+      "log_sha256": "2da432e3bb64ca3abce8bbe17f7d74b25f30fcbaa1c789ca21d261f4f588adc7",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39831734079/job/120009337389",
+      "selected_lines": [
+        "2026-10-22T18:29:54.8300373Z HEAD is now at cc6bcc4 Merge e8dc2ba471e674d43825f3fba36a2783092dc84a into 23132abf97cc7a1d675039358aa07de694b3fa8d"
+      ],
+      "workflow_status": "completed",
+      "workflow_conclusion": "success"
+    }
+  ],
+  "checked_merge": "cc6bcc4b5bf059c2f3889b7c578bff1b2c6680bd",
+  "checked_tree": "2ac60589ea1ab7cd9a1fe99bc5129c8b0ddbffdc"
+}
