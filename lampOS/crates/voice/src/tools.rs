@@ -1542,8 +1542,9 @@ fn run_call_with_scope(
                 }
                 _ => told,
             };
-            // A face saved: the face cache has not answered for it yet, so a
-            // line begun before it does may look later for its keeper (#2807).
+            // A face saved by this tool: the face cache goes cold at once
+            // (#2807, `FaceCache::face_remembered`), without waiting for the
+            // refresh to see the eyes' known file change.
             if call.name == crate::known_faces::REMEMBER
                 && told.0["ok"] == true
                 && let Some(lease) = lease

@@ -13541,19 +13541,27 @@ async fn the_first_line_after_a_restart_keeps_for_the_face_the_eyes_name_later()
 ///   the lamp answers, before the keep: the keep is not A's.
 /// - reviewer-three's P2: the final words come back 600 ms after the end,
 ///   past `KEEPER_WAIT`: the keeper is still named as of the end.
-/// - El's P2: a warm cache (it answered nobody before the line) arms no
+/// - El's P2: a warm cache (cold long ago, it named nobody since) arms no
 ///   late look: A first cached mid-line, nobody seen speaking (an unknown
 ///   voice off camera), the keep stays the room's.
+/// - The #2807 run on lamp-c0a4 at `39a68c91b`: a restart 1 s before the
+///   line and a refresh naming nobody since: still cold (`COLD_FOR`), so A
+///   named mid-line is the keeper. And a warm cache whose eyes' known set is
+///   rewritten by another writer (a face remembered through the eyes' own
+///   socket) just before the line: cold again, A is the keeper.
 #[tokio::test]
 async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
     use crate::memory_scope::{FaceCache, KEEPER_WAIT, ScopeLease};
     use crate::speaking_faces::{SpeakingFaces, known_face_of};
     use std::sync::atomic::{AtomicBool, Ordering};
-    let path = std::env::temp_dir().join(format!(
+    let directory = std::env::temp_dir().join(format!(
         "keep-late-speaking-{}-{:?}",
         std::process::id(),
         std::thread::current().id()
     ));
+    std::fs::create_dir_all(&directory).unwrap();
+    let path = directory.join("known");
+    let names = directory.join("tellable");
     std::fs::write(&path, "A").unwrap();
     std::fs::write(known_face_of(&path), "f1\n").unwrap();
     let a = crate::remember::person_id("A");
@@ -13583,8 +13591,30 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
             None,
             None,
         ),
+        (
+            "restart 1 s ago, nobody named since, A named mid-line",
+            "",
+            true,
+            None,
+            Some(a.clone()),
+        ),
+        (
+            "known set rewritten by another writer, A named mid-line",
+            "",
+            true,
+            None,
+            Some(a.clone()),
+        ),
+        (
+            "known file named A then nobody, A named mid-line",
+            "",
+            true,
+            None,
+            Some(a.clone()),
+        ),
     ] {
         let warm = what.starts_with("warm");
+        let lamp = what.starts_with("restart") || what.starts_with("known");
         // Fresh for this case: the known file names A for 3 s from now.
         std::fs::write(&path, "A").unwrap();
         let script = Arc::new(Script {
@@ -13648,10 +13678,62 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
             .seeing_who_speaks(eyes.clone(), path.clone())
             .announcing(false);
         engine.memory_camera(true, 1);
+        let long_ago = Instant::now()
+            .checked_sub(crate::memory_scope::COLD_FOR + Duration::from_secs(1))
+            .unwrap();
         if warm {
-            // The cache gave its first answer since the camera was allowed,
-            // before the line: nobody.
+            // Cold long ago (past `COLD_FOR`), and a refresh since named
+            // nobody, before the line.
+            cache.cold_since(long_ago);
             assert!(cache.replace(cache.begin_refresh(), None));
+        }
+        // A refresh as the worker's: the known file's mark, then its
+        // observation.
+        let refresh = || {
+            let mut token = cache.begin_refresh();
+            let changed = cache.known_file_read(
+                &mut token,
+                crate::known_faces::KnownMark::read(&path),
+                Instant::now(),
+            );
+            cache.replace(token, crate::known_faces::FaceObservation::read(&path));
+            changed
+        };
+        if what.starts_with("restart") {
+            // The voice restarted 1 s ago; a refresh since named nobody.
+            cache.cold_since(Instant::now() - Duration::from_secs(1));
+            let _ = std::fs::remove_file(&path);
+            assert!(!refresh());
+        }
+        if what.starts_with("known set") {
+            // Warm, nobody known; then the eyes remember A through their own
+            // socket and rewrite their names file, which the next refresh
+            // reads, naming nobody yet.
+            cache.cold_since(long_ago);
+            let _ = std::fs::remove_file(&path);
+            std::fs::write(&names, "A\n").unwrap();
+            assert!(!refresh(), "the first read sets the mark");
+            assert!(!cache.is_cold(Instant::now()), "{what}: warm");
+            std::fs::File::options()
+                .write(true)
+                .open(&names)
+                .unwrap()
+                .set_modified(std::time::SystemTime::now() + Duration::from_secs(5))
+                .unwrap();
+            assert!(refresh(), "{what}: the known set changed");
+        }
+        if what.starts_with("known file") {
+            // Warm; the eyes name A (a face remembered through their own
+            // socket), then A looks away and the file names nobody.
+            cache.cold_since(long_ago);
+            assert!(!refresh(), "the first read sets the mark");
+            std::fs::remove_file(&path).unwrap();
+            assert!(refresh(), "{what}: A no longer named");
+        }
+        if lamp {
+            assert!(cache.is_cold(Instant::now()), "{what}: cold");
+            // A named during the line, from the known file.
+            std::fs::write(&path, "A").unwrap();
         }
         let done = Arc::new(AtomicBool::new(false));
         let feeder = {
@@ -13714,6 +13796,5 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
         feeder.join().unwrap();
         assert_eq!(*keepers.lock().unwrap(), [expected], "{what}");
     }
-    std::fs::remove_file(known_face_of(&path)).unwrap();
-    std::fs::remove_file(path).unwrap();
+    std::fs::remove_dir_all(&directory).unwrap();
 }
