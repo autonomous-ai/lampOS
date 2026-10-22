@@ -3204,6 +3204,82 @@ fn a_resting_lamp_glances_with_the_switch_and_comes_back_to_rest() {
     }
 }
 
+/// A head that stops short only when it lifts, as lamp-52e6's does (26
+/// counts short in the factory's self-test on #2818): dipped by a glance at
+/// rest, it is led back up to where it rested, and is back within the
+/// self-test's 12 counts within its 3 s, not left resting 26 below.
+#[test]
+fn a_resting_head_dipped_by_a_glance_is_led_back_up_where_it_stops_short_lifting() {
+    let (from, until) = (Duration::from_secs(10), Duration::from_millis(11_000));
+    let (mut lamp, mut clock) = folded(Duration::from_secs(16));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    // Lifting, the head stops 26 short of its goal; it dips all the way.
+    lamp.heavy = Some((PITCH, 0.0, 26.0, 25));
+    // Found standing, as the factory's self-test finds it, its head at its
+    // goal there.
+    for (servo, at) in lamp
+        .servos
+        .iter_mut()
+        .zip([2_015, 2_650, 2_600, 2_044, 1_900])
+    {
+        servo.position = f32::from(at);
+        servo.goal = at;
+    }
+    let limits = Limits::folded_with(Tuning {
+        reach: [150, 15, 1, 250],
+        speed: 120,
+        servo_speed: 1_000,
+        servo_acceleration: 60,
+    })
+    .map(|limits| Limits {
+        rest_glance: true,
+        ..limits
+    })
+    .unwrap();
+    let time = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut seen = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        || Some((Mood::Resting, 0)),
+        move || Asked {
+            toward: None,
+            seen: None,
+            gesture: None,
+            expression: (time.get() >= from && time.get() < until).then_some([40.0, 0.0, 0.0]),
+            called: false,
+            still: false,
+            paused: false,
+            unplug: false,
+            held_by_test: false,
+            asleep: false,
+            woken: false,
+        },
+        |glimpse| seen.push((seen_at.get(), glimpse.positions[0])),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let at = |when: Duration| seen.iter().rfind(|step| step.0 < when).unwrap().1;
+    let before = at(from);
+    let lowest = seen
+        .iter()
+        .filter(|step| step.0 >= from && step.0 < until)
+        .map(|step| step.1)
+        .max()
+        .unwrap();
+    assert!(lowest >= before + 30, "dipped from {before} to {lowest}");
+    let after = at(until + Duration::from_secs(3));
+    assert!(
+        after.abs_diff(before) <= 12,
+        "back at {after}, rested at {before}"
+    );
+}
+
 #[test]
 fn a_standing_lamp_nods_and_is_left_exactly_where_it_was() {
     // Standing takes a little over four seconds; the nod is asked at eight.
