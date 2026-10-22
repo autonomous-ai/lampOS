@@ -67,11 +67,14 @@ fn write_part(dir: &Path, run_id: &str, bytes: &[u8]) -> io::Result<PathBuf> {
 
 /// The folder of `lamp`'s records in `place`. A lamp's id is a plain name
 /// (the record refuses any other). Here it must also be lower case, since a
-/// share may not tell `Lamp-4ACE` from `lamp-4ace`, and not start with a
-/// dot, such as `..`: either would not be a folder of its own.
+/// share may not tell `Lamp-4ACE` from `lamp-4ace`, not start with a dot,
+/// such as `..`, and be one lamp's own name (`SelfTest::is_own_name`): a
+/// name lamps share, such as the image's `autonomous` or `lamp-` with no
+/// suffix, would put several lamps' records in one folder (El on #3073).
 pub fn lamp_dir(place: &Path, lamp: &str) -> io::Result<PathBuf> {
     if lamp.is_empty()
         || lamp.starts_with('.')
+        || !lamp_msgs::SelfTest::is_own_name(lamp)
         || !lamp.bytes().all(|b| {
             b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'-' | b'_' | b'.')
         })
@@ -413,7 +416,17 @@ mod tests {
         for (path, read) in &found {
             assert!(read.is_err(), "{}", path.display());
         }
-        for lamp in ["..", ".", "", "a/b", ".hidden", "Lamp-4ACE"] {
+        for lamp in [
+            "..",
+            ".",
+            "",
+            "a/b",
+            ".hidden",
+            "Lamp-4ACE",
+            "autonomous",
+            "orangepi",
+            "lamp-",
+        ] {
             assert_eq!(
                 lamp_dir(place.path(), lamp).unwrap_err().kind(),
                 io::ErrorKind::InvalidInput,
