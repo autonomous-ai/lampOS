@@ -1,0 +1,14 @@
+{
+  "heads": {
+    "45b8ef5decd3e7ec2765798ce565761f0007358b": {
+      "lampOS/Cargo.lock": "e0b90eda8204cb8176ea22aeac76321634aaaac0d6cd652bf9f348d73fd38f64",
+      "lampOS/crates/voice/src/second_provider/net.rs": "0d57b1317787d23b02f173646095b066e226baafedd93289f3b8ab475f37a8fe",
+      "lampOS/crates/voice/src/second_provider/net/chat.rs": "6c1cb6e68c04a518fc416ddb8b845f94308d00bb10b7512fd181554c2b08a0b2"
+    },
+    "6f603c138a12fe4337a886211b2c575403974f74": {
+      "lampOS/Cargo.lock": "e0b90eda8204cb8176ea22aeac76321634aaaac0d6cd652bf9f348d73fd38f64",
+      "lampOS/crates/voice/src/second_provider/net.rs": "6e5619e9315870bf5467d7164dc0574ecd2ec64f25d82212e21499ea4d864c72",
+      "lampOS/crates/voice/src/second_provider/net/chat.rs": "7507fdc00a2e2a38caa6f874145e559e91adf3b07a3af4d6b9884d37a72bede1"
+    }
+  }
+}
