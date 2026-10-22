@@ -6844,6 +6844,34 @@ Ready for lamp-voice: no
   Next: coordinate the Eyes boot/face evidence format, then correct the
   public photo acknowledgement while the request-proof change proceeds.
 
+## 2026-10-22, 22:54: request speaker evidence published
+
+Ready for lamp-voice: no
+
+- #3064 at 471e741f0 publishes atomic Eyes name/ID/boot/face evidence and a
+  single-use request-owned positive speaker proof. Known-name notes require
+  both; prepared chats carry no name and are discarded if final proof adds it.
+- On this Mac: `cargo fmt --all -- --check`, strict workspace/all-target
+  Clippy, 48 distinct focused tests and `cargo build -q --workspace` passed.
+  The helper took 239 microseconds first and 57 repeated on a warm synthetic
+  file. Microphone boundaries are original nonempty host reads, not measured
+  acoustic acquisition times; no general replay or liveness claim is made.
+- Linux Clippy 39806690387 passed on that head; ARM64 39806690416 is testing.
+  The full-host failures remain recorded: Eyes 222/1/5 (absent /dev/full),
+  earlier Voice 3383/3/14 (two unchanged child-exit timeouts and an own fixture
+  setup error, since corrected and covered by the 12-case prepared-chat test).
+  No full-host waiver, corrected-head model probe or device pass is claimed.
+- #3014 integrates the identical common Rust source, with only its held unit,
+  install assertion and activation notes additional. Its local gate is running.
+  #2988 integration preserves the uniform app receipt and same-speaker photo
+  yes corrections. Neither product activation hold is lifted.
+- The reserved atomic repair store has tests written first and source reviewed;
+  no Cargo run or runtime route yet. Final account approval is an explicit
+  identity attestation tied to a fresh ticket; source will remain off. The old
+  name, stable ID and memory stay occupied throughout replacement.
+- Read every new Queue and own-PR comment; clean root advanced to ec5428a34.
+  Coordination remains on Queue/PR, with no lamp, SSH or owner relay.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
