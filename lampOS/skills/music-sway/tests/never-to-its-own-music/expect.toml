@@ -1,4 +1,6 @@
-# Five minutes of music the lamp plays itself (own_voice present), the voice
-# resting: nothing (#2833).
+# A requested recording (#1757) as the lamp plays it: asked at 1 s, its
+# confirmation spoken from 4 s (own_voice present), then 60 s of its own
+# music with the voice listening (own_voice unknown), and resting at 66 s
+# while the ears' windows still hold the music's last second: nothing (#2833).
 clock = "10:00"
 none = true

@@ -1,10 +1,10 @@
-# The lamp's own music for two minutes, six quiet minutes (rearmed), then two
-# minutes of music in the room: one sway 20 s into the room's music. The
-# lamp's own piece spent no cooldown.
+# The lamp's own music (#1757, the voice listening) to 66 s, quiet (rearmed),
+# then two minutes of music in the room from 400 s, the voice resting: one
+# sway 20 s into the room's music. The lamp's own piece spent no cooldown.
 clock = "10:00"
 
 [[expect]]
-at = "500s"
+at = "420s"
 within = "1s"
 call = "body.move"
 args = { move = "sway" }
