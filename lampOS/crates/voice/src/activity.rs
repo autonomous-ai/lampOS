@@ -248,15 +248,19 @@ pub struct TurnDetector {
     /// An end that was due while they did, held for [`UNFINISHED_WAIT_BLOCKS`]
     /// more of quiet.
     held_end: Option<HeldEnd>,
+    /// Quiet the line in hand was already held for, in blocks: its holds
+    /// add up to [`UNFINISHED_WAIT_BLOCKS`] at most (El on #3045).
+    held_blocks: u16,
     /// The last held end, for the journal, until taken.
     held_told: Option<Waited>,
 }
 
-/// An end held for unfinished words: the pause when it was due, the
-/// trailing word's class, and the decision then.
+/// An end held for unfinished words: the pause when it was due, how much
+/// more it may wait, the trailing word's class, and the decision then.
 #[derive(Debug)]
 struct HeldEnd {
     from: u16,
+    most: u16,
     class: Trailing,
     decision: EndpointDecision,
 }
@@ -287,6 +291,7 @@ impl Default for TurnDetector {
             waited: false,
             unfinished: None,
             held_end: None,
+            held_blocks: 0,
             held_told: None,
         }
     }
@@ -408,7 +413,11 @@ impl TurnDetector {
     /// `decision`, held while the words so far end unfinished: at most
     /// [`UNFINISHED_WAIT_BLOCKS`] of quiet past when it was due, and let go
     /// at once when speech comes (the line goes on) or the words are told
-    /// finished after all. `quiet_before` is the pause before this block.
+    /// finished after all. The bound is the line's: holds on one line add
+    /// up to no more, and none takes the pause past the silence window plus
+    /// it. An end the model held as incomplete has waited already (El on
+    /// #3045: Smart Turn's 1.5 s plus 1.3 s). `quiet_before` is the pause
+    /// before this block.
     fn hold_unfinished(
         &mut self,
         decision: Option<EndpointDecision>,
@@ -422,10 +431,11 @@ impl TurnDetector {
                 self.silence_count
             };
             let waited = pause.saturating_sub(held.from);
-            if !speech && waited < UNFINISHED_WAIT_BLOCKS && self.unfinished.is_some() {
+            if !speech && waited < held.most && self.unfinished.is_some() {
                 self.held_end = Some(held);
                 return None;
             }
+            self.held_blocks = self.held_blocks.saturating_add(waited);
             self.held_told = Some(Waited {
                 class: held.class,
                 waited_ms: u64::from(waited) * 10,
@@ -438,11 +448,22 @@ impl TurnDetector {
             ended.unfinished_wait_ms = Some(u64::from(waited) * 10);
             return Some(ended);
         }
+        // What the line has left of its hold, and no quiet past the window
+        // plus the hold in all.
+        let most = UNFINISHED_WAIT_BLOCKS.saturating_sub(self.held_blocks).min(
+            self.end_silence_blocks
+                .saturating_add(UNFINISHED_WAIT_BLOCKS)
+                .saturating_sub(self.silence_count),
+        );
         match (decision, self.unfinished) {
-            // A call's wait that ran out has waited already.
-            (Some(due), Some(class)) if due.call_wait_ms.is_none() => {
+            // A call's wait that ran out, or the model's incomplete wait,
+            // has waited already.
+            (Some(due), Some(class))
+                if due.call_wait_ms.is_none() && due.basis != "model_incomplete" && most > 0 =>
+            {
                 self.held_end = Some(HeldEnd {
                     from: self.silence_count,
+                    most,
                     class,
                     decision: due,
                 });
@@ -601,6 +622,7 @@ impl TurnDetector {
             self.waiting = false;
             self.unfinished = None;
             self.held_end = None;
+            self.held_blocks = 0;
             self.waited = false;
             if let Some(confirmation) = self.confirmation.as_mut() {
                 confirmation.begin(&self.prefix, self.speech_blocks);
@@ -980,6 +1002,13 @@ impl EndpointDecision {
             rechecked_from: None,
             unfinished_wait_ms: None,
         }
+    }
+
+    /// The quiet waited before this end, in ms: the pause when it was due,
+    /// plus any hold for unfinished words after it (the Reviewer-lead on
+    /// #3045: a held end keeps its `silence_ms` from when it was due).
+    pub fn quiet_ms(&self) -> u64 {
+        self.silence_ms + self.unfinished_wait_ms.unwrap_or(0)
     }
 }
 

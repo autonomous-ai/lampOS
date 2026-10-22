@@ -2,7 +2,8 @@
 //! (#3026, `LAMP_SECOND_UNFINISHED_WAIT`): the detector holds a due end for
 //! at most `WAIT_BLOCKS` more of quiet while it is told so; a finished line,
 //! and a detector told nothing, end as before.
-use lamp_voice::activity::{Activity, ObservedAudio, TurnDetector};
+use lamp_turn_end_wire::{Availability, Classifier, Outcome, Submit, Token, Verdict};
+use lamp_voice::activity::{Activity, ConfirmPolicy, ObservedAudio, TurnDetector};
 use lamp_voice::unfinished_words::{Trailing, WAIT_BLOCKS, trailing};
 
 fn frame(sequence: u64) -> ObservedAudio {
@@ -28,6 +29,21 @@ impl Line {
     fn new() -> Self {
         Self {
             detector: lamp(),
+            sequence: 0,
+            starts: 0,
+        }
+    }
+    /// With the end-of-turn model, as `--endpoint smart-turn-fast` runs it
+    /// (the responsive profile on the 600 ms window), every verdict
+    /// `probability`.
+    fn smart_turn(probability: f32) -> Self {
+        Self {
+            detector: lamp()
+                .with_confirmation(
+                    Box::new(Fixed(probability, None)),
+                    ConfirmPolicy::responsive(),
+                )
+                .unwrap(),
             sequence: 0,
             starts: 0,
         }
@@ -146,4 +162,98 @@ fn without_words_told_the_line_ends_as_before() {
     line.detector.words_end(Some(Trailing::Filler));
     line.speak(150);
     assert_eq!(line.quiet_to_end(400), Some(60));
+}
+
+/// An end-of-turn model whose every verdict is the same.
+struct Fixed(f32, Option<Token>);
+
+impl Classifier for Fixed {
+    fn submit(&mut self, token: Token, _pcm: &[i16]) -> Submit {
+        self.1 = Some(token);
+        Submit::Accepted
+    }
+    fn poll(&mut self) -> Option<Outcome> {
+        self.1.take().map(|token| Outcome {
+            token,
+            worker: 1,
+            request: 1,
+            result: Ok(Verdict {
+                probability: self.0,
+                ..Verdict::default()
+            }),
+        })
+    }
+    fn availability(&self) -> Availability {
+        Availability::Ready
+    }
+    fn cancel(&mut self) {
+        self.1 = None;
+    }
+}
+
+/// El on #3045 (P2): with the end-of-turn model on, a person who stopped
+/// after "um" is answered at the model's incomplete wait (1.5 s), never
+/// that plus the hold; an uncertain verdict's end, on the window, is held
+/// to the window plus the hold at most.
+#[test]
+fn with_smart_turn_a_stop_after_um_is_answered_within_the_bound() {
+    let incomplete = ConfirmPolicy::responsive().incomplete_blocks;
+    let mut line = Line::smart_turn(0.001);
+    line.speak(150);
+    line.detector.words_end(trailing("Lamp, can you, um"));
+    assert_eq!(line.quiet_to_end(1_000), Some(incomplete));
+    let end = line.detector.last_endpoint().unwrap();
+    assert_eq!(end.basis, "model_incomplete");
+    assert_eq!(end.unfinished_wait_ms, None);
+    assert_eq!(line.detector.take_unfinished_wait(), None);
+
+    let mut line = Line::smart_turn(0.5);
+    line.speak(150);
+    line.detector.words_end(trailing("Lamp, can you, um"));
+    assert_eq!(line.quiet_to_end(1_000), Some(60 + WAIT_BLOCKS));
+    let end = line.detector.last_endpoint().unwrap();
+    assert_eq!(end.basis, "model_uncertain");
+    assert_eq!(end.quiet_ms(), u64::from(60 + WAIT_BLOCKS) * 10);
+}
+
+/// El on #3045 (P3): the hold is the line's. A noise block lets a hold go
+/// at 1.0 s; the next due end on the same words is held only for the 0.3 s
+/// left. A line whose noise came 10 ms before its hold ran out is held
+/// 10 ms more at its next end: 1.3 s in all, never another 1.3 s.
+#[test]
+fn a_lines_holds_add_up_to_the_bound() {
+    let mut line = Line::new();
+    line.speak(150);
+    line.detector
+        .words_end(trailing("Lamp, I'm thinking about"));
+    for _ in 0..60 + 100 {
+        assert!(matches!(line.push(0.0), Activity::Continue(_)));
+    }
+    // A chair, a TV: one block scored as speech.
+    line.speak(1);
+    assert_eq!(
+        line.detector.take_unfinished_wait().unwrap().waited_ms,
+        1_000
+    );
+    assert_eq!(line.quiet_to_end(400), Some(60 + WAIT_BLOCKS - 100));
+    assert_eq!(
+        line.detector.last_endpoint().unwrap().unfinished_wait_ms,
+        Some(u64::from(WAIT_BLOCKS - 100) * 10)
+    );
+
+    // Another line, whose hold is all but taken by one pause.
+    let mut line = Line::new();
+    line.speak(150);
+    line.detector
+        .words_end(trailing("Lamp, I'm thinking about"));
+    for _ in 0..60 + WAIT_BLOCKS - 1 {
+        assert!(matches!(line.push(0.0), Activity::Continue(_)));
+    }
+    line.speak(1);
+    assert_eq!(line.quiet_to_end(400), Some(60 + 1));
+    assert_eq!(
+        line.detector.last_endpoint().unwrap().unfinished_wait_ms,
+        Some(10)
+    );
+    assert_eq!(line.starts, 1);
 }
