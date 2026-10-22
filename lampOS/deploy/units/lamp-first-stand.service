@@ -1,7 +1,7 @@
 # lampOS body: the first stand of a lamp moved from V1, confirmed at the lamp (#2396; the first
 # builder on #1711, 21 Oct). Its body runs seated (lamp-body-measure.service) until a person beside
 # it says yes. Once someone is near, the lamp asks through the voice's say service: "I'd like to
-# stretch for the first time. Rest your hand on my head, or just say yes, when you're ready." A touch
+# stretch for the first time. When you're ready, say yes, or rest your hand on my head." A touch
 # on the head or a button held a second is the yes, or a short spoken yes heard after the ask, with a
 # face near (voice/heard). lamp-body is then stopped, the arm stood at 30% and 100% as the
 # factory's steps stand it, this arm's stand written into /etc/lampOS/body/lamp.env, and lamp-body
@@ -13,7 +13,7 @@
 # body and its read run as @LAMP_USER@ through setpriv (util-linux), which execs them, so a stop
 # reaches the body itself and it folds before it ends; as the servo port's owner requires.
 [Unit]
-Description=lampOS body: the first stand, asked at the lamp and confirmed by a touch
+Description=lampOS body: the first stand, asked at the lamp and confirmed by a touch or a spoken yes
 ConditionHost=@UNIT_ID@
 PartOf=lampos.target
 After=lamp-body.service lamp-voice.service lamp-controls.service lamp-eyes.service
