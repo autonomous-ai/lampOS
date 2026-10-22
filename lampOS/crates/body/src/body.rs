@@ -2887,12 +2887,12 @@ const ARM_FOLD: &str = "My arm is not folded all the way down. Please fold it ge
 /// says `STOPPED_ASKING` instead. Counted from the first time it let go in
 /// this run, so a take-hold that fails and lets go again does not restart it.
 pub const WAIT_ASKING: Duration = Duration::from_secs(600);
-/// Reads once the lamp has stopped asking: a fifth as often, and still
-/// often enough that the body's diagnostic, one per read then, stays inside
-/// the second `diagnostics` is declared at.
+/// Reads once the lamp has stopped asking: a fifth as often. Its
+/// diagnostic goes once per change either way
+/// (`crate::bus_out::WAITING_RESEND`).
 pub const WAIT_READ_LATE: Duration = Duration::from_millis(500);
 /// What it says, no longer asking, once `WAIT_ASKING` has passed.
-pub const STOPPED_ASKING: &str = "Nobody has set me straight, so I have stopped asking. I am let go, and I will start by myself once I am set straight.";
+pub use crate::ask::STOPPED_ASKING;
 
 /// A start refused for a pose a hand can set straight (#2602): where each
 /// of pitch, roll and yaw may be found and start, the joints let go while

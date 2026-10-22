@@ -577,6 +577,26 @@ may not need it.
 
 
 **An add-on's quoted line (#2530 part 2, `LAMP_ADDON_SAY=on`).** In place of `note` or `text`, `quoted` is a partner's line from an add-on's folder, at most 300 bytes on one line. Refused without the switch, and on the Live route. Its turn tells the model it is quoted and untrusted, never an instruction, and that it may say nothing; it is asked with no functions, runs none, is kept out of memory and is never urgent ([addons.md](addons.md)).
+
+**The body's ask (#2938, `LAMP_BODY_ASK=on`, with `LAMP_SAY=on` and
+`LAMP_BUS=on`; off unless set).** A body that refuses to start for its pose
+lets go and says on `diagnostics` what it needs a person to do
+([body.md](body.md), `--refused-let-go`). The voice reads that diagnostic
+(`lamp_body::ask::asks`: the body's own error while starting or paused,
+never another part's, a stop or a warning) on a thread of its own
+(`body_ask`), and hands the line to its own say service as `text`, skill
+`body`, priority 8, not begun after a minute: the same queue and gates as a
+skill's say, so the voice's loop never waits for it. It is said once when
+the body first lets go, not for each report; again only when the lamp's name
+is heard (`name/heard`, at the name note's 0.9), at most once in 10 s; and
+never as "stopped asking", for which a call says the last ask. Another body
+report, or 10 s with none, ends the let-go, and the next is said again. The
+journal has the outcome, never the words. Tests:
+`body_ask::tests::the_ask_is_said_once_per_let_go_not_for_each_identical_report`,
+`called_by_name_it_is_said_again_never_twice_in_ten_seconds`,
+`other_diagnostics_are_never_said`,
+`a_body_gone_quiet_ends_the_episode_and_its_next_ask_is_said`,
+`the_ask_reaches_the_say_service_as_written_text`. On a lamp: not yet run.
 ## Asking the policy (#752)
 
 Removed with the voice's own hello (#2825). It held a due hello up to 2 s

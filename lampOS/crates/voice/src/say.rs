@@ -536,6 +536,45 @@ struct Asked {
     expires_at_us: u64,
 }
 
+/// An ask from inside the voice, through the same queue and gates as a
+/// socket client's ([`Says::own_asks`]). Never waits.
+#[derive(Clone)]
+pub struct OwnAsks(mpsc::Sender<Asked>);
+
+impl OwnAsks {
+    /// Ask for `text` said as written, as `skill`, at `priority`, not
+    /// begun after `expires_in_ms`: where its answer comes.
+    pub fn text(
+        &self,
+        skill: &str,
+        text: &str,
+        priority: u8,
+        expires_in_ms: u64,
+    ) -> mpsc::Receiver<Answer> {
+        let (answer, answered) = mpsc::channel();
+        let read_at_us = lamp_ipc::monotonic_us();
+        let request = Request {
+            skill: skill.into(),
+            words: Words::Text(text.into()),
+            priority,
+            expires_in_ms,
+            start_before_us: None,
+            task: None,
+            invitation: None,
+            unplug_request: None,
+        };
+        // A voice gone drops the answer's sender: the receiver says so.
+        let _ = self.0.send(Asked {
+            expires_at_us: request.expires_at_us(read_at_us),
+            request,
+            answer,
+            read_at_us,
+            guard: None,
+        });
+        answered
+    }
+}
+
 /// One waiting, in the order taken.
 struct Waiting {
     request: Request,
@@ -649,6 +688,8 @@ pub(crate) fn guarded_ticket_for_test() -> (
 
 /// The voice's side: what has been asked and waits to be said.
 pub struct Says {
+    /// Where the voice's own parts ask, as a client would ([`OwnAsks`]).
+    own: mpsc::Sender<Asked>,
     incoming: mpsc::Receiver<Asked>,
     waiting: Vec<Waiting>,
     order: u64,
@@ -717,10 +758,12 @@ impl Says {
         let open = Arc::new(AtomicUsize::new(0));
         let sounds: Arc<Path> = sounds.into();
         let recordings = Arc::new(recordings);
+        let own = ask.clone();
         thread::Builder::new()
             .name("lamp-voice-say".into())
             .spawn(move || accept(&listener, &ask, &open, &sounds, &recordings))?;
         Ok(Self {
+            own,
             incoming,
             waiting: Vec::new(),
             order: 0,
@@ -861,6 +904,7 @@ impl Says {
         let (ask, incoming) = mpsc::channel();
         (
             Self {
+                own: ask.clone(),
                 incoming,
                 waiting: Vec::new(),
                 order: 0,
@@ -869,6 +913,12 @@ impl Says {
             },
             ask,
         )
+    }
+
+    /// A way for the voice's own parts to ask as a client of the socket
+    /// would, from a thread of their own (#2938, [`crate::body_ask`]).
+    pub fn own_asks(&self) -> OwnAsks {
+        OwnAsks(self.own.clone())
     }
 
     /// Take what has been asked, and answer those not begun by `now_us`.

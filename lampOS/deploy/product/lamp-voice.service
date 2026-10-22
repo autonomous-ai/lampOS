@@ -171,6 +171,8 @@ Environment=LAMP_ROOM_FACTS=on
 # through the say service below.
 Environment=LAMP_SAY=on
 Environment=LAMP_SAY_GROUP=lampos
+# A body let go for its pose says its ask through the say service, once, and when called by name (#2938).
+Environment=LAMP_BODY_ASK=on
 Environment=LAMP_ACTIONS_DIR=/run/lampos-actions
 # The skills' functions, in lamp-skills' own folder; the old one inside the actions part's is still
 # read after it for one release.

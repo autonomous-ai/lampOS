@@ -5536,6 +5536,12 @@ fn conversation_with_gate_inner(
     } else {
         None
     };
+    // The body's ask when it lets go for its pose, said through the say
+    // service from a thread of its own (#2938, `LAMP_BODY_ASK=on`).
+    #[cfg(not(test))]
+    if let Some(says) = says.as_ref() {
+        crate::body_ask::start_from_environment(says.own_asks());
+    }
     // A skill typed in the app, handed over and told aloud as the voice's
     // own (#2813, `LAMP_APP_MAKE_SKILL=on`): a socket for lamp-cloud.
     #[cfg(not(test))]
