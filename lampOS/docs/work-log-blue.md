@@ -440,3 +440,10 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - **07:3x, the first builder's answer:** yes. A dropped say costs nothing, and after a drop that add-on waits 5 minutes. Opened as #2768 (`blue/addon-say-cap`). The hold (`AFTER_A_DROP_US`, 300 s, that add-on only) was folded in at 08:00 (`2ecc994f2`), with a unit test and an e2e check; both fail with the hold taken out.
 - **08:21, reviewer-two on #2768:** P1/P2 none at `2ecc994f2`, and asked for a rebase because `6bb802490` changed `main.rs`. Rebased at 08:3x to `c806ac0f8` on `efff7c4a5` (range-diff `=`). Locally, lamp-skills passes 140 + 22 + 271 and clippy is clean; fresh ARM64 is running.
 - **08:2x, my person's decision:** everything related to mood measurement belongs to Sixth from now on. Blue takes no mood work and points any mood task to Sixth.
+- **09:34–09:59, part 2's rerun on lamp-75c9** (#2768's build `61cd049bd`, via my helper's setup and restore). Five say proposals in 23 minutes:
+  - the first was dropped by the room rule (`unknown`);
+  - four reached the policy once the room was `quiet`, and all four came back `wait`: Jev 0.20, 0.21 and 0.19, and one rule wait after 1519 ms with no model answer;
+  - 16 triggers were held by the 5-minute hold;
+  - the voice's quoted turn was not reached.
+  Put back and released to Nine at 10:01. Results are on #2602 (6331607814).
+- **09:48, reviewer-two:** asked for a merge window at the current base for #2768 and #2764. I agreed to keep `fe174b748` until its ARM64 finishes.
