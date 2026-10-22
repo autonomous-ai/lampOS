@@ -64,6 +64,8 @@ struct Script {
     /// How many times a listener was asked for its words so far, at a pause
     /// ([`Listener::flush`], `LAMP_SECOND_EARLY_FINALIZE`).
     flushed: Arc<AtomicUsize>,
+    /// The turns that settled the relay's routes (`Services::turn_begins`).
+    turns_begun: AtomicUsize,
 }
 
 struct ScriptListener {
@@ -110,6 +112,10 @@ impl Listener for ScriptListener {
 }
 
 impl Services for Script {
+    fn turn_begins(&self) {
+        self.turns_begun.fetch_add(1, Ordering::Relaxed);
+    }
+
     fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
         self.listened.fetch_add(1, Ordering::Relaxed);
         let result = match &self.listen_error {
@@ -3810,6 +3816,32 @@ async fn a_reminder_is_deferred_as_the_fixture_does() {
         late_by_ms: None,
     });
     assert_eq!(turn(&mut engine).await, ["deferred:Disabled"]);
+}
+
+/// #2882 (reviewer-two's P2 on #2919): every turn the engine begins,
+/// spoken, written or a reminder said, settles the relay's routes once, as
+/// it begins; a retired request's settles none, nor a reminder not said.
+#[tokio::test]
+async fn every_turn_begun_settles_the_routes_once() {
+    let script = Arc::new(Script::default());
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine.saying_reminders(true);
+    let begun = || script.turns_begun.load(Ordering::Relaxed);
+    engine.submit(start(1));
+    assert_eq!(begun(), 1);
+    engine.submit(written(2, "Hello"));
+    assert_eq!(begun(), 2);
+    engine.submit(reminder(3, "Tea"));
+    assert_eq!(begun(), 3);
+    engine.retire_through(6);
+    engine.submit(start(4));
+    engine.submit(written(5, "Hello"));
+    engine.submit(reminder(6, "Tea"));
+    assert_eq!(begun(), 3);
+    let quiet = Arc::new(Script::default());
+    let (mut deferring, _, _) = scripted(quiet.clone());
+    deferring.submit(reminder(1, "Tea"));
+    assert_eq!(quiet.turns_begun.load(Ordering::Relaxed), 0);
 }
 
 fn reminder(request: u64, text: &str) -> ProviderInput {

@@ -905,6 +905,7 @@ pub fn services(
     let key = (route.chat == Some(ChatRoute::Gemini) || route.gemini_speech())
         .then(|| gemini_key(provider, credentials))
         .transpose()?;
+    let routable = relay_routable(&config, route);
     let mut net = Net::new(config, declare).map_err(io::Error::other)?;
     let call = |model| {
         key.as_ref().map(|key| super::services::GeminiCall {
@@ -1012,10 +1013,53 @@ pub fn services(
             "lamp-voice second: a speech socket is opened as each answer begins, for its first piece (LAMP_SECOND_SPEECH_SOCKET)"
         );
     }
+    // The relay's near addresses, asked in the background (#2882).
+    let relay_routes = std::env::var(super::services::RELAY_ROUTES_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if relay_routes {
+        let may = |on: bool| {
+            if on {
+                "may be near"
+            } else {
+                "stays at its own"
+            }
+        };
+        eprintln!(
+            "lamp-voice second: the relay is asked for near addresses, never on a turn's way: chat {}, speech {}, listening {} (LAMP_RELAY_ROUTES)",
+            may(routable.chat),
+            may(routable.speech),
+            may(routable.listening)
+        );
+        net = net.routing_through_the_relay(routable);
+    }
     Ok(net
         .warming_the_chat(warm)
         .warming_the_speech(warm_speech)
         .speaking_on_a_socket(speech_socket))
+}
+
+/// What the relay's near addresses may take (`LAMP_RELAY_ROUTES`, #2882):
+/// the chat when it is DeepSeek through the relay (a `deepseek_base_url`,
+/// not DeepSeek's own API) with its key, speech when
+/// the configured voice speaks, listening when it is the relay's; speech and
+/// listening only with the relay's key, so a key of another service's in
+/// `second.json` never goes to the relay's near address; for none whose
+/// address the voice unit's environment gave.
+pub(crate) fn relay_routable(
+    config: &crate::second_config::SecondConfig,
+    route: RouteFlags,
+) -> super::services::Routable {
+    super::services::Routable {
+        chat: route.chat == Some(ChatRoute::DeepSeek)
+            && config.hosted.own_deepseek.is_none()
+            && config.hosted.deepseek_base_url.is_some()
+            && !config.pinned.chat,
+        speech: !route.gemini_speech() && config.tts_key == config.llm_key && !config.pinned.speech,
+        listening: matches!(&config.stt, crate::second_config::Stt::Autonomous { key, .. } if *key == config.llm_key)
+            && !config.pinned.listening,
+    }
 }
 
 /// The web search the model may call as its own functions, as `route` sets
@@ -2061,6 +2105,8 @@ pub fn serve(
     // The same calls with the admitted request's memory authority (#1794).
     let scoped_runner = scoped_tool_runner(scoped_settings, search.clone(), early.clone(), policed);
     let system: crate::second_provider::System = Arc::new(system);
+    // The relay's routes, asked on the runtime below (#2882).
+    let routes_task = net.routes_task();
     let mut engine = Engine::new(
         Arc::new(net),
         {
@@ -2817,6 +2863,9 @@ pub fn serve(
             crate::second_provider::net::weather::ENVIRONMENT
         );
         runtime.spawn(weather_task(place, weather));
+    }
+    if let Some(task) = routes_task {
+        runtime.spawn(task);
     }
     if let Some((bus, told)) = air {
         eprintln!(
@@ -6253,6 +6302,9 @@ pub async fn run(
             changed.validate(monotonic_us())?;
             if was_down {
                 eprintln!("lamp-voice second: a service host answers again: the link is back");
+                // The relay's routes asked again now, not at their time's
+                // end (#2882).
+                engine.shared.services.link_back();
             } else {
                 eprintln!(
                     "lamp-voice second: no service host answers after a turn failed on the network: the link is down, checked every {} s",
