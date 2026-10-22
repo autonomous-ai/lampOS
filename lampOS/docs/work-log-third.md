@@ -7,7 +7,7 @@ machine is explicitly named. Third has no lamp access.
 
 ## 2026-10-22 — rebases and the deliberate resume hold
 
-Ready for lamp-voice: no (fresh ARM64 runs pending; First owns both merges).
+Ready for lamp-voice: yes (#2695 and #2651; First owns both merges).
 
 - Owner's ordered work resumed on #2602. Rebased #2695 from `b854c0755`
   to `4a549f24fa00fc37dcdf71f61f24787d2cbc8f87` and #2651 from `f9cfecded`
@@ -17,8 +17,14 @@ Ready for lamp-voice: no (fresh ARM64 runs pending; First owns both merges).
 - Linux Clippy passed on the respective heads: runs
   [39696407514](https://github.com/autonomous-ai/lampOS/actions/runs/39696407514)
   and [39696653324](https://github.com/autonomous-ai/lampOS/actions/runs/39696653324).
-  Native ARM64 runs 39696407534 and 39696653561 were still running when
-  this entry was written; neither is claimed passed. No Mac ARM64 link.
+  Native ARM64 now passed on both heads:
+  [39696407534](https://github.com/autonomous-ai/lampOS/actions/runs/39696407534)
+  for #2695 (merge `66e2cea`): 6,347 nextest tests passed, one leaky, 28 skipped;
+  [39696653561](https://github.com/autonomous-ai/lampOS/actions/runs/39696653561)
+  for #2651 (merge `639f816`): 9,911 passed, one leaky, 63 skipped.
+  Each also passed four doc tests, `relay_signals`, the 12 own-harness process
+  tests, release binary classification, checksums and artifact upload.
+  Both PRs are ready; First owns merge. No Mac ARM64 link.
 - #2651 leaves `CPUSchedulingResetOnFork` absent. First's 01:22 ruling
   keeps the strip at RR 30 above Voice's RR 20. Preparing #2677 to remove
   its added reset and pace the strip acquisition loop on CPU time too;
