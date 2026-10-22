@@ -1,0 +1,38 @@
+{
+  "run": 39770980758,
+  "head": "e2232b8369fb125af6c79e8bf6927ec590a612e9",
+  "conclusion": "success",
+  "watch_exit": 0,
+  "summaries": [
+    "lampOS \u2014 build and test on Linux ARM64 (2/4)\tUNKNOWN STEP\t2026-10-22T11:55:55.5640007Z      Summary [ 192.032s] 2610 tests run: 2610 passed, 7913 skipped",
+    "lampOS \u2014 build and test on Linux ARM64 (3/4)\tUNKNOWN STEP\t2026-10-22T11:53:42.3747436Z      Summary [ 159.650s] 2591 tests run: 2591 passed, 7932 skipped",
+    "lampOS \u2014 build and test on Linux ARM64 (4/4)\tUNKNOWN STEP\t2026-10-22T11:57:08.0427434Z      Summary [ 180.974s] 2744 tests run: 2744 passed, 7779 skipped",
+    "lampOS \u2014 build and test on Linux ARM64 (1/4)\tUNKNOWN STEP\t2026-10-22T11:55:24.4811391Z      Summary [ 140.301s] 2511 tests run: 2511 passed (1 leaky), 8012 skipped"
+  ],
+  "jobs": [
+    {
+      "name": "lampOS \u2014 build and test on Linux ARM64 (2/4)",
+      "conclusion": "success"
+    },
+    {
+      "name": "lampOS \u2014 build and test on Linux ARM64 (3/4)",
+      "conclusion": "success"
+    },
+    {
+      "name": "lampOS \u2014 build and test on Linux ARM64 (4/4)",
+      "conclusion": "success"
+    },
+    {
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/4)",
+      "conclusion": "success"
+    },
+    {
+      "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "report-full-run-failure",
+      "conclusion": "skipped"
+    }
+  ]
+}

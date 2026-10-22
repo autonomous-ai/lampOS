@@ -1,0 +1,11 @@
+--- a/lampOS/crates/voice/src/remember.rs
++++ b/lampOS/crates/voice/src/remember.rs
+@@ -9629,6 +9629,8 @@
+         let (ready, prepared) = sync_channel(0);
+         let served = std::thread::spawn(move || {
+             for _ in 0..2 {
++                // Control: only fake preparation happens before the real call.
++                std::thread::sleep(HITS_WITHIN + Duration::from_millis(100));
+                 ready.send(()).unwrap();
+                 let (mut stream, _) = session_note_request(&listener);
+                 stream

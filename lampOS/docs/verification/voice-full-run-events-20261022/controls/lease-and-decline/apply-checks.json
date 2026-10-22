@@ -1,0 +1,80 @@
+{
+  "base": "69f2228338a8df63a81d23087c3e55308fa125ca",
+  "files": [
+    {
+      "case": "timer",
+      "path": "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs",
+      "test": "provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet",
+      "base_sha256": "d6493f59e0d1690ab966fbd3a9bd02832d30aeb3e7fb1a0d307568991924a60e",
+      "candidate_sha256": "d6493f59e0d1690ab966fbd3a9bd02832d30aeb3e7fb1a0d307568991924a60e",
+      "before_probe_sha256": "2616d6f5264b1819348f94403375b583ef42620278a37c179fc8da918f6452f5",
+      "after_probe_sha256": "7c681b2c4dfc91985f04d21b004f5b2393fff66dc6fc1102da1d160ea4fd1178"
+    },
+    {
+      "case": "reminder",
+      "path": "lampOS/crates/voice/src/provider_worker/tests/reminders.rs",
+      "test": "provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by",
+      "base_sha256": "e71ba546111f0cc9aa1193de0190cdb124c88e78e715bdc2ffdb3d940397efbf",
+      "candidate_sha256": "e71ba546111f0cc9aa1193de0190cdb124c88e78e715bdc2ffdb3d940397efbf",
+      "before_probe_sha256": "37faa99af003db3f69ce93fa2398e8321895a500d5fec7613591267587680697",
+      "after_probe_sha256": "4bae5c817e8b22c836a1a1c9a74c9b7c6937b8a633b15930620130d850feb286"
+    },
+    {
+      "case": "decline",
+      "path": "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs",
+      "test": "provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation",
+      "base_sha256": "ba3edf76d891495f98f7be88726e0a9ed56e5cd644181e779f8a1d8471cd6e6b",
+      "candidate_sha256": "e952adec2c664516baccd2a638180c412ddf29cdc3eb99071de85ebaf7948a02",
+      "before_probe_sha256": "98f45dcd9a45854938e78f52c2e10c54a70451b5f60fd80195827d24552d8199",
+      "after_probe_sha256": "217b6de369234d3b9b9b5e1c03fc12e72989be5f19062296b1fa919fc0d07c51"
+    }
+  ],
+  "patches": [
+    {
+      "path": "before-three-pauses.patch",
+      "sha256": "3b9da66a88176107ac2ab0f9669089ff63fe415319252bbf8b72c6313f10371e"
+    },
+    {
+      "path": "after-three-pauses-with-existing-clock.patch",
+      "sha256": "01f017c3eda631f4ee34e3e34ac169abc9d8870266197595b6b3674f841d5216"
+    }
+  ],
+  "checks": [
+    {
+      "argv": [
+        "git",
+        "read-tree",
+        "69f2228338a8df63a81d23087c3e55308fa125ca"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--cached",
+        "--check",
+        "/private/tmp/tests-codex-voice-events-evidence-20261022/controls/lease-and-decline/before-three-pauses.patch"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--check",
+        "/private/tmp/tests-codex-voice-events-evidence-20261022/controls/lease-and-decline/after-three-pauses-with-existing-clock.patch"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "candidate_unchanged": true,
+  "executed": false,
+  "sampling_plan": "Compile each combined variant once, then run each exact test once: three before observations and three after observations; no retry until green."
+}

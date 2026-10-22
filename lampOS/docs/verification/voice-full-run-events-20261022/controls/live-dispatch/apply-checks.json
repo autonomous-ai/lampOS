@@ -1,0 +1,77 @@
+{
+  "base": "69f2228338a8df63a81d23087c3e55308fa125ca",
+  "source_path": "lampOS/crates/voice/src/provider_worker.rs",
+  "base_source_sha256": "3040807016b194a84a7983687e7df6234bb179358f985322b67bcf2f757852ff",
+  "candidate_source_sha256": "fbf70c5d8f52ca0f250c02c7064464fa0bf5ae1d54dd88b7608b731f0c010005",
+  "candidate_delta": "Exactly five added lines in this one test at preparation; no other differences in provider_worker.rs.",
+  "test": "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply",
+  "patches": [
+    {
+      "path": "before-setup-pause.patch",
+      "sha256": "bcb829c1572eaccd407b9c215da37ffb46321451bc3ebabcf3b347a0ea9a9962",
+      "base": "original 69f2228",
+      "expected": "FAIL, music_accept unwrap reports TimedOut"
+    },
+    {
+      "path": "after-setup-pause.patch",
+      "sha256": "6bce3b1fd9fcb236ae5bae694e9fc711dec930e38b6105194e68567d31c77356",
+      "base": "69f2228 plus five-line dispatch arm",
+      "expected": "PASS, both direct and wrapped cases"
+    },
+    {
+      "path": "after-omit-dispatch.patch",
+      "sha256": "7b5dd26a802cb6abed58a1ec758721e7c9df05562748c8e3582ae3e9f98e9a63",
+      "base": "69f2228 plus five-line dispatch arm",
+      "expected": "FAIL, music_accept unwrap reports TimedOut"
+    }
+  ],
+  "checks": [
+    {
+      "argv": [
+        "git",
+        "read-tree",
+        "69f2228338a8df63a81d23087c3e55308fa125ca"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--cached",
+        "--check",
+        "/private/tmp/tests-codex-voice-events-evidence-20261022/controls/live-dispatch/before-setup-pause.patch"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--check",
+        "/private/tmp/tests-codex-voice-events-evidence-20261022/controls/live-dispatch/after-setup-pause.patch"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--check",
+        "/private/tmp/tests-codex-voice-events-evidence-20261022/controls/live-dispatch/after-omit-dispatch.patch"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "initial_check_limitation": "An earlier attempt to populate a candidate temporary Git index with git apply --cached was denied creation of an object-store backing file by the sandbox. It changed no candidate source. Candidate checks instead used git apply --check against the exact current file.",
+  "repository_source_unchanged": true,
+  "execution": "Apply checks only. No Cargo, test execution or candidate source edits."
+}

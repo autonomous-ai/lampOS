@@ -1,0 +1,13 @@
+--- a/lampOS/crates/voice/src/coordinator/tests/requested_audio.rs
++++ b/lampOS/crates/voice/src/coordinator/tests/requested_audio.rs
+@@ -861,6 +861,10 @@
+     for reason in ["hand_stop", "new_owner", "privacy", "gap", "expiry"] {
+         let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+         let offer = test.load(1);
++        eprintln!("REQUESTED_AUDIO_AFTER_LOAD_CONTROL reason={reason}");
++        let mut resume = [0];
++        std::io::stdin().read_exact(&mut resume).unwrap();
++        assert_eq!(resume, [b'R']);
+         test.answer_news();
+         test.confirmed();
+         assert!(test.prepare());

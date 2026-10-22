@@ -1,0 +1,36 @@
+{
+  "base": "e2232b8369fb125af6c79e8bf6927ec590a612e9",
+  "platform": "Darwin x86_64",
+  "cpu_count": 16,
+  "target": "/private/tmp/tests-codex-1569-target",
+  "source_files": 1378,
+  "source_sha256": "c5230777034030653aca6b77784c823275da34c3c4f7688757ccea95edcf3737",
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "0"
+  },
+  "rust_test_threads": "unset; full-library default parallelism",
+  "commands": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started": "2026-10-22T11:52:09.134648+00:00",
+      "seconds": 11.821332667022943,
+      "exit": 1,
+      "watchdog_timeout": false,
+      "log": "fmt.txt",
+      "sha256": "29c96f6c986ef81f4a191b8f9f296952e7b35c86402db4dce38adce8a1a05af8",
+      "summaries": []
+    }
+  ]
+}

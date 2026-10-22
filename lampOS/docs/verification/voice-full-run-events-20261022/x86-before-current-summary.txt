@@ -1,0 +1,5 @@
+Base e2232b8369fb125af6c79e8bf6927ec590a612e9
+Command: cargo test -p lamp-voice --lib --offline
+test result: ok. 3355 passed; 0 failed; 14 ignored; 0 measured; 0 filtered out; finished in 304.72s
+Exit: 0
+Full output SHA256: dcd408e9aa4906057d541ce5663a89e9c32244dc22cd9be3e718e4031d25501c

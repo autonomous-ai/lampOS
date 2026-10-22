@@ -12002,18 +12002,43 @@ mod tests {
     #[test]
     fn the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked() {
         const NOW: u64 = 1_792_000_000_000;
-        let (socket, served) = memory("hits-long", 2, |_| {
+        let answer = {
             let mut entries = vec![
                 json!({"id":1,"at_unix_ms":NOW - 100 * 86_400_000,"text":"Their sister lives in Hue."}),
             ];
             for id in 2..=150u64 {
                 entries.push(json!({"id":id,"at_unix_ms":NOW - id,"text":format!("A kept thing about the garden, number {id}.")}));
             }
-            json!({"ok":true,"entries":entries})
+            format!("{}\n", json!({"ok":true,"entries":entries}))
+        };
+        // Prepare the long reply before either real 60 ms call. Readiness
+        // below is the fake worker's setup, not the response being received.
+        let socket = std::env::temp_dir().join(format!(
+            "lamp-remember-hits-long-{}.sock",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        let (ready, prepared) = sync_channel(0);
+        let served = std::thread::spawn(move || {
+            for _ in 0..2 {
+                ready.send(()).unwrap();
+                let (mut stream, _) = session_note_request(&listener);
+                stream
+                    .set_write_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                stream.write_all(answer.as_bytes()).unwrap();
+            }
         });
+        prepared
+            .recv_timeout(Duration::from_secs(5))
+            .expect("prepared fake memory ready for the person's request");
         let told = hits_note(&socket, Some("p-1"), "how is my sister's job?", NOW, None).unwrap();
         assert!(told.contains("Their sister lives in Hue."), "{told}");
         assert!(!told.contains(HITS_ROOM_NOTE), "theirs, not the room's");
+        prepared
+            .recv_timeout(Duration::from_secs(5))
+            .expect("prepared fake memory ready for the room's request");
         let room = hits_note(&socket, None, "the sister", NOW, None).unwrap();
         assert!(room.ends_with(HITS_ROOM_NOTE), "{room}");
         served.join().unwrap();

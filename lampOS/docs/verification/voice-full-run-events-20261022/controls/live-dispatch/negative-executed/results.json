@@ -1,0 +1,113 @@
+{
+  "status": "expected negative control passed",
+  "commands": [
+    {
+      "label": "compile",
+      "argv": [
+        "/Users/autonomous/.cargo/bin/cargo",
+        "test",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS",
+      "timeout_s": 900,
+      "stdout": "compile.stdout",
+      "stderr": "compile.stderr",
+      "started_utc": "2026-10-22T11:25:52.458361+00:00",
+      "pid": 62338,
+      "exit": 0,
+      "timed_out": false,
+      "wall_seconds": 197.827305,
+      "stdout_bytes": 249229,
+      "stdout_sha256": "f6ce6bdd9e559911e1b88fb83083dbe1a48e6650d6d0ec067790755f1ee2ddc8",
+      "stderr_bytes": 167,
+      "stderr_sha256": "36566b132c530b2ca7d5f9b05fb58a5d9a8dbf251d664ec50817d5fc393d8003"
+    },
+    {
+      "label": "missing-dispatch",
+      "argv": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+        "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS",
+      "timeout_s": 30,
+      "stdout": "missing-dispatch.stdout",
+      "stderr": "missing-dispatch.stderr",
+      "started_utc": "2026-10-22T11:29:10.605223+00:00",
+      "pid": 73301,
+      "exit": 101,
+      "timed_out": false,
+      "wall_seconds": 5.308527,
+      "stdout_bytes": 341,
+      "stdout_sha256": "33c4d798f3d67c250f0ea8615d16f2b88f0bac044dc3cdbe5543d3d7c5f1f1a6",
+      "stderr_bytes": 454,
+      "stderr_sha256": "1baf14c28d88e6113d105fbecc72638b33c1325739d344ece3ad090b0a7262a1"
+    }
+  ],
+  "test_executions": 1,
+  "artifact": {
+    "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+    "sha256": "2c539d117c9ecb8aee4b75457429fd683b51693be44fa836f227571a52254910",
+    "fresh": false,
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_voice",
+      "src_path": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS/crates/voice/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    }
+  },
+  "diagnostic_checks": {
+    "exit_101": true,
+    "not_timeout": true,
+    "one_named_test": true,
+    "exactly_one_failure": true,
+    "accept_timeout": true,
+    "helper_and_join_panics": true,
+    "join_failure": true
+  },
+  "libtest_summary": [
+    [
+      "0",
+      "1",
+      "0",
+      "0",
+      "3365"
+    ]
+  ],
+  "restoration": {
+    "baseline_sha256": "3040807016b194a84a7983687e7df6234bb179358f985322b67bcf2f757852ff",
+    "restored_sha256": "3040807016b194a84a7983687e7df6234bb179358f985322b67bcf2f757852ff",
+    "baseline_bytes_equal": true,
+    "candidate_sha256_after": "fbf70c5d8f52ca0f250c02c7064464fa0bf5ae1d54dd88b7608b731f0c010005",
+    "candidate_unchanged": true,
+    "neighbor_sha256_after": {
+      "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs": "d6493f59e0d1690ab966fbd3a9bd02832d30aeb3e7fb1a0d307568991924a60e",
+      "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "e71ba546111f0cc9aa1193de0190cdb124c88e78e715bdc2ffdb3d940397efbf",
+      "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "ba3edf76d891495f98f7be88726e0a9ed56e5cd644181e779f8a1d8471cd6e6b",
+      "lampOS/crates/voice/src/remember.rs": "5745a9e5e4b5ef532016f8583f15fef950da49d6ab50571c884ee7b558bfec9d",
+      "lampOS/crates/voice/src/second_provider/worker.rs": "78304483650fe06231013f4d44408b56e40dd7b2d6e4cd5df9853d5a6954d9be"
+    },
+    "neighbors_unchanged": true
+  }
+}

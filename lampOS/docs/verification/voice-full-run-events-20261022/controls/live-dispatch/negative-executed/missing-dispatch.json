@@ -1,0 +1,22 @@
+{
+  "label": "missing-dispatch",
+  "argv": [
+    "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+    "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply",
+    "--exact",
+    "--nocapture"
+  ],
+  "cwd": "/private/tmp/tests-codex-voice-events-base-20261022/lampOS",
+  "timeout_s": 30,
+  "stdout": "missing-dispatch.stdout",
+  "stderr": "missing-dispatch.stderr",
+  "started_utc": "2026-10-22T11:29:10.605223+00:00",
+  "pid": 73301,
+  "exit": 101,
+  "timed_out": false,
+  "wall_seconds": 5.308527,
+  "stdout_bytes": 341,
+  "stdout_sha256": "33c4d798f3d67c250f0ea8615d16f2b88f0bac044dc3cdbe5543d3d7c5f1f1a6",
+  "stderr_bytes": 454,
+  "stderr_sha256": "1baf14c28d88e6113d105fbecc72638b33c1325739d344ece3ad090b0a7262a1"
+}

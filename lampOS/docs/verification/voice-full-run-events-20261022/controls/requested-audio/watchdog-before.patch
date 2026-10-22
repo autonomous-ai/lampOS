@@ -1,0 +1,11 @@
+--- a/lampOS/crates/voice/src/requested_audio/runtime.rs
++++ b/lampOS/crates/voice/src/requested_audio/runtime.rs
+@@ -647,7 +647,7 @@
+         let (_held, result) = self
+             .busy
+             .changed
+-            .wait_timeout_while(held, Duration::from_secs(3), |_| {
++            .wait_timeout_while(held, Duration::ZERO, |_| {
+                 !self.wake.load(Ordering::Acquire) && !self.running.stop.load(Ordering::Acquire)
+             })
+             .unwrap();

@@ -1,0 +1,41 @@
+{
+  "base": "e2232b8369fb125af6c79e8bf6927ec590a612e9",
+  "platform": "Darwin x86_64",
+  "cpu_count": 16,
+  "target": "/private/tmp/tests-codex-1569-target",
+  "source_files": 1378,
+  "source_sha256": "b585a717caad54dd21778372a01eaf81f22e7d25d4ea88e4aed4c6ff066843cf",
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "0"
+  },
+  "rust_test_threads": "unset; full-library default parallelism",
+  "commands": [
+    {
+      "name": "package-tests",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--offline"
+      ],
+      "started": "2026-10-22T12:13:33.425235+00:00",
+      "seconds": 372.15416995761916,
+      "exit": 101,
+      "watchdog_timeout": false,
+      "log": "package-tests.txt",
+      "sha256": "0c697284c6ba07d2b33f6700cb880ca9fed871fb30a2c8f90b4d90f54121e528",
+      "summaries": [
+        "test result: ok. 3355 passed; 0 failed; 14 ignored; 0 measured; 0 filtered out; finished in 229.98s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: FAILED. 265 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.91s"
+      ]
+    }
+  ]
+}

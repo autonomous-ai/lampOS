@@ -1,0 +1,12 @@
+
+running 1 test
+test coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news ... lamp-voice: the news (tasks-fixture:2:4) was cut short (hand_stop): its harness stays open
+lamp-voice: the news (tasks-fixture:2:4) was cut short (user_interrupted): its harness stays open
+lamp-voice: the news (tasks-fixture:2:4) was cut short (privacy): its harness stays open
+lamp-voice: the news (tasks-fixture:2:4) was not heard whole (audio_written_unscored): its harness stays open
+lamp-voice: the news (tasks-fixture:2:4) was not heard whole (audio_written_unscored): its harness stays open
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 21.13s
+
+END RAW CONTROL OUTPUT

@@ -1,0 +1,16 @@
+
+running 1 test
+test coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news ...
+thread 'coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news' (695787484) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:472:9:
+assertion failed: self.accept_offer(offer.clone())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 4.25s
+
+END RAW CONTROL OUTPUT

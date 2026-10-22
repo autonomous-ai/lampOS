@@ -11519,7 +11519,13 @@ pub(crate) mod tests {
             let listener =
                 std::os::unix::net::UnixListener::bind(home.path.join(crate::tools::CALL_SOCKET))
                     .unwrap();
+            let (dispatch, dispatched) = std::sync::mpsc::channel();
             let skill = std::thread::spawn(move || {
+                // Provider setup must not spend the Skills accept watchdog.
+                // Dropping the sender also releases this wait on unwind.
+                dispatched
+                    .recv()
+                    .expect("test ended before Skills dispatch");
                 let mut stream = music_accept(&listener).unwrap();
                 let mut line = String::new();
                 std::io::BufReader::new((&stream).take(16_384))
@@ -11570,6 +11576,7 @@ pub(crate) mod tests {
             } else {
                 "play_relaxing_music"
             };
+            dispatch.send(()).unwrap();
             dial.service
                 .send(json!({"toolCall":{"functionCalls":[{
                     "id":"music-original", "name":name,

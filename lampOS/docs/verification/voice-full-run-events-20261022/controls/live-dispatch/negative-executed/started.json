@@ -1,0 +1,30 @@
+{
+  "started_utc": "2026-10-22T11:25:52.396091+00:00",
+  "base": "69f2228338a8df63a81d23087c3e55308fa125ca",
+  "baseline_worktree": "/private/tmp/tests-codex-voice-events-base-20261022",
+  "candidate_worktree": "/private/tmp/tests-codex-voice-events-20261022",
+  "source": "lampOS/crates/voice/src/provider_worker.rs",
+  "baseline_sha256": "3040807016b194a84a7983687e7df6234bb179358f985322b67bcf2f757852ff",
+  "candidate_sha256": "fbf70c5d8f52ca0f250c02c7064464fa0bf5ae1d54dd88b7608b731f0c010005",
+  "patch_sha256": "7b5dd26a802cb6abed58a1ec758721e7c9df05562748c8e3582ae3e9f98e9a63",
+  "mutant_sha256": "1ccb1a30f177532acb8f271b6b0573f27147391a87cf9ff008bb8380a6aca6c1",
+  "environment": {
+    "PATH": "/Users/autonomous/.cargo/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/usr/local/go/bin:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/Users/autonomous/.codex/tmp/arg0/codex-arg0t3G8CO:/Users/autonomous/.harness/runtime/grid-0.3.59-darwin-x64/bin:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true"
+  },
+  "runner_sha256": "e1d4eacba9e30811b94da98a2282bf84e6557e275511891b9cc2bc58e8b10a91",
+  "test": "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply",
+  "neighbor_sha256_before": {
+    "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs": "d6493f59e0d1690ab966fbd3a9bd02832d30aeb3e7fb1a0d307568991924a60e",
+    "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "e71ba546111f0cc9aa1193de0190cdb124c88e78e715bdc2ffdb3d940397efbf",
+    "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "ba3edf76d891495f98f7be88726e0a9ed56e5cd644181e779f8a1d8471cd6e6b",
+    "lampOS/crates/voice/src/remember.rs": "5745a9e5e4b5ef532016f8583f15fef950da49d6ab50571c884ee7b558bfec9d",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "78304483650fe06231013f4d44408b56e40dd7b2d6e4cd5df9853d5a6954d9be"
+  },
+  "execution_count": 1
+}

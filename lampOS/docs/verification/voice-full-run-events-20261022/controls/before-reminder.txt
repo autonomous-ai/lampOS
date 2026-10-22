@@ -1,0 +1,17 @@
+
+running 1 test
+test provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by ... lamp-voice provider: held up 0 ms; 1 lapsed authority snapshots skipped, going on
+
+thread 'provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by' (695529229) panicked at crates/voice/src/provider_worker.rs:9642:30:
+called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: "provider.c.p: Connection reset by peer (os error 54)" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 0.22s
+
+END RAW CONTROL OUTPUT

@@ -1,0 +1,33 @@
+--- a/lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs
++++ b/lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs
+@@ -739,6 +739,8 @@
+             the_lamp_answers(&mut rig, &mut dial).await;
+         }
+         let request = rig.speak(&mut dial, false, true).await;
++        // Fault injection: the host stalls while the 100 ms owner is live.
++        std::thread::sleep(Duration::from_millis(200));
+         desk.decide_with(
+             Some(request),
+             "stay_quiet",
+--- a/lampOS/crates/voice/src/provider_worker/tests/reminders.rs
++++ b/lampOS/crates/voice/src/provider_worker/tests/reminders.rs
+@@ -693,6 +693,8 @@
+         *crate::room_told::room().lock().unwrap() = busy;
+     }
+     let request = rig.reminder(&dial, "Tea");
++    // Fault injection: the host stalls before the Started observation.
++    std::thread::sleep(Duration::from_millis(200));
+     assert!(
+         matches!(rig.output().await, ProviderOutput::Started { request: got, .. } if got == request)
+     );
+--- a/lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs
++++ b/lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs
+@@ -884,6 +884,8 @@
+     let _turn = one_at_a_time().await;
+     for wrapped in [false, true] {
+         let skills = DeclineMusic::new();
++        // Fault injection: unrelated worker setup outlasts the accept bound.
++        std::thread::sleep(Duration::from_secs(4));
+         let mut rig = LiveRig::start_with(quick_policy(), skills.options(wrapped));
+         let mut dial = rig.ready().await;
+         let request = rig.speak(&mut dial, false, true).await;

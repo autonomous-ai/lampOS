@@ -1,0 +1,36 @@
+{
+  "base": "69f2228338a8df63a81d23087c3e55308fa125ca",
+  "selected_test": "second_provider::worker::tests::own_answers_and_pending_music_share_no_conversation_state",
+  "candidate_guard_sha256": "8779ef3bb9a91a83d96dd940c88055f2e7b20bc52dbf4736f5f57b31d4901579",
+  "variants": {
+    "before": {
+      "patch_sha256": "103eccbfa3a0d24dac2655d68588608621e335f917eaf3a415263fc919eb75f4",
+      "original_sha256": {
+        "lampOS/crates/voice/src/provider_worker.rs": "3040807016b194a84a7983687e7df6234bb179358f985322b67bcf2f757852ff",
+        "lampOS/crates/voice/src/second_provider/worker.rs": "78304483650fe06231013f4d44408b56e40dd7b2d6e4cd5df9853d5a6954d9be"
+      },
+      "instrumented_sha256": {
+        "lampOS/crates/voice/src/provider_worker.rs": "685d8638ca667a170eb3b5d5737f31cd934ff4cb3f2acc71e6ebb77a7f6fb1a1",
+        "lampOS/crates/voice/src/second_provider/worker.rs": "0da37831144c18a2b46ac552a9d6772543eb15c827161af9dff080bae55f13f3"
+      },
+      "original_bytes_recoverable": true,
+      "git_apply_check": "passed"
+    },
+    "after": {
+      "patch_sha256": "dda61672a45f3dd6f7688169e9e92fa9aaabc44454c02f082fad74f44419d18b",
+      "original_sha256": {
+        "lampOS/crates/voice/src/provider_worker.rs": "3040807016b194a84a7983687e7df6234bb179358f985322b67bcf2f757852ff",
+        "lampOS/crates/voice/src/second_provider/worker.rs": "8779ef3bb9a91a83d96dd940c88055f2e7b20bc52dbf4736f5f57b31d4901579"
+      },
+      "instrumented_sha256": {
+        "lampOS/crates/voice/src/provider_worker.rs": "685d8638ca667a170eb3b5d5737f31cd934ff4cb3f2acc71e6ebb77a7f6fb1a1",
+        "lampOS/crates/voice/src/second_provider/worker.rs": "68446a48f1193e074f0f82a3759c5ff637c0c93493a25fa0e0090be277063d2f"
+      },
+      "original_bytes_recoverable": true,
+      "git_apply_check": "passed"
+    }
+  },
+  "candidate_guard_patch_sha256": "4be58bfb7ca39f82c31bfcc22b567789b96493f2c76faa35b7aa831fa3dc0733",
+  "after_patch_current_worktree_check": "passed",
+  "compiled_or_run": false
+}

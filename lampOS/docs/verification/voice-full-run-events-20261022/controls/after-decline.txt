@@ -1,0 +1,11 @@
+
+running 1 test
+test provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation ... lamp-voice provider: request 1 asked for play_relaxing_music; the executive answered in 0 ms; the answer was sent
+lamp-voice provider: request 1: the model said it was not for it after doing what was asked; not taken
+lamp-voice provider: request 1 asked for use_skill; the executive answered in 0 ms; the answer was sent
+lamp-voice provider: request 1: the model said it was not for it after doing what was asked; not taken
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 8.26s
+
+END RAW CONTROL OUTPUT

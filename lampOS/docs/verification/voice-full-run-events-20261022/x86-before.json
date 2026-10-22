@@ -1,0 +1,81 @@
+{
+  "base": "69f2228338a8df63a81d23087c3e55308fa125ca",
+  "platform": "Darwin x86_64",
+  "cpu_count": 16,
+  "target": "/private/tmp/tests-codex-1569-target",
+  "source_files": 6414,
+  "source_sha256": "342ed00c0965bcf9825f383909267c2c23ddb6561ad80852f2bd07f4649f66b2",
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "0"
+  },
+  "rust_test_threads": "unset; full-library default parallelism",
+  "commands": [
+    {
+      "name": "compile",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--message-format=json"
+      ],
+      "started": "2026-10-22T11:00:17.642265+00:00",
+      "seconds": 159.74703621584922,
+      "exit": 0,
+      "log": "compile.txt",
+      "sha256": "36ff40f24a25a3ea19fa348fd143b25da10cdaeb198d003cde621d52c741ebbf",
+      "summaries": []
+    },
+    {
+      "name": "test-list",
+      "argv": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+        "--list"
+      ],
+      "started": "2026-10-22T11:02:59.841278+00:00",
+      "seconds": 2.1215109759941697,
+      "exit": 0,
+      "log": "test-list.txt",
+      "sha256": "324d3fa99d7326b1d78d69bc15c71a02a33b75b5a47428759a060728718317f3",
+      "summaries": []
+    },
+    {
+      "name": "full-library",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--offline"
+      ],
+      "started": "2026-10-22T11:03:02.738487+00:00",
+      "seconds": 247.89209991693497,
+      "exit": 101,
+      "log": "full-library.txt",
+      "sha256": "4da14c3b8670782e419be3bf7a4bb07bd075cb6538d2fbf76f8963277d5435be",
+      "summaries": [
+        "test result: FAILED. 3350 passed; 2 failed; 14 ignored; 0 measured; 0 filtered out; finished in 246.67s"
+      ]
+    }
+  ],
+  "library_executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+  "library_executable_sha256": "c56f1e7bb66736f99c808609d2401a5429485da0334f78c36df18dd6b85ce4cf",
+  "tests_listed": 3366,
+  "failed_tests": [
+    "coordinator::tests::requested_audio::an_empty_or_gapped_confirmation_cancels_instead_of_starting_the_recording",
+    "provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation"
+  ],
+  "source_unchanged": true,
+  "status": "baseline-completed",
+  "full_library_exit": 101
+}

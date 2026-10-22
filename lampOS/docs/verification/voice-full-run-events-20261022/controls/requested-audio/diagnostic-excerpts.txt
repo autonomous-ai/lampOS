@@ -1,0 +1,42 @@
+Readable diagnostic excerpts only; whitespace normalized.
+Complete original UTF-8 byte streams and SHA-256 are in raw-output.json.
+
+before-pause-1
+thread 'coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news' (696004692) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:870:9:
+assertion failed: test.prepare()
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 0.32s
+
+before-pause-2
+thread 'coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news' (696004885) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:870:9:
+assertion failed: test.prepare()
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 0.31s
+
+before-pause-3
+thread 'coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news' (696005122) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:870:9:
+assertion failed: test.prepare()
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 0.31s
+
+after-pause-1
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 1.70s
+
+after-pause-2
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 1.69s
+
+after-pause-3
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 1.71s
+
+watchdog-after
+thread 'requested-audio-fixture' (696079702) panicked at crates/voice/src/requested_audio/runtime.rs:661:9:
+requested audio fixture worker was not stepped
+thread 'coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news' (696079700) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:894:9:
+assertion failed: test.prepare()
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 0.01s
+
+watchdog-before
+thread 'requested-audio-fixture' (696100205) panicked at crates/voice/src/requested_audio/runtime.rs:654:9:
+requested audio fixture worker was not stepped
+thread 'coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news' (696100203) panicked at crates/voice/src/requested_audio/runtime.rs:619:42:
+thread 'coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news' (696100203) panicked at crates/voice/src/requested_audio/runtime.rs:612:43:
+thread 'coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news' (696100203) panicked at crates/voice/src/requested_audio/runtime.rs:612:43:
+thread 'coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news' (696100203) panicked at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:233:5:
+panic in a destructor during cleanup
