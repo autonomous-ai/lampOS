@@ -5768,6 +5768,32 @@ Ready for lamp-voice: no (#2774 awaits its exact-head native gates).
   found so far; socket presence alone does not select Days. The retry
   PR is not claimed to explain this lamp failure. Score remains 0.40.
 
+## 2026-10-22 08:33 ICT: #2540 mode mismatch established; callback regression underway
+
+Ready for lamp-voice: no (#2774's ARM64 is running; callback regression is in its host gate).
+
+- #2774 head `b18ff0bc6`: fresh format, strict workspace Clippy, and 15
+  focused checks pass after the final rebase. Native Clippy run
+  39705015774 passes; ARM64 run 39705015937 is testing. Source remains
+  one commit and the worktree is clean.
+- Seventh confirmed the 07:56–08:07 lamp-52e6 run had Days off, one voice
+  PID (181 journal lines), one boot since 07:48:12, and a 28 ms memory
+  answer. No `remembered=true` field exists in that journal. The missing
+  Days marker is therefore expected on the legacy path; the run is void
+  as #2540 Days proof. Its legacy recall result remains unexplained.
+  Receipt: https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6330442424.
+  Seventh owns a Days-on rerun after row 10, around 08:45. No lamp access
+  or deployment by Fourth, and no spoken words copied.
+- The follow-up is on `fourth/kept-name-callback`. It extracts the existing
+  context callback for direct testing with the real global client and
+  scoped tool runner, plus a local socket fixture. No refresh policy or
+  runtime diagnostic is changed. Days and legacy tests cover propagation
+  after a keep and after both conversation histories have evicted it;
+  they do not prove real-store conflicting-name ordering or a model's
+  spoken choice. Negative controls and the host gate are underway.
+- Friday's #2673 has merged at `75bddc520`; its P2 was Friday's work.
+  #2762's switch census remains open with Friday. The row stays at 0.40.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -5793,7 +5819,7 @@ The first line's socket opened before it (#2345) was not run on a lamp.
 `LAMP_SECOND_OPEN_NAME` (#2355) is off unless set and was not run on a lamp.
 `LAMP_ENDPOINT_SHORT_VERDICT` (#2380) is off unless set and was not run on a lamp.
 `LAMP_VOICE_TONE` (#2427) is off unless set. It was played on lamp-75c9 with nobody there (Ten, 21 Oct: the words' valence passed, the arousal wasn't shown by the tools there), and run with a known face on lamp-c0a4 (Thirteen, 21 Oct: a pass on the second route; on the duplex route no forget, now in its fix).
-`LAMP_SECOND_FACE_NAME` (#2573), `LAMP_MOOD_TONE` (#2582) and `LAMP_WORKER_SCHEDULING` (#2554) are off unless set and were not run on a lamp. #2627's note re-ask had a failed lamp-52e6 retention run on 22 Oct; its missing marker is under audit. #2621's duplex words and #2632's unplug words (a pure move) were not run on a lamp.
+`LAMP_SECOND_FACE_NAME` (#2573), `LAMP_MOOD_TONE` (#2582) and `LAMP_WORKER_SCHEDULING` (#2554) are off unless set and were not run on a lamp. #2627's 22 Oct lamp-52e6 run had Days off, so it is void as Days proof; Seventh owns the Days-on rerun. #2621's duplex words and #2632's unplug words (a pure move) were not run on a lamp.
 lamp-peek's one page (#2259) was not run on a lamp; its timings are this
 Mac's. `probe-cascade --wire --sizes` (#2276) was not run anywhere with a
 real key.
