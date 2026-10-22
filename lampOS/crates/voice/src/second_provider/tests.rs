@@ -11866,3 +11866,71 @@ fn speech_tags_reach_only_the_voice_and_only_with_the_switch() {
         );
     }
 }
+
+/// #2997 (`LAMP_SECOND_OWN_ECHO`): on lamp-4ace on 22 Oct, 5 of the 8
+/// lines mostly of the lamp's own words were answered. With the switch, its
+/// answer heard back over its voice is held, and its own words leading a
+/// person's line over it are not sent to the model; without, both are asked
+/// as heard, as before.
+#[tokio::test(start_paused = true)]
+async fn the_lamps_own_words_heard_back_are_held_or_taken_out_only_with_the_switch() {
+    for on in [false, true] {
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok("What time is it?".to_owned()),
+                    Ok("It's four in the morning.".to_owned()),
+                    Ok("in the morning set an alarm for seven please".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new(
+                [
+                    vec![text("It's four in the morning."), Ok(ChatEvent::Done)],
+                    vec![text("Good night."), Ok(ChatEvent::Done)],
+                    vec![text("Done."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.holding_own_echo(on);
+        spoken_turn(&mut engine);
+        turn(&mut engine).await;
+        // Its own answer, heard back over its voice.
+        engine.submit(start_over(2));
+        engine.submit(audio(2, 1));
+        engine.submit(end(2));
+        let echo = turn(&mut engine).await;
+        if on {
+            assert_eq!(
+                echo,
+                ["started:2", "heard:It's four in the morning.", "complete"],
+                "on"
+            );
+        } else {
+            assert!(echo.contains(&"said:Good night.".to_owned()), "{echo:?}");
+        }
+        // A person's line over it, led by three of its words.
+        engine.submit(start_over(3));
+        engine.submit(audio(3, 1));
+        engine.submit(end(3));
+        let mixed = turn(&mut engine).await;
+        assert!(
+            mixed.contains(&"heard:in the morning set an alarm for seven please".to_owned()),
+            "{mixed:?}"
+        );
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(asked.len(), if on { 2 } else { 3 }, "on {on}");
+        assert_eq!(
+            asked.last().unwrap().last(),
+            Some(&Message::user(if on {
+                "set an alarm for seven please"
+            } else {
+                "in the morning set an alarm for seven please"
+            })),
+            "on {on}"
+        );
+    }
+}
