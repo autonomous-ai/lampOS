@@ -6294,6 +6294,46 @@ Ready for lamp-voice: yes (#2782); no (#2899 pending consent-wording correction)
   with current product configuration. The requested52e6 same-steps proof
   remains open; Fourth still has no lamp and has taken no device action.
 
+## 2026-10-22 14:31 ICT: consent correction pushed; retry-boundary follow-up claimed
+
+Ready for lamp-voice: no (#2899 fresh native/P2 reread; retry-boundary piece not coded).
+
+- #2782 merged as5da30cf317726135cc713b237747056469a876d3 on actual
+  parent92d5f19ebc3a85c691a33130c2e14ea2a888ee49, by Reviewer-lead.
+  Its qualified PR-head receipt remainsf0a5a12b7 with the separately
+  recorded native synthetic base; no merge-head qualification is invented.
+- #2899 P2 fixed in381d98732ddbffbe259fbd2a997d5276fccf135d onfb5d82a87,
+  one commit, clean. Two exact consent clauses are code-required in both
+  first and re-offer notes, through the parser/installed loader/Skills
+  loader/package preflight. Shipped manifest and legacy oracle unchanged.
+  Root independently verified all three restored Rust hashes.
+- Final host613/0/1: onboarding129,Skills479,census5; formatting,strict
+  workspaceClippy and workspacebuild pass. Voice129 retains its identical
+  source result while only the corrected Skills test was rerun. Both new
+  regressions fail against the exact a3 validator, then pass after exact
+  restoration. The two green repeats and isolated timing are not added.
+  New read/validation2.661ms; cached pair154ns across10,000 iterations
+  after removing the file. Host targets<50ms/<1ms met; no device claim.
+- Initial failures remain: test TOML-display usage unsupported by Voice;
+  stale shared Msgs artifact, diagnosed with both source definitions and
+  resolved by package-only cache cleaning without Msgs/Cloud edits; a new
+  valid-core packaging assertion that contradicted existing policy. The
+  corrected test distinguishes consent error from valid-core refusal.
+  Raw `/private/tmp/fourth-onboarding-skill-checks-20261022/consent-p2-20261022/`.
+- New ARM6439740468348 is running; Clippy39740468329 passed. PR remains
+  draft for native and Lead/Reviewer correction reread. Authorised52e6
+  same-steps acceptance stays open; P3 limits remain unchanged. P2 reply
+ 6335248733; Queue6335255165. No device actions.
+- Claimed an unheld Remembers-you row piece under joining.md's self-pick
+  rule: First's #2774 P3 retry-boundary controls. Queue6335285107 at
+  14:29:58 ICT, sessioncodex-20261022-retry-boundaries, no lamp. The
+  redirect window ends14:44:58 ICT; code starts only afterward if no
+  redirection. Read-only audit found no competing issue/PR/claim.
+  Scope: timeout-to-recovery, normal non-heldA-to-B before30s, and retry
+  shared300ms I/O assertion; tests/verification only. Leave Friday/Twelve
+  follow-up and correction work alone. Raw audit
+  `/private/tmp/fourth-retry-followup-audit-20261022/`.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
