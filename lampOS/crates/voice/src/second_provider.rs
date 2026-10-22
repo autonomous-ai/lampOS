@@ -801,6 +801,9 @@ struct Shared {
     name_carries: bool,
     /// That line, while its answer waits ([`NameWait`]).
     name_waits: Mutex<Option<NameWait>>,
+    /// Whether one person said the name and the line after it, and where
+    /// a line not judged yet is kept for that ([`Engine::telling_one_speaker`]).
+    one_speaker: Option<(SameSpeaker, LineKept)>,
     /// A line of nothing but the lamp's own words heard back is held, and
     /// its own words at a line's start or end are taken out
     /// ([`Engine::holding_own_echo`]).
@@ -876,23 +879,51 @@ pub const OPEN_NAME_WITHIN: Duration = Duration::from_millis(2_500);
 /// nobody.
 pub const NAME_CARRIES_FOR: Duration = Duration::from_millis(2_500);
 
-/// A line that was only the lamp's name, while its answer waits for the
-/// line after it ([`NAME_CARRIES_FOR`], `LAMP_SECOND_NAME_CARRIES`).
-#[derive(Clone, Copy, Debug)]
+/// What a line waiting as the lamp's name said: its words, as it would
+/// have been asked, and whether the coordinator ended it as only the name
+/// (`Called`). They go before the line said by it when they begin with the
+/// name (`LAMP_SECOND_NAME_CARRIES`).
+type NameSaid = (String, bool);
+
+/// The words of a line that is the lamp's name, for the line begun while
+/// it waits.
+#[derive(Debug)]
+enum NameWords {
+    Known(NameSaid),
+    /// The coordinator's call whose speech to text was still working when
+    /// the next line began: its words come here once they are back
+    /// ([`Marks::words_back`]), none if it failed.
+    Coming(tokio::sync::oneshot::Receiver<Option<NameSaid>>),
+}
+
+/// A line that is the lamp's name, while its answer waits for the line
+/// after it ([`NAME_CARRIES_FOR`], `LAMP_SECOND_NAME_CARRIES`).
+#[derive(Debug)]
 struct NameWait {
     request: u64,
     session: u64,
     privacy: u64,
-    /// When its wait is over, by the runtime's clock.
+    words: NameWords,
+    /// When its wait is over, by the runtime's clock: 2.5 s from its end.
     until: tokio::time::Instant,
     /// When its first sound was read, by this process's clock: the rule's
     /// window for the line said by it begins here, so the name heard in it
     /// counts for that line.
     said_from: u64,
-    /// When it began and ended, for the faces seen speaking it.
-    began: Instant,
-    ended: Instant,
 }
+
+/// The name a line is said by, once one person is shown to have said both
+/// ([`said_by_the_name`]).
+struct SaidBy {
+    said_from: u64,
+    words: String,
+    called: bool,
+}
+
+/// Told how the room was, and who spoke, as a line the rule has not judged
+/// ended, by its request and window (`worker::Heeding::keep_unjudged`):
+/// the name's line, and the line after it before it is judged.
+pub type LineKept = Arc<dyn Fn(u64, (u64, u64)) + Send + Sync>;
 
 /// The last spoken line's sound, at most [`KEPT_SAMPLES`], for a line that
 /// goes on from it in the same session: one the coordinator says continues
@@ -1151,10 +1182,15 @@ struct Marks {
     /// sound (`Start`'s `over_the_lamps_voice`): judged for its echo
     /// ([`Engine::holding_own_echo`]).
     over_the_lamps_voice: bool,
-    /// Begun while the line before it, only the lamp's name, waited for it
-    /// (`LAMP_SECOND_NAME_CARRIES`): said by that name, unless the eyes saw
-    /// another face speak it.
-    name_of: Option<NameWait>,
+    /// Begun while the line before it, the lamp's name, waited for it
+    /// (`LAMP_SECOND_NAME_CARRIES`): said by that name when one person said
+    /// both ([`said_by_the_name`]); taken by its task.
+    name_of: Mutex<Option<NameWait>>,
+    /// When its End came, by the runtime's clock (`LAMP_SECOND_NAME_CARRIES`).
+    ended_at: Mutex<Option<tokio::time::Instant>>,
+    /// Whether its words are back, and, when the line after it began first
+    /// and waits for them, where they go ([`NameWords::Coming`]).
+    words_back: Mutex<(bool, Option<tokio::sync::oneshot::Sender<Option<NameSaid>>>)>,
 }
 
 /// What a line that was only the lamp's name is asked as when no words of
@@ -1162,10 +1198,11 @@ struct Marks {
 const CALLED_WORDS: &str = "Lamp.";
 
 /// A line's words past a "hey" or "ok" before them, any case and
-/// punctuation aside (`LAMP_SECOND_NAME_CARRIES`).
+/// punctuation aside, an apostrophe kept in its word ("what's", "Lamp's")
+/// (`LAMP_SECOND_NAME_CARRIES`).
 fn past_a_greeting(text: &str) -> Vec<&str> {
     let mut words: Vec<&str> = text
-        .split(|c: char| !c.is_alphanumeric())
+        .split(|c: char| !(c.is_alphanumeric() || c == '\'' || c == '\u{2019}'))
         .filter(|word| !word.is_empty())
         .collect();
     if words.first().is_some_and(|first| {
@@ -1185,28 +1222,27 @@ fn name_alone(text: &str) -> bool {
     matches!(past_a_greeting(text)[..], [word] if word.eq_ignore_ascii_case(net::key_terms::NAME))
 }
 
-/// Whether the eyes saw a face speak a line said after the lamp's name that
-/// they did not see say the name (`LAMP_SECOND_NAME_CARRIES`): never when
-/// they saw nobody say it.
-fn another_face(said_the_name: &[String], spoke: &[String]) -> bool {
-    !said_the_name.is_empty() && spoke.iter().any(|face| !said_the_name.contains(face))
+/// The most words a short line may have after the lamp's name and still
+/// wait for the line after it ([`name_first`]).
+const NAME_FIRST_MORE: usize = 3;
+
+/// Whether a line is short and begins with the lamp's name, set off as a
+/// call ([`crate::attention::begins_with_the_name`]), with at most
+/// [`NAME_FIRST_MORE`] words after it: "Lamp. So", "Lamp, can", "Hey Lamp,
+/// what's"; and the name alone ([`name_alone`]). Not "Lamp is broken.",
+/// nor a question its words end ("Hey Lamp, what's the time?"), which is
+/// whole and answered at once (`LAMP_SECOND_NAME_CARRIES`).
+fn name_first(text: &str) -> bool {
+    let words = past_a_greeting(text);
+    words
+        .first()
+        .is_some_and(|first| first.eq_ignore_ascii_case(net::key_terms::NAME))
+        && words.len() <= 1 + NAME_FIRST_MORE
+        && (words.len() == 1 || !text.trim_end().ends_with('?'))
+        && crate::attention::begins_with_the_name(text)
 }
 
 impl Shared {
-    /// The faces the eyes saw speaking from `from` to `to`, each with the
-    /// eyes' boot, when this route reads who speaks
-    /// (`LAMP_SECOND_SPEAKING_FACE` or `LAMP_EYES_SPEAKING`).
-    fn faces_speaking(
-        &self,
-        from: Instant,
-        to: Instant,
-    ) -> Option<crate::speaking_faces::Speakers> {
-        self.speaking
-            .as_ref()
-            .or(self.forget_sight.as_ref())
-            .map(|(eyes, _)| eyes.speakers_with_boot(from, to))
-    }
-
     /// Whether `request` was judged in a busy room: by the rule's hook, or
     /// else by this process's room now, as the Live worker reads its own.
     fn busy(&self, request: u64) -> bool {
@@ -1237,6 +1273,11 @@ pub struct Engine {
     retired_through: u64,
     /// The request begun last, with its session.
     begun_last: Option<(u64, u64)>,
+    /// The coordinator's call whose words were not back when the next line
+    /// began, kept running for them (`LAMP_SECOND_NAME_CARRIES`,
+    /// [`NameWords::Coming`]): it says and keeps nothing. Let go at the
+    /// next start or a stop.
+    superseded: Option<Turn>,
     /// `--sounds-checked`: a short sound is answered only when heard as a
     /// short word.
     sounds_checked: bool,
@@ -1363,6 +1404,7 @@ impl Engine {
                 open_name: false,
                 name_carries: false,
                 name_waits: Mutex::new(None),
+                one_speaker: None,
                 own_echo: false,
                 spare: Mutex::new(None),
                 spares: AtomicU64::new(0),
@@ -1384,6 +1426,7 @@ impl Engine {
             turn: None,
             retired_through: 0,
             begun_last: None,
+            superseded: None,
             sounds_checked: false,
             cut_in_told: false,
             holds_hand_on: false,
@@ -1740,20 +1783,33 @@ impl Engine {
         self
     }
 
-    /// A spoken line that is only the lamp's name ([`name_alone`]), or that
-    /// the coordinator says was ([`ProviderInput::Called`]), is never held
-    /// as a short sound, and its answer waits up to
-    /// [`NAME_CARRIES_FOR`] after its end (`LAMP_SECOND_NAME_CARRIES=on`). A
-    /// line begun in that wait, in the same session, drops the name's
-    /// request and is said by the name: the rule judges it with the name
-    /// before its words and its window from the name's first sound, and it
-    /// is asked with the name before its words. Not when the eyes saw a
-    /// face speak it that they did not see say the name. With none, the
-    /// name is answered as a call ([`crate::provider_worker::CALLED_NOTE`]).
-    /// Before any turn only.
+    /// A spoken line that is only the lamp's name ([`name_alone`]), short
+    /// and begun with it ([`name_first`]), or that the coordinator says was
+    /// only the name ([`ProviderInput::Called`]), is never held as a short
+    /// sound, and its answer waits up to [`NAME_CARRIES_FOR`] after its end
+    /// (`LAMP_SECOND_NAME_CARRIES=on`). A line begun in that wait, in the
+    /// same session, drops the name's request and is said by the name: the
+    /// rule judges it with the name's words before its own (or "Lamp, "
+    /// for a name misheard) and its window from the name's first sound,
+    /// and it is asked so. Not when the eyes saw a face speak it that they
+    /// did not see say the name. With none, the name alone is answered as
+    /// a call ([`crate::provider_worker::CALLED_NOTE`]), a short line as it
+    /// is. Before any turn only.
     pub fn carrying_the_name(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.name_carries = on;
+        }
+        self
+    }
+
+    /// With [`Self::carrying_the_name`]: `same` says whether one person said
+    /// the name and the line after it (`worker::Heeding::one_speaker`, the
+    /// join's judgement), and `kept` keeps each of the two for it before
+    /// the rule judges either. Without it the name never carries. Before
+    /// any turn only.
+    pub fn telling_one_speaker(mut self, same: SameSpeaker, kept: LineKept) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.one_speaker = Some((same, kept));
         }
         self
     }
@@ -2337,6 +2393,12 @@ impl Engine {
                         only
                     });
                 let over_the_lamps_voice = over_the_lamps_voice && !over_the_wait_sound;
+                // The coordinator's call just before, its words not back:
+                // kept running for them, unless its newer owner's authority
+                // came first and kept it already (`LAMP_SECOND_NAME_CARRIES`).
+                if request > self.retired_through {
+                    self.keep_a_coming_name();
+                }
                 if !self.begin(request, session) {
                     return;
                 }
@@ -2354,6 +2416,13 @@ impl Engine {
                     previous,
                     after_stop,
                 );
+                // A call kept for its words feeds only the line it waits for.
+                if !name_of
+                    .as_ref()
+                    .is_some_and(|name| matches!(name.words, NameWords::Coming(_)))
+                {
+                    self.superseded = None;
+                }
                 room(|room| {
                     room.heard(request, monotonic_us());
                     if over_the_lamps_voice {
@@ -2433,6 +2502,15 @@ impl Engine {
                             .map(|end| (kept.request, now.saturating_duration_since(end)))
                     });
                 let carried = self.kept.take().filter(|kept| {
+                    // The name waiting for this line goes to it only when
+                    // one person said both ([`said_by_the_name`]), never
+                    // as the kept sound, which asks nothing of who spoke.
+                    if name_of
+                        .as_ref()
+                        .is_some_and(|name| name.request == kept.request)
+                    {
+                        return false;
+                    }
                     let since = kept.ended.map(|end| now.saturating_duration_since(end));
                     // Only the name cut off on its own: a piece that came
                     // back with no words, or with the lamp's name alone. One
@@ -2511,7 +2589,9 @@ impl Engine {
                     // goes on from it.
                     after_end: after_end.filter(|_| carried.is_none() && before.is_none()),
                     over_the_lamps_voice,
-                    name_of,
+                    name_of: Mutex::new(name_of),
+                    ended_at: Mutex::new(None),
+                    words_back: Mutex::default(),
                 });
                 let said = Arc::new(Mutex::new((0, 0)));
                 self.kept = Some(match carried {
@@ -2698,6 +2778,9 @@ impl Engine {
                         }
                     });
                     turn.sound.store(sound, Ordering::Release);
+                    if let Ok(mut at) = turn.marks.ended_at.lock() {
+                        *at = Some(tokio::time::Instant::now());
+                    }
                     // Closing the queue is the end of input for the task.
                     turn.audio = None;
                     if let Some(hearing) = &self.shared.hearing {
@@ -2967,6 +3050,7 @@ impl Engine {
             .turn
             .as_ref()
             .is_some_and(|turn| turn.request <= self.retired_through)
+            && !self.keep_a_coming_name()
         {
             self.turn = None;
         }
@@ -2997,7 +3081,21 @@ impl Engine {
             );
         }
         self.let_go_cut("a stop came after it");
+        // A name waiting for the line after it carries to none
+        // (`LAMP_SECOND_NAME_CARRIES`): the stopped turn is dropped, never
+        // kept for its words.
+        if self
+            .turn
+            .as_ref()
+            .is_some_and(|turn| turn.request <= through)
+        {
+            self.turn = None;
+        }
         self.retire_through(through);
+        self.superseded = None;
+        if let Ok(mut waits) = self.shared.name_waits.lock() {
+            waits.take();
+        }
     }
 
     /// Words cut short and not yet taken are let go, and the journal says
@@ -3009,6 +3107,62 @@ impl Engine {
                 cut.request
             );
         }
+    }
+
+    /// The turn in hand, when it is the coordinator's call (`Called`) that
+    /// ended within [`NAME_CARRIES_FOR`] and its words are not back yet
+    /// (`LAMP_SECOND_NAME_CARRIES`): kept running, not dropped, so its words
+    /// go to the line begun after it once they come ([`NameWords::Coming`]);
+    /// it says and keeps nothing itself. Its newer owner's authority
+    /// retires it first, or that line's start does. Whether it was kept.
+    fn keep_a_coming_name(&mut self) -> bool {
+        if !self.shared.name_carries {
+            return false;
+        }
+        let Some(turn) = self.turn.as_ref() else {
+            return false;
+        };
+        let Some((request, session)) = self.begun_last.filter(|(begun, _)| *begun == turn.request)
+        else {
+            return false;
+        };
+        let Some(ended) = turn.marks.ended_at.lock().ok().and_then(|at| *at) else {
+            return false;
+        };
+        let until = ended + NAME_CARRIES_FOR;
+        if !turn.marks.called.load(Ordering::Acquire) || tokio::time::Instant::now() > until {
+            return false;
+        }
+        let (tell, words) = tokio::sync::oneshot::channel();
+        {
+            let Ok(mut back) = turn.marks.words_back.lock() else {
+                return false;
+            };
+            if back.0 {
+                return false;
+            }
+            back.1 = Some(tell);
+        }
+        let wait = NameWait {
+            request,
+            session,
+            privacy: turn.marks.privacy,
+            words: NameWords::Coming(words),
+            until,
+            said_from: turn.said.lock().map_or(0, |said| said.0),
+        };
+        if let Ok(mut waits) = self.shared.name_waits.lock() {
+            *waits = Some(wait);
+        }
+        if let Some(mut kept) = self.turn.take() {
+            // It answers nothing now: its memory scope goes.
+            kept.memory_scope.take();
+            self.superseded = Some(kept);
+        }
+        eprintln!(
+            "lamp-voice second: request {request}: the coordinator's call, its words not back yet, is kept for them until 2.5 s after its end: the next line may be said by it (LAMP_SECOND_NAME_CARRIES)"
+        );
+        true
     }
 
     /// The line that was only the lamp's name, begun just before `request`
@@ -3450,6 +3604,42 @@ async fn spoken(
             (&cut_in, &marks),
         );
     }
+    // The coordinator's call, its words back after the next line began
+    // (`LAMP_SECOND_NAME_CARRIES`, [`NameWords::Coming`]): they go to that
+    // line, kept for whom it was said by, and nothing of this one is said,
+    // told or kept.
+    let superseded = marks.words_back.lock().ok().and_then(|mut back| {
+        back.0 = true;
+        back.1.take()
+    });
+    if let Some(tell) = superseded {
+        // Only within its 2.5 s: words later than that carry nothing.
+        let in_time = marks
+            .ended_at
+            .lock()
+            .ok()
+            .and_then(|at| *at)
+            .is_some_and(|at| tokio::time::Instant::now() <= at + NAME_CARRIES_FOR);
+        let back = finished.as_ref().ok().filter(|_| in_time).cloned();
+        if back.is_some()
+            && let Some((_, kept)) = &shared.one_speaker
+        {
+            kept(request, said.lock().map_or((0, 0), |said| *said));
+        }
+        eprintln!(
+            "lamp-voice second: request {request}: {} after the next line began, and nothing of this line is said (LAMP_SECOND_NAME_CARRIES)",
+            match (&finished, in_time) {
+                (Ok(words), true) => format!(
+                    "its {} words came back: they go to it",
+                    words.split_whitespace().count()
+                ),
+                (Ok(_), false) => "its words came back past 2.5 s from its end".to_owned(),
+                (Err(_), _) => "its speech to text failed".to_owned(),
+            }
+        );
+        let _ = tell.send(back.map(|words| (words, true)));
+        return;
+    }
     let text = match finished {
         Ok(text) => {
             reached(&times, |times| &mut times.words);
@@ -3592,57 +3782,64 @@ async fn spoken(
     } else {
         text
     };
-    // Said by the lamp's name alone just before, whose request this line
-    // dropped (`LAMP_SECOND_NAME_CARRIES`): the name goes before its words,
-    // unless they begin with it already (the name's words carried in front
-    // of them, [`KeptSound`]); with no words of its own, it is the call.
-    // Never a line the eyes saw a face speak that they did not see say the
-    // name.
-    let name_of = marks.name_of.filter(|name| {
-        let another = shared
-            .faces_speaking(name.began, name.ended)
-            .zip(shared.faces_speaking(begun, finishing))
-            .is_some_and(|(said_the_name, spoke)| another_face(&said_the_name, &spoke));
-        if another {
+    // Said by the lamp's name just before, whose request this line dropped
+    // (`LAMP_SECOND_NAME_CARRIES`), when one person said both: the name's
+    // words go before its own when they begin with the name, else "Lamp, "
+    // does, unless its words begin with the name already; with no words of
+    // its own, it is the name's line. Otherwise it is judged as its own.
+    let name_of = match marks.name_of.lock().ok().and_then(|mut name| name.take()) {
+        Some(name) => {
+            let own = said.lock().map_or((0, 0), |said| *said);
+            said_by_the_name(&shared, request, name, own).await
+        }
+        None => None,
+    };
+    let wordless = text.trim().is_empty();
+    let (text, called) = match &name_of {
+        Some(name) if wordless && name_first(&name.words) => (
+            name.words.clone(),
+            called || name.called || name_alone(&name.words),
+        ),
+        Some(_) if wordless => (CALLED_WORDS.to_owned(), true),
+        Some(_) if crate::attention::begins_with_the_name(&text) => (text, called),
+        Some(name) if name_first(&name.words) => {
+            (format!("{} {}", name.words.trim(), text.trim()), called)
+        }
+        Some(_) => (format!("{}, {}", net::key_terms::NAME, text.trim()), called),
+        None => (text, called),
+    };
+    // Only the lamp's name, short and begun with it, or the coordinator
+    // heard the name and nothing more (`Called`; the words may be a name
+    // misheard, "Life."): its answer waits for the line after it, which
+    // drops this request; with none, the name alone is answered as a call,
+    // a short line as it is (`LAMP_SECOND_NAME_CARRIES`). A line said by a
+    // name waits no more.
+    let name_waits = shared.name_carries && name_of.is_none() && (called || name_first(&text));
+    if name_waits {
+        let left = NAME_CARRIES_FOR.saturating_sub(finishing.elapsed());
+        if called || name_alone(&text) {
             eprintln!(
-                "lamp-voice second: request {request}: the eyes saw another face than request {}'s speak it: the name is not carried (LAMP_SECOND_NAME_CARRIES)",
-                name.request
+                "lamp-voice second: request {request}: only the lamp's name: its answer waits for the line after it (LAMP_SECOND_NAME_CARRIES)"
             );
         } else {
             eprintln!(
-                "lamp-voice second: request {request} is said by the name of request {}",
-                name.request
+                "lamp-voice second: request {request}: its {} words begin with the lamp's name and stop short: its answer waits for the line after it (LAMP_SECOND_NAME_CARRIES)",
+                text.split_whitespace().count()
             );
         }
-        !another
-    });
-    let wordless = text.trim().is_empty();
-    let (text, called) = match name_of {
-        Some(_) if wordless => (CALLED_WORDS.to_owned(), true),
-        Some(_) if !crate::attention::begins_with_the_name(&text) => {
-            (format!("{}, {}", net::key_terms::NAME, text.trim()), called)
+        let window = said.lock().map_or((0, 0), |said| *said);
+        // Kept for whom the line after it is said by, before either is
+        // judged: this one never is if one comes.
+        if let Some((_, kept)) = &shared.one_speaker {
+            kept(request, window);
         }
-        _ => (text, called),
-    };
-    // Only the lamp's name, or the coordinator heard the name and nothing
-    // more (`Called`; the words may be a name misheard, "Life."): its answer
-    // waits for the line after it, which drops this request; with none, it
-    // is answered as a call (`LAMP_SECOND_NAME_CARRIES`). A line said by a
-    // name waits no more.
-    let name_waits = shared.name_carries && name_of.is_none() && (called || name_alone(&text));
-    if name_waits {
-        let left = NAME_CARRIES_FOR.saturating_sub(finishing.elapsed());
-        eprintln!(
-            "lamp-voice second: request {request}: only the lamp's name: its answer waits for the line after it (LAMP_SECOND_NAME_CARRIES)"
-        );
         let wait = NameWait {
             request,
             session: turn.session,
             privacy: turn.privacy_generation,
+            words: NameWords::Known((text.clone(), called)),
             until: tokio::time::Instant::now() + left,
-            said_from: said.lock().map_or(0, |said| said.0),
-            began: begun,
-            ended: finishing,
+            said_from: window.0,
         };
         if let Ok(mut waits) = shared.name_waits.lock() {
             *waits = Some(wait);
@@ -3653,16 +3850,26 @@ async fn spoken(
             waits.take_if(|wait| wait.request == request);
         }
         eprintln!(
-            "lamp-voice second: request {request}: no line came after its name: answered as a call"
+            "lamp-voice second: request {request}: no line came after its name: answered as {}",
+            if called || name_alone(&text) {
+                "a call"
+            } else {
+                "it is"
+            }
         );
     }
-    // Answered as a call: the name for one word misheard, else its words,
-    // told it was a call as without the switch.
+    // The name alone is answered as a call: the name for one word misheard,
+    // else its words, told it was a call as without the switch. A short
+    // line begun with the name is answered as it is.
     let (text, called) = match name_waits {
-        true if !name_alone(&text) && past_a_greeting(&text).len() <= 1 => {
+        true if !name_first(&text) && past_a_greeting(&text).len() <= 1 => {
             (CALLED_WORDS.to_owned(), true)
         }
-        _ => (text, called || name_waits),
+        true => {
+            let alone = name_alone(&text);
+            (text, called || alone)
+        }
+        false => (text, called),
     };
     // Its words end before a name: answered no sooner than
     // [`OPEN_NAME_WITHIN`] after the line's end, so the name said next goes
@@ -3733,7 +3940,7 @@ async fn spoken(
             // Said by the name just before: its window begins with the
             // name's line, so the name heard there is this line's, as for
             // a heard name.
-            let window = match name_of {
+            let window = match &name_of {
                 Some(name) if name.said_from != 0 && window.0 != 0 => {
                     (window.0.min(name.said_from), window.1)
                 }
@@ -4173,6 +4380,105 @@ fn still_holding(shared: &Shared, request: u64) -> bool {
     })
 }
 
+/// What `same` says of whether one person said `before` and `request`, a
+/// voice print still to come waited for up to [`JOIN_WAIT`], then what is
+/// known without it ([`Joined::Coming`]): for a join
+/// ([`joined_with_cut`]) and for the lamp's name ([`said_by_the_name`]).
+async fn said_by_one(same: &SameSpeaker, (before, request): (u64, u64)) -> Joined {
+    let bound = tokio::time::Instant::now() + JOIN_WAIT;
+    loop {
+        match same(before, request) {
+            Joined::Coming(without) if tokio::time::Instant::now() >= bound => {
+                break match *without {
+                    Joined::Not(why) => Joined::Not(format!(
+                        "a voice print did not come in {} ms; {why}",
+                        JOIN_WAIT.as_millis()
+                    )),
+                    without => without,
+                };
+            }
+            Joined::Coming(_) => tokio::time::sleep(JOIN_POLL).await,
+            said => break said,
+        }
+    }
+}
+
+/// The name `request` is said by (`LAMP_SECOND_NAME_CARRIES`): `name`'s
+/// words, once back (waited for up to its 2.5 s), and only when one person
+/// said both ([`Engine::telling_one_speaker`]: one face seen speaking each,
+/// the same voice, or no sign of a second person in a quiet room). `own`
+/// is `request`'s window, for the rule to keep it before it is judged.
+/// Not carried, `request` is judged as its own, and the name's words wait
+/// where words cut short do: answered in its place if it is held.
+async fn said_by_the_name(
+    shared: &Shared,
+    request: u64,
+    name: NameWait,
+    own: (u64, u64),
+) -> Option<SaidBy> {
+    let (words, called) = match name.words {
+        NameWords::Known(said) => said,
+        NameWords::Coming(coming) => match tokio::time::timeout_at(name.until, coming).await {
+            Ok(Ok(Some(said))) => said,
+            _ => {
+                eprintln!(
+                    "lamp-voice second: request {request}: request {}'s words did not come back within 2.5 s of its end: its name is not carried (LAMP_SECOND_NAME_CARRIES)",
+                    name.request
+                );
+                return None;
+            }
+        },
+    };
+    let said = match &shared.one_speaker {
+        Some((same, kept)) => {
+            kept(request, own);
+            said_by_one(same, (name.request, request)).await
+        }
+        None => Joined::Not("nothing here tells whether one person said both".to_owned()),
+    };
+    let why = match said {
+        Joined::Same(why) => Ok(why.to_owned()),
+        Joined::NoSecond(why) => Ok(why),
+        Joined::Not(why) => Err(why),
+        Joined::Coming(_) => Err("a voice print still to come past the wait".to_owned()),
+    };
+    match why {
+        Ok(why) => {
+            eprintln!(
+                "lamp-voice second: request {request} is said by the name of request {}: {why} (LAMP_SECOND_NAME_CARRIES)",
+                name.request
+            );
+            Some(SaidBy {
+                said_from: name.said_from,
+                words,
+                called,
+            })
+        }
+        Err(why) => {
+            eprintln!(
+                "lamp-voice second: request {request} is not said by the name of request {}: {why}; it is judged as its own (LAMP_SECOND_NAME_CARRIES)",
+                name.request
+            );
+            let asked = if name_first(&words) {
+                words
+            } else {
+                CALLED_WORDS.to_owned()
+            };
+            if let Ok(mut cut) = shared.cut.lock()
+                && cut.is_none()
+            {
+                *cut = Some(Carried {
+                    request: name.request,
+                    text: asked,
+                    at: Instant::now(),
+                    said_by: name.request,
+                });
+            }
+            None
+        }
+    }
+}
+
 /// `text`, the words of `request`, let out or held (`let_out`), and
 /// `carried`, the words of the line it cut short, none of whose answer was
 /// heard: the two asked as one line when one person said both
@@ -4218,22 +4524,7 @@ async fn joined_with_cut(
         ));
         return (text, Some(carried));
     }
-    let bound = tokio::time::Instant::now() + JOIN_WAIT;
-    let said = loop {
-        match same(carried.request, request) {
-            Joined::Coming(without) if tokio::time::Instant::now() >= bound => {
-                break match *without {
-                    Joined::Not(why) => Joined::Not(format!(
-                        "a voice print did not come in {} ms; {why}",
-                        JOIN_WAIT.as_millis()
-                    )),
-                    without => without,
-                };
-            }
-            Joined::Coming(_) => tokio::time::sleep(JOIN_POLL).await,
-            said => break said,
-        }
-    };
+    let said = said_by_one(same, (carried.request, request)).await;
     let why = match said {
         Joined::Same(why) => Ok(why.to_owned()),
         Joined::NoSecond(why) if let_out => Ok(why),

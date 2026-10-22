@@ -1006,53 +1006,98 @@ order is kept. A written turn is the same from the chat on.
   (`not_speech::SHORT_WORDS`), so a short sound held so was a misheard
   name or more than the name. `marks.called` (the coordinator heard the
   name) had only rescued a line with no words. With the switch:
-  - **Which line waits** (`name_alone`): its words are only
-    `key_terms::NAME` ("Lamp"), any case and punctuation, "hey" or "ok"
-    before it at most; or the coordinator ended it as only the name
+  - **Which line waits:** its words are only `key_terms::NAME` ("Lamp"),
+    any case and punctuation, "hey" or "ok" before it at most
+    (`name_alone`); or they are short and begin with it (`name_first`):
+    the name first, set off as a call (`attention::begins_with_the_name`,
+    so not "Lamp is broken."), at most 3 words after it
+    (`NAME_FIRST_MORE`), and no question their end shows ("Lamp. So",
+    "Lamp, can", "Hey Lamp, what's"; "Hey Lamp, what's the time?" is
+    answered at once). In r01 such pieces were the ones held: "Lamp. So So
+    I have a meeting…" was held as a short sound, then the rest for no
+    name. Or the coordinator ended it as only the name
     (`ProviderInput::Called`), whatever its words. Such a line is never
     held as a short sound, and its answer waits up to `NAME_CARRIES_FOR`
     (2.5 s) after its end, as `OPEN_NAME_WITHIN`'s wait does. A line itself
     said by a name never waits again.
-  - **A line begun in that wait is said by the name.** Its Start takes the
-    wait (`Engine::name_said_before`); `begin` drops the name's request,
-    which gets no answer. The line is never held as a short sound. The
-    rule is given its words with "Lamp, " before them, unless they begin
-    with the name already (the kept sound put the name's words first,
-    within `CARRY_AFTER_END`), and its window from the name's first sound,
+  - **A line begun in that wait is said by the name, only when one person
+    said both** (El's P1s on the branch, 22 Oct). Its Start takes the wait
+    (`Engine::name_said_before`); `begin` drops the name's request. The
+    rule keeps both lines as a judgement keeps them, before either is
+    judged (`Heeding::keep_unjudged`: the faces seen speaking it, the
+    eyes' newest look, the room; no name hearing read), and tells whether
+    one person said both by the join's own judgement
+    (`Heeding::one_speaker`, `same_speaker`, a print still to come waited
+    for up to `JOIN_WAIT`): one face seen speaking each, or prints at
+    0.70 or more; failing those, its no sign of a second person (at most
+    one face in each newest look, no other voice heard and no two faces
+    seen speaking in the conversation) only when both were said in a
+    quiet room, never an unknown or busy one, even with one face in view
+    at each. Otherwise there's no carry: the line is judged as its own,
+    with its own words and window, and held as it would be without the
+    name; the name's words wait where words cut short do, answered in its
+    place if it is held. With no rule (`Engine::telling_one_speaker`
+    unset), nothing carries. Carried, the line is never held as a short
+    sound, and the rule is given its words with the name line's words before them when
+    those begin with the name ("Lamp. So I have a meeting at three…"), or
+    "Lamp, " for a name misheard ("Life."), unless its own words begin with
+    the name already (the kept sound put the name's words first, within
+    `CARRY_AFTER_END`), and its window from the name's first sound,
     so the name heard there counts for it and earns the name note
-    (`LAMP_NAME_NOTE`), as a heard name does. It is asked with those words.
-    A line said by the name with no words of its own is the call.
+    (`LAMP_NAME_NOTE`), as a heard name does: that window, the name's
+    words and `LAMP_BUSY_CALLED_STRICT`'s evidence go to no line that
+    didn't show one speaker. It is asked with those words. A line said by
+    the name with no words of its own is the name's line. The kept sound
+    (`KeptSound`) never carries a waiting name's piece: it asks nothing
+    of who spoke.
+  - **A call whose words come late** (El's P2): when the next line begins
+    before the coordinator's call (`Called`) has its words back, the
+    call's turn is kept running for them (`Engine::keep_a_coming_name`,
+    whether its newer owner's authority or that line's start comes first)
+    and says nothing itself; its words go to the line once back, within
+    2.5 s of its end, and are judged as above. Words later than that carry
+    nothing. A name by its words alone, with no `Called`, is known only
+    once they are back, so the kept sound's own carry is left as it was
+    for it.
   - **Never carried** across sessions or privacy generations, after a
     stop, past the wait, or to any line but the one begun just after the
-    name. Nor into a line the eyes saw a face speak that they did not see
-    say the name (`another_face`, read with `LAMP_SECOND_SPEAKING_FACE` or
-    `LAMP_EYES_SPEAKING`; with neither, nothing is seen and the face isn't
-    checked). Nobody seen saying the name tells nothing.
-  - **With no line in the wait,** the name is answered as a call:
-    `CALLED_NOTE`, its words when they are the name or more than one, the
-    name (`CALLED_WORDS`) for one word misheard or none.
+    name.
+  - **With no line in the wait,** the name alone, or a `Called` line, is
+    answered as a call: `CALLED_NOTE`, its words when they begin with the
+    name or are more than one, the name (`CALLED_WORDS`) for one word
+    misheard or none. A short line begun with the name is answered as it
+    is, not told it was a call.
   - **The journal**, counts only, never the words: `request N: only the
     lamp's name: its answer waits for the line after it
-    (LAMP_SECOND_NAME_CARRIES)`, then `request M is said by the name of
-    request N`, or `request N: no line came after its name: answered as a
-    call`; a line the eyes refuse says so, and a start that may not carry
-    the name says why.
-  - **What it costs:** a lone call is answered up to 2.5 s later than
-    before; every other line is as it was.
+    (LAMP_SECOND_NAME_CARRIES)` (for a short line, `its W words begin with
+    the lamp's name and stop short: …`), then `request M is said by the
+    name of request N: <the sign>`, or `request M is not said by the name
+    of request N: <why>; it is judged as its own`, or `request N: no line
+    came after its name: answered as a call` (`as it is`); a call kept for
+    its words, and a start that may not carry the name, say so.
+  - **What it costs:** a lone call, or a short line begun with the name
+    and whole ("Lamp, stop.", "Lamp, lights off."), is answered up to 2.5 s
+    later than before; every other line is as it was.
   - **What it doesn't do:** the coordinator isn't told of the wait, so its
     answer wait (`LAMP_WAIT_KEEPS_ANSWER`) and the body's motors judge a
     sound begun in it as they judge any sound while an answer is awaited:
     a short one may be let go, and a line admitted after the 2.5 s is not
-    carried. A name with more words after it ("Lamp. So") is carried only
-    with `Called`.
+    carried. A short line that doesn't begin with the name ("So I") waits
+    only with `Called`.
   - **Tests:** `second_provider::tests::name_carries` (a line 1.2 s, 2 s
-    and 2.4 s after "Lamp." or a misheard name with `Called`; a lone call;
-    a short sound that is no name; a line 3 s later; another session, a
-    stop and another face; the switch off).
+    and 2.4 s after "Lamp." or a misheard name with `Called`; "Lamp. So"
+    and the rest 1.0 s later, asked as one line; "So I" held as before; a
+    lone call; a short sound that is no name; a line 3 s later; another
+    session and a stop; two faces, two voices or no rule; a call's words
+    back 0.6 s and 3 s after its end; the switch off) and
+    `worker::tests::the_lamps_name_carries_only_on_a_sign_of_one_speaker`
+    (a busy room, two faces, no eyes in a quiet and an unknown room, a
+    print under 0.30) and
+    `a_line_kept_unjudged_is_read_for_one_speaker_as_a_judged_one`.
   - **For a lamp:** played name lines with a 0.4–2.4 s pause after
     "Lamp,", heard right and misheard, lone calls, and a colleague's line
-    within 2.5 s of a call: no request lost, lone calls answered, nothing
-    carried to another face.
+    within 2.5 s of a call, in a quiet and a busy room: no request lost,
+    lone calls answered, nothing carried to another person.
 - **With `LAMP_SECOND_QUIET_HELD=on` the quiet after a pause isn't sent**
   (off unless set; needs `LAMP_SECOND_EARLY_FINALIZE=on`; the backend on
   #2135 and the first builder on #1722, 21 Oct 13:1x). Deepgram bills each
