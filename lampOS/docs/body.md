@@ -1848,7 +1848,8 @@ as root) is how a seated lamp gets its standing file without the factory:
 
 - **The ask.** Once a face at least 0.12 of the picture's height has been in
   the eyes' presence file for 5 s, the lamp says "I'd like to stretch for
-  the first time. Touch the top of my head when you're ready." through the
+  the first time. Rest your hand on my head, or just say yes, when you're
+  ready." through the
   voice's say service (`LAMP_SAY=on` in the generic voice unit). The say
   service says it only after 15 s of quiet. Nothing is asked in the run's
   first 2 minutes, so an update's 45 s check that every part runs never
@@ -1857,7 +1858,24 @@ as root) is how a seated lamp gets its standing file without the factory:
   `controls/state` (`head_active`, `buttons[].pressed`). It counts only if
   begun once the ask's words have ended (a hand on the head while the lamp
   speaks, a pet, is no answer): a hand already on the head must be lifted
-  and put back. An ask not said to its end is asked again later.
+  and put back. An ask not said to its end is asked again later, and the
+  journal says why (`dropped (user_interrupted)`, `expired`).
+- **Or a spoken yes** (the owner, 22 Oct: a customer doesn't know to touch):
+  a finished line on `voice/heard` that the voice heard after the ask's words
+  ended, so the lamp's own words never count, within the same window. It must
+  be short (5 words at most), open with yes, yeah, yep, yup, sure, okay, ok,
+  ready or go, and hold no "no", "not", "don't", "wait", "stop" or "later"
+  (`first_stand::is_yes`). A face must be near when it is heard. And, since a
+  yes starts the arm (the first builder on #2602, 22 Oct 12:0x), **never in a
+  busy room** (`room/state`): an ask made in one says only "Rest your hand on
+  my head when you're ready", and takes the touch alone; nor once another
+  line was heard in the window (a second voice, or "yes, wait"), nor after
+  the window (`first_stand::SpokenYes`). A yes not taken has a journal line
+  saying why.
+- **A beat before moving.** Once the yes is taken, by touch or by voice, the
+  lamp says "Okay, here I go.", waits 1 s, and then starts. The words are read in
+  memory and never journaled. It needs the voice on the bus (`LAMP_BUS=on`);
+  without `voice/heard` the touch alone is the yes.
 - **The stand.** `steps.sh`'s body step:
   1. `lamp-body.service` is stopped and the lamp is read at rest. A lamp
      held with torque on is first let go by a body run.
