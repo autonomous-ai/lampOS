@@ -1465,24 +1465,17 @@ struct Marks {
     /// Whether its words are back, and, when the line after it began first
     /// and waits for them, where they go ([`NameWords::Coming`]).
     words_back: Mutex<(bool, Option<tokio::sync::oneshot::Sender<Option<NameSaid>>>)>,
-    /// Begun while the lamp's name before it waited for it
-    /// (`LAMP_SECOND_NAME_CARRIES`): that name line's own link
-    /// ([`KeptSound::link`]), which a chain goes on across once it is said
-    /// by the name (`name_carried`).
-    name_link: Option<(u64, Duration)>,
     /// Said by the name before it ([`said_by_the_name`]).
     name_carried: AtomicBool,
 }
 
-/// The link a line's join goes by: the lamp's name's own when the line is
-/// said by it (`LAMP_SECOND_NAME_CARRIES`), so a chain goes on across a
-/// carried name; else its own ([`Marks::after_end`]).
+/// The link a line's join goes by: its own ([`Marks::after_end`]). A line
+/// said by the lamp's name goes on only from the name, never from a piece
+/// cut before it, which is often the end of other talk (reviewer-three's
+/// P2 on 22 Oct: "yeah, I'll send it after lunch", then "Lamp.", then
+/// "what's on my calendar?").
 fn join_link(marks: &Marks) -> Option<(u64, Duration)> {
-    if marks.name_carried.load(Ordering::Acquire) {
-        marks.name_link
-    } else {
-        marks.after_end
-    }
+    marks.after_end
 }
 
 /// What a line that was only the lamp's name is asked as when no words of
@@ -2939,10 +2932,6 @@ impl Engine {
                     name_of: Mutex::new(name_of),
                     ended_at: Mutex::new(None),
                     words_back: Mutex::default(),
-                    name_link: name_waiting
-                        .and(before_link)
-                        .filter(|(before, _, _)| name_waiting == Some(*before))
-                        .and_then(|(_, link, _)| link),
                     name_carried: AtomicBool::new(false),
                 });
                 let said = Arc::new(Mutex::new((0, 0)));
