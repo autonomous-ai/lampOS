@@ -8,7 +8,7 @@
 //! Off unless given, and a test flag no deployed unit passes; the file is
 //! new each run and stops at [`MOST_US`] or [`MOST_BYTES`], whichever
 //! comes first.
-use crate::change::Glance;
+use crate::change::{Glance, Rule};
 use std::{
     fs::{File, OpenOptions},
     io::{self, Write},
@@ -39,12 +39,16 @@ pub fn hex(bytes: &[u8]) -> String {
 /// `ratio`, `resid_greys_q` (the three per cell, in hex), `frame_shift`,
 /// `detect`, `why` and `faces` (how many faces the detector found that
 /// `--leave-still-faces` kept, so the faces the body was told of; 0 when
-/// the detector did not run).
+/// the detector did not run). With `--change-persist on` a `rule` field,
+/// `persist-2`, says which rule gave `changed`; without it the line is as
+/// before, the current rule's.
 pub fn line(glance: &Glance, faces: usize) -> String {
     #[derive(serde::Serialize)]
     struct Line<'a> {
         at_us: u64,
         changed: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        rule: Option<&'static str>,
         lit: bool,
         cells: usize,
         mask: String,
@@ -58,6 +62,7 @@ pub fn line(glance: &Glance, faces: usize) -> String {
     serde_json::to_string(&Line {
         at_us: glance.at_us,
         changed: glance.changed,
+        rule: (glance.rule != Rule::Current).then(|| glance.rule.name()),
         lit: glance.lit,
         cells: glance.cells,
         mask: hex(&glance.mask),
@@ -240,6 +245,51 @@ mod tests {
                 .bytes()
                 .all(|b| b == b'0')
         );
+    }
+
+    /// With `--change-persist on` each line names its rule; `changed` is
+    /// persist-2's verdict while `mask` is still every cell past the bar.
+    #[test]
+    fn a_persist_2_line_names_its_rule() {
+        let mut change = Change::default();
+        change.keep_glances();
+        change.persist_2();
+        let mut lines = Vec::new();
+        for (at, frame) in [pattern(0.0), pattern(0.0), pattern(0.0)]
+            .into_iter()
+            .enumerate()
+        {
+            change.detect(frame, None, at as u64 * 600_000);
+            lines.extend(change.take_glance().map(|glance| line(&glance, 0)));
+        }
+        let last: serde_json::Value = serde_json::from_str(&lines[1]).unwrap();
+        assert_eq!(last["rule"], "persist-2");
+        assert_eq!(last["changed"], false);
+        // A person in a 4 by 4 block of cells, two glances running: the
+        // first has no cell held from the glance before, the second does.
+        let person = Grid::from_greys(
+            (0..ACROSS * DOWN)
+                .map(|cell| {
+                    20.0 + ((cell * 37) % 200) as f32
+                        + if cell % ACROSS < 4 && cell < 4 * ACROSS {
+                            60.0
+                        } else {
+                            0.0
+                        }
+                })
+                .collect(),
+        );
+        change.detect(person.clone(), None, 1_800_000);
+        let first: serde_json::Value =
+            serde_json::from_str(&line(&change.take_glance().unwrap(), 0)).unwrap();
+        change.detect(person, None, 2_400_000);
+        let second: serde_json::Value =
+            serde_json::from_str(&line(&change.take_glance().unwrap(), 0)).unwrap();
+        assert_eq!(
+            (first["changed"].clone(), first["cells"].clone()),
+            (false.into(), 16.into())
+        );
+        assert_eq!(second["changed"], true);
     }
 
     #[test]

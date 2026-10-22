@@ -167,11 +167,31 @@ sees" with what has and has not been shown of it.
   one of them. Not yet run
   on a lamp: the saving and a sit-down's time to a look are to be measured
   on lamp-4ace.
+- With `--change-persist on` (only with `--look-on-change on`; off unless
+  given; `src/change.rs`, `Rule::Persist2`) the change bar uses the
+  "persist-2" rule: a cell counts only if it was past the bar (12 greys and
+  eight times its noise, after the row's median change) in this compared
+  glance and in the one compared before it, and the frame has changed when
+  three or more such cells are; the first compared glance has none before
+  it. Noise in a dark room lands in a few scattered cells for one glance
+  at a time, so it stops running the detector; a person who walks in
+  changes the same cells two glances running, so they are a change at the
+  second glance: at most one glance (about 0.6 s with nobody in view)
+  more before the first detection. The 3 s look, the two settling glances
+  after a change, the lamp's own light and the busy room (a face under 4 s
+  ago, a full look asked for, someone being remembered) are as without it,
+  and without it the bar is exactly as before. Why: `--glance-log` on
+  lamp-c0a4's dark empty office, 1027 glances replayed by
+  `examples/glance_replay.rs` (the same definition as the code), skipped
+  22.8% of the empty-room glances by the current rule and 64.2% by
+  persist-2. Not yet run live on a lamp: a night's looks and a walk-in's
+  time to a look are owed.
 - With `--glance-log /var/lib/lampos-eyes/glance.log` (only with
   `--look-on-change on`; off unless given; `src/glance_log.rs`) each
   compared glance is written to that file as one JSON line of numbers, so the change bar's rules can be
-  replayed offline: `at_us` (monotonic), `changed` (the current rule's
-  verdict), `lit` (the lamp's own light changing), `cells` (cells past the
+  replayed offline: `at_us` (monotonic), `changed` (the active rule's
+  verdict), `rule` (only with `--change-persist on`: `persist-2`; absent,
+  the line is the current rule's, as before), `lit` (the lamp's own light changing), `cells` (cells past the
   bar), `mask` (the 768 cells past the bar by the current rule, one bit a
   cell in row order, as hex), `ratio` (each cell's change over its learned
   noise before this glance teaches it, times 8, floored, at most 255; 255
