@@ -67,6 +67,13 @@ and Who was here are not given it),
 `speak_up::tests::the_familiar_level_is_read_from_moods_fresh_state_only`.
 No test runs the whole loop with a presence file.
 
+The say's `skill_says` record keeps whether its note was told
+(`told_who`, true or false) and Mood's level it was told with (`familiar`:
+`"new"`, `"regular"`, `"close"`, or null when not told or the level is not
+known), so the records show whether the level shaped the words (#2831).
+Never the name or the note (`person::told_record`; test
+`person::tests::a_says_record_keeps_the_level_its_note_was_told_and_no_name`).
+
 What ends the quiet every unasked turn waits for is talk: the lamp's own
 words playing, any voice the detector calls speech (words or none: a line in
 a language the route takes no words from is still someone talking), a
@@ -428,8 +435,8 @@ free, nobody's utterance pending, the microphone's capture fresh and a
 second since the last speech, the playback mask free, a ready session and
 the keeper's pause off; and a quiet since the last turn of 15 s (as the
 news), or 1 s from priority 8 up (as a reminder). It is a written turn like
-the others (`skill_says` in the record, with the skill and the priority;
-never the words), the lamp's own turn to the attention rule and the
+the others (`skill_says` in the record, with the skill, the priority, `told_who`
+and `familiar` (above); never the words), the lamp's own turn to the attention rule and the
 Policy's hold. The Policy is not asked here: whoever asks the voice to
 speak has asked the Policy's gate first ([skills.md](skills.md)).
 
