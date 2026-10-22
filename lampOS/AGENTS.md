@@ -42,6 +42,22 @@ It replaces the three-agent `harness send` route of 12 October.
 - **People and lamps.** No person's name or handle goes in the repository. Ask
   before an install on a lamp you don't hold, and post
   `PLAYING <lamp> HH:MM–HH:MM` on the Queue before any played round.
+- **Before asking for a review, read your own diff for the faults reviews
+  found most on 22 October**, and say in the PR body which you checked:
+  1. **Wrong person:** can one person's words, name, face or memory reach
+     another's turn? Check two people, a face out of view, no eyes, and a
+     room `Unknown` (not the same as quiet).
+  2. **Stops and forgets:** does a stop, "never mind", privacy close or
+     forget clear everything in flight, including what's cached, kept,
+     carried or retried?
+  3. **Default-on side effects:** does anything change with your switch
+     *off*? If so, gate it or test every reader of what changed.
+  4. **The census:** a new switch, topic, unit line or msgs field is in
+     every census test (grep its name across `crates/`) and in
+     `docs/switches.md`.
+  5. **Gates:** `cargo fmt --check` and strict clippy on the Mac and on
+     Linux (`#[cfg(target_os = "linux")]` for Linux-only code), on the
+     latest `lamp-voice`.
 
 - First release: chat with a physical robot beside one person at a desk.
   Lamp is fixed on the left or right; calls and visiting colleagues are negative
