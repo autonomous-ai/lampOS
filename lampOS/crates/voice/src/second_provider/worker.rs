@@ -2384,11 +2384,24 @@ pub fn serve(
     // model can look at all.
     let skill_look = std::env::var(crate::second_provider::SKILL_LOOK_ENVIRONMENT).ok();
     let skill_look = skill_look.as_deref();
+    // A push on the body ends a skill's search here too, as lamp-skills
+    // ends it (`body/hand`, #2904): only with the bus (`LAMP_BUS=on`), read
+    // while this worker runs.
+    let hand_reader = takes_skill_looks(skill_look, look_by_call)
+        .then_some(files.bus_root.as_deref())
+        .flatten()
+        .and_then(|root| {
+            let pushed = Arc::new(Mutex::new(crate::search_pushed::SearchPushed::default()));
+            crate::search_pushed::read_from(pushed.clone(), root).map(|reader| (pushed, reader))
+        });
     if takes_skill_looks(skill_look, look_by_call) {
         eprintln!(
             "lamp-voice second: a skill's answer that asks for a look takes the turn's full look (LAMP_SECOND_SKILL_LOOK)"
         );
         engine = engine.looking_for_skills(skill_call(skill_settings));
+        if let Some((pushed, _)) = &hand_reader {
+            engine = engine.stopping_searches_by_hand(pushed.clone());
+        }
         // A look's turn whose answer called nothing is told so, so that a
         // skill's search the model left after one look gets one note to go
         // on (`LAMP_SECOND_LOOK_NOTE=on`).

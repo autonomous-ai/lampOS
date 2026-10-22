@@ -160,6 +160,9 @@ struct Script {
     /// A hand Stop (the button's tap) comes through Controls this many
     /// capture frames after the murmur.
     hand_stop: Option<u64>,
+    /// The body says it is pushed (`body/hand`, #2904), from then on, on
+    /// the bus `TEST_HAND_IN` reads.
+    push: Option<When>,
     /// Privacy reports muted once this many turns are settled.
     turns: usize,
     /// The Live link is Ready again, with a new session, once this many
@@ -258,6 +261,7 @@ impl Script {
             speak_again: None,
             murmur: None,
             hand_stop: None,
+            push: None,
             turns: 1,
             live_back_after: None,
             live_late: None,
@@ -458,6 +462,10 @@ thread_local! {
     /// been sent (`memory/forgot`), on the bus `TEST_FORGOT_IN` reads.
     static TEST_MEMORY_FORGETS: std::cell::RefCell<Option<(usize, String, lamp_bus::Publisher)>> =
         const { std::cell::RefCell::new(None) };
+    /// The body, saying `body/hand` on the bus `TEST_HAND_IN` reads
+    /// (`Script::push`), and whether it is pushed yet.
+    static TEST_BODY_HAND: std::cell::RefCell<Option<(bool, lamp_bus::Publisher)>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 struct Peers {
@@ -567,6 +575,36 @@ impl Peers {
                 self.murmur_at = Some(self.frames);
             }
         }
+        if let Some(when) = self.script.push {
+            let due = match when {
+                When::Settled(count) => self.settled >= count,
+                When::Ended(count) => self.ended.len() >= count,
+                When::Accepted(count) => self.accepted >= count,
+                When::LookTurns(count) => self.look_turns >= count,
+            };
+            if due {
+                self.script.push = None;
+                TEST_BODY_HAND.with(|slot| {
+                    if let Some((pushed, _)) = slot.borrow_mut().as_mut() {
+                        *pushed = true;
+                    }
+                });
+            }
+        }
+        // Held pushed, the body says so again and again, as it does every
+        // 100 ms: one push, from when it began.
+        TEST_BODY_HAND.with(|slot| {
+            if let Some((true, body)) = slot.borrow_mut().as_mut() {
+                body.publish_json(
+                    monotonic_us(),
+                    &lamp_msgs::Hand {
+                        pushed: true,
+                        since_us: 1,
+                    },
+                )
+                .unwrap();
+            }
+        });
         if let (Some(after), Some(at)) = (self.script.hand_stop, self.murmur_at)
             && self.frames >= at + after
             && let Some(hand) = self.hand.as_ref()
@@ -2365,6 +2403,89 @@ fn a_hand_stop_after_a_looks_answer_drops_its_note() {
     );
     // The search ended with the Stop: nothing owed is left to drop.
     assert!(run.events("look_note_dropped").is_empty());
+}
+
+/// A skill's search on the second route alone, with the note, and the
+/// body's `body/hand` on a bus of the run's own: pushed from `push` on.
+fn pushed_search(push: Option<When>) -> Run {
+    let root = PathBuf::from(format!("/tmp/lv-hand-loop-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let body = bus
+        .publisher_declared(
+            lamp_msgs::Hand::TOPIC,
+            &lamp_msgs::Hand::declaration(),
+            "body",
+        )
+        .unwrap();
+    TEST_BODY_HAND.with(|slot| *slot.borrow_mut() = Some((false, body)));
+    TEST_HAND_IN.with(|slot| {
+        *slot.borrow_mut() = Some(crate::search_pushed::HandIn::on(
+            lamp_bus::Bus::new(&root).unwrap(),
+        ));
+    });
+    let still = std::env::temp_dir().join(format!(
+        "lamp-voice-loop-look-pushed-{}.jpg",
+        std::process::id()
+    ));
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = Some(still.clone()));
+    TEST_EYES_ANSWER.set(true);
+    TEST_LOOK_NOTE.set(true);
+    let run = run(Script {
+        only: true,
+        second: false,
+        second_looks: true,
+        look_answers: &[LookAnswer::Nothing],
+        note_answer: LookAnswer::Other,
+        push,
+        turn_taking: TurnTaking::VadOnly,
+        mute_at_frame: Some(1_100),
+        written: Written::Said(6),
+        ..Script::question(Live::Answer(12))
+    });
+    TEST_LOOK_NOTE.set(false);
+    TEST_EYES_ANSWER.set(false);
+    TEST_FULL_LOOK.with(|look| *look.borrow_mut() = None);
+    TEST_HAND_IN.with(|slot| *slot.borrow_mut() = None);
+    TEST_BODY_HAND.with(|slot| *slot.borrow_mut() = None);
+    let _ = std::fs::remove_file(&still);
+    let _ = std::fs::remove_dir_all(&root);
+    run
+}
+
+/// #2904: a push on the body while the lamp says it will look ends the
+/// search for the voice, as lamp-skills ends it for the body: the held
+/// look's picture never goes to the model, and no note follows. With the
+/// body read and no push, the search is as before.
+#[test]
+fn a_push_mid_search_drops_its_looks_picture() {
+    let _one = super::pilot_faults::one_session();
+    let run = pushed_search(Some(When::Accepted(1)));
+    run.assert_clean();
+    assert!(look_turns(&run).is_empty(), "{}", run.summary());
+    assert!(run.events("look_full_still").is_empty());
+    let dropped: Vec<_> = run
+        .events("look_dropped")
+        .into_iter()
+        .map(|e| (e["turn"].clone(), e["why"].clone()))
+        .collect();
+    assert_eq!(
+        dropped,
+        [(json!(1), json!(crate::search_pushed::WHY))],
+        "{}",
+        run.summary()
+    );
+    let pushed = run.events("search_pushed");
+    assert_eq!(pushed.len(), 1, "{}", run.summary());
+    assert_eq!(pushed[0]["look_dropped"], 1);
+    assert!(look_notes(&run).is_empty());
+
+    let unpushed = pushed_search(None);
+    unpushed.assert_clean();
+    assert_eq!(look_turns(&unpushed).len(), 1, "{}", unpushed.summary());
+    assert_eq!(look_notes(&unpushed).len(), 1);
+    assert!(unpushed.events("search_pushed").is_empty());
 }
 
 /// (e) Without `LAMP_SECOND_LOOK_NOTE`, a look left with no call is as
