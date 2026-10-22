@@ -5020,10 +5020,12 @@ pub(crate) mod tests {
     }
 
     /// #3135 with #3131 (the first builder, 23 Oct 05:35): with
-    /// `LAMP_TASKS_CORRECT`, an ask refused for want of Harness leaves
-    /// nothing waiting, so its repeat gets no "not a yes" note about a task
-    /// never prepared: it is asked of the tasks part again and told
-    /// `NO_HARNESS`'s set-up-later answer again, never confirmed.
+    /// `LAMP_TASKS_CORRECT`, when nothing was waiting, an ask refused for
+    /// want of Harness leaves nothing waiting, so its repeat gets no "not a
+    /// yes" note about a task never prepared: it is asked of the tasks part
+    /// again and told `NO_HARNESS`'s set-up-later answer again, never
+    /// confirmed. A refusal doesn't clear a task already waiting
+    /// (reviewer-two's P3 on #3135).
     #[test]
     fn a_repeat_after_a_no_harness_refusal_is_refused_again_with_nothing_waiting() {
         let _one = ONE_AT_A_TIME
