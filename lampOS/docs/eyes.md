@@ -1011,6 +1011,17 @@ belong to the same live `People` instance, with the same record and no
 intervening committed save. This requires an exclusive process-local writer;
 it is not a lock or transaction shared by separately opened stores.
 
+Repair writes use the one exact sibling `<people>.repair.new`, opened with
+`create_new` and mode 0600; an occupied path refuses the attempt without
+overwriting it. The file's mode must still be exactly 0600 just before
+rename. At `People::open`, the exclusive writer unlinks only `<people>.new`
+and `<people>.repair.new` before reading the committed file. These are
+uncommitted ordinary-save and repair leftovers, even if they contain a full
+JSON record. Cleanup does not follow a temporary symlink and does not remove
+a directory in its place; any error except an absent file refuses startup.
+The current product, example and lamp-06c1 reset plans list both exact
+siblings alongside `people.json`. No glob or wider directory wipe is added.
+
 A successful replacement changes only the face prints and clears
 `tell_visits`: a new capture cannot inherit the old face's consent to named
 visits. The canonical name, existing stable ID (or missing legacy ID),

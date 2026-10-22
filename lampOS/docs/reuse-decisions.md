@@ -23,6 +23,17 @@ account approval, fresh capture, proved lamp consent, expiry and cancellation
 remain caller work. No runtime, V1 parity, biometric proof or device result is
 claimed.
 
+For the interrupted-write review on #3072, keep Setup's existing exact-path,
+symlink-safe reset implementation. Replace the variable repair filenames
+with one `people.json.repair.new`, created exclusively, and include it and
+the ordinary `people.json.new` in every live reset plan. Reuse startup's
+exclusive writer ownership to unlink just those two uncommitted siblings;
+unexpected cleanup failure refuses opening the store. Recheck mode 0600
+before rename. Historical Update plan fixtures keep their original bytes
+and hashes as migration evidence; the new product-plan hash is added to
+`RESET_PLAN_SHIPPED`. No broader deletion or ordinary-save durability change
+is introduced.
+
 ## Bedtime and Morning as a core skill (#1672, 2026-10-19)
 
 V1's `hal/app_state.py::_wake_sleepy_peripherals` restores only sleep-owned
