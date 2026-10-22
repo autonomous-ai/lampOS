@@ -2524,7 +2524,7 @@ pub fn serve(
         == Some("on")
     {
         eprintln!(
-            "lamp-voice second: a line that is only the lamp's name is answered no sooner than 2.5 s after its end, and a line begun before then is said by it (LAMP_SECOND_NAME_CARRIES)"
+            "lamp-voice second: a line that is only the lamp's name, or short and begun with it, is answered no sooner than 2.5 s after its end, and a line begun before then is said by it when one person said both (LAMP_SECOND_NAME_CARRIES)"
         );
         engine = engine.carrying_the_name(true);
     }
@@ -2896,6 +2896,31 @@ pub fn serve(
                     |mut heeding| heeding.same_speaker(cut, request),
                 )
             }));
+        }
+        // The lamp's name carries to the line after it only when one person
+        // said both, as the join tells it (`LAMP_SECOND_NAME_CARRIES`): the
+        // same reader of the eyes, the rooms kept for each line.
+        if std::env::var(crate::second_provider::NAME_CARRIES_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.opening_the_eyes(files.bus_root.as_deref());
+                heeding.keeping_line_rooms();
+            }
+            let (same, kept) = (heeding.clone(), heeding.clone());
+            engine = engine.telling_one_speaker(
+                Arc::new(move |name, request| {
+                    same.lock().map_or(
+                        Joined::Not("the rule is not readable".to_owned()),
+                        |mut heeding| heeding.one_speaker(name, request),
+                    )
+                }),
+                Arc::new(move |request, said| {
+                    if let Ok(mut heeding) = kept.lock() {
+                        heeding.keep_unjudged(request, said);
+                    }
+                }),
+            );
         }
         // The rule keeps the route's one reader of the Policy's decisions,
         // which a line going on reads too (`LAMP_GOING_ON_ASKS`, below).
@@ -4617,6 +4642,96 @@ impl Heeding {
         }
     }
 
+    /// The faces seen speaking `request` and how the room was, kept for
+    /// [`Self::same_speaker`]: another person shown by another voice than
+    /// the conversation's, a print under
+    /// [`crate::same_voice::DIFFERENT_BELOW`] against it, or two faces
+    /// speaking it.
+    fn keep_spoken(
+        &mut self,
+        request: u64,
+        speakers: &crate::speaking_faces::Speakers,
+        (room, going_on): (crate::room_told::Room, bool),
+        other_voice: bool,
+        likeness: Option<f32>,
+    ) {
+        if self.spoke.len() == SPOKE_KEPT {
+            self.spoke.pop_front();
+        }
+        self.spoke.push_back((request, speakers.clone()));
+        let another = other_voice
+            || likeness.is_some_and(|likeness| likeness < crate::same_voice::DIFFERENT_BELOW)
+            || speakers.len() > 1;
+        self.keep_line_room(request, room, going_on, another);
+    }
+
+    /// `LAMP_SECOND_NAME_CARRIES`: a line said in `began_us..=ended_us` that
+    /// the rule has not judged, kept as a judgement keeps it, for
+    /// [`Self::one_speaker`]: the faces seen speaking it, the eyes' newest
+    /// look, and the room now. The lamp's name waiting for the line after
+    /// it, and that line before it is judged with the name or without.
+    /// Nothing of the bus's name hearings is read, so they are still there
+    /// for the line that is judged; and no conversation's end clears
+    /// another person seen in it.
+    pub(crate) fn keep_unjudged(&mut self, request: u64, (began_us, ended_us): (u64, u64)) {
+        let room = if self.keeps_room {
+            crate::room_told::room()
+                .lock()
+                .map_or(crate::room_told::Room::Unknown, |mut room| {
+                    room.at(monotonic_us())
+                })
+        } else {
+            self.bus
+                .as_ref()
+                .map_or(crate::room_told::Room::Unknown, |(bus, _)| {
+                    crate::bus_out::room_now(bus)
+                })
+        };
+        if self.rooms.is_some() {
+            let in_view = self
+                .bus
+                .as_ref()
+                .and_then(|(bus, _)| crate::bus_out::faces_in_view(bus));
+            self.in_view = Some((request, in_view));
+        }
+        let (speakers, _) = speakers_between(self.eyes.as_ref(), began_us, ended_us);
+        let likeness = self
+            .voices
+            .as_mut()
+            .and_then(|voices| voices.likeness(request));
+        self.keep_spoken(request, &speakers, (room, true), false, likeness);
+    }
+
+    /// Whether one person said `name`, a line that was the lamp's name (or
+    /// short and begun with it), and `request`, the line begun while it
+    /// waited (`LAMP_SECOND_NAME_CARRIES`): [`Self::same_speaker`]'s
+    /// judgement, the join's own, with its no sign of a second person
+    /// ([`Joined::NoSecond`]) only when both were said in a quiet room. One
+    /// face in view in a busy room, or in one not known to be quiet, may be
+    /// a person turned away from the lamp while another speaks: the name
+    /// never carries on it.
+    pub(crate) fn one_speaker(&mut self, name: u64, request: u64) -> Joined {
+        let quiet = |heeding: &Self| {
+            [name, request].iter().all(|of| {
+                heeding
+                    .rooms
+                    .as_ref()
+                    .and_then(|rooms| rooms.iter().rev().find(|(line, _)| line == of))
+                    .is_some_and(|(_, room)| room.room == crate::room_told::Room::Quiet)
+            })
+        };
+        let in_quiet = |said: Joined, heeding: &Self| match said {
+            Joined::NoSecond(why) if !quiet(heeding) => {
+                Joined::Not(format!("{why}, but not both in a quiet room"))
+            }
+            said => said,
+        };
+        match self.same_speaker(name, request) {
+            Joined::Coming(without) => Joined::Coming(Box::new(in_quiet(*without, self))),
+            said => in_quiet(said, self),
+        }
+    }
+
     /// Whether nothing shows a second person at `cut` and `request` by how
     /// the room was as each was judged ([`Self::keeping_line_rooms`]): no
     /// other voice heard and no two faces seen speaking in the conversation
@@ -5503,16 +5618,15 @@ impl Heeding {
         self.attention
             .narrow_the_call(self.busy_called_strict && busy && signs.turned != Some(true));
         let (speakers, turned_speakers) = speakers_between(self.eyes.as_ref(), began_us, ended_us);
-        if self.spoke.len() == SPOKE_KEPT {
-            self.spoke.pop_front();
-        }
-        self.spoke.push_back((request, speakers.clone()));
-        // `LAMP_JOIN_CUT_WORDS`: how the room was, for a join on no sign of
-        // a second person.
-        let another = other_voice
-            || likeness.is_some_and(|likeness| likeness < crate::same_voice::DIFFERENT_BELOW)
-            || speakers.len() > 1;
-        self.keep_line_room(request, room, signs.going_on, another);
+        // `LAMP_JOIN_CUT_WORDS`: who spoke it and how the room was, for a
+        // join on no sign of a second person.
+        self.keep_spoken(
+            request,
+            &speakers,
+            (room, signs.going_on),
+            other_voice,
+            likeness,
+        );
         let attention = &mut self.attention;
         let seen = Seen {
             room,
@@ -13230,6 +13344,166 @@ mod tests {
             Message::user("I want the um, and weather in Saigon this weekend?"),
             "X then nobody then X"
         );
+    }
+
+    /// `LAMP_SECOND_NAME_CARRIES` (El's P1s on first/name-carries, 22 Oct):
+    /// the lamp's name carries to the line after it only on the join's own
+    /// sign of one speaker, its no sign of a second person only in a quiet
+    /// room. A busy room, even with one face in view at each; two faces in
+    /// view, or seen speaking; no eyes in a room not known to be quiet; two
+    /// voices (a print under 0.30): no carry. No eyes in a quiet room, or
+    /// one face in view at each there: it carries. The same voice carries
+    /// in any room.
+    #[test]
+    fn the_lamps_name_carries_only_on_a_sign_of_one_speaker() {
+        use crate::room_told::Room::{Busy, Quiet, Unknown};
+        use crate::second_provider::Heard;
+        let one =
+            |name: &str, in_view, room| judged_in_rooms(name, in_view, room).one_speaker(1, 2);
+        assert!(
+            matches!(one("na", [Some(1), Some(1)], Busy), Joined::Not(why) if why.ends_with("but not both in a quiet room")),
+            "one face each, a busy room"
+        );
+        assert!(
+            matches!(one("nb", [None, None], Busy), Joined::Not(_)),
+            "no eyes, busy"
+        );
+        assert!(
+            matches!(one("nc", [Some(1), Some(1)], Unknown), Joined::Not(_)),
+            "one face each, a room not known"
+        );
+        assert!(
+            matches!(one("nd", [Some(1), Some(2)], Quiet), Joined::Not(_)),
+            "two faces"
+        );
+        let mut heeding = judged_in_rooms("ne", [Some(1), Some(1)], Quiet);
+        heeding.spoke.push_back((1, vec!["a".to_owned()]));
+        heeding.spoke.push_back((2, vec!["b".to_owned()]));
+        assert_eq!(
+            heeding.one_speaker(1, 2),
+            Joined::Not("two faces were seen speaking them".to_owned()),
+            "two faces seen speaking"
+        );
+        assert!(
+            matches!(one("nf", [None, None], Quiet), Joined::NoSecond(_)),
+            "no eyes, quiet"
+        );
+        assert!(
+            matches!(one("ng", [Some(1), Some(1)], Quiet), Joined::NoSecond(_)),
+            "one face each, quiet"
+        );
+        assert!(
+            matches!(one("nh", [None, None], Unknown), Joined::Not(_)),
+            "no eyes, unknown"
+        );
+        // Prints: 1 one voice, anything else another (cosine 0).
+        #[derive(Default)]
+        struct Voice(std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = if samples[0] == 1 {
+                    vec![1.0, 0.0]
+                } else {
+                    vec![0.0, 1.0]
+                };
+                self.0.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.0.pop_front()
+            }
+        }
+        let voiced = |name: &str, room, second: i16| {
+            let mut heeding = judged_in_rooms(name, [None, None], room);
+            heeding.checking_the_voice(Box::new(Voice::default()));
+            for (request, voice) in [(1, 1), (2, second)] {
+                heeding.hear(
+                    request,
+                    Heard::Began {
+                        over_the_lamps_voice: false,
+                    },
+                );
+                heeding.hear(request, Heard::Samples(&[voice; 48_000]));
+                heeding.hear(request, Heard::Ended);
+            }
+            heeding.one_speaker(1, 2)
+        };
+        assert!(
+            matches!(voiced("ni", Quiet, -1), Joined::Not(why) if why.starts_with("two voices")),
+            "a print under 0.30, even in a quiet room"
+        );
+        assert_eq!(
+            voiced("nj", Busy, 1),
+            Joined::Same(SAME_VOICE_JOINS),
+            "the same voice"
+        );
+    }
+
+    /// `LAMP_SECOND_NAME_CARRIES`: a line kept before it is judged is kept as
+    /// a judgement keeps it, from the bus: the eyes' newest look and the
+    /// room, so the name and the line after it are told apart as judged
+    /// lines are.
+    #[test]
+    fn a_line_kept_unjudged_is_read_for_one_speaker_as_a_judged_one() {
+        use lamp_msgs::{Face, Faces, RoomState};
+        let kept = |name: &str, in_view: usize, room: lamp_msgs::Room| {
+            let root = std::path::PathBuf::from(format!("/tmp/lk{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&root);
+            std::fs::create_dir_all(&root).unwrap();
+            let bus = lamp_bus::Bus::new(&root).unwrap();
+            let mut eyes = bus
+                .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+                .unwrap();
+            let mut rooms = bus
+                .publisher_declared(RoomState::TOPIC, &RoomState::declaration(), "room")
+                .unwrap();
+            let mut heeding = Heeding::new(true, true, Some(&root), None);
+            heeding.keeping_line_rooms();
+            for request in [1, 2] {
+                eyes.publish_json(
+                    monotonic_us(),
+                    &Faces {
+                        faces: (0..in_view)
+                            .map(|n| Face {
+                                speaking: None,
+                                id: format!("f{n}"),
+                                xmin: 0.4,
+                                ymin: 0.3,
+                                xmax: 0.6,
+                                ymax: 0.6,
+                                confidence: 1.0,
+                                yaw: Some(0.1),
+                                facing: Some(true),
+                            })
+                            .collect(),
+                    },
+                )
+                .unwrap();
+                rooms
+                    .publish_json(monotonic_us(), &RoomState { state: room })
+                    .unwrap();
+                let now = monotonic_us();
+                heeding.keep_unjudged(request, (now.saturating_sub(1_000_000), now));
+            }
+            let _ = std::fs::remove_dir_all(&root);
+            heeding.one_speaker(1, 2)
+        };
+        assert!(matches!(
+            kept("a", 1, lamp_msgs::Room::Quiet),
+            Joined::NoSecond(_)
+        ));
+        assert!(matches!(
+            kept("b", 1, lamp_msgs::Room::Busy),
+            Joined::Not(_)
+        ));
+        assert!(matches!(
+            kept("c", 2, lamp_msgs::Room::Quiet),
+            Joined::Not(_)
+        ));
+        assert!(matches!(
+            kept("d", 0, lamp_msgs::Room::Unknown),
+            Joined::Not(_)
+        ));
     }
 
     /// The same rule's verdicts as the engine asks them: the owner's request
