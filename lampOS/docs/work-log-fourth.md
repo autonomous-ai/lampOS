@@ -5824,6 +5824,46 @@ Ready for lamp-voice: no (#2774 waits for Friday's deterministic fixture correct
 - Queue: https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6330815606.
   The memory row remains 0.40 and Fourth has no lamp loan.
 
+## 2026-10-22 09:20 ICT: callback regression pushed as #2782
+
+Ready for lamp-voice: no (#2782's native gates are running; both memory branches await #2780's merge before their next rebase).
+
+- Draft #2782, head `64282e440`, base `6bb802490`, on
+  `fourth/kept-name-callback`: the production memory callback is extracted
+  unchanged and exercised with the real global memory client, scoped tool
+  runner and provider-message serialization. Stable room and personal
+  scopes, refusals, held/revoked contexts, and both legacy switch controls
+  are covered. Nine synthetic exchanges over 368 virtual seconds evict
+  the name from both histories before checking memory-only retention.
+- Full host gate: 5,194 passed, 0 failed, 23 ignored, counting target
+  groups once. Voice 3,391/0/14; Memory 288/0/6; Cloud 174/0/1;
+  Skills 427/0/0; Update 291/0/2; Voice-eval 623/0/0. Formatting, strict
+  workspace Clippy and workspace build passed. Integration targets were
+  serial from the outset; test-enabled examples and doctests passed.
+- Disabling actual marker consumption fails both Days cases while legacy
+  passes. The exact worker bytes were restored and focused tests passed
+  3/0/0 in four fresh children. Callback plus serialization first/refresh/
+  cached times were 1.346/0.611/0.065 ms for personal scope and
+  1.349/0.638/0.074 ms for room scope. These are host observations, not
+  full prompt or acoustic latency. No store-conflict ranking or model's
+  spoken choice is proved. Source and evidence are one commit, pushed.
+- Evidence: `lampOS/docs/verification/kept-name-callback-20261022/`;
+  raw checks `/private/tmp/fourth-kept-name-callback-checks/`.
+  Native ARM64 and Clippy run on the draft; both are required for ready.
+  The separate #2774 retry/authority changes will be preserved when the
+  two branches are integrated after the first merge.
+- Friday's #2780 fixture correction, head `0125738e1`, is green on ARM64
+  run 39708923768 and Clippy run 39708923795, awaiting First's merge.
+  #2774 remains draft at `b18ff0bc6`, with both native failures preserved;
+  its next head will follow that fixture correction with fresh gates.
+- Fifth withdrew the row-16 cue failure as void: the only 1,610 ms
+  first-event candidate was a cold post-restart turn without established
+  clip readiness. A warmed five-turn on/off rerun is planned. No cue code
+  change claimed; the FEW_TOOLS row-23 result is separate from #2540.
+- Seventh owns the full six-minute Days-on lamp repeat with continuity
+  checks and a 60 s final observation. No spoken recall pass claimed;
+  the memory row remains 0.40. Fourth still has no lamp loan.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
