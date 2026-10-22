@@ -1,6 +1,9 @@
 //! Caller-owned face observations and immutable per-request memory scope.
 //! No global registry, polling, speaker inference, or session authorization;
-//! a lease is only ever narrowed to the room, never widened.
+//! a lease is only ever narrowed to the room, never widened. The one late
+//! look is a keep's ([`ScopeLease::keeper_within`]): a line admitted as the
+//! room's only because no known face was cached yet keeps for the known face
+//! the eyes name by the time of the keep (#2807); its reads stay the room's.
 use crate::known_faces::FaceObservation;
 use lamp_turn_owner::BootId;
 use std::{
@@ -253,6 +256,12 @@ impl FaceCache {
         ))
     }
 
+    /// The privacy generation now: a late look ([`RequestScope::looking_later`])
+    /// reads the cache only while it is the one its line was admitted in.
+    pub fn generation(&self) -> u64 {
+        self.generation.load(Ordering::Acquire)
+    }
+
     pub fn snapshot(&self, now: Instant) -> ScopeSnapshot {
         let generation = self.generation.load(Ordering::Acquire);
         if generation == u64::MAX {
@@ -291,7 +300,17 @@ struct RequestContext {
     narrowed: AtomicBool,
     room: ScopeSnapshot,
     active: AtomicBool,
+    /// A line admitted as the room's with the camera allowed: the face cache
+    /// and its generation then, for a keep's late look (#2807).
+    late: Option<(Arc<FaceCache>, u64)>,
 }
+
+/// How long a keep in a line admitted as the room's waits, at most, for the
+/// eyes to name a known face (#2807): one refresh of the face cache (200 ms)
+/// and a little, inside the memory's 1.5 s.
+pub const KEEPER_WAIT: Duration = Duration::from_millis(300);
+/// How often that wait looks at the cache.
+const KEEPER_POLL: Duration = Duration::from_millis(50);
 
 /// Only this non-cloneable owner keeps the request authorized. Task leases
 /// hold immutable data but cannot keep authorization alive after owner drop.
@@ -307,6 +326,28 @@ impl RequestScope {
                 narrowed: AtomicBool::new(false),
                 room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
+                late: None,
+            }),
+        }
+    }
+    /// A line admitted as the room's while the camera was allowed, with no
+    /// known face in `cache` yet: its keeps may look again
+    /// ([`ScopeLease::keeper_within`]). A person's or a held scope takes no
+    /// late look, nor does anything once `cache`'s generation moves on (a
+    /// privacy change).
+    pub fn looking_later(key: RequestKey, scope: ScopeSnapshot, cache: Arc<FaceCache>) -> Self {
+        let late = (scope.person.is_none() && !scope.held).then(|| {
+            let generation = cache.generation();
+            (cache, generation)
+        });
+        Self {
+            context: Arc::new(RequestContext {
+                key,
+                scope,
+                narrowed: AtomicBool::new(false),
+                room: ScopeSnapshot::room(),
+                active: AtomicBool::new(true),
+                late,
             }),
         }
     }
@@ -353,6 +394,41 @@ impl ScopeLease {
     /// scope again.
     pub fn narrow_to_room(&self) {
         self.context.narrowed.store(true, Ordering::Release);
+    }
+
+    /// Whose a keep in this line is (#2807): the known face the eyes name in
+    /// the face cache now, waiting up to `wait` for one, but only for a line
+    /// admitted as the room's because no known face was cached yet
+    /// ([`RequestScope::looking_later`]): after a voice restart, or a face
+    /// just remembered, the first line was admitted before the eyes' first
+    /// answer and its keep went to the room. `None`, and the keep is the
+    /// lease's own, for a person's line, a line narrowed to the room
+    /// (another face seen speaking it), a revoked one, a privacy change
+    /// since admission, a face held only by its gap, or nobody known by
+    /// then. Only a keep reads this; every read stays the room's.
+    pub fn keeper_within(&self, wait: Duration) -> Option<String> {
+        let (cache, generation) = self.context.late.as_ref()?;
+        let until = Instant::now() + wait;
+        loop {
+            if !self.is_current()
+                || self.context.narrowed.load(Ordering::Acquire)
+                || cache.generation() != *generation
+            {
+                return None;
+            }
+            let now = Instant::now();
+            let seen = cache.snapshot(now);
+            if !seen.held
+                && let Some(person) = seen.person()
+            {
+                return Some(person.to_owned());
+            }
+            let left = until.checked_duration_since(now)?;
+            if left.is_zero() {
+                return None;
+            }
+            std::thread::sleep(left.min(KEEPER_POLL));
+        }
     }
 }
 
@@ -718,5 +794,103 @@ mod tests {
         lost(&cache, Some(0));
         assert_eq!(whose(&cache, until + Duration::from_secs(1)), known);
         assert_eq!(whose(&cache, until + Duration::from_secs(2)), None);
+    }
+
+    /// #2807: right after a voice restart, a remembered face's first line
+    /// was admitted before the eyes' first answer, as the room's. Its keep
+    /// looks again: the known face named by then, or within the wait, is
+    /// the keeper. Its reads stay the room's.
+    #[test]
+    fn a_keep_in_a_line_admitted_before_the_eyes_answered_goes_to_their_face() {
+        let cache = Arc::new(FaceCache::default());
+        let owner =
+            RequestScope::looking_later(key(1), cache.snapshot(Instant::now()), cache.clone());
+        let lease = owner.lease();
+        assert_eq!(lease.scope(), Some(&ScopeSnapshot::room()));
+        cached(&cache, "Ann", Instant::now() + Duration::from_secs(3));
+        let ann = crate::remember::person_id("Ann");
+        assert_eq!(lease.keeper_within(Duration::ZERO), Some(ann.clone()));
+        assert_eq!(
+            lease.scope(),
+            Some(&ScopeSnapshot::room()),
+            "reads stay the room's"
+        );
+
+        // The eyes answer during the wait.
+        let cache = Arc::new(FaceCache::default());
+        let owner = RequestScope::looking_later(key(2), ScopeSnapshot::room(), cache.clone());
+        let lease = owner.lease();
+        let later = {
+            let cache = cache.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(60));
+                cached(&cache, "Ann", Instant::now() + Duration::from_secs(3));
+            })
+        };
+        assert_eq!(lease.keeper_within(KEEPER_WAIT), Some(ann));
+        later.join().unwrap();
+    }
+
+    /// Nobody known by the end of the wait, a line narrowed to the room, a
+    /// privacy change since admission, a revoked line, a face held only by
+    /// its gap, a person's line or a plain room lease: no keeper, and the
+    /// keep is the lease's own.
+    #[test]
+    fn a_keep_looks_again_only_for_a_room_line_admitted_with_nobody_known_yet() {
+        let started = Instant::now();
+        let cache = Arc::new(FaceCache::default());
+        let nobody = RequestScope::looking_later(key(1), ScopeSnapshot::room(), cache.clone());
+        assert_eq!(
+            nobody.lease().keeper_within(Duration::from_millis(120)),
+            None
+        );
+        assert!(started.elapsed() < Duration::from_millis(600), "bounded");
+
+        let narrowed = RequestScope::looking_later(key(2), ScopeSnapshot::room(), cache.clone());
+        narrowed.lease().narrow_to_room();
+        let changed = RequestScope::looking_later(key(3), ScopeSnapshot::room(), cache.clone());
+        let revoked = RequestScope::looking_later(key(4), ScopeSnapshot::room(), cache.clone());
+        revoked.revoke();
+        let held = RequestScope::looking_later(
+            key(5),
+            ScopeSnapshot {
+                person: Some(Arc::from("p-0123456789abcdef")),
+                held: true,
+            },
+            cache.clone(),
+        );
+        let theirs = RequestScope::looking_later(key(6), ScopeSnapshot::of("Bob"), cache.clone());
+        let plain = RequestScope::new(key(7), ScopeSnapshot::room());
+        cached(&cache, "Ann", Instant::now() + Duration::from_secs(3));
+        for (what, owner) in [
+            ("narrowed", &narrowed),
+            ("revoked", &revoked),
+            ("held", &held),
+            ("a person's", &theirs),
+            ("plain", &plain),
+        ] {
+            assert_eq!(owner.lease().keeper_within(Duration::ZERO), None, "{what}");
+        }
+        assert!(changed.lease().keeper_within(Duration::ZERO).is_some());
+        // A privacy change since admission: never, whatever is cached after.
+        cache.invalidate();
+        cached(&cache, "Ann", Instant::now() + Duration::from_secs(3));
+        assert_eq!(changed.lease().keeper_within(Duration::ZERO), None);
+        let after = RequestScope::looking_later(key(9), ScopeSnapshot::room(), cache.clone());
+        assert!(after.lease().keeper_within(Duration::ZERO).is_some());
+
+        // A face held only by its gap names no keeper either.
+        let cache = Arc::new(FaceCache::default());
+        let line = RequestScope::looking_later(key(8), ScopeSnapshot::room(), cache.clone());
+        *cache.face.lock().unwrap() = Some(CachedFace {
+            generation: cache.generation(),
+            scope: ScopeSnapshot {
+                person: Some(Arc::from("p-0123456789abcdef")),
+                held: true,
+            },
+            valid_until: Instant::now() + Duration::from_secs(3),
+            seen_until: Instant::now(),
+        });
+        assert_eq!(line.lease().keeper_within(Duration::ZERO), None);
     }
 }
