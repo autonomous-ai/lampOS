@@ -1,0 +1,37 @@
+[
+  {
+    "label": "compile",
+    "argv": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--no-run",
+      "--offline",
+      "--message-format=json"
+    ],
+    "exit": 0,
+    "timeout": false,
+    "seconds": 96.85476060584188,
+    "sha256": "27c08f9c768c70192af76ecffe9b7f48d39c2180f231a87f5a4cc4b844708690",
+    "summaries": []
+  },
+  {
+    "label": "host-pause",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+      "--exact",
+      "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit": 101,
+    "timeout": false,
+    "seconds": 6.308867623098195,
+    "sha256": "5d8012536a552cab7225a81d154eb5dfb25e196389b261947b6c6723a7f7fb2d",
+    "summaries": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 4.25s"
+    ]
+  }
+]

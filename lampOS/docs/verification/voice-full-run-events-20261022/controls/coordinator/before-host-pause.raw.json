@@ -1,0 +1,5 @@
+{
+  "original_name": "host-pause.txt",
+  "sha256": "5d8012536a552cab7225a81d154eb5dfb25e196389b261947b6c6723a7f7fb2d",
+  "utf8": "\nrunning 1 test\ntest coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news ... \nthread 'coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news' (695787484) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:472:9:\nassertion failed: self.accept_offer(offer.clone())\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\nFAILED\n\nfailures:\n\nfailures:\n    coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3368 filtered out; finished in 4.25s\n\n"
+}

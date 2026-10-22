@@ -1,0 +1,11 @@
+--- a/lampOS/crates/voice/src/provider_worker.rs
++++ b/lampOS/crates/voice/src/provider_worker.rs
+@@ -11354,6 +11354,8 @@
+                 .unwrap();
+                 offer
+             });
++            // Fault injection: setup is delayed before any worker lease exists.
++            std::thread::sleep(Duration::from_secs(4));
+             let mut rig = LiveRig::start_with(
+                 quick_policy(),
+                 typed_with(crate::tools::Settings {

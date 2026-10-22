@@ -1,0 +1,11 @@
+--- a/lampOS/crates/voice/src/remember.rs
++++ b/lampOS/crates/voice/src/remember.rs
+@@ -9634,6 +9634,8 @@
+                 stream
+                     .set_write_timeout(Some(Duration::from_secs(2)))
+                     .unwrap();
++                // Control: fixture readiness does not relax the real call deadline.
++                std::thread::sleep(HITS_WITHIN + Duration::from_millis(100));
+                 stream.write_all(answer.as_bytes()).unwrap();
+             }
+         });

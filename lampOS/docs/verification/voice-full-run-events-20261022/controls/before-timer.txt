@@ -1,0 +1,21 @@
+
+running 1 test
+test provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet ... lamp-voice provider: request 2 asked for set_timer; waiting for the Policy's decision
+lamp-voice provider: request 2 asked for set_timer; its turn ended while it waited for the Policy's decision; not run
+lamp-voice provider: dropped a late provider event (StaleToolResponse); it changed no request
+
+thread 'provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet' (695529066) panicked at crates/voice/src/provider_worker/tests/policy_holds.rs:760:9:
+assertion `left == right` failed: set_timer run: true
+  left: false
+ right: true
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 0.24s
+
+END RAW CONTROL OUTPUT

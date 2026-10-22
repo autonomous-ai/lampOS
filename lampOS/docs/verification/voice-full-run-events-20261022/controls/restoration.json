@@ -1,0 +1,9 @@
+{
+  "lampOS/crates/voice/src/provider_worker.rs": true,
+  "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs": true,
+  "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": true,
+  "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": true,
+  "lampOS/crates/voice/src/second_provider/worker.rs": true,
+  "lampOS/crates/voice/src/remember.rs": true,
+  "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": true
+}

@@ -1,0 +1,8 @@
+
+thread '<unnamed>' (695629026) panicked at crates/voice/src/provider_worker.rs:11327:58:
+called `Result::unwrap()` on an `Err` value: Kind(TimedOut)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply' (695629025) panicked at crates/voice/src/provider_worker.rs:11375:38:
+called `Result::unwrap()` on an `Err` value: Any { .. }
+END RAW CONTROL OUTPUT

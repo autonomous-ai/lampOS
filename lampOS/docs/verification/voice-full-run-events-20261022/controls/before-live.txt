@@ -1,0 +1,22 @@
+
+running 1 test
+test provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply ...
+thread '<unnamed>' (695530163) panicked at crates/voice/src/provider_worker.rs:11342:58:
+called `Result::unwrap()` on an `Err` value: Kind(TimedOut)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+lamp-voice provider: request 1 asked for play_relaxing_music; the executive did not answer in 0 ms; the answer was sent
+
+thread 'provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply' (695530162) panicked at crates/voice/src/provider_worker.rs:11404:13:
+assertion `left == right` failed
+  left: Object {"toolResponse": Object {"functionResponses": Array [Object {"id": String("music-original"), "name": String("play_relaxing_music"), "response": Object {"error": String("That part of me is not running right now, so I could not do it.")}}]}}
+ right: Object {"toolResponse": Object {"functionResponses": Array [Object {"id": String("music-original"), "name": String("play_relaxing_music"), "response": Object {"next": String("Confirm.")}}]}}
+FAILED
+
+failures:
+
+failures:
+    provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 4.02s
+
+END RAW CONTROL OUTPUT

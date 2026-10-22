@@ -1,0 +1,114 @@
+{
+  "base": "e2232b8369fb125af6c79e8bf6927ec590a612e9",
+  "platform": "Darwin x86_64",
+  "cpu_count": 16,
+  "target": "/private/tmp/tests-codex-1569-target",
+  "source_files": 1378,
+  "source_sha256": "b585a717caad54dd21778372a01eaf81f22e7d25d4ea88e4aed4c6ff066843cf",
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "0"
+  },
+  "rust_test_threads": "unset; full-library default parallelism",
+  "commands": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started": "2026-10-22T11:53:24.329452+00:00",
+      "seconds": 11.541189636103809,
+      "exit": 0,
+      "watchdog_timeout": false,
+      "log": "fmt.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": []
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started": "2026-10-22T11:53:36.013772+00:00",
+      "seconds": 114.76162624312565,
+      "exit": 0,
+      "watchdog_timeout": false,
+      "log": "clippy.txt",
+      "sha256": "894c9776290aadb0f069d4077ac9931966137486da11967a1b513d0fd1a0cbcd",
+      "summaries": []
+    },
+    {
+      "name": "compile",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--message-format=json"
+      ],
+      "started": "2026-10-22T11:55:31.491264+00:00",
+      "seconds": 119.31742915697396,
+      "exit": 0,
+      "watchdog_timeout": false,
+      "log": "compile.txt",
+      "sha256": "7f916dda850b87b40374af94d619a0040b34ffc46b97950522ce3c7761d13566",
+      "summaries": []
+    },
+    {
+      "name": "test-list",
+      "argv": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+        "--list"
+      ],
+      "started": "2026-10-22T11:57:31.671016+00:00",
+      "seconds": 7.561223553027958,
+      "exit": 0,
+      "watchdog_timeout": false,
+      "log": "test-list.txt",
+      "sha256": "994422cff3884b14f27f75e3b47c2a990b3cf0f44477c8230c795a7600a9e3cd",
+      "summaries": []
+    },
+    {
+      "name": "full-library",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--offline"
+      ],
+      "started": "2026-10-22T11:57:39.494190+00:00",
+      "seconds": 300.80728500988334,
+      "exit": 101,
+      "watchdog_timeout": false,
+      "log": "full-library.txt",
+      "sha256": "1721a221d2596889271df0ae1c6f1c54953c0717546b4f0cbbca7fa5fd427885",
+      "summaries": [
+        "test result: FAILED. 3352 passed; 3 failed; 14 ignored; 0 measured; 0 filtered out; finished in 299.96s"
+      ]
+    }
+  ],
+  "library_executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+  "library_executable_sha256": "36e7a09a7a03e55bdd4064e7a816f6256701faaf4684cdf5d312da5b5985a3cd",
+  "tests_listed": 3369
+}

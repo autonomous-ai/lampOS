@@ -1,0 +1,8 @@
+
+running 1 test
+test provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by ... lamp-voice: reminders's [reminder.words] can't be read (/var/lib/lampOS/skills/reminders/skill.toml: No such file or directory (os error 2)): the built-in ones are said, for this release only (#940)
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 0.31s
+
+END RAW CONTROL OUTPUT

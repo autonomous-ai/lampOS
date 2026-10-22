@@ -1,0 +1,17 @@
+{
+  "comparison_base": "e2232b8369fb125af6c79e8bf6927ec590a612e9",
+  "source_sha256": {
+    "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "9731e6c2a23b99565352a6077a550802eadbeeca8d14dee22d36e7558d1f8433",
+    "lampOS/crates/voice/src/provider_worker.rs": "41647be6135de3af2085ae011486a0ea87d19f7c23b2c071921fb914d19431b5",
+    "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs": "f4fd991f9035d663751454e14ba6eeac292f88580be4391e40fd70090661cb25",
+    "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "b1370e287f9ffa4b52574fceaaa16b4e3fb9cc4d440bab9d6cbbf27db1ea3f1f",
+    "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "e952adec2c664516baccd2a638180c412ddf29cdc3eb99071de85ebaf7948a02",
+    "lampOS/crates/voice/src/remember.rs": "a92cb09849f024cd1e2344ee19b5a11f9159133360258b673fce11016aa6e8c2",
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "5d76c1b00352bdf4395f0d39c8c5293b2d3ad0b299261df902ce664aa0f2bbf2",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "8779ef3bb9a91a83d96dd940c88055f2e7b20bc52dbf4736f5f57b31d4901579"
+  },
+  "coordinator_original_test_cases_retained": 12,
+  "coordinator_original_assertion_macros_retained": 142,
+  "release_behavior_changes": false,
+  "compiled_inventory_sha256": "994422cff3884b14f27f75e3b47c2a990b3cf0f44477c8230c795a7600a9e3cd"
+}

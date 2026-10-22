@@ -1,0 +1,55 @@
+--- a/lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs
++++ b/lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs
+@@ -729,8 +729,9 @@
+ /// timer is held (the reviewer on #1054). The volume in such a turn is
+ /// still held, and so is a cancel, which is silent and cannot be undone
+ /// (Fourth on #1054).
+-#[tokio::test]
++#[tokio::test(start_paused = true)]
+ async fn a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet() {
++    let _clock = logical_clock();
+     for spoke in [true, false] {
+         let mut desk = Desk::new(if spoke { "follows" } else { "follows-silent" });
+         let mut rig = LiveRig::start_with(quick_policy(), desk.options(true));
+@@ -739,6 +740,8 @@
+             the_lamp_answers(&mut rig, &mut dial).await;
+         }
+         let request = rig.speak(&mut dial, false, true).await;
++        // Fault injection: the host stalls while the 100 ms owner is live.
++        std::thread::sleep(Duration::from_millis(200));
+         desk.decide_with(
+             Some(request),
+             "stay_quiet",
+--- a/lampOS/crates/voice/src/provider_worker/tests/reminders.rs
++++ b/lampOS/crates/voice/src/provider_worker/tests/reminders.rs
+@@ -674,8 +674,9 @@
+ /// `RoomTold::spoke_unasked`, so the room stays busy for three minutes from
+ /// its talk, not a minute from the reminder. The room is made after the
+ /// worker has started, since it sets the room's switches then.
+-#[tokio::test]
++#[tokio::test(start_paused = true)]
+ async fn a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by() {
++    let _clock = logical_clock();
+     let _restore = RestoreRoom::quiet();
+     let mut rig = LiveRig::start_with(quick_policy(), options(true));
+     let mut dial = rig.ready().await;
+@@ -693,6 +694,8 @@
+         *crate::room_told::room().lock().unwrap() = busy;
+     }
+     let request = rig.reminder(&dial, "Tea");
++    // Fault injection: the host stalls before the Started observation.
++    std::thread::sleep(Duration::from_millis(200));
+     assert!(
+         matches!(rig.output().await, ProviderOutput::Started { request: got, .. } if got == request)
+     );
+--- a/lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs
++++ b/lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs
+@@ -904,6 +904,8 @@
+     let _turn = one_at_a_time().await;
+     for wrapped in [false, true] {
+         let mut skills = DeclineMusic::new();
++        // Fault injection: unrelated worker setup outlasts the accept bound.
++        std::thread::sleep(Duration::from_secs(4));
+         let mut rig = LiveRig::start_with(quick_policy(), skills.options(wrapped));
+         let mut dial = rig.ready().await;
+         let request = rig.speak(&mut dial, false, true).await;

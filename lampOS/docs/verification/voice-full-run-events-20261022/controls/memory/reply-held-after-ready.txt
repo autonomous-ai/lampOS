@@ -1,0 +1,20 @@
+BEGIN RAW STDOUT
+
+running 1 test
+test remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked ... FAILED
+
+failures:
+
+failures:
+    remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3365 filtered out; finished in 0.06s
+
+END RAW STDOUT
+BEGIN RAW STDERR
+
+thread 'remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked' (695646162) panicked at crates/voice/src/remember.rs:9645:90:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+END RAW STDERR
+END RAW CONTROL OUTPUT

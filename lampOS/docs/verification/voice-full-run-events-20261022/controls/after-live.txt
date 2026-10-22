@@ -1,0 +1,9 @@
+
+running 1 test
+test provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply ... lamp-voice provider: request 1 asked for play_relaxing_music; the executive answered in 1 ms; the answer was sent
+lamp-voice provider: request 1 asked for use_skill; the executive answered in 1 ms; the answer was sent
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3366 filtered out; finished in 8.26s
+
+END RAW CONTROL OUTPUT

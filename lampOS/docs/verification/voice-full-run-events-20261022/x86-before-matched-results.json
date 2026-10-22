@@ -1,0 +1,78 @@
+{
+  "base": "e2232b8369fb125af6c79e8bf6927ec590a612e9",
+  "platform": "Darwin x86_64",
+  "cpu_count": 16,
+  "target": "/private/tmp/tests-codex-1569-target",
+  "source_files": 6414,
+  "source_sha256": "b4e7fcda498fbe0285ae160e1d4e27d13eb465da267cdf2d18d18a446aa154ca",
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "0"
+  },
+  "rust_test_threads": "unset; full-library default parallelism",
+  "commands": [
+    {
+      "name": "compile",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--message-format=json"
+      ],
+      "started": "2026-10-22T12:04:33.317797+00:00",
+      "seconds": 133.25524289580062,
+      "exit": 0,
+      "log": "compile.txt",
+      "sha256": "17f7c4c0c679c0f1d21ccf5c5023aa05d0cbfef0833c10769c30f9065a47cc5a",
+      "summaries": []
+    },
+    {
+      "name": "test-list",
+      "argv": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+        "--list"
+      ],
+      "started": "2026-10-22T12:06:47.632686+00:00",
+      "seconds": 2.0439723930321634,
+      "exit": 0,
+      "log": "test-list.txt",
+      "sha256": "994422cff3884b14f27f75e3b47c2a990b3cf0f44477c8230c795a7600a9e3cd",
+      "summaries": []
+    },
+    {
+      "name": "full-library",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--offline"
+      ],
+      "started": "2026-10-22T12:06:50.556327+00:00",
+      "seconds": 263.6550259501673,
+      "exit": 0,
+      "log": "full-library.txt",
+      "sha256": "ad28bb8e69bbda85cb5fdf508edab94a6bcd712068d73f7bd04ab5dd99a50d2f",
+      "summaries": [
+        "test result: ok. 3355 passed; 0 failed; 14 ignored; 0 measured; 0 filtered out; finished in 262.86s"
+      ]
+    }
+  ],
+  "library_executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+  "library_executable_sha256": "72fbc68e1ac614deb24a36d2b5a8bb2118149062eed259eb3e80dd9c6910cc24",
+  "tests_listed": 3369,
+  "failed_tests": [],
+  "source_unchanged": true,
+  "status": "baseline-completed",
+  "full_library_exit": 0
+}
