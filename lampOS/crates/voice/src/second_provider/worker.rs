@@ -1414,8 +1414,9 @@ async fn seems_task(bus: lamp_bus::Bus, seems: Arc<Mutex<crate::seems_told::Seem
                 let said_ms = message.header.at_unix_ms;
                 Some((message.parse::<lamp_msgs::HumanSeems>().ok()?, said_ms))
             });
+        let faces = crate::known_faces::faces_in_view(&bus);
         if let Ok(mut seems) = seems.lock() {
-            seems.seen(read, monotonic_us());
+            seems.seen_in_view(read, faces, monotonic_us());
         }
     }
 }
