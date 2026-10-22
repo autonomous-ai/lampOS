@@ -1940,6 +1940,17 @@ fn person_now() -> Option<String> {
         .map(|observation| observation.person())
 }
 
+/// The name the eyes know for `person` while that face is at the lamp now,
+/// from `known` or else the known file [`start`] was given; `None` for
+/// someone else, nobody, or no eyes. Only a forget of everything asks: the
+/// room's lines that name them go too (#2849's find, seen again in #1693's
+/// c0a4 run). Never in a log line.
+fn name_at_lamp(known: Option<&Path>, person: &str) -> Option<String> {
+    let path = known.or_else(|| KNOWN_FILE.get().map(PathBuf::as_path))?;
+    let observation = crate::known_faces::FaceObservation::read(path)?;
+    (observation.person() == person).then(|| observation.name().to_owned())
+}
+
 /// What a session is told, after who is at the lamp, when it has a memory.
 pub const THEIRS: &str = " (What they ask you to keep, and what they say to you, is kept as theirs. What recall \
      marks \"theirs\" they told you themselves: with them you may say \"you told me\" about it, never about the rest.)";
@@ -3191,6 +3202,10 @@ pub struct DaysClient {
     room_sounds: PathBuf,
     /// [`JOURNAL_RESUMES_ENVIRONMENT`], read when the client is made.
     resumes: AtomicBool,
+    /// The eyes' known file, when it is not the one [`start`] was given
+    /// (a test's): whose name a forget of everything also takes from the
+    /// room's lines ([`name_at_lamp`]).
+    known: Option<PathBuf>,
     /// When a fresh open was last tried and didn't resume.
     fresh_tried: Arc<Mutex<Option<Instant>>>,
     /// Something kept with `remember` since this was last asked
@@ -4378,6 +4393,7 @@ impl DaysClient {
             resumes: AtomicBool::new(
                 std::env::var(JOURNAL_RESUMES_ENVIRONMENT).ok().as_deref() == Some("on"),
             ),
+            known: None,
             fresh_tried: Arc::new(Mutex::new(None)),
             kept_since_note: Arc::new(AtomicBool::new(false)),
             link_used: AtomicBool::new(link_used_on()),
@@ -5049,6 +5065,31 @@ impl DaysClient {
                         self.stop(Stopped::Forgotten);
                     }
                     return lost((gone(), false));
+                }
+            }
+            // The room's kept things and observations that name them, such
+            // as "Mai's dentist is Friday" said with nobody known (#2849's
+            // find, seen again in #1693's c0a4 run): only with their own
+            // forgotten and their name known, never the room's other lines.
+            // Their own memory is already gone, so a failure here is only
+            // journalled. Counts only, never the name.
+            if call.name == FORGET_EVERYTHING
+                && self.forget_all.load(Ordering::Acquire)
+                && answer["ok"] == true
+                && let Some(name) = person.and_then(|p| name_at_lamp(self.known.as_deref(), p))
+            {
+                let naming = json!({"op":"forget_naming","name":name});
+                match deadline
+                    .checked_sub(started.elapsed())
+                    .and_then(|left| bounded_exchange_scoped(&self.socket, &naming, left, lease))
+                {
+                    Some(answer) if answer["ok"] == true => eprintln!(
+                        "lamp-voice provider: forget everything: the room's lines naming them, {} removed",
+                        answer["removed"].as_u64().unwrap_or(0)
+                    ),
+                    _ => eprintln!(
+                        "lamp-voice provider: forget everything: the room's lines naming them could not be removed"
+                    ),
                 }
             }
             // And the household's yes to music and laughter, and to how a
@@ -7832,6 +7873,111 @@ mod tests {
         std::fs::remove_file(&socket).unwrap();
     }
 
+    /// #2849's find, seen again in #1693's c0a4 run: with
+    /// `LAMP_MEMORY_FORGET_ALL`, "forget everything" from someone the eyes
+    /// know by name also asks the room's memory to drop the lines that
+    /// name them, after their own is emptied. Not for another face at the
+    /// lamp, not when their own forget was refused, and with the switch
+    /// off nothing is sent at all.
+    #[test]
+    fn forgetting_everything_also_takes_the_rooms_lines_naming_them() {
+        let known =
+            std::env::temp_dir().join(format!("lamp-remember-naming-known-{}", std::process::id()));
+        std::fs::write(&known, "Mai\n").unwrap();
+        // Each mock waits this long for one request more than the call
+        // should make: a missing request, or an extra one, fails the
+        // assertion instead of hanging the test.
+        const WAIT: Duration = Duration::from_secs(2);
+        let mai = crate::known_faces::FaceObservation::read(&known)
+            .unwrap()
+            .person();
+        let client_on = |socket: &PathBuf, on: bool| {
+            let mut client = DaysClient::new(socket.clone()).unwrap();
+            client.forget_all.store(on, Ordering::Release);
+            client.known = Some(known.clone());
+            client.room_sounds = socket.with_extension("room-sounds.json");
+            client
+        };
+        let forget = |client: &DaysClient, person: &str| {
+            client
+                .run_at(
+                    &call(FORGET_EVERYTHING, json!({})),
+                    FIRST_READ,
+                    NOW,
+                    Some(&EAST),
+                    Some(person),
+                )
+                .0
+        };
+
+        let (socket, served) = memory_until(
+            "forget-naming",
+            2,
+            |request| match request["op"].as_str() {
+                Some("forget_all") => json!({"ok":true,"removed":4}),
+                Some("forget_naming") => json!({"ok":true,"removed":2}),
+                _ => json!({"ok":false}),
+            },
+            WAIT,
+        );
+        let client = client_on(&socket, true);
+        assert_eq!(
+            forget(&client, &mai),
+            json!({"forgotten": true, "everything": true})
+        );
+        assert_eq!(
+            served.join().unwrap(),
+            [
+                json!({"op":"forget_all","person":mai}),
+                json!({"op":"forget_naming","name":"Mai"})
+            ]
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+
+        // Someone else at the lamp than the one forgetting: their own only.
+        const MINH: &str = "p-be9688998f085098";
+        let (socket, served) = memory_until(
+            "forget-naming-other",
+            2,
+            |_| json!({"ok":true,"removed":4}),
+            WAIT,
+        );
+        let client = client_on(&socket, true);
+        forget(&client, MINH);
+        assert_eq!(
+            served.join().unwrap(),
+            [json!({"op":"forget_all","person":MINH})]
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+
+        // Their own forget refused: nothing of the room's is asked.
+        let (socket, served) = memory_until(
+            "forget-naming-refused",
+            2,
+            |_| json!({"ok":false,"error":"storage"}),
+            WAIT,
+        );
+        let client = client_on(&socket, true);
+        forget(&client, &mai);
+        assert_eq!(
+            served.join().unwrap(),
+            [json!({"op":"forget_all","person":mai})]
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+
+        // Off: nothing is sent.
+        let (socket, served) = memory_until("forget-naming-off", 1, |_| json!({"ok":true}), WAIT);
+        let client = client_on(&socket, false);
+        forget(&client, &mai);
+        assert!(served.join().unwrap().is_empty());
+        drop(client);
+        let _ = std::fs::remove_file(&socket);
+        std::fs::remove_file(&known).unwrap();
+    }
+
     /// #2176, `LAMP_MEMORY_FORGET_ABOUT`: "forget what I said about my
     /// bicycle" lists the scope's kept things, forgets each with every key
     /// word by its id, and never another kept thing or the last kept thing
@@ -9451,6 +9597,7 @@ mod tests {
             room_sounds: PathBuf::from("/unused-no-io"),
             resumes: AtomicBool::new(false),
             fresh_tried: Arc::new(Mutex::new(None)),
+            known: None,
             kept_since_note: Arc::new(AtomicBool::new(false)),
             link_used: AtomicBool::new(false),
             current: Arc::new(Mutex::new(Current::default())),
@@ -12063,6 +12210,44 @@ mod tests {
         (socket, served)
     }
 
+    /// [`memory`] that waits for its `requests` no longer than `wait`, then
+    /// gives back what came: a request never sent fails the test's
+    /// assertion instead of hanging it.
+    fn memory_until(
+        name: &str,
+        requests: usize,
+        answer: fn(&Value) -> Value,
+        wait: Duration,
+    ) -> (PathBuf, std::thread::JoinHandle<Vec<Value>>) {
+        let socket =
+            std::env::temp_dir().join(format!("lamp-remember-{name}-{}.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let served = std::thread::spawn(move || {
+            let until = Instant::now() + wait;
+            let mut read = Vec::new();
+            while read.len() < requests && Instant::now() < until {
+                let Ok((mut stream, _)) = listener.accept() else {
+                    std::thread::sleep(Duration::from_millis(5));
+                    continue;
+                };
+                stream.set_nonblocking(false).unwrap();
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                let request: Value = serde_json::from_str(&line).unwrap();
+                stream
+                    .write_all(format!("{}\n", answer(&request)).as_bytes())
+                    .unwrap();
+                read.push(request);
+            }
+            read
+        });
+        (socket, served)
+    }
+
     /// #813 is off unless set: without the rules switch the model is told
     /// of the same three functions, a rule's name is not the memory's, and
     /// a session's note is the same bytes after the same requests.
@@ -13107,6 +13292,7 @@ mod tests {
             room_sounds: PathBuf::from("/unused-no-io"),
             resumes: AtomicBool::new(false),
             fresh_tried: Arc::new(Mutex::new(None)),
+            known: None,
             kept_since_note: Arc::new(AtomicBool::new(false)),
             link_used: AtomicBool::new(false),
             current: Arc::new(Mutex::new(Current::default())),
@@ -13271,6 +13457,7 @@ mod tests {
             forget_about: AtomicBool::new(false),
             resumes: AtomicBool::new(false),
             fresh_tried: Arc::new(Mutex::new(None)),
+            known: None,
             kept_since_note: Arc::new(AtomicBool::new(false)),
             link_used: AtomicBool::new(false),
             current: Arc::new(Mutex::new(Current::default())),
@@ -13744,6 +13931,7 @@ mod tests {
             forget_about: AtomicBool::new(false),
             resumes: AtomicBool::new(resumes),
             fresh_tried: Arc::new(Mutex::new(None)),
+            known: None,
             kept_since_note: Arc::new(AtomicBool::new(false)),
             link_used: AtomicBool::new(false),
             current: Arc::new(Mutex::new(Current::default())),

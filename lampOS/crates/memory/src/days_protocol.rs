@@ -71,6 +71,14 @@ enum Extra {
         person: Who,
         id: u64,
     },
+    /// The room's kept things and observations that name someone, after
+    /// their "forget everything" (`Days::forget_naming`). The room's only:
+    /// `person` is unsaid or `everyone`.
+    ForgetNaming {
+        #[serde(default)]
+        person: Who,
+        name: String,
+    },
     SessionOpen {
         #[serde(default)]
         person: Who,
@@ -411,6 +419,15 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
         Extra::Forget { person, id } => {
             json!({"ok":true,"removed":store.forget(&one(person)?,id)?})
         }
+        Extra::ForgetNaming { person, name } => {
+            if one(person)? != Person::everyone() {
+                return Err(Error::new(
+                    "bad_person",
+                    "forget_naming acts on the room's memory only",
+                ));
+            }
+            json!({"ok":true,"removed":store.forget_naming(&name)?})
+        }
         Extra::SessionOpen {
             person,
             session,
@@ -498,6 +515,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "append_linked",
             "search",
             "forget",
+            "forget_naming",
             "session_open",
             "session_close",
             "follow_up",
@@ -1090,6 +1108,65 @@ mod tests {
         assert!(store.status(None).unwrap().is_empty());
     }
 
+    /// `forget_naming` acts on the room's memory only: unsaid or
+    /// `everyone`, never a person's, every person's, or a name shorter than
+    /// two characters. It answers a count, as `forget` does, and leaves the
+    /// person's own lines that name the same name.
+    #[test]
+    fn forget_naming_is_the_rooms_only_and_answers_a_count() {
+        let (_scratch, mut store) = Scratch::new("naming");
+        let ask = |store: &mut _, line: Value| -> Value {
+            serde_json::from_str(&answer(store, line.to_string().as_bytes(), NOW_MS).line).unwrap()
+        };
+        const ALEX: &str = "p-0123456789abcdef";
+        for line in [
+            json!({"op":"remember","at_unix_ms":NOW_MS,"text":"Alex likes tea"}),
+            json!({"op":"remember","at_unix_ms":NOW_MS,"text":"the tea is in the cupboard"}),
+            json!({"op":"remember","person":ALEX,"at_unix_ms":NOW_MS,"text":"Alex likes tea"}),
+        ] {
+            assert_eq!(ask(&mut store, line)["ok"], true);
+        }
+        for (line, error) in [
+            (
+                json!({"op":"forget_naming","person":ALEX,"name":"Alex"}),
+                "bad_person",
+            ),
+            (
+                json!({"op":"forget_naming","person":null,"name":"Alex"}),
+                "bad_person",
+            ),
+            (json!({"op":"forget_naming","name":"A"}), "bad_name"),
+            (json!({"op":"forget_naming"}), "bad_request"),
+        ] {
+            let told = ask(&mut store, line.clone());
+            assert_eq!(
+                (told["ok"].clone(), told["error"].clone()),
+                (json!(false), json!(error)),
+                "{line}"
+            );
+        }
+        assert_eq!(
+            ask(
+                &mut store,
+                json!({"op":"forget_naming","person":"everyone","name":"alex"})
+            ),
+            json!({"ok":true,"removed":1})
+        );
+        assert_eq!(
+            ask(&mut store, json!({"op":"forget_naming","name":"Alex"})),
+            json!({"ok":true,"removed":0})
+        );
+        let kept = |store: &mut _, person: Option<&str>| {
+            let mut line = json!({"op":"kept"});
+            if let Some(person) = person {
+                line["person"] = json!(person);
+            }
+            ask(store, line)["entries"].as_array().unwrap().len()
+        };
+        assert_eq!(kept(&mut store, None), 1);
+        assert_eq!(kept(&mut store, Some(ALEX)), 1);
+    }
+
     #[test]
     fn every_opt_in_request_shape_in_the_document_parses() {
         let document = include_str!("../../../docs/memory.md");
@@ -1119,6 +1196,7 @@ mod tests {
                 // With the rules it may have followed (#813).
                 "append_linked",
                 "forget",
+                "forget_naming",
                 "session_open",
                 "session_close",
                 "conversation_end",

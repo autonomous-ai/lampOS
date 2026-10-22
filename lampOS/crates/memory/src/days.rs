@@ -972,6 +972,48 @@ impl Days {
         tx.commit()?;
         Ok(count)
     }
+
+    /// The room's (`everyone`) kept things and observations that name
+    /// `name` (#2849's find, seen again in #1693's c0a4 run): after a
+    /// person's "forget everything", the room must not keep lines about
+    /// them, such as "Mai's birthday is in May". Only the matched rows go,
+    /// in one transaction, with their search rows, event days and links
+    /// (by the foreign keys). Unlike [`Self::forget`] it never climbs to
+    /// the exchange a line came from: that exchange's other children, the
+    /// household's lines kept in the same conversation, would go with it
+    /// (the review of #3113 on #3127). A whole-word match, ignoring case
+    /// ([`names`]); exchanges are never matched, and a room line that
+    /// doesn't name them stays. A name shorter than two characters is
+    /// refused.
+    pub fn forget_naming(&mut self, name: &str) -> Result<u64> {
+        let name = folded(name);
+        if name.chars().count() < 2 {
+            return Err(Error::new(
+                "bad_name",
+                "forget_naming takes a name of at least two characters",
+            ));
+        }
+        let everyone = Person::everyone();
+        let rows: Vec<(i64, String, String)> = self
+            .db
+            .prepare("SELECT rid,text,said FROM entries WHERE person=? AND kind IN ('kept','observation')")?
+            .query_map([everyone.as_str()], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        let matched: Vec<i64> = rows
+            .into_iter()
+            .filter(|(_, text, said)| names(text, &name) || names(said, &name))
+            .map(|(rid, ..)| rid)
+            .collect();
+        let tx = self.db.transaction()?;
+        tx.execute("DELETE FROM doomed", [])?;
+        for rid in matched {
+            tx.execute("INSERT INTO doomed VALUES (?)", [rid])?;
+        }
+        let count = erase(&tx)?;
+        tx.commit()?;
+        self.forget_set_aside()?;
+        Ok(count)
+    }
     pub fn forget_last(&mut self, person: &Person, only: Option<Kind>) -> Result<Option<Removed>> {
         let kind = only.map(|k| match k {
             Kind::Kept => "kept",
@@ -1881,6 +1923,32 @@ impl Days {
     }
 }
 
+/// What a name is looked for in (`Days::forget_naming`): NFC, lower case,
+/// white space collapsed to single spaces.
+fn folded(text: &str) -> String {
+    let lower: String = text.nfc().flat_map(char::to_lowercase).nfc().collect();
+    lower.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Whether `text` names `name` (already [`folded`]) as a whole word or
+/// phrase: no letter or digit right before or after it, so "Mai" is in
+/// "mai's birthday" but not in "Maine".
+fn names(text: &str, name: &str) -> bool {
+    let text = folded(text);
+    let mut from = 0;
+    while let Some(at) = text[from..].find(name) {
+        let start = from + at;
+        let end = start + name.len();
+        let before = text[..start].chars().next_back();
+        let after = text[end..].chars().next();
+        if !before.is_some_and(char::is_alphanumeric) && !after.is_some_and(char::is_alphanumeric) {
+            return true;
+        }
+        from = start + text[start..].chars().next().map_or(1, char::len_utf8);
+    }
+    false
+}
+
 /// What two kept things are compared by (#2176): NFC, lower case, white
 /// space trimmed and collapsed, and punctuation at the end dropped.
 fn same_text(text: &str) -> String {
@@ -2314,6 +2382,164 @@ mod tests {
             drop(reopened);
             fs::remove_dir_all(dir).unwrap();
         }
+    }
+
+    /// #2849's find, seen again in #1693's c0a4 run: after a person's
+    /// "forget everything", the room's kept things and observations that
+    /// name them go, with their event day and search row, a whole word or
+    /// phrase ignoring case. The exchange a line came up in stays (the
+    /// review of #3113 on #3127), and so do a room fact without the name,
+    /// the room's exchanges, and another person's lines.
+    #[test]
+    fn forget_naming_removes_the_rooms_lines_that_name_them_only() {
+        let dir = std::env::temp_dir().join(format!("lamp-days-naming-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let now = 1_791_892_800_000;
+        let mut store = Days::open(
+            Options {
+                dir: dir.clone(),
+                keep_days: 30,
+                local: LocalTime::Offset(0),
+            },
+            now,
+        )
+        .unwrap();
+        let room = Person::everyone();
+        let alex = Person::new("p-0123456789abcdef").unwrap();
+        // The room's exchange a kept line came up in, and one only naming her.
+        let told = store
+            .append(&room, now, "mai's dentist is friday", "noted", &[])
+            .unwrap();
+        let chat = store
+            .append(&room, now, "is Mai home?", "I don't know", &[])
+            .unwrap();
+        let dentist = store
+            .remember_on(
+                &room,
+                now,
+                "MAI's dentist is Friday",
+                &[told],
+                false,
+                Some("2026-10-16"),
+            )
+            .unwrap()
+            .0;
+        let phrase = store
+            .remember(&room, now, "Mai  Anh likes green tea")
+            .unwrap();
+        let maine = store
+            .remember(&room, now, "a trip to Maine in May")
+            .unwrap();
+        let shared = store
+            .remember(&room, now, "the wifi password is on the fridge")
+            .unwrap();
+        let theirs = store.remember(&alex, now, "Mai is my sister").unwrap();
+        let observation = |store: &Days, id: u64, text: &str, said: &str| {
+            store
+                .db
+                .execute(
+                    "INSERT INTO entries(person,id,kind,at_unix_ms,day,said,text,used_unix_ms) VALUES('everyone',?1,'observation',?2,'2026-10-14',?3,?4,?2)",
+                    params![id, now, said, text],
+                )
+                .unwrap();
+            store
+                .db
+                .execute(
+                    "INSERT INTO search(rowid,body) VALUES(last_insert_rowid(),?1)",
+                    [text],
+                )
+                .unwrap();
+        };
+        observation(&store, 900, "someone seems tired", "Good night, mai!");
+        observation(&store, 901, "Mairead visits often", "");
+        let events = |store: &Days| -> u64 {
+            store
+                .db
+                .query_row("SELECT count(*) FROM event_days", [], |r| r.get(0))
+                .unwrap()
+        };
+        assert_eq!(events(&store), 1);
+        let gone = |store: &Days, id: u64| store.record(&room, id).unwrap().is_none();
+
+        // Too short, or nothing but space: refused, nothing removed.
+        for name in ["", "  ", "M"] {
+            assert_eq!(store.forget_naming(name).unwrap_err().code, "bad_name");
+        }
+        assert!(!gone(&store, dentist));
+
+        // A name with a space is the whole phrase, spacing and case
+        // ignored: not a line with only one of its words.
+        let anh = store
+            .remember(&room, now, "Anh Thu's bike is blue")
+            .unwrap();
+        assert_eq!(store.forget_naming("Mai Anh Thu").unwrap(), 0);
+        assert_eq!(store.forget_naming("MAI anh").unwrap(), 1);
+        assert!(gone(&store, phrase));
+        assert!(!gone(&store, anh) && !gone(&store, dentist));
+
+        // The kept line and its event day, not the exchange it came from;
+        // the observation whose said names her. Nothing else.
+        assert_eq!(store.forget_naming(" mai ").unwrap(), 2);
+        for id in [dentist, 900] {
+            assert!(gone(&store, id), "{id}");
+        }
+        for id in [told, chat, maine, shared, anh, 901] {
+            assert!(!gone(&store, id), "{id}");
+        }
+        assert!(store.record(&alex, theirs).unwrap().is_some());
+        assert_eq!(events(&store), 0);
+        let orphans: u64 = store
+            .db
+            .query_row(
+                "SELECT count(*) FROM search WHERE rowid NOT IN (SELECT rid FROM entries)",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(orphans, 0);
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// The review of #3113 on #3127: two things kept in one conversation
+    /// of the room's, one naming Mai: `forget_naming` takes that one alone,
+    /// never climbing to the exchange and down to its other child.
+    #[test]
+    fn forget_naming_leaves_a_sibling_kept_in_the_same_conversation() {
+        let dir = std::env::temp_dir().join(format!("lamp-days-naming-sib-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let now = 1_791_892_800_000;
+        let mut store = Days::open(
+            Options {
+                dir: dir.clone(),
+                keep_days: 30,
+                local: LocalTime::Offset(0),
+            },
+            now,
+        )
+        .unwrap();
+        let room = Person::everyone();
+        let exchange = store
+            .append(
+                &room,
+                now,
+                "Mai's dentist is Friday and the meeting is at four",
+                "noted",
+                &[],
+            )
+            .unwrap();
+        let dentist = store
+            .remember_from(&room, now, "Mai's dentist is Friday", &[exchange])
+            .unwrap();
+        let meeting = store
+            .remember_from(&room, now, "The meeting is at four", &[exchange])
+            .unwrap();
+        assert_eq!(store.forget_naming("Mai").unwrap(), 1);
+        assert!(store.record(&room, dentist).unwrap().is_none());
+        assert!(store.record(&room, meeting).unwrap().is_some());
+        assert!(store.record(&room, exchange).unwrap().is_some());
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
     }
 
     /// #2176: a kept thing no longer active (replaced) is not what `once`

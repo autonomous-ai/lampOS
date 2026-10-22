@@ -343,6 +343,7 @@ order; it does not return observations. New operations are:
 {"op":"append_linked","at_unix_ms":1791892800000,"heard":"My coffee?","said":"Black.","source_ids":[2]}
 {"op":"append_linked","person":"p-be9688998f085098","at_unix_ms":1791892800000,"heard":"Who am I?","said":"Minh.","source_ids":[],"rule_ids":[1]}
 {"op":"forget","id":2}
+{"op":"forget_naming","name":"Mai"}
 {"op":"session_open","session":"voice_1","max_bytes":1200}
 {"op":"session_close","session":"voice_1"}
 {"op":"conversation_end","conversation":"turn_1","source_ids":[1],"previous_ids":[]}
@@ -353,6 +354,10 @@ order; it does not return observations. New operations are:
 These are shapes, not an ordered script: IDs must come from successful
 responses in the same person's store. `search` returns ranked records with
 their provenance; `forget` returns a count after removal and index checks.
+`forget_naming` removes the room's (`everyone`) kept things and
+observations that name someone, those rows alone (never the exchange they
+came from, nor its other children), and returns the count; it refuses any other person
+([the rule](memory-days.md#request-contract)).
 The base `remember` may also name the person's own exchanges it came from,
 `{"op":"remember",…,"source_ids":[3]}` (#1693); forgetting it then removes
 them, one step back. The legacy store ignores them.
@@ -710,6 +715,24 @@ the unchanged legacy client, used unless the new Days client is selected.
     everything only for someone it knows by face, and one thing at a time
     instead: the room's memory is the household's, and a guest, a child or
     the TV must never empty it (the reviewer on #1723).
+  - **The room's lines that name them** (#2849's find, seen again in
+    #1693's c0a4 run): something said about them with nobody known, such
+    as "Mai's dentist is Friday", is kept as the room's, so emptying their
+    own scope left it. When their own `forget_all` succeeds and the eyes
+    know their name (the face at the lamp is theirs), the voice also sends
+    `forget_naming {name}` with no person. The store removes the room's
+    kept things and observations that name them as a whole word, those
+    rows alone: unlike `forget`, never the exchange a line came from, whose
+    other children are the household's (the review of #3113 on #3127). The
+    room's exchanges and every other room line stay.
+    The journal says `forget everything: the room's lines naming them, N
+    removed`, counts only, never the name. A failure there is only
+    journalled: their own memory is already gone. No new switch: only with
+    `LAMP_MEMORY_FORGET_ALL`. Tests:
+    `days::forget_naming_removes_the_rooms_lines_that_name_them_only`,
+    `days::forget_naming_leaves_a_sibling_kept_in_the_same_conversation`,
+    `days_protocol::forget_naming_is_the_rooms_only_and_answers_a_count`
+    and `remember::forgetting_everything_also_takes_the_rooms_lines_naming_them`.
   - Both clear the conversation thread and stop journalling until a fresh
     worker starts, as `forget` does. `forget` with nothing is as before.
   - **The conversation it came up in** (#1693, the first builder's 23:57):
@@ -731,7 +754,8 @@ the unchanged legacy client, used unless the new Days client is selected.
       `voice_forget::after_forgetting_the_next_thing_remembered_is_kept`).
     - **Unchanged:** without the switch, `remember` is as before, and so is
       the room's rule: `forget_everything` empties only the known person's
-      own scope, never the room's (#1723).
+      own scope, never the room's (#1723); of the room's it takes only the
+      lines that name them (above).
     - **Tests:** `days::a_kept_thing_goes_with_the_conversation_it_came_up_in_and_nothing_else`
       and `voice_forget::forget_that_removes_the_conversation_a_kept_thing_came_up_in`
       (the voice's client against the real store: the turn goes, an earlier
