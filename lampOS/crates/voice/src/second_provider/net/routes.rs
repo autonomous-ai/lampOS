@@ -14,6 +14,10 @@ use tokio::sync::Notify;
 
 /// How long an answer holds when it says nothing ([`Read::Routes`]).
 pub const TTL: Duration = Duration::from_secs(600);
+/// How soon a failed asking is asked again, if sooner than the answer's
+/// end: a lamp whose first asking fails before its network is up takes
+/// the relay's routes a minute later, not ten (El's P3 on #2919).
+pub const RETRY: Duration = Duration::from_secs(60);
 /// The least and the most an answer's `ttl_seconds` is taken for.
 const LEAST_TTL: u64 = 60;
 const MOST_TTL: u64 = 3600;
@@ -143,10 +147,16 @@ pub fn url(llm_base_url: &str) -> String {
     format!("{}/relay/routes", openai_base(llm_base_url))
 }
 
-/// The routes last read, and the bell that asks again at once.
+/// The routes last read, the near addresses that failed since, and the
+/// bell that asks again at once.
 #[derive(Default)]
 pub struct Kept {
     latest: Mutex<Routes>,
+    /// Each service's near address that failed on the link since the routes
+    /// were last read: the service stays at its own until the next reading,
+    /// so a near host that never answers costs one slow turn or utterance,
+    /// not every one (El's P2s on #2919).
+    held: Mutex<Vec<(&'static str, String)>>,
     again: Notify,
 }
 
@@ -165,9 +175,34 @@ impl Kept {
         self.again.notify_one();
     }
 
+    /// `service`'s near address `url` failed on the link: its own until the
+    /// routes are next read.
+    pub fn hold(&self, service: &'static str, url: &str) {
+        if let Ok(mut held) = self.held.lock()
+            && !held
+                .iter()
+                .any(|(at, address)| *at == service && address == url)
+        {
+            held.push((service, url.to_owned()));
+        }
+    }
+
+    /// Whether `service`'s near address `url` failed since the routes were
+    /// last read.
+    pub fn held(&self, service: &'static str, url: &str) -> bool {
+        self.held.lock().is_ok_and(|held| {
+            held.iter()
+                .any(|(at, address)| *at == service && address == url)
+        })
+    }
+
+    /// A reading's routes, and every near address tried afresh.
     fn keep(&self, routes: Routes) {
         if let Ok(mut latest) = self.latest.lock() {
             *latest = routes;
+        }
+        if let Ok(mut held) = self.held.lock() {
+            held.clear();
         }
     }
 
@@ -175,6 +210,12 @@ impl Kept {
     pub fn set(&self, routes: Routes) {
         self.keep(routes);
     }
+}
+
+/// When a failed asking is asked again: at the answer's end, or after
+/// [`RETRY`] if that is sooner.
+fn after_a_failure(ttl: Duration) -> Duration {
+    ttl.min(RETRY)
 }
 
 /// Asks the relay at `url` at once, then at each answer's end
@@ -188,7 +229,7 @@ pub async fn task(url: String, authorization: String, kept: Arc<Kept>) {
     let mut failing = false;
     let mut refused_before: Vec<&'static str> = Vec::new();
     loop {
-        match read(get_json(&url, &authorization).await) {
+        let next = match read(get_json(&url, &authorization).await) {
             Read::Routes {
                 routes,
                 ttl: holds,
@@ -208,18 +249,21 @@ pub async fn task(url: String, authorization: String, kept: Arc<Kept>) {
                     eprintln!("lamp-voice second: {}", routes.told());
                     told = Some(routes);
                 }
+                ttl
             }
             Read::Keep(why) => {
+                let next = after_a_failure(ttl);
                 if !std::mem::replace(&mut failing, true) {
                     eprintln!(
                         "lamp-voice second: the relay's routes were not read ({why}); those kept stay, asked again in {} s",
-                        ttl.as_secs()
+                        next.as_secs()
                     );
                 }
+                next
             }
-        }
+        };
         tokio::select! {
-            () = tokio::time::sleep(ttl) => {}
+            () = tokio::time::sleep(next) => {}
             () = kept.again.notified() => {}
         }
     }
@@ -378,6 +422,22 @@ mod tests {
         ] {
             assert_eq!(fallback_why(&kept), None, "{kept:?}");
         }
+    }
+
+    /// El's P3 and P2s on #2919: a failed asking is asked again within a
+    /// minute; a near address that failed is held until the routes are next
+    /// read, for its service alone, and every one is tried afresh then.
+    #[test]
+    fn a_failure_is_asked_again_soon_and_a_failed_address_held_until_read() {
+        assert_eq!(after_a_failure(TTL), RETRY);
+        assert_eq!(after_a_failure(Duration::from_secs(60)), RETRY);
+        let kept = Kept::default();
+        kept.hold("chat", NEAR);
+        assert!(kept.held("chat", NEAR));
+        assert!(!kept.held("speech", NEAR));
+        assert!(!kept.held("chat", "https://other.example.invalid/ai"));
+        kept.set(Routes::default());
+        assert!(!kept.held("chat", NEAR));
     }
 
     /// The journal names which are near, never an address.

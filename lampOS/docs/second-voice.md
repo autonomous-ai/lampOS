@@ -80,8 +80,9 @@ Each address is what the matching variable takes (`chat` as
 route on a host other than the company's is a complete API base, as those
 settings are (`/v1` is added only to `campaign-api.autonomous.ai`'s `/ai`).
 `null`, an address not to use, or a 404 is the service's own address; a
-401 or any other failure keeps what was last read. It is asked at start,
-every `ttl_seconds` (60 to 3600) and as the link comes back, in the
+401 or any other failure keeps what was last read, and is asked again
+within a minute. It is asked at start, every `ttl_seconds` (60 to 3600)
+and as the link comes back, in the
 background: a turn never waits for it. A turn's chat and speech take the
 routes as they stood when it began and keep them to its end; listening
 takes the latest at each utterance. The unit's own address wins: a service
@@ -91,8 +92,11 @@ or listening with another service's key from `second.json`. A near
 service that fails on the link, times out, answers a 5xx or a 401 goes to
 its own address for the rest of the turn (the chat's request sent again
 there, the sentence said in the voice at its own, listening opened once
-more at its own), journaled `route=fallback service=… why=…`; the journal
-names which services are near, never an address.
+more at its own), journaled `route=fallback service=… why=…`, and that
+service stays at its own address, in later turns and utterances too,
+until the routes are next read, so a near host that never answers costs
+one slow turn, not every one; the journal names which services are near,
+never an address.
 
 A person's own DeepSeek endpoint and key and Deepgram key, with
 `LAMP_OWN_KEYS=on`, go over the relay and over `deepgram_credential_file`
