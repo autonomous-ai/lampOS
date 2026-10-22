@@ -40,8 +40,10 @@ use std::{
     time::Duration,
 };
 
-/// What the lamp says, the first builder's words.
-pub const ASK: &str = "I'd like to stretch for the first time. Rest your hand on my head, or just say yes, when you're ready.";
+/// What the lamp says, the first builder's words. It ends on words that
+/// aren't a yes (the first builder on #2893, 12:1x), so an echo of its tail
+/// can't read as one.
+pub const ASK: &str = "I'd like to stretch for the first time. When you're ready, say yes, or rest your hand on my head.";
 /// The ask in a busy room, where only the touch counts (the first builder on
 /// #2602, 12:0x).
 pub const ASK_TOUCH_ONLY: &str =
@@ -51,36 +53,66 @@ pub const ASK_TOUCH_ONLY: &str =
 pub const GOING: &str = "Okay, here I go.";
 /// The beat after [`GOING`] is said.
 pub const GOING_BEAT: Duration = Duration::from_secs(1);
-/// The say service's skill name for it.
-pub const SKILL: &str = "first-stand";
+/// The say service's skill name for it, and its name as the bus's
+/// subscriber, so `[a-z][a-z0-9_]{0,31}` (`lamp_bus`'s names: a hyphen is
+/// refused, El on #2893).
+pub const SKILL: &str = "first_stand";
 /// The words that are a spoken yes, said alone or first in a short line.
 const YES_WORDS: [&str; 9] = [
     "yes", "yeah", "yep", "yup", "sure", "okay", "ok", "ready", "go",
 ];
-/// Words that make a line no yes, wherever they are in it.
-const NOT_YES_WORDS: [&str; 7] = ["no", "not", "don't", "dont", "wait", "stop", "later"];
+/// Words that make a line no yes, wherever they are in it: a take-back or a
+/// put-off ("okay hold on", "yeah one sec", "sure, in a minute", "okay never
+/// mind", "go away": El on #2893), or "or", a choice not yet made.
+const NOT_YES_WORDS: [&str; 22] = [
+    "no", "not", "don't", "dont", "wait", "stop", "later", "away", "hold", "hang", "sec", "secs",
+    "second", "seconds", "minute", "minutes", "moment", "never", "mind", "or", "until", "after",
+];
 /// A spoken yes is a short line: a longer one is someone talking.
 const YES_MOST_WORDS: usize = 5;
+/// Past this a line's pieces are not joined: a yes is far shorter (the
+/// onboarding's 4 KiB).
+const LINE_MOST_BYTES: usize = 4_096;
+/// Lines the voice began hearing this soon after the ask's words ended are
+/// the lamp's own, its echo through a weak canceller (the Reviewer-lead and
+/// El on #2893).
+pub const ECHO_TAIL_US: u64 = 1_500_000;
 
 /// Whether `heard`, a finished line the voice heard, is a spoken yes to the
 /// ask: short, opening with a yes, and with no word that takes it back
 /// ("yes, but wait", "not yet").
 pub fn is_yes(heard: &str) -> bool {
-    let words: Vec<String> = heard
-        .split_whitespace()
-        .map(|word| {
-            word.trim_matches(|c: char| !c.is_alphanumeric() && c != '\'')
-                .to_lowercase()
-                .replace('\u{2019}', "'")
-        })
-        .filter(|word| !word.is_empty())
-        .collect();
+    let words = words(heard);
     !words.is_empty()
         && words.len() <= YES_MOST_WORDS
         && YES_WORDS.contains(&words[0].as_str())
         && !words
             .iter()
             .any(|word| NOT_YES_WORDS.contains(&word.as_str()))
+}
+
+/// `text`'s words, lower case, without their marks.
+fn words(text: &str) -> Vec<String> {
+    text.split_whitespace()
+        .map(|word| {
+            word.replace('\u{2019}', "'")
+                .trim_matches(|c: char| !c.is_alphanumeric() && c != '\'')
+                .to_lowercase()
+        })
+        .filter(|word| !word.is_empty())
+        .collect()
+}
+
+/// Whether `heard` is the lamp's own `asked` heard back: two words or more,
+/// all of them a run of the ask's own words in order. A lone word can't be
+/// told from a person's, so the time of the line keeps it out.
+pub fn is_echo(heard: &str, asked: &str) -> bool {
+    let heard = words(heard);
+    let asked = words(asked);
+    heard.len() >= 2
+        && asked
+            .windows(heard.len())
+            .any(|run| run == heard.as_slice())
 }
 
 /// What became of a line the voice heard, for a spoken yes.
@@ -99,12 +131,20 @@ pub enum Heard {
 /// The spoken yes in one ask's window (the first builder on #2602, 12:0x):
 /// only after the ask was spoken whole, never in a busy room, never once
 /// another voice has spoken in the window, and only with a face near.
+///
+/// `voice/heard` carries a line in pieces, and a closing piece may be empty
+/// (the Reviewer-lead on #2893): the pieces are joined and the whole line is
+/// judged when it finishes, as the onboarding does. A line any piece of
+/// which was heard before the window opened is the lamp's own, or begun
+/// while it spoke, and counts for nothing.
 #[derive(Debug, Clone, Default)]
 pub struct SpokenYes {
-    open: bool,
+    opens_at_us: Option<u64>,
     closed: bool,
     touch_only: bool,
     other_voice: bool,
+    line: String,
+    line_early: bool,
 }
 
 impl SpokenYes {
@@ -116,9 +156,15 @@ impl SpokenYes {
         }
     }
 
-    /// The ask's words have ended: lines from now on are the person's.
-    pub fn open(&mut self) {
-        self.open = true;
+    /// The words asked in this window.
+    pub fn asked(&self) -> &'static str {
+        if self.touch_only { ASK_TOUCH_ONLY } else { ASK }
+    }
+
+    /// The ask's words ended at `spoken_us` (the bus's monotonic clock):
+    /// lines begun [`ECHO_TAIL_US`] after it are the person's.
+    pub fn open(&mut self, spoken_us: u64) {
+        self.opens_at_us = Some(spoken_us.saturating_add(ECHO_TAIL_US));
     }
 
     /// The window is over ([`ANSWER_US`] after the ask): no yes counts.
@@ -126,13 +172,32 @@ impl SpokenYes {
         self.closed = true;
     }
 
-    /// A line the voice heard, with whether the room is busy and a face is
-    /// near now.
-    pub fn line(&mut self, text: &str, finished: bool, busy: bool, near: bool) -> Heard {
-        if !self.open || self.closed || !finished {
+    /// A piece of a line the voice heard, stamped `at_us` by the voice, with
+    /// whether the room is busy and a face is near now.
+    pub fn line(
+        &mut self,
+        piece: &str,
+        at_us: u64,
+        finished: bool,
+        busy: bool,
+        near: bool,
+    ) -> Heard {
+        if self.opens_at_us.is_none_or(|opens| at_us < opens) {
+            self.line_early = true;
+        }
+        if self.line.len() + piece.len() <= LINE_MOST_BYTES {
+            self.line.push_str(piece);
+        }
+        if !finished {
             return Heard::Nothing;
         }
-        if !is_yes(text) {
+        let text = std::mem::take(&mut self.line);
+        let early = std::mem::take(&mut self.line_early);
+        // An empty line is no voice; the lamp's own words are none either.
+        if early || self.closed || text.trim().is_empty() || is_echo(&text, self.asked()) {
+            return Heard::Nothing;
+        }
+        if !is_yes(&text) {
             // Someone said something else: a second voice, or the person
             // talking of something else. Only the touch counts from now.
             self.other_voice = true;
@@ -591,9 +656,9 @@ mod run {
     /// was said and no yes came, None when it was not said (asked again
     /// later, not counted).
     fn ask_and_wait(options: &Options, bus: &lamp_bus::Bus) -> Option<bool> {
-        // What the voice hears, from before the ask: only a line heard
-        // after the ask was spoken whole can be its yes, so the lamp's own
-        // words never count. Without the bus's \`voice/heard\` (the voice
+        // What the voice hears, from before the ask: only a line begun
+        // after the ask was spoken whole, and its echo's tail, can be its
+        // yes, so the lamp's own words never count. Without the bus's \`voice/heard\` (the voice
         // with \`LAMP_BUS=on\`), the touch alone is the yes.
         let mut heard = bus
             .subscribe_typed(lamp_msgs::Speech::TOPICS[0], SKILL, lamp_msgs::Speech::TYPE)
@@ -606,8 +671,7 @@ mod run {
         // In a busy room only the touch counts, and the ask says so.
         let busy = busy_now(bus);
         let mut spoken_yes = SpokenYes::new(busy);
-        let text = if busy { ASK_TOUCH_ONLY } else { ASK };
-        let told = match ask(options, text) {
+        let told = match ask(options, spoken_yes.asked()) {
             Ok(told) => told,
             Err(error) => {
                 say(&format!(
@@ -632,7 +696,7 @@ mod run {
                 Ok(Said::Outcome(outcome, _)) if outcome == "spoken" => {
                     say("the ask was spoken");
                     spoken = Some(Instant::now());
-                    spoken_yes.open();
+                    spoken_yes.open(lamp_ipc::monotonic_us());
                 }
                 // Not said to its end: no yes is taken for words not heard.
                 Ok(Said::Outcome(outcome, why)) => {
@@ -644,11 +708,10 @@ mod run {
                 }
                 Err(mpsc::TryRecvError::Empty | mpsc::TryRecvError::Disconnected) => {}
             }
-            // Lines heard before the ask was spoken whole are passed over
-            // (the window isn't open, so they count for nothing).
-            if spoken.is_none() {
-                heard_lines(heard.as_mut(), &mut spoken_yes, bus, options);
-            }
+            // Every line waiting is read on every pass, and judged by when
+            // the voice heard it: one begun before the window opened counts
+            // for nothing, whenever it is read (the Reviewer-lead on #2893).
+            let verdict = heard_lines(heard.as_mut(), &mut spoken_yes, bus, options);
             let Some(at) = spoken else {
                 if started.elapsed() > Duration::from_millis(SAY_EXPIRES_MS + 10_000) {
                     say(if begun.is_some() {
@@ -666,7 +729,7 @@ mod run {
                 say("yes: a touch held a second");
                 return Some(true);
             }
-            match heard_lines(heard.as_mut(), &mut spoken_yes, bus, options) {
+            match verdict {
                 // Never the words: only that a yes was heard.
                 Heard::Yes => {
                     say("yes: said, with someone near");
@@ -678,7 +741,7 @@ mod run {
             if now_us >= ANSWER_US {
                 spoken_yes.close();
                 say(&format!(
-                    "no touch within {} s of the ask; nothing moves",
+                    "no yes, touched or said, within {} s of the ask; nothing moves",
                     ANSWER_US / 1_000_000
                 ));
                 return Some(false);
@@ -701,7 +764,14 @@ mod run {
         let mut verdict = Heard::Nothing;
         while let Ok(Some(message)) = heard.recv(Duration::ZERO) {
             if let Ok(line) = message.parse::<lamp_msgs::Speech>() {
-                match spoken_yes.line(&line.text, line.finished, busy_now(bus), near_now(options)) {
+                let at_us = message.header.at_us;
+                match spoken_yes.line(
+                    &line.text,
+                    at_us,
+                    line.finished,
+                    busy_now(bus),
+                    near_now(options),
+                ) {
                     Heard::Yes => return Heard::Yes,
                     Heard::NotTaken(why) => verdict = Heard::NotTaken(why),
                     Heard::Nothing => {}
@@ -1121,53 +1191,192 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_put_off_is_no_yes() {
+        // El's on #2893, and their kin.
+        for no in [
+            "go away",
+            "okay hold on",
+            "yeah one sec",
+            "okay never mind",
+            "sure, in a minute",
+            "yeah hang on",
+            "ok just a moment",
+            "yes or no",
+            "okay after lunch",
+        ] {
+            assert!(!is_yes(no), "{no}");
+        }
+    }
+
+    /// A window opened at 10 s on the voice's clock: lines begun from
+    /// 11.5 s on are the person's.
+    fn opened(touch_only: bool) -> SpokenYes {
+        let mut window = SpokenYes::new(touch_only);
+        window.open(10_000_000);
+        window
+    }
+    const AFTER: u64 = 10_000_000 + ECHO_TAIL_US;
+
     /// The first builder's refusals (#2602, 12:0x): the lamp's own words, a
     /// yes with nobody near, "yes… wait", a yes after another voice, a yes
     /// in a busy room; and a plain yes with someone near is taken.
     #[test]
     fn a_spoken_yes_is_taken_only_after_the_ask_alone_and_with_someone_near() {
-        // The lamp's own "just say yes", heard before the ask ended.
+        // The lamp's own "say yes", heard before the ask ended.
         let mut window = SpokenYes::new(false);
-        assert_eq!(window.line("yes", true, false, true), Heard::Nothing);
-        window.open();
+        assert_eq!(window.line("yes", 1, true, false, true), Heard::Nothing);
+        window.open(10_000_000);
         assert_eq!(
-            window.line("yes", false, false, true),
+            window.line("yes", AFTER, false, false, true),
             Heard::Nothing,
             "unfinished"
         );
         assert_eq!(
-            window.line("yes", true, false, false),
+            window.line("", AFTER, true, false, false),
             Heard::NotTaken("nobody is seen near")
         );
-        assert_eq!(window.line("yes, wait", true, false, true), Heard::Nothing);
+        assert_eq!(
+            window.line("yes, wait", AFTER, true, false, true),
+            Heard::Nothing
+        );
         // After "yes, wait", another line was heard: only the touch now.
         assert_eq!(
-            window.line("yes", true, false, true),
+            window.line("yes", AFTER, true, false, true),
             Heard::NotTaken("another voice was heard after the ask")
         );
 
-        let mut busy = SpokenYes::new(false);
-        busy.open();
+        let mut busy = opened(false);
         assert_eq!(
-            busy.line("yes", true, true, true),
+            busy.line("yes", AFTER, true, true, true),
             Heard::NotTaken("the room is busy")
         );
-        let mut asked_busy = SpokenYes::new(true);
-        asked_busy.open();
+        let mut asked_busy = opened(true);
+        assert_eq!(asked_busy.asked(), ASK_TOUCH_ONLY);
         assert_eq!(
-            asked_busy.line("yes", true, false, true),
+            asked_busy.line("yes", AFTER, true, false, true),
             Heard::NotTaken("the room is busy")
         );
 
-        let mut plain = SpokenYes::new(false);
-        plain.open();
-        assert_eq!(plain.line("Yes, go ahead", true, false, true), Heard::Yes);
+        let mut plain = opened(false);
+        assert_eq!(plain.asked(), ASK);
+        assert_eq!(
+            plain.line("Yes, go ahead", AFTER, true, false, true),
+            Heard::Yes
+        );
 
         // After the window: nothing counts.
-        let mut late = SpokenYes::new(false);
-        late.open();
+        let mut late = opened(false);
         late.close();
-        assert_eq!(late.line("yes", true, false, true), Heard::Nothing);
+        assert_eq!(late.line("yes", AFTER, true, false, true), Heard::Nothing);
+    }
+
+    /// The Reviewer-lead's P1 on #2893: the line's pieces are joined, and
+    /// the whole line is judged.
+    #[test]
+    fn the_joined_line_is_judged_not_each_piece() {
+        // "No, not now… okay": the last piece alone would be a yes.
+        let mut window = opened(false);
+        assert_eq!(
+            window.line("No, not now…", AFTER, false, false, true),
+            Heard::Nothing
+        );
+        assert_eq!(
+            window.line(" okay", AFTER + 1, true, false, true),
+            Heard::Nothing
+        );
+        assert_eq!(
+            window.line("yes", AFTER + 2, true, false, true),
+            Heard::NotTaken("another voice was heard after the ask")
+        );
+        // A yes whose closing piece is empty is still the yes.
+        let mut window = opened(false);
+        assert_eq!(
+            window.line("Yes", AFTER, false, false, true),
+            Heard::Nothing
+        );
+        assert_eq!(window.line("", AFTER + 1, true, false, true), Heard::Yes);
+        // A line of nothing is no other voice: a yes after it is taken.
+        let mut window = opened(false);
+        assert_eq!(window.line("", AFTER, true, false, true), Heard::Nothing);
+        assert_eq!(window.line(" ", AFTER, true, false, true), Heard::Nothing);
+        assert_eq!(window.line("yeah", AFTER, true, false, true), Heard::Yes);
+    }
+
+    /// The Reviewer-lead's and El's P2s on #2893: the lamp's own words never
+    /// stand it, however late they are read.
+    #[test]
+    fn the_lamps_own_words_are_never_its_yes() {
+        // Heard in the echo's tail, read after the window opened.
+        let mut window = opened(false);
+        assert_eq!(
+            window.line("yes", AFTER - 1, true, false, true),
+            Heard::Nothing
+        );
+        // Begun while the lamp spoke, finished after it.
+        assert_eq!(
+            window.line("yes", 9_000_000, false, false, true),
+            Heard::Nothing
+        );
+        assert_eq!(window.line("", AFTER, true, false, true), Heard::Nothing);
+        // Neither counts as another voice: the person's yes is taken.
+        assert_eq!(window.line("yes", AFTER, true, false, true), Heard::Yes);
+        // The ask heard back late is no other voice either.
+        let mut window = opened(false);
+        assert_eq!(
+            window.line("When you're ready, say yes", AFTER, true, false, true),
+            Heard::Nothing
+        );
+        assert_eq!(window.line("yes", AFTER, true, false, true), Heard::Yes);
+        assert!(is_echo("ready, say", ASK));
+        assert!(!is_echo("yes", ASK));
+        assert!(!is_echo("yes, go ahead", ASK));
+    }
+
+    /// The first builder on #2893 (12:1x): the ask ends on words that aren't
+    /// a yes, so no tail of it is one. (A busy room's ask takes no spoken
+    /// yes at all.)
+    #[test]
+    fn no_tail_of_the_ask_is_a_yes() {
+        let words: Vec<&str> = ASK.split_whitespace().collect();
+        for from in 0..words.len() {
+            let tail = words[from..].join(" ");
+            assert!(!is_yes(&tail), "{tail}");
+        }
+    }
+
+    /// El's P1 on #2893: the subscriber's name is one the bus takes, and a
+    /// line the voice publishes reaches it.
+    #[test]
+    fn what_the_voice_hears_is_subscribed_by_this_name() {
+        let root = PathBuf::from(format!("/tmp/lb-fs-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut heard = bus
+            .subscribe_typed(lamp_msgs::Speech::TOPICS[0], SKILL, lamp_msgs::Speech::TYPE)
+            .unwrap();
+        let mut voice = bus
+            .publisher_declared(
+                lamp_msgs::Speech::TOPICS[0],
+                &lamp_msgs::Speech::declaration(),
+                "voice",
+            )
+            .unwrap();
+        let line = lamp_msgs::Speech {
+            text: "yes".into(),
+            finished: true,
+            locale: None,
+            request: None,
+        };
+        voice.publish_json(42, &line).unwrap();
+        let message = heard
+            .recv(Duration::from_secs(5))
+            .unwrap()
+            .expect("the line");
+        assert_eq!(message.header.at_us, 42);
+        assert_eq!(message.parse::<lamp_msgs::Speech>().unwrap().text, "yes");
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
