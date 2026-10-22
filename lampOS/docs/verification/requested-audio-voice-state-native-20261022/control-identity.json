@@ -1,0 +1,11 @@
+{
+  "positive_head": "4e060a224cb3d04bcd4404355aa5fc0bac187705",
+  "branch": "second/voice-state-unshown-control",
+  "source": "lampOS/crates/voice/src/coordinator/notices.rs",
+  "original_sha256": "dec9fe70db0f6e3fa40b02344af8a38d6e2e75e7063feac301a532d26275d89d",
+  "mutated_sha256": "8ea5bc4f7800d73cbd4af16934d7da119bf6519af7584f787115322e5c402c81",
+  "patch_sha256": "da82d9b5fc6535094392f1326dc35d9ddd250b75b4adffffbbf8fb7d8f8393d0",
+  "status": "mac-negative-qualified-native-pending",
+  "control_head": "672023248b37d1f1b226b0b1758ee8503807b7d0",
+  "mac_control_sha256": "adaae1a248aaa95aca337ee0b7d465ba2d4249296598ccff265733b3d08f1ee7"
+}

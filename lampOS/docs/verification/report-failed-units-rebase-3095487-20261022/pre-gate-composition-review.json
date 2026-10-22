@@ -1,0 +1,17 @@
+{
+  "recorded_at": "2026-10-22T11:02:54.790459+07:00",
+  "head": "27ab70a2c6dbf1e4769de767082fc66291a87c8d",
+  "base": "3095487ad6330c89566e7d6db6208dcc882f47e9",
+  "reason_for_stop": "Cloud tree changed upstream; old complete-tree identity cannot be carried forward",
+  "upstream_cloud_files": [
+    "lampOS/crates/cloud/src/answer.rs",
+    "lampOS/crates/cloud/src/lamp.rs"
+  ],
+  "change": "#2864 adds system.info capability kinds and shared switch guards; reports.get/set retains the reports-present gate",
+  "own_report_source_and_contract_unchanged": true,
+  "own_patch_range_diff": "1:  93d93ecb1 = 1:  27ab70a2c lampOS: report currently failed product units",
+  "docs_cloud_change": "Upstream system.info can table row; failed-unit section unchanged",
+  "old_cloud_tree": "1dd3e10a85ee130c788c245b789a6ae779c6434f",
+  "new_cloud_tree": "df643415a4ba38a75c584c0a825b54f86cc6d785",
+  "new_gate": "required; not yet run"
+}

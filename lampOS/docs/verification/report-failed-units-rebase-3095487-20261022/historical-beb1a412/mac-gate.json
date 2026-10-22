@@ -1,0 +1,230 @@
+{
+  "schema": 1,
+  "record_kind": "compact-normalized-gate-receipt",
+  "raw_receipt": {
+    "name": "gate.json",
+    "sha256": "dba1249961977914a2b9e7fc925f3a2e298a62ed2cb4cc0d52c76fb6439c8e94",
+    "bytes": 106014,
+    "published": false
+  },
+  "tested_head": "beb1a412386a69af7687b5c17dfbf6602603afea",
+  "integration_parent": "5c8b03a2eb2f7755262397c46216be2af41b4a95",
+  "original_base_field_meaning": "tested checkout head, not its integration parent",
+  "publication": "historical-withheld-not-pushed",
+  "native_qualification": "not-claimed-for-unpublished-candidate",
+  "started_at": "2026-10-22T10:22:43.313983+07:00",
+  "finished_at": "2026-10-22T10:24:07.738284+07:00",
+  "status": "passed",
+  "source_invariance": {
+    "recorded_file_count": 464,
+    "before_equals_after": true,
+    "source_unchanged": true,
+    "digest_algorithm": "SHA-256 of UTF-8 json.dumps(map, sort_keys=True, separators=(comma, colon)); no trailing newline",
+    "before_map_sha256": "4632c4bc9745a4bc9d88d15bb0595a962d85e36aef97cbd54c1fb6434d892162",
+    "after_map_sha256": "4632c4bc9745a4bc9d88d15bb0595a962d85e36aef97cbd54c1fb6434d892162",
+    "paths_relative_to": "lampOS",
+    "complete_map_retained_in_raw_receipt": true
+  },
+  "cloud_source_sha256": {
+    "crates/cloud/Cargo.toml": "57a154cf64d7adc8b5e21be9338f57d6da62b1ed01497647ace3a7aa495009d8",
+    "crates/cloud/src/account.rs": "01475eb4e834b67787edd84b904f109b42adb8f0505caa71ea1e915dfd1c9b08",
+    "crates/cloud/src/answer.rs": "e4cfa21c1a9b222298d54e51618d7ecb2746cfeb1da0df422d27f279a9e2c947",
+    "crates/cloud/src/beat.rs": "7da7333328dd2ef44afddfed9ec87736aaf5b00b4c4c581d73709b80d0f3e33f",
+    "crates/cloud/src/chat.rs": "ba7a9b7d84f4ffefccefc58e829891ea70c0fd2c5bbca8e596fba0b350026ffc",
+    "crates/cloud/src/faces.rs": "cec8bac5b37b4bc42e946e470253a14857b180c96b53f8718dc7a2400a8e733f",
+    "crates/cloud/src/guard.rs": "3019569939b50e1d6a917ed6c3aa8e0e24f7449ba4dd1c467019526449268026",
+    "crates/cloud/src/lamp.rs": "55abc71e2c9f94a93f48c12d3c72194dca3117517c585a58c39bb60526f4b3ac",
+    "crates/cloud/src/lib.rs": "79af7100de08cf081bbc7397630fe21e0ed0f1bce024459af1fd231dc30116ec",
+    "crates/cloud/src/light.rs": "64e1a57a7ebdf3c31499de16e2acb40b6a913b1cbff20d96b02447fe021dbc2a",
+    "crates/cloud/src/main.rs": "c963f19c1ba45ab8c2a1900eedf4b6ada184a04994b4b92bb5d19bc74421458d",
+    "crates/cloud/src/online.rs": "3de31b58708e1bc1dff7bd83910e6773adbca6d82596a07029f5651415c74fc0",
+    "crates/cloud/src/photos.rs": "be47ef1f235e8f2969cff209112332d5ee99cfd6ae7ded35bfc0d9757f212313",
+    "crates/cloud/src/ping.rs": "9851973cfbacc6b5791deaa95982f89d7e9461ff681cd62b7455705cc2a796ed",
+    "crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "crates/cloud/src/schedule.rs": "b1d4bca2cc4e184baad2b50979d3d5aca3d0383c1acc54b9b32a4ed83bf1e5c9",
+    "crates/cloud/src/settings.rs": "3f7527e1bab70d17b28b489c659ef4092aad82673f91d6f90f0a093a67d45a87",
+    "crates/cloud/src/skills.rs": "b0aca82f6faeceec3244b3df5440dd6f95b8b14c229d6187d3a29a0832124405",
+    "crates/cloud/src/unasked.rs": "fc904adb3ef8414284126e5d9a7e77ebdf42d4c80f40661ea09467b926ae41d2",
+    "crates/cloud/src/update.rs": "3e9d23c050b5a770bc07789a75cec0eac41e001d27940171da1e53ce0e62cf40",
+    "crates/cloud/src/wire.rs": "111286c50ca8a1e6c056c383784ac8e11efff08dfb54f852fe11c65e40f8686f",
+    "crates/cloud/tests/it/app_contract.rs": "516d2d81a03bc0ce4c23f97a77f1ccacf47d44ef07e7a4d0a2c4375b0a916022",
+    "crates/cloud/tests/it/main.rs": "ed68a6a31d4a02f0ac95bddf4fc0411689ca19f242713e348a43190d4a330147",
+    "crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68",
+    "crates/cloud/tests/it/ring.rs": "4c6343e5a854a02662767e757ba8c568967bf09ce102fe45ec027d859db6edb5",
+    "crates/cloud/tests/it/setup.rs": "5359b645e44bcc5c12f32f7354b282da2fb3b58f137bf123428323549bab6bd5",
+    "crates/cloud/tests/it/skills_contract.rs": "b38309fb9021b3f376ab81b4aca97911b3a3c84c89af2d9eef6bb425b19b8989",
+    "crates/cloud/tests/it/switch.rs": "3e3d727391c9b97cab3eebc12dc12a4773d13a4ed4fc6269d99df9fd6dff68ef",
+    "crates/cloud/tests/it/texts.rs": "8c285c79a8f4862a6247b2726449fbc392c5153d7c2cf2b0ccdb2328a52d40ca"
+  },
+  "stages": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 5.074,
+      "log_name": "fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": [],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      },
+      "raw_log_bytes": 0,
+      "raw_log_published": false,
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-cloud",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 13.448,
+      "log_name": "clippy.log",
+      "log_sha256": "2687cc1a4a3bcdfe96c899d81b854fce0e1810a79fdc90415857fbf512760a80",
+      "summaries": [],
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "filtered out": 0
+      },
+      "raw_log_bytes": 473,
+      "raw_log_published": false,
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--no-fail-fast",
+        "-p",
+        "lamp-cloud",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 65.793,
+      "log_name": "tests.log",
+      "log_sha256": "0301797203555de40b3788358b75b617220af7c436cee31efea0259c37e06541",
+      "summaries": [
+        "test result: ok. 150 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 40.14s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.15s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "counts": {
+        "passed": 177,
+        "failed": 0,
+        "ignored": 1,
+        "filtered out": 0
+      },
+      "raw_log_bytes": 15983,
+      "raw_log_published": false,
+      "warnings": [],
+      "errors": [],
+      "parsed_summaries": [
+        {
+          "log_line": 161,
+          "counts": {
+            "passed": 150,
+            "failed": 0,
+            "ignored": 1,
+            "filtered out": 0
+          },
+          "measured": 0,
+          "test_seconds": 40.14
+        },
+        {
+          "log_line": 167,
+          "counts": {
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "filtered out": 0
+          },
+          "measured": 0,
+          "test_seconds": 0.0
+        },
+        {
+          "log_line": 200,
+          "counts": {
+            "passed": 27,
+            "failed": 0,
+            "ignored": 0,
+            "filtered out": 0
+          },
+          "measured": 0,
+          "test_seconds": 3.15
+        },
+        {
+          "log_line": 206,
+          "counts": {
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "filtered out": 0
+          },
+          "measured": 0,
+          "test_seconds": 0.0
+        }
+      ],
+      "selected_test_passes": [
+        {
+          "name": "reports::tests::failed_units_are_current_allowlisted_and_unambiguous",
+          "log_line": 94,
+          "result": "passed"
+        },
+        {
+          "name": "reports::tests::failed_units_share_the_gated_restart_query_and_cached_recovery",
+          "log_line": 95,
+          "result": "passed"
+        },
+        {
+          "name": "report_contract::failed_units_are_canonical_in_schema_one_and_kept_on_retransmit",
+          "log_line": 180,
+          "result": "passed"
+        }
+      ],
+      "ignored_tests": [
+        {
+          "log_line": 109,
+          "line": "test reports::tests::write_a_reports_fixture ... ignored, writes a reports fixture: run by hand with LAMP_CLOUD_REPORTS_FIXTURE set"
+        }
+      ],
+      "doc_tests": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "evidence": "Doc-tests lamp_cloud followed by the fourth zero-test summary"
+      }
+    }
+  ]
+}
