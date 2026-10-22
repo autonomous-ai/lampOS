@@ -4684,6 +4684,10 @@ thread_local! {
     /// place of the environment's (`memory/forgot`).
     pub(super) static TEST_FORGOT_IN: std::cell::RefCell<Option<crate::bus_out::ForgotIn>> =
         const { std::cell::RefCell::new(None) };
+    /// A loop test's reader of the body's pushes on a bus of its own, in
+    /// place of the environment's (`body/hand`).
+    pub(super) static TEST_HAND_IN: std::cell::RefCell<Option<crate::search_pushed::HandIn>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 /// Memory has forgotten everything under `person` (`memory/forgot`), or
@@ -5453,6 +5457,13 @@ fn conversation_with_gate(
     #[cfg(test)]
     if tone_on && let Some(given) = TEST_FORGOT_IN.with(|slot| slot.borrow_mut().take()) {
         forgot_in = Some(given);
+    }
+    // The body's pushes (`body/hand`): one ends a skill's search for the
+    // voice as lamp-skills ends it for the body (#2904).
+    let mut hand_in = crate::search_pushed::HandIn::from_environment();
+    #[cfg(test)]
+    if let Some(given) = TEST_HAND_IN.with(|slot| slot.borrow_mut().take()) {
+        hand_in = Some(given);
     }
     // A line's reading, waiting for its words and for a line that goes on
     // from it ([`TonePending`]).
@@ -9684,6 +9695,39 @@ fn conversation_with_gate(
             last_turn_us = clock;
         }
         last_turn_us = last_turn_us.max(last_speech_us);
+        // A push on the body ends a skill's search for the voice too, as
+        // lamp-skills ends it for the body (#2904): its held look's picture
+        // never goes to the model, and no note or walk step follows. The
+        // second route holds its further looks itself (`search_pushed`).
+        if let Some(hand) = hand_in.as_mut()
+            && hand.pushed(clock)
+            && let Some(held) = look_note.pushed()
+        {
+            let dropped = look_wanted
+                .map(|(turn, _)| turn)
+                .filter(|turn| held == Some(*turn));
+            if let Some(turn) = dropped {
+                look_wanted = None;
+                look_held = None;
+                record(
+                    trace,
+                    json!({"kind":"look_dropped","turn":turn,"by":"tool","why":crate::search_pushed::WHY,"at_us":clock}),
+                )?;
+            }
+            record(
+                trace,
+                json!({"kind":"search_pushed","look_dropped":dropped,"at_us":clock}),
+            )?;
+            eprintln!(
+                "lamp-voice: {}: the search ended{}",
+                crate::search_pushed::WHY,
+                if dropped.is_some() {
+                    "; its look's picture is dropped"
+                } else {
+                    ""
+                }
+            );
+        }
         // The look the lamp said it would take, as soon as it has finished
         // saying so. Someone speaking first takes the turn and the look is
         // dropped; so is one that could not begin within fifteen seconds of being asked for.

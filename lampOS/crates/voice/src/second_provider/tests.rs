@@ -9228,6 +9228,112 @@ async fn a_searchs_own_written_turn_takes_the_skills_next_look() {
     }
 }
 
+/// #2904: a push on the body mid-search (look-for-things) ends the search
+/// for this route too. The model's `look_for` in the look's turn the lamp
+/// writes after it is not run (the skill is not called, so the base does not
+/// turn again) and asks no look; the person's next request is told they
+/// stopped the search with a hand, and their words may look again. With no
+/// push, each look runs as before and nothing is told.
+#[tokio::test]
+async fn a_push_mid_search_holds_its_looks_until_the_person_asks_again() {
+    for push in [true, false] {
+        let looked = || {
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c1",
+                    "look_for",
+                    json!({"place": "left"}),
+                )])),
+                Ok(ChatEvent::Done),
+            ]
+        };
+        let mut chats = vec![looked(), looked()];
+        if push {
+            chats.push(vec![text("All right."), Ok(ChatEvent::Done)]);
+        }
+        chats.push(looked());
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok("Where are my keys?".to_owned()),
+                    Ok("Look on the right.".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let runs = Arc::new(AtomicUsize::new(0));
+        let ran = runs.clone();
+        let tools: ToolRunner = Arc::new(move |_, _, _, _| {
+            ran.fetch_add(1, Ordering::Relaxed);
+            Box::pin(async { json!({"next": "Look.", "look": true}) })
+        });
+        let pushed = Arc::new(Mutex::new(crate::search_pushed::SearchPushed::default()));
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        )
+        .looking_by_call()
+        .looking_for_skills(Arc::new(|name| name == "look_for"))
+        .looking(Arc::new(|| Ok(vec![0xFF, 0xD8, 0xFF])))
+        .stopping_searches_by_hand(pushed.clone());
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        assert_eq!(look_and_words(&mut engine).await.0, Some((1, 1, None)));
+        if push {
+            assert!(pushed.lock().unwrap().hand(monotonic_us()));
+        }
+        // The search's look turn, its picture taken before the push.
+        engine.submit(ProviderInput::Written {
+            request: 2,
+            session: 1,
+            privacy_generation: 1,
+            text: crate::speak_up::LOOK_FULL_NOTE.into(),
+            look: true,
+            search: true,
+            quoted: false,
+        });
+        let (asked, said) = look_and_words(&mut engine).await;
+        if push {
+            assert_eq!(asked, None);
+            assert_eq!(said, ["All right."]);
+        } else {
+            assert_eq!(asked, Some((2, 1, None)));
+        }
+        engine.submit(start(3));
+        engine.submit(audio(3, 1));
+        engine.submit(end(3));
+        assert_eq!(
+            look_and_words(&mut engine).await.0,
+            Some((3, 1, None)),
+            "push {push}: the person's words look again"
+        );
+        assert_eq!(runs.load(Ordering::Relaxed), if push { 2 } else { 3 });
+        let asked = script.asked.lock().unwrap();
+        let told = Message::system(crate::search_pushed::NOTE);
+        let told_in: Vec<usize> = asked
+            .iter()
+            .enumerate()
+            .filter(|(_, round)| round.contains(&told))
+            .map(|(i, _)| i)
+            .collect();
+        if push {
+            // Only the person's next request, and the held call answered so.
+            assert_eq!(told_in, [asked.len() - 1]);
+            assert!(asked[2].contains(&Message::tool(
+                "c1",
+                json!({"error": crate::search_pushed::HELD}).to_string()
+            )));
+        } else {
+            assert!(told_in.is_empty());
+        }
+    }
+}
+
 /// `LAMP_SECOND_LOOK_NOTE` (look-for-things, step 2): a look's turn whose
 /// answer called nothing in any round tells the coordinator so
 /// (`LookNoCall`, for its session, before its `TurnComplete`). One whose

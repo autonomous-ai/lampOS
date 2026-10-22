@@ -719,6 +719,9 @@ struct Shared {
     /// A skill's answer with `"look": true` asks for the turn's look
     /// ([`Engine::looking_for_skills`]): which calls go to the skills.
     skill_look: Option<SkillCall>,
+    /// A push on the body during a skill's search ends it for this route
+    /// too ([`Engine::stopping_searches_by_hand`], #2904).
+    search_pushed: Option<Arc<Mutex<crate::search_pushed::SearchPushed>>>,
     /// A spoken turn's chat begins on the line's early words
     /// ([`Engine::preparing`]).
     prepare: bool,
@@ -1197,6 +1200,7 @@ impl Engine {
                 words_heard: None,
                 look_by_call: false,
                 skill_look: None,
+                search_pushed: None,
                 prepare: false,
                 note_tools: false,
                 #[cfg(test)]
@@ -1889,6 +1893,22 @@ impl Engine {
     pub fn looking_for_skills(mut self, skill: SkillCall) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.skill_look = Some(skill);
+        }
+        self
+    }
+
+    /// A push on the body during a skill's search (`body/hand`, read into
+    /// `pushed` by [`crate::search_pushed::read_from`], #2904) ends it here
+    /// as a spoken stop would: no look call of that conversation runs for
+    /// [`crate::search_pushed::QUIET_US`] unless the person asks again in
+    /// words, and the next request they ask is told
+    /// ([`crate::search_pushed::NOTE`]). Before any turn only.
+    pub fn stopping_searches_by_hand(
+        mut self,
+        pushed: Arc<Mutex<crate::search_pushed::SearchPushed>>,
+    ) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.search_pushed = Some(pushed);
         }
         self
     }
@@ -2885,6 +2905,20 @@ impl Shared {
         self.out.send(event).await.is_ok()
     }
 
+    /// `then` with the search a push may end ([`Engine::stopping_searches_by_hand`]),
+    /// if there is one.
+    fn search_pushed<T>(
+        &self,
+        then: impl FnOnce(&mut crate::search_pushed::SearchPushed) -> T,
+    ) -> Option<T> {
+        let pushed = self.search_pushed.as_ref()?;
+        Some(then(
+            &mut pushed
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+        ))
+    }
+
     async fn fail(&self, request: u64, stage: FailedStage, error: &net::Error) {
         self.emit(ProviderOutput::TurnFailed {
             request,
@@ -3451,6 +3485,18 @@ async fn spoken(
         stop.asked = true;
         Some(crate::provider_worker::STOPPED_NOTE.to_owned())
     });
+    // The first request asked after a push on the body ended a skill's
+    // search: the model is told so, as of a stop, and these words may ask
+    // for a look again (#2904).
+    let pushed = shared
+        .search_pushed(|pushed| pushed.asked(request, monotonic_us()))
+        .flatten()
+        .map(|note| {
+            eprintln!(
+                "lamp-voice second: request {request}: the model is told the person stopped the search with a hand"
+            );
+            note.to_owned()
+        });
     let staff = shared
         .staff
         .as_ref()
@@ -3549,6 +3595,7 @@ async fn spoken(
         .map(str::to_owned);
     let notes = stopped
         .into_iter()
+        .chain(pushed)
         .chain(cut_in)
         .chain(misheard)
         .chain(staff)
@@ -4435,13 +4482,23 @@ async fn ask_look(
         .and_then(|begun| *begun)
         .filter(|(of, _)| *of == request)
         .map(|(_, session)| session);
+    let now = monotonic_us();
     let dropped = if !heard {
         Some("the turn is one the lamp wrote itself")
     } else if session.is_none() {
         Some("its turn is not the one in hand")
+    } else if shared
+        .search_pushed(|pushed| pushed.holds(request, heard, name, &args, now))
+        .unwrap_or(false)
+    {
+        Some(crate::search_pushed::WHY)
     } else {
         None
     };
+    // A skill's look asked is its search's newest, which a push may end.
+    if search && dropped.is_none() {
+        shared.search_pushed(|pushed| pushed.looked(request, name, &args, now));
+    }
     eprintln!(
         "lamp-voice second: request {request} called {name}: {}",
         dropped.unwrap_or("the look is asked of the coordinator")
@@ -5454,6 +5511,26 @@ async fn answer(
                     messages.push(Message::tool(
                         call.id.clone(),
                         crate::policy_holds::held().to_string(),
+                    ));
+                    continue;
+                }
+                // A push on the body ended the search: its look is not
+                // called again, so the base does not turn again, unless
+                // the person asks in words (#2904).
+                if shared
+                    .search_pushed(|pushed| {
+                        pushed.holds(request, heard, &call.name, &call.args, monotonic_us())
+                    })
+                    .unwrap_or(false)
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: {}",
+                        call.name,
+                        crate::search_pushed::WHY
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        serde_json::json!({"error": crate::search_pushed::HELD}).to_string(),
                     ));
                     continue;
                 }
