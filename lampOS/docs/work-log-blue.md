@@ -422,3 +422,18 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - The stand-in's folder is removed if an upload fails before setup.
   - New test cases `early` and `plan-fails`; the mutant fails `early`.
   - Folded as `8cf682a0d`. The first builder runs it on 4ace only after Eighth's store-of-its-own fix.
+
+## 22 Oct, 06:5x–07:3x: #2745 merged; part 2's 75c9 row
+
+- **#2745:**
+  - rebased onto Eighth's stand-in store fix, at reviewer-two's base gate;
+  - the Reviewer-lead's P2 closed;
+  - merged as `20e394fac`.
+- **The lead (07:3x):** run lamp-runs rows now, from the Mac.
+- **lamp-75c9, 07:25–07:31**, on `8e5033e8e`, with `blue-lamp2.sh` and the `probe-say` add-on, root by hand-off:
+  - four says were dropped by the judge for the room (`room/state` `unknown`, about −20 dBFS);
+  - the room turned quiet at 07:30:05;
+  - lamp-skills' 4-says-an-hour cap, which counts dropped proposals, stopped the next one;
+  - the policy and voice end was not reached.
+- Restored, and released to Nine.
+- **Asked the first builder on #2530:** should lamp-skills count only kept says toward its cap?
