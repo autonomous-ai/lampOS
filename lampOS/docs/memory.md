@@ -712,6 +712,43 @@ the unchanged legacy client, used unless the new Days client is selected.
     the TV must never empty it (the reviewer on #1723).
   - Both clear the conversation thread and stop journalling until a fresh
     worker starts, as `forget` does. `forget` with nothing is as before.
+  - **The room's lines about them, for the rest of the day**
+    (`LAMP_MEMORY_ROOM_AFTER_FORGET=on`, with the Days client and
+    `LAMP_MEMORY_FORGET_ALL`; off unless set; both voice routes). #2849's
+    find, seen again in #1693's c0a4 run: after "forget everything",
+    "what's my favourite colour?" was answered from a room-kept line
+    ("...'s favourite colour is green"). The first builder's yes on #2602,
+    23 Oct 03:31. With the switch:
+    - **Who:** a known person whose `forget_everything` the store answered
+      `ok` (whatever it removed) is remembered with the local day it was
+      said on. In this process only, at most 64 people (those of an
+      earlier day go first, then the earliest): a restart forgets who
+      forgot, and the room's lines reach them again.
+    - **What they don't get, that same local day:** any room-kept thing
+      or room exchange about a person, in a new session's note (the
+      room's snapshot, its ids with it, so nothing left out is a source)
+      and in what `recall` or `search` gives from the room's beside their
+      own. About a person (`remember::about_someone`) is a whole word,
+      lower-cased with a curly apostrophe read as a straight one: first
+      person `i`, `i'm`, `i've`, `i'd`, `i'll`, `me`, `my`, `mine`,
+      `myself`; third person `he`, `she`, `him`, `his`, `her`, `hers`,
+      `herself`, `himself`, `their`, `theirs`, `them`, `themselves`;
+      `user` ("the user"); or a word ending in `'s` other than `it's`,
+      `that's`, `what's`, `there's`, `here's`, `let's`, `where's`,
+      `when's`, `how's`, `who's`, `today's` ("Mai's favourite colour").
+      For a recall entry its heard, said and kept words are all checked.
+      Careful on purpose, for one day: a household line with "my" in it
+      is left out too.
+    - **What they still get:** the room's other lines ("the meeting is at
+      four"), and everything of the room's the next local day. Someone
+      else, who forgot nothing, gets them all. A note already told before
+      the forget is not taken back; the next session's is.
+    - **The journal:** "room after forget: N room lines about a person
+      left out for them". Counts only, never a word.
+    - Off, the room's reach them as before. Tests:
+      `remember::tests::after_forget_everything_the_room_s_lines_about_a_person_are_not_recalled_that_day`,
+      `remember::tests::after_forget_everything_the_room_s_lines_about_a_person_are_not_in_their_note_that_day`,
+      `remember::tests::about_someone_is_first_and_third_person_words_and_possessives`.
   - **The conversation it came up in** (#1693, the first builder's 23:57):
     - **What's sent:** at `remember`, the voice sends the exchanges of the
       conversation it's in. That's the person's own, journalled so far,
