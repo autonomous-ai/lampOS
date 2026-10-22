@@ -9,6 +9,9 @@ After=local-fs.target
 Type=simple
 User=orangepi
 Group=orangepi
+# Its hearings from 0.5 up also go on name/near (LAMP_NAME_NEAR, --near 0.5), for the night rounds' scores of
+# misheard calls; nothing else changes. The voice's half of the switch is its own unit's, off there.
+Environment=LAMP_NAME_NEAR=on
 ExecStart=/opt/lampOS/name/47d31414ef8931c395de6e14730a347c959a5225daed5cf893a9c2b791b2aeb9/lamp-name --models /opt/lampOS/name/models --microphone mic2 --least 0.9 --stop-least 0.5 --bus-root /run/lampos-bus
 Restart=on-failure
 RestartSec=5s

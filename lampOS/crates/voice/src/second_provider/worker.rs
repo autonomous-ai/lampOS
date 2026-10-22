@@ -2922,6 +2922,27 @@ pub fn serve(
                 }),
             );
         }
+        // A line's first word, set off and sounding like the lamp's name, is
+        // the name when lamp-name heard it near at the line's start
+        // (`LAMP_NAME_NEAR`): both signs, never one.
+        if std::env::var(lamp_msgs::NameHeard::NEAR_ENVIRONMENT).is_ok_and(|value| value == "on") {
+            if heeding
+                .lock()
+                .is_ok_and(|mut heeding| heeding.hearing_near())
+            {
+                eprintln!(
+                    "lamp-voice second: a line's first word, set off and sounding like the lamp's name, is the name when lamp-name heard it near (0.5 or more) within 1.3 s of the line's start (LAMP_NAME_NEAR)"
+                );
+                let near = heeding.clone();
+                engine = engine.hearing_the_name_near(Arc::new(move |began_us| {
+                    near.lock().ok()?.near_name(began_us)
+                }));
+            } else {
+                eprintln!(
+                    "lamp-voice second: a first word like the lamp's name is never taken as it: no bus to read lamp-name's near hearings from (LAMP_NAME_NEAR)"
+                );
+            }
+        }
         // The rule keeps the route's one reader of the Policy's decisions,
         // which a line going on reads too (`LAMP_GOING_ON_ASKS`, below).
         if let Some(verdicts) = verdicts {
@@ -3855,6 +3876,11 @@ pub(crate) struct Heeding {
     /// The faces the eyes saw speaking each of the last lines judged, newest
     /// last, at most [`SPOKE_KEPT`] ([`Self::same_speaker`]).
     spoke: std::collections::VecDeque<(u64, crate::speaking_faces::Speakers)>,
+    /// With `LAMP_NAME_NEAR=on` ([`Self::hearing_near`]): lamp-name's near
+    /// hearings (`name/near`), and those read so far, when each reached its
+    /// bar by this process's clock and its score, the last
+    /// [`NEAR_KEPT_US`].
+    near: Option<(lamp_bus::Subscriber, std::collections::VecDeque<(u64, f32)>)>,
     /// With `LAMP_JOIN_CUT_WORDS` ([`Self::keeping_line_rooms`]): how the
     /// room was as each of the last lines was judged, newest last, at most
     /// [`SPOKE_KEPT`]; none without it.
@@ -4323,6 +4349,13 @@ pub(crate) struct Signs {
 
 /// Hearings of the name read in one turn's judgement; more wait for the next.
 const NAMES_READ: usize = 64;
+/// `LAMP_NAME_NEAR`: a near hearing counts for a line's first word from
+/// this long before the line's first sound, which holds the sound read
+/// before the line was taken ([`Heeding::near_name`]).
+const NEAR_BEFORE_US: u64 = 300_000;
+/// Near hearings are kept this long, and at most this many.
+const NEAR_KEPT_US: u64 = 30_000_000;
+const NEAR_HEARINGS_KEPT: usize = 32;
 /// The room microphone's level is sampled this often, as the Live worker does.
 const LEVEL_EVERY: Duration = Duration::from_millis(100);
 /// A level older than this is let go: longer than a line replayed to this
@@ -4400,6 +4433,7 @@ impl Heeding {
             turned_speaking: false,
             name_or_follow_up: false,
             spoke: std::collections::VecDeque::new(),
+            near: None,
             rooms: None,
             in_view: None,
             another_person: None,
@@ -4700,6 +4734,62 @@ impl Heeding {
             .as_mut()
             .and_then(|voices| voices.likeness(request));
         self.keep_spoken(request, &speakers, (room, true), false, likeness);
+    }
+
+    /// `LAMP_NAME_NEAR=on`: lamp-name's near hearings (`name/near`) are read
+    /// for a line's first word ([`Self::near_name`]). Whether they can be.
+    pub(crate) fn hearing_near(&mut self) -> bool {
+        if self.near.is_some() {
+            return true;
+        }
+        let Some((bus, _)) = &self.bus else {
+            return false;
+        };
+        match bus.subscribe_typed(
+            lamp_msgs::NameHeard::NEAR_TOPIC,
+            "second",
+            lamp_msgs::NameHeard::TYPE,
+        ) {
+            Ok(near) => {
+                self.near = Some((near, std::collections::VecDeque::new()));
+                true
+            }
+            Err(why) => {
+                eprintln!(
+                    "lamp-voice second: lamp-name's near hearings cannot be taken from the bus: {why} (LAMP_NAME_NEAR)"
+                );
+                false
+            }
+        }
+    }
+
+    /// The best score of lamp-name's near hearings (`name/near`) that
+    /// reached their bar from [`NEAR_BEFORE_US`] before `began_us`, a
+    /// line's first sound, to [`crate::attention::NAME_AT_THE_START_US`]
+    /// (1.3 s) after it: none without [`Self::hearing_near`] or any such.
+    /// Hearings are kept [`NEAR_KEPT_US`], so a line asks of its own start
+    /// whatever came since.
+    pub(crate) fn near_name(&mut self, began_us: u64) -> Option<f32> {
+        let (near, kept) = self.near.as_mut()?;
+        let now_us = monotonic_us();
+        let now_ms = unix_ms(SystemTime::now());
+        while let Ok(Some(message)) = near.recv(Duration::ZERO) {
+            if let Ok(heard) = message.parse::<lamp_msgs::NameHeard>() {
+                let ago_ms =
+                    now_ms.saturating_sub(message.header.at_unix_ms) + u64::from(heard.ago_ms);
+                if kept.len() == NEAR_HEARINGS_KEPT {
+                    kept.pop_front();
+                }
+                kept.push_back((now_us.saturating_sub(ago_ms * 1_000), heard.score));
+            }
+        }
+        kept.retain(|(at, _)| now_us.saturating_sub(*at) <= NEAR_KEPT_US);
+        let from = began_us.saturating_sub(NEAR_BEFORE_US);
+        let until = began_us.saturating_add(crate::attention::NAME_AT_THE_START_US);
+        kept.iter()
+            .filter(|(at, _)| (from..=until).contains(at))
+            .map(|(_, score)| *score)
+            .reduce(f32::max)
     }
 
     /// Whether one person said `name`, a line that was the lamp's name (or
@@ -13344,6 +13434,45 @@ mod tests {
             Message::user("I want the um, and weather in Saigon this weekend?"),
             "X then nobody then X"
         );
+    }
+
+    /// `LAMP_NAME_NEAR`: lamp-name's near hearings on the bus count for a
+    /// line's first word from 0.3 s before its first sound to 1.3 s after,
+    /// the best of them; none outside that, or without the reader.
+    #[test]
+    fn a_near_hearing_counts_only_around_the_lines_start() {
+        let root = std::path::PathBuf::from(format!("/tmp/lnn-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut heeding = Heeding::new(true, true, Some(&root), None);
+        assert_eq!(heeding.near_name(monotonic_us()), None, "no reader");
+        assert!(heeding.hearing_near());
+        let mut near = bus
+            .publisher_declared(
+                lamp_msgs::NameHeard::NEAR_TOPIC,
+                &lamp_msgs::NameHeard::declaration(),
+                "name",
+            )
+            .unwrap();
+        for score in [0.55, 0.62] {
+            near.publish_json(monotonic_us(), &lamp_msgs::NameHeard { score, ago_ms: 0 })
+                .unwrap();
+        }
+        let now = monotonic_us();
+        assert_eq!(
+            heeding.near_name(now - 500_000),
+            Some(0.62),
+            "within its start"
+        );
+        assert_eq!(
+            heeding.near_name(now + 200_000),
+            Some(0.62),
+            "just before it"
+        );
+        assert_eq!(heeding.near_name(now - 2_000_000), None, "past 1.3 s after");
+        assert_eq!(heeding.near_name(now + 1_000_000), None, "long before it");
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// `LAMP_SECOND_NAME_CARRIES` (El's P1s on first/name-carries, 22 Oct):
