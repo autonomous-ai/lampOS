@@ -6135,6 +6135,65 @@ Ready for lamp-voice: yes (#2870 only; the memory PRs await fresh native gates).
 - #2789's remaining reader-group/bus contract is still unanswered. No lamp
   access, account, group or unit changes were made.
 
+## 2026-10-22 13:14 ICT: retry and Peek merged; onboarding and callback qualified separately
+
+Ready for lamp-voice: yes (#2899 code at f6431ebcb, before its necessary new-base integration); no (#2782 current native gate).
+
+- #2774 merged as `fdf8914f338dd0c1888be2581d90275e106a0cbe`
+  from `d0168c786c0ac2bc850b8119cd623a7e3e19b2a3` on `ebc5e5c9f`.
+  First explicitly requested one more plain rebase and merge after x86
+  Clippy under the clean-rebase exception (issuecomment-6333328003).
+  Its ARM64 run finished after the merge: 39727468703 passed 10,228/0/63,
+  with all nine retry/authority, six client, five census and one repaired
+  fixture checks. Clippy 39727468821, four doctests, 12 separate process
+  checks and relay signals passed. One unchanged same-voice leaky pass.
+  Artifact 12404197478, SHA-256
+  `68af45317ea615b56703b34c10c394fda1244c6c5b2f90c4a22debd78bc2d9eb`.
+  Final local gate: 21/0/0, formatting and strict Voice Clippy.
+  Raw `/private/tmp/fourth-memory-retry-ci-20261022/rebase-d0168c786/`.
+  No source push after merge. The preceding fa13e2f86 ARM run was cancelled
+  by the requested newer push; metadata/watch retained, but GitHub's job
+  log is unavailable. No qualified count, artifact or rerun is claimed.
+- #2870 merged as `66e577e40c76d290ac100cb90d76c91cd2590fa1`.
+  Its exact head 7f6a6afe4 passed ARM64 39716259731: 1,114/0/3,
+  all 26 Peek tests including five new regressions; Clippy 39716259849,
+  four doctests, 12 separate process tests and relay passed.
+  #2789 remains partial: typed read-error/stale/recovery is delivered;
+  Voice/Records reader-group and bus-only account contract, dedicated unit,
+  and authorized lamp proof still await their owners. No permission change.
+- #2824 is PR #2899, one commit f6431ebcb on fdf8914f3.
+  Native ARM64 39729071356 passed 10,238/0/63, including all ten new
+  regressions; Clippy 39729071347, four doctests, 12 process checks and
+  relay passed. One unchanged same-voice leaky pass. CI merge 6a2336c53
+  used base 5a2bc0168. Artifact 12405162593, SHA-256
+  `5646d650ff7696327eaf87ce9357958119926d9f69faa93f20860fe74dd7800b`.
+  Host total 5,351/0/23 retains its original tested base; fresh merged-base
+  onboarding128, Skills467 and census5 each passed with no failures/ignores.
+  The bounded skill snapshot loads once before audio; later file-only
+  changes/repair require the next Voice service invocation. Host loader
+  37.063ms, service startup13.697ms, missing-file1.448ms; cached lookup pair
+  mean195ns over10,000 iterations. No acoustic or device claim.
+  Reviewer-two routed this default-behavior source read to First without
+  an implementation disposition. The same-steps52e6 walk remains an
+  authorized operator gate. New main drift has made it conflict; the owned
+  branch is being integrated and will need a new exact-head native gate.
+- #2782 is 4451c0334 on 01887391d. The real retry conflict required a
+  fresh callback extraction: parent's 40-line selection is byte-identical,
+  43-line composition matches tokens/strings, guard/Sessions unchanged,
+  and reverse extraction restores the entire parent worker. The 508-line
+  fixture moved unchanged to kept_name_callback_tests.rs for correct census
+  classification; no production grant/exemption was added. Initial census
+  4/1 retained. Fresh current-parent formatting, strict workspace Clippy,
+  all24 focused cases and workspace build pass. Clippy39730903401 passed;
+  ARM6439730903538 is running. An integration reread is required.
+  Raw `/private/tmp/fourth-kept-name-callback-checks/rebase-after-retry-20261022/latest-01887391d/`.
+- Dependency audit: #2856 waits for #2867/#2854 to merge; #2876/#2855 is
+  merged and its real-lamp5/5 check moves to Mobile's #2856 run. Product
+  activation needs Voice/Cloud/Eyes units and their configuration checks;
+  no installable photo-face skill exists yet. #2800 waits for Sixth's
+  #2797 real tone session. Neither dependency was bypassed or claimed.
+- Fourth still has no lamp. No device, account or unit actions were made.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
