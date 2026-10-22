@@ -5888,6 +5888,33 @@ Ready for lamp-voice: no (#2774 waits for the fixture merge; #2782's ARM64 gate 
   still open with Friday. The broader memory row remains 0.40 for First's
   decision; its other acceptance cases are not implied by one recall pass.
 
+## 2026-10-22 09:39 ICT: #2782 ready on its exact native result
+
+Ready for lamp-voice: yes (#2782).
+
+- Head `64282e4407c2cc2a4e289beb2d6ca877298f1150`, one commit on
+  `fourth/kept-name-callback`. ARM64 run 39710707311 passed 10,002 tests,
+  0 failed, 63 skipped, 0 selected tests unrun, plus 4 doctests,
+  12 process tests and the relay_signals harness. All three new callback
+  tests explicitly passed. The unchanged same-voice journal test was
+  marked leaky but passed. Clippy run 39710707354 passed.
+- Both jobs checked merge `d6d372864e6b611d2d1cb6ee6a1ca251673ce849`
+  against `9e7eec6e5352d605598a6fd3bac2dd9fe924496c`. Artifact 12396819631
+  is `lampos-arm64-64282e4407c2cc2a4e289beb2d6ca877298f1150`, digest
+  `sha256:433c3ab273bab96a31fd8a7b25ce77720ac4056517b63a2e860fb467fae57002`.
+- The follows-face fixture passed here in 0.807 s. This independent fresh
+  pass releases #2782 for review; it does not waive #2774's two failures.
+  #2774 stays draft until #2780 lands, followed by its rebase and fresh
+  gates. Whichever memory change lands second must preserve the other's
+  callback/retry/authority behavior and qualify its new head.
+- Counts and artifact are in the PR and Queue:
+  https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6331337046.
+  Raw receipt: `/private/tmp/fourth-kept-name-callback-ci-20261022/`.
+- The lead's later lamp-peek permission request refers to merged #2259
+  and closed #2141 (Tests). There is no open Fourth follow-up yet. A
+  read-only source/ownership audit is preparing a concrete scope for First
+  to assign; no code, permission change or lamp access is claimed.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
