@@ -1359,6 +1359,16 @@ the lamp never says how anyone looks (#1671; the first builder's 14:04).
   (`lamp_msgs::HumanSeems`, good for 5 s): a kind and a confidence only.
   No name, print or picture is kept or said. With no face near, nothing is
   said, and a reader treats no fresh value as not known.
+- **Only with the person's yes** (the reviewer-lead's P2 on #2872), kept
+  as the ears keep the yes to room sounds: `seems::due` reads
+  `/var/lib/lampOS/consent/face-expressions.json` when a read is due, and
+  only a JSON object whose `face_expressions` is exactly `"yes"` counts
+  (`seems::face_expressions_yes`). Missing, unreadable, over 4096 bytes or
+  anything else is no: no face is read, by either reader, nothing goes on
+  `humans/seems` or into `--seems-log`, and the ask comes again 2 s later.
+  The journal says once each time the yes comes or goes. The eyes still
+  look, follow faces and say who is there. Who writes the file:
+  privacy-switch.md, "Face reads stay off without a yes".
 - **The journal** says only how many reads there were in the last minute,
   how long one took on average and the longest, for the cost on a lamp.
   A read runs in the look loop, so it delays the look it comes with (one in
@@ -1418,7 +1428,8 @@ line and isn't read.
 
 **Only for the session:** it reads whoever is near the lamp, not only the
 labelled person, so at a desk it would keep the reads of anyone who stops by
-and never said yes. Turn `--seems-log` on for the labelled session alone,
+and never said yes. Nothing is read at all without the person's kept yes
+(`face-expressions.json`, above), so the session needs it too. Turn `--seems-log` on for the labelled session alone,
 with nobody else near, and off right after it; don't leave it running to its
 cap. Measure and delete it before a lamp is passed on (a reset wipes it too).
 
@@ -1459,14 +1470,22 @@ and the journal's once-a-minute line names its reader. The measure's
 logger takes the stream and splits it by `from`: `latest` holds only the
 newest, whichever reader that was.
 
-- **One reader a look.** A look where one reader has read leaves the other
-  for the next look, so a look waits for one read, never two.
-- **The 100 ms rule above holds here too.** A read with the mouth's pass to
-  reuse adds the blendshape model, about 13 ms on lamp-52e6 by the ratio
-  below. With no pass to reuse (`--mouth-on-heard on` between lines) it
-  adds a mesh pass too, about 98 ms under tract, right at the line. Before
-  anything turns this on, the read moves to its own thread, or the mesh
-  runs under ONNX Runtime (`--mouth-runtime`, 33 ms a pass).
+- **Off the look, on its own thread** (the reviewer-lead's P2 on #2872).
+  With `--seems-blendshapes` the mesh belongs to the `eyes-seems` thread:
+  when a read is due the look only cuts the near face's crop
+  (`mesh::crop`) and offers it through one slot that holds the newest
+  (`latest::worker`). A crop not taken yet is dropped for a newer one,
+  never queued, and the look never waits. The thread runs the mesh and
+  the blendshapes (85 ms under tract on lamp-52e6's big core, 290 ms on a
+  small one, 33 under `--mouth-runtime`), and the next look takes the read
+  and says it, stamped with when its face was seen, so it lasts its 5 s
+  from then. The journal's minute line says the longest is off the look.
+- **So the mouth's per-look pass doesn't run.** With `--seems-blendshapes`
+  the look loop has no mesh, and the speaking read judges from the corners,
+  as the product did before #2872. `--mouth-model` alone keeps its pass on
+  the look for the speaking read's lips, as below.
+- **One reader a look.** With `--seems` beside it, a look where one reader
+  has read leaves the other for the next look.
 - **FER+ as before:** a face it can't cut out upright is not read, and its
   clock doesn't start, so the next look tries again.
 
@@ -1502,9 +1521,8 @@ newest, whichever reader that was.
   face at 0.07–0.10 of the picture, 7–9 px between the eyes, read
   `unsure` 105 times in 106. An `unsure` from a face too small to read
   would break Mood's run of reads, so under 10 px there is no read at all.
-- **The read:** the mesh's 478 landmarks for that face, from the mouth's
-  pass if it read the same face on that look, else one mesh pass
-  (`Mesh::landmarks`). The 146 points MediaPipe's own graph takes
+- **The read:** the mesh's 478 landmarks for that face, from the thread's
+  own mesh pass on the crop (`Mesh::landmarks_of`). The 146 points MediaPipe's own graph takes
   (`blendshapes::POINTS`) are turned back by the eye line's angle to the
   frame's (`mesh::eye_line`), since the crop is turned so the eyes are
   level and the model minds a turn but not where the face sits or how
@@ -1525,8 +1543,8 @@ newest, whichever reader that was.
   back, the turned one is 0.57 off.
 - **The cost:** the model takes about a sixth of a mesh pass (0.8 ms
   against 5.1 on an x86 laptop's one thread). On lamp-52e6 a mesh pass was
-  85 ms under tract and 33 ms under ONNX Runtime (#720). So with the mouth
-  off, a read is about one mesh pass every 2 s. **Not measured on a lamp
+  85 ms under tract and 33 ms under ONNX Runtime (#720). So a read is about
+  one mesh pass every 2 s, on its own thread. **Not measured on a lamp
   yet.**
 
 Tests: a smile `positive`, a frown or a sneer `negative`, one side only or
@@ -1540,7 +1558,13 @@ is off unless given, needs `--mouth-model`,
 and is a short absolute path, given once (`main.rs`); `--seems` beside
 it runs both. A read says its reader, a message without `from` reads as
 FER+'s, and a read is a kind, a confidence and its reader only
-(`msgs/seems.rs`, `bus_out.rs`).
+(`msgs/seems.rs`, `bus_out.rs`). No yes, no read; a yes, a read; before
+its time the file isn't asked; the yes file is read as the ears' room sounds
+yes is (`a_face_is_read_only_with_the_persons_kept_yes`, `seems.rs`). A
+reader that takes 300 ms doesn't slow the offers, which stay under 50 ms,
+and of the crops offered while it reads only the newest is read
+(`a_busy_worker_never_holds_up_the_offer_and_reads_only_the_newest`,
+`latest.rs`).
 
 ### Whether anyone is at the lamp (`LAMP_PRESENCE=on`, #1677)
 
@@ -1736,8 +1760,9 @@ is chosen and converted (Face Mesh V2, `models/mouth/SOURCE.md`).
 **Measuring the mouth with Face Mesh V2 (`--mouth-model PATH`, none unless
 given, #720).** Install places the pinned model at
 `/opt/lampOS/eyes/models/face_mesh_v2.onnx` (`deploy/product/models.json`),
-and the product's unit passes it, for Blendshape V2 (#2799), so with
-`LAMP_EYES_SPEAKING=on` the product's speaking read takes the mesh. With it, the largest face in each look is cut out of the
+and the product's unit passes it, for Blendshape V2 (#2799), whose mesh
+runs on its own thread off the look, so the product's speaking read stays on
+the corners. With it alone, the largest face in each look is cut out of the
 same 320 by 240 look: its box, widened by a quarter on every side and
 turned so the eyes are level, made 256 pixels square (`src/mesh.rs`).
 The mesh reads it under tract, and with `--mouth-diagnostics on` (never in
@@ -1824,7 +1849,8 @@ measured 14.35 microseconds/look off and 36.33 on over 10,000 looks (about
 22 microseconds extra). This meets the host target only; real-device overhead
 and capture-to-decision latency remain unmeasured.
 
-**A closing camera waits for the mesh.** With `--mouth-model`, a
+**A closing camera waits for the mesh.** With `--mouth-model` (and no
+`--seems-blendshapes`, whose mesh is off the look), a
 `{"camera":false}` that arrives mid-look closes the camera once that look's
 mesh is done: up to 85 ms on a big core and 290 ms on a small one under
 tract, 33 and 154 under ONNX Runtime.

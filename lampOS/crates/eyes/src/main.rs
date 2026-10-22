@@ -13,7 +13,7 @@ file, made new each start (0600, in a folder of the owner's only), as one JSON l
 numbers: the rule's verdict, the cells past the bar and, per cell, its change over its
 noise and its change in greys after its row's median change; no grey, pixel or picture,
 and it stops after 20 minutes or 50 MB. A test flag: no unit lampOS deploys passes it
-(off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once;\n{\"close_receipt\":N} after it asks for N on eyes/camera_closed (LAMP_BUS=on) once the\ncamera is shut, with whether its last stop released the device. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there, and `tellable` beside it holds the names\nof those who said yes to being named in Who was here ({\"visits_yes\":\"NAME\"} on the\nsocket, taken only from the face at the lamp now; {\"visits_no\":\"NAME\"} takes it back). With --visits on, each remembered person\nhas one familiarity number, rising once a day they are seen and halving every 14 days,\nwith no date or time of a visit kept, and with LAMP_BUS=on the level of the one at the\nlamp is said on humans/familiar, with no name (off unless given). With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --sight-from-look on (with --full-look and --sight-file), the sight file's 320-across\nframe is encoded from the look's own decoded picture instead of the full frame being decoded\nand shrunk again (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the largest face's mouth is read each look\n(with --mouth-diagnostics on, the journal says how open, each look), and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\nWith --seems (the pinned FER+ expression model), how the near face seems is read at\nmost every 2 s, as positive, negative or unsure with a confidence, and with LAMP_BUS=on\nsaid on humans/seems, with no name and no picture; the journal says only how many reads\nthere were, how long one took and the longest, once a minute (off unless given; #1671).\nWith --seems-log (with --seems or --seems-blendshapes), each read is also written to that\nfile (0600) as its time, kind, confidence and reader, nothing of whose face, up to 20,000\nlines, for the measure; lamp-seems-measure counts it against a labelled session and\nremoves both (off unless given; #1671).\nWith --seems-blendshapes (the pinned Blendshape V2 model, with --mouth-model), the same is\nread from the mesh's points: the smiles, frowns and sneers of the near face, said and\njournaled the same way, each read naming its reader, so both may run side by side\n(off unless given; #1671). With LAMP_SEEMS_BROW_LOW=on, it also names a face negative with\nthe brows drawn down at or over 0.80 and the smiles under 0.3 (off unless set; #2132).\nWith --photo-dir (the eyes' own folder, with --recogniser), {\"remember\":\"NAME\",\"photo\":\"FILE\"}\non the who socket takes the one face in that JPEG in the folder and removes the file once\nread (no picture is kept); the face is kept unconfirmed until its person says yes at the\nlamp, and deleted if not (off unless given).\nWith LAMP_TURN_TO_ANSWERED=on (with LAMP_BUS=on and LAMP_EYES_SPEAKING=on), as the voice\nbegins an answer (voice/state on the bus), the one face seen speaking just before is the\none sent to --body-socket until the answer ends; while it is out of view nothing is sent (off unless given; #1810).\nWith --mouth-diagnostics on (off by default), one numeric journal record per look explains\nthe largest detection's speaking decision. Requires LAMP_BUS=on and LAMP_EYES_SPEAKING=on;\nnever enables inference and records no IDs, landmarks, images, sound or words.\n";
+(off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once;\n{\"close_receipt\":N} after it asks for N on eyes/camera_closed (LAMP_BUS=on) once the\ncamera is shut, with whether its last stop released the device. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there, and `tellable` beside it holds the names\nof those who said yes to being named in Who was here ({\"visits_yes\":\"NAME\"} on the\nsocket, taken only from the face at the lamp now; {\"visits_no\":\"NAME\"} takes it back). With --visits on, each remembered person\nhas one familiarity number, rising once a day they are seen and halving every 14 days,\nwith no date or time of a visit kept, and with LAMP_BUS=on the level of the one at the\nlamp is said on humans/familiar, with no name (off unless given). With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --sight-from-look on (with --full-look and --sight-file), the sight file's 320-across\nframe is encoded from the look's own decoded picture instead of the full frame being decoded\nand shrunk again (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the largest face's mouth is read each look\n(with --mouth-diagnostics on, the journal says how open, each look), and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\nWith --seems (the pinned FER+ expression model), how the near face seems is read at\nmost every 2 s, as positive, negative or unsure with a confidence, and with LAMP_BUS=on\nsaid on humans/seems, with no name and no picture, and only while the person's yes is kept\nin /var/lib/lampOS/consent/face-expressions.json ({\"face_expressions\":\"yes\"}; none, no\nread: the eyes still look); the journal says only how many reads\nthere were, how long one took and the longest, once a minute (off unless given; #1671).\nWith --seems-log (with --seems or --seems-blendshapes), each read is also written to that\nfile (0600) as its time, kind, confidence and reader, nothing of whose face, up to 20,000\nlines, for the measure; lamp-seems-measure counts it against a labelled session and\nremoves both (off unless given; #1671).\nWith --seems-blendshapes (the pinned Blendshape V2 model, with --mouth-model), the same is\nread from the mesh's points: the smiles, frowns and sneers of the near face, said and\njournaled the same way and with the same yes, each read naming its reader, so both may run\nside by side (off unless given; #1671). The mesh and this read then run on their own thread\nwith the newest near face's crop, and no look waits on them; the mouth's per-look pass\ndoesn't run, so the speaking read judges from the corners. With LAMP_SEEMS_BROW_LOW=on, it also names a face negative with\nthe brows drawn down at or over 0.80 and the smiles under 0.3 (off unless set; #2132).\nWith --photo-dir (the eyes' own folder, with --recogniser), {\"remember\":\"NAME\",\"photo\":\"FILE\"}\non the who socket takes the one face in that JPEG in the folder and removes the file once\nread (no picture is kept); the face is kept unconfirmed until its person says yes at the\nlamp, and deleted if not (off unless given).\nWith LAMP_TURN_TO_ANSWERED=on (with LAMP_BUS=on and LAMP_EYES_SPEAKING=on), as the voice\nbegins an answer (voice/state on the bus), the one face seen speaking just before is the\none sent to --body-socket until the answer ends; while it is out of view nothing is sent (off unless given; #1810).\nWith --mouth-diagnostics on (off by default), one numeric journal record per look explains\nthe largest detection's speaking decision. Requires LAMP_BUS=on and LAMP_EYES_SPEAKING=on;\nnever enables inference and records no IDs, landmarks, images, sound or words.\n";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Usb {
@@ -679,20 +679,40 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         eprintln!("lamp-eyes: photos are off until the photo folder is ready: {error}");
     }
     let detector = Detector::load(&arguments.model)?;
-    let mut mesh = match (&arguments.mouth_model, &arguments.mouth_runtime) {
-        (Some(model), Some(runtime)) => {
-            Some(lamp_eyes::mesh::Mesh::load_with_runtime(model, runtime)?)
-        }
-        (Some(model), None) => Some(lamp_eyes::mesh::Mesh::load(model)?),
-        (None, _) => None,
+    let load_mesh = || -> Result<_, Box<dyn std::error::Error + Send + Sync>> {
+        Ok(match (&arguments.mouth_model, &arguments.mouth_runtime) {
+            (Some(model), Some(runtime)) => {
+                Some(lamp_eyes::mesh::Mesh::load_with_runtime(model, runtime)?)
+            }
+            (Some(model), None) => Some(lamp_eyes::mesh::Mesh::load(model)?),
+            (None, _) => None,
+        })
+    };
+    // With --seems-blendshapes the mesh is the seems worker's, off the look
+    // (85 ms on a big core, 290 ms on a small one under tract: the
+    // reviewer-lead's P2 on #2872), so no look waits on it and the speaking
+    // read judges from the corners. Without it, the mouth's pass runs on
+    // the look as before, for the speaking read's lips.
+    let mut mesh = if arguments.seems_blendshapes.is_some() {
+        None
+    } else {
+        load_mesh()?
     };
     // With --seems and/or --seems-blendshapes, how the near face seems
     // (#1671), each reader on its own: the reads, and how many there were
     // and how long they took, for the journal once a minute. With both, the
     // two run side by side for the measure (the first builder, 09:51).
+    /// One read's outcome, how long it took and when its face was seen.
+    type SeemsRead = (Result<lamp_msgs::HumanSeems, String>, Duration, u64);
     enum Reader {
         FerPlus(lamp_eyes::seems::Reader),
-        Blendshapes(lamp_eyes::blendshapes::Reader),
+        /// On its own thread with its own mesh: the look only cuts the
+        /// face's crop and offers it, newest only, and takes the reads
+        /// that are done.
+        Blendshapes {
+            latest: lamp_eyes::latest::Latest<(Vec<f32>, (f32, f32), u64)>,
+            done: std::sync::mpsc::Receiver<SeemsRead>,
+        },
     }
     struct Seems {
         reader: Reader,
@@ -708,14 +728,29 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         readers.push(Reader::FerPlus(lamp_eyes::seems::Reader::load(model)?));
     }
     if let Some(model) = &arguments.seems_blendshapes {
-        readers.push(Reader::Blendshapes(
-            lamp_eyes::blendshapes::Reader::load(model)?.with_brow_low(
-                std::env::var(lamp_eyes::blendshapes::BROW_LOW_ENVIRONMENT)
-                    .ok()
-                    .as_deref()
-                    == Some("on"),
-            ),
-        ));
+        let reader = lamp_eyes::blendshapes::Reader::load(model)?.with_brow_low(
+            std::env::var(lamp_eyes::blendshapes::BROW_LOW_ENVIRONMENT)
+                .ok()
+                .as_deref()
+                == Some("on"),
+        );
+        let mut mesh = load_mesh()?.ok_or("--seems-blendshapes needs --mouth-model")?;
+        let (latest, done) = lamp_eyes::latest::worker(
+            "eyes-seems",
+            move |(input, eye_line, at_us): (Vec<f32>, (f32, f32), u64)| -> SeemsRead {
+                let began = Instant::now();
+                let read = mesh
+                    .landmarks_of(input)
+                    .map_err(|error| error.to_string())
+                    .and_then(|landmarks| {
+                        lamp_eyes::blendshapes::points(&landmarks, eye_line)
+                            .ok_or_else(|| "no face to read".to_owned())
+                    })
+                    .and_then(|points| reader.read(&points).map_err(|error| error.to_string()));
+                (read, began.elapsed(), at_us)
+            },
+        )?;
+        readers.push(Reader::Blendshapes { latest, done });
     }
     let mut seems: Vec<Seems> = readers
         .into_iter()
@@ -728,6 +763,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             told_at: Instant::now(),
         })
         .collect();
+    // Whether the person's yes to face reads was there at the last ask, for
+    // the journal's one line each time it changes.
+    let mut face_yes_told: Option<bool> = None;
     // With --seems-log, each read's time, kind, confidence and reader, for
     // the measure (#1671, step 0): nothing of whose face.
     let mut seems_log = match &arguments.seems_log {
@@ -1857,9 +1895,6 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             }
                         }
                         let mut opens = vec![None; faces.len()];
-                        // The mouth's landmarks and whose they are, for the
-                        // blendshapes' read of the same face on this look.
-                        let mut meshed: Option<(usize, Vec<f32>)> = None;
                         if let Some(mesh) = mesh.as_mut()
                             && (heard_lines.is_none() || heard.hears(now_us))
                             && let Some((largest, face)) = faces
@@ -1868,13 +1903,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 .max_by(|a, b| a.1.height.total_cmp(&b.1.height))
                         {
                             let began = Instant::now();
-                            let open = mesh.landmarks(&picture, face).map(|landmarks| {
-                                landmarks.and_then(|landmarks| {
-                                    let open = lamp_eyes::mesh::mouth_open(&landmarks);
-                                    meshed = Some((largest, landmarks));
-                                    open
-                                })
-                            });
+                            let open = mesh.mouth_open(&picture, face);
                             let eyes = lamp_eyes::speaking::shape(&face.marks)
                                 .map_or(0.0, |shape| shape.1);
                             match open {
@@ -1982,11 +2011,14 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 }
                             }
                         }
-                        // How the near face seems, at most every 2 s: a
-                        // kind and a confidence on the bus, nothing kept.
+                        // How the near face seems, at most every 2 s and
+                        // only with the person's kept yes (privacy-switch.md):
+                        // a kind and a confidence on the bus, nothing kept.
                         // One reader a look, so two readers' times never
                         // add up in one look's delay (the reviewer on
                         // #2132): the other's turn comes on the next.
+                        // Blendshape V2 adds none: its read is offered to
+                        // its worker and taken here once done.
                         let mut read_this_look = false;
                         for seems in seems.iter_mut() {
                             // A far face, its eyes too close together to
@@ -1995,21 +2027,48 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 &faces,
                                 picture.filled.1.max(1) as f32,
                             );
+                            let due = !read_this_look
+                                && near.is_some()
+                                && match lamp_eyes::seems::due(
+                                    seems.read_at,
+                                    std::path::Path::new(lamp_eyes::seems::FACE_EXPRESSIONS_FILE),
+                                ) {
+                                    lamp_eyes::seems::Due::NotYet => false,
+                                    lamp_eyes::seems::Due::NoYes => {
+                                        // Asked again in 2 s, not every look.
+                                        seems.read_at = Some(Instant::now());
+                                        if face_yes_told != Some(false) {
+                                            eprintln!(
+                                                "lamp-eyes: no yes to face reads in {}: no face is read",
+                                                lamp_eyes::seems::FACE_EXPRESSIONS_FILE
+                                            );
+                                            face_yes_told = Some(false);
+                                        }
+                                        false
+                                    }
+                                    lamp_eyes::seems::Due::Now => {
+                                        if face_yes_told != Some(true) {
+                                            eprintln!(
+                                                "lamp-eyes: a yes to face reads in {}: the near face is read",
+                                                lamp_eyes::seems::FACE_EXPRESSIONS_FILE
+                                            );
+                                            face_yes_told = Some(true);
+                                        }
+                                        true
+                                    }
+                                };
                             // FER+ reads the face cut out upright, once its
                             // read is due; a face that can't be is not read,
                             // and the next look tries again, as before
                             // Blendshape V2 (the reviewer on #2132).
-                            let due = !read_this_look
-                                && seems.read_at.is_none_or(|at| {
-                                    at.elapsed() >= lamp_eyes::seems::READ_EVERY
-                                });
                             let aligned = match (&seems.reader, near) {
                                 (Reader::FerPlus(_), Some((_, face))) if due => {
                                     align(&picture, &face.marks)
                                 }
                                 _ => None,
                             };
-                            if let Some((index, face)) = near
+                            let mut reads: Vec<SeemsRead> = Vec::new();
+                            if let Some((_, face)) = near
                                 && due
                                 && (aligned.is_some()
                                     || !matches!(seems.reader, Reader::FerPlus(_)))
@@ -2017,39 +2076,39 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 let began = Instant::now();
                                 seems.read_at = Some(began);
                                 read_this_look = true;
-                                let read = match &seems.reader {
+                                let at_us = lamp_ipc::monotonic_us();
+                                match &seems.reader {
                                     Reader::FerPlus(reader) => {
-                                        aligned.map(|aligned| reader.read(&aligned))
+                                        let read = aligned
+                                            .map(|aligned| reader.read(&aligned))
+                                            .unwrap_or_else(|| Err("no face to read".into()))
+                                            .map_err(|error| error.to_string());
+                                        reads.push((read, began.elapsed(), at_us));
                                     }
-                                    // The mouth's pass's landmarks if they
-                                    // are this face's, else one pass now.
-                                    Reader::Blendshapes(reader) => {
-                                        let landmarks = match meshed.take() {
-                                            Some((meshed, landmarks)) if meshed == index => {
-                                                Ok(Some(landmarks))
+                                    // Only the crop is cut here; an older
+                                    // one not yet taken is dropped for it.
+                                    Reader::Blendshapes { latest, .. } => {
+                                        match lamp_eyes::mesh::crop(&picture, face)
+                                            .zip(lamp_eyes::mesh::eye_line(face))
+                                        {
+                                            Some((input, eye_line)) => {
+                                                latest.offer((input, eye_line, at_us));
                                             }
-                                            _ => mesh
-                                                .as_mut()
-                                                .ok_or("no mesh")
-                                                .map_err(Into::into)
-                                                .and_then(|mesh| mesh.landmarks(&picture, face)),
-                                        };
-                                        match landmarks {
-                                            Ok(landmarks) => landmarks
-                                                .zip(lamp_eyes::mesh::eye_line(face))
-                                                .and_then(|(landmarks, eye_line)| {
-                                                    lamp_eyes::blendshapes::points(
-                                                        &landmarks, eye_line,
-                                                    )
-                                                })
-                                                .map(|points| reader.read(&points)),
-                                            Err(error) => Some(Err(error)),
+                                            None => reads.push((
+                                                Err("no face to read".into()),
+                                                began.elapsed(),
+                                                at_us,
+                                            )),
                                         }
                                     }
-                                };
-                                match read.unwrap_or_else(|| Err("no face to read".into())) {
+                                }
+                            }
+                            if let Reader::Blendshapes { done, .. } = &seems.reader {
+                                reads.extend(done.try_iter());
+                            }
+                            for (read, took, at_us) in reads {
+                                match read {
                                     Ok(read) => {
-                                        let took = began.elapsed();
                                         seems.reads += 1;
                                         seems.spent += took;
                                         seems.longest = seems.longest.max(took);
@@ -2061,8 +2120,11 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                                 eprintln!("lamp-eyes: {said}");
                                             }
                                         }
+                                        // As of when the face was seen, so a
+                                        // read done off the look lasts no
+                                        // longer for it (`HumanSeems::LASTS`).
                                         if let Some(bus) = bus_out.as_mut() {
-                                            bus.seems(read, lamp_ipc::monotonic_us());
+                                            bus.seems(read, at_us);
                                         }
                                     }
                                     Err(error) => {
@@ -2073,14 +2135,18 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             if seems.told_at.elapsed() >= Duration::from_secs(60) {
                                 if seems.reads > 0 {
                                     eprintln!(
-                                        "lamp-eyes: {} face reads by {} in the last minute, {} ms each, the longest {} ms (that look's delay)",
+                                        "lamp-eyes: {} face reads by {} in the last minute, {} ms each, the longest {} ms ({})",
                                         seems.reads,
                                         match seems.reader {
                                             Reader::FerPlus(_) => "FER+",
-                                            Reader::Blendshapes(_) => "Blendshape V2",
+                                            Reader::Blendshapes { .. } => "Blendshape V2",
                                         },
                                         seems.spent.as_millis() / u128::from(seems.reads),
-                                        seems.longest.as_millis()
+                                        seems.longest.as_millis(),
+                                        match seems.reader {
+                                            Reader::FerPlus(_) => "that look's delay",
+                                            Reader::Blendshapes { .. } => "off the look, on its own thread",
+                                        },
                                     );
                                 }
                                 seems.told_at = Instant::now();
