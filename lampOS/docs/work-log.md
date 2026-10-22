@@ -1,3 +1,40 @@
+## Current checkpoint: 2026-10-22 09:58 +07, failed-unit candidate on the coordinated base
+
+**#2764:** Pushed `93d93ecb1415d1e3b97a7a94d3852fa10cb03018` on
+`fab69b0c4c4333ff8d51459e063169af7355e1dc`, after verifying the remote base.
+[Rebase and fresh gate](verification/report-failed-units-rebase-fab69-20261022/README.md)
+record an equal Cloud patch, unchanged complete Cloud tree, fresh fmt
+**4.767 s**, strict Cloud Clippy **13.023 s**, and **177 passed / 0 failed /
+1 ignored / 0 filtered out** in **65.491 s**. All 453 captured source hashes
+stayed fixed. The successful unpublished `667b03d9e` / `a52357bb0` gate is
+retained separately: the pre-push guard withheld it when the base advanced.
+No source correction or test failure was involved.
+
+New-head Linux Clippy **39713887283** is green; ARM64 **39713887288**
+continues. Readiness remains pending. Reviewer-two and Blue are coordinating
+the current-base merge window; whichever candidate qualifies first goes first,
+then the other can rebase once. First has been asked to include Music's merge
+in this coordination. Reviewer-two's independent source read of the preceding
+Cloud head still found no P1/P2 and passed **177/0/1 ignored**.
+
+**#1757** `d96f484ec` is pushed, mergeable and non-draft. Linux Clippy
+**39713220653** is green; ARM64 **39713220661** continues. The captured
+Clippy checkout tests merge `be24496f5`, parents `fab69b0c4` and `d96f484ec`;
+the final native receipt must confirm both jobs agree. The range-diff and
+fresh five-crate **4854/0/14/0** are posted on #1757 and #2602. First has
+confirmed the PR is in their read queue, after the installer and other lane work.
+
+**#2767** `19d1a46d9` remains with First for its installer read/merge.
+**Metadata diagnostics** is being prepared against Music's tested merge on
+its own branch: all six follow-up files remain identical, and fresh Skills
+gates are running. P3 `fb714e28c` is pushed separately. Both follow-up PRs
+wait for Music's merge as assigned. No device action, local ARM64 build or
+full local workspace gate.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 09:49 +07, Music rebase pushed with fresh five-crate gate
 
 **#1757:** Pushed `d96f484ec0567ecd66819cb45bd44f5c39961118`, rebased on

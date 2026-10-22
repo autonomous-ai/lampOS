@@ -1,0 +1,130 @@
+{
+  "old_head": "a50f88224132066826946c452b1a52fd44568459",
+  "old_base": "17fdfda1d757324b8437d997304e855e8ecbf9dd",
+  "new_base": "fab69b0c4c4333ff8d51459e063169af7355e1dc",
+  "source_hashes_before": {
+    "lampOS/crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "lampOS/crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68",
+    "lampOS/docs/cloud.md": "d451ae1ddccefd377ef9fa7c103e5c4d376da773e9f0d31b7594004c74930d2b"
+  },
+  "cloud_tree_before": "1dd3e10a85ee130c788c245b789a6ae779c6434f",
+  "upstream_changed_files": [
+    "lampOS/crates/body/src/bin/lamp-body.rs",
+    "lampOS/crates/body/src/body.rs",
+    "lampOS/crates/body/src/body/tests.rs",
+    "lampOS/crates/body/src/bus_out.rs",
+    "lampOS/crates/body/src/gaze.rs",
+    "lampOS/crates/skills/src/lib.rs",
+    "lampOS/crates/skills/src/visits.rs",
+    "lampOS/crates/skills/src/watch.rs",
+    "lampOS/crates/skills/tests/it/skills.rs",
+    "lampOS/crates/voice/src/agent_tasks.rs",
+    "lampOS/crates/voice/src/coordinator.rs",
+    "lampOS/crates/voice/src/coordinator/tests/duplex.rs",
+    "lampOS/crates/voice/src/lib.rs",
+    "lampOS/crates/voice/src/made_skill.rs",
+    "lampOS/crates/voice/src/provider_worker/reminder_policy.rs",
+    "lampOS/crates/voice/src/skill_words.rs",
+    "lampOS/crates/voice/src/task_news.rs",
+    "lampOS/crates/voice/src/turn_taking.rs",
+    "lampOS/docs/body.md",
+    "lampOS/docs/duplex-listening.md",
+    "lampOS/docs/install.md",
+    "lampOS/docs/skills.md",
+    "lampOS/docs/speaking-first.md",
+    "lampOS/docs/switches.md",
+    "lampOS/docs/tasks.md",
+    "lampOS/skills/look-for-things/SKILL.md",
+    "lampOS/skills/reminders/SKILL.md",
+    "lampOS/skills/reminders/skill.toml",
+    "lampOS/skills/task-news/SKILL.md",
+    "lampOS/skills/task-news/skill.toml"
+  ],
+  "intermediate_unpushed_head": "667b03d9e7cfa724de09f41f1f99a21c52b11c9d",
+  "intermediate_base": "a52357bb02895c2a0bedc139cf2aee31cf1601a9",
+  "intermediate_push_withheld_reason": "The pre-push base check found fab69b0c4 after a successful focused gate on a52357bb0; no push was attempted.",
+  "new_head": "93d93ecb1415d1e3b97a7a94d3852fa10cb03018",
+  "source_hashes_after": {
+    "lampOS/crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "lampOS/crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68",
+    "lampOS/docs/cloud.md": "d451ae1ddccefd377ef9fa7c103e5c4d376da773e9f0d31b7594004c74930d2b"
+  },
+  "cloud_tree_after": "1dd3e10a85ee130c788c245b789a6ae779c6434f",
+  "range_diff": "1:  a50f88224 = 1:  93d93ecb1 lampOS: report currently failed product units",
+  "new_local_gate_required": "Skills, Body and Voice production changed upstream; rerun Cloud fmt, strict Clippy and tests.",
+  "remote_base_verified_before_push": "fab69b0c4c4333ff8d51459e063169af7355e1dc",
+  "fresh_mac_gate": {
+    "status": "passed",
+    "head": "93d93ecb1415d1e3b97a7a94d3852fa10cb03018",
+    "stages": [
+      {
+        "name": "fmt",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 4.767,
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered out": 0
+        },
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "clippy",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-cloud",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 13.023,
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered out": 0
+        },
+        "log_sha256": "0b231784b5a881a517ba267f0cc462b4349429e2fed25faa434a87585307497a"
+      },
+      {
+        "name": "tests",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--no-fail-fast",
+          "-p",
+          "lamp-cloud",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 65.491,
+        "counts": {
+          "passed": 177,
+          "failed": 0,
+          "ignored": 1,
+          "filtered out": 0
+        },
+        "log_sha256": "2a63726d82352b276eb29c152c1ed49efc02070b4c67d5aed0b632bbcab559b1"
+      }
+    ]
+  }
+}
