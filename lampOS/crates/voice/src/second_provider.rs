@@ -928,10 +928,10 @@ struct SaidBy {
 }
 
 /// lamp-name's best near hearing (`name/near`, `LAMP_NAME_NEAR`) around a
-/// line's start, by its first sound's read time (`worker::Heeding::near_name`),
-/// and whether a face is turned to the lamp now, as the eyes' newest look
-/// says (`worker::Heeding::turned_to_the_lamp`).
-pub type NameNear = Arc<dyn Fn(u64) -> (Option<f32>, bool) + Send + Sync>;
+/// line's start, by the line's window (its first and last sound's read
+/// times; `worker::Heeding::near_name`), and whether a face turned to the
+/// lamp said it (`worker::Heeding::turned_to_the_lamp`).
+pub type NameNear = Arc<dyn Fn((u64, u64)) -> (Option<f32>, bool) + Send + Sync>;
 
 /// The least near score that, beside a first word set off and sounding
 /// like the name, makes it the name (`LAMP_NAME_NEAR`): lamp-name's own
@@ -978,18 +978,16 @@ fn like_the_name(word: &str) -> LikeTheName {
     if HEARD_FOR_THE_NAME.contains(&word.as_str()) {
         return LikeTheName::AsHeard;
     }
-    let vowel = |c: char| "aeiouy".contains(c);
-    // A silent "e" after a consonant ends no syllable: "line", "lane".
-    let spoken = match word.strip_suffix('e') {
-        Some(stem) if stem.chars().last().is_some_and(|c| !vowel(c)) => stem,
-        _ => word.as_str(),
-    };
-    let spoken = spoken
-        .strip_suffix("mb")
-        .map_or(spoken.to_owned(), |stem| format!("{stem}m"));
-    if NAMES_OF_ITS_SHAPE.contains(&spoken.as_str()) {
+    let spoken = spoken_form(&word);
+    // Each name as it is spoken too, so "Leanne" is "leann" on both sides
+    // (reviewer-three's P3 on 1600b0a69).
+    if NAMES_OF_ITS_SHAPE
+        .iter()
+        .any(|name| spoken_form(name) == spoken)
+    {
         return LikeTheName::Not;
     }
+    let vowel = |c: char| "aeiouy".contains(c);
     let syllables = spoken
         .chars()
         .zip(std::iter::once(' ').chain(spoken.chars()))
@@ -1000,6 +998,20 @@ fn like_the_name(word: &str) -> LikeTheName {
     } else {
         LikeTheName::Not
     }
+}
+
+/// A lower-case word as it is spoken, for its shape: a silent "e" after a
+/// consonant let go ("line", "lane": it ends no syllable), and "-mb" as
+/// an M ("Lamb").
+fn spoken_form(word: &str) -> String {
+    let vowel = |c: char| "aeiouy".contains(c);
+    let spoken = match word.strip_suffix('e') {
+        Some(stem) if stem.chars().last().is_some_and(|c| !vowel(c)) => stem,
+        _ => word,
+    };
+    spoken
+        .strip_suffix("mb")
+        .map_or(spoken.to_owned(), |stem| format!("{stem}m"))
 }
 
 /// Whether a word sounds like the lamp's name at all ([`like_the_name`]).
@@ -1033,13 +1045,14 @@ fn first_word_set_off(text: &str) -> Option<(usize, usize)> {
 /// `LAMP_NAME_NEAR`: `text`'s first word, set off and sounding like the
 /// lamp's name, is the name when lamp-name heard it near
 /// ([`NAME_NEAR_LEAST`] or more) within 1.3 s of the line's first sound
-/// (`began_us`), and, when only its shape is the name's
+/// (the first of `window`), and, when only its shape is the name's
 /// ([`LikeTheName::Shape`]: "Leon, pass me that" is a colleague called),
-/// a face is turned to the lamp (reviewer-three's P2 on 194accd24). It is
+/// a face turned to the lamp said it (reviewer-three's P2 on 194accd24;
+/// with speaking faces read, one seen speaking, the P3 on 1600b0a69). It is
 /// put in the word's place, so the rule and the model read the call. Any
 /// sign missing changes nothing, and the journal says which held, counts
 /// only.
-fn named_near(request: u64, text: String, began_us: u64, near: &NameNear) -> String {
+fn named_near(request: u64, text: String, window: (u64, u64), near: &NameNear) -> String {
     let Some((start, end)) = first_word_set_off(&text) else {
         return text;
     };
@@ -1048,7 +1061,7 @@ fn named_near(request: u64, text: String, began_us: u64, near: &NameNear) -> Str
         return text;
     }
     let like = like_the_name(word);
-    let (heard, turned) = near(began_us);
+    let (heard, turned) = near(window);
     let near_enough = heard.filter(|score| *score >= NAME_NEAR_LEAST);
     let named = match (like, near_enough) {
         (LikeTheName::AsHeard, Some(score)) => Some(format!(
@@ -3990,9 +4003,12 @@ async fn spoken(
     // with an earlier piece's words, whose start is not this line's
     // (reviewer-three's P3 on 194accd24).
     let text = match &shared.name_near {
-        Some(near) if !went_on => {
-            named_near(request, text, said.lock().map_or(0, |said| said.0), near)
-        }
+        Some(near) if !went_on => named_near(
+            request,
+            text,
+            said.lock().map_or((0, 0), |said| *said),
+            near,
+        ),
         _ => text,
     };
     // Said by the lamp's name just before, whose request this line dropped
