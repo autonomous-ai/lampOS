@@ -1,3 +1,30 @@
+## Current checkpoint: 2026-10-22 08:55 +07, failed-unit head includes Controls base
+
+**#2764:** Pushed `87154f0530c1b1cf3519f748cc9d5919424cf72e` on
+`2d953bb5a241b9e4c71d3c82af32dc9b14efb38c`, verifying the remote base
+immediately before push. Equal range-diff, identical complete Cloud tree and
+unchanged source/document hashes; no source correction. Controls changed in
+the base and is used by dependencies. Fresh fmt, strict Cloud Clippy and
+**177 passed / 0 failed / 1 ignored / 0 filtered out** passed. [Rebase and gate](verification/report-failed-units-rebase-2d953-20261022/README.md)
+are published. ARM64 **39708347268** and Linux Clippy **39708347385** are
+this head's runs. Ready for lamp-voice: **no**, new-head native qualification
+pending. Reviewer-two owns the final current-base check and merge.
+
+The superseded `1114e4b8f` passed both native runs: **9998 passed / 0 failed /
+63 skipped** (one leaky pass), four doc tests, twelve process-harness tests,
+relay and all three new Cloud tests. [Its complete native receipt](verification/report-failed-units-rebase-a498-native-20261022/README.md)
+verifies merge `8a74f8d02` and both parents and is explicitly historical.
+First and Reviewer-two have been asked to coordinate a merge window because
+repeated base advances otherwise require another CI cycle under this gate.
+
+**#1757** `bd1d79a5a` and **#2767** `19d1a46d9` remain with First for
+Music merge and installer read/merge. The dependent Music follow-ups are
+prepared. No device action, full local workspace gate or local ARM64 build.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 08:39 +07, failed-unit current-base rebase pushed
 
 **#2764:** Reviewer-two's final check kept **P1/P2 none** but requires the

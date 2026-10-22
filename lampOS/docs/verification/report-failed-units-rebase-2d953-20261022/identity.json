@@ -1,0 +1,27 @@
+{
+  "old_head": "1114e4b8f2030cac4ca1315d94bd07f94cf6ecd9",
+  "old_base": "a498ecc030a9c28419aef3b7de89486664868440",
+  "new_head": "87154f0530c1b1cf3519f748cc9d5919424cf72e",
+  "new_base": "2d953bb5a241b9e4c71d3c82af32dc9b14efb38c",
+  "cloud_tree_before": "1dd3e10a85ee130c788c245b789a6ae779c6434f",
+  "cloud_tree_after": "1dd3e10a85ee130c788c245b789a6ae779c6434f",
+  "source_hashes_before": {
+    "lampOS/crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "lampOS/crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68",
+    "lampOS/docs/cloud.md": "d451ae1ddccefd377ef9fa7c103e5c4d376da773e9f0d31b7594004c74930d2b"
+  },
+  "source_hashes_after": {
+    "lampOS/crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "lampOS/crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68",
+    "lampOS/docs/cloud.md": "d451ae1ddccefd377ef9fa7c103e5c4d376da773e9f0d31b7594004c74930d2b"
+  },
+  "range_diff": "1:  1114e4b8f = 1:  87154f053 lampOS: report currently failed product units",
+  "upstream_changed_files": [
+    "lampOS/crates/controls/src/main.rs",
+    "lampOS/crates/controls/src/pins.rs",
+    "lampOS/crates/controls/tests/it/main.rs",
+    "lampOS/crates/controls/tests/it/touch_from.rs",
+    "lampOS/docs/controls.md"
+  ],
+  "remote_base_verified_before_push": "2d953bb5a241b9e4c71d3c82af32dc9b14efb38c"
+}

@@ -1,0 +1,1 @@
+1:  1114e4b8f = 1:  87154f053 lampOS: report currently failed product units
