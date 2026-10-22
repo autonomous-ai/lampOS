@@ -429,6 +429,20 @@ impl Real {
     }
 }
 
+/// `system.info`'s `reset` from the controls' pins at `pins` (#2937):
+/// `hold` with a `reset` line (a product lamp), `none` without (a lamp moved
+/// from V1, whose pins never carry one); none for a file that can't be read
+/// as an object, so the app reads it as before.
+fn reset_of(pins: &std::path::Path) -> Option<&'static str> {
+    let pins: serde_json::Map<String, Value> =
+        serde_json::from_str(&std::fs::read_to_string(pins).ok()?).ok()?;
+    Some(if pins.contains_key("reset") {
+        "hold"
+    } else {
+        "none"
+    })
+}
+
 #[derive(serde::Deserialize)]
 struct Level {
     volume: u8,
@@ -582,6 +596,10 @@ impl Lamp for Real {
             .run
             .join(RECOVERY_ON.trim_start_matches("/run/"))
             .exists()
+    }
+
+    fn reset(&self) -> Option<&'static str> {
+        reset_of(&self.places.etc.join("lampOS/controls/controls-pins.json"))
     }
 
     fn texting(&self) -> bool {
@@ -841,6 +859,28 @@ mod tests {
         assert!(lamp.recovery());
         let _ = std::fs::remove_dir_all(root);
         assert_eq!(RECOVERY_ON, lamp_setup::recover::ON_FILE);
+    }
+
+    /// #2937: the reset the app is told, from the controls' pins: `hold`
+    /// with a reset line, `none` without one (a lamp moved from V1), and
+    /// nothing when the pins can't be read.
+    #[test]
+    fn the_reset_is_read_from_the_controls_pins() {
+        let (places, root) = places("reset");
+        let pins = places.etc.join("lampOS/controls/controls-pins.json");
+        assert_eq!(reset_of(&pins), None);
+        std::fs::create_dir_all(pins.parent().unwrap()).unwrap();
+        std::fs::write(
+            &pins,
+            "{\"chip\":\"/dev/gpiochip0\",\"reset\":{\"name\":\"reset\",\"line\":100}}",
+        )
+        .unwrap();
+        assert_eq!(reset_of(&pins), Some("hold"));
+        std::fs::write(&pins, "{\"chip\":\"/dev/gpiochip0\",\"legacy_head\":true}").unwrap();
+        assert_eq!(reset_of(&pins), Some("none"));
+        std::fs::write(&pins, "[1]").unwrap();
+        assert_eq!(reset_of(&pins), None);
+        let _ = std::fs::remove_dir_all(root);
     }
 
     /// The volume goes through `lamp-actions`' socket, in its own line

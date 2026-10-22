@@ -27,6 +27,7 @@ lamp-msgs = { path = "../msgs" }
 lamp-update = { path = "../update", optional = true }
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 
 [lints]
 workspace = true

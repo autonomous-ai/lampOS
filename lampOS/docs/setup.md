@@ -769,6 +769,52 @@ above, not yet run on a lamp). Setup pressed to `connected` and the marker:
 and #811 (the two settings files, `provider.json`, the voice's sessions
 folder, the lock folders' modes).
 
+## A lamp moved from V1 (the generic package, #2937)
+
+A V1 lamp moved to V2's generic lamp-os package (#2163, #2396) gets setup
+as a product lamp has it, so a person who changes router can join the new
+Wi-Fi without a put-back to V1:
+
+- **The units** (`deploy/units/`): `lamp-setup.service` and
+  `lamp-setup-recover.service`, the product's twins with the same commands,
+  conditions and hardening; no reset unit (below). A test
+  (`the_generic_package_sets_up_and_resets_as_the_product_does`,
+  `crates/update/src/unit.rs`) holds them to the product's, and names
+  setup's product units a moved lamp does not get yet (the app's Wi-Fi,
+  settings and own-key changes after setup, and the marker's path unit).
+- **The settings** (`lamp-keeper prepare`, [keeper.md](keeper.md)): where
+  missing, `serve-own-page.json` and `reset-plan-product.json`, the pair
+  `install --setup on` writes, and, with the plan, setup's marker. A moved
+  lamp got the package over its home's Wi-Fi, so it is set up already, and
+  the move never opens a hotspot. A lamp with the plan and no marker was
+  put back into setup, and prepare leaves it so.
+- **No 5 s reset on a moved lamp** (the first builder on #2975, after El's
+  P1): the generic controls run without `--touch` and the pins never carry
+  `reset`, whatever the lamp's own V1 wiring says. V1's wired head pad
+  idles high and goes low on a touch, as a pulled-up button does, so a pad
+  on line 100 can't be told from the reset button, and a hand on the head
+  must never wipe a lamp. lamp-cloud's `system.info` says `"reset": "none"`
+  for it, so the app sends its person to the hotspot instead. This stays
+  until a real V1 pad on line 100 has been measured and a safe way to tell
+  them apart is shown.
+- **Its way to a new Wi-Fi** is setup's hotspot when the saved network is
+  gone (#3020, below), with `LAMP_WIFI_RECOVERY=on` on its
+  `lamp-setup-recover.service` (Fourteen's P2 on #2977). Off, the unit says
+  so and exits at once; main's adapter (#2977) doesn't wait for it. The
+  first builder signs off before the switch goes on, as for product lamps.
+
+**What a moved lamp keeps of V1:** prepare never touches V1's own files,
+and the product's reset plan names V2's stores only, so V1's person data
+would outlive a reset; with no reset on a moved lamp, that waits for the
+first builder's call when a reset comes back. **Wiping a moved lamp before
+it is given away** has no way at the lamp yet: neither the hold nor
+recovery wipes anything. Until a reset is allowed, that is a hand step for
+the team (the first builder's call on #2937).
+
+**On main:** #2977 carries setup and recovery in the generic package, and its
+adapter starts setup alone on a lamp with no marker, then the lamp once
+setup writes it. Not run on a lamp.
+
 ## When the saved network is gone (#3020)
 
 With `LAMP_WIFI_RECOVERY=on` (off unless set, a drop-in on
@@ -776,8 +822,8 @@ With `LAMP_WIFI_RECOVERY=on` (off unless set, a drop-in on
 whose saved network is gone (a new router, a changed password, a move)
 opens setup's own hotspot after 90 s, as V1 did (`system/network/recovery.go`
 in the parent repository), so the app's setup flow sets the new network
-without a 5 s reset. A lamp moved from V1 whose line 100 is a head pad has no
-reset (above), so this is its only way back.
+without a 5 s reset. A lamp moved from V1 has no reset (above), so this is
+its only way back once its package carries the unit.
 
 - **Watched** by `lamp-setup recover`, one look every 5 s: a station address
   on the Wi-Fi (online), `wpa_state` (joined to a known network's radio,

@@ -63,14 +63,28 @@ the lamp (#2396, [body.md](../../docs/body.md), "The first stand of a moved
 lamp"):
 - Once someone is near, the lamp asks for a touch through the voice's say
   service. This is why the generic voice unit sets `LAMP_SAY=on`.
-  `lamp-setup`'s Wi-Fi, reset and `wifi_lost` lines would speak through it
-  too, but a moved lamp has no `lamp-setup` unit. The socket is root's only.
+  `lamp-setup`'s Wi-Fi, reset and `wifi_lost` lines speak through it too
+  (below). The socket is root's only.
 - A touch held 1 s is the yes. On a yes, the unit stops `lamp-body`, stands
   the arm as the factory's steps do, writes `/etc/lampOS/body/lamp.env`, and
   starts the body again.
 - It runs as root, and runs the body and its read as `@LAMP_USER@`.
 - With `lamp.env` there it does nothing. It stays active, whatever became of
   the stand.
+
+`lamp-setup.service` and `lamp-setup-recover.service` give a moved lamp the
+product's setup and its recovery (#2937, #3020, [setup.md](../../docs/setup.md),
+"A lamp moved from V1"): the same commands, conditions and hardening as the
+product's units. Recovery is off unless `LAMP_WIFI_RECOVERY=on`, and is a
+moved lamp's only way to a new Wi-Fi. There is no `lamp-setup-reset.service`:
+`lamp-controls.service` still runs without `--touch` and the pins carry no
+`reset`, since a moved lamp's line 100 may be a head pad, which can't be
+told from the button (the first builder on #2975). `lamp-keeper prepare`
+writes setup's page, its reset plan and, with the plan, the marker, so the
+move itself never opens a hotspot. Setup's other product units (the app's
+Wi-Fi, settings and own-key changes after setup, and the marker's path
+unit) are not here yet; a test in `crates/update/src/unit.rs` names each
+with why.
 
 Since 22 Oct, for lamps moved from V1, `lamp-voice.service` carries the
 product unit's "who it answers" switches at the product's values (with
