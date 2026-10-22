@@ -1045,7 +1045,15 @@ the unchanged legacy client, used unless the new Days client is selected.
   memory never sees it) and the note are byte for byte as before. Either
   way, nothing dated is asked about before its day: with the switch turned
   off after a day was kept, the memory holds that thread back until its
-  day is over, then gives it by the old rules. Tests:
+  day is over, then gives it by the old rules. It is asked only of the
+  person who told it (#2807): another known face that talks first after
+  its day is given nothing and marks nothing, so it is still owed to the
+  teller, who is asked once; the room's scope holds none of it, nor does
+  it after early words with a day are adopted by the face that said them.
+  Tests:
+  `days::an_event_is_given_only_to_the_person_who_said_it`,
+  `days::after_its_day_another_face_talking_first_is_never_asked_and_the_teller_is_once`,
+  `days::a_dated_thing_adopted_from_the_room_is_asked_only_of_its_teller`,
   `remember::tests::with_events_the_observe_job_has_its_day_and_the_prompt_asks_for_one`,
   `remember::tests::an_event_s_day_reaches_the_memory_only_with_the_switch`,
   `remember::tests::with_events_a_dated_follow_up_is_told_with_its_day`,
