@@ -5660,6 +5660,9 @@ fn conversation_with_gate(
     // points at the lamp's own voice (#2602, `LAMP_CUT_IN_COUNTS_REAL=on`).
     // Off unless set.
     let counts_real = duplex && crate::turn_taking::cut_in_counts_real();
+    // A yield resumes after 250 ms of stillness, not 400 (#2602,
+    // `LAMP_RESUME_WAIT_SHORT=on`). Off unless set.
+    let resume_short = duplex && crate::turn_taking::resume_wait_short();
     detector.keep_first_words(first_words);
     let hold = match (duplex, first_words) {
         (true, true) => Hold::DUPLEX.keeping_first_words(),
@@ -5793,7 +5796,7 @@ fn conversation_with_gate(
             "clear_after_blocks":Hearing::EVALUATED.clear_after_blocks,
             "yield_after_blocks":Confirmation::EVALUATED.onset_blocks,
             "commit_after_clear_blocks":Confirmation::EVALUATED.speech_blocks,
-            "resume_after_still_blocks":Confirmation::EVALUATED.silence_blocks,
+            "resume_after_still_blocks":if resume_short { crate::turn_taking::RESUME_WAIT_SHORT_BLOCKS } else { Confirmation::EVALUATED.silence_blocks },
             "resume_deadline_blocks":Confirmation::EVALUATED.deadline_blocks,
             "plain_percent":Hearing::EVALUATED.plain_percent,
             "commit_on_stillness_after_plain_blocks":Confirmation::EVALUATED.plain_blocks,
@@ -5826,6 +5829,9 @@ fn conversation_with_gate(
         }
         if counts_real {
             mask.count_real_cut_ins();
+        }
+        if resume_short {
+            mask.shorten_resume_wait();
         }
         // A sound that waits holds its pre-roll and up to the hold's 1.2 s:
         // more than the mask's usual memory, which would reject it as
@@ -11179,14 +11185,17 @@ fn hear_capture_block(
         DuplexStep::Commit => "duplex_commit",
         DuplexStep::Resume => "duplex_resume",
     };
-    record(
-        trace,
-        json!({"kind":kind,"at_us":at_us,"frame_sequence":sequence,
-        "last_block_host_read_us":captured_at_us,"owner":owner,
-        "reply_queued_frames":reply.as_ref().map(|current| current.pcm.len()),
-        "hearing_margin_db":mask.hearing_margin_db(),
-        "boundary":"coordinator hearing decision; not acoustic onset or stopped output"}),
-    )?;
+    let mut decision = json!({"kind":kind,"at_us":at_us,"frame_sequence":sequence,
+    "last_block_host_read_us":captured_at_us,"owner":owner,
+    "reply_queued_frames":reply.as_ref().map(|current| current.pcm.len()),
+    "hearing_margin_db":mask.hearing_margin_db(),
+    "boundary":"coordinator hearing decision; not acoustic onset or stopped output"});
+    // The stillness this resume waited for, 40 blocks or 25 with
+    // `LAMP_RESUME_WAIT_SHORT=on` (#2602), so a run counts each arm's resumes.
+    if listened.step == DuplexStep::Resume {
+        decision["resume_after_still_blocks"] = json!(mask.resume_wait_blocks());
+    }
+    record(trace, decision)?;
     match listened.step {
         DuplexStep::Commit => finish_duplex_yield(
             trace,

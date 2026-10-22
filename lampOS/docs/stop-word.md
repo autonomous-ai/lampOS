@@ -854,7 +854,8 @@ With the switch:
 - **The words asked for after 100 ms of stillness**
   (`FINALIZE_AFTER_STILL_BLOCKS`). Through the relay they came about 0.25 s
   after a stop phrase ended (the sixth builder, #828, 08:22), inside the
-  400 ms of stillness after which the rule resumes. A block counts as still
+  400 ms of stillness after which the rule resumes (250 ms with
+  `LAMP_RESUME_WAIT_SHORT=on`, #2602; it still waits for the words). A block counts as still
   only 300 ms after the lamp stops (`clear_after_blocks`), so for a "Stop."
   that ends as the lamp yields the commit comes about 0.65 s after it: the
   lamp is silent from the yield, and only the decision comes later (the

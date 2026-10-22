@@ -96,6 +96,20 @@ pub fn cut_in_counts_real() -> bool {
         == Some("on")
 }
 
+/// The voice's environment switch, with `on`, for resuming a yielded reply
+/// after [`RESUME_WAIT_SHORT_BLOCKS`] `Still` blocks, 250 ms, in place of
+/// `Confirmation::EVALUATED.silence_blocks`, 400 ms (#2602, the resume
+/// wait's played A/B); off unless set.
+pub const RESUME_WAIT_SHORT_ENVIRONMENT: &str = "LAMP_RESUME_WAIT_SHORT";
+/// `Still` blocks that resume a yielded reply with `LAMP_RESUME_WAIT_SHORT=on`.
+pub const RESUME_WAIT_SHORT_BLOCKS: u8 = 25;
+
+/// Whether the voice's environment says `on` for
+/// [`RESUME_WAIT_SHORT_ENVIRONMENT`].
+pub fn resume_wait_short() -> bool {
+    std::env::var(RESUME_WAIT_SHORT_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// What one yield's evidence window held, with `LAMP_CUT_IN_COUNTS_REAL=on`.
 /// The window is bounded: the consecutive `Over` blocks that made the yield
 /// (its onset run, 7 or 10 blocks) and every block heard while the yield is
@@ -259,6 +273,9 @@ struct Duplex {
     over_run: u16,
     /// `LAMP_CUT_IN_COUNTS_REAL=on`: see [`YieldEvidence`].
     counts_real: bool,
+    /// `Still` blocks that resume a yield: see
+    /// [`PlaybackMask::shorten_resume_wait`].
+    resume_wait_blocks: u8,
     /// The onset run so far, while no yield is in force.
     onset: YieldEvidence,
     /// The window of the yield in force, or of the last one.
@@ -358,6 +375,7 @@ impl PlaybackMask {
                 keeps_listening: false,
                 over_run: 0,
                 counts_real: false,
+                resume_wait_blocks: Confirmation::EVALUATED.silence_blocks,
                 onset: YieldEvidence::default(),
                 window: YieldEvidence::default(),
             }),
@@ -416,6 +434,22 @@ impl PlaybackMask {
         if let Some(duplex) = self.duplex.as_mut() {
             duplex.counts_real = true;
         }
+    }
+    /// `LAMP_RESUME_WAIT_SHORT=on`: a yield resumes after
+    /// [`RESUME_WAIT_SHORT_BLOCKS`] `Still` blocks. Before the first block
+    /// only: it starts the reply's yielding afresh. Only with ears.
+    pub fn shorten_resume_wait(&mut self) {
+        if let Some(duplex) = self.duplex.as_mut() {
+            duplex.interruption = Interruption::new(Confirmation {
+                silence_blocks: RESUME_WAIT_SHORT_BLOCKS,
+                ..Confirmation::EVALUATED
+            });
+            duplex.resume_wait_blocks = RESUME_WAIT_SHORT_BLOCKS;
+        }
+    }
+    /// The `Still` blocks that resume a yield, with ears.
+    pub fn resume_wait_blocks(&self) -> Option<u8> {
+        Some(self.duplex.as_ref()?.resume_wait_blocks)
     }
     /// Remember enough hearing for a yield's first words (#828): every
     /// block of a candidate that reaches back is checked against it before
@@ -2057,6 +2091,37 @@ mod tests {
         assert_eq!(steps, [(ONSET + 70, Step::Resume)]);
         assert_eq!(disposition(&mask, ONSET).unwrap(), Disposition::Suppress);
         assert_eq!(mask.duplex_summary(), Some(((1, 0, 1), false)));
+    }
+
+    /// #2602, the resume wait's A/B: with `LAMP_RESUME_WAIT_SHORT=on` a
+    /// yield nobody goes on from resumes after 25 `Still` blocks; without
+    /// it, after 40, as before.
+    #[test]
+    fn the_short_resume_wait_resumes_after_its_own_still_blocks() {
+        for (short, still) in [(false, 40), (true, u64::from(RESUME_WAIT_SHORT_BLOCKS))] {
+            let mut mask = PlaybackMask::duplex();
+            mask.assume_matched();
+            if short {
+                mask.shorten_resume_wait();
+            }
+            assert_eq!(mask.resume_wait_blocks(), Some(still as u8));
+            let mut sequence = 1;
+            hear(
+                &mut mask,
+                &mut sequence,
+                ONSET,
+                0.9,
+                &evidence(0, OVER),
+                true,
+            );
+            hear(&mut mask, &mut sequence, 30, 0.1, &evidence(10, None), true);
+            let steps = hear(&mut mask, &mut sequence, 40, 0.1, &evidence(40, None), true);
+            assert_eq!(steps, [(ONSET + 30 + still, Step::Resume)], "short {short}");
+        }
+        assert_eq!(
+            PlaybackMask::new(TurnTaking::V1Baseline).resume_wait_blocks(),
+            None
+        );
     }
 
     #[test]

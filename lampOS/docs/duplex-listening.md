@@ -378,7 +378,9 @@ A run of blocks becomes at most three moments (`Interruption`):
    0.5 s after the clip began, resume 0.5 s later, in the breath after the
    first word, and yield again 0.3 s after that before it committed. A
    lamp that has been spoken over now waits 400 ms of stillness before it
-   goes on.)
+   goes on.) With `LAMP_RESUME_WAIT_SHORT=on` (#2602, off unless set) it
+   waits 25 blocks, 250 ms; each `duplex_resume` record carries the wait
+   it used in `resume_after_still_blocks`.
 
 While a yield is open, what the lamp hears is one utterance. The detector
 is never given a score it would count towards the end of speech (anything
