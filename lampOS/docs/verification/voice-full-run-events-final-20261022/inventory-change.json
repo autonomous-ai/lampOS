@@ -1,0 +1,35 @@
+{
+  "head": "ebbb25cb1f836b5db9529116655e13c2d50359a4",
+  "base": "d7492ca743141d9c8afbefbd390407e1e58132aa",
+  "earlier_comparison_base": "e2232b8369fb125af6c79e8bf6927ec590a612e9",
+  "listed_before": 3369,
+  "listed_final": 3370,
+  "added_by_upstream": [
+    "known_faces::tests::forget_my_face_asks_for_the_known_person_whose_line_it_is",
+    "known_faces::tests::forget_my_face_sends_the_name_the_eyes_keep",
+    "person::tests::a_skills_note_is_told_who_is_at_the_lamp",
+    "person::tests::only_a_note_that_asked_is_told_who_is_at_the_lamp",
+    "person::tests::the_name_is_in_what_the_model_is_told",
+    "remember::tests::a_face_forgotten_with_its_memory_says_which_went",
+    "remember::tests::an_undated_thread_held_until_asked_is_waited_on_without_events",
+    "say::tests::who_goes_only_with_a_note",
+    "second_provider::services::tests::the_routes_gemini_chat_goes_near_and_falls_back",
+    "second_provider::services::tests::the_routes_gemini_is_routed_only_through_the_relay_with_its_key",
+    "speak_up::tests::only_welcome_back_says_hello_on_an_arrival",
+    "speak_up::tests::someone_is_present_after_three_seconds_and_gone_at_once"
+  ],
+  "removed_by_upstream": [
+    "person::tests::someone_who_comes_by_often_is_greeted_one_beat_warmer",
+    "person::tests::the_hello_names_a_known_face_first_then_the_typed_name",
+    "person::tests::the_name_is_in_what_the_model_is_told_and_in_the_hello",
+    "speak_up::tests::an_add_ons_decision_is_never_the_hellos_answer",
+    "speak_up::tests::asking_holds_the_hello_for_the_policys_answer",
+    "speak_up::tests::it_keeps_quiet_for_everything_else",
+    "speak_up::tests::it_says_hello_once_to_someone_who_comes_back_after_five_minutes",
+    "speak_up::tests::no_answer_within_two_seconds_leaves_it_to_the_rule",
+    "speak_up::tests::someone_close_is_not_greeted_twice_in_an_hour",
+    "speak_up::tests::tests_peer_read_someone_close_who_glances_away_after_the_hour_is_not_greeted_mid_sitting",
+    "speak_up::tests::without_asking_a_ready_hello_is_the_rules_at_once"
+  ],
+  "compiled_list_sha256": "8f454a5c580a5726ae8d67fb9358fada494bc60875bb74daeb30e6f3bc3e28f1"
+}

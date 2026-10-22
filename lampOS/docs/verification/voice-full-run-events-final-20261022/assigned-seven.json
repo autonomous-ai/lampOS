@@ -1,0 +1,14 @@
+{
+  "code_head": "ebbb25cb1f836b5db9529116655e13c2d50359a4",
+  "documentation_head": "141336d93e49ff65f4a5eaaea4db2fb8054f810f",
+  "log_sha256": "da9a126bec3d5ebca7127d4538132300b569a617e4f6bf68d7807c6bfa68bcc1",
+  "passed": {
+    "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply": true,
+    "provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet": true,
+    "provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by": true,
+    "remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked": true,
+    "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply": true,
+    "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going": true,
+    "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news": true
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "status": "single diagnostic observation completed",
+  "test_executions": 1,
+  "commands": [
+    {
+      "label": "compile",
+      "argv": [
+        "/Users/autonomous/.cargo/bin/cargo",
+        "test",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cwd": "/private/tmp/tests-codex-voice-clock-probe-20261022/lampOS",
+      "timeout_seconds": 900,
+      "started_utc": "2026-10-22T12:56:28.864590+00:00",
+      "stdout": "compile.stdout",
+      "stderr": "compile.stderr",
+      "pid": 24477,
+      "exit": 0,
+      "timed_out": false,
+      "wall_seconds": 98.581787,
+      "stdout_sha256": "85ef5ecc98796cbb9b6b5ba9bd7f2fc603ae16c20e976ffd2c32fb2721b40f3e",
+      "stderr_sha256": "1bde1edb5d5ec3811eadca601072343bf1cd3ab382fd010fdb8e3724e45191c8"
+    },
+    {
+      "label": "host-stall-200ms",
+      "argv": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+        "provider_worker::tests::kept_start::with_no_first_answer_the_patience_ends_in_the_strict_timeout_and_no_end",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/private/tmp/tests-codex-voice-clock-probe-20261022/lampOS",
+      "timeout_seconds": 30,
+      "started_utc": "2026-10-22T12:58:07.680962+00:00",
+      "stdout": "host-stall-200ms.stdout",
+      "stderr": "host-stall-200ms.stderr",
+      "pid": 29736,
+      "exit": 101,
+      "timed_out": false,
+      "wall_seconds": 2.624919,
+      "stdout_sha256": "4a1d9221969fdf6c473e78adde1ee4e9c233665032871d3d98620f99364e0954",
+      "stderr_sha256": "7afe5b52a999f9e14f0e8d9df3ff73a5d985141cf742a2a632d54970dece28d6"
+    }
+  ],
+  "artifact": {
+    "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+    "sha256": "1d885c3762676b7fb85b1895d49c84de27bc70e47a9f6f6789a4a88f9fddd6bf",
+    "fresh": false
+  },
+  "libtest_summaries": [
+    "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3369 filtered out; finished in 0.73s"
+  ],
+  "diagnostics": {
+    "one_named_test": true,
+    "one_failure": true,
+    "worker_hung": true,
+    "request_2_abandoned_after_3200_samples": true,
+    "lapsed_authority_logged": false
+  },
+  "original_failure_signature_reproduced": true,
+  "restoration": {
+    "source_before_sha256": "3040807016b194a84a7983687e7df6234bb179358f985322b67bcf2f757852ff",
+    "source_after_sha256": "3040807016b194a84a7983687e7df6234bb179358f985322b67bcf2f757852ff",
+    "source_bytes_equal": true,
+    "input_aggregate_before_sha256": "537a8eed2d71393a19258fa91e056d8632a98001cbfabc40d82ccd236b070d9e",
+    "input_aggregate_after_sha256": "537a8eed2d71393a19258fa91e056d8632a98001cbfabc40d82ccd236b070d9e",
+    "all_input_bytes_equal": true,
+    "candidate_source_after_sha256": "41647be6135de3af2085ae011486a0ea87d19f7c23b2c071921fb914d19431b5",
+    "candidate_source_unchanged": true,
+    "git_status_porcelain_after": ""
+  }
+}

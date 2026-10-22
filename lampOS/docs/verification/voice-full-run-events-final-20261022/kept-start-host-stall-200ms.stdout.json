@@ -1,0 +1,7 @@
+{
+  "original_file": "/private/tmp/tests-codex-voice-events-evidence-20261022/kept-start-control/host-stall-200ms.stdout",
+  "sha256": "4a1d9221969fdf6c473e78adde1ee4e9c233665032871d3d98620f99364e0954",
+  "byte_count": 377,
+  "encoding": "UTF-8",
+  "raw_text": "\nrunning 1 test\ntest provider_worker::tests::kept_start::with_no_first_answer_the_patience_ends_in_the_strict_timeout_and_no_end ... FAILED\n\nfailures:\n\nfailures:\n    provider_worker::tests::kept_start::with_no_first_answer_the_patience_ends_in_the_strict_timeout_and_no_end\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3369 filtered out; finished in 0.73s\n\n"
+}

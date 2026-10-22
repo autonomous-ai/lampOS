@@ -1,0 +1,20 @@
+{
+  "label": "host-stall-200ms",
+  "argv": [
+    "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+    "provider_worker::tests::kept_start::with_no_first_answer_the_patience_ends_in_the_strict_timeout_and_no_end",
+    "--exact",
+    "--nocapture"
+  ],
+  "cwd": "/private/tmp/tests-codex-voice-clock-probe-20261022/lampOS",
+  "timeout_seconds": 30,
+  "started_utc": "2026-10-22T12:58:07.680962+00:00",
+  "stdout": "host-stall-200ms.stdout",
+  "stderr": "host-stall-200ms.stderr",
+  "pid": 29736,
+  "exit": 101,
+  "timed_out": false,
+  "wall_seconds": 2.624919,
+  "stdout_sha256": "4a1d9221969fdf6c473e78adde1ee4e9c233665032871d3d98620f99364e0954",
+  "stderr_sha256": "7afe5b52a999f9e14f0e8d9df3ff73a5d985141cf742a2a632d54970dece28d6"
+}

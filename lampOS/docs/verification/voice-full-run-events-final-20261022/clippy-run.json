@@ -1,0 +1,100 @@
+{
+  "conclusion": "success",
+  "headSha": "141336d93e49ff65f4a5eaaea4db2fb8054f810f",
+  "jobs": [
+    {
+      "completedAt": "2026-10-22T12:39:20Z",
+      "conclusion": "success",
+      "databaseId": 119827789281,
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "startedAt": "2026-10-22T12:36:55Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-10-22T12:36:57Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-10-22T12:36:56Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-22T12:37:16Z",
+          "conclusion": "success",
+          "name": "system packages",
+          "number": 2,
+          "startedAt": "2026-10-22T12:36:57Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-22T12:37:23Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 3,
+          "startedAt": "2026-10-22T12:37:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-22T12:37:31Z",
+          "conclusion": "success",
+          "name": "Rust 1.96.0",
+          "number": 4,
+          "startedAt": "2026-10-22T12:37:23Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-22T12:37:46Z",
+          "conclusion": "success",
+          "name": "restore the cache",
+          "number": 5,
+          "startedAt": "2026-10-22T12:37:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-22T12:37:47Z",
+          "conclusion": "success",
+          "name": "unchanged source files get the cached build's times back",
+          "number": 6,
+          "startedAt": "2026-10-22T12:37:46Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-22T12:39:19Z",
+          "conclusion": "success",
+          "name": "clippy (every crate and target, warnings as errors)",
+          "number": 7,
+          "startedAt": "2026-10-22T12:37:47Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-22T12:39:19Z",
+          "conclusion": "skipped",
+          "name": "save the cache",
+          "number": 8,
+          "startedAt": "2026-10-22T12:39:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-22T12:39:19Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 16,
+          "startedAt": "2026-10-22T12:39:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-22T12:39:19Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 17,
+          "startedAt": "2026-10-22T12:39:19Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39779788056/job/119827789281"
+    }
+  ],
+  "number": 1957,
+  "status": "completed",
+  "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39779788056"
+}

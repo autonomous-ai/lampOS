@@ -1,0 +1,98 @@
+{
+  "base": "ebbb25cb1f836b5db9529116655e13c2d50359a4",
+  "platform": "Darwin x86_64",
+  "cpu_count": 16,
+  "target": "/private/tmp/tests-codex-1569-target",
+  "source_files": 1376,
+  "source_sha256": "b84fef71664840f23c5186c6dbabb6488d10e54878e2db4ef3a3a006eb15463d",
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "0"
+  },
+  "rust_test_threads": "unset; full-library default parallelism",
+  "commands": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started": "2026-10-22T12:26:38.264996+00:00",
+      "seconds": 11.356657051015645,
+      "exit": 0,
+      "watchdog_timeout": false,
+      "log": "fmt.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": []
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started": "2026-10-22T12:26:49.780800+00:00",
+      "seconds": 77.24529905524105,
+      "exit": 0,
+      "watchdog_timeout": false,
+      "log": "clippy.txt",
+      "sha256": "531b17a176e203d8730691af61b6a0ec4af9993e01bf0aee2be2d8d1ec79c0fb",
+      "summaries": []
+    },
+    {
+      "name": "workspace-build",
+      "argv": [
+        "cargo",
+        "build",
+        "--workspace",
+        "--offline"
+      ],
+      "started": "2026-10-22T12:28:07.159023+00:00",
+      "seconds": 62.20054439781234,
+      "exit": 0,
+      "watchdog_timeout": false,
+      "log": "workspace-build.txt",
+      "sha256": "92d6711379f00eb6b7b0fb022f3fc347d08f7007e7a1906b375df6d9e9beeb0a",
+      "summaries": []
+    },
+    {
+      "name": "package-tests",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--offline",
+        "--no-fail-fast"
+      ],
+      "started": "2026-10-22T12:29:09.500632+00:00",
+      "seconds": 409.3380380086601,
+      "exit": 101,
+      "watchdog_timeout": false,
+      "log": "package-tests.txt",
+      "sha256": "da9a126bec3d5ebca7127d4538132300b569a617e4f6bf68d7807c6bfa68bcc1",
+      "summaries": [
+        "test result: FAILED. 3355 passed; 1 failed; 14 ignored; 0 measured; 0 filtered out; finished in 268.44s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: FAILED. 260 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.83s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    }
+  ]
+}

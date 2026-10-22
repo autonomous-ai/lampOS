@@ -1,0 +1,7 @@
+{
+  "original_file": "/private/tmp/tests-codex-voice-events-evidence-20261022/kept-start-control/host-stall-200ms.patch",
+  "sha256": "1d1c5d73b45a196ad27e5c14cc8093a8ff3e75ba4e878148ec8f323065a7fde1",
+  "byte_count": 580,
+  "encoding": "UTF-8",
+  "raw_text": "--- a/lampOS/crates/voice/src/provider_worker.rs\n+++ b/lampOS/crates/voice/src/provider_worker.rs\n@@ -15328,6 +15328,8 @@\n                 wire.extend(rig.heard(&mut dial, QUIET).await);\n             }\n             assert_eq!(wire, expected);\n+            // Fault injection: the host stalls after all kept audio was sent.\n+            std::thread::sleep(Duration::from_millis(200));\n             assert!(kept_since.elapsed() >= KEPT_START_PATIENCE - Duration::from_millis(400));\n             // And then the strict wait, which nothing satisfies.\n             let (result, _) = {\n"
+}

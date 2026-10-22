@@ -1,0 +1,30 @@
+{
+  "base": "d7492ca743141d9c8afbefbd390407e1e58132aa",
+  "worktree": "/private/tmp/tests-codex-voice-clock-probe-20261022",
+  "source": "lampOS/crates/voice/src/provider_worker.rs",
+  "test": "provider_worker::tests::kept_start::with_no_first_answer_the_patience_ends_in_the_strict_timeout_and_no_end",
+  "source_before_sha256": "3040807016b194a84a7983687e7df6234bb179358f985322b67bcf2f757852ff",
+  "mutant_sha256": "c00e1011850b683d9718363c4d483050e3a39b696905c3a3ccfa0444d6e96e61",
+  "source_file_count": 1376,
+  "source_aggregate_sha256": "537a8eed2d71393a19258fa91e056d8632a98001cbfabc40d82ccd236b070d9e",
+  "aggregate_scheme": "SHA256(json.dumps(sorted path-to-file-SHA256 map, sort_keys=True).encode())",
+  "patch_sha256": "1d1c5d73b45a196ad27e5c14cc8093a8ff3e75ba4e878148ec8f323065a7fde1",
+  "candidate_source_before_sha256": "41647be6135de3af2085ae011486a0ea87d19f7c23b2c071921fb914d19431b5",
+  "runner_sha256": "024b780a89ed4b900cab708186bf9bfcbfcfcded1aed827c9c587b249bb6dede",
+  "environment": {
+    "PATH": "/Users/autonomous/.cargo/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/usr/local/go/bin:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/Users/autonomous/.codex/tmp/arg0/codex-arg0t3G8CO:/Users/autonomous/.harness/runtime/grid-0.3.59-darwin-x64/bin:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "0"
+  },
+  "unset_environment": [
+    "CARGO_BUILD_TARGET",
+    "RUST_TEST_THREADS"
+  ],
+  "purpose": "One diagnostic fault injection on unchanged d749, not a green retry or proof of the original unscheduled failure cause."
+}

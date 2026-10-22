@@ -1,0 +1,13 @@
+{
+  "run": 39779788056,
+  "head": "141336d93e49ff65f4a5eaaea4db2fb8054f810f",
+  "conclusion": "success",
+  "watch_exit": 0,
+  "summaries": [],
+  "jobs": [
+    {
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "conclusion": "success"
+    }
+  ]
+}

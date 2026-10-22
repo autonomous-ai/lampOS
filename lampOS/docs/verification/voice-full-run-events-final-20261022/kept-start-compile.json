@@ -1,0 +1,24 @@
+{
+  "label": "compile",
+  "argv": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "test",
+    "--offline",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "cwd": "/private/tmp/tests-codex-voice-clock-probe-20261022/lampOS",
+  "timeout_seconds": 900,
+  "started_utc": "2026-10-22T12:56:28.864590+00:00",
+  "stdout": "compile.stdout",
+  "stderr": "compile.stderr",
+  "pid": 24477,
+  "exit": 0,
+  "timed_out": false,
+  "wall_seconds": 98.581787,
+  "stdout_sha256": "85ef5ecc98796cbb9b6b5ba9bd7f2fc603ae16c20e976ffd2c32fb2721b40f3e",
+  "stderr_sha256": "1bde1edb5d5ec3811eadca601072343bf1cd3ab382fd010fdb8e3724e45191c8"
+}

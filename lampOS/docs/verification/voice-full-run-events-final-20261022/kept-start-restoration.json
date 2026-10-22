@@ -1,0 +1,11 @@
+{
+  "source_before_sha256": "3040807016b194a84a7983687e7df6234bb179358f985322b67bcf2f757852ff",
+  "source_after_sha256": "3040807016b194a84a7983687e7df6234bb179358f985322b67bcf2f757852ff",
+  "source_bytes_equal": true,
+  "input_aggregate_before_sha256": "537a8eed2d71393a19258fa91e056d8632a98001cbfabc40d82ccd236b070d9e",
+  "input_aggregate_after_sha256": "537a8eed2d71393a19258fa91e056d8632a98001cbfabc40d82ccd236b070d9e",
+  "all_input_bytes_equal": true,
+  "candidate_source_after_sha256": "41647be6135de3af2085ae011486a0ea87d19f7c23b2c071921fb914d19431b5",
+  "candidate_source_unchanged": true,
+  "git_status_porcelain_after": ""
+}

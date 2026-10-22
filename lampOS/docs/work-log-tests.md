@@ -1,5 +1,51 @@
 # Tests work log
 
+## 2026-10-22 19:58 +0700 — final Voice fixture qualification delivered
+
+Ready for lamp-voice: no; draft [#3023](https://github.com/autonomous-ai/lampOS/pull/3023).
+
+Seven assigned fixtures are pushed at `141336d93`; code is `ebbb25cb1`,
+parent `d7492ca743`. The documentation-only correction has an identical Rust
+tree. [Final qualification receipts](verification/voice-full-run-events-final-20261022/)
+retain lossless native output, exact-base comparison, source identities,
+compiled inventory changes, and terminal Linux metadata. Original controls
+and all historical failed observations remain on the task branch.
+
+Native x86 full package `cargo test -p lamp-voice --offline --no-fail-fast`:
+unchanged d749 library **3,356/0/14**; candidate **3,355/1/14**, all seven
+assigned pass. Integration is **260/1** in both. Binary unit 1/0, examples 10/0
+and docs 0/0 complete in both. Both commands exit 101. Fmt, strict all-target
+Voice Clippy and workspace build pass. Candidate-only kept-start hangs after
+a 111 ms authority lapse; unchanged full base passes, so it is not established
+as inherited. Light-call upper median fails the original 25 ms bound on both:
+base 81.141344ms, after 58.344188ms. All 20 calls complete. No bounds are raised,
+assertions weakened, or failed observations replaced by later passes.
+
+ARM64 full [before #5895](https://github.com/autonomous-ai/lampOS/actions/runs/39770980758)
+is **10,456/0**, [after #5944](https://github.com/autonomous-ai/lampOS/actions/runs/39778150685)
+**10,457/0**, each 67 not run and one passing leaky; e223→d749 upstream adds
+one net listed case. Voice library alone is **3,378/0→3,379/0**, including
+one passing leaky. All seven assigned cases, kept-start and light-call pass.
+Required current-head [ARM64 #5954](https://github.com/autonomous-ai/lampOS/actions/runs/39779788065)
+is green, **10,459/0/67**, Voice library 3,379/0; it tested merge `bc0f72e`
+onto `135f14957`. Current [Clippy #1957](https://github.com/autonomous-ai/lampOS/actions/runs/39779788056)
+is green. Older PR ARM5943 was cancelled by the factual documentation push,
+not a code failure. No ARM64 build on the Mac, SSH, device action or workflow
+change occurred.
+
+One fixed 200 ms host-stall diagnostic on unchanged d749 reproduced request 2
+abandonment/all 3,200 samples sent and the original kept-start `worker hung`
+assertion, 0/1/3,369 filtered, exit 101. No lapsed-authority log in that control.
+This proves the same fixture vulnerability exists without the patch, not the
+cause of the unscheduled candidate failure. It ran once, restored all 1,376
+input bytes/hashes and clean scratch status; candidate source was unchanged.
+The control artifact must be rebuilt before reusing the shared native target.
+
+Queue #2602 has full x86 and ARM64 before/after counts and the PR. Reviewer-two
+was asked for the completed patch's read and the outside-seven native-failure
+disposition; First/Reviewer-two retain the latest-base merge window. No fully
+green native package, readiness, merge or physical lamp qualification is claimed.
+
 ## 2026-10-22 19:28 +0700 — Voice fixture event PR published
 
 Ready for lamp-voice: no; draft [#3023](https://github.com/autonomous-ai/lampOS/pull/3023).

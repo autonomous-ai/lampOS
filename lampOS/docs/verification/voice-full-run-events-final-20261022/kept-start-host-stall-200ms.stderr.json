@@ -1,0 +1,7 @@
+{
+  "original_file": "/private/tmp/tests-codex-voice-events-evidence-20261022/kept-start-control/host-stall-200ms.stderr",
+  "sha256": "7afe5b52a999f9e14f0e8d9df3ff73a5d985141cf742a2a632d54970dece28d6",
+  "byte_count": 385,
+  "encoding": "UTF-8",
+  "raw_text": "lamp-voice provider: input through request 2 abandoned: dropped_unsent_samples=0 already_sent_samples=3200\n\nthread 'provider_worker::tests::kept_start::with_no_first_answer_the_patience_ends_in_the_strict_timeout_and_no_end' (696830990) panicked at crates/voice/src/provider_worker.rs:15338:21:\nworker hung\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+}
