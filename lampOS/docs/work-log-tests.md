@@ -1,5 +1,54 @@
 # Tests work log
 
+## 2026-10-23 01:12 +0700 — Skills and TLS carries merged with combined Linux qualification
+
+Ready for lamp-voice: **merged** for [#2693](https://github.com/autonomous-ai/lampOS/pull/2693),
+[#3076](https://github.com/autonomous-ai/lampOS/pull/3076) and
+[#3062](https://github.com/autonomous-ai/lampOS/pull/3062), through the coordinated trains.
+
+[#3086](https://github.com/autonomous-ai/lampOS/pull/3086) landed at `28f796223`.
+Skills source `381e5ce54` carries to `ecc495601` with equal range-diff;
+`273f8fb96` carries to `07f16694d` with only documentation insertion context
+changed. All authored payloads and 35 added evidence blobs are identical;
+both requested Skills paragraphs occur once. Checked merge `36e702ee2`,
+train head and landed commit have the same Git tree.
+[Combined ARM64](https://github.com/autonomous-ai/lampOS/actions/runs/39821152975/job/119972457615)
+completed **10,608/0/67**, including one passing LEAK, in 176.704 s;
+Skills **500/0**, all three changed cases pass. Separate docs **4/0**, process
+**12/0**, relay_signals ok.
+[Linux Clippy](https://github.com/autonomous-ai/lampOS/actions/runs/39821152962/job/119972460849)
+workflow and job both completed successfully.
+
+[#3090](https://github.com/autonomous-ai/lampOS/pull/3090) landed at `c7003f01d`.
+TLS source `6622e83e2` carries to `4fe22ce88` directly on `28f796223` with equal
+range-diff and identical four-file authored payload. Both Rust blobs remain
+identical through the final train; later switch documentation changes preserve
+the complete TLS row. Checked merge `24453988a`, train `2a27a6278` and landed
+commit share tree `03c235925`.
+[Combined ARM64](https://github.com/autonomous-ai/lampOS/actions/runs/39825146547/job/119986356453)
+and [Linux Clippy](https://github.com/autonomous-ai/lampOS/actions/runs/39825146557/job/119986356217)
+workflows and actual jobs are terminal success. ARM64 **10,624/0/67**, including
+one passing LEAK, in 178.114 s; Cloud **195/0** and the switched TLS case passes.
+Separate docs **4/0**, process **12/0**, relay_signals ok. Both train totals are
+full-workspace parallel PR-profile observations, not matched speed comparisons
+or `full=true` serial runs. These are existing jobs; no rerun was started.
+TLS remains opt-in; broker/account-port acceptance and lamp activation were not
+performed or established. Source PRs are closed as carried by the trains.
+
+[#3023](https://github.com/autonomous-ai/lampOS/pull/3023) remains **draft, not ready**.
+Its published parallel **3,366/18/14** and consumer **1,916/1/11** failures are
+unwaived. The unchanged control reproduces two named candidate failures;
+16 candidate identities remain unattributed. Successful serial and ARM64
+observations do not clear those failed commands. The requested final evidence
+read and next attribution/carry decision belong to the reviewers and merge owner.
+
+Two further reports are recorded without a fix claim: VoiceEval final-dispatch
+lost its original panic to filtered output, and ARM64 requested-audio renewal
+has its original assertion retained in [the register](https://github.com/autonomous-ai/lampOS/issues/1569#issuecomment-6347830100).
+No product change, new test execution, ARM64 build on the Mac or device action
+was performed for this record. Full train audit logs remain external temporary
+artifacts; linked original CI jobs are the public sources.
+
 ## 2026-10-23 00:45 +0700 — Voice terminal Linux checks retain failed Mac qualification
 
 Ready for lamp-voice: **no, [#3023](https://github.com/autonomous-ai/lampOS/pull/3023)**.
