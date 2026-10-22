@@ -142,6 +142,8 @@ async fn run_seen_from(turns: &[Turn], sight: Option<&[Sight]>, first: u64) -> R
         Instant::now(),
         Some((("eyes", 0), &lamp_msgs::Faces { faces: Vec::new() })),
     );
+    // Strictly after it, beyond a coarse file clock's tick.
+    std::thread::sleep(Duration::from_millis(20));
     let mut frame = 0u64;
     for (at, (who, said, _, after)) in turns.iter().enumerate() {
         let request = at as u64 + first;
