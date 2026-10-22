@@ -121,6 +121,18 @@ These you can run on their own:
   made-up messages. Both scripts set their ask, the stand-in's answer and
   two words of it, and run `account-ask.sh`.
 
+- `full-look-row.sh LABEL`, about 35 minutes (#2998, the product's full look): on a lamp on the
+  product units with #2998, the eyes' cost of `--sight-from-look` off and on (a `/run` drop-in runs
+  the unit's own line with `--look-on-change on` for the 10 s line's stage times, 4 minutes each,
+  removed on exit and checked removed), then ten "Hey Lamp, what do you see?" asks as installed,
+  each a scene of its own. It prints the medians of "ms a look", "sight file" and "decode", and per
+  ask the first and second times the lamp starts speaking after the end of speech was decided (for
+  a look, normally "Let me look." and its answer), with what the lamp said. Before each change to
+  the eyes and each ask it waits for 45 s of quiet (`quiet_gate.sh`, up to `QUIET_MAX`, 900 s).
+  Each look sends a still of the desk to the model, so it plays no ask while the eyes see a face
+  (`/run/lampos-eyes/present`, a face on a screen too) and stops there. Its stand-in test is
+  `full-look-row-test.sh` (zsh needed).
+
 ## What it needs
 
 - A Mac beside the lamp, its speaker where the lamp can hear it.
