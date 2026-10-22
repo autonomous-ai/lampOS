@@ -41,7 +41,20 @@ until its model is put there and the voice is told where.
   prints the spread of three groups: pieces of one clip (the join's
   question), the same voice in two clips, and another voice. It also gives
   how many fall on each side of `DIFFERENT_BELOW` and `SAME_FROM`, and the
-  bar with the fewest pairs on the wrong side. Numbers only.
+  bar with the fewest pairs on the wrong side. Numbers only. In place of
+  the index it takes a microphone's recording (`--bus`, `lamp-bus record
+  DIR mic2/audio`'s `mic2_audio.jsonl`), cut by when each line was played
+  (`--plays`, `start_unix_ms<TAB>end_unix_ms<TAB>voice` or the night
+  kit's round `.json`, whose `rows` give `start`, `end` in Unix seconds
+  and `voice`; `--offset-ms` for the two clocks). Each clip runs from 300 ms before its play to 700 ms
+  after, never past the plays on either side. Keep the 300 ms lead:
+  `afplay`'s start time is taken before its sound begins. It also counts
+  the plays with no line heard, the blocks lost inside the clips and the
+  lines too short to print. These are diagnostics, not proof the times
+  line up: the first and last tend to rise when the times miss the sound,
+  but a recording with no loss counts 0 lost at any offset. `at_unix_ms`
+  is when a block was published, not when it was heard, so one constant
+  `--offset-ms` can't take out a delay that varies.
 
 ## Measured (fourth builder's Intel Mac, 2026-10-15)
 
