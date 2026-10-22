@@ -1,5 +1,5 @@
 use lamp_bus::Bus;
-use lamp_expression::{Catalogue, Engine, TICK_US, replay, runtime};
+use lamp_expression::{Catalogue, Engine, TICK_US, replay, runtime, startle};
 
 fn bounds(long: bool) -> replay::Bounds {
     if long {
@@ -20,8 +20,8 @@ use std::{
     time::Duration,
 };
 
-const USAGE: &str = "lamp-expression serve [--enable] [--bus-root PATH] [--clock-id ID] [--catalogue FILE] [--record FILE] [--seconds N] [--utc-offset-minutes N | --zone system|NAME] [--kernel-clock] [--head-touch] [--offline-face]\n\
-lamp-expression replay --input FILE [--output FILE] --clock-id ID [--enable] [--catalogue FILE] [--until-us N] [--long]\n\
+const USAGE: &str = "lamp-expression serve [--enable] [--bus-root PATH] [--clock-id ID] [--catalogue FILE] [--startle FILE] [--record FILE] [--seconds N] [--utc-offset-minutes N | --zone system|NAME] [--kernel-clock] [--head-touch] [--offline-face]\n\
+lamp-expression replay --input FILE [--output FILE] --clock-id ID [--enable] [--catalogue FILE] [--startle FILE] [--until-us N] [--long]\n\
 lamp-expression import --clock-id ID [--long] [--utc-offset-minutes N | --zone system|NAME] FILE...\n\
 lamp-expression catalogue\n\
 lamp-expression clock [--clock-id ID]\n\n\
@@ -39,6 +39,8 @@ night/presence schedule; off otherwise. It does not enable actuator output witho
 --head-touch reads the head's requests from --touch Controls: a hand kept on the head is leaned\n\
 into, a three-second hold puts it to sleep, a tap wakes it (docs/alive.md, #711).\n\
 --offline-face draws listening as not ready while lamp/online says the lamp is offline.\n\
+--startle reads the startle, a glance at a sudden sound, from its skill's file (#2822): serve\n\
+reads /var/lib/lampOS/skills/startle/skill.toml without it, replay none. No other startle.\n\
 No command opens hardware, launches a provider, or changes a device's service settings.";
 
 #[derive(Debug, Default)]
@@ -50,6 +52,7 @@ struct Arguments {
     bus_root: Option<PathBuf>,
     clock: Option<String>,
     catalogue: Option<PathBuf>,
+    startle: Option<PathBuf>,
     input: Option<PathBuf>,
     output: Option<PathBuf>,
     record: Option<PathBuf>,
@@ -95,6 +98,7 @@ fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Option<Arguments
                 "--bus-root",
                 "--clock-id",
                 "--catalogue",
+                "--startle",
                 "--record",
                 "--seconds",
                 "--utc-offset-minutes",
@@ -108,6 +112,7 @@ fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Option<Arguments
                 "--enable",
                 "--clock-id",
                 "--catalogue",
+                "--startle",
                 "--input",
                 "--output",
                 "--until-us",
@@ -155,6 +160,7 @@ fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Option<Arguments
                 out.bus_root = Some(path);
             }
             "--catalogue" => out.catalogue = Some(value.into()),
+            "--startle" => out.startle = Some(value.into()),
             "--input" => out.input = Some(value.into()),
             "--output" => out.output = Some(value.into()),
             "--record" => out.record = Some(value.into()),
@@ -290,7 +296,23 @@ fn run(args: Arguments) -> Result<(), Box<dyn std::error::Error>> {
         }
         return Ok(());
     }
-    let catalogue = catalogue(args.catalogue.as_ref())?;
+    let mut catalogue = catalogue(args.catalogue.as_ref())?;
+    // The startle's move is its skill's (#2822), read once here: a skill
+    // changed later is taken up at the next start.
+    let startle = match (&args.startle, args.command.as_str()) {
+        (Some(path), _) => Some(path.clone()),
+        (None, "serve") => Some(PathBuf::from(startle::INSTALLED)),
+        (None, _) => None,
+    };
+    if let Some(path) = startle {
+        match startle::read(&path) {
+            Ok(clip) => {
+                eprintln!("lamp-expression: the startle from {}", path.display());
+                catalogue.behaviours.push(clip);
+            }
+            Err(error) => eprintln!("lamp-expression: no startle until a restart: {error}"),
+        }
+    }
     let rest_requests = runtime::rest_requests_on(
         std::env::var(runtime::REST_REQUESTS_ENVIRONMENT)
             .ok()

@@ -202,12 +202,16 @@ owner: "everything is a skill"). Install puts every product skill in
 `/var/lib/lampOS/skills/` (`install::PRODUCT_SKILLS` in `crates/update`),
 and every core skill is a product skill (the owner: core skills are always
 installed, installable ones as apps; `tests/install.rs` holds the two
-equal, Laugh glance parked out of both): nineteen folders are installed,
-ten enabled, one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
+equal, Laugh glance parked out of both): twenty folders are installed,
+eleven enabled, one of them hidden unless `LAMP_UNPLUG=on`. Welcome back, Reminders, Task news, Onboarding, Stretch
 break, Stuffy air, Dance and Not feeling well keep their enabled defaults.
 Night sleep (#940) is enabled but inert: when the lamp sleeps at night, moved out of
 Expression ([alive.md](alive.md#night-sleep-is-a-skill)); its switches stay
 off for now, so Expression's built-in sleep runs.
+Startle (#2822) is the startle's move, Expression's glance at a sudden
+sound: Expression reads its `[startle]` when it starts and plays it as its
+reflex ([expression.md](expression.md#the-startle-a-glance-at-a-sudden-sound));
+lamp-skills only checks it, and the catalogue no longer carries it.
 Not feeling well (#1681) came with the product after its lamp check, row 8
 on lamp-52e6 with the lead (20 Oct 11:35): one slow droop for a failed
 part, and the light back after; it adds no function. Prepare-to-unplug is

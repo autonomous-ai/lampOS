@@ -185,6 +185,10 @@ struct SkillFile {
     /// The core onboarding runner's order and words, checked by the same
     /// validator Voice uses when it takes its service-start snapshot.
     onboarding: Option<lamp_voice::onboarding::skill::Definition>,
+    /// The startle's move (#2822): Expression reads it from the installed
+    /// file and plays it as its reflex; here it is checked by Expression's
+    /// own check, and the skill is never run.
+    startle: Option<lamp_expression::startle::Startle>,
     /// Local hours when the skill never starts itself.
     quiet: Option<QuietFile>,
     /// The most runs it starts itself a local day (#1685's nudges).
@@ -1098,8 +1102,10 @@ pub struct Permissions {
 /// prepare_unplug = true }`), its reads and the reserved never-mind tool;
 /// and `sleep`, the night's sleep (#940, Night sleep): the creature's own,
 /// so its runs ask nobody, the Policy or `LAMP_SKILLS_ASK`, and its steps
-/// are its rest alone, no light, sound or words.
-pub const CORE_GRANTS: [&str; 3] = ["onboarding", "prepare_unplug", "sleep"];
+/// are its rest alone, no light, sound or words; and `startle`, the glance
+/// at a sudden sound (#2822): its `[startle]` is the move Expression plays
+/// as a reflex, and the skill has nothing else.
+pub const CORE_GRANTS: [&str; 4] = ["onboarding", "prepare_unplug", "sleep", "startle"];
 
 /// An add-on's say grant, the one value of `[permissions] say`: its words
 /// reach the voice quoted and untrusted, never as an instruction.
@@ -2742,6 +2748,28 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 );
             }
         }
+    } else if file.permissions.grants("startle") {
+        // The startle (#2822) is Expression's reflex: its move is this
+        // file's `[startle]`, and lamp-skills never runs it.
+        match &file.startle {
+            Some(startle) => {
+                startle.checked().map_err(|error| error.0)?;
+            }
+            None => return Err("a skill granted core = [\"startle\"] needs [startle]".into()),
+        }
+        if !triggers.is_empty()
+            || file.tool.is_some()
+            || !file.steps.is_empty()
+            || file.ask.is_some()
+            || !file.conditions.is_empty()
+        {
+            return Err(
+                "a skill granted core = [\"startle\"] is Expression's reflex: no trigger, tool, [ask], [[while]] or [[do]]"
+                    .into(),
+            );
+        }
+    } else if file.startle.is_some() {
+        return Err("[startle] belongs only to a skill granted core = [\"startle\"]".into());
     } else if (triggers.is_empty() && file.tool.is_none()) || file.steps.is_empty() {
         return Err("skill.toml needs a trigger or a tool, and at least one [[do]]".into());
     }

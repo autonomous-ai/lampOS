@@ -1411,8 +1411,9 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
         .map(|name| lamp_skills::load(&root.join(name)).unwrap())
         .collect();
     // Not feeling well came with the product after its lamp check (#1681);
-    // the eight of PRODUCT_SKILLS_OFF come installed disabled.
-    assert_eq!(installed.len(), 19);
+    // the eight of PRODUCT_SKILLS_OFF come installed disabled; the startle
+    // came with its move (#2822).
+    assert_eq!(installed.len(), 20);
     let bedtime = installed
         .iter()
         .find(|skill| skill.name == "bedtime-morning")
@@ -1437,10 +1438,10 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     assert!(root.join("bedtime-morning/SKILL.md").is_file());
     // Inventory includes the disabled core and its grants; only live skills
-    // contribute functions. The ten live skills offer Dance and
+    // contribute functions. The eleven live skills offer Dance and
     // prepare_to_unplug, the latter hidden at run time unless LAMP_UNPLUG=on.
     let inventory = lamp_skills::load_each(&root);
-    assert_eq!(inventory.len(), 19);
+    assert_eq!(inventory.len(), 20);
     assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
     let listed = lamp_skills::package::list(&root).unwrap();
     let row = listed
@@ -1461,7 +1462,7 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     let (live, errors) = lamp_skills::load_all(&root);
     assert!(errors.is_empty(), "{errors:?}");
-    assert_eq!(live.len(), 10);
+    assert_eq!(live.len(), 11);
     assert!(live.iter().all(|skill| skill.name != bedtime.name));
     // Each core skill installed off is disabled on the lamp and adds no
     // function, its tool or not: the 2 above are all a session is told.
