@@ -1,3 +1,34 @@
+## Current checkpoint: 2026-10-22 21:56 +07, real CLI handover shown; next integration gate running
+
+Ready for lamp-voice: no — replacement latest-base qualification pending
+
+Kind: tests/docs only. Public #3012 head `d4d5e5a66` passed ARM64 and Clippy:
+**10,491 passed / 0 failed / 67 skipped**, one leaky Voice pass; checker
+PASS3.967s, four doctests, twelve process tests and relay. Its exact artifact
+archive and all49 payload hashes are independently verified.
+
+[Actual CLI evidence](verification/updater-cli-exec-20261022/README.md)
+now shows genuine same-PID updater exec, new-main confirmation exactly once,
+pending cleanup and the next sequence-2 round in two ARM64 Podman scenarios.
+The authored artifact and the different replacement artifact were tested
+separately. The original18 bus subscription warnings are retained; the later
+fixture uses container-local sockets and has none. This is a self-only
+synthetic-variant test, not a cross-release, timer, power-loss or Body proof.
+A separate fixed-root actual updater SIGKILL/back case is being prepared.
+
+The latest integration is `b722fd212`, including an Update installer change.
+Local equal-range replacement `97ca7b322` is running fresh required Update
+gates before push; no older native green is transferred to it. First and
+Reviewer-lead were asked for a coordinated integration window to complete
+that final latest-base qualification. The tree's current AGENTS.md protocol
+is in use; replies go on Queue/PR, and new addressed comments are read.
+
+The real #2810 unplug and #1812 signed release remain unexecuted, requiring
+First's lamp/person/persistent setup and the owner's signing/publication
+inputs. No device connection, installation or real-key access occurred.
+
+---
+
 ## Current checkpoint: 2026-10-22 21:24 +07, corrected-base replacement pushed
 
 Ready for lamp-voice: no — exact replacement native checks pending
