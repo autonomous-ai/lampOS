@@ -1,0 +1,239 @@
+{
+  "base": "bad1144960da9dcdbbcc29072e86a767bcbd0437",
+  "platform": "Darwin arm64",
+  "inputs": {
+    "crates/update/src/apply.rs": "89db5a74e01e2ce5419ef4de9c6c0c87001941a4de36ea39c7805573de497274",
+    "crates/update/src/check_units.rs": "1c5cde0249f9d15ed566af3bd90bf490900b6184e2f81c77954fe89723d3d5f5",
+    "crates/update/src/fetch.rs": "752e1e2f5e09256b58fc3f9c9cf139dab0e09d3ed0bdcf230118edc882f3b881",
+    "crates/update/src/image.rs": "638716079df7e1770cb9c778814ae857a7e242b23519ed8bf490fe1f99a5466c",
+    "crates/update/src/install.rs": "68ea5df297fa682037974ffcb93ead8a2d18c8b35496c4d343d3d491190ff08d",
+    "crates/update/src/judge.rs": "3a5670311ae6741a8c08620bfa1591c886b4a1165d45688ba4ea996357fc830f",
+    "crates/update/src/lib.rs": "0dee46c6481bdd66b01b692bf3b37b01d9501a1d2b051e8d739491062fac63a0",
+    "crates/update/src/main.rs": "f841cce11f5583b06d5c4d695feb506d1455ced2338f62de34bbfabbbcc91277",
+    "crates/update/src/manifest.rs": "1eb17a3675d99f3c9fbb9c6a80d65c06b640dfb5ac35963500e022b5c84e8548",
+    "crates/update/src/models.rs": "246d7ea10b652ec6265253c2a4af5df61e2c09b77963ff602087d4ffe5cd8384",
+    "crates/update/src/own.rs": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7",
+    "crates/update/src/product_skills.rs": "140bab39dd74570a3329210178d9c02db4da78e6417b7f0664891cfdf644bf1f",
+    "crates/update/src/publish.rs": "90af8f48962c22d163b1f1cb19c1e1a32e307b2f1269c7715d3ed743a3e05ad6",
+    "crates/update/src/quiet.rs": "8de6893ad64de665957effcd3a8236190ad6d53494fc8b7ae0968cdb01b7e6e5",
+    "crates/update/src/records.rs": "e74440211d5a86ef0a69e4686e528c77dbbc53cfe44f9b5d1a9c6f4dc1866859",
+    "crates/update/src/round.rs": "a9119a26010d799cb85a2a5f99a4509204e9b8f92f6fb2f10006cfdf314b49b9",
+    "crates/update/src/status.rs": "3b4d0ab9ffcd0f77084f47f2627c2d4517a4e31d5ca3b21093aa695959e7126b",
+    "crates/update/src/unit.rs": "62783c6e0bc42bde5d194d8716074652dafe99f566955e147e481a2069120004",
+    "crates/update/src/world.rs": "e33a959f95b787be18810533dfd62b3ed3a459b2998dd8d75934f3b00c84f571",
+    "crates/update/tests/functions.rs": "3448d8f0896888a5f424a82756818abc2f08b8ee2a05697e27392d3b2d15b5d5",
+    "crates/update/tests/install.rs": "207780e6bdfb97193aee101ef02a1b65e2572d75e1ae327b101dbd9b341e33ed",
+    "crates/update/tests/it/ci_paths.rs": "da2d09282d8c6ee4248f61bdfc904d21eb2b28f89e72d9639d88b8777c5e4725",
+    "crates/update/tests/it/image_journal.rs": "415143feed902d28f9a88a8bb85c209efacc8babfd6c53f9f0f9492907688ea2",
+    "crates/update/tests/it/image_ramlog.rs": "2d60293fcf7fe5ab17c639a115654110e55205bf4b72f693d0aea89ba6f08e7e",
+    "crates/update/tests/it/main.rs": "7b486c660aa349e676019b3f55ae292947be9381241ae5436c7ee86225683535",
+    "crates/update/tests/it/scratch_paths.rs": "40749f7cf74a1f5bcb11ebce3ba36866710fdf2d3ad13eb85fa1d75169b62554",
+    "crates/update/tests/round/self_cuts.rs": "9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013",
+    "crates/update/tests/round/self_recovery.rs": "2cce3692a1376a60cec1752c8fbcd3e760561f38f3988648ed32013da45363de",
+    "crates/update/tests/round.rs": "86bdd7617d8abbb97d89bcd83789be929cc5f6326da10b457e66a23d0168d31c",
+    "crates/update/Cargo.toml": "18b88d969259eee19cf3303a8fcbd3856b995be2f00eaeffb95a90cf762fbb0b",
+    "Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+    "Cargo.lock": "71bf4574105bd0ea35c26d29fa61226a4fb2c04180018aed3dc721687cc8a9f0"
+  },
+  "source_unchanged": true,
+  "environment": {
+    "CARGO_TARGET_DIR": "SECOND_CARGO_TARGET",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TERM_COLOR": "never"
+  },
+  "commands": [
+    {
+      "label": "control-stuck-child",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "-p",
+        "lamp-update",
+        "--offline",
+        "--test",
+        "round",
+        "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+        "--",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "started_utc": "2026-10-22T17:05:08.573999+00:00",
+      "seconds": 34.217,
+      "exit": 101,
+      "timed_out": false,
+      "source_sha256": "50e2ff5f11f6f58139d8f4a32383cbf615ecd049a08fb026e8ff99df281e867e",
+      "log_sha256": "307cf9019a72ddce64fe90fdcc97eedc8c97fadc20ee7e0b77c1a5cbaecc2d14",
+      "log_bytes": 1145,
+      "summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 105 filtered out; finished in 3.91s"
+      ]
+    },
+    {
+      "label": "control-exited-after-missed-poll",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "-p",
+        "lamp-update",
+        "--offline",
+        "--test",
+        "round",
+        "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+        "--",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "started_utc": "2026-10-22T17:05:42.793034+00:00",
+      "seconds": 5.872,
+      "exit": 101,
+      "timed_out": false,
+      "source_sha256": "8114d4d738e37d0513061791a0c1bb29f61282f471b37e9c28f70c9081a085d2",
+      "log_sha256": "cf7130671bdbb170dddc8cb69c5b0db691780000d1aa7a68c279f2a64a3940a3",
+      "log_bytes": 1166,
+      "summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 105 filtered out; finished in 3.90s"
+      ]
+    },
+    {
+      "label": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started_utc": "2026-10-22T17:05:48.671183+00:00",
+      "seconds": 5.686,
+      "exit": 0,
+      "timed_out": false,
+      "source_sha256": "9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log_bytes": 0,
+      "summaries": []
+    },
+    {
+      "label": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "-p",
+        "lamp-update",
+        "--all-targets",
+        "--offline",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_utc": "2026-10-22T17:05:54.360272+00:00",
+      "seconds": 21.305,
+      "exit": 0,
+      "timed_out": false,
+      "source_sha256": "9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log_bytes": 0,
+      "summaries": []
+    },
+    {
+      "label": "tests",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "-p",
+        "lamp-update",
+        "--offline"
+      ],
+      "started_utc": "2026-10-22T17:06:15.668735+00:00",
+      "seconds": 220.452,
+      "exit": 0,
+      "timed_out": false,
+      "source_sha256": "9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013",
+      "log_sha256": "94b78a4a33687207c2a938679fd2f903d1d0905d9f813ae07e7349c1242e762c",
+      "log_bytes": 1849,
+      "summaries": [
+        "test result: ok. 111 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 2.44s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+        "test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 90.03s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s",
+        "test result: ok. 106 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 119.95s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    }
+  ],
+  "limits": "Diagnostics-only: the original intermittent failure cause remains unproven. Controlled mutations are not the original failure reproduction. No full workspace or local ARM64 gate.",
+  "raw_receipt_sha256": "c24d9fe9bd4c2b4f4406038726c5073be126998a653a0cd6905b15afd036ffc8",
+  "controls": [
+    {
+      "label": "control-stuck-child",
+      "mutation": "Append the shell builtin loop while :; do :; done to OLD; it creates no descendant.",
+      "result": "expected timeout assertion, test exit 101",
+      "normalized_diagnostic_lines": [
+        "updater fixture did not exit: check=1 caller=crates/update/tests/round/self_cuts.rs:348:20 path=FIXTURE_ROOT/opt/lampOS/update/current/lamp-update expected=old sha256=90639cfa6035fbc72eda335bf3df365f4667aeeb608df548fd18ba0ed2a24f53; pid=97385 elapsed=2.000229334s polls=332 last_poll=2.000228834s..2.00022925s final_status=Ok(None) (diagnostic only; timeout still fails)",
+        "updater fixture cleanup: pid=97385 kill=Ok(()) reap=Ok(ExitStatus(unix_wait_status(9))) elapsed=357.917\u00b5s"
+      ],
+      "normalization": "Only generated temporary fixture prefix replaced; raw-log digest retained in command record."
+    },
+    {
+      "label": "control-exited-after-missed-poll",
+      "mutation": "Replace the ordinary try_wait observation with a 2100 ms parent sleep and Ok(None); keep the final diagnostic try_wait and timeout panic unchanged.",
+      "result": "expected timeout assertion, test exit 101",
+      "normalized_diagnostic_lines": [
+        "updater fixture did not exit: check=1 caller=crates/update/tests/round/self_cuts.rs:349:20 path=FIXTURE_ROOT/opt/lampOS/update/current/lamp-update expected=old sha256=464cef54a392e0ee63a30123bda2ca3e5e63254a71659bfd7afd60f124900fe7; pid=97973 elapsed=2.109898042s polls=1 last_poll=125ns..2.1098965s final_status=Ok(Some(ExitStatus(unix_wait_status(0)))) (diagnostic only; timeout still fails)",
+        "updater fixture cleanup: pid=97973 kill=Ok(()) reap=Ok(ExitStatus(unix_wait_status(0))) elapsed=2.042\u00b5s"
+      ],
+      "normalization": "Only generated temporary fixture prefix replaced; raw-log digest retained in command record."
+    }
+  ],
+  "original_failure": {
+    "report": "https://github.com/autonomous-ai/lampOS/pull/3012#issuecomment-6346276126",
+    "evidence_commit": "b7acbb809acccc6cdcaf00ac8984cc934d9d7602",
+    "candidate": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+    "base": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+    "raw_consumer_log_sha256": "f34508439300c9d60472bcb333970854870d6d4bbac0ccde9a892eb9cdefcd73",
+    "verified_raw_bytes": 230969,
+    "cause": "unproven; not cleared by this diagnostic patch or isolated passes"
+  },
+  "mac_totals": {
+    "passed": 307,
+    "failed": 0,
+    "ignored": 2,
+    "filtered": 0
+  },
+  "source_review": {
+    "findings": "No P1/P2; invocation ordinal resolves the sole diagnostic P3.",
+    "runtime_changed": false,
+    "new_switch_or_wire_type": false,
+    "scope": "Private round-test helper and its docs; grep across crates found no production consumer."
+  },
+  "platform_observation": {
+    "observed_at_utc": "2026-10-22T17:27:09.297184+00:00",
+    "os_architecture": "Darwin arm64",
+    "rustc_command": "rustc +1.96.0 -vV",
+    "rustc_output": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: aarch64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2\n",
+    "retained_round_artifact": {
+      "name": "round-90a73260605e4fce",
+      "mtime_utc": "2026-10-22T17:06:18.773132+00:00",
+      "bytes": 13975648,
+      "sha256": "0e80d43fc9410f4366c3caf835911058949fffaa33721c386d0be24203975c3d",
+      "file": "Mach-O 64-bit executable arm64",
+      "depfile_sha256": "f64e07e6450af59de25b7baacfdaddb2d461ba8de83416a34d604285d00ed1c9"
+    },
+    "artifact_limit": "Inspected after the gate; its mtime falls inside that gate and it is the newest retained Round artifact. No pre-run binary digest was captured, so this is not a retrospective claim of such a capture.",
+    "correction": "The earlier x86_64 macOS wording was incorrect. The OS, Rust host and retained Round executable are ARM64. No test was rerun for this metadata observation."
+  }
+}
