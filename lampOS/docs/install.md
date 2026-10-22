@@ -1184,8 +1184,9 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
     the voice's lines in between were lost. That's read from the base's
     scripts (on lamp-75c9), not yet reproduced.
   - **What changes:** the same copy-back, with `/var/log.hdd/journal` left
-    out. The rotated text logs still come back to the RAM disk, and the
-    journal is still copied to the eMMC each night by `write`. Off when
+    out. The rotated text logs still come back to the RAM disk. Since
+    #2602 `write` no longer copies the journal to the eMMC (below), so
+    there is none there to copy back. Off when
     `/etc/default/orangepi-ramlog` says `ENABLED` isn't `true`, as the base.
     `orangepi-truncate-logs` (over 75% of `/var/log`) runs logrotate without
     the service, so it never copies back.
@@ -1196,6 +1197,74 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   - **Existing lamps:** only a newly imaged lamp has it (#1369), as for the
     journal's size above. On a lamp in use the two files are copied by hand,
     then `sudo systemctl daemon-reload`.
+- ramlog's own copies leave the journal out:
+  `robots/lamp/rootfs/etc/default/orangepi-ramlog` (#2602).
+  - **Why:** at boot `orangepi-ramlog` copies `/var/log.hdd` (the eMMC)
+    into the new `/var/log` RAM disk, and journald starts after it (the
+    base's `systemd-journald.service.d/override.conf`), so its flush already
+    comes after the copy. But the copy brought back earlier boots' journal
+    files, some still marked open: journald said "Failed to read journal
+    file … Device or resource busy" at +11.05 s on lamp-06c1 (22 Oct). They
+    filled the disk past the 75% at which `orangepi-truncate-logs` (cron,
+    every 15 min) runs `write` and `journalctl --vacuum-size=5M`, and at
+    19:00 that vacuum dropped this boot's oldest file. The journal then had
+    nothing before +11.0 s, though dmesg had lines from 3.8 s.
+  - **What changes:** the base's own settings file, with its options for
+    extra rsync arguments set. The boot's copy (`XTRA_RSYNC_FROM`) leaves
+    out `/var/log.hdd/journal`'s files, but not the folder, so journald
+    still keeps its journal in `/var/log`. Each copy to the eMMC
+    (`XTRA_RSYNC_TO`: `write` at 00:00, at shutdown and from
+    `orangepi-truncate-logs`) hides the journal, so it is never written to
+    the eMMC, and its `--delete` removes the old copy there once. The
+    journal lives in the RAM disk only, one boot at a time, within
+    `zz-lamp-journal.conf`'s 20M; the last two boots are kept apart (the
+    next item). `ENABLED`, `SIZE=50M` and `USE_RSYNC` are the base's. The
+    night's copy-back then finds no journal to write over, even on a lamp
+    without `zz-lamp-ramlog.conf`.
+  - **Tests:** `lamp-update`'s `tests/it/image_ramlog.rs` checks the
+    settings, and where GNU rsync exists runs the base's two rsync copies
+    with them on copies shaped as the lamp's.
+  - **Existing lamps:** a build carries it with the image's files
+    (`LAMP_UPDATE_IMAGE=on`). It replaces only the base's file as shipped
+    (`deploy/image/shipped.json` lists that one's SHA-256 too), so a lamp
+    whose `SIZE` was set by hand (lamp-4ace) keeps its own. By hand: copy
+    it over `/etc/default/orangepi-ramlog`. The next copy to the eMMC uses
+    it, and the boot's copy at the next boot.
+- The last two boots' journal, kept on the eMMC at a clean shutdown or
+  reboot: `robots/lamp/rootfs/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf`
+  and `/usr/local/libexec/lamp-journal-keep` (#2602, the first builder's
+  21:43 call). So `journalctl -b -1` works after an update or a reboot.
+  - **What changes:** the drop-in clears the base unit's `ExecStop=` and
+    runs `lamp-journal-keep keep`, then the base's own
+    `orangepi-ramlog stop`, which unmounts the RAM disk. Only when systemd
+    says `stopping` (a shutdown or reboot, never a `systemctl stop`):
+    journald rotates, and this boot's closed files are copied, newest
+    first, to `/var/lib/lamp-journal/last`, up to 5 MB, stopping at the
+    first that doesn't fit, so a long boot keeps its end without a gap
+    (lamp-06c1's archived files were 1.1 to 1.4 MB an hour on 22 Oct: about
+    the last 3 hours). The boot before moves to `previous`, the one before
+    that is removed: 2 boots, 10 MB at most, written once a shutdown. At
+    boot (`ExecStartPost=`, `link`) each kept file is linked into
+    `/run/log/journal` as `lamp-kept-<last|previous>-….journal`.
+    journalctl (systemd 252) reads journal files at the top of
+    `/run/log/journal` as well as its machine's folders, symlinks
+    included. A crash runs nothing, so its boot isn't kept (accepted).
+  - **Why this way:** the kept files never come back to the RAM disk,
+    which is what filled it past `orangepi-truncate-logs`' 75% (above). Not
+    in `/var/log.hdd` either, whose copy has `--delete`. journald's
+    vacuum is of its machine's folder only, and a `journalctl
+    --vacuum-size` removes only archived files, by name ("@"), which a
+    link's name isn't. The 15-minute and midnight copies still leave the
+    journal out: the only new eMMC write is this one at shutdown. Both
+    steps start with "-", so neither may fail ramlog.
+  - **Tests:** `tests/it/image_ramlog.rs` pins the drop-in, and runs the
+    script: nothing kept unless `stopping`, 5 MB a boot newest first, 2
+    boots and 10 MB at most, a boot with nothing closed keeps the kept, and
+    the links.
+  - **Existing lamps:** a build carries both with the image's files
+    (`LAMP_UPDATE_IMAGE=on`), then `systemctl daemon-reload`: the next
+    shutdown keeps, and the boot after it links. By hand: copy both, then
+    `sudo systemctl daemon-reload`.
 - Which group may read the GPIO chips and the I²C bus on the base image was
   not checked.
 - `lamp-surround` was not read beyond its unit, and `lamp-records` has two
