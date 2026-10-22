@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-23 01:14 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-23 02:17 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 90.1% over 72 rows. Quality 61.9% over 16 rows.**
+**Build 90.3% over 72 rows. Quality 61.9% over 16 rows.**
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -64,14 +64,14 @@ Written by the first builder from the team's review page at 2026-10-23 01:14 (+0
 | The light dims and goes out when nobody is there, a core skill | 1.00 | #1677 #1721 #1747 | nine | Built and tried on lamp-4ace 20 Oct 01:23 (trials.sh with Tests’ #1999 stages, lamp-skills at 782e6ef34): with nobody there the light-out skill asked the ring to fade the light over 30 s, held it while nobody was there, … |
 | What you teach it (“don’t say hello in the morning”) is kept and honoured | 1.00 | #813 | seventh | Built |
 | Forgets on request: that, everything, my face, and everything it came from | 0.92 | #1586 #1693 #2849 #2850 | fourth, twelve | 23 Oct 00:1x, up from 0.9: a room’s forget goes through only when the named person’s own face was seen saying the line (#3063 merged, Twelve; |
-| Remembers what matters without being asked (“how was the wedding?”) | 0.70 | #1693 #2648 #2680 #2805 #2806 #2807 #2808 | friday, twelve | 22 Oct 17:3x, up from 0.65: a dated event’s follow-up is worded in memory’s note and marked when the lamp asks it (LAMP_MEMORY_EVENTS, Twelve’s #2894, carried as #2980, a8564b52e). |
+| Remembers what matters without being asked (“how was the wedding?”) | 0.75 | #1693 #2648 #2680 #2805 #2806 #2807 #2808 | friday, twelve | 23 Oct 02:1x, up from 0.7: a dated follow-up is asked of the person who told it on their greeting line, never of another face (#3059 merged in train 3; |
 | Keeps going when one part fails | 1.00 | — | — | Built: each part its own unit, restarted alone, health says how the lamp is |
 | Change the Wi-Fi, name or time zone after setup, without a reset | 0.95 | #1982 #1995 #2038 #2851 #2852 #2853 | fourteen, nine | 22 Oct 16:1x, up from 0.9: the settings and Wi-Fi helpers take a request only from lamp-cloud’s unit (#2696), and install puts their units on every product lamp (Sixth’s #2926, carried as #2955). |
 | Hand-overs from a home lamp: Harness installed, the person signed in | 0.80 | #751 #765 #798 #1854 #2702 #2838 #2839 #2840 #2841 #2842 | seventh, eighth | 22 Oct 09:10, up from 0.75: a task’s finish is told after the agent’s question, on lamp-75c9 (Eighth, #2543). |
 | Updates cover the whole lamp, so V3, V4 and V5 update a shipped lamp in place: units, models, the updater itself, rollback, every part’s saved data read across versions | 0.55 | #1369 #1505 #2700 #2809 #2810 | migrate, tests | 22 Oct 12:4x, up from 0.5: three more parts’ kept files are read by every later build’s tests: controls (#2784), lamp-cloud’s rotated login (#2786) and records (#2787) (Migrate). |
 | The company sees its lamps in homes: health, crash and support logs, opt-in | 0.95 | #1683 #1755 #2862 | jarvis, mobile, backend | 22 Oct 12:46, up from 0.9: the health report lists the product parts that have failed, under the same consent (Second, #2764). |
 | The factory’s per-lamp steps: body poses, touch pads, the update key | 0.70 | #1682 #1717 #1744 #2817 #2818 | third, thirteen | 22 Oct 16:3x, up from 0.65: the factory steps start the body before the stand, so a whole run needs no person between steps (Fifth, #2869, ef1eb0cf2). |
-| Reads your mood from your face or voice *(not a ship gate)* | 0.35 | #2796 #2797 #2798 #2799 #2800 | ten, fourth | 22 Oct 16:1x, up from 0.3: the eyes read a face’s expression only on the person’s kept yes, and the face mesh runs on its own worker (Sixth’s #2872, carried as #2953); |
+| Reads your mood from your face or voice *(not a ship gate)* | 0.45 | #2796 #2797 #2798 #2799 #2800 | ten, fourth | 23 Oct 02:1x, up from 0.35: the product units carry the face reader, Blendshape alone (#2953, #2799 closed), and onboarding’s one ask whether the lamp may notice how a face seems, keeping only a yes, is merged (#3082, tr… |
 | Notices your activity and posture | 1.00 | — | — | Built and tried on lamp-4ace 20 Oct 01:23: with LAMP_ACTIVITY on the eyes say what the person at the desk is doing on room/activity (away in an empty room); |
 | Habits and wellbeing nudges beyond Stretch break, as skills | 1.00 | — | — | 20 Oct 11:46, built: all four tried on lamp-52e6 with the lead (row 12: rest your eyes, a sip of water, stand up, wind down), each passed with its skill done. |
 | Text your lamp from your phone, in the Autonomous app | 0.70 | #1396 #1673 #1726 #1742 #2836 | ten, mobile, backend, fourth | 20 Oct 11:3x, up from 0.25: on lamp-0c89 from a phone, a texted reminder was set and said at the lamp 2 min later, and a moving skill was refused from a text; |
