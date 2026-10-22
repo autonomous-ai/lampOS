@@ -661,13 +661,16 @@ fn declared(place: &Place, staff: &[Member]) -> Vec<Tool> {
                      own, and not if they said no or something else. In the same breath, \
                      before you call it, say in a few natural words that you are giving it \
                      to whoever will do it (\"Okay, giving that to {default}.\"), and nothing \
-                     more until it answers."
+                     more until it answers.{}",
+                    if place.correct { NOT_A_YES } else { "" }
                 )
             } else {
-                "Start the task you prepared with start_agent_task. Call it only right \
-                 after the person has said yes to the task you read back; never on your \
-                 own, and not if they said no or something else."
-                    .into()
+                format!(
+                    "Start the task you prepared with start_agent_task. Call it only right \
+                     after the person has said yes to the task you read back; never on your \
+                     own, and not if they said no or something else.{}",
+                    if place.correct { NOT_A_YES } else { "" }
+                )
             },
             parameters: None,
             silent: false,
@@ -1600,7 +1603,7 @@ pub fn pending_note(request: u64, now: Instant) -> Option<String> {
     (request > pending.request && now.duration_since(pending.at) <= CONFIRM_WITHIN).then(|| {
         if pending.correct {
             format!(
-                "(For you to know, not to answer: you have prepared a task for {} and asked the person whether to start it. If they say yes now, call {CONFIRM}. If they say no and say what they meant instead (\"no, I said …\", \"no, ask Codex …\"), call {START} again with the corrected task, and who if they named one: it replaces the one waiting, which you will not start now. If they only say no, call nothing. Never call {START} again for the same work unchanged.)",
+                "(For you to know, not to answer: you have prepared a task for {} and asked the person whether to start it. If they say yes now, call {CONFIRM}. If they say no and say what they meant instead (\"no, I said …\", \"no, ask Codex …\"), call {START} again with the corrected task, and who if they named one: it replaces the one waiting, which you will not start now. If they only say no, call nothing. Only their yes starts it: if they ask for the same work again, in the same words or others, that is not a yes; call {START} again with it, and read it back, never {CONFIRM}.)",
                 pending.who
             )
         } else {
@@ -1613,7 +1616,12 @@ pub fn pending_note(request: u64, now: Instant) -> Option<String> {
 }
 
 /// What [`prepared_next`] gains with [`CORRECT_FLAG`] (#2838).
-const CORRECTED_NEXT: &str = "If they say no and give a corrected ask, call start_agent_task again with it: it replaces this one.";
+const CORRECTED_NEXT: &str = "If they say no and give a corrected ask, call start_agent_task again with it: it replaces this one. Only their yes starts it: the same ask again, in the same words or others, is not a yes.";
+/// What the confirm tool's description gains with [`CORRECT_FLAG`]: a
+/// repeat of the waiting ask is not a yes (the first builder on #2838,
+/// 23 Oct 05:08: hand-over work runs on the person's computer, so only a
+/// yes starts it; on lamp-75c9 a reworded repeat was confirmed).
+const NOT_A_YES: &str = " The same ask again, in the same words or others, is not a yes: call start_agent_task with it again instead.";
 /// What `next` begins with when a corrected ask replaced the one waiting.
 const REPLACED_NEXT: &str = "This one replaces the earlier task, which you will not start now.";
 
@@ -4993,19 +5001,148 @@ pub(crate) mod tests {
                 switched.staff_note = noted;
                 switched.accounts = accounts && asked;
                 switched.named_only = named_only;
-                for tool in super::declared(&switched, &staff) {
-                    if tool.validate().is_err() {
-                        refused.push(format!(
-                            "{} with {} of the staff, asked {asked}, lead-in {lead_in}, noted {noted}, accounts {accounts}, named only {named_only}: {} bytes",
-                            tool.name,
-                            staff.len(),
-                            tool.description.len()
-                        ));
+                for correct in [false, true] {
+                    switched.correct = correct;
+                    for tool in super::declared(&switched, &staff) {
+                        if tool.validate().is_err() {
+                            refused.push(format!(
+                                "{} with {} of the staff, asked {asked}, lead-in {lead_in}, noted {noted}, accounts {accounts}, named only {named_only}, correct {correct}: {} bytes",
+                                tool.name,
+                                staff.len(),
+                                tool.description.len()
+                            ));
+                        }
                     }
                 }
             }
         }
         assert!(refused.is_empty(), "{refused:#?}");
+    }
+
+    /// #3135 with #3131 (the first builder, 23 Oct 05:35): with
+    /// `LAMP_TASKS_CORRECT`, an ask refused for want of Harness leaves
+    /// nothing waiting, so its repeat gets no "not a yes" note about a task
+    /// never prepared: it is asked of the tasks part again and told
+    /// `NO_HARNESS`'s set-up-later answer again, never confirmed.
+    #[test]
+    fn a_repeat_after_a_no_harness_refusal_is_refused_again_with_nothing_waiting() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *PENDING.lock().unwrap() = None;
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-no-harness-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let refused = json!({"ok":false,"error":"no_harness"});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status.clone()),
+                ("request.sock", refused.clone()),
+                ("request.sock", status),
+                ("request.sock", refused),
+            ],
+        );
+        let place = correcting(&directory, true);
+        let call = |task: &str| ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({ "task": task }),
+        };
+        let (first, _) = run(
+            &place,
+            &call("Summarise the readme in three lines"),
+            1,
+            true,
+            PEER_WAIT,
+        );
+        assert_eq!(first, json!({"error": NO_HARNESS}));
+        assert!(pending_note(2, Instant::now()).is_none(), "nothing waits");
+        let (again, _) = run(
+            &place,
+            &call("Make a three line summary of the readme"),
+            2,
+            true,
+            PEER_WAIT,
+        );
+        assert_eq!(again, json!({"error": NO_HARNESS}));
+        assert!(pending_note(3, Instant::now()).is_none(), "nothing waits");
+        let ops: Vec<String> = seen
+            .try_iter()
+            .map(|line| line["op"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(
+            ops,
+            ["status", "prepare", "status", "prepare"],
+            "no cancel, no confirm"
+        );
+        *PENDING.lock().unwrap() = None;
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// The first builder on #2838 (23 Oct 05:08): a repeat is not a yes. On
+    /// lamp-75c9 at 04:59 the same ask in other words, while a task waited,
+    /// was taken as the yes and the task started. With `LAMP_TASKS_CORRECT`
+    /// everything the model is told while a task waits says only their yes
+    /// starts it, and a repeat is prepared again: the confirm tool, the
+    /// prepared answer's `next`, and the note beside a later line. Off, all
+    /// three are as before.
+    #[test]
+    fn with_the_correct_switch_a_repeat_of_the_waiting_ask_is_not_a_yes() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let staff = two();
+        for lead_in in [false, true] {
+            let mut off = correcting(Path::new("/run/t"), false);
+            off.lead_in = lead_in;
+            let mut on = off.clone();
+            on.correct = true;
+            let confirm = |place: &Place| {
+                super::declared(place, &staff)
+                    .into_iter()
+                    .find(|tool| tool.name == CONFIRM)
+                    .unwrap()
+                    .description
+            };
+            assert_eq!(confirm(&on), format!("{}{NOT_A_YES}", confirm(&off)));
+            assert!(!confirm(&off).contains("not a yes"), "lead-in {lead_in}");
+            assert!(
+                confirm(&on).ends_with(
+                    "The same ask again, in the same words or others, is not a yes: call start_agent_task with it again instead."
+                ),
+                "lead-in {lead_in}"
+            );
+            for choosing in [false, true] {
+                assert!(
+                    next_for(&on, choosing, "Codex", false).ends_with(
+                        "Only their yes starts it: the same ask again, in the same words or others, is not a yes."
+                    )
+                );
+                assert!(!next_for(&off, choosing, "Codex", false).contains("not a yes"));
+            }
+        }
+        // A task prepared, then the same ask in other words: the note
+        // beside that line says to prepare it again, never to confirm.
+        let at = Instant::now();
+        for correct in [false, true] {
+            *PENDING.lock().unwrap() = Some(Pending {
+                id: 7,
+                digest: "d".into(),
+                request: 1,
+                at,
+                who: CLAUDE_CODE,
+                text: "Summarise the readme in three short lines".into(),
+                correct,
+            });
+            let note = pending_note(2, at).unwrap();
+            assert_eq!(note.contains("that is not a yes"), correct, "{note}");
+            assert_eq!(note.contains("never confirm_agent_task"), correct, "{note}");
+        }
+        *PENDING.lock().unwrap() = None;
     }
 
     #[test]
@@ -6208,8 +6345,11 @@ pub(crate) mod tests {
             note.contains("If they only say no, call nothing."),
             "{note}"
         );
-        assert!(note.ends_with("Never call start_agent_task again for the same work unchanged.)"));
-        assert!(note.len() < 600, "{} bytes", note.len());
+        assert!(
+            note.ends_with("Only their yes starts it: if they ask for the same work again, in the same words or others, that is not a yes; call start_agent_task again with it, and read it back, never confirm_agent_task.)"),
+            "{note}"
+        );
+        assert!(note.len() < 700, "{} bytes", note.len());
         *PENDING.lock().unwrap() = None;
         for lead_in in [false, true] {
             for choosing in [false, true] {

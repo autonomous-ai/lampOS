@@ -1569,14 +1569,22 @@ needs only the tasks part) a "no, I said …" after a read-back gives the
 corrected ask, read back again, and started only on a yes:
 
 - `start_agent_task`'s `next` ends "If they say no and give a corrected ask,
-  call start_agent_task again with it: it replaces this one."
+  call start_agent_task again with it: it replaces this one. Only their yes
+  starts it: the same ask again, in the same words or others, is not a yes."
+- `confirm_agent_task`'s description ends "The same ask again, in the same
+  words or others, is not a yes: call start_agent_task with it again
+  instead." **A repeat is not a yes** (the first builder on #2838, 23 Oct
+  05:08): hand-over work runs on the person's computer, so only their yes to
+  the read-back starts it. On lamp-75c9 at 04:59 the same ask in other
+  words, while a task waited, was taken as the yes and the task started.
 - the second route's note beside a later request while a task waits
   (`agent_tasks::pending_note`) says: on a yes, call `confirm_agent_task`; on
   a no with what they meant instead ("no, I said …", "no, ask Codex …"),
   call `start_agent_task` again with the corrected task, and who if named,
   which replaces the one waiting, "which you will not start now"; on a
-  plain no, call nothing; never call `start_agent_task` again for the same
-  work unchanged.
+  plain no, call nothing; "Only their yes starts it": the same work asked
+  again, in the same words or others, is not a yes, so `start_agent_task`
+  again and read it back, never `confirm_agent_task`.
 - a `start_agent_task` that prepares while another task still waits for its
   yes replaces it, but only from a request that could say yes to it
   (`may_confirm`): a later request than the one that prepared it, heard (or
@@ -1603,8 +1611,25 @@ as before (a second prepare already replaced the one waiting, unsaid).
 Tests: `a_corrected_ask_replaces_the_one_waiting_and_only_it_starts`,
 `a_plain_no_starts_nothing_and_a_failed_cancel_keeps_the_correction`,
 `two_starts_in_one_request_or_a_written_one_replace_nothing`,
-`without_the_correct_switch_the_note_and_next_are_as_before`. Not run on a
-lamp yet.
+`without_the_correct_switch_the_note_and_next_are_as_before`,
+`with_the_correct_switch_a_repeat_of_the_waiting_ask_is_not_a_yes`,
+`a_repeat_after_a_no_harness_refusal_is_refused_again_with_nothing_waiting`
+(a refused ask leaves nothing waiting, so no note follows it). The
+words only steer the model: the voice doesn't yet refuse a confirm on a line
+with no yes in it, which comes only if a run shows the words aren't enough.
+
+**Played on lamp-75c9** (23 Oct, lamp-voice `b8a9148bd`, lines from a laptop
+in Piper's voice, `LAMP_SPOKEN_TO=off` as lamp-name didn't take Piper's
+"Lamp"; #2838):
+- **Passed:**
+  - a correction then yes (task 24 replaced, only 25 reached the computer);
+  - a plain no (nothing called);
+  - two corrections in a row then yes (31 and 32 replaced, only 33 sent).
+- **Found:**
+  - a reworded repeat was taken as the yes (before the words above);
+  - within the 120 s after a plain no, new asks were answered in words, as
+    the declined task's note still stood beside them;
+  - "yes, and also …" isn't shown cleanly yet.
 
 ### A lead-in before a call (#799, off unless `LAMP_TOOL_LEAD_IN=on`)
 
