@@ -2342,7 +2342,8 @@ impl Engine {
     /// With `LAMP_MEMORY_EVENTS` (the first builder on #2805, 22 Oct
     /// 20:28, and on #2602, 22 Oct 22:17): a spoken request, not one held
     /// only by a gap, is asked with `note`'s line last among its notes, its
-    /// own instructions, after the session's note is read ([`event_line`]):
+    /// own instructions, after the session's note is read, ahead or as the
+    /// turn is told ([`Self::asking_the_note_ahead`]), and taken ([`event_line`]):
     /// `crate::remember::event_turn_note` gives it on the person's first
     /// line of a session they were offered a dated follow-up in, when that
     /// line only greets. Every chat is told without the note's section for
@@ -6759,9 +6760,11 @@ async fn answer(
             return Err(Stop::Gone);
         }
         // A dated follow-up's line, last among the notes: asked only now,
-        // once the session's note is read, as a session's first line is
-        // the one that opens it and the offer is made as it opens. Then
-        // the note's section for it is cut unless that line only greeted
+        // once the session's note is in (read as the line began or as the
+        // turn is told, its follow-up read for this answered turn, and
+        // taken just above), as a session's first line is the one that
+        // opens it and the offer is made as it opens. Then the note's
+        // section for it is cut unless that line only greeted
         // (reviewer-two's P2 on #3059).
         let mut notes = notes;
         if heard && let Some(line) = event_line(shared, request, &event_words, scope.as_ref()).await

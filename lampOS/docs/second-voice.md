@@ -1432,7 +1432,18 @@ order is kept. A written turn is the same from the chat on.
     more (`FOLLOW_UP_WITHIN`, `NoteRead::follow_up`), and a read begun as
     the turn is told asks it with the note. A line never answered spends
     no offer of anyone's. An answered turn whose read is then refused (a
-    forget in those few ms) has had its offer counted.
+    forget in those few ms) has had its offer counted, unless it is dated
+    (`LAMP_MEMORY_EVENTS`): a read given a dated follow-up and let go
+    untold takes it back (`follow_up_unoffered`), as a session that gives
+    way with it undecided does ([memory.md](memory.md)).
+  - **A dated follow-up's line** (`LAMP_MEMORY_EVENTS`,
+    [memory.md](memory.md)): the line a greeting alone gets is asked for
+    only once the turn has taken its read (`NoteRead::adopt`), so it comes
+    after the session's note, read ahead or as the turn is told, and the
+    offer belongs to the session that read opened. The note's section for it is
+    cut from a note read ahead as from any other (`Told::without`): before
+    the session's first line decides it, and for the rest of a session
+    whose first line asked something.
   - **A forget during the read, or after it** (El's and reviewer-two's P2s
     on #3016): the Days client counts each forget or rule write sent, each
     stop of journalling and each write whose answer was lost (`changes`).
@@ -1483,6 +1494,11 @@ order is kept. A written turn is the same from the chat on.
     rejected after a forget never bringing the forgotten note back:
     reviewer-two's reproductions and their controls, each step waiting on
     the read's own done mark or the store's open, never on a time),
+    the engine's
+    `a_dated_follow_up_s_line_comes_after_the_note_read_at_the_turn_or_ahead`
+    and `a_note_read_ahead_withholds_its_dated_follow_up_after_a_first_request`
+    (`second_provider::tests`, with the worker's own note ahead and context),
+    `remember::tests::a_note_read_let_go_untold_takes_its_dated_follow_up_back`,
     `remember::tests::a_forget_during_a_note_read_keeps_it_from_being_told`
     and, against the real store, `lamp-memory`'s
     `voice_note_ahead::a_note_read_ahead_spends_the_last_follow_up_offer_only_when_a_turn_takes_it`;

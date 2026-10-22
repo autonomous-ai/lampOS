@@ -7221,6 +7221,44 @@ impl Ahead {
     }
 }
 
+/// The note asked ahead ([`Ahead`]) and the scoped context callback
+/// ([`memory_context`]) as [`serve`] wires them with the Days client and
+/// `LAMP_SECOND_SCOPED_CONTEXT`, read through `client`, a turn waiting up to
+/// `within` for its note and its follow-up: for the engine's tests of the
+/// note read ahead with `LAMP_MEMORY_EVENTS` (#3016 with #3059).
+#[cfg(test)]
+pub(super) fn reading_ahead(
+    client: Arc<crate::remember::DaysClient>,
+    within: Duration,
+) -> (
+    crate::second_provider::NoteAhead,
+    crate::second_provider::ScopedSystem,
+) {
+    let sessions = Arc::new(Mutex::new(Sessions::default()));
+    let ahead = Ahead::asking(
+        sessions.clone(),
+        None,
+        Arc::new(move |session, person, _, follow_up| {
+            client.read_note_within(session, person, false, within, (true, follow_up))
+        }),
+    )
+    .waiting_up_to(within);
+    let socket = Some(PathBuf::from("/unused/the note is asked ahead"));
+    let told = memory_context(sessions, socket, None, true, |_, person, note| {
+        system_message(
+            "Synthetic character.\n",
+            None,
+            &note,
+            None,
+            person.as_deref(),
+        )
+    });
+    (
+        ahead.told_as(),
+        Arc::new(move |lease: &crate::memory_scope::ScopeLease| told(Some(lease))),
+    )
+}
+
 /// Whether this turn's session is opened anew: the person changed, or the
 /// memory wants a fresh context after journalling stopped or a write was
 /// lost (`LAMP_MEMORY_JOURNAL_RESUMES`, Friday's P1 on #2226).
