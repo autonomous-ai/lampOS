@@ -1,3 +1,47 @@
+## Current checkpoint: 2026-10-22 09:35 +07, fresh Cloud gate and renewed Music conflict
+
+**#2764:** Pushed `a50f88224132066826946c452b1a52fd44568459` on
+`17fdfda1d757324b8437d997304e855e8ecbf9dd`, checking the remote base before
+push. [Rebase identity and fresh Mac gate](verification/report-failed-units-rebase-17fdf-20261022/README.md)
+show an equal Cloud patch and unchanged complete Cloud tree. Upstream Voice
+production changed, so fmt (**4.894 s**), strict Cloud Clippy (**13.216 s**)
+and Cloud tests (**177 passed / 0 failed / 1 ignored / 0 filtered out**,
+**65.981 s**) were freshly run. All 394 captured source hashes stayed fixed.
+New-head Clippy **39711676412** is green; ARM64 **39711676351** continues.
+Ready for lamp-voice: **no**, native qualification pending. Reviewer-two
+owns the current-base check and merge.
+
+[Historical native evidence](verification/report-failed-units-rebase-9e7ee-native-20261022/README.md)
+qualifies superseded `c37fe695c` only: **10002 passed / 0 failed / 63 skipped**
+(one leaky pass), **169.874 s**, four doc tests, twelve custom-harness tests,
+relay and all three new Cloud tests. Both jobs tested `e6a427b81`, with
+parents `9e7eec6e5` and `c37fe695c`. The new head has its own CI runs.
+
+**#1757:** The new base caused a conflict in the adjacent seems-note and
+requested-audio engine setup. Candidate `d96f484ec` retains both blocks;
+an independent source read found no P1/P2. All 34 reviewed proof files and
+78 of 89 patch files are unchanged. Fresh fmt and strict Clippy across
+Msgs, Actions, Skills, Voice and Voice-eval pass; those five crates' tests
+are running before push. The old `bd1d79a5a` native receipt remains old-head
+evidence. First owns the eventual merge.
+
+**Music P3 follow-up:** Committed and pushed `fb714e28c556bffaca55af2cc2a94bbec4e03fee`
+on `second/requested-audio-voice-state`, based on reviewed Music `bd1d79a5a`.
+[Proof](https://github.com/autonomous-ai/lampOS/blob/fb714e28c556bffaca55af2cc2a94bbec4e03fee/lampOS/docs/verification/requested-audio-voice-state-20261022/README.md)
+records fresh fmt/strict Voice Clippy, Voice **3445/0/14/0**, the Skills
+consumer **1/0/0/260**, and Ears consumer **1/0/0/66**. The required
+unshown mutant fails **0/1/0/3183** at Resting-versus-Thinking; positive and
+restored runs each pass **1/0/0/3183**. The PR follows Music's merge as assigned.
+The initial cache-permission attempt is retained separately, before tests ran.
+
+**#2767** `19d1a46d9` remains green and mergeable with First for its
+installer source read/merge. No device action, full local workspace gate or
+local ARM64 build.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 09:24 +07, failed-unit head includes Eyes tools base
 
 **#2764:** Pushed `c37fe695c9cfe92d6d0c489706ec2e7f036de7a8` on
