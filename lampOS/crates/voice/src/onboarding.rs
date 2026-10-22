@@ -615,6 +615,17 @@ impl Onboarding {
         let mut walk = Self::with_storage(file, client);
         walk.eyes = lamp_bus::Bus::from_environment().ok();
         walk.nudge = std::env::var(NUDGE_ENVIRONMENT).as_deref() == Ok("on");
+        // The seat's sentence bar (#2844): off unless set, and a value out
+        // of range is off with one line.
+        walk.near.seat_bar = near::seat_sentence_bar(
+            std::env::var(near::SEAT_SENTENCE_BAR_ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        )
+        .unwrap_or_else(|why| {
+            eprintln!("{why}");
+            None
+        });
         // The head pads' touches, from `--touch` Controls, only with the
         // voice's bus on.
         if std::env::var(crate::bus_out::ENVIRONMENT).ok().as_deref() == Some("on") {

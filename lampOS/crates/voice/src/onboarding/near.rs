@@ -81,6 +81,42 @@ const MOST_REOFFERS: u8 = 2;
 /// calls rose only 3.9 dB (lamp-52e6, row 10), a line under it is not told
 /// from the room's own swing.
 const SENTENCE_LOWEST_DB: f32 = 3.0;
+/// `<dB>`: the seat's sentence bar (#2844). A sentence said from the seat
+/// passes at this rise over the room's quiet, in place of the near rule's
+/// bar (`crate::attention::near_rise_db`) as the most it must reach: still
+/// never over this person's quietest call less 3 dB, never under
+/// [`SENTENCE_LOWEST_DB`]. Onboarding try 6 refused the new person's
+/// sentence: a call is louder than a sentence, so a bar made from calls, or
+/// the near rule's 18 dB made from lines said close, is too strict at the
+/// seat. The value is measured from sentences said at the seat (the
+/// record's `rise_db`), so a lamp sets it with no rebuild. Off unless set;
+/// a value that is not a number from [`SEAT_BAR_LOWEST_DB`] to
+/// [`SEAT_BAR_HIGHEST_DB`] is off, with one line on stderr.
+pub const SEAT_SENTENCE_BAR_ENVIRONMENT: &str = "LAMP_SEAT_SENTENCE_BAR";
+/// The seat's sentence bar is at least this ([`SENTENCE_LOWEST_DB`]) ...
+pub const SEAT_BAR_LOWEST_DB: f32 = SENTENCE_LOWEST_DB;
+/// ... and at most the highest bar a person's calls make (#2844).
+pub const SEAT_BAR_HIGHEST_DB: f32 = lamp_near_call::HIGHEST_DB;
+
+/// [`SEAT_SENTENCE_BAR_ENVIRONMENT`]'s value (#2844): none when unset or
+/// empty, the bar when it is a number in range, else why it is off.
+pub fn seat_sentence_bar(value: Option<&str>) -> Result<Option<f32>, String> {
+    let Some(value) = value.filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    value
+        .parse::<f32>()
+        .ok()
+        .filter(|bar| (SEAT_BAR_LOWEST_DB..=SEAT_BAR_HIGHEST_DB).contains(bar))
+        .map(Some)
+        .ok_or_else(|| {
+            format!(
+                "lamp-voice: {SEAT_SENTENCE_BAR_ENVIRONMENT}={value:?} is not a number of dB from \
+                 {SEAT_BAR_LOWEST_DB} to {SEAT_BAR_HIGHEST_DB}; the seat's sentence bar is off"
+            )
+        })
+}
+
 /// The sentence part's prompts: the first, and one coached.
 pub(crate) const SENTENCE_PROMPTS: u8 = 2;
 /// A line said for the sentence ends within this long of the prompt's end:
@@ -239,6 +275,8 @@ pub(crate) struct NearFlow {
     short: Option<Short>,
     /// Prompts offered again after being cut ([`MOST_REOFFERS`]).
     reoffered: u8,
+    /// [`SEAT_SENTENCE_BAR_ENVIRONMENT`], read once at start (#2844).
+    pub(super) seat_bar: Option<f32>,
 }
 
 impl NearFlow {
@@ -718,9 +756,14 @@ impl Onboarding {
     /// calibrated), which also stands with no call accepted, and never under
     /// [`SENTENCE_LOWEST_DB`]. People farther off rose 9.8 to 15.1 dB in a
     /// quiet room, under a quiet room's bar of 18 dB and under the calls'
-    /// own less 3 dB.
+    /// own less 3 dB. With the seat's bar set
+    /// ([`SEAT_SENTENCE_BAR_ENVIRONMENT`], #2844) it stands in for the near
+    /// rule's bar here.
     fn sentence_bar(&self) -> f32 {
-        let bar = crate::attention::near_rise_db();
+        let bar = self
+            .near
+            .seat_bar
+            .unwrap_or_else(crate::attention::near_rise_db);
         self.desired
             .near_call_tries
             .iter()

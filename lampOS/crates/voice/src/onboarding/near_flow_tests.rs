@@ -1033,6 +1033,90 @@ fn in_a_loud_room_the_sentence_is_judged_against_the_persons_own_calls() {
     assert_eq!(judged["bar_db"].as_f64().unwrap() as f32, 18.0);
 }
 
+/// The seat's sentence bar (#2844): onboarding try 6 refused the new
+/// person's sentence, since a call from the seat is louder than a sentence
+/// said from it. With the bar set, a sentence at a seat's level passes at
+/// its first try, and a line from across the room, 10 to 12 dB lower, is
+/// still refused. Unset, the same seat sentence is refused at 18 dB.
+#[test]
+fn with_the_seats_bar_a_seat_sentence_passes_first_and_one_across_the_room_is_refused() {
+    const SEAT_BAR: f32 = 10.0;
+    for (seat_bar, rise_db, accepted, bar_db) in [
+        (Some(SEAT_BAR), 14.0, true, SEAT_BAR),
+        (Some(SEAT_BAR), SEAT_BAR, true, SEAT_BAR),
+        (Some(SEAT_BAR), 9.9, false, SEAT_BAR),
+        // Across the room: the seat's sentence less 10 to 12 dB.
+        (Some(SEAT_BAR), 4.0, false, SEAT_BAR),
+        (Some(SEAT_BAR), 2.0, false, SEAT_BAR),
+        // Off: today's bar, the calls' 22.4 less 3 held to the 18 dB rule.
+        (None, 14.0, false, 18.0),
+        (None, 18.0, true, 18.0),
+    ] {
+        let store = Store::new(None);
+        let mut walk = store.cycle(S);
+        walk.near.seat_bar = seat_bar;
+        past_the_name(&mut walk);
+        assert_eq!(ask(&mut walk, 80 * S, 4), SENTENCE_FIRST);
+        let judged = sentence(&mut walk, 80 * S, 2_500, rise_db, Some(8));
+        assert_eq!(judged["accepted"], accepted, "{seat_bar:?} {judged}");
+        assert_eq!(judged["bar_db"].as_f64().unwrap() as f32, bar_db);
+        if accepted {
+            assert_eq!(settle(&mut walk, 100 * S), [SENTENCE_DONE]);
+            assert_eq!(outcome(&walk), Some(Outcome::Done));
+            assert_eq!(walk.kept().sentence_prompts, 1);
+        } else {
+            assert_eq!(judged["short"], "level");
+            assert_eq!(outcome(&walk), None);
+        }
+    }
+    // Still never over this person's quietest call less 3 dB, nor under
+    // 3 dB: in the office, calls of 3.9 dB keep the bar at 3.
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    walk.near.seat_bar = Some(SEAT_BAR);
+    for (turn, rise) in [(1, 3.9), (2, 5.2), (3, 4.4)] {
+        assert_eq!(call(&mut walk, turn * 20 * S, rise, turn)["accepted"], true);
+    }
+    assert_eq!(settle(&mut walk, 70 * S), [NEAR_DONE]);
+    ask(&mut walk, 80 * S, 4);
+    let judged = sentence(&mut walk, 80 * S, 1_950, 4.2, Some(8));
+    assert_eq!(judged["accepted"], true, "{judged}");
+    assert_eq!(judged["bar_db"].as_f64().unwrap() as f32, 3.0);
+    // With no call accepted, the seat's bar stands in for the 18 dB rule.
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    walk.near.seat_bar = Some(SEAT_BAR);
+    for (turn, at) in [(1, 10 * S), (2, 30 * S), (3, 50 * S)] {
+        let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        judge(&mut walk, &prompt);
+    }
+    assert_eq!(settle(&mut walk, 70 * S), [NEAR_FAILED]);
+    ask(&mut walk, 80 * S, 4);
+    let judged = sentence(&mut walk, 80 * S, 2_500, 12.0, Some(8));
+    assert_eq!(judged["accepted"], true, "{judged}");
+    assert_eq!(judged["bar_db"].as_f64().unwrap() as f32, SEAT_BAR);
+}
+
+#[test]
+fn the_seats_sentence_bar_is_a_number_of_db_in_range_or_off() {
+    use super::near::{SEAT_BAR_HIGHEST_DB, SEAT_BAR_LOWEST_DB, seat_sentence_bar};
+    assert_eq!((SEAT_BAR_LOWEST_DB, SEAT_BAR_HIGHEST_DB), (3.0, 24.0));
+    assert_eq!(seat_sentence_bar(None), Ok(None));
+    assert_eq!(seat_sentence_bar(Some("")), Ok(None));
+    for (value, bar) in [("3", 3.0), ("10", 10.0), ("11.5", 11.5), ("24", 24.0)] {
+        assert_eq!(seat_sentence_bar(Some(value)), Ok(Some(bar)), "{value}");
+    }
+    for value in [
+        "2.9", "24.1", "-10", "0", "on", "off", "NaN", "inf", " 10", "10 dB",
+    ] {
+        let why = seat_sentence_bar(Some(value)).expect_err(value);
+        assert!(
+            why.starts_with("lamp-voice: LAMP_SEAT_SENTENCE_BAR=") && why.ends_with("is off"),
+            "{why}"
+        );
+    }
+}
+
 #[test]
 fn the_step_is_the_sentences_whatever_the_name_part_came_to() {
     // Nobody called: no bar, and the sentence part still runs and decides.

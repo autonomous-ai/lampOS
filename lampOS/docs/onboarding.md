@@ -502,7 +502,17 @@ evidence (`near.rs`, `sentence_judge`):
   (8 words in 1.95 s) fell short of the flat 18 dB; there the bar is 3 dB. A
   far, quiet line still falls short: people farther off rose 9.8 to 15.1 dB in
   a quiet room, under its 18 dB, and a line under 3 dB in the office. Test:
-  `in_a_loud_room_the_sentence_is_judged_against_the_persons_own_calls`;
+  `in_a_loud_room_the_sentence_is_judged_against_the_persons_own_calls`.
+  **The seat's bar** (`LAMP_SEAT_SENTENCE_BAR=<dB>`, #2844, off unless set):
+  onboarding try 6 refused the new person's sentence, since a call from the
+  seat is louder than a sentence said from it, and the 18 dB rule came from
+  lines said close. Set, the value (3 to 24 dB, measured from sentences said
+  at the usual seat, the records' `rise_db`) stands in for the near rule's
+  bar here, still never over the quietest call less 3 dB nor under 3 dB;
+  any other value is off with one line on stderr. Off, the bar is as above.
+  Tests:
+  `with_the_seats_bar_a_seat_sentence_passes_first_and_one_across_the_room_is_refused`,
+  `the_seats_sentence_bar_is_a_number_of_db_in_range_or_off`;
 - **its words covering it**: at least one word for each second of the line's
   speech (`MS_A_WORD`, half the pace of ordinary speech; the line's speech is
   its blocks the detector scored as speech, 10 ms each). Fewer is a fragment.
