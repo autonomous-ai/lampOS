@@ -2840,10 +2840,20 @@ after a take-over, but now for every turn:
     the thread. The model is asked both questions once, with no partial
     answer. The journal says `request M: K lines joined into it had none
     of their answers played; those answers are not kept as the lamp's
-    words`. An answer that began playing is never joined, and the thread
-    keeps it as before. Without the switch nothing changes, and a cut line
-    not joined keeps its exchange: with `LAMP_SAID_AS_HEARD` its part is
-    "—", so the person's words are not lost.
+    words`. Words cut short and answered in a held line's place, not
+    joined (#1712's carry), had none of their answer heard either, so
+    their requests leave the thread the same way (`unsay_carried`; the
+    held line's that last answered them too, when carried through one):
+    the model is asked them again with no partial answer as the lamp's
+    (reviewer-three's P3 on #3129). The journal says `request M: the words
+    answered in its place had none of their answers played; those answers
+    are not kept as the lamp's words`. #1712's carry has no switch of its
+    own, so this unsaying stays behind `LAMP_JOIN_CUT_WORDS` with the
+    join's. An answer that began playing is never joined or carried, and
+    the thread keeps it as before. Without the switch nothing changes, and
+    a cut line neither joined nor carried keeps its exchange: with
+    `LAMP_SAID_AS_HEARD` its part is "—", so the person's words are not
+    lost.
 - **What the lamp said is kept as what was heard** (`LAMP_SAID_AS_HEARD=on`,
   off unless set; #1712, the first builder's yes on #1722, 20 Oct 09:38).
   - **The fault it fixes:** this route sends each piece of an answer, its
