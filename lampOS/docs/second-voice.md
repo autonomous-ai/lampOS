@@ -440,8 +440,10 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
     (`VOICE_IDS_BY_LANG`) is turned into its id; any other value is taken as
     an id.
 
-  Text in `[...]` is not spoken. A sentence with nothing left to say sends
-  no request. Every sample is doubled (+6 dB) and clipped at full scale:
+  OpenAI and Gemini are given the text without anything in `[...]`;
+  ElevenLabs is given it as written, tags and all, unless
+  `LAMP_SECOND_SPEECH_TAGS=on` filters it (below). A sentence with nothing
+  left to say sends no request. Every sample is doubled (+6 dB) and clipped at full scale:
   through the relay `tts-1` `nova` measured peak -7.3 dBFS and RMS -28.8
   dBFS, ElevenLabs Rachel peak -6.4 and RMS -23.5, and the second voice was
   heard much quieter than Gemini's.
@@ -594,6 +596,23 @@ order is kept. A written turn is the same from the chat on.
   words before its calls: the next round is told they were heard`. The
   check is on the lamp: the day lines' timer and reminder at 4 of 4 runs,
   one confirmation each.
+- **With `LAMP_SECOND_SPEECH_TAGS=on` the voice may be given an emotion
+  tag** (off unless set; #2901, the lead's proposal on #1711, 22 Oct). The
+  spoken turns' character is followed by a short note
+  (`speech_tags::NOTE`): the voice reads `[laughs]`, `[sighs]`,
+  `[whispers]` and `[excited]`, to be used rarely, only where a person
+  would make that sound, at most one a reply. Each piece of the reply goes
+  through `speech_tags::Tags` before it is said. The voice is given only a
+  listed tag, the first of the reply, and only when it is ElevenLabs
+  (`eleven_v4_turbo` reads them); any other `[...]` is dropped, and with
+  OpenAI or Gemini every tag is. A `[` left open at a piece's end (up to 24
+  characters) waits for the next piece, so "[lau" then "ghs] ok" is said as
+  `[laughs] ok`; a tag with no words after it waits for the next words. The
+  lamp's words, which go to the transcript, the thread, the own-words list
+  and the body, never carry a tag, so a tag never moves the body or the
+  light. The journal says `speech tags: K given to the voice, D dropped`
+  per reply, counts only. Off, a reply is said and written as the chat
+  wrote it.
 - **With `LAMP_SECOND_FEW_TOOLS=on` a spoken turn's chat is given its few
   functions first** (off unless set; #1712, the first builder at 18:56:
   "light, volume, timer, search, look, tasks"). The others are behind one,
