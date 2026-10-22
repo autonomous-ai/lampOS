@@ -142,6 +142,11 @@ pub const MAKE_SKILL_FLAG: &str = "--tasks-make-skill";
 /// [`WHO_ENVIRONMENT`].
 pub const NAMED_ONLY_ENVIRONMENT: &str = "LAMP_TASKS_NAMED_ONLY";
 pub const NAMED_ONLY_FLAG: &str = "--tasks-named-only";
+/// Where it reads whether a "no, I said …" after a read-back prepares the
+/// corrected ask in place of the one waiting ([`Place::correct`], #2838).
+/// `on` only.
+pub const CORRECT_ENVIRONMENT: &str = "LAMP_TASKS_CORRECT";
+pub const CORRECT_FLAG: &str = "--tasks-correct";
 /// Where the second route reads whether a line whose own words ask one of
 /// the staff by name to do something ("ask Claude Code to …") has its
 /// first chat round made to call [`START`] ([`named_ask`], #1722). `on`
@@ -186,6 +191,12 @@ struct Pending {
     at: Instant,
     /// Who it was prepared for, as the person calls them.
     who: &'static str,
+    /// The work as it was prepared: the same work again is no correction
+    /// (El's P3 on #3028).
+    text: String,
+    /// Prepared with [`CORRECT_FLAG`]: its note says a corrected ask
+    /// replaces it.
+    correct: bool,
 }
 
 static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
@@ -1360,6 +1371,10 @@ pub struct Place {
     /// them, as any agent the voice knows, and one named who isn't set up
     /// prepares nothing and is said not to be.
     pub named_only: bool,
+    /// A "no, I said …" after a read-back prepares the corrected ask in
+    /// place of the one waiting, which is never started ([`CORRECT_FLAG`],
+    /// #2838).
+    pub correct: bool,
     /// The person may sign the lamp's Harness in by voice
     /// ([`SIGN_IN_FLAG`], `crate::sign_in`).
     pub sign_in: bool,
@@ -1387,7 +1402,19 @@ pub fn arguments_from_environment() -> Vec<String> {
     ) {
         arguments.push(NAMED_ONLY_FLAG.to_owned());
     }
+    if correct(
+        &arguments,
+        std::env::var(CORRECT_ENVIRONMENT).ok().as_deref(),
+    ) {
+        arguments.push(CORRECT_FLAG.to_owned());
+    }
     arguments
+}
+
+/// Whether [`CORRECT_FLAG`] goes after `arguments`: `on`, and only with the
+/// tasks part; it needs no other switch.
+fn correct(arguments: &[String], value: Option<&str>) -> bool {
+    value == Some("on") && !arguments.is_empty()
 }
 
 /// Whether [`NAMED_ONLY_FLAG`] goes after `arguments`: `on`, and only with
@@ -1456,8 +1483,8 @@ fn alias(text: &str) -> bool {
 
 /// Take a leading `--tasks-dir DIR [--tasks-target ALIAS] [--tasks-who]
 /// [--tasks-lead-in] [--tasks-asked [--tasks-accounts]] [--tasks-machine-names]
-/// [--tasks-needs PATH] [--tasks-make-skill] [--tasks-sign-in] [--tasks-named-only]`
-/// off the flags.
+/// [--tasks-needs PATH] [--tasks-make-skill] [--tasks-sign-in] [--tasks-named-only]
+/// [--tasks-correct]` off the flags.
 pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
     let [flag, rest @ ..] = flags else {
         return Ok((None, flags));
@@ -1526,6 +1553,10 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
         [flag, rest @ ..] if flag == NAMED_ONLY_FLAG && who => (true, rest),
         _ => (false, rest),
     };
+    let (correct, rest) = match rest {
+        [flag, rest @ ..] if flag == CORRECT_FLAG => (true, rest),
+        _ => (false, rest),
+    };
     Ok((
         Some(Place {
             directory: PathBuf::from(directory),
@@ -1539,6 +1570,7 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
             staff_note: false,
             make_skill,
             named_only,
+            correct,
             sign_in,
         }),
         rest,
@@ -1566,11 +1598,66 @@ fn may_confirm(pending: &Pending, request: u64, heard: bool, now: Instant) -> bo
 pub fn pending_note(request: u64, now: Instant) -> Option<String> {
     let pending = PENDING.lock().ok()?.clone()?;
     (request > pending.request && now.duration_since(pending.at) <= CONFIRM_WITHIN).then(|| {
-        format!(
-            "(For you to know, not to answer: you have prepared a task for {} and asked the person whether to start it. If they say yes now, call {CONFIRM}; do not call {START} again for that work.)",
-            pending.who
-        )
+        if pending.correct {
+            format!(
+                "(For you to know, not to answer: you have prepared a task for {} and asked the person whether to start it. If they say yes now, call {CONFIRM}. If they say no and say what they meant instead (\"no, I said …\", \"no, ask Codex …\"), call {START} again with the corrected task, and who if they named one: it replaces the one waiting, which is never started. If they only say no, call nothing. Never call {START} again for the same work unchanged.)",
+                pending.who
+            )
+        } else {
+            format!(
+                "(For you to know, not to answer: you have prepared a task for {} and asked the person whether to start it. If they say yes now, call {CONFIRM}; do not call {START} again for that work.)",
+                pending.who
+            )
+        }
     })
+}
+
+/// What [`prepared_next`] gains with [`CORRECT_FLAG`] (#2838).
+const CORRECTED_NEXT: &str = "If they say no and give a corrected ask, call start_agent_task again with it: it replaces this one.";
+/// What `next` begins with when a corrected ask replaced the one waiting.
+const REPLACED_NEXT: &str = "This one replaces the earlier task, which you will not start now.";
+
+/// [`prepared_next`], with [`CORRECT_FLAG`]'s sentence, and begun with
+/// [`REPLACED_NEXT`] when this task replaced one waiting.
+fn next_for(place: &Place, choosing: bool, who: &str, replaced: bool) -> String {
+    let next = prepared_next(place.lead_in, choosing, who);
+    if !place.correct {
+        return next;
+    }
+    if replaced {
+        format!("{REPLACED_NEXT} {next} {CORRECTED_NEXT}")
+    } else {
+        format!("{next} {CORRECTED_NEXT}")
+    }
+}
+
+/// Cancel a task a corrected ask replaced, best-effort: the tasks part takes
+/// a cancel for a prepared task, so it never lingers as one to confirm. The
+/// new task stands whatever is answered. `store` and `revision` are the
+/// tasks part's after the new task was prepared.
+fn cancel_replaced(
+    place: &Place,
+    request: u64,
+    old: u64,
+    store: Option<&str>,
+    revision: Option<u64>,
+    deadline: Duration,
+) {
+    let (Some(store), Some(revision)) = (store, revision) else {
+        return;
+    };
+    let guard = json!({"store_id": store, "revision": revision, "request_id": format!("voice-{request}-cancel-{}", nonce())});
+    let cancelled = ask(
+        &place.directory.join("request.sock"),
+        &json!({"op":"cancel","guard":guard,"id":old}),
+        deadline,
+    )
+    .is_some_and(|answer| answer.get("ok") == Some(&json!(true)));
+    if !cancelled {
+        eprintln!(
+            "lamp-voice: tasks: request {request}: task {old} could not be cancelled; this voice no longer confirms it"
+        );
+    }
 }
 
 /// Run one call. Blocking, for a thread of its own. `heard`: the request the
@@ -1723,14 +1810,46 @@ fn run_for(
                     ) else {
                         return (unreached(place), false);
                     };
+                    let mut replaced = None;
                     if let Ok(mut pending) = PENDING.lock() {
+                        // With the switch, one still waiting for its yes is
+                        // replaced by this corrected ask (#2838): only from
+                        // a later request than the one that prepared it (one
+                        // line asking two agents makes two in the same
+                        // request, reviewers' P2 on #3009), and only from one
+                        // that may say yes to it ([`may_confirm`]: a line the
+                        // lamp wrote itself never replaces the person's).
+                        replaced = pending
+                            .as_ref()
+                            .filter(|waiting| {
+                                place.correct
+                                    && waiting.id != id
+                                    && (waiting.text != task || waiting.who != who)
+                                    && may_confirm(waiting, request, heard, Instant::now())
+                            })
+                            .map(|waiting| waiting.id);
                         *pending = Some(Pending {
                             id,
                             digest: digest.to_owned(),
                             request,
                             at: Instant::now(),
                             who,
+                            text: task.to_owned(),
+                            correct: place.correct,
                         });
+                    }
+                    if let Some(old) = replaced {
+                        eprintln!(
+                            "lamp-voice: tasks: request {request}: a corrected ask replaces task {old}, which this voice no longer confirms"
+                        );
+                        cancel_replaced(
+                            place,
+                            request,
+                            old,
+                            status.get("store_id").and_then(Value::as_str),
+                            answer.get("revision").and_then(Value::as_u64),
+                            left(),
+                        );
                     }
                     // Devin Cloud works in Devin's cloud, not on a computer.
                     let cloud = member.is_some_and(|member| {
@@ -1754,7 +1873,7 @@ fn run_for(
                             true,
                         );
                     }
-                    let next = prepared_next(place.lead_in, choosing(place, staff), who);
+                    let next = next_for(place, choosing(place, staff), who, replaced.is_some());
                     (
                         json!({
                             "prepared": true,
@@ -2108,6 +2227,7 @@ pub fn hand_over(
             staff_note: false,
             make_skill: true,
             named_only: false,
+            correct: false,
             sign_in: false,
         };
         match missing_target(&place, 0, target, "claude", left()) {
@@ -2267,6 +2387,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            correct: false,
             sign_in: false,
         };
         let told = |place: &Place, name: &str, args: Value| {
@@ -2320,6 +2441,8 @@ pub(crate) mod tests {
             request: 5,
             at,
             who: CLAUDE_CODE,
+            text: String::new(),
+            correct: false,
         };
         assert!(may_confirm(&pending, 6, true, at + Duration::from_secs(10)));
         // In the request that prepared it: the model asking itself.
@@ -2354,6 +2477,8 @@ pub(crate) mod tests {
             request: asked,
             at,
             who: CLAUDE_CODE,
+            text: String::new(),
+            correct: false,
         };
         assert!(may_confirm(
             &pending,
@@ -2500,6 +2625,7 @@ pub(crate) mod tests {
                 staff_note: false,
                 make_skill: false,
                 named_only: false,
+                correct: false,
                 sign_in: false,
             })
         );
@@ -2911,6 +3037,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            correct: false,
             sign_in: false,
         };
         let not_set_up = "Claude Code isn't set up for the lamp yet, so this can't be handed over. \
@@ -3409,6 +3536,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            correct: false,
             sign_in: false,
         };
         let call = |name: &str, args: Value| ToolCall {
@@ -3490,6 +3618,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            correct: false,
             sign_in: false,
         };
         let call = |name: &str, args: Value| ToolCall {
@@ -3579,6 +3708,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            correct: false,
             sign_in: false,
         };
         let call = |name: &str, args: Value| ToolCall {
@@ -3633,6 +3763,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            correct: false,
             sign_in: false,
         };
         let call = |task: &str| ToolCall {
@@ -3689,6 +3820,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            correct: false,
             sign_in: false,
         };
         let task = json!({"ok":true,"text":"Suggest three names","target":{"engine":"claude"},
@@ -3767,6 +3899,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            correct: false,
             sign_in: false,
         };
         let seen = tasks_part(
@@ -4250,6 +4383,7 @@ pub(crate) mod tests {
             staff_note: false,
             make_skill: false,
             named_only: false,
+            correct: false,
             sign_in: false,
         }
     }
@@ -5186,6 +5320,7 @@ pub(crate) mod tests {
                 staff_note: false,
                 make_skill: false,
                 named_only: false,
+                correct: false,
                 sign_in: false,
             })
         );
@@ -5655,5 +5790,438 @@ pub(crate) mod tests {
         assert!(named_only(&flags(&[WHO_FLAG]), Some("on")));
         assert!(!named_only(&flags(&[WHO_FLAG]), Some("yes")));
         assert!(!named_only(&flags(&[]), Some("on")));
+    }
+
+    /// `LAMP_TASKS_CORRECT` (#2838) reaches the place with the tasks part
+    /// alone, after every other flag, and only as `on`.
+    #[test]
+    fn the_correct_switch_is_on_only_with_the_tasks_part() {
+        let flags = |rest: &[&str]| -> Vec<String> {
+            [FLAG, "/run/t"]
+                .iter()
+                .chain(rest)
+                .map(|flag| (*flag).to_owned())
+                .collect()
+        };
+        let all = flags(&[WHO_FLAG, MAKE_SKILL_FLAG, NAMED_ONLY_FLAG, CORRECT_FLAG]);
+        let (place, rest) = take(&all).unwrap();
+        let place = place.unwrap();
+        assert!(place.correct && place.named_only);
+        assert!(rest.is_empty());
+        let alone = flags(&[CORRECT_FLAG]);
+        let (place, rest) = take(&alone).unwrap();
+        assert!(place.unwrap().correct);
+        assert!(rest.is_empty());
+        let (place, _) = take(&flags(&[])).unwrap();
+        assert!(!place.unwrap().correct);
+        assert!(correct(&flags(&[]), Some("on")));
+        assert!(!correct(&flags(&[]), Some("yes")));
+        assert!(!correct(&flags(&[]), None));
+        assert!(!correct(&[], Some("on")));
+    }
+
+    /// The place for the correction tests: the office's Claude Code.
+    fn correcting(directory: &Path, correct: bool) -> Place {
+        Place {
+            directory: directory.to_owned(),
+            target: "office".into(),
+            who: false,
+            lead_in: false,
+            asked: false,
+            accounts: false,
+            machine_names: false,
+            needs: None,
+            staff_note: false,
+            make_skill: false,
+            named_only: false,
+            correct,
+            sign_in: false,
+        }
+    }
+
+    /// #2838: with `LAMP_TASKS_CORRECT`, "no, I said tea" after the read-back
+    /// prepares the corrected ask in place of the one waiting, which is
+    /// cancelled and never started; the yes then starts only the corrected
+    /// one, with its own digest.
+    #[test]
+    fn a_corrected_ask_replaces_the_one_waiting_and_only_it_starts() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *PENDING.lock().unwrap() = None;
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-correct-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"coffee","revision":1}),
+                ),
+                ("request.sock", status(1)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":8,"prepared_digest":"tea","revision":2}),
+                ),
+                ("request.sock", json!({"ok":true,"id":7,"revision":3})),
+                ("request.sock", status(3)),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"id":8,"queued":true,"revision":4}),
+                ),
+            ],
+        );
+        let place = correcting(&directory, true);
+        let call = |name: &str, args: Value| ToolCall {
+            id: "c".into(),
+            name: name.into(),
+            args,
+        };
+        let (told, _) = run(
+            &place,
+            &call(START, json!({"task":"Write a haiku about coffee"})),
+            1,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(!next.starts_with(REPLACED_NEXT), "{next}");
+        assert!(next.ends_with(CORRECTED_NEXT), "{next}");
+        // The note beside "No, I said tea." says a correction replaces it.
+        let note = pending_note(2, Instant::now()).unwrap();
+        assert!(note.contains("no, I said …"), "{note}");
+        assert!(note.contains("it replaces the one waiting"), "{note}");
+        let (told, _) = run(
+            &place,
+            &call(START, json!({"task":"Write a haiku about tea"})),
+            2,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        assert_eq!(told["task"], "Write a haiku about tea");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.starts_with(REPLACED_NEXT), "{next}");
+        assert!(next.ends_with(CORRECTED_NEXT), "{next}");
+        // The yes starts the tea, never the coffee.
+        let (told, _) = run(&place, &call(CONFIRM, json!({})), 3, true, PEER_WAIT);
+        assert!(told["handing_over"] == json!(true), "{told}");
+        let sent: Vec<Value> = seen.try_iter().collect();
+        let ops: Vec<&str> = sent
+            .iter()
+            .map(|line| line["op"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            ops,
+            [
+                "status", "prepare", "status", "prepare", "cancel", "status", "confirm"
+            ]
+        );
+        assert_eq!(sent[1]["text"], "Write a haiku about coffee");
+        assert_eq!(sent[3]["text"], "Write a haiku about tea");
+        // The coffee cancelled at the revision the tea's prepare left.
+        assert_eq!(sent[4]["id"], 7);
+        assert_eq!(sent[4]["guard"]["revision"], 2);
+        assert_eq!(sent[4]["guard"]["store_id"], "s1");
+        assert_eq!(sent[6]["id"], 8);
+        assert_eq!(sent[6]["prepared_digest"], "tea");
+        assert!(PENDING.lock().unwrap().is_none());
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Reviewers' P2 on #3009: one line asking two agents makes two starts
+    /// in the same request; the second never replaces or cancels the first,
+    /// nor says it did. Nor does a start in a request the lamp wrote itself
+    /// (not heard, another chat) replace the person's waiting task, nor the
+    /// same work asked again (El's P3 on #3028).
+    #[test]
+    fn two_starts_in_one_request_or_a_written_one_replace_nothing() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *PENDING.lock().unwrap() = None;
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-two-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"one","revision":1}),
+                ),
+                ("request.sock", status(1)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":8,"prepared_digest":"two","revision":2}),
+                ),
+                ("request.sock", status(2)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":9,"prepared_digest":"three","revision":3}),
+                ),
+                ("request.sock", status(3)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":10,"prepared_digest":"three-again","revision":4}),
+                ),
+            ],
+        );
+        let place = correcting(&directory, true);
+        let call = |task: &str| ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({ "task": task }),
+        };
+        // One line, two agents: both prepared in request 1.
+        let (first, _) = run(&place, &call("Write a haiku"), 1, true, PEER_WAIT);
+        let (second, _) = run(&place, &call("Write a limerick"), 1, true, PEER_WAIT);
+        for told in [&first, &second] {
+            assert!(told["prepared"] == json!(true), "{told}");
+            assert!(
+                !told["next"].as_str().unwrap().starts_with(REPLACED_NEXT),
+                "{told}"
+            );
+        }
+        // A later request the lamp wrote, not heard and in no chat of the
+        // person's: prepared, but nothing replaced.
+        let (written, _) = run(&place, &call("Write a sonnet"), 2, false, PEER_WAIT);
+        assert!(written["prepared"] == json!(true), "{written}");
+        assert!(
+            !written["next"].as_str().unwrap().starts_with(REPLACED_NEXT),
+            "{written}"
+        );
+        // The same work again, heard, in a later request (a yes taken as a
+        // new hand-over, #1712): no correction either (El's P3 on #3028).
+        let (again, _) = run(&place, &call("Write a sonnet"), 3, true, PEER_WAIT);
+        assert!(again["prepared"] == json!(true), "{again}");
+        assert!(
+            !again["next"].as_str().unwrap().starts_with(REPLACED_NEXT),
+            "{again}"
+        );
+        let ops: Vec<String> = seen
+            .try_iter()
+            .map(|line| line["op"].as_str().unwrap().to_owned())
+            .collect();
+        assert!(!ops.iter().any(|op| op == "cancel"), "{ops:?}");
+        *PENDING.lock().unwrap() = None;
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #2838: a plain "no" calls nothing, so nothing is started and the one
+    /// waiting still waits; a cancel the tasks part refuses, or never
+    /// answers, leaves the corrected ask prepared all the same.
+    #[test]
+    fn a_plain_no_starts_nothing_and_a_failed_cancel_keeps_the_correction() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *PENDING.lock().unwrap() = None;
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-correct-no-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"coffee","revision":1}),
+                ),
+                ("request.sock", status(1)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":8,"prepared_digest":"tea","revision":2}),
+                ),
+                (
+                    "request.sock",
+                    json!({"ok":false,"error":"already_attempted"}),
+                ),
+            ],
+        );
+        let place = correcting(&directory, true);
+        let call = |name: &str, args: Value| ToolCall {
+            id: "c".into(),
+            name: name.into(),
+            args,
+        };
+        let (told, _) = run(
+            &place,
+            &call(START, json!({"task":"Write a haiku about coffee"})),
+            1,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        // Request 2, "No.": the model calls nothing. Nothing was started
+        // and the coffee still waits.
+        {
+            let pending = PENDING.lock().unwrap();
+            let pending = pending.as_ref().unwrap();
+            assert_eq!((pending.id, pending.digest.as_str()), (7, "coffee"));
+        }
+        let sent: Vec<Value> = seen.try_iter().collect();
+        assert!(sent.iter().all(|line| line["op"] != "confirm"), "{sent:?}");
+        // A yes too late is refused, and nothing is sent.
+        PENDING.lock().unwrap().as_mut().unwrap().at -= CONFIRM_WITHIN + Duration::from_secs(1);
+        let (told, _) = run(&place, &call(CONFIRM, json!({})), 3, true, PEER_WAIT);
+        assert!(
+            told["error"].as_str().unwrap().starts_with("Not started"),
+            "{told}"
+        );
+        assert!(pending_note(3, Instant::now()).is_none());
+        // Nor is a task waiting that long replaced: it is past its yes.
+        let (told, _) = run(
+            &place,
+            &call(START, json!({"task":"Write a haiku about tea"})),
+            4,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        assert!(!told["next"].as_str().unwrap().starts_with(REPLACED_NEXT));
+        // Within its time, a cancel refused leaves the correction prepared.
+        PENDING.lock().unwrap().as_mut().unwrap().id = 7;
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let _seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(2)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":9,"prepared_digest":"milk","revision":3}),
+                ),
+                (
+                    "request.sock",
+                    json!({"ok":false,"error":"already_attempted"}),
+                ),
+            ],
+        );
+        let (told, _) = run(
+            &place,
+            &call(START, json!({"task":"Write a haiku about milk"})),
+            5,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        assert!(told["next"].as_str().unwrap().starts_with(REPLACED_NEXT));
+        assert_eq!(PENDING.lock().unwrap().as_ref().unwrap().id, 9);
+        *PENDING.lock().unwrap() = None;
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #2838: without the switch the note and `next` are exactly as before,
+    /// and a second ask replaces the first with nothing said or cancelled;
+    /// with it, both carry the correction's sentence.
+    #[test]
+    fn without_the_correct_switch_the_note_and_next_are_as_before() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let at = Instant::now();
+        let waiting = |correct: bool| Pending {
+            id: 7,
+            digest: "d".into(),
+            request: 1,
+            at,
+            who: CLAUDE_CODE,
+            text: String::new(),
+            correct,
+        };
+        *PENDING.lock().unwrap() = Some(waiting(false));
+        assert_eq!(
+            pending_note(2, at).unwrap(),
+            "(For you to know, not to answer: you have prepared a task for Claude Code and asked the person whether to start it. If they say yes now, call confirm_agent_task; do not call start_agent_task again for that work.)"
+        );
+        *PENDING.lock().unwrap() = Some(waiting(true));
+        let note = pending_note(2, at).unwrap();
+        assert!(
+            note.contains("If they say no and say what they meant instead (\"no, I said …\", \"no, ask Codex …\"), call start_agent_task again with the corrected task"),
+            "{note}"
+        );
+        assert!(
+            note.contains("If they only say no, call nothing."),
+            "{note}"
+        );
+        assert!(note.ends_with("Never call start_agent_task again for the same work unchanged.)"));
+        assert!(note.len() < 600, "{} bytes", note.len());
+        *PENDING.lock().unwrap() = None;
+        for lead_in in [false, true] {
+            for choosing in [false, true] {
+                let mut off = correcting(Path::new("/run/t"), false);
+                off.lead_in = lead_in;
+                let before = prepared_next(lead_in, choosing, "Codex");
+                for replaced in [false, true] {
+                    assert_eq!(next_for(&off, choosing, "Codex", replaced), before);
+                }
+                let mut on = off.clone();
+                on.correct = true;
+                assert_eq!(
+                    next_for(&on, choosing, "Codex", false),
+                    format!("{before} {CORRECTED_NEXT}")
+                );
+                assert_eq!(
+                    next_for(&on, choosing, "Codex", true),
+                    format!("{REPLACED_NEXT} {before} {CORRECTED_NEXT}")
+                );
+            }
+        }
+        // Off, a second ask replaces the first unsaid and uncancelled.
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-correct-off-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"coffee","revision":1}),
+                ),
+                ("request.sock", status(1)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":8,"prepared_digest":"tea","revision":2}),
+                ),
+            ],
+        );
+        let place = correcting(&directory, false);
+        let call = |task: &str| ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({ "task": task }),
+        };
+        for (request, task) in [
+            (1, "Write a haiku about coffee"),
+            (2, "Write a haiku about tea"),
+        ] {
+            let (told, _) = run(&place, &call(task), request, true, PEER_WAIT);
+            assert_eq!(
+                told["next"].as_str().unwrap(),
+                prepared_next(false, false, CLAUDE_CODE)
+            );
+        }
+        let ops: Vec<String> = seen
+            .try_iter()
+            .map(|line| line["op"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(ops, ["status", "prepare", "status", "prepare"]);
+        assert_eq!(PENDING.lock().unwrap().as_ref().unwrap().id, 8);
+        *PENDING.lock().unwrap() = None;
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }

@@ -3099,6 +3099,7 @@ mod tests {
             staff_note: false,
             make_skill: true,
             named_only: false,
+            correct: false,
             sign_in: false,
         };
         let kept = read(&on);
