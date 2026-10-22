@@ -6904,7 +6904,7 @@ Ready for lamp-voice: no
 - No lamp, SSH, provider/model call or physical acceptance in these checks.
   The owner name row remains held for the first builder and person.
 
-## 2026-10-22, 23:57: final private output guard and reset correction
+## 2026-10-22, 23:54: final private output guard and reset correction
 
 Ready for lamp-voice: no
 
@@ -6928,6 +6928,32 @@ Ready for lamp-voice: no
   and next work on #2602. All four PRs remain draft and outside the merge train.
 - No lamp, install, model spend or physical acceptance is claimed. The known
   name row remains 0.40 until the first builder's person check on 23 October.
+
+## 2026-10-23, 00:17: current-base correction gates and final-boundary audit
+
+Ready for lamp-voice: no
+
+- Source branches now include current main `bad114496`: store `6f5528c97`,
+  common speaker `0eb98ba69`, name `9f3d99662`, photo `cd7f2a87b` (local
+  checkpoints, not qualified new heads). Name activation/hold and Photo full
+  look, consent, receipt and startup cleanup settings are preserved.
+- Store P2: strict workspace clippy and formatting pass; Eyes has 56 passed,
+  zero failed, one existing ignore; full Setup has 178 passed, zero failed,
+  one existing ignore. The new two-path wipe fixture required the existing
+  unknown-entry diagnostic to name entry 8; its original failure is retained.
+  Full Update and workspace build are still running.
+- Common speaker audit: authorization now travels through output-credit waits.
+  Loss of private authorization completes only the still-current live request,
+  with no private words; retired/revoked requests are not revived. New actual
+  Engine and real credited-IPC controls are authored and await execution.
+  The audit also covers the speech task's deferred first poll and a publisher
+  update between reader start and file open. These corrections are unqualified.
+- Repair controller: 17 tests are authored, none run yet. Runtime account or
+  privacy invalidation can drop pending work without a camera frame; a write
+  already handed off remains truthfully Committing. The core still has no
+  runtime adapter, RPC or effective environment switch.
+- Posted current-base results and next work on #2602 at 00:06. No PR is offered
+  for a train. No lamp, model call or physical acceptance is claimed.
 
 ## Not shown
 
