@@ -1789,6 +1789,34 @@ then use that person's scope:
     probe's quality case waits for a base with the relay probe (#2279);
     until then these tests are its check.
 
+- **Nothing personal kept while nobody is known** (the owner's question 1,
+  option (b); `LAMP_MEMORY_PERSONAL_NEEDS_FACE=on`, off unless set; both
+  voice routes, either memory client). On lamp-c0a4 "the user's favourite
+  colour is blue", said with no face known, was kept as the room's. With
+  the switch, while nobody is known (the room's scope, a text from the app
+  included):
+  - **A `remember`** whose text is about a person
+    (`remember::about_someone`, `LAMP_MEMORY_ROOM_AFTER_FORGET`'s detector,
+    the same one, not a second: first or third person words, "the user",
+    or a possessive `'s`) is not sent to the memory. The model is told, in
+    a refused `remember`'s shape, `{"remembered": false, "note": "This
+    wasn't kept: nobody known is speaking. If they want it kept, they can
+    tell you who they are, or let the lamp see their face, and say it
+    again. …"}`, which asks it to say so, short and friendly, not as a
+    refusal. Nothing is held for later, so the note promises no later keep
+    and the answer never says it was kept. "Remember the plant needs water
+    on Fridays" is kept as before; "remember I left my keys on the shelf"
+    is not; a known face's own personal line, said again, is kept to them.
+    A text from the app is always the room's, so its personal `remember`
+    gets the same note: to have it kept, the person says it again at the
+    lamp, known.
+  - **The observation pass** (`LAMP_MEMORY_OBSERVE`) drops the proposals
+    the detector marks before `tidy_apply`; the rest go as before.
+  - **The journal** says, with no words: "a remember about a person was not
+    kept: speaker unknown (skipped=1)", or "observation pass: dropped N
+    about a person: speaker unknown".
+  - Off, both are what they were. Tests: `remember::needs_face::tests`.
+
 ### A session for each person (#764 follow-up)
 
 Scopes alone did not reach what the open provider session had already

@@ -55,6 +55,7 @@ use std::{
 use unicode_normalization::UnicodeNormalization;
 
 pub mod heard;
+pub mod needs_face;
 pub mod noted;
 pub mod on;
 
@@ -1785,6 +1786,11 @@ fn run_for_guarded(
 ) -> (Value, bool) {
     if !scope_current(lease) {
         return (gone(), false);
+    }
+    // With `LAMP_MEMORY_PERSONAL_NEEDS_FACE`, nothing about a person is kept
+    // while nobody is known, on either memory client.
+    if let Some(told) = needs_face::withheld(call, person, needs_face::on()) {
+        return (told, true);
     }
     if DAYS_MODE.get() == Some(&true) {
         if crate::rules::on() && crate::rules::is_tool(&call.name) {
@@ -6953,6 +6959,7 @@ fn close_job(socket: &Path, person: Option<&str>, job: &str) -> bool {
 /// closes the job with nothing kept. The journal has counts only.
 fn observe_jobs(socket: &Path, jobs: &Receiver<(Option<String>, Value)>) {
     let events = events_on();
+    let needs_face = needs_face::on();
     for (person, input) in jobs {
         let Some(job) = input["job"].as_str().map(str::to_owned) else {
             continue;
@@ -6977,6 +6984,13 @@ fn observe_jobs(socket: &Path, jobs: &Receiver<(Option<String>, Value)>) {
             );
             continue;
         };
+        // With `LAMP_MEMORY_PERSONAL_NEEDS_FACE`, nothing about a person is
+        // kept while nobody is known.
+        let (observations, dropped) =
+            needs_face::kept_proposals(observations, person.as_deref(), needs_face);
+        if dropped > 0 {
+            eprintln!("{}", needs_face::dropped_line(dropped));
+        }
         let answer = bounded_exchange(
             socket,
             &for_person(
@@ -13168,7 +13182,7 @@ mod tests {
         assert!(at(95) < HITS_WITHIN, "{:?}", at(95));
     }
 
-    fn memory(
+    pub(super) fn memory(
         name: &str,
         requests: usize,
         answer: fn(&Value) -> Value,
