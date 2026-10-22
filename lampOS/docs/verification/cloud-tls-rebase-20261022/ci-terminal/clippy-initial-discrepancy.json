@@ -1,0 +1,120 @@
+{
+  "meaning": "Historical snapshot, not counted as a terminal required-job success. The terminal job receipt supersedes these status fields without changing this observation.",
+  "snapshot_collected_at_utc": "2026-10-22T15:45:01.314004+00:00",
+  "run": {
+    "id": 39803867845,
+    "run_number": 2057,
+    "head_sha": "6622e83e2b931110482304da1843570bed4b254b",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-10-22T15:20:15Z",
+    "updated_at": "2026-10-22T15:23:11Z",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39803867845"
+  },
+  "job": {
+    "id": 119911747559,
+    "run_id": 39803867845,
+    "head_sha": "6622e83e2b931110482304da1843570bed4b254b",
+    "status": "in_progress",
+    "conclusion": null,
+    "created_at": "2026-10-22T15:20:16Z",
+    "started_at": "2026-10-22T15:20:19Z",
+    "completed_at": null,
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39803867845/job/119911747559",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-10-22T15:20:20Z",
+        "completed_at": "2026-10-22T15:20:22Z"
+      },
+      {
+        "name": "system packages",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-10-22T15:20:22Z",
+        "completed_at": "2026-10-22T15:21:02Z"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-10-22T15:21:02Z",
+        "completed_at": "2026-10-22T15:21:11Z"
+      },
+      {
+        "name": "Rust 1.96.0",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-10-22T15:21:11Z",
+        "completed_at": "2026-10-22T15:21:23Z"
+      },
+      {
+        "name": "restore the cache",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-10-22T15:21:23Z",
+        "completed_at": "2026-10-22T15:21:48Z"
+      },
+      {
+        "name": "unchanged source files get the cached build's times back",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-10-22T15:21:48Z",
+        "completed_at": "2026-10-22T15:21:49Z"
+      },
+      {
+        "name": "clippy (every crate and target, warnings as errors)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-10-22T15:21:49Z",
+        "completed_at": "2026-10-22T15:23:06Z"
+      },
+      {
+        "name": "save the cache",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 8,
+        "started_at": "2026-10-22T15:23:06Z",
+        "completed_at": "2026-10-22T15:23:06Z"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16,
+        "started_at": "2026-10-22T15:23:06Z",
+        "completed_at": "2026-10-22T15:23:07Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17,
+        "started_at": "2026-10-22T15:23:07Z",
+        "completed_at": "2026-10-22T15:23:07Z"
+      }
+    ]
+  },
+  "provenance": [
+    {
+      "external_source": "/private/tmp/tests-cloud-tls-refresh-20261022/arm64/clippy-run-discrepancy.json",
+      "bytes": 12737,
+      "sha256": "40a3b7d90e6624b69b05e8398c9c2013403c030902726006b4b397d27a75cc41"
+    },
+    {
+      "external_source": "/private/tmp/tests-cloud-tls-refresh-20261022/arm64/clippy-job-discrepancy.json",
+      "bytes": 2586,
+      "sha256": "d7862e412b6fc9ffb9a698c134fc57cf08d569c6f61d5df27ada07bb80583c41"
+    }
+  ],
+  "selection": "Exact status/identity/step fields; API actor and repository-account metadata are omitted."
+}

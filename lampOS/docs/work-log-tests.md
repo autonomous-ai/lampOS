@@ -1,5 +1,35 @@
 # Tests work log
 
+## 2026-10-22 23:05 +0700 — broker TLS required CI complete
+
+Ready for lamp-voice: **yes, [#3062](https://github.com/autonomous-ai/lampOS/pull/3062)**.
+[Reviewer-lead's read](https://github.com/autonomous-ai/lampOS/pull/3062#issuecomment-6345012540)
+has no finding; the PR is out of draft. Final current-base guard and merge
+remain with Reviewer-lead. Owned carry `6622e83e2` leaves source
+`first/cloud-tls` at `60d4efb86` unchanged.
+
+[Terminal receipts](verification/cloud-tls-rebase-20261022/#terminal-ci-qualification)
+record both actual required jobs SUCCESS: ARM64
+[#6053](https://github.com/autonomous-ai/lampOS/actions/runs/39803867884)
+**10,496 / 0 / 67** including one passing leaky, Cloud **194 / 0**;
+Linux Clippy [#2057](https://github.com/autonomous-ai/lampOS/actions/runs/39803867845)
+job `119911747559` is now terminal success. ARM checked merge `52ab57f48`
+into `16b1a2a15`. The earlier run-success/job-in-progress Clippy discrepancy
+is retained alongside final metadata and direct checks. Full ARM output
+stays external with its digest; selected checkout, summary and all Cloud
+rows are portable. No new gate, source change or device activation occurred.
+
+Taken: [#1806 follow-up claim](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6345179586),
+Skills add-on `a_fifth_say` Done-event fixture, branch
+`tests/1806-addon-drop-events` at base `464438fc5`. Initial ARM case **5.632 s**,
+Skills integration summed case time **97.352 s**. Implementation is underway;
+there is no after result yet. Preserve every assertion and the full **3 s**
+negative observation, with no product seam. Current Voice serial
+library **3,384 / 0 / 14** and integration **269 / 0** pass; the five-consumer
+package gate is still in progress. Skills `381e5ce54` required jobs are
+terminal green, but ARM workflow aggregation and log download remain pending;
+this entry does not claim that workflow is final.
+
 ## 2026-10-22 22:55 +0700 — search/push unchanged-head probe completed
 
 No fix or PR: First's two #3046 watchdog reports were not reproduced; cause

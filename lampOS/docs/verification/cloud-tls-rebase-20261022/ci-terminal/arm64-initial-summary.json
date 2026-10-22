@@ -1,0 +1,110 @@
+{
+  "collected_at_utc": "2026-10-22T15:45:01.314004+00:00",
+  "source_head": "6622e83e2b931110482304da1843570bed4b254b",
+  "tested_merge": "52ab57f486f7f51a2fbd68fc6c7830a134a0c906",
+  "tested_base": "16b1a2a1582a0aeaaf8f3bbc5421800a1a51b3a6",
+  "actual_checkout_verified_from_log_and_merge_parents": true,
+  "run": {
+    "id": 39803867884,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39803867884",
+    "status": "completed",
+    "conclusion": "success",
+    "attempt": 1
+  },
+  "job": {
+    "id": 119911747770,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39803867884/job/119911747770",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-10-22T15:20:21Z",
+    "completed_at": "2026-10-22T15:33:46Z"
+  },
+  "release_workspace_build": "success",
+  "test_selection": "Whole workspace because lampOS/docs/switches.md is read by tests; nextest pr profile, own-harness binaries excluded and run separately.",
+  "nextest": {
+    "run": 10496,
+    "passed": 10496,
+    "failed": 0,
+    "leaky": 1,
+    "skipped": 67,
+    "binaries_run": 162,
+    "binaries_skipped": 2,
+    "seconds": 179.79,
+    "cloud_passed_by_binary": {
+      "lamp-cloud": 164,
+      "lamp-cloud::it": 30
+    },
+    "leaky_tests": [
+      {
+        "binary": "lamp-voice",
+        "name": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+        "seconds": 0.22
+      }
+    ]
+  },
+  "doc_tests": {
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0
+  },
+  "own_harness": {
+    "relay_signals": "ok (no numeric count reported)",
+    "turn_end_wire_process": {
+      "passed": 12,
+      "failed": 0
+    }
+  },
+  "clippy_discrepancy": {
+    "run_id": 39803867845,
+    "run_status": "completed",
+    "run_conclusion": "success",
+    "job_id": 119911747559,
+    "job_status": "in_progress",
+    "job_conclusion": null,
+    "job_completed_at": null,
+    "complete_job_step": {
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 17,
+      "started_at": "2026-10-22T15:23:07Z",
+      "completed_at": "2026-10-22T15:23:07Z"
+    },
+    "qualification": "Not claimed green; root owns existing watcher; this is one metadata snapshot."
+  },
+  "limitations": [
+    "Final current-base ancestry guard belongs to Reviewer-lead before merge.",
+    "TLS activation row remains unrun and switch remains off.",
+    "No device or ARM64 build on the Mac was performed."
+  ],
+  "raw_files": {
+    "arm64-job.json": {
+      "bytes": 5163,
+      "sha256": "d1254c7ec0acd435c307777af7dbe9063cde0ed0b8cbb6428b3a8e204b1bb48e"
+    },
+    "arm64-job.log": {
+      "bytes": 1792194,
+      "sha256": "15d42ed21104b82a2202aa06461ac3c49699791fead3f21a3604c5c1c3a29101"
+    },
+    "arm64-run.json": {
+      "bytes": 12738,
+      "sha256": "bac5617f11b9508cfb0ace13e1d75ffd8326c036339e703bae0bd6d6bd53ff8e"
+    },
+    "clippy-job-discrepancy.json": {
+      "bytes": 2586,
+      "sha256": "d7862e412b6fc9ffb9a698c134fc57cf08d569c6f61d5df27ada07bb80583c41"
+    },
+    "clippy-run-discrepancy.json": {
+      "bytes": 12737,
+      "sha256": "40a3b7d90e6624b69b05e8398c9c2013403c030902726006b4b397d27a75cc41"
+    },
+    "pr-3062.json": {
+      "bytes": 19178,
+      "sha256": "5abfa8584cf867c124285be5de4b610b549ae7e239b6f65b9784249467fba60e"
+    },
+    "tested-merge.json": {
+      "bytes": 2603,
+      "sha256": "22cbc799ffd3d6bb5cdb8072a948ef32e3fb3aa354efac1d4c9fbefb5f2d15d0"
+    }
+  }
+}

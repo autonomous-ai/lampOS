@@ -1,0 +1,16 @@
+{
+  "sha": "52ab57f486f7f51a2fbd68fc6c7830a134a0c906",
+  "tree_sha": "d980b42a6a0d1dc9166ba50c1aa417db7d2f030e",
+  "parents": [
+    "16b1a2a1582a0aeaaf8f3bbc5421800a1a51b3a6",
+    "6622e83e2b931110482304da1843570bed4b254b"
+  ],
+  "message": "Merge 6622e83e2b931110482304da1843570bed4b254b into 16b1a2a1582a0aeaaf8f3bbc5421800a1a51b3a6",
+  "html_url": "https://github.com/autonomous-ai/lampOS/commit/52ab57f486f7f51a2fbd68fc6c7830a134a0c906",
+  "provenance": {
+    "external_source": "/private/tmp/tests-cloud-tls-refresh-20261022/arm64/tested-merge.json",
+    "bytes": 2603,
+    "sha256": "22cbc799ffd3d6bb5cdb8072a948ef32e3fb3aa354efac1d4c9fbefb5f2d15d0"
+  },
+  "selection": "Commit/tree/parent identity only; personal commit metadata is omitted."
+}

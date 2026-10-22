@@ -1,6 +1,6 @@
 # Broker TLS carry, 22 October 2026
 
-Draft [#3062](https://github.com/autonomous-ai/lampOS/pull/3062) carries
+[#3062](https://github.com/autonomous-ai/lampOS/pull/3062) carries
 [#2587](https://github.com/autonomous-ai/lampOS/pull/2587) at source
 `60d4efb86f025e9731202b956c90af9b1410e508`, as Reviewer-lead requested.
 Owned carry head `6622e83e2b931110482304da1843570bed4b254b` has parent
@@ -42,11 +42,61 @@ Each txt.json stores complete original UTF-8 bytes with SHA-256 and byte
 count; escaping retains newlines and whitespace. No Python runner, binary,
 credential or physical recording is committed.
 
-## Qualification still open
+## Initial publication status (historical)
 
-Exact-head ARM64 run 39803867884 and Linux Clippy 39803867845 are active.
-Readiness also needs the final current-base guard and Reviewer-lead's
-resolution read. No current native CI success or merge is claimed here.
+At the initial publication, exact-head ARM64 run 39803867884 and Linux
+Clippy 39803867845 were active, so this record did not claim CI qualification.
+The terminal receipts below supersede that pending status. The original
+native receipts above remain unchanged.
+
+## Terminal CI qualification
+
+Ready for lamp-voice: **yes, #3062**. [Reviewer-lead's resolution read](https://github.com/autonomous-ai/lampOS/pull/3062#issuecomment-6345012540)
+reported no finding, and the PR is out of draft. Reviewer-lead retains the
+final current-base guard and merge; this receipt does not claim a merge.
+
+Both required jobs are terminal **SUCCESS** for owned head `6622e83e2`:
+
+- [ARM64 #6053](https://github.com/autonomous-ai/lampOS/actions/runs/39803867884/job/119911747770)
+  built release workspace binaries/examples and passed nextest **10,496 / 0
+  failed / 67 skipped**, including one passing leaky. Cloud is **194 / 0**
+  (164 library, 30 integration), including the TLS broker case. The passing
+  leaky is retained in the total, not added to it. Separate docs pass **4 / 0**;
+  own-harness relay signals reports `ok` and turn-end process passes **12 / 0**.
+- [Linux Clippy #2057](https://github.com/autonomous-ai/lampOS/actions/runs/39803867845/job/119911747559)
+  completes strict checks for every crate and target. The actual required
+  job `119911747559`, as well as its workflow run, now reports success.
+
+ARM64 checked out synthetic merge `52ab57f486` with parents `16b1a2a15` and
+`6622e83e2`; [merge identity](ci-terminal/tested-merge.json) and
+[selected raw output](ci-terminal/selected-arm64-output.json) retain the
+checkout and summaries. The count audit uses the result interval before
+nextest's terminal Summary: **10,495 PASS + 1 LEAK**, with every result index
+present once. The 35 repeated diagnostic rows after Summary are not counted
+again. All 194 Cloud rows are included in the portable selection.
+
+The [earlier Clippy discrepancy](ci-terminal/clippy-initial-discrepancy.json)
+is preserved: its workflow said success while the actual required job still
+said `in_progress`, with no conclusion or completion time. That snapshot was
+not counted as green. The [final Clippy metadata](ci-terminal/clippy-final-run.json),
+[final ARM metadata](ci-terminal/arm64-final-run.json),
+[direct checks](ci-terminal/required-checks-result.json) and
+[lossless watch output](ci-terminal/required-checks-watch.txt.json) establish
+the later terminal result; the watcher exited 0. The
+[initial summary](ci-terminal/arm64-initial-summary.json) is historical and
+retains its original qualification wording.
+
+[Receipt summary](ci-terminal/summary.json) and
+[manifest](ci-terminal/manifest.json) describe provenance and SHA-256 checks.
+Selected raw sections preserve exact UTF-8 source lines and line numbers.
+The full ARM job log (1,792,194 bytes, SHA-256
+`15d42ed21104b82a2202aa06461ac3c49699791fead3f21a3604c5c1c3a29101`)
+remains at `/private/tmp/tests-cloud-tls-refresh-20261022/arm64/arm64-job.log`;
+it is not copied here. The portable receipt therefore contains the official
+summary, selected evidence and full final job metadata, not all workspace
+per-test output. No new gates ran for this documentation-only publication.
+
 The backend's TLS port/certificate and a real lamp online/command row remain
 unrun; the product switch is still off. No SSH, device change or ARM64 build
-on the Mac occurred.
+on the Mac occurred. Source `first/cloud-tls` remains at `60d4efb86`; only the
+owned carry `6622e83e2` was qualified.

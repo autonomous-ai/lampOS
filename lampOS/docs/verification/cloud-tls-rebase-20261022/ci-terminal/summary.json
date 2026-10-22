@@ -1,0 +1,70 @@
+{
+  "packaged_at_utc": "2026-10-22T16:05:15.558299+00:00",
+  "pr": "https://github.com/autonomous-ai/lampOS/pull/3062",
+  "ready_for_lamp_voice": true,
+  "reviewer_resolution": "https://github.com/autonomous-ai/lampOS/pull/3062#issuecomment-6345012540",
+  "reviewer_resolution_scope": "No finding; final current-base guard and merge remain owned by Reviewer-lead. This receipt does not claim a merge.",
+  "source_first_cloud_tls": "60d4efb86f025e9731202b956c90af9b1410e508",
+  "owned_carry_head": "6622e83e2b931110482304da1843570bed4b254b",
+  "owned_carry_parent": "c6d50559aa54fe58699da5ba1c0e2d79f1a70dd8",
+  "tested_merge": "52ab57f486f7f51a2fbd68fc6c7830a134a0c906",
+  "tested_base": "16b1a2a1582a0aeaaf8f3bbc5421800a1a51b3a6",
+  "arm64": {
+    "run_id": 39803867884,
+    "run_number": 6053,
+    "job_id": 119911747770,
+    "run_status": "completed",
+    "job_status": "completed",
+    "conclusion": "success",
+    "nextest": {
+      "run": 10496,
+      "passed": 10496,
+      "failed": 0,
+      "leaky": 1,
+      "skipped": 67,
+      "binaries_run": 162,
+      "binaries_skipped": 2,
+      "seconds": 179.79,
+      "cloud_passed_by_binary": {
+        "lamp-cloud": 164,
+        "lamp-cloud::it": 30
+      },
+      "leaky_tests": [
+        {
+          "binary": "lamp-voice",
+          "name": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+          "seconds": 0.22
+        }
+      ]
+    },
+    "doc_tests": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "own_harness": {
+      "relay_signals": "ok (no numeric count reported)",
+      "turn_end_wire_process": {
+        "passed": 12,
+        "failed": 0
+      }
+    }
+  },
+  "clippy": {
+    "run_id": 39803867845,
+    "run_number": 2057,
+    "job_id": 119911747559,
+    "run_status": "completed",
+    "job_status": "completed",
+    "conclusion": "success",
+    "historical_discrepancy_preserved": "clippy-initial-discrepancy.json",
+    "final_receipt": "clippy-final-run.json"
+  },
+  "required_check_watch_exit": 0,
+  "limits": [
+    "Full 1,792,194-byte ARM64 job log stays external with its SHA-256; selected raw checkout, command, summary, all Cloud rows and separate harness summaries are portable here.",
+    "The earlier Clippy snapshot showed run success while its actual required job still said in_progress; it was not qualified as green until the final job receipt and direct checks reported success.",
+    "This documentation-only publication runs no new gates and changes no source or PR state.",
+    "Real backend TLS port/certificate and lamp online/command activation are unrun; LAMP_CLOUD_TLS stays off unless exactly on. No device operation or local ARM64 build is claimed."
+  ]
+}
