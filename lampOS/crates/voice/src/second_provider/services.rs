@@ -211,12 +211,15 @@ enum Service {
 struct Taken {
     near: Arc<Near>,
     generation: u64,
+    url: String,
 }
 
 impl Taken {
     /// `service` failed at its near address (`why`, [`routes::fallback_why`]):
     /// its own for the rest of the turn it was taken for, if that turn is
-    /// still the latest; a later turn's routes stay as they are.
+    /// still the latest; a later turn's routes stay as they are. The
+    /// address is held until the routes are next read, so later turns don't
+    /// try it again (El's P2 on #2919).
     fn fell(&self, service: Service, why: &str) {
         if let Ok(mut turn) = self.near.turn.lock()
             && turn.0 == self.generation
@@ -226,13 +229,19 @@ impl Taken {
                 Service::Speech => turn.1.speech = None,
             }
         }
-        routes::fell_back(
-            match service {
-                Service::Chat => "chat",
-                Service::Speech => "speech",
-            },
-            why,
-        );
+        let name = service.name();
+        self.near.kept.hold(name, &self.url);
+        routes::fell_back(name, why);
+    }
+}
+
+impl Service {
+    /// The service's name in the routes and the journal.
+    fn name(self) -> &'static str {
+        match self {
+            Self::Chat => "chat",
+            Self::Speech => "speech",
+        }
     }
 }
 
@@ -245,10 +254,11 @@ impl Near {
             Service::Speech => turn.1.speech.clone(),
         }?;
         Some((
-            url,
+            url.clone(),
             Taken {
                 near: self.clone(),
                 generation: turn.0,
+                url,
             },
         ))
     }
@@ -456,21 +466,26 @@ impl Net {
         Some((tts, taken))
     }
 
-    /// The configuration listening opens with, if its address is near now.
-    fn near_hearing(&self) -> Option<Arc<SecondConfig>> {
+    /// The configuration listening opens with, and where, if its address
+    /// is near now and has not failed since the routes were read.
+    fn near_hearing(&self) -> Option<(Arc<SecondConfig>, String, Arc<Near>)> {
         let near = self.near.as_ref()?;
         if !near.routable.listening {
             return None;
         }
         let url = near.kept.latest().listening?;
-        Near::client(&near.hearing, &url, || {
+        if near.kept.held("listening", &url) {
+            return None;
+        }
+        let config = Near::client(&near.hearing, &url, || {
             let mut config = (*self.config).clone();
             match &mut config.stt {
                 Stt::Autonomous { base_url, .. } => *base_url = url.clone(),
                 Stt::Deepgram { .. } => return None,
             }
             Some(config)
-        })
+        })?;
+        Some((config, url, near.clone()))
     }
 
     /// A request the person's own key is refused for goes to the relay's
@@ -757,11 +772,15 @@ impl Services for Net {
         Box::pin(async move {
             // Near, unless it fails on the link: then once at its own
             // address (#2882).
-            if let Some(near) = near {
-                match SttStream::connect(&near).await {
+            if let Some((hearing, url, near)) = near {
+                match SttStream::connect(&hearing).await {
                     Ok(stream) => return Ok(Box::new(stream) as Box<dyn Listener>),
                     Err(error) => match routes::fallback_why(&error) {
-                        Some(why) => routes::fell_back("listening", &why),
+                        // Its own until the routes are next read (El's P2).
+                        Some(why) => {
+                            near.kept.hold("listening", &url);
+                            routes::fell_back("listening", &why);
+                        }
                         None => return Err(error),
                     },
                 }
@@ -861,9 +880,14 @@ impl Services for Net {
         if let Ok(mut turn) = near.turn.lock() {
             *turn = (
                 turn.0.wrapping_add(1),
+                // Not one that failed since the routes were read (El's P2).
                 Routes {
-                    chat: latest.chat.filter(|_| near.routable.chat),
-                    speech: latest.speech.filter(|_| near.routable.speech),
+                    chat: latest
+                        .chat
+                        .filter(|url| near.routable.chat && !near.kept.held("chat", url)),
+                    speech: latest
+                        .speech
+                        .filter(|url| near.routable.speech && !near.kept.held("speech", url)),
                     listening: None,
                 },
             );
@@ -1576,7 +1600,16 @@ mod tests {
                 &[]
             };
             assert_eq!(near.seen(), expected, "{why}");
-            // The next turn tries the near one again.
+            // Nor the next turn: held at its own until the routes are next
+            // read (El's P2 on #2919), then tried afresh.
+            net.turn_begins();
+            assert!(net.near_chat().is_none(), "{why}");
+            assert_eq!(words(&net).await, "relay", "{why}");
+            assert_eq!(near.seen(), expected, "{why}");
+            kept(&net).set(Routes {
+                chat: Some(format!("{at}{BASE}/deepseek")),
+                ..Routes::default()
+            });
             net.turn_begins();
             assert!(net.near_chat().is_some(), "{why}");
         }
@@ -1698,6 +1731,17 @@ mod tests {
             "{near_seen:?}"
         );
         assert_eq!(own.asked("/ws/audio/transcriptions"), 1);
+        // The next utterance opens at its own at once: the near address is
+        // held until the routes are next read (El's P2 on #2919).
+        assert!(net.listen().await.is_err());
+        assert_eq!(near.seen().len(), 1);
+        assert_eq!(own.asked("/ws/audio/transcriptions"), 2);
+        kept(&net).set(Routes {
+            listening: Some(format!("{}{BASE}", near.url)),
+            ..Routes::default()
+        });
+        assert!(net.listen().await.is_err());
+        assert_eq!(near.seen().len(), 2);
     }
 
     /// #2882 (f): a relay that never answers its routes delays no turn: the
