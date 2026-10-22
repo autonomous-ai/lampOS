@@ -5864,6 +5864,30 @@ Ready for lamp-voice: no (#2782's native gates are running; both memory branches
   checks and a 60 s final observation. No spoken recall pass claimed;
   the memory row remains 0.40. Fourth still has no lamp loan.
 
+## 2026-10-22 09:29 ICT: six-minute lamp retention observed
+
+Ready for lamp-voice: no (#2774 waits for the fixture merge; #2782's ARM64 gate is running).
+
+- Seventh's full #2540 repeat reports PASS on lamp-52e6, build `403b444d4`,
+  09:08–09:21 ICT. Days and Rules were verified on; MainPID and
+  InvocationID matched at both ends. One keep, one next-turn refresh
+  marker at 09:12:27, then request 49 recalled correctly after 6 min 17 s
+  of continued talk. The evidence is session events and the person at
+  the lamp. The Mac microphone captured nothing in its 60 s window and
+  is not the evidence source. No spoken words or raw journal copied.
+- Receipt: https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6331136109.
+  Fourth's qualification: https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6331206620,
+  also posted on #2540 and in both PR bodies. This replaces the earlier
+  Days-off and incomplete-window observations for this retention case;
+  it does not qualify #2774's outage recovery or native gate.
+- #2782, head `64282e440`: exact-head Clippy run 39710707354 passed in
+  2m37s. ARM64 run 39710707311 passed its release-build stage and is
+  running. Source is one commit and the worktree is clean.
+- #2780's native and Clippy gates are green; First's merge still unblocks
+  the fresh memory rebases. #2762's worker switch pass-through/census is
+  still open with Friday. The broader memory row remains 0.40 for First's
+  decision; its other acceptance cases are not implied by one recall pass.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -5889,7 +5913,7 @@ The first line's socket opened before it (#2345) was not run on a lamp.
 `LAMP_SECOND_OPEN_NAME` (#2355) is off unless set and was not run on a lamp.
 `LAMP_ENDPOINT_SHORT_VERDICT` (#2380) is off unless set and was not run on a lamp.
 `LAMP_VOICE_TONE` (#2427) is off unless set. It was played on lamp-75c9 with nobody there (Ten, 21 Oct: the words' valence passed, the arousal wasn't shown by the tools there), and run with a known face on lamp-c0a4 (Thirteen, 21 Oct: a pass on the second route; on the duplex route no forget, now in its fix).
-`LAMP_SECOND_FACE_NAME` (#2573), `LAMP_MOOD_TONE` (#2582) and `LAMP_WORKER_SCHEDULING` (#2554) are off unless set and were not run on a lamp. #2627's 22 Oct lamp-52e6 run had Days off, so it is void as Days proof; Seventh owns the Days-on rerun. #2621's duplex words and #2632's unplug words (a pure move) were not run on a lamp.
+`LAMP_SECOND_FACE_NAME` (#2573), `LAMP_MOOD_TONE` (#2582) and `LAMP_WORKER_SCHEDULING` (#2554) are off unless set and were not run on a lamp. #2627's first 22 Oct lamp-52e6 run had Days off and is void as Days proof; Seventh's complete Days-on repeat passed the six-minute retention case at 09:21 (above). It did not force a memory outage. #2621's duplex words and #2632's unplug words (a pure move) were not run on a lamp.
 lamp-peek's one page (#2259) was not run on a lamp; its timings are this
 Mac's. `probe-cascade --wire --sizes` (#2276) was not run anywhere with a
 real key.
