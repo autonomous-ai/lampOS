@@ -762,6 +762,9 @@ fn an_eligible_retry_shares_one_budget_between_room_and_person() {
     );
 }
 
+/// The thread [`Paced`] gives as a person's follow-up.
+const THREAD: &str = "a synthetic trip";
+
 /// What the memory does with a snapshot open ([`Paced`]): answers it, or
 /// refuses it, after so many ms.
 #[derive(Clone, Copy)]
@@ -772,8 +775,9 @@ enum Reply {
 
 /// A memory on its own thread that answers each request in turn, as
 /// lamp-memory does: each snapshot open as `pace` says for its count from
-/// 0, an answer with one fact naming that count and whose it is, and
-/// everything else at once. A wake connection stops it.
+/// 0, an answer with one fact naming that count and whose it is, a
+/// person's follow-up with [`THREAD`], and everything else at once. A wake
+/// connection stops it.
 struct Paced {
     socket: PathBuf,
     requests: Arc<Mutex<Vec<Value>>>,
@@ -829,6 +833,8 @@ impl Paced {
                     } else {
                         json!({"ok":false,"error":"temporarily unavailable"})
                     }
+                } else if request["op"] == "follow_up" && request["person"].is_string() {
+                    json!({"ok":true,"follow_up":{"id":99,"category":"thread","text":THREAD,"until_asked":true}})
                 } else {
                     json!({"ok":true})
                 };
@@ -890,8 +896,8 @@ impl Turns {
         let ahead = super::Ahead {
             sessions: sessions.clone(),
             who: None,
-            ask: Arc::new(move |session, person, within| {
-                reading.read_note_within(session, person, false, within, true)
+            ask: Arc::new(move |session, person, within, follow_up| {
+                reading.read_note_within(session, person, false, within, (true, follow_up))
             }),
         };
         Self {
@@ -1063,6 +1069,47 @@ fn lines_never_answered_open_and_close_no_session_and_spend_no_follow_up() {
     assert_eq!(memory.opens(), 2);
     assert_eq!(memory.count("session_close"), 0);
     assert_eq!(memory.count("follow_up"), 1);
+}
+
+/// Reviewer-two's P2 on #3016: the memory counts a follow-up's offer as it
+/// gives one, so a note read as a line begins asks none. The person's first
+/// turn, answered, reads it with its note; a retry read as their next line
+/// begins, a line never answered, asks the memory none; their next answered
+/// turn takes that read, and only then is its follow-up read, and told.
+#[test]
+fn a_follow_up_is_read_only_once_its_turn_is_answered() {
+    // Their first personal snapshot is refused, so their next line asks
+    // again as it begins.
+    let memory = Paced::new("follow", |count| match count {
+        1 => Reply::RefusedAfter(0),
+        _ => Reply::After(0),
+    });
+    let turns = Turns::new(&memory);
+    turns.client.following_up();
+    let line = |request| scoped(request, ScopeSnapshot::of("Scope P"));
+    let (first, unanswered, last) = runtime().block_on(async {
+        let first_line = line(1);
+        turns.begins(&first_line);
+        let first = turns.answered(&first_line).await;
+        let follow_ups = memory.count("follow_up");
+        turns.begins(&line(2));
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let unanswered = (memory.opens(), memory.count("follow_up") - follow_ups);
+        let next = line(3);
+        turns.begins(&next);
+        (first, unanswered, turns.answered(&next).await)
+    });
+    assert!(
+        first.contains(THREAD),
+        "the answered turn's own read: {first}"
+    );
+    assert_eq!(unanswered, (4, 0), "read ahead, and no follow-up asked");
+    assert!(
+        last.contains(THREAD) && last.contains("fact 3 of"),
+        "{last}"
+    );
+    assert_eq!(memory.count("follow_up"), 2);
+    assert_eq!(memory.opens(), 4, "the read ahead is the one taken");
 }
 
 /// A note not in by what is left of its 300 ms from the ask is late: the
