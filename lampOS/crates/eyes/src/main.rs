@@ -7,7 +7,10 @@
 
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-eyes (--device ABSOLUTE_PATH --usb VENDOR:PRODUCT@TOPOLOGY | --usb VENDOR:PRODUCT) --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH] [--visits on|off]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off [--glance-log /var/lib/lampos-eyes/glance.log]] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off] [--sight-from-look on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]] [--seems ABSOLUTE_PATH] [--seems-blendshapes ABSOLUTE_PATH] [--seems-log ABSOLUTE_PATH] [--photo-dir ABSOLUTE_PATH] [--mouth-diagnostics on|off]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4; with VENDOR:PRODUCT alone,\nthe one camera with those ids on any port, found at each open, and none or two refused\nwith a reason) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). With --glance-log /var/lib/lampos-eyes/glance.log (with --look-on-change on;
+const USAGE: &str = "lamp-eyes (--device ABSOLUTE_PATH --usb VENDOR:PRODUCT@TOPOLOGY | --usb VENDOR:PRODUCT) --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH] [--visits on|off]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off [--change-persist on|off] [--glance-log /var/lib/lampos-eyes/glance.log]] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off] [--sight-from-look on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]] [--seems ABSOLUTE_PATH] [--seems-blendshapes ABSOLUTE_PATH] [--seems-log ABSOLUTE_PATH] [--photo-dir ABSOLUTE_PATH] [--mouth-diagnostics on|off]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4; with VENDOR:PRODUCT alone,\nthe one camera with those ids on any port, found at each open, and none or two refused\nwith a reason) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). With --change-persist on (with --look-on-change on), a cell
+counts as changed only if it changed in this glance and the one compared before it, so a
+one-glance flicker is not a change and a person costs at most one glance more (off unless
+given). With --glance-log /var/lib/lampos-eyes/glance.log (with --look-on-change on;
 that path only, the one place a reset wipes), each compared glance is written to that
 file, made new each start (0600, in a folder of the owner's only), as one JSON line of
 numbers: the rule's verdict, the cells past the bar and, per cell, its change over its
@@ -49,6 +52,8 @@ struct Arguments {
     steady_rate: bool,
     /// With nobody in view, run no detector on a frame like the last (#705).
     look_on_change: bool,
+    /// With it, a change counts only where it held two glances (persist-2).
+    change_persist: bool,
     glance_log: Option<PathBuf>,
     /// The camera's size for a full look (#836), when one may be asked for.
     full_look: Option<(u32, u32)>,
@@ -169,7 +174,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
     let (mut leave_still, mut full_look, mut full_look_file) = (None, None, None);
     let (mut steady_rate, mut full_look_movement, mut look_on_change) = (None, None, None);
     let mut sight_from_look = None;
-    let (mut visits, mut glance_log) = (None, None);
+    let (mut visits, mut glance_log, mut change_persist) = (None, None, None);
     let (mut mouth_model, mut mouth_on_heard, mut mouth_runtime) = (None, None, None);
     let (mut seems, mut seems_blendshapes, mut seems_log) = (None, None, None);
     let mut photo_dir = None;
@@ -193,6 +198,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                 && visits.is_none()
                 && look_on_change.is_none()
                 && glance_log.is_none()
+                && change_persist.is_none()
                 && full_look_movement.is_none()
                 && sight_from_look.is_none()
                 && full_look.is_none()
@@ -261,6 +267,13 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                     Some("on") => true,
                     Some("off") => false,
                     _ => return Err("--look-on-change is on or off"),
+                });
+            }
+            Some("--change-persist") if change_persist.is_none() => {
+                change_persist = Some(match value.to_str() {
+                    Some("on") => true,
+                    Some("off") => false,
+                    _ => return Err("--change-persist is on or off"),
                 });
             }
             Some("--sight-from-look") if sight_from_look.is_none() => {
@@ -342,6 +355,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         steady_rate: steady_rate.unwrap_or(false),
         visits: visits.unwrap_or(false),
         look_on_change: look_on_change.unwrap_or(false),
+        change_persist: change_persist.unwrap_or(false),
         glance_log,
         full_look,
         full_look_file,
@@ -397,6 +411,9 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         .is_some_and(|path| path != std::path::Path::new(lamp_eyes::seems_log::PATH))
     {
         return Err("--seems-log is /var/lib/lampos-eyes/seems.log, the one place a reset wipes");
+    }
+    if result.change_persist && !result.look_on_change {
+        return Err("--change-persist needs --look-on-change on");
     }
     if result.glance_log.is_some() && !result.look_on_change {
         return Err("--glance-log needs --look-on-change on");
@@ -920,9 +937,13 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     // `--look-on-change`, a frame like the last needs no detector only
     // once nobody has been found for a while.
     let mut any_face_at: Option<Instant> = None;
-    let mut change = arguments
-        .look_on_change
-        .then(lamp_eyes::change::Change::default);
+    let mut change = arguments.look_on_change.then(|| {
+        let mut change = lamp_eyes::change::Change::default();
+        if arguments.change_persist {
+            change.persist_2();
+        }
+        change
+    });
     // With it, the lamp's own light, read from the bus at each glance: a
     // change while the ring's light changes is the lamp's own.
     let own_bus = arguments
@@ -2473,6 +2494,18 @@ mod tests {
         assert!(parse(args(&[&FULL[..], &["--look-on-change", "yes"]].concat())).is_err());
         let twice = [&on[..], &["--look-on-change", "on"]].concat();
         assert!(parse(args(&twice)).is_err());
+        // Persist-2 only with looking on change, off unless given.
+        assert!(!value.change_persist);
+        let persist = [&on[..], &["--change-persist", "on"]].concat();
+        assert!(parse(args(&persist)).unwrap().unwrap().change_persist);
+        let persist_off = [&on[..], &["--change-persist", "off"]].concat();
+        assert!(!parse(args(&persist_off)).unwrap().unwrap().change_persist);
+        assert!(parse(args(&[&on[..], &["--change-persist", "yes"]].concat())).is_err());
+        assert!(parse(args(&[&persist[..], &["--change-persist", "on"]].concat())).is_err());
+        assert_eq!(
+            parse(args(&[&FULL[..], &["--change-persist", "on"]].concat())).err(),
+            Some("--change-persist needs --look-on-change on")
+        );
         // The glance log only with looking on change, at the one path a
         // reset wipes.
         assert_eq!(value.glance_log, None);

@@ -22,6 +22,17 @@
 //! hundred pixels, a face does not. It changed when [`CELLS`] cells or more
 //! are [`GREYS`] or more brighter or darker than in the last frame the
 //! detector ran on, not the last one seen, so a slow change adds up.
+//!
+//! With `--change-persist on` (off unless given; [`Change::persist_2`]), the
+//! "persist-2" rule: a cell counts only if it was past the bar in this
+//! compared glance and in the one compared before it, so noise that lands
+//! in a cell for one glance is not a change. A person who walks in changes
+//! the same cells two glances running, so they cost at most one glance
+//! (about 0.6 s with nobody in view) before the first detection; the 3 s
+//! look and the busy room are as without it. On lamp-c0a4's dark empty
+//! office (1027 glances, `--glance-log` replayed by
+//! `examples/glance_replay.rs`) the current rule skipped 22.8% of the
+//! empty-room glances, persist-2 64.2%.
 use crate::picture::{HEIGHT, Picture, WIDTH};
 
 pub const ACROSS: usize = 32;
@@ -62,6 +73,27 @@ pub const LOOK_AT_LEAST_US: u64 = 3_000_000;
 /// And at every glance until the picture has been still this many glances
 /// in a row after a change.
 pub const SETTLE_GLANCES: u32 = 2;
+
+/// Which rule decides that a glance changed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Rule {
+    /// [`CELLS`] or more cells past the bar in this glance.
+    #[default]
+    Current,
+    /// [`CELLS`] or more cells past the bar in this glance and in the one
+    /// compared before it (`--change-persist on`).
+    Persist2,
+}
+
+impl Rule {
+    /// The rule's name, as `--glance-log` and `glance_replay` say it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Rule::Current => "current",
+            Rule::Persist2 => "persist-2",
+        }
+    }
+}
 
 /// A frame as the cells' mean greys.
 #[derive(Clone, Debug, PartialEq)]
@@ -317,6 +349,11 @@ pub struct Change {
     /// [`Change::take_glance`].
     keep_glances: bool,
     glance: Option<Glance>,
+    /// The rule that decides a change ([`Change::persist_2`]).
+    rule: Rule,
+    /// With [`Rule::Persist2`], which cells were past the bar in the last
+    /// compared glance, busy or not; none before the first.
+    last_mask: Option<Vec<bool>>,
 }
 
 /// One compared glance's numbers for `--glance-log` (`glance_log`): counts
@@ -324,9 +361,12 @@ pub struct Change {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Glance {
     pub at_us: u64,
-    /// The current rule's verdict: [`CELLS`] or more cells past the bar,
-    /// and not while the lamp's own light changed.
+    /// The active rule's verdict ([`Glance::rule`]): [`CELLS`] or more
+    /// cells past the bar (with persist-2, past it in this glance and the
+    /// one compared before), and not while the lamp's own light changed.
     pub changed: bool,
+    /// The rule that gave [`Glance::changed`].
+    pub rule: Rule,
     /// The lamp's own light was changing ([`OwnLight`]).
     pub lit: bool,
     /// Cells past the bar.
@@ -370,6 +410,7 @@ impl Glance {
         Self {
             at_us,
             changed: false,
+            rule: Rule::Current,
             lit: false,
             cells,
             mask,
@@ -393,6 +434,12 @@ impl Change {
     /// (`--glance-log`).
     pub fn keep_glances(&mut self) {
         self.keep_glances = true;
+    }
+
+    /// Count a change only where it held two glances: the persist-2 rule
+    /// (`--change-persist on`, off unless given).
+    pub fn persist_2(&mut self) {
+        self.rule = Rule::Persist2;
     }
 
     /// The last compared glance's numbers, once, if kept.
@@ -434,8 +481,28 @@ impl Change {
             )
         });
         let cells = compared.as_ref().map(|compared| compared.0);
-        let lit = self.lit && cells.is_some_and(|cells| cells >= CELLS);
-        let changed = !self.lit && cells.is_some_and(|cells| cells >= CELLS);
+        // The cells that decide the verdict: with persist-2, only those past
+        // the bar in this glance and the one compared before it.
+        let verdict_cells = match self.rule {
+            Rule::Current => cells,
+            Rule::Persist2 => compared.as_ref().map(|(_, _, _, _, residuals)| {
+                let mask: Vec<bool> = residuals
+                    .iter()
+                    .zip(&self.noise)
+                    .map(|(residual, noise)| residual.abs() >= GREYS.max(NOISE_TIMES * *noise))
+                    .collect();
+                let held = self.last_mask.as_ref().map_or(0, |last| {
+                    mask.iter()
+                        .zip(last)
+                        .filter(|(now, then)| **now && **then)
+                        .count()
+                });
+                self.last_mask = Some(mask);
+                held
+            }),
+        };
+        let lit = self.lit && verdict_cells.is_some_and(|cells| cells >= CELLS);
+        let changed = !self.lit && verdict_cells.is_some_and(|cells| cells >= CELLS);
         self.since_change = if changed {
             Some(0)
         } else {
@@ -495,6 +562,7 @@ impl Change {
         let detect = busy.is_some() || moving || due;
         if let Some(glance) = glance.as_mut() {
             glance.changed = changed;
+            glance.rule = self.rule;
             glance.lit = self.lit;
             glance.detect = detect;
             glance.why = said;
@@ -965,6 +1033,152 @@ mod tests {
         assert!(!empty_room(false, false, Some(EMPTY_AFTER_US - 1)));
         assert!(!empty_room(true, false, None));
         assert!(!empty_room(false, true, None));
+    }
+
+    /// A flat grid of 100 greys with `bright` cells 40 greys brighter.
+    fn flat(bright: &[usize]) -> Grid {
+        let mut greys = vec![100.0; ACROSS * DOWN];
+        for &cell in bright {
+            greys[cell] += 40.0;
+        }
+        Grid::from_greys(greys)
+    }
+
+    /// Runs `frames` one a glance through a `Change`, persist-2 or not, and
+    /// says which glances were detected and each compared glance's numbers.
+    fn run(persist: bool, frames: &[Grid], busy: &[usize]) -> (Vec<usize>, Vec<Glance>) {
+        let mut change = Change::default();
+        change.keep_glances();
+        if persist {
+            change.persist_2();
+        }
+        let mut detected = Vec::new();
+        let mut glances = Vec::new();
+        for (n, frame) in frames.iter().enumerate() {
+            let why = busy.contains(&n).then_some(Busy::Face);
+            if change.detect(frame.clone(), why, n as u64 * GLANCE_US) {
+                detected.push(n);
+            }
+            glances.extend(change.take_glance());
+        }
+        (detected, glances)
+    }
+
+    /// A noise burst: three to five cells in scattered rows, past the bar
+    /// for one glance each, in different cells every time.
+    const BURSTS: [&[usize]; 3] = [&[37, 300, 611], &[90, 401, 520, 700], &[5, 250, 333]];
+
+    /// Persist-2 (1): a one-glance noise burst in scattered cells is a
+    /// change with the switch off and none with it on.
+    #[test]
+    fn persist_2_a_one_glance_noise_burst_is_no_change() {
+        let frames = [flat(&[]), flat(&[]), flat(BURSTS[0]), flat(&[]), flat(&[])];
+        let (off, _) = run(false, &frames, &[]);
+        let (on, glances) = run(true, &frames, &[]);
+        // Off: the burst at 2 and its two settling glances (the burst gone
+        // at 3 is a change against the burst's frame, which was detected).
+        assert_eq!(off, [0, 2, 3, 4]);
+        assert_eq!(on, [0]);
+        assert!(glances.iter().all(|glance| !glance.changed));
+        assert!(glances.iter().all(|glance| glance.rule == Rule::Persist2));
+        assert_eq!(glances[1].cells, 3, "the mask still says the burst");
+    }
+
+    /// Persist-2 (2): a person changing the same cells two glances running
+    /// is a change at the second, one glance later than without it.
+    #[test]
+    fn persist_2_a_person_held_two_glances_is_a_change_at_the_second() {
+        let person: Vec<usize> = (0..4)
+            .flat_map(|row| (10..14).map(move |col| (8 + row) * ACROSS + col))
+            .collect();
+        let frames = [
+            flat(&[]),
+            flat(&[]),
+            flat(&person),
+            flat(&person),
+            flat(&person),
+            flat(&person),
+        ];
+        let (off, _) = run(false, &frames, &[]);
+        let (on, glances) = run(true, &frames, &[]);
+        assert_eq!(off, [0, 2, 3, 4]);
+        assert_eq!(on, [0, 3, 4, 5]);
+        let changed: Vec<bool> = glances.iter().map(|glance| glance.changed).collect();
+        assert_eq!(changed, [false, false, true, false, false]);
+    }
+
+    /// Persist-2 (3): with the switch off the verdicts are the current
+    /// rule's, as before (`cells` against [`CELLS`], each glance alone);
+    /// with it on they are the replay's persist-2 (`glance_replay`): a cell
+    /// counts if past the bar in this glance and the one compared before.
+    #[test]
+    fn persist_2_off_is_the_current_rule_and_on_is_the_replays() {
+        let person: Vec<usize> = (300..306).chain(332..338).collect();
+        let mut frames = Vec::new();
+        for n in 0..40usize {
+            frames.push(match n {
+                3 | 9 | 17 | 25 => flat(BURSTS[n % 3]),
+                12..=15 => flat(&person),
+                21 => flat(&[37, 300, 611, 612]),
+                22 => flat(&[37, 300, 611, 613]),
+                _ => flat(&[]),
+            });
+        }
+        let busy = [30, 31];
+        let (off, off_glances) = run(false, &frames, &busy);
+        // Today's verdicts on these frames: each burst, the room after it
+        // (a change against the burst's frame), and the settling glances.
+        assert_eq!(
+            off,
+            [
+                0, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+                27, 28, 30, 31, 36
+            ]
+        );
+        for glance in &off_glances {
+            assert_eq!(glance.rule, Rule::Current);
+            assert_eq!(glance.changed, !glance.lit && glance.cells >= CELLS);
+        }
+        let (_, on_glances) = run(true, &frames, &busy);
+        let bits = |glance: &Glance| -> Vec<bool> {
+            (0..ACROSS * DOWN)
+                .map(|cell| glance.mask[cell / 8] >> (cell % 8) & 1 == 1)
+                .collect()
+        };
+        for (n, glance) in on_glances.iter().enumerate() {
+            let held = match n {
+                0 => 0,
+                _ => bits(glance)
+                    .iter()
+                    .zip(bits(&on_glances[n - 1]))
+                    .filter(|(now, then)| **now && *then)
+                    .count(),
+            };
+            assert_eq!(glance.changed, held >= CELLS, "glance {}", n + 1);
+        }
+        assert!(on_glances.iter().filter(|glance| glance.changed).count() >= 2);
+    }
+
+    /// Persist-2 (4): the 3 s look and a busy room are as without it: a
+    /// room of nothing but one-glance bursts is still detected every 3 s,
+    /// and every glance while a face was seen.
+    #[test]
+    fn persist_2_keeps_the_three_second_look_and_the_busy_room() {
+        // Bursts in different cells every glance, the room plain at each
+        // 3 s look and while a face is seen (8 to 10).
+        let frames: Vec<Grid> = (0..20)
+            .map(|n| {
+                if n % 5 == 0 || (8..=10).contains(&n) {
+                    flat(&[])
+                } else {
+                    flat(BURSTS[n % 3])
+                }
+            })
+            .collect();
+        let (on, _) = run(true, &frames, &[]);
+        assert_eq!(on, [0, 5, 10, 15]);
+        let (on, _) = run(true, &frames, &[8, 9, 10]);
+        assert_eq!(on, [0, 5, 8, 9, 10, 15]);
     }
 
     /// A frame the working size is not (a full look's working frame is
