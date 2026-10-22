@@ -6,8 +6,12 @@
 # itself over HTTPS (at most 18 MB within 25 s, redirects only to https) and installs only when it
 # is signed with the update channel's key (--key-file), never a core skill or a core skill's name,
 # and never older than the version installed.
-# It answers one line and exits. Only the skills folder is writable; /etc is read-only, the key
-# with it.
+# Or {"off": NAME} / {"on": NAME}, the app's off and on (#2815): kept in lamp-skills' state
+# folder, its `off` and `on`. That folder is lampos's, 0700 (the daily journal requires it), so
+# the helper keeps one capability, CAP_DAC_OVERRIDE, and nothing else: root without it is held to
+# the folder's mode. ProtectSystem=strict still limits its writes to the two paths below.
+# It answers one line and exits. Only the skills folder and that state folder are writable; /etc
+# is read-only, the key with it.
 # The Store is off unless set, as lamp-cloud's LAMP_SKILLS_STORE is: off, the helper refuses every
 # install itself ("not on this lamp: skills.install"), whoever connected, removes still run, and
 # it has no network. A drop-in turns it on, with the network for the fetch (lamp-cloud passes the
@@ -36,10 +40,10 @@ SyslogIdentifier=lamp-skills
 RuntimeMaxSec=60
 NoNewPrivileges=yes
 ProtectSystem=strict
-ReadWritePaths=/var/lib/lampOS/skills
+ReadWritePaths=/var/lib/lampOS/skills -/var/lib/lampos-skills-state
 ProtectHome=yes
 PrivateTmp=yes
 PrivateNetwork=yes
 PrivateDevices=yes
 RestrictAddressFamilies=AF_UNIX
-CapabilityBoundingSet=
+CapabilityBoundingSet=CAP_DAC_OVERRIDE

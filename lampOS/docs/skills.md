@@ -342,7 +342,15 @@ skills".)
 - `--state-dir DIR` is the part's own folder, where the skills a person
   turned off with a skill's `[stop]` are kept across a restart: `DIR/off`,
   one skill's name a line (#1685). It is read at the start, and the journal
-  says which. Without it, off lasts until the program stops. With
+  says which, and again every 2 s, when the folder is looked at, and before
+  a `[stop]`'s off or on is written: the app turns a skill off and on there
+  too, through the manage helper (#2815, "The manage helper" below), and
+  the journal says `the skills turned off read again: the app changed
+  them`. Both write it with one function (`lamp_skills::keep_names`), and
+  read it with one (`lamp_skills::read_names`). An off stops what a skill
+  does by itself (its triggers), as a `[stop]`'s does; its function, asked
+  for in a talk, still answers. Without it, off lasts until the program
+  stops. With
   `LAMP_SKILL_ROUTINES` on, `DIR/rested` keeps the night each routine
   rested (#1672, #2757): one line a skill, its name and the local day the
   night began (`bedtime-morning 20453`), nothing about a person. Written
@@ -352,8 +360,8 @@ skills".)
   and its morning still has the morning's wake and a `yields_to` know the
   lamp rested. The product's
   unit gives `--state-dir /var/lib/lampos-skills-state` with
-  `StateDirectory=lampos-skills-state` (mode 0700), the folder #1732's
-  daily journal shares.
+  `StateDirectory=lampos-skills-state` (mode 0700, which the daily journal
+  requires), the folder #1732's daily journal shares.
 - It loads every folder in `--dir` (`/var/lib/lampOS/skills`), looks at the
   folder every two seconds, and loads them all again when a file other
   than a test changed. Cooldowns are kept across a reload.
@@ -1056,12 +1064,15 @@ through an install or update round (the first builder on #2585): an
 update changes what the build ships, not what was chosen on the lamp. A
 core skill that is off by default (Bedtime and Morning, and those of
 `install::PRODUCT_SKILLS_OFF`) is turned on by editing its installed
-`skill.toml` (`enabled = true`, or install's off line taken out). The next
+`skill.toml` (`enabled = true`, or install's off line taken out), or from
+the app (`skills.on`, #2815), which makes that edit through the manage
+helper and writes the name in `on` at once. The next
 install or round sees that, keeps the name in `--state-dir`'s `on` (one
 name a line, beside `off`, written whole, 0644), and writes the build's
 file turned on. A skill named in `on` is written turned on even when its
 file is gone or the build's file changes. Editing the file back to off
-takes the name out of `on`. A lamp with no `on` has none turned on, as
+takes the name out of `on`; the app's `skills.off` does that edit, takes
+the name out of `on` and puts it in `off`. A lamp with no `on` has none turned on, as
 before. A skill the build no longer carries leaves `on` with one journal
 line (`NAME is no longer a core skill of this build: its turn-on in
 /var/lib/lampos-skills-state/on is dropped`). `lamp-skills remove`
@@ -1141,8 +1152,15 @@ for it.
   (`lamp-skills-manage@.service`), the connection its standard input and
   output. It reads one line of at most 4 KiB, answers one line,
   `{"done": WHAT}` or `{"refused": WHY}`, and exits. Its unit has only the
-  skills folder writable (`/etc`, the key with it, read-only), no
-  capabilities, `NoNewPrivileges` and 60 s at most.
+  skills folder and `lamp-skills`' state folder writable (`/etc`, the key
+  with it, read-only), one capability, `CAP_DAC_OVERRIDE`
+  (`CapabilityBoundingSet=`, for the app's off and on: the state folder is
+  `lampos`'s, 0700, and root without it is held to that mode),
+  `NoNewPrivileges` and 60 s at most. `off` and `on` are written beside
+  and moved over, the file beside only ever made new and never through a
+  link (`O_CREAT | O_EXCL | O_NOFOLLOW`; a link there is refused, its
+  target untouched), and read never through a link (the reviewer's P2 on
+  #2878).
 - **The Store's switch, in the helper too.** `LAMP_SKILLS_STORE=on`
   (`package::STORE_SWITCH`), off unless set, as `lamp-cloud`'s is. The
   helper reads it in its own environment, so a process that reaches the
@@ -1171,7 +1189,7 @@ for it.
   `LAMP_SKILLS_ANY_ASKER=on` in the helper's environment, which no unit
   sets, and the helper says so in the journal each time it lets a peer
   through (`a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed`).
-- **It checks each request itself,** whoever connected. Three are taken,
+- **It checks each request itself,** whoever connected. Five are taken,
   each exactly one key:
   - `{"remove": NAME}`, a string: it runs `remove` above, which refuses a
     name that is not a skill's (1 to 64 lowercase letters, digits and
@@ -1186,6 +1204,27 @@ for it.
   - `{"install_made": SHA256}`, 64 lowercase hex: a skill made here by
     voice, put on at its person's yes (below). It needs no Store switch:
     it fetches nothing.
+  - `{"off": NAME}` and `{"on": NAME}`, a string: the app's off and on
+    (#2815, `package::turn`), under the folder's lock, kept in
+    `--state-dir`'s `off` (`--state-dir` of `asked`,
+    `/var/lib/lampos-skills-state` by default) as a `[stop]`'s off is, so a
+    round and a restart keep it, and the running program reads it within
+    2 s. Off puts the name in `off`; on takes it out. A core skill the
+    build ships off (`enabled = false`) is turned on in its `skill.toml`
+    (`lamp_update::product_skills::turned_on`) and its name kept in `on`,
+    so a round keeps it on (#2585); turned off again, its file is the
+    build's again (`enabled = false`, or install's off line back on top),
+    its name leaves `on`, and it is in `off`. A skill granted a core
+    operation (`core = [...]` in `[permissions]`: Night sleep, Onboarding,
+    Prepare to unplug) is refused with `NAME is part of how the lamp itself
+    works, so it can't be turned off` (`package::cannot_turn_off`, the one
+    rule the app's page reads too), and so is one that doesn't load (`NAME
+    does not load, so it can't be turned off or on: WHY`) or isn't there.
+    It answers `turned NAME off` or `turned NAME on`. Tests:
+    `the_apps_off_and_on_are_kept_and_a_skill_of_the_lamp_itself_is_refused`
+    (`tests/it/package.rs`) and, through two update rounds and a restart,
+    `the_apps_off_and_on_hold_through_a_round_and_a_restart`
+    (`crates/update/tests/round.rs`).
 
   Anything else is refused, `a request is one line, {"remove": NAME},
   {"install": {"url": URL, "sha256": HASH, "name": NAME, "version":
@@ -1481,10 +1520,8 @@ list, is not built: an entry from it goes to `skills.install` as it is.
 
 Not built yet: the Store's server (a catalogue, review, publishing) and
 `skills.catalog`; the app's "My skills" page (`list` is text for a
-person); turning a skill off
-without removing it, core ones among them; the core skills
-installed disabled are turned on only by editing their `skill.toml` on the
-lamp. `PRODUCT_SKILLS` are exactly the core skills, Laugh glance parked
+person; the lamp's `skills.off` and `skills.on` for it are built, #2815).
+`PRODUCT_SKILLS` are exactly the core skills, Laugh glance parked
 (`the_product_skills_are_exactly_the_core_skills` in
 `crates/update/tests/install.rs`).
 A skill's functions past a session's 32 are #1668's (`LAMP_USE_SKILL=on`,

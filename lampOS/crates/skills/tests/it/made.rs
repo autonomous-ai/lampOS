@@ -176,6 +176,7 @@ fn a_made_skill_goes_on_by_its_sha256_and_only_by_it() {
     let ok = asked_helper(
         &skills,
         &keeping.directory,
+        &skills.join("no-state"),
         wait,
         None,
         asked.as_bytes(),
@@ -344,6 +345,7 @@ fn a_made_skill_is_put_on_by_a_spoken_yes_through_the_helper() {
         asked_helper(
             &served,
             &helper_made,
+            &served.join("no-state"),
             std::time::Duration::from_secs(2),
             None,
             &stream,

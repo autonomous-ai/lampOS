@@ -41,7 +41,7 @@ const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-soc
                      lamp-skills remove [--dir DIR] NAME\n       \
                      lamp-skills list [--dir DIR]\n       \
                      lamp-skills pack [--out DIR] [--key-file PRIVATE] SKILL_DIR\n       \
-                     lamp-skills asked [--dir DIR] [--key-file PATH]";
+                     lamp-skills asked [--dir DIR] [--state-dir DIR] [--key-file PATH]";
 /// The daily journal's file, as the product unit passes it; `--daily-state`
 /// wins when both are given.
 const DAILY_ENVIRONMENT: &str = "LAMP_SKILLS_DAILY_FILE";
@@ -326,6 +326,8 @@ fn test(dirs: &[String]) -> ExitCode {
 fn manage(command: &str, given: &[String]) -> ExitCode {
     let mut dir = PathBuf::from(SKILLS_DIR);
     let mut out = PathBuf::from(".");
+    // `asked`: the running program's `--state-dir`, for the app's off and on.
+    let mut state = PathBuf::from(package::STATE_DIR);
     // `asked`: the update channel's public key a Store package must be
     // signed with. `pack`: the private key it is signed with, if any.
     let mut key_file: Option<PathBuf> = None;
@@ -335,6 +337,7 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
         let flag = match word.as_str() {
             "--dir" if command != "pack" => &mut dir,
             "--out" if command == "pack" => &mut out,
+            "--state-dir" if command == "asked" => &mut state,
             "--key-file" if matches!(command, "pack" | "asked") => {
                 let Some(value) = given.next() else {
                     eprintln!("{USAGE}");
@@ -419,6 +422,7 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
             return match package::asked(
                 &dir,
                 Path::new(lamp_voice::made_skill::DIRECTORY),
+                &state,
                 package::ASKED_LOCK_WAIT,
                 store,
                 std::io::stdin(),
@@ -1043,6 +1047,10 @@ fn serve(
         }
         if looked.is_none_or(|at| clock::now().saturating_duration_since(at) >= RELOAD_EVERY) {
             looked = Some(clock::now());
+            // The app's off and on (#2815), written by the manage helper.
+            if engine.reread_off() {
+                eprintln!("lamp-skills: the skills turned off read again: the app changed them");
+            }
             // Potential file I/O stays outside the authority lock. A stalled
             // scan cannot keep old leases alive: authorization checks its age.
             let mut scan = audio.lock().unwrap().scan();

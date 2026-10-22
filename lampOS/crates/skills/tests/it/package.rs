@@ -991,6 +991,7 @@ fn the_manage_helper_waits_for_a_held_folder_only_so_long_then_does_nothing() {
     let ok = package::asked(
         &skills,
         &skills.join("no-made"),
+        &skills.join("no-state"),
         WAIT,
         None,
         &b"{\"remove\": \"desk-tutor\"}\n"[..],
@@ -1196,4 +1197,134 @@ fn the_manage_helper_refuses_core_skills_and_bad_names_on_its_own() {
             .starts_with("removed desk-tutor")
     );
     assert_eq!(left(&skills), ["dance"]);
+}
+
+/// #2815: the app's off and on, asked of the manage helper: a skill turned
+/// off is in the state folder's `off`, where a running lamp-skills reads it
+/// again and a started one reads it; on takes it out. A skill that is part
+/// of the lamp itself is refused with why, and nothing is kept.
+#[test]
+fn the_apps_off_and_on_are_kept_and_a_skill_of_the_lamp_itself_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    let state = dir.path().join("state");
+    fs::create_dir_all(&state).unwrap();
+    tutor(&skills, "1.0.0");
+    copy(
+        &skills_root().join("night-sleep"),
+        &skills.join("night-sleep"),
+    );
+    let ask = |line: &str| {
+        let mut answer = Vec::new();
+        let ok = package::asked(
+            &skills,
+            &skills.join("no-made"),
+            &state,
+            package::ASKED_LOCK_WAIT,
+            None,
+            line.as_bytes(),
+            &mut answer,
+        )
+        .unwrap();
+        (
+            serde_json::from_slice::<serde_json::Value>(&answer).unwrap(),
+            ok,
+        )
+    };
+    let (loaded, _) = lamp_skills::load_all(&skills);
+    let mut running = lamp_skills::Engine::new(loaded, true);
+    running.keep_off_in(&state).unwrap();
+
+    let (answer, ok) = ask("{\"off\": \"desk-tutor\"}\n");
+    assert!(ok, "{answer}");
+    assert_eq!(answer["done"], "turned desk-tutor off");
+    assert_eq!(
+        fs::read_to_string(state.join("off")).unwrap(),
+        "desk-tutor\n"
+    );
+    assert!(running.reread_off());
+    assert!(running.stopped("desk-tutor", 0));
+    let (loaded, _) = lamp_skills::load_all(&skills);
+    let mut started = lamp_skills::Engine::new(loaded, true);
+    assert_eq!(started.keep_off_in(&state).unwrap(), ["desk-tutor"]);
+
+    let (answer, ok) = ask("{\"on\": \"desk-tutor\"}\n");
+    assert!(ok, "{answer}");
+    assert_eq!(answer["done"], "turned desk-tutor on");
+    assert_eq!(fs::read_to_string(state.join("off")).unwrap(), "");
+    assert!(running.reread_off());
+    assert!(!running.stopped("desk-tutor", 0));
+
+    let (answer, ok) = ask("{\"off\": \"night-sleep\"}\n");
+    assert!(!ok);
+    assert_eq!(
+        answer["refused"],
+        "night-sleep is part of how the lamp itself works, so it can't be turned off"
+    );
+    assert_eq!(fs::read_to_string(state.join("off")).unwrap(), "");
+    let (answer, _) = ask("{\"off\": \"no-such\"}\n");
+    assert_eq!(answer["refused"], "no skill no-such on this lamp");
+    let (answer, _) = ask("{\"off\": \"desk-tutor\", \"on\": \"desk-tutor\"}\n");
+    assert_eq!(answer["refused"], package::NOT_A_REQUEST);
+}
+
+/// The reviewer's P2 on #2878: root's helper writes `off` in a folder the
+/// skills' user owns, so a link planted where the file beside goes is
+/// refused and its target untouched, and a link at `off` is not read
+/// through. A plain file left there by a cut-off run is replaced.
+#[test]
+fn the_off_file_is_never_written_or_read_through_a_link() {
+    let dir = tempfile::tempdir().unwrap();
+    let victim = dir.path().join("victim");
+    fs::write(&victim, "not yours\n").unwrap();
+    let off = dir.path().join("off");
+    std::os::unix::fs::symlink(&victim, off.with_extension("new")).unwrap();
+    let names = ["desk-tutor".to_owned()].into();
+    assert!(lamp_skills::keep_names(&off, &names).is_err());
+    assert_eq!(fs::read_to_string(&victim).unwrap(), "not yours\n");
+    assert!(!off.exists());
+
+    fs::remove_file(off.with_extension("new")).unwrap();
+    fs::write(off.with_extension("new"), "left\n").unwrap();
+    lamp_skills::keep_names(&off, &names).unwrap();
+    assert_eq!(fs::read_to_string(&off).unwrap(), "desk-tutor\n");
+    assert!(!off.with_extension("new").exists());
+
+    let linked = dir.path().join("linked");
+    std::os::unix::fs::symlink(&off, &linked).unwrap();
+    assert!(lamp_skills::read_names(&linked).is_err());
+}
+
+/// The reviewer's P1 on #2878: the state folder stays 0700, as the daily
+/// journal requires, and the app's off kept there leaves the journal
+/// opening as before.
+#[test]
+fn the_daily_journal_opens_beside_the_apps_off_in_a_0700_state_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    let state = dir.path().join("state");
+    fs::create_dir_all(&state).unwrap();
+    fs::set_permissions(&state, fs::Permissions::from_mode(0o700)).unwrap();
+    tutor(&skills, "1.0.0");
+    package::turn(
+        &skills,
+        &state,
+        "desk-tutor",
+        true,
+        package::ASKED_LOCK_WAIT,
+    )
+    .unwrap();
+    assert_eq!(
+        fs::read_to_string(state.join("off")).unwrap(),
+        "desk-tutor\n"
+    );
+    lamp_skills::daily::Journal::open(state.join("daily.json")).unwrap();
+    let units = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    let skills_unit = fs::read_to_string(units.join("lamp-skills.service")).unwrap();
+    assert!(skills_unit.contains("\nStateDirectoryMode=0700\n"));
+    let helper = fs::read_to_string(units.join("lamp-skills-manage@.service")).unwrap();
+    assert!(helper.contains("\nCapabilityBoundingSet=CAP_DAC_OVERRIDE\n"));
+    assert!(
+        helper.contains("\nReadWritePaths=/var/lib/lampOS/skills -/var/lib/lampos-skills-state\n")
+    );
 }
