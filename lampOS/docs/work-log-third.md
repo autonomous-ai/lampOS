@@ -5,6 +5,30 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-22 — current merge order and second privacy rebase
+
+Ready for lamp-voice: no (#2695 fresh head gates; #2677 still being folded).
+
+- First merged #2651 as `613986c5967f78f48d9bb2724da6e6eba65b0534`.
+  Its RR 30 choice leaves ResetOnFork absent; First owns the lamp-4ace
+  check. The prior entry records that head's green ARM64 and Clippy.
+- #2695's reviewer requested another plain rebase after #2511 changed
+  `process.rs`. Pushed `50a5eb01fd81ba049743fd16448a945c50dc98d7` on base
+  `42aa8d4ae6ad67d75fed78c6a96885d7087fac2e`; range-diff from `4a549f24f`
+  is `=`. Formatting and diff checks pass. Kept it draft for the owner's
+  explicit fresh ARM64 gate, although the reviewer would take a clean
+  rebase on Clippy alone. The prior head's successful run is historical.
+- #2677 rebased onto `a503d70f0` after #2651 merged; the upstream
+  `--privacy-from` usage line is preserved. Folding First's requested
+  strip CPU-rest floor and reset removal into its single commit. A local
+  review caught delayed fault reporting; errors now bypass sleep. Both
+  regressions caught their intentional faults, and restored Controls unit
+  tests passed 33/33. Final-base workspace Clippy passed; the 14-crate
+  test run is active. The old-base run was interrupted (exit 130), not
+  counted as a pass. No build ran in a secondary worktree.
+- First acknowledged the resume-hold design note and asked Seventh for
+  the policy call. Third changes no product hold. #1362 remains draft.
+
 ## 2026-10-22 — rebases and the deliberate resume hold
 
 Ready for lamp-voice: yes (#2695 and #2651; First owns both merges).
