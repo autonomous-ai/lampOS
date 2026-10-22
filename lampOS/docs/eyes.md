@@ -844,7 +844,11 @@ this room" until someone asks to be recognised.
     their `forget_everything` would (their scope only, never the room's;
     memory.md). The voice asks the eyes for that person under the name the
     eyes keep, read from the known file, never the model's guess, and never
-    for anyone else's face (voice-side, `known_faces::forget_name`). A remove from the owner's page (`face.remove`) takes their
+    for anyone else's face (voice-side, `known_faces::forget_name`). A
+    room's line (no known person's) sends a forget only when the known file
+    names the person the model asked for, their face at the lamp now; else
+    nothing is sent and the model hears that only the asker's face, seen at
+    the lamp, can be forgotten (the first builder on #2602). A remove from the owner's page (`face.remove`) takes their
     memory too (cloud.md, "The faces it knows"). Memory names a person by
     their name's hash, so until person ids are stable (#2176 row 3), a new
     face kept under the same name would be given those memories.
