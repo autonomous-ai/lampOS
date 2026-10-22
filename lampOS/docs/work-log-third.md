@@ -5,6 +5,26 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-22 07:45 — privacy worker second rebase is green
+
+Ready for lamp-voice: yes (#2695; First owns merge).
+
+- Current head `50a5eb01fd81ba049743fd16448a945c50dc98d7` on
+  `42aa8d4ae6ad67d75fed78c6a96885d7087fac2e`; range-diff from `4a549f24f`
+  is `=`. It includes #2511's `process.rs` change in its base. No patch
+  edit or ARM64 link on the Mac; formatting/diff checks passed.
+- Native ARM64 [39699776504](https://github.com/autonomous-ai/lampOS/actions/runs/39699776504)
+  tested merge `32ea77e`: 6,375 nextest tests passed (one leaky), 28 skipped.
+  Four doc tests, `relay_signals`, all 12 own-harness process tests,
+  release binary classification/checksums and artifact upload passed.
+- Linux Clippy [39699776825](https://github.com/autonomous-ai/lampOS/actions/runs/39699776825)
+  passed on the head for every workspace crate/target with warnings denied.
+  PR body updated and marked ready; head/range/result posted on #2602 and
+  the PR. First merges and owns the lamp-4ace checks.
+- #2677 is still being validated on the local rebase: workspace Clippy
+  passed; the required 14-crate test run is progressing through its process
+  and installation cases. It is not claimed passed or ready yet.
+
 ## 2026-10-22 — current merge order and second privacy rebase
 
 Ready for lamp-voice: no (#2695 fresh head gates; #2677 still being folded).
