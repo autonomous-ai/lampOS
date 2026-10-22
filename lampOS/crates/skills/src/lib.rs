@@ -1677,6 +1677,18 @@ impl Skill {
                     .filter(|_| self.permissions.refuses_reading(watch::SOUNDS).is_none())
                     .map(|_| (watch::SOUNDS.to_owned(), "a watch's arrivals by sound")),
             )
+            // And the voice's state beside them, where they name it too: a
+            // window the ears scored with the lamp's own voice unknown is
+            // taken only when it says the lamp wasn't speaking (#2562).
+            .chain(
+                self.watch
+                    .iter()
+                    .filter(|_| {
+                        self.permissions.refuses_reading(watch::SOUNDS).is_none()
+                            && self.permissions.refuses_reading(watch::VOICE).is_none()
+                    })
+                    .map(|_| (watch::VOICE.to_owned(), "a watch's arrivals by sound")),
+            )
             .chain(
                 self.is_routine()
                     .then(|| (VoiceState::TOPIC.to_owned(), "a routine's quiet gate")),

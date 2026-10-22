@@ -73,7 +73,7 @@
 //! from anyone else, and, with names on, for the visit's text: it is never
 //! in an event or the journal, and in a text only on the eyes' yes.
 use crate::{Call, LightFile, Skill, Words as SayWords, duration_us, light_call, words};
-use lamp_msgs::{Faces, OwnVoiceEvidence, SoundClasses};
+use lamp_msgs::{Faces, OwnVoiceEvidence, SoundClasses, Voice, VoiceState};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -96,6 +96,14 @@ pub const OFF: &str = "off";
 /// by a watch whose `[permissions]` topics name it, and only with
 /// [`SOUNDS_ENVIRONMENT`] on.
 pub const SOUNDS: &str = "ears/classes";
+/// The voice's state, read by a watch whose `[permissions]` topics name it
+/// beside [`SOUNDS`] (#2562): the ears score a window the lamp didn't speak
+/// into with its own voice unknown, never clear (their speaking flag maps a
+/// stale state to false), so the watch's own reading says it was quiet.
+pub const VOICE: &str = "voice/state";
+/// A reading of the voice lasts this long: it says its state once a second
+/// and on each change, as a routine's quiet gate reads it.
+pub const VOICE_FRESH_US: u64 = 3_000_000;
 /// `on` takes arrivals by sound; off unless set (#2562).
 pub const SOUNDS_ENVIRONMENT: &str = "LAMP_GUARD_SOUNDS";
 /// `on` takes `guard.on` and `guard.off` from the owner's app on the call
@@ -1141,6 +1149,10 @@ struct Entry {
     /// Its `[permissions]` topics name [`SOUNDS`]: it may hear a door,
     /// footsteps and speech (#2562).
     sounds: bool,
+    /// Its `[permissions]` topics name [`VOICE`] too: it may hear a window
+    /// the ears scored with the lamp's own voice unknown, when the voice's
+    /// own state says the lamp wasn't speaking over it (#2562).
+    voice: bool,
     /// Its `[permissions]` have `known_faces = true`: with names on, it may
     /// name someone who said yes (#2562).
     known_faces: bool,
@@ -1158,6 +1170,11 @@ pub struct Watches {
     pub sounds: bool,
     /// The privacy switch was last seen closed: no watch goes on.
     closed: bool,
+    /// Since when every reading of [`VOICE`], each within
+    /// [`VOICE_FRESH_US`] of the one before, said the lamp wasn't speaking,
+    /// and the newest's time, on the monotonic clock in µs, as the ears'
+    /// windows are. None: speaking, or nothing fresh read (#2562).
+    quiet: Option<(u64, u64)>,
     /// With [`NAMES_ENVIRONMENT`] on: the eyes' `tellable` file beside
     /// their known file (`crate::known::tellable_of`), for a watch whose
     /// skill has `known_faces = true` (#2562). None: nobody is named.
@@ -1219,6 +1236,7 @@ impl Watches {
                     choice: choice.name.clone(),
                     watch,
                     sounds: skill.permissions.refuses_reading(SOUNDS).is_none(),
+                    voice: skill.permissions.refuses_reading(VOICE).is_none(),
                     known_faces: skill.permissions.known_faces,
                 },
             );
@@ -1335,22 +1353,53 @@ impl Watches {
                 {
                     self.heard = Some((now_us, text.to_owned()));
                     // Speech after a door or footsteps (#2562).
-                    made = self.sounded(false, true, now_us, minute);
+                    made = self.sounded(false, true, false, now_us, minute);
                 }
             }
             SOUNDS => {
-                // Scored with the lamp's own voice clear only: its own
-                // words are no one coming in.
+                // Only a window the lamp didn't speak into: its own words
+                // are no one coming in. Clear as the ears score it, or
+                // unknown there and quiet by the voice's own state over it.
                 if let Ok(SoundClasses::Scored {
+                    window,
                     scores,
-                    own_voice: OwnVoiceEvidence::Clear,
+                    own_voice,
                     ..
                 }) = serde_json::from_value::<SoundClasses>(value)
                 {
-                    let door = scores.door.max(scores.footsteps) >= SOUND_AT_LEAST;
-                    let speech = scores.speech >= SOUND_AT_LEAST;
-                    made = self.sounded(door, speech, now_us, minute);
+                    let by_voice = match own_voice {
+                        OwnVoiceEvidence::Clear => Some(false),
+                        OwnVoiceEvidence::Unknown => self
+                            .quiet
+                            .is_some_and(|(since, newest)| {
+                                since <= window.start_us
+                                    && newest <= now_us
+                                    && now_us - newest < VOICE_FRESH_US
+                            })
+                            .then_some(true),
+                        OwnVoiceEvidence::Present => None,
+                    };
+                    if let Some(by_voice) = by_voice {
+                        let door = scores.door.max(scores.footsteps) >= SOUND_AT_LEAST;
+                        let speech = scores.speech >= SOUND_AT_LEAST;
+                        made = self.sounded(door, speech, by_voice, now_us, minute);
+                    }
                 }
+            }
+            VOICE => {
+                // A gap longer than a reading lasts may have hidden speech:
+                // quiet again only from this reading.
+                let quiet = serde_json::from_value::<VoiceState>(value)
+                    .is_ok_and(|voice| voice.state != Voice::Speaking);
+                self.quiet = match self.quiet {
+                    _ if !quiet => None,
+                    Some((since, newest))
+                        if newest <= now_us && now_us - newest < VOICE_FRESH_US =>
+                    {
+                        Some((since, now_us))
+                    }
+                    _ => Some((now_us, now_us)),
+                };
             }
             "room/presence" => {
                 if let Some(someone) = value["someone"].as_bool() {
@@ -1394,13 +1443,25 @@ impl Watches {
     }
 
     /// A door or footsteps, or speech, for each watch that may hear them,
-    /// with [`Self::sounds`] on (#2562).
-    fn sounded(&mut self, door: bool, speech: bool, now_us: u64, minute: Option<u16>) -> Outs {
+    /// with [`Self::sounds`] on (#2562). Taken `by_voice`, the lamp quiet
+    /// only by the voice's state, only by a watch that may read [`VOICE`].
+    fn sounded(
+        &mut self,
+        door: bool,
+        speech: bool,
+        by_voice: bool,
+        now_us: u64,
+        minute: Option<u16>,
+    ) -> Outs {
         let mut made = Vec::new();
         if !self.sounds {
             return made;
         }
-        for (skill, entry) in self.each.iter_mut().filter(|(_, entry)| entry.sounds) {
+        for (skill, entry) in self
+            .each
+            .iter_mut()
+            .filter(|(_, entry)| entry.sounds && (entry.voice || !by_voice))
+        {
             for out in entry.watch.sound(door, speech, now_us, minute) {
                 made.push((skill.clone(), out));
             }
@@ -2260,18 +2321,32 @@ mod tests {
         watches
     }
 
-    /// The ears' room sound classes: a door scored `door`, speech `speech`,
-    /// the lamp's own voice `own`.
-    fn classes(door: f32, speech: f32, own: &str) -> Vec<u8> {
+    /// The ears' room sound classes completed at `at`, for the 0.96 s
+    /// window before it: a door scored `door`, speech `speech`, the lamp's
+    /// own voice `own`. On a lamp it is `present` or `unknown`, never
+    /// `clear` (lamp-ears since #2714).
+    fn classes(door: f32, speech: f32, own: &str, at: u64) -> Vec<u8> {
         json!({
             "status": "scored",
             "model_id": "yamnet-qai-v0.59.0",
-            "window": {"start_us": 0, "end_us": 960_000, "completed_us": 1_000_000, "capture_epoch": 1},
+            "window": {"start_us": at - 1_000_000, "end_us": at - 40_000, "completed_us": at, "capture_epoch": 1},
             "scores": {"speech": speech, "music": 0.0, "laughter": 0.0, "door": door, "footsteps": 0.0},
             "own_voice": own,
         })
         .to_string()
         .into_bytes()
+    }
+
+    /// One face near, as the eyes track it.
+    const FACE: &[u8] =
+        br#"{"faces":[{"id":"f1","xmin":0.4,"ymin":0.3,"xmax":0.6,"ymax":0.6,"confidence":0.9}]}"#;
+
+    /// The voice's state `state` once a second from `from` to `to`.
+    fn voice(watches: &mut Watches, state: &str, from: u64, to: u64) {
+        let state = json!({ "state": state }).to_string();
+        for at in (from..=to).step_by(SECOND as usize) {
+            watches.observe(VOICE, state.as_bytes(), at, None);
+        }
     }
 
     /// The watch on, the desk empty and its mark confirmed at `now`.
@@ -2480,16 +2555,25 @@ mod tests {
     }
 
     /// #2562: a door on the ears' classes is taken only with the switch on
-    /// and with the lamp's own voice clear; speech on `voice/heard` or the
-    /// classes follows it.
+    /// and with the lamp's own voice clear, or unknown with the voice's own
+    /// state saying it wasn't speaking over the window; speech on
+    /// `voice/heard` or the classes follows it.
     #[test]
     fn sounds_are_taken_only_with_the_switch_and_the_lamps_voice_clear() {
         let empty = br#"{"someone":false}"#;
-        for (sounds, own, came) in [
-            (true, "clear", true),
-            (false, "clear", false),
-            (true, "present", false),
-            (true, "unknown", false),
+        // The voice's state from 5 s to 10 s, a door scored at 10 s.
+        for (sounds, own, state, came) in [
+            // What lamp-ears sends: unknown, the voice resting over it.
+            (true, "unknown", Some("resting"), true),
+            (false, "unknown", Some("resting"), false),
+            // Unknown while the voice was speaking, or with no state read.
+            (true, "unknown", Some("speaking"), false),
+            (true, "unknown", None, false),
+            // The lamp spoke into it: never, whatever the state says.
+            (true, "present", Some("resting"), false),
+            // Clear, from an older or a later producer: as it was.
+            (true, "clear", None, true),
+            (false, "clear", None, false),
         ] {
             let mut watches = guard();
             watches.sounds = sounds;
@@ -2497,24 +2581,85 @@ mod tests {
             watches.tool("keep_watch", &json!({"turn": "on"}), 2 * SECOND, None, true);
             watches.ring_said(GUARD, true, None, 3 * SECOND);
             watches.observe("room/presence", empty, 4 * SECOND, None);
-            let door = watches.observe(SOUNDS, &classes(0.9, 0.0, own), 10 * SECOND, None);
-            let heard = br#"{"text":"hello?","finished":true}"#;
-            let spoke = watches.observe("voice/heard", heard, 15 * SECOND, None);
-            let said = format!("{door:?}{spoke:?}");
+            if let Some(state) = state {
+                voice(&mut watches, state, 5 * SECOND, 10 * SECOND);
+            }
+            let door = watches.observe(
+                SOUNDS,
+                &classes(0.9, 0.0, own, 10 * SECOND),
+                10 * SECOND,
+                None,
+            );
+            let seen = watches.observe(Faces::TOPIC, FACE, 15 * SECOND, None);
+            let said = format!("{door:?}{seen:?}");
             assert_eq!(
                 said.contains("someone came in"),
                 came,
-                "{sounds} {own}: {said}"
+                "{sounds} {own} {state:?}: {said}"
             );
         }
+        // Speaking within the window, resting before and after it: nothing.
+        let mut watches = guard();
+        watches.observe("voice/heard", HEARD, SECOND, None);
+        watches.tool("keep_watch", &json!({"turn": "on"}), 2 * SECOND, None, true);
+        watches.ring_said(GUARD, true, None, 3 * SECOND);
+        watches.observe("room/presence", empty, 4 * SECOND, None);
+        voice(&mut watches, "resting", 5 * SECOND, 9 * SECOND);
+        voice(
+            &mut watches,
+            "speaking",
+            9 * SECOND + 500_000,
+            9 * SECOND + 500_000,
+        );
+        voice(
+            &mut watches,
+            "resting",
+            9 * SECOND + 700_000,
+            9 * SECOND + 700_000,
+        );
+        let door = watches.observe(
+            SOUNDS,
+            &classes(0.9, 0.0, "unknown", 10 * SECOND),
+            10 * SECOND,
+            None,
+        );
+        let seen = watches.observe(Faces::TOPIC, FACE, 15 * SECOND, None);
+        assert!(!format!("{door:?}{seen:?}").contains("someone came in"));
+        // A state gone stale before the window says nothing of it.
+        let mut watches = guard();
+        watches.observe("voice/heard", HEARD, SECOND, None);
+        watches.tool("keep_watch", &json!({"turn": "on"}), 2 * SECOND, None, true);
+        watches.ring_said(GUARD, true, None, 3 * SECOND);
+        watches.observe("room/presence", empty, 4 * SECOND, None);
+        voice(&mut watches, "resting", 4 * SECOND, 5 * SECOND);
+        let door = watches.observe(
+            SOUNDS,
+            &classes(0.9, 0.0, "unknown", 10 * SECOND),
+            10 * SECOND,
+            None,
+        );
+        let seen = watches.observe(Faces::TOPIC, FACE, 15 * SECOND, None);
+        assert!(!format!("{door:?}{seen:?}").contains("someone came in"));
         // Speech on the classes follows a door too.
         let mut watches = guard();
         watches.observe("voice/heard", HEARD, SECOND, None);
         watches.tool("keep_watch", &json!({"turn": "on"}), 2 * SECOND, None, true);
         watches.ring_said(GUARD, true, None, 3 * SECOND);
         watches.observe("room/presence", empty, 4 * SECOND, None);
-        watches.observe(SOUNDS, &classes(0.9, 0.0, "clear"), 10 * SECOND, None);
-        let spoke = watches.observe(SOUNDS, &classes(0.0, 0.8, "clear"), 12 * SECOND, None);
+        voice(&mut watches, "resting", 5 * SECOND, 10 * SECOND);
+        watches.observe(
+            SOUNDS,
+            &classes(0.9, 0.0, "unknown", 10 * SECOND),
+            10 * SECOND,
+            None,
+        );
+        voice(&mut watches, "resting", 11 * SECOND, 12 * SECOND);
+        let spoke = watches.observe(
+            SOUNDS,
+            &classes(0.0, 0.8, "unknown", 12 * SECOND),
+            12 * SECOND,
+            None,
+        );
         assert!(format!("{spoke:?}").contains("then speech"));
     }
 
@@ -2534,6 +2679,7 @@ mod tests {
         assert_eq!(LISTENS[2], lamp_msgs::Speech::TOPICS[0]);
         assert_eq!(PRIVACY, lamp_msgs::MicrophonePrivacy::TOPIC);
         assert_eq!(SOUNDS, SoundClasses::TOPIC);
+        assert_eq!(VOICE, VoiceState::TOPIC);
     }
 
     /// What went to the phone: each text, and whether it names someone
@@ -2573,9 +2719,10 @@ mod tests {
         );
         outs.extend(watches.ring_said(GUARD, true, None, SECOND));
         outs.extend(watches.observe("room/presence", &presence_of(false), MINUTE, None));
+        voice(watches, "resting", 10 * MINUTE - 5 * SECOND, 10 * MINUTE);
         outs.extend(watches.observe(
             SOUNDS,
-            &classes(0.9, 0.0, "clear"),
+            &classes(0.9, 0.0, "unknown", 10 * MINUTE),
             10 * MINUTE,
             Some(18 * 60 + 10),
         ));
@@ -2754,9 +2901,15 @@ mod tests {
         watches.from_app(true, SECOND, true).unwrap();
         outs.extend(watches.ring_said(GUARD, true, None, SECOND));
         outs.extend(watches.observe("room/presence", &presence_of(false), MINUTE, None));
+        voice(
+            &mut watches,
+            "resting",
+            10 * MINUTE - 5 * SECOND,
+            10 * MINUTE,
+        );
         outs.extend(watches.observe(
             SOUNDS,
-            &classes(0.9, 0.0, "clear"),
+            &classes(0.9, 0.0, "unknown", 10 * MINUTE),
             10 * MINUTE,
             Some(18 * 60 + 10),
         ));
