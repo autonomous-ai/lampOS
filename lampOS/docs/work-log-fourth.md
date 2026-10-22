@@ -6364,6 +6364,45 @@ Ready for lamp-voice: #2899 source/native ready, now carried by Reviewer-lead as
   budget/scope decision. The app/lamp-0c89 acceptance belongs to an
   authorised operator; installable-skill scope question6334168716 remains.
 
+## 2026-10-22 15:17 ICT: retry native green; onboarding merged; photo blocker published
+
+Ready for lamp-voice: yes, #2936 tests and #2946 evidence only; photo activation not ready.
+
+- #2936 3bbbb6cbc qualified ARM6439744314100:10,334/0/67,
+  all27 focused checks including the three new cases, four doctests,
+  12 process checks and relay. One unchanged same-voice leaky pass;
+  no rerun. Clippy39744313022 green. Ready6336044383, Queue6336063067.
+  Authored parentae80e1c5d; actual CI merge616ece5713 useda16545d92.
+  Artifact12410858272 SHA-256
+  `83c907ec12b04f7965e739cd49b097bc5505ed3f7d81cb38480f92640b6b7fbf`.
+  Raw `/private/tmp/fourth-memory-retry-boundaries-ci-20261022/qualification.json`.
+  Root rechecked final source hash, original411-line prefix, untouched
+  production/config hashes and focused-count attribution. Review/merge
+  remains with reviewers/First; row acceptance remains separate.
+- Reviewer-lead's unchanged #2899 carry #2941 merged as
+  60c0ba9ceff46203984d9ced506690117fa1a4b3 at15:10:04ICT.
+  Lead's reviewed range-diff= and x86Clippy exception are theirs; Fourth's
+  prior381 native receipt retains its exact head and CIbase attribution.
+  #2824 still requires an authorised52e6 same-steps walk, no Fourth device.
+- #2856 real product harness at8613304e4: baseline/off exact, Live31,
+  Second32. PhotoON drops Live snooze_reminder with core-overflow ERROR;
+  Second keeps17Actions/Dance/photo_yes/no but drops time/search/fetch.
+  Linkrejections are empty because cuts happen earlier. One diagnostic,
+  1/0/0,0.18s execution/52.68s compile; initial wrongcwd failure retained.
+  Temporary test preserved privately then restored byte-exact. No source,
+  unit, runtimepolicy,cap or selection change. Raw
+  `/private/tmp/fourth-photo-product-checks-20261022/`.
+- Published reviewable verification-only checkpoint #2946,
+  dcb7b80d1 on8613304e4, two unread Markdown files. Root audited base,
+  counts/lists/restored source; diffcheck clean. Documentation-only native
+  exception applies; no activation/native qualification claimed.
+- First decision6336046979: reuse existing consent surface with no new
+  functions, or keep off for separately assigned admission-budget work.
+  Even one new consolidated tool displaces an existing Second function.
+  Installable-skill scope6334168716 also remains. No silent feature cuts.
+  Cross-unit0700/path/socket, privacy and native gates follow scoped code;
+  Mobile/authorised0c89 full-update selfie/yes remains acceptance.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
