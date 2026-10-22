@@ -4110,6 +4110,8 @@ fn run_on<P: PortIo, R: Runtime>(
     // glance took the head out of rest. The glance is laid on that, and
     // the head goes back to it; the base is left as it is.
     let mut glance_from: Option<[f32; 3]> = None;
+    // Steps the head has been led up while still below its way.
+    let mut led_below = 0u8;
     // A joint that has arrived and is asked nothing until the wanted pose
     // moves far enough from it; the steps each has been arriving for; and
     // the pose last wanted of each.
@@ -5147,7 +5149,19 @@ fn run_on<P: PortIo, R: Runtime>(
                 && report.last.is_some_and(|last| {
                     f32::from(last[COMMANDED[0].index()].position) > commanded[0] + ARRIVED_COUNTS
                 });
-            let led = if index == 0 && glance_from.is_some() && (extra[0] < 0.0 || below) {
+            // A glance is judged with a gesture's bounds, so nothing else
+            // ends a lead into a hand or a stall: still below after as many
+            // steps as the tracking check lets a head stay off its goal, the
+            // head is no longer led until it is back at its way.
+            let lead = index == 0 && glance_from.is_some() && (extra[0] < 0.0 || below);
+            if index == 0 {
+                led_below = if below {
+                    led_below.saturating_add(u8::from(lead))
+                } else {
+                    0
+                };
+            }
+            let led = if lead && led_below <= limits.tracking_steps {
                 (commanded[index] - GLANCE_LIFT_LEAD).max(low[index].min(commanded[index]))
             } else {
                 commanded[index]
