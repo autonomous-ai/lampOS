@@ -206,7 +206,11 @@ For the fault-recovery case, verify `LAMP_RESTORED_MUTE=on` and
 Cause an unhandled process crash (SIGKILL) after capture has delivered
 frames. An ordinary SIGTERM or service restart takes the clean-stop path
 and does not exercise the fault-restored mute. After the voice restarts,
-require its `mute_restored_after_fault` record before testing that one
-fresh head tap opens the microphones. A restart that is already unmuted
-does not establish this case. Record the crash, restored-mute evidence,
+require either its `mute_restored_after_fault` trace record or this
+journal message from that restart:
+
+> `lamp-voice: muted by the restart guard after a fault, not by choice`
+
+Then test that one fresh head tap opens the microphones. A restart that
+is already unmuted does not establish this case. Record the crash, restored-mute evidence,
 tap and resumed capture times with the build and flags.
