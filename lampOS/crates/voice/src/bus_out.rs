@@ -518,8 +518,11 @@ pub fn someone_in_view_turned_away(bus: &Bus) -> bool {
 /// How many faces the eyes see now (`humans/faces/tracked`), turned to the
 /// lamp or not: in their newest look, nothing when they have said nothing
 /// still fresh, as [`someone_turned_to_lamp`] reads them. Two or more is
-/// people together at the lamp (`LAMP_NAME_OR_FOLLOW_UP`,
-/// `room_told::RoomTold::two_people`).
+/// people together at the lamp: the room is busy at once
+/// (`LAMP_NAME_OR_FOLLOW_UP`, `room_told::RoomTold::two_people`), and a line
+/// cut short is not joined with the next on no other sign
+/// (`LAMP_JOIN_CUT_WORDS`). The second route reads it once a verdict for
+/// both.
 pub fn faces_in_view(bus: &Bus) -> Option<usize> {
     let message = bus.latest(lamp_msgs::Faces::TOPIC).ok()??;
     if message.expired {
@@ -1803,8 +1806,9 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
-    /// `LAMP_NAME_OR_FOLLOW_UP`: the faces in the eyes' newest fresh look,
-    /// turned to the lamp or not, are counted; none fresh, none known.
+    /// `LAMP_NAME_OR_FOLLOW_UP` and `LAMP_JOIN_CUT_WORDS`: the faces in the
+    /// eyes' newest fresh look, turned to the lamp or not, are counted; none
+    /// fresh, none known.
     #[test]
     fn the_faces_in_view_are_counted_only_from_the_eyes_newest_fresh_look() {
         use lamp_msgs::{Face, Faces};

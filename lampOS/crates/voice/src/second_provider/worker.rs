@@ -2868,10 +2868,11 @@ pub fn serve(
             .is_ok_and(|value| value == "on")
         {
             eprintln!(
-                "lamp-voice second: a line that cuts the one before it short, that one unanswered, is asked with its words when the same voice or one face said both (LAMP_JOIN_CUT_WORDS)"
+                "lamp-voice second: a line that cuts the one before it short, that one unanswered, is asked with its words when the same voice or one face said both, or, let out, when nothing shows a second person (LAMP_JOIN_CUT_WORDS)"
             );
             if let Ok(mut heeding) = heeding.lock() {
                 heeding.opening_the_eyes(files.bus_root.as_deref());
+                heeding.keeping_line_rooms();
             }
             let same = heeding.clone();
             engine = engine.joining_cut_words(Arc::new(move |cut, request| {
@@ -3814,6 +3815,30 @@ pub(crate) struct Heeding {
     /// The faces the eyes saw speaking each of the last lines judged, newest
     /// last, at most [`SPOKE_KEPT`] ([`Self::same_speaker`]).
     spoke: std::collections::VecDeque<(u64, crate::speaking_faces::Speakers)>,
+    /// With `LAMP_JOIN_CUT_WORDS` ([`Self::keeping_line_rooms`]): how the
+    /// room was as each of the last lines was judged, newest last, at most
+    /// [`SPOKE_KEPT`]; none without it.
+    rooms: Option<std::collections::VecDeque<(u64, LineRoom)>>,
+    /// With it, the faces in the eyes' newest look as a request's signs were
+    /// read ([`Self::signs`]), for its judgement.
+    in_view: Option<(u64, Option<usize>)>,
+    /// With it, the conversation's last line that showed another person:
+    /// heard in another voice than the conversation's (#829), printed under
+    /// [`crate::same_voice::DIFFERENT_BELOW`] against it, or seen spoken by
+    /// two faces. Gone when a line is judged with no conversation going on.
+    another_person: Option<u64>,
+}
+
+/// How the room was as a line was judged, for a join on no sign of a
+/// second person ([`Heeding::same_speaker`], `LAMP_JOIN_CUT_WORDS`).
+#[derive(Clone, Copy, Debug)]
+struct LineRoom {
+    /// The faces in the eyes' newest fresh look, turned to the lamp or not
+    /// ([`crate::bus_out::faces_in_view`]); none when the eyes said nothing
+    /// fresh (not running, or the camera closed).
+    in_view: Option<usize>,
+    /// Judged in a busy room.
+    busy: bool,
 }
 
 /// Lines whose speaking faces [`Heeding`] keeps: the line cut short is the
@@ -4332,7 +4357,19 @@ impl Heeding {
             turned_speaking: false,
             name_or_follow_up: false,
             spoke: std::collections::VecDeque::new(),
+            rooms: None,
+            in_view: None,
+            another_person: None,
         }
+    }
+
+    /// `LAMP_JOIN_CUT_WORDS`: how the room was as each line was judged is
+    /// kept (the faces in the eyes' newest look, a busy room), and another
+    /// person heard or seen speaking in the conversation, so that a line
+    /// let out may be joined with the one it cut short on no sign of a
+    /// second person ([`Self::same_speaker`]).
+    pub(crate) fn keeping_line_rooms(&mut self) {
+        self.rooms = Some(std::collections::VecDeque::new());
     }
 
     /// A line that begins with the lamp's name, said to a face turned to the
@@ -4436,11 +4473,14 @@ impl Heeding {
     ///   saw; at or over [`crate::same_voice::SAME_FROM`] the same one;
     /// - else the eyes: one face, the same passing id, seen speaking each
     ///   line and no other face speaking either;
+    /// - else no sign of a second person ([`Self::no_second_person`]),
+    ///   which joins only a line let out ([`Joined::NoSecond`]);
     /// - a print still to come (said with the lamp quiet, long enough to
-    ///   know) is waited for, with what the eyes saw, if anything, for when
-    ///   the wait is over.
+    ///   know) is waited for, with what is known without it for when the
+    ///   wait is over.
     ///
-    /// Nothing to tell is two people: the cut words go, as without it.
+    /// Otherwise two people, or nothing to tell: the cut words go, as
+    /// without it.
     pub(crate) fn same_speaker(&mut self, cut: u64, request: u64) -> Joined {
         let spoke = |of: u64| {
             self.spoke
@@ -4483,39 +4523,127 @@ impl Heeding {
             (Some([a]), Some([b])) => a == b,
             _ => false,
         };
-        let face = one_face.then_some(SAME_FACE_JOINS);
         let coming = likeness.is_none()
             && self
                 .voices
                 .as_ref()
                 .is_some_and(|voices| voices.print_coming(cut) || voices.print_coming(request));
-        match (face, coming) {
-            (face, true) => Joined::Coming(face),
-            (Some(why), false) => Joined::Same(why),
-            (None, false) => {
-                // What was missing, for the journal: the voices, then the
-                // eyes.
-                let voice = match (likeness, self.voices.as_mut()) {
-                    (Some(likeness), _) => {
-                        format!("a likeness between the bars (cosine {likeness:.2})")
-                    }
-                    (None, None) => "no voice check".to_owned(),
-                    (None, Some(voices)) => match (voices.printed(cut), voices.printed(request)) {
-                        (false, false) => "neither has a voice print".to_owned(),
-                        (false, true) => format!("request {cut} has no voice print"),
-                        _ => format!(
-                            "request {request} has no voice print (too short, or begun over the lamp's sound)"
-                        ),
-                    },
-                };
-                let eyes = if self.eyes.is_none() {
-                    "no eyes read"
-                } else {
-                    "no one face was seen speaking both"
-                };
-                Joined::Not(format!("{voice}, and {eyes}"))
+        // What was missing, for the journal: the voices (a print still to
+        // come is said once its wait is over), the eyes, then the sign of a
+        // second person.
+        let voice = match (likeness, self.voices.as_mut()) {
+            _ if coming => String::new(),
+            (Some(likeness), _) => {
+                format!("a likeness between the bars (cosine {likeness:.2}), and ")
             }
+            (None, None) => "no voice check, and ".to_owned(),
+            (None, Some(voices)) => match (voices.printed(cut), voices.printed(request)) {
+                (false, false) => "neither has a voice print, and ".to_owned(),
+                (false, true) => format!("request {cut} has no voice print, and "),
+                _ => format!(
+                    "request {request} has no voice print (too short, or begun over the lamp's sound), and "
+                ),
+            },
+        };
+        let eyes = if self.eyes.is_none() {
+            "no eyes read"
+        } else {
+            "no one face was seen speaking both"
+        };
+        // Without a print: one face speaking both, else no sign of a second
+        // person.
+        let without = if one_face {
+            Joined::Same(SAME_FACE_JOINS)
+        } else {
+            match self.no_second_person(cut, request) {
+                Ok(why) => Joined::NoSecond(why),
+                Err(sign) => Joined::Not(format!("{voice}{eyes}; {sign}")),
+            }
+        };
+        if coming {
+            Joined::Coming(Box::new(without))
+        } else {
+            without
         }
+    }
+
+    /// How the room was as `request` was judged, with
+    /// [`Self::keeping_line_rooms`]: the faces in view read for its signs,
+    /// and whether in a busy room. Another person heard or seen speaking it
+    /// (`another`) is kept until a line is judged with no conversation going
+    /// on.
+    fn keep_line_room(&mut self, request: u64, busy: bool, going_on: bool, another: bool) {
+        let Some(rooms) = self.rooms.as_mut() else {
+            return;
+        };
+        if rooms.len() == SPOKE_KEPT {
+            rooms.pop_front();
+        }
+        let in_view = self
+            .in_view
+            .take()
+            .filter(|(of, _)| *of == request)
+            .and_then(|(_, faces)| faces);
+        rooms.push_back((request, LineRoom { in_view, busy }));
+        if !going_on {
+            self.another_person = None;
+        }
+        if another {
+            self.another_person = Some(request);
+        }
+    }
+
+    /// Whether nothing shows a second person at `cut` and `request` by how
+    /// the room was as each was judged ([`Self::keeping_line_rooms`]): no
+    /// other voice heard and no two faces seen speaking in the conversation
+    /// ([`Self::keep_line_room`]), the eyes' newest look at each
+    /// showing one face at most, and with no face in view at either (nobody
+    /// in view, or no eyes: not running, or the camera closed) neither
+    /// judged in a busy room, the one sign left. Two faces seen speaking are
+    /// [`Self::same_speaker`]'s to tell, before this. What was seen, in
+    /// counts, or the sign of a second person. Nothing kept of a line (the
+    /// switch off, a privacy change since) is no join.
+    fn no_second_person(&self, cut: u64, request: u64) -> Result<String, String> {
+        let kept = |of: u64| {
+            self.rooms
+                .as_ref()?
+                .iter()
+                .rev()
+                .find(|(line, _)| *line == of)
+                .map(|(_, room)| *room)
+        };
+        let (before, now) = match (kept(cut), kept(request)) {
+            (Some(before), Some(now)) => (before, now),
+            (None, _) => return Err(format!("nothing kept of the room at request {cut}")),
+            (_, None) => return Err(format!("nothing kept of the room at request {request}")),
+        };
+        if let Some(other) = self.another_person {
+            return Err(format!(
+                "another voice or two faces speaking in the conversation (request {other})"
+            ));
+        }
+        let seen = |room: LineRoom| match room.in_view {
+            Some(1) => "1 face in view".to_owned(),
+            Some(0) => "no face in view".to_owned(),
+            Some(faces) => format!("{faces} faces in view"),
+            None => "no fresh look from the eyes".to_owned(),
+        };
+        let looks = format!(
+            "{} at request {cut}'s end, {} at request {request}'s",
+            seen(before),
+            seen(now)
+        );
+        if [before, now].iter().any(|room| room.in_view > Some(1)) {
+            return Err(looks);
+        }
+        let one_each = before.in_view == Some(1) && now.in_view == Some(1);
+        if !one_each && (before.busy || now.busy) {
+            return Err(format!("{looks}, in a busy room"));
+        }
+        Ok(format!(
+            "no sign of a second person: {looks}{}, no other voice heard and no two faces seen speaking in the conversation",
+            if one_each { "" } else { ", a room not busy" }
+        ))
     }
 
     /// Whether `request` was judged as begun with the lamp's name said to
@@ -4747,8 +4875,13 @@ impl Heeding {
     /// looks go, so no passing id outlives a privacy change.
     pub(crate) fn privacy_changed(&mut self) {
         self.caller_faces.clear();
-        // The lines' speaking faces too, for a join (`Self::same_speaker`).
+        // The lines' speaking faces too, for a join (`Self::same_speaker`),
+        // and how the room was.
         self.spoke.clear();
+        if let Some(rooms) = self.rooms.as_mut() {
+            rooms.clear();
+        }
+        self.in_view = None;
         if let Some((eyes, _)) = &self.eyes {
             eyes.forget();
         }
@@ -5159,11 +5292,18 @@ impl Heeding {
             signs.room = crate::bus_out::room_now(bus);
         }
         signs.turned = crate::bus_out::someone_turned_to_lamp(bus);
-        // `LAMP_NAME_OR_FOLLOW_UP`: two faces in view are two people at the
-        // lamp, and the room is busy at once.
-        if self.name_or_follow_up
-            && crate::bus_out::faces_in_view(bus).is_some_and(|faces| faces >= 2)
-        {
+        // The faces in the newest look, read once for both switches that
+        // count them: the line's room, for a join on no sign of a second
+        // person (`LAMP_JOIN_CUT_WORDS`, [`Self::keeping_line_rooms`]); and
+        // two in view are two people at the lamp, so the room is busy at
+        // once (`LAMP_NAME_OR_FOLLOW_UP`).
+        let in_view = (self.name_or_follow_up || self.rooms.is_some())
+            .then(|| crate::bus_out::faces_in_view(bus))
+            .flatten();
+        if self.rooms.is_some() {
+            self.in_view = Some((request, in_view));
+        }
+        if self.name_or_follow_up && in_view.is_some_and(|faces| faces >= 2) {
             if self.keeps_room
                 && let Ok(mut room) = crate::room_told::room().lock()
                 && room.two_people(monotonic_us())
@@ -5335,6 +5475,12 @@ impl Heeding {
             self.spoke.pop_front();
         }
         self.spoke.push_back((request, speakers.clone()));
+        // `LAMP_JOIN_CUT_WORDS`: how the room was, for a join on no sign of
+        // a second person.
+        let another = other_voice
+            || likeness.is_some_and(|likeness| likeness < crate::same_voice::DIFFERENT_BELOW)
+            || speakers.len() > 1;
+        self.keep_line_room(request, busy, signs.going_on, another);
         let attention = &mut self.attention;
         let seen = Seen {
             room,
@@ -12759,7 +12905,10 @@ mod tests {
         line(&mut heeding, 2, 2);
         assert_eq!(
             heeding.same_speaker(1, 2),
-            Joined::Not("a likeness between the bars (cosine 0.50), and no eyes read".to_owned())
+            Joined::Not(
+                "a likeness between the bars (cosine 0.50), and no eyes read; nothing kept of the room at request 1"
+                    .to_owned()
+            )
         );
         faces(&mut heeding, 1, &["a"]);
         faces(&mut heeding, 2, &["a"]);
@@ -12768,12 +12917,17 @@ mod tests {
         let mut heeding = voiced(true);
         line(&mut heeding, 1, 1);
         line(&mut heeding, 2, 1);
-        assert_eq!(heeding.same_speaker(1, 2), Joined::Coming(None));
+        assert_eq!(
+            heeding.same_speaker(1, 2),
+            Joined::Coming(Box::new(Joined::Not(
+                "no eyes read; nothing kept of the room at request 1".to_owned()
+            )))
+        );
         faces(&mut heeding, 1, &["a"]);
         faces(&mut heeding, 2, &["a"]);
         assert_eq!(
             heeding.same_speaker(1, 2),
-            Joined::Coming(Some(SAME_FACE_JOINS))
+            Joined::Coming(Box::new(Joined::Same(SAME_FACE_JOINS)))
         );
         // No voice check: the eyes alone. One face, the same, each time.
         let unvoiced = |first: &[&str], second: &[&str]| {
@@ -12784,7 +12938,9 @@ mod tests {
         };
         assert_eq!(unvoiced(&["a"], &["a"]), Joined::Same(SAME_FACE_JOINS));
         // Each refusal says what was missing, for the journal.
-        let nothing = Joined::Not("no voice check, and no eyes read".to_owned());
+        let nothing = Joined::Not(
+            "no voice check, and no eyes read; nothing kept of the room at request 1".to_owned(),
+        );
         assert_eq!(unvoiced(&["a"], &["b"]), two, "two faces");
         assert_eq!(unvoiced(&["a"], &["a", "b"]), two, "another face spoke too");
         assert_eq!(unvoiced(&[], &["a"]), nothing, "nobody seen speaking");
@@ -12798,9 +12954,236 @@ mod tests {
         assert_eq!(
             heeding.same_speaker(1, 2),
             Joined::Not(
-                "request 2 has no voice print (too short, or begun over the lamp's sound), and no eyes read"
+                "request 2 has no voice print (too short, or begun over the lamp's sound), and no eyes read; nothing kept of the room at request 1"
                     .to_owned()
             )
+        );
+    }
+
+    /// The rule as `LAMP_JOIN_CUT_WORDS` runs it, with the eyes read but no
+    /// face seen speaking and no voice check, as on lamp-4ace on 22 Oct:
+    /// requests 1 and 2 judged in `room`, each with the eyes' newest look
+    /// holding `in_view` faces just before (none: no fresh look, as with the
+    /// camera closed), on a bus of its own named `name`.
+    fn judged_in_rooms(
+        name: &str,
+        in_view: [Option<usize>; 2],
+        room: crate::room_told::Room,
+    ) -> Heeding {
+        use lamp_msgs::{Face, Faces};
+        // A short root: a Unix socket's address holds 103 bytes.
+        let root = std::path::PathBuf::from(format!("/tmp/lj{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut eyes = bus
+            .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+            .unwrap();
+        // A look lives 300 ms here: one with none waits it out.
+        eyes.expires_after(Some(Duration::from_millis(300)));
+        let face = |n: usize| Face {
+            speaking: None,
+            id: format!("f{n}"),
+            xmin: 0.4,
+            ymin: 0.3,
+            xmax: 0.6,
+            ymax: 0.6,
+            confidence: 1.0,
+            yaw: Some(0.1),
+            facing: Some(true),
+        };
+        let mut heeding = Heeding::new(true, true, Some(&root), None);
+        heeding.seeing_speaking_faces(
+            Arc::new(crate::speaking_faces::SpeakingFaces::default()),
+            None,
+        );
+        heeding.keeping_line_rooms();
+        for (request, faces) in [1, 2].into_iter().zip(in_view) {
+            match faces {
+                Some(faces) => {
+                    eyes.publish_json(
+                        monotonic_us(),
+                        &Faces {
+                            faces: (0..faces).map(face).collect(),
+                        },
+                    )
+                    .unwrap();
+                }
+                None => std::thread::sleep(Duration::from_millis(400)),
+            }
+            let line = (monotonic_us().saturating_sub(2_000_000), monotonic_us());
+            let signs = heeding.signs(request, line);
+            heeding.judge(
+                request,
+                line,
+                "What's the weather like",
+                Signs {
+                    room,
+                    going_on: true,
+                    ..signs
+                },
+            );
+        }
+        let _ = std::fs::remove_dir_all(&root);
+        heeding
+    }
+
+    /// `LAMP_JOIN_CUT_WORDS` with no voice print and no face seen speaking,
+    /// as on lamp-4ace on 22 Oct at 19:04-19:08, where 5 of 28 lines were a
+    /// request's second half answered alone: nothing showing a second
+    /// person joins a line let out. One face in the eyes' newest look at
+    /// each line, in a quiet room or a busy one; no face in view or no eyes
+    /// at all (the camera closed), only in a room not busy. Two faces in
+    /// view, two faces seen speaking, another voice heard in the
+    /// conversation, or a privacy change since: no join. The journal's why
+    /// is counts only.
+    #[test]
+    fn with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short() {
+        use crate::room_told::Room::{Busy, Quiet};
+        let same =
+            |name: &str, in_view, room| judged_in_rooms(name, in_view, room).same_speaker(1, 2);
+        let one_each = Joined::NoSecond(
+            "no sign of a second person: 1 face in view at request 1's end, 1 face in view at request 2's, no other voice heard and no two faces seen speaking in the conversation"
+                .to_owned(),
+        );
+        assert_eq!(same("a", [Some(1), Some(1)], Quiet), one_each);
+        assert_eq!(
+            same("b", [Some(1), Some(1)], Busy),
+            one_each,
+            "one face: a busy room too"
+        );
+        // A second face in view at either line: two people may be there.
+        let missing = "no voice check, and no one face was seen speaking both";
+        assert_eq!(
+            same("c", [Some(1), Some(2)], Quiet),
+            Joined::Not(format!(
+                "{missing}; 1 face in view at request 1's end, 2 faces in view at request 2's"
+            ))
+        );
+        assert!(matches!(
+            same("d", [Some(2), Some(1)], Quiet),
+            Joined::Not(_)
+        ));
+        // No eyes (the camera closed, or nobody in view): the room is the one
+        // sign left, so only where it is not busy.
+        let unseen = |looks: &str| {
+            Joined::NoSecond(format!(
+                "no sign of a second person: {looks}, a room not busy, no other voice heard and no two faces seen speaking in the conversation"
+            ))
+        };
+        assert_eq!(
+            same("e", [None, None], Quiet),
+            unseen(
+                "no fresh look from the eyes at request 1's end, no fresh look from the eyes at request 2's"
+            )
+        );
+        assert_eq!(
+            same("f", [None, None], Busy),
+            Joined::Not(format!(
+                "{missing}; no fresh look from the eyes at request 1's end, no fresh look from the eyes at request 2's, in a busy room"
+            ))
+        );
+        assert_eq!(
+            same("g", [Some(0), Some(0)], Quiet),
+            unseen("no face in view at request 1's end, no face in view at request 2's")
+        );
+        assert!(matches!(
+            same("h", [Some(0), Some(0)], Busy),
+            Joined::Not(_)
+        ));
+        assert!(matches!(same("i", [Some(1), None], Busy), Joined::Not(_)));
+        assert!(matches!(
+            same("j", [Some(1), None], Quiet),
+            Joined::NoSecond(_)
+        ));
+        // Two faces seen speaking: two people first, whatever was in view.
+        let mut heeding = judged_in_rooms("k", [Some(1), Some(1)], Quiet);
+        heeding.spoke.push_back((1, vec!["a".to_owned()]));
+        heeding.spoke.push_back((2, vec!["b".to_owned()]));
+        assert_eq!(
+            heeding.same_speaker(1, 2),
+            Joined::Not("two faces were seen speaking them".to_owned())
+        );
+        // Another voice heard in the conversation, until a line is judged
+        // with none going on.
+        let mut heeding = judged_in_rooms("l", [Some(1), Some(1)], Quiet);
+        heeding.keep_line_room(3, false, true, true);
+        assert_eq!(
+            heeding.same_speaker(1, 2),
+            Joined::Not(format!(
+                "{missing}; another voice or two faces speaking in the conversation (request 3)"
+            ))
+        );
+        heeding.keep_line_room(4, false, false, false);
+        assert_eq!(heeding.same_speaker(1, 2), one_each);
+        // A camera closed or a mute since: nothing kept to join on.
+        let mut heeding = judged_in_rooms("m", [Some(1), Some(1)], Quiet);
+        heeding.privacy_changed();
+        assert_eq!(
+            heeding.same_speaker(1, 2),
+            Joined::Not(format!("{missing}; nothing kept of the room at request 1"))
+        );
+    }
+
+    /// The same rule's verdicts as the engine asks them: the owner's request
+    /// with a pause, one face in view, is asked whole; two faces in view, or
+    /// no eyes in a busy room, keep the second line alone; a held second
+    /// line, too long a pause, or the switch off, as before.
+    #[tokio::test]
+    async fn a_request_with_a_pause_and_one_face_in_view_is_asked_whole() {
+        use crate::room_told::Room::{Busy, Quiet};
+        use crate::second_provider::net::Message;
+        use crate::second_provider::tests::asked_after_a_cut;
+        let lines = ("What's the weather like", "in Saigon this weekend?");
+        let joined = Message::user("What's the weather like in Saigon this weekend?");
+        let alone = Message::user("in Saigon this weekend?");
+        let rule = |name: &str, in_view, room| -> Option<crate::second_provider::SameSpeaker> {
+            let heeding = Arc::new(Mutex::new(judged_in_rooms(name, in_view, room)));
+            Some(Arc::new(move |cut, request| {
+                heeding.lock().unwrap().same_speaker(cut, request)
+            }))
+        };
+        let soon = Duration::from_millis(1_500);
+        assert_eq!(
+            asked_after_a_cut(lines, soon, rule("n", [Some(1), Some(1)], Busy), false).await,
+            joined,
+            "one face"
+        );
+        assert_eq!(
+            asked_after_a_cut(lines, soon, rule("o", [Some(1), Some(2)], Quiet), false).await,
+            alone,
+            "two faces"
+        );
+        assert_eq!(
+            asked_after_a_cut(lines, soon, rule("p", [None, None], Quiet), false).await,
+            joined,
+            "no eyes, a quiet room"
+        );
+        assert_eq!(
+            asked_after_a_cut(lines, soon, rule("q", [None, None], Busy), false).await,
+            alone,
+            "no eyes, a busy room"
+        );
+        assert_eq!(
+            asked_after_a_cut(lines, soon, rule("r", [Some(1), Some(1)], Quiet), true).await,
+            Message::user("What's the weather like"),
+            "held: the cut words alone, in its place"
+        );
+        assert_eq!(
+            asked_after_a_cut(
+                lines,
+                crate::second_provider::JOIN_WITHIN + Duration::from_millis(100),
+                rule("s", [Some(1), Some(1)], Quiet),
+                false
+            )
+            .await,
+            alone,
+            "too long a pause"
+        );
+        assert_eq!(
+            asked_after_a_cut(lines, soon, None, false).await,
+            alone,
+            "the switch off"
         );
     }
 

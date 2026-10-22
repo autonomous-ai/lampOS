@@ -491,9 +491,17 @@ pub enum Joined {
     /// The same person, and why: the two lines' voices, or one face seen
     /// speaking both.
     Same(&'static str),
-    /// A print still to come, and what is known without it: the face's why
-    /// if one face spoke both, once [`JOIN_WAIT`] is over.
-    Coming(Option<&'static str>),
+    /// No sign of a second person, and what was seen, in counts: at most
+    /// one face in view, no other voice heard in the conversation, no two
+    /// faces seen speaking. A line let out is asked with the cut words; a
+    /// held one is not, since only the voices or one face tell whose its
+    /// words are (owner's test on lamp-4ace on 22 Oct, 19:04-19:08: 5 of 28
+    /// lines were a request's second half answered alone, with neither a
+    /// voice print nor a speaking face to join them).
+    NoSecond(String),
+    /// A print still to come, and what is known without it, for once
+    /// [`JOIN_WAIT`] is over.
+    Coming(Box<Joined>),
     /// Two people, or nothing to tell, and which: the cut line's words go,
     /// as today, and the journal says why.
     Not(String),
@@ -1752,7 +1760,9 @@ impl Engine {
     /// when `same` says one person said both (`LAMP_JOIN_CUT_WORDS`): begun
     /// within [`JOIN_WITHIN`] of that one's end, in the same session.
     /// Let out, it is answered so; held, so are the words it cut short,
-    /// which alone would be answered in its place. Otherwise as without it:
+    /// which alone would be answered in its place. A line let out is also
+    /// joined when `same` sees no sign of a second person
+    /// ([`Joined::NoSecond`]); a held one is not. Otherwise as without it:
     /// in a two-person scene the second person's line let out is answered
     /// alone, and that one's words are let go. Before any turn only.
     pub fn joining_cut_words(mut self, same: SameSpeaker) -> Self {
@@ -3502,8 +3512,14 @@ async fn spoken(
                         ..carried.clone()
                     },
                 );
-                let joined =
-                    joined_with_cut(&shared, request, &marks, carried.clone(), text.clone()).await;
+                let joined = joined_with_cut(
+                    &shared,
+                    (request, false),
+                    &marks,
+                    carried.clone(),
+                    text.clone(),
+                )
+                .await;
                 if joining && !still_holding(&shared, request) {
                     return;
                 }
@@ -3598,7 +3614,7 @@ async fn spoken(
                     said_by: request,
                 },
             );
-            let joined = joined_with_cut(&shared, request, &marks, carried, text).await;
+            let joined = joined_with_cut(&shared, (request, true), &marks, carried, text).await;
             if joining && !still_holding(&shared, request) {
                 return;
             }
@@ -3817,15 +3833,17 @@ fn still_holding(shared: &Shared, request: u64) -> bool {
     })
 }
 
-/// `text`, the words of `request`, which is answered, and `carried`, the
-/// words of the line it cut short, none of whose answer was heard: the two
-/// asked as one line when one person said both ([`Engine::joining_cut_words`]),
-/// begun within [`JOIN_WITHIN`] of its end, and nothing carried then. A print
-/// still to come is waited for up to [`JOIN_WAIT`]. Otherwise both as they
-/// came, and the journal says why.
+/// `text`, the words of `request`, let out or held (`let_out`), and
+/// `carried`, the words of the line it cut short, none of whose answer was
+/// heard: the two asked as one line when one person said both
+/// ([`Engine::joining_cut_words`]), or, for a line let out, when nothing
+/// shows a second person ([`Joined::NoSecond`]); begun within
+/// [`JOIN_WITHIN`] of its end, and nothing carried then. A print still to
+/// come is waited for up to [`JOIN_WAIT`]. Otherwise both as they came, and
+/// the journal says why.
 async fn joined_with_cut(
     shared: &Shared,
-    request: u64,
+    (request, let_out): (u64, bool),
     marks: &Marks,
     carried: Carried,
     text: String,
@@ -3861,19 +3879,29 @@ async fn joined_with_cut(
         return (text, Some(carried));
     }
     let bound = tokio::time::Instant::now() + JOIN_WAIT;
-    let why = loop {
+    let said = loop {
         match same(carried.request, request) {
-            Joined::Same(why) => break Ok(why),
-            Joined::Not(why) => break Err(why),
-            Joined::Coming(Some(why)) if tokio::time::Instant::now() >= bound => break Ok(why),
-            Joined::Coming(None) if tokio::time::Instant::now() >= bound => {
-                break Err(format!(
-                    "a voice print did not come in {} ms, and no one face was seen speaking both",
-                    JOIN_WAIT.as_millis()
-                ));
+            Joined::Coming(without) if tokio::time::Instant::now() >= bound => {
+                break match *without {
+                    Joined::Not(why) => Joined::Not(format!(
+                        "a voice print did not come in {} ms; {why}",
+                        JOIN_WAIT.as_millis()
+                    )),
+                    without => without,
+                };
             }
             Joined::Coming(_) => tokio::time::sleep(JOIN_POLL).await,
+            said => break said,
         }
+    };
+    let why = match said {
+        Joined::Same(why) => Ok(why.to_owned()),
+        Joined::NoSecond(why) if let_out => Ok(why),
+        Joined::NoSecond(why) => Err(format!(
+            "{why}, but this line was held: a held line's words are joined only by the voices or one face"
+        )),
+        Joined::Not(why) => Err(why),
+        Joined::Coming(_) => Err("a voice print still to come past the wait".to_owned()),
     };
     let why = match why {
         Ok(why) => why,

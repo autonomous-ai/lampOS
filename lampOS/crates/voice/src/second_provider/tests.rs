@@ -6830,7 +6830,8 @@ async fn words_cut_short_by_a_line_let_out_are_let_go() {
 /// while `first`'s answer was still searching, begun `gap` after `first`
 /// ended, with `same` telling whether one person said both
 /// (`LAMP_JOIN_CUT_WORDS`), and `second` let out or `held` by the rule.
-async fn asked_after_a_cut(
+/// The worker's tests ask it with the rule's own judgement.
+pub(super) async fn asked_after_a_cut(
     (first, second): (&'static str, &'static str),
     gap: Duration,
     same: Option<SameSpeaker>,
@@ -6969,6 +6970,59 @@ async fn a_line_cut_short_by_the_same_person_is_asked_with_the_line_that_cut_it(
     assert_eq!(
         asked_after_a_cut(lines, soon, None, false).await,
         alone,
+        "the switch off"
+    );
+}
+
+/// `LAMP_JOIN_CUT_WORDS` on lamp-4ace on 22 Oct (19:04-19:08), where
+/// neither a voice print nor a speaking face could tell: with no sign of a
+/// second person, a line let out that cut the one before it short is asked
+/// with that one's words; held, the cut words are answered alone in its
+/// place, as before; begun too long after, or the switch off, it is
+/// answered alone.
+#[tokio::test]
+async fn a_line_let_out_with_no_sign_of_a_second_person_is_asked_with_the_words_it_cut_short() {
+    let lines = ("What's the weather like", "in Saigon this weekend?");
+    let none_seen: SameSpeaker =
+        Arc::new(|_, _| Joined::NoSecond("no sign of a second person".to_owned()));
+    // On lamp-4ace the lines that cut one short began 1.45 to 2.6 s after
+    // its end, as near as the journal tells.
+    let soon = Duration::from_millis(1_500);
+    assert_eq!(
+        asked_after_a_cut(lines, soon, Some(none_seen.clone()), false).await,
+        Message::user("What's the weather like in Saigon this weekend?"),
+        "let out: one line"
+    );
+    assert_eq!(
+        asked_after_a_cut(lines, soon, Some(none_seen.clone()), true).await,
+        Message::user("What's the weather like"),
+        "held: the cut words alone, in its place, as before"
+    );
+    assert_eq!(
+        asked_after_a_cut(
+            lines,
+            JOIN_WITHIN + Duration::from_millis(100),
+            Some(none_seen),
+            false
+        )
+        .await,
+        Message::user("in Saigon this weekend?"),
+        "begun too long after the first ended"
+    );
+    // A print still to come, past its wait: what is known without it.
+    let late: SameSpeaker = Arc::new(|_, _| {
+        Joined::Coming(Box::new(Joined::NoSecond(
+            "no sign of a second person".to_owned(),
+        )))
+    });
+    assert_eq!(
+        asked_after_a_cut(lines, soon, Some(late), false).await,
+        Message::user("What's the weather like in Saigon this weekend?"),
+        "a print that never came"
+    );
+    assert_eq!(
+        asked_after_a_cut(lines, soon, None, false).await,
+        Message::user("in Saigon this weekend?"),
         "the switch off"
     );
 }
@@ -7112,7 +7166,7 @@ async fn a_print_still_to_come_is_waited_for_before_the_lines_are_joined() {
     let counted = asks.clone();
     let late: SameSpeaker = Arc::new(move |_, _| {
         if counted.fetch_add(1, Ordering::Relaxed) < 2 {
-            Joined::Coming(None)
+            Joined::Coming(Box::new(Joined::Not("no eyes read".to_owned())))
         } else {
             Joined::Same("the same voice said both")
         }
@@ -7124,14 +7178,15 @@ async fn a_print_still_to_come_is_waited_for_before_the_lines_are_joined() {
     assert_eq!(asks.load(Ordering::Relaxed), 3);
     // Never comes: the face, when one face spoke both; else let go.
     let faced: SameSpeaker =
-        Arc::new(|_, _| Joined::Coming(Some("one face was seen speaking both")));
+        Arc::new(|_, _| Joined::Coming(Box::new(Joined::Same("one face was seen speaking both"))));
     let begun = Instant::now();
     assert_eq!(
         asked_after_a_cut(lines, soon, Some(faced), false).await,
         joined
     );
     assert!(begun.elapsed() >= JOIN_WAIT, "it waited for the print");
-    let unseen: SameSpeaker = Arc::new(|_, _| Joined::Coming(None));
+    let unseen: SameSpeaker =
+        Arc::new(|_, _| Joined::Coming(Box::new(Joined::Not("no eyes read".to_owned()))));
     assert_eq!(
         asked_after_a_cut(lines, soon, Some(unseen), false).await,
         alone
@@ -7192,7 +7247,7 @@ async fn a_line_begun_while_a_join_waits_for_a_print_still_carries_the_words() {
             if request == 2 {
                 let _ = waiting.send(());
             }
-            Joined::Coming(None)
+            Joined::Coming(Box::new(Joined::Not("no eyes read".to_owned())))
         });
         let mut engine = Engine::with_clock(
             script.clone(),
