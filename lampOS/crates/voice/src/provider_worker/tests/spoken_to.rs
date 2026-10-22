@@ -774,13 +774,15 @@ async fn with_the_switch_two_lines_the_lamp_left_alone_end_its_conversation() {
 /// Lamp, how much is one hundred dollars in euros?" was answered in a busy
 /// room, a follow-up begun 5 s after the lamp's words ended is answered as
 /// the conversation going on, and so is one begun then that goes on 7 s, its
-/// answer 12 s after the words (reviewer-two's P2 on #2967: the window runs
+/// answer 12 s after the words (a reviewer's P2 on #2967: the window runs
 /// to the line's start, not its verdict); one begun 12 s after, without the
 /// name, is held, inside the thread's 45 s; with the name it is answered.
-/// Without the switch the 12 s one is answered too. In a room not known to
-/// be busy the windows are as without the switch: one begun 15 s after the
-/// words is answered (the owner at 18:0x). On the logical clock, so that
-/// the long line's 7 s pass in a moment.
+/// Without the switch the 12 s one is answered too. A follow-up begun while
+/// the answer still plays is answered, however long it goes on (a run on
+/// lamp-52e6 on 22 Oct lost three begun as the answers played). In a room
+/// not known to be busy the windows are as without the switch: one begun
+/// 15 s after the words is answered (the owner at 18:0x). On the logical
+/// clock, so that the long lines pass in a moment.
 #[tokio::test(start_paused = true)]
 async fn with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds() {
     let _clock = logical_clock();
@@ -798,6 +800,8 @@ async fn with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds() {
         (true, true, 12, 0, follow_up, false),
         (true, true, 5, 0, follow_up, true),
         (true, true, 5, 7, follow_up, true),
+        (true, true, -2, 0, follow_up, true),
+        (true, true, -2, 16, follow_up, true),
         (true, false, 15, 0, follow_up, true),
         (true, false, 12, 0, follow_up, true),
     ] {
@@ -809,11 +813,38 @@ async fn with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds() {
     }
 }
 
+/// `LAMP_NAME_OR_FOLLOW_UP`'s known limit on Live, as built: the end of the
+/// lamp's words is when the words it handed on would have played, as the
+/// second route counts its own, and a barge-in that cuts them is not
+/// counted back. An answer of 8 s handed on at once and cut 2 s in by a
+/// barge-in: a line begun 13 s after it was handed on is 5 s after that
+/// projected end, a follow-up, where 11 s after the cut it would not be.
+/// The worker's loop can't be driven to it: the rig's Start never says how
+/// much of a cut reply was heard (`heard_of_cut`), so this is the
+/// helpers' own arithmetic. The thread's 45 s still bound it.
+#[test]
+fn a_barge_in_leaves_lives_follow_up_window_counting_from_the_words_projected_end() {
+    use std::sync::atomic::Ordering::Relaxed;
+    let before = said_until_us().swap(0, Relaxed);
+    let handed_on = 1_000_000_000;
+    said_through(8 * lamp_gemini::OUTPUT_RATE as usize, handed_on);
+    let until = said_until_us().load(Relaxed);
+    assert_eq!(until, handed_on + 8_000_000);
+    let cut = handed_on + 2_000_000;
+    let line = handed_on + 13_000_000;
+    assert!(follows_up_at(until, line), "counted from the projected end");
+    assert!(
+        !follows_up_at(cut, line),
+        "counted from the cut, it would not be"
+    );
+    said_until_us().store(before, Relaxed);
+}
+
 /// Whether `line`, begun `ago_s` s after the lamp's words to the euros
-/// question ended and going on `long_s` s before its end, was answered, in
-/// a room made busy first or not, with `LAMP_NAME_OR_FOLLOW_UP` `on` or
-/// not.
-async fn after_the_lamps_words(on: bool, busy: bool, ago_s: u64, long_s: u64, line: &str) -> bool {
+/// question ended (less than none: while they still play) and going on
+/// `long_s` s before its end, was answered, in a room made busy first or
+/// not, with `LAMP_NAME_OR_FOLLOW_UP` `on` or not.
+async fn after_the_lamps_words(on: bool, busy: bool, ago_s: i64, long_s: u64, line: &str) -> bool {
     use std::sync::atomic::Ordering::Relaxed;
     let _mark = OwnMark::kept();
     let _room = OwnRoom::fresh();
@@ -832,8 +863,11 @@ async fn after_the_lamps_words(on: bool, busy: bool, ago_s: u64, long_s: u64, li
         crate::tools::Settings::default(),
     ))
     .await;
-    // The words the worker counted ended `ago_s` s ago.
-    said_until_us().store(monotonic_us().saturating_sub(ago_s * 1_000_000), Relaxed);
+    // The words the worker counted ended `ago_s` s ago, or end later.
+    said_until_us().store(
+        monotonic_us().saturating_add_signed(-ago_s * 1_000_000),
+        Relaxed,
+    );
     let request = rig.speak(&mut dial, false, false).await;
     // The person goes on speaking, then ends.
     rig.pump(Duration::from_secs(long_s)).await;

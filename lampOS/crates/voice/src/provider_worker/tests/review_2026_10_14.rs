@@ -1106,3 +1106,85 @@ async fn an_accepted_decline_allows_reports_withdrawal_without_reviving_speech()
     }
     eprintln!("{COMPLETED}");
 }
+
+/// `LAMP_NAME_OR_FOLLOW_UP` through the worker's own loop, with the eyes on
+/// this module's bus and the room as the worker keeps it (`attention_now`),
+/// `LAMP_SPOKEN_TO` on: two faces in the eyes' newest look turn a room not
+/// known to be busy busy at once, and the line in hand, one of the faces
+/// turned to the lamp, is held, since there a face lets nothing out alone.
+/// One face turned to the lamp lets the same line out, and so do two
+/// without the switch.
+#[tokio::test(start_paused = true)]
+async fn with_name_or_follow_up_two_faces_make_the_room_busy_and_a_face_alone_is_held() {
+    use lamp_msgs::{Face, Faces};
+    use std::sync::atomic::Ordering::Relaxed;
+    let _clock = logical_clock();
+    let _turn = one_at_a_time().await;
+    // Held through every case, and let go only once the bus and its looks
+    // are gone (`root`, dropped first): no other test's worker reads a face
+    // this test put on the bus all of them share.
+    let _one = super::one_thread();
+    let root = Root::new();
+    let face = |id: &str, facing: bool| Face {
+        id: id.into(),
+        xmin: 0.4,
+        ymin: 0.0,
+        xmax: 0.7,
+        ymax: 0.3,
+        confidence: 0.9,
+        yaw: None,
+        facing: Some(facing),
+        speaking: None,
+    };
+    let mut eyes = lamp_bus::Bus::new(&root.0)
+        .unwrap()
+        .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+        .unwrap();
+    for (on, faces, played, room) in [
+        (
+            true,
+            vec![face("a", true), face("b", false)],
+            false,
+            crate::room_told::Room::Busy,
+        ),
+        (
+            true,
+            vec![face("a", true)],
+            true,
+            crate::room_told::Room::Unknown,
+        ),
+        (
+            false,
+            vec![face("a", true), face("b", false)],
+            true,
+            crate::room_told::Room::Unknown,
+        ),
+    ] {
+        let _room = super::spoken_to::OwnRoom::fresh();
+        let before = name_or_follow_up().swap(on, Relaxed);
+        let options = Options {
+            attention: Some(attention_now),
+            spoken_to: true,
+            ..in_a_busy_room()
+        };
+        let mut rig = LiveRig::start_with(quick_policy(), options);
+        let mut dial = rig.ready().await;
+        eyes.publish_json(monotonic_us(), &Faces { faces }).unwrap();
+        let request = rig.speak(&mut dial, false, true).await;
+        dial.service.send(heard("Okay yeah, sure.")).await;
+        dial.service.send(provider_audio(9, 480)).await;
+        dial.service.send(idle_complete()).await;
+        let mut answered = false;
+        loop {
+            match rig.output().await {
+                ProviderOutput::Audio { request: of, .. } if of == request => answered = true,
+                ProviderOutput::TurnComplete { request: of, .. } if of == request => break,
+                _ => {}
+            }
+        }
+        let now = crate::room_told::room().lock().unwrap().at(monotonic_us());
+        rig.stop().await;
+        name_or_follow_up().store(before, Relaxed);
+        assert_eq!((answered, now), (played, room), "the switch {on}");
+    }
+}

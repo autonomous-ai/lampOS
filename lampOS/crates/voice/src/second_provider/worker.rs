@@ -5073,8 +5073,9 @@ impl Heeding {
         let said_ago = to_the_end(said_ago, ended_ago(said_until_us, monotonic_us()));
         let going_on = going_on_from(said_going_on, said_ago, called_ago);
         // `LAMP_NAME_OR_FOLLOW_UP`: whether the line is a follow-up begun
-        // soon after the lamp's words, or its call, however long it went on;
-        // in a busy room only such a line goes on (`ended`, below).
+        // while the lamp's words played or soon after them, or its call,
+        // however long it went on; in a busy room such a line, and only
+        // such a line, goes on (`ended`, below).
         let began_ago = Duration::from_micros(monotonic_us().saturating_sub(onset_us));
         let followed_up = !self.name_or_follow_up || follows_up(said_ago, called_ago, began_ago);
         // What a busy room goes on by: the thread's window or the call,
@@ -5102,27 +5103,45 @@ impl Heeding {
         // The route's own room as the only voice, as the Live worker reads
         // its own (`attention_now`): with people talking past the lamp since
         // it last spoke, no conversation is going on.
+        let mut talked_past = false;
         if self.keeps_room
             && let Ok(mut room) = crate::room_told::room().lock()
         {
             signs.room = room.at(monotonic_us());
             left_alone = Some(room.left_alone_since_spoke());
-            signs.going_on &= !room.talked_past_the_lamp();
+            talked_past = room.talked_past_the_lamp();
+            signs.going_on &= !talked_past;
         }
+        let switch = self.name_or_follow_up;
         let ended = |mut signs: Signs| {
-            if signs.room == crate::room_told::Room::Busy && signs.going_on && !followed_up {
-                let after = |ago: Option<Duration>| {
-                    ago.map_or("never".to_owned(), |ago| {
-                        format!("{} s", ago.saturating_sub(began_ago).as_secs())
-                    })
-                };
-                eprintln!(
-                    "lamp-voice second: request {request}: no conversation going on: in a busy room, the line began {} after the lamp's words ended and {} after its call, past the {} s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)",
-                    after(said_ago),
-                    after(called_ago),
-                    crate::name_or_follow_up::FOLLOW_UP_FOR.as_secs()
-                );
-                signs.going_on = false;
+            // `LAMP_NAME_OR_FOLLOW_UP`, in a busy room: a line is in the
+            // conversation going on when it began while the lamp's words
+            // played, or within `FOLLOW_UP_FOR` of their end or of its call,
+            // however long it then went on, and nobody has talked past the
+            // lamp since it spoke. The windows read as it is judged (the
+            // thread's, a busy room's 15 s) don't decide: on lamp-52e6 on 22
+            // Oct, follow-ups begun about 7 s after their asks, as the
+            // answers played, went unanswered.
+            if switch && signs.room == crate::room_told::Room::Busy {
+                signs.going_on = followed_up && !talked_past;
+                if !followed_up {
+                    let after = |ago: Option<Duration>| {
+                        ago.map_or("never".to_owned(), |ago| {
+                            format!("{} s", ago.saturating_sub(began_ago).as_secs())
+                        })
+                    };
+                    eprintln!(
+                        "lamp-voice second: request {request}: no conversation going on: in a busy room, the line began {} after the lamp's words ended and {} after its call, past the {} s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)",
+                        after(said_ago),
+                        after(called_ago),
+                        crate::name_or_follow_up::FOLLOW_UP_FOR.as_secs()
+                    );
+                } else if talked_past {
+                    eprintln!(
+                        "lamp-voice second: request {request}: no conversation going on: in a busy room, people have talked past the lamp since it last spoke (LAMP_NAME_OR_FOLLOW_UP)"
+                    );
+                }
+                return signs;
             }
             went_on_told(
                 request,
@@ -7082,6 +7101,149 @@ mod tests {
         assert_eq!(after(false), (Room::Quiet, None));
     }
 
+    /// `LAMP_NAME_OR_FOLLOW_UP` on this route, in a busy room: a follow-up
+    /// begun while the lamp's answer is still playing is in the conversation
+    /// going on, however long it then goes on, whether the thread has that
+    /// answer's words yet or only an earlier one's (a run on lamp-52e6 on
+    /// 22 Oct: "Another one?" begun about 7 s after its ask, while the
+    /// answer played, went unanswered). One begun 12 s after the words
+    /// ended, without the name, is held.
+    #[test]
+    fn with_name_or_follow_up_a_follow_up_begun_while_the_answer_plays_goes_on() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::room_told::Room;
+        let s = Duration::from_secs;
+        // The ask's answer began `began_s` s ago and its words play until
+        // `until_s` s from now (negative: ended that long ago); the thread
+        // has its words, or only an answer of a minute before. The line began
+        // `long` s ago and is judged now.
+        let judged = |in_thread: bool, began_s: u64, until_s: i64, long: u64| {
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            {
+                let mut room = crate::room_told::room().lock().unwrap();
+                for other in 901..=903 {
+                    room.unanswered(other, monotonic_us());
+                }
+                assert_eq!(room.at(monotonic_us()), Room::Busy);
+            }
+            let mut thread = crate::thread::Thread::new();
+            let earlier = Instant::now() - s(60);
+            thread.person("Lamp, what's the weather today?", true, earlier);
+            thread.lamp(1, "Sunny and warm today.", earlier);
+            if in_thread {
+                let began = Instant::now() - s(began_s);
+                thread.person("Lamp, tell me a joke.", true, began);
+                thread.lamp(2, "Why did the lamp go to school?", began);
+            }
+            *crate::thread::THREAD.lock().unwrap() = thread;
+            let mut heeding = Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.needing_name_or_follow_up();
+            let now_us = monotonic_us();
+            let until = now_us.saturating_add_signed(until_s * 1_000_000);
+            heeding.lamp_did(crate::second_provider::Did::Said(2, until));
+            let said = (now_us - long * 1_000_000, now_us);
+            let held = heeding.heed(3, said, "Another one?", None);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            held
+        };
+        for in_thread in [true, false] {
+            assert_eq!(
+                judged(in_thread, 6, 3, 1),
+                None,
+                "still playing, {in_thread}"
+            );
+            assert_eq!(
+                judged(in_thread, 25, -15, 17),
+                None,
+                "begun 2 s before the words ended, judged 15 s after, {in_thread}"
+            );
+            assert!(
+                judged(in_thread, 25, -12, 0).is_some(),
+                "begun 12 s after, {in_thread}"
+            );
+        }
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    }
+
+    /// `LAMP_NAME_OR_FOLLOW_UP`'s known limit on this route, as built: the
+    /// person at the desk faces the lamp while a colleague off camera talks
+    /// with them, and there is no voice model. One face is in view, turned
+    /// to the lamp, in a room not known to be busy, so every line is let out
+    /// by the face, nothing is held, and the room never turns busy: the
+    /// desk talk is answered, as without the switch, until a line is held. A
+    /// run on the lamp must say whether the colleague was in view and
+    /// whether the voice model was on.
+    #[test]
+    fn with_name_or_follow_up_a_colleague_off_camera_is_answered_while_the_person_faces_the_lamp() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
+        // A short root: a Unix socket's address holds 103 bytes.
+        let root = std::path::PathBuf::from(format!("/tmp/lnc-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut eyes = bus
+            .publisher_declared(
+                lamp_msgs::Faces::TOPIC,
+                &lamp_msgs::Faces::declaration(),
+                "eyes",
+            )
+            .unwrap();
+        let faces = lamp_msgs::Faces {
+            faces: vec![lamp_msgs::Face {
+                id: "at-the-desk".into(),
+                xmin: 0.4,
+                ymin: 0.0,
+                xmax: 0.7,
+                ymax: 0.3,
+                confidence: 0.9,
+                yaw: None,
+                facing: Some(true),
+                speaking: None,
+            }],
+        };
+        eyes.publish_json(lamp_ipc::monotonic_us(), &faces).unwrap();
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        {
+            let mut room = crate::room_told::room().lock().unwrap();
+            *room = crate::room_told::RoomTold::new();
+            room.count_only_talk(true);
+            room.count_held_talk(true);
+        }
+        let mut heeding = Heeding::new(true, true, Some(&root), None);
+        heeding.as_the_only_voice(false, true, false);
+        heeding.needing_name_or_follow_up();
+        let now_us = monotonic_us();
+        for (request, line) in (1..).zip([
+            "Did you get my message about the budget?",
+            "Yes, I'll read it after lunch.",
+            "Can we move the meeting to three?",
+            "Sure, three works for me.",
+        ]) {
+            let said = (
+                now_us + request * 3_000_000,
+                now_us + request * 3_000_000 + 1,
+            );
+            crate::room_told::room()
+                .lock()
+                .unwrap()
+                .heard(request, said.0);
+            assert_eq!(heeding.heed(request, said, line, None), None, "{line}");
+            let mut room = crate::room_told::room().lock().unwrap();
+            room.ended(request, said.1);
+            room.spoke(request, said.1);
+        }
+        let room = crate::room_told::room()
+            .lock()
+            .unwrap()
+            .at(now_us + 13_000_000);
+        assert_ne!(room, crate::room_told::Room::Busy);
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// `LAMP_NAME_OR_FOLLOW_UP` on this route: two faces in the eyes' newest
     /// look make the room this route keeps busy at once, and the line in
     /// hand is judged in it: a face turned to the lamp lets nothing out
@@ -7151,7 +7313,7 @@ mod tests {
     /// today?" was answered, in a busy room, a follow-up said 5 s after the
     /// lamp's words ended is played as the conversation going on, and so is
     /// one begun 5 s after them that went on 7 s, judged 12 s after them
-    /// (reviewer-two's P2 on #2967: the window runs to the line's start, not
+    /// (a reviewer's P2 on #2967: the window runs to the line's start, not
     /// its verdict); one begun 12 s after, without the name, is held; with
     /// the name it is played. Without the switch the 12 s one is played, in
     /// a busy room's 15 s. In a quiet room the windows are as without the
