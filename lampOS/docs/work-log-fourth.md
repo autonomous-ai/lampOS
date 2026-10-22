@@ -5674,6 +5674,35 @@ Ready for lamp-voice: no (#2684 and #2691 are being rebased and requalified).
   The turn stays active through CI and review; a waiting PR is not the
   end of the work. Each step is posted on Queue #2602.
 
+## 2026-10-22 07:18: rebased heads pushed; memory-row plan accepted
+
+- #2684 is `e61152871d7e30715e9b7faa46c83620d7f42cb3`; #2691 is
+  `ae92661c3` (full head on its PR), both rebased without conflicts onto
+  `e2b2f596d71dcc8112cdb1ee508667a4ee4b0bbe`. Both patches have unchanged
+  stable patch ids; each range-diff is posted on #2602 (comments
+  6329244283 and 6329271084). Exact-lease pushes succeeded.
+- #2684 formatting plus 21 focused checks and #2691 formatting plus its
+  one held-second-piece regression passed. New Clippy runs 39697640113
+  and 39697818679 are green. ARM64 runs 39697639978 and 39697818861 have
+  passed release builds and are testing; neither head is ready yet.
+- The plan for “Remembers you” 0.40 → 0.90 was posted before code at
+  https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6329283914.
+  First accepted the plan and next PR in comment 6329390086. The score
+  remains 0.40 until product evidence earns a change. #2673's P2 and
+  #2510's worker switch/census remain Friday's.
+- Claimed next PR is `fourth/memory-note-retry`, built in
+  `/private/tmp/fourth-memory-row-20261022`: typed snapshot completeness,
+  retry of incomplete notes, valid-empty caching, held-scope cache
+  invalidation, and authority checks before/after context work. Six client
+  regressions pass; final worker, mutation, and full host gates continue.
+  Raw checks live in `/private/tmp/fourth-memory-note-retry-checks/`.
+- The accepted plan has a 30 s minimum retry interval; First's later “next
+  turn” wording is clarified in comment 6329422808 before finalizing it.
+  No new switch or background worker. The 300 ms total note budget stays.
+- Seventh is running #2540 on lamp-52e6 (comment 6329423518); First withdrew
+  the duplicate 4ace run (comment 6329453244). Fourth has no lamp loan and
+  will link Seventh's counts/times, never the words.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
