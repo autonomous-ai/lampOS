@@ -324,7 +324,18 @@ const BACKCHANNELS: &[&str] = &[
     "alright", "right", "oh", "ah", "sure",
 ];
 /// The same, when the speech-to-text is told Vietnamese (`stt_language`).
-const BACKCHANNELS_VI: &[&str] = &["ừ", "ừm", "ờ", "à", "ồ", "dạ", "vâng", "ok", "đúng", "rồi"];
+/// "Rồi" and "đúng" are left out: as often a reply ("done", "that's right")
+/// as an acknowledgment (the reviewer-lead on #2959).
+const BACKCHANNELS_VI: &[&str] = &["ừ", "ừm", "ờ", "à", "ồ", "dạ", "vâng", "ok"];
+
+/// Whether the lamp's last finished sentence in `said` is a question: a
+/// "Yes." or "Sure." said then answers it, and is no backchannel (the
+/// reviewer-lead on #2959).
+pub fn lamp_asked(said: &str) -> bool {
+    said.trim_end()
+        .rfind(['.', '!', '?', '\u{2026}', '\u{ff1f}', '\u{3002}'])
+        .is_some_and(|at| said[at..].starts_with(['?', '\u{ff1f}']))
+}
 
 /// Whether what was heard is a backchannel (#2939): one or two words, all
 /// on the list for the language, no question mark and no stop phrase.
@@ -469,6 +480,9 @@ pub struct StopWords {
     /// The speech-to-text is told Vietnamese: its backchannels are
     /// Vietnamese ([`Self::with_language`]).
     vietnamese: bool,
+    /// The lamp's last finished sentence before the yield in force was a
+    /// question: its words answer it, and are no backchannel.
+    lamp_asked: bool,
 }
 
 /// A stop heard over the lamp and held ([`HOLD_US`]): what was heard,
@@ -512,6 +526,7 @@ impl StopWords {
             ahead_at: 0,
             holds: Vec::new(),
             vietnamese: false,
+            lamp_asked: false,
         }
     }
 
@@ -598,12 +613,12 @@ impl StopWords {
     /// they play, `ahead` of when they were written when the reply's audio
     /// is queued before them. Only such words can end a held stop early:
     /// stamped as written, a piece can be text for audio played before it.
+    /// In a yield the words heard before it say whether the lamp had just
+    /// asked something ([`lamp_asked`], #2959).
     pub fn lamp_said(&mut self, text: &str, at_us: u64, ahead: bool) {
-        if self.always {
-            self.lamp.push_back((at_us, text.to_owned()));
-            if ahead {
-                self.ahead_at = self.ahead_at.max(at_us);
-            }
+        self.lamp.push_back((at_us, text.to_owned()));
+        if self.always && ahead {
+            self.ahead_at = self.ahead_at.max(at_us);
         }
     }
 
@@ -841,6 +856,10 @@ impl StopWords {
             self.listen_always(replying, sounding, yielded, captured_at_us, samples);
             return Tell::Nothing;
         }
+        let since = captured_at_us.saturating_sub(LAMP_WORDS_US);
+        while self.lamp.front().is_some_and(|(at, _)| *at < since) {
+            self.lamp.pop_front();
+        }
         if self.closed {
             if yielded {
                 return Tell::Nothing;
@@ -857,6 +876,14 @@ impl StopWords {
             self.yielded = true;
             self.asked = false;
             self.told = false;
+            // What the lamp had said by the yield, not what it was to say.
+            let said: Vec<&str> = self
+                .lamp
+                .iter()
+                .filter(|(at, _)| *at <= captured_at_us)
+                .map(|(_, text)| text.as_str())
+                .collect();
+            self.lamp_asked = lamp_asked(&said.concat());
             match held {
                 Some(held) => {
                     for block in held {
@@ -898,7 +925,7 @@ impl StopWords {
             tell = Tell::Words {
                 stop: stop_phrase(&words),
                 count: words.split_whitespace().count(),
-                backchannel: backchannel(&words, self.vietnamese),
+                backchannel: !self.lamp_asked && backchannel(&words, self.vietnamese),
             };
         }
         tell
@@ -1707,8 +1734,28 @@ mod tests {
             ("Ừ.", false, false),
             ("Yeah.", true, false),
             ("Hả?", true, false),
+            // As often a reply as an acknowledgment (#2959's P3).
+            ("Rồi.", true, false),
+            ("Đúng.", true, false),
         ] {
             assert_eq!(backchannel(heard, vietnamese), is, "{heard:?}");
+        }
+    }
+
+    /// #2959: whether the lamp's last finished sentence was a question.
+    #[test]
+    fn the_lamp_asked_when_its_last_finished_sentence_is_a_question() {
+        for (said, asked) in [
+            ("Shall I go on?", true),
+            ("It rained. Shall I go on?  ", true),
+            ("Shall I go on? Well", true),
+            ("Bạn có muốn nghe tiếp không？", true),
+            ("It rained all day.", false),
+            ("Shall I go on? Okay. Then", false),
+            ("Once upon a time", false),
+            ("", false),
+        ] {
+            assert_eq!(lamp_asked(said), asked, "{said:?}");
         }
     }
 

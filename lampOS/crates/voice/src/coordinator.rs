@@ -5886,8 +5886,8 @@ fn conversation_with_gate(
     let backchannel_holds = crate::stop_words::holds_backchannels()
         && if stop_words.is_some() && !always {
             eprintln!(
-                "lamp-voice: backchannel holds: a yield's commit waits up to {} ms for its words, and a backchannel resumes the answer",
-                lamp_audio::duplex::BACKCHANNEL_HOLD_BLOCKS * 10
+                "lamp-voice: backchannel holds: a yield's commit waits for its words, up to {} ms after they are asked for, and a backchannel resumes the answer",
+                u16::from(lamp_audio::duplex::BACKCHANNEL_WORDS_WAIT_BLOCKS) * 10
             );
             true
         } else {
@@ -5923,7 +5923,7 @@ fn conversation_with_gate(
             "listen_gaps":listen_gaps.then_some(json!({"after_ms":crate::listen_gaps::AFTER_FRAMES * 1_000 / u64::from(lamp_audio::RENDER_RATE),"quiet_run_ms":crate::listen_gaps::LOW_RUN_CHUNKS * 10,"gap_ms":crate::listen_gaps::GAP_US / 1_000,"silence_heard":true})),
             "stop_words_after_still_blocks":(stop_words.is_some() && !always).then_some(crate::stop_words::FINALIZE_AFTER_STILL_BLOCKS),
             "stop_words_always":(stop_words.is_some() && always).then_some(true),
-            "backchannel_holds":backchannel_holds.then_some(json!({"hold_ms":u64::from(lamp_audio::duplex::BACKCHANNEL_HOLD_BLOCKS) * 10,"sentence_ms":u64::from(lamp_audio::duplex::BACKCHANNEL_SPEECH_BLOCKS) * 10})),
+            "backchannel_holds":backchannel_holds.then_some(json!({"words_wait_ms_after_ask":u64::from(lamp_audio::duplex::BACKCHANNEL_WORDS_WAIT_BLOCKS) * 10,"sentence_ms":u64::from(lamp_audio::duplex::BACKCHANNEL_SPEECH_BLOCKS) * 10})),
             "provider_queue_bound":provider_queue_bound(hold),
             "provider_total_queue_bound":provider_queue_bound(hold) + 1,
             "provider_terminal_allowance":1,
@@ -11354,6 +11354,13 @@ fn hear_capture_block(
         // #2939: how long the commit was held for the yield's words, and
         // whether they were a backchannel (null: none came).
         let (held_ms, backchannel) = mask.yield_words();
+        if listened.step == DuplexStep::Commit && held_ms > 0 && backchannel.is_none() {
+            // Words that come after this are dropped with the yield: say
+            // that the hold ran out before them.
+            eprintln!(
+                "lamp-voice: a yield's words had not come after its commit was held {held_ms} ms: committed"
+            );
+        }
         event["held_ms"] = json!(held_ms);
         event["backchannel"] = json!(backchannel);
     }
