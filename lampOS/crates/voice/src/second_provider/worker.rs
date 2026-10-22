@@ -1141,16 +1141,16 @@ pub fn chat_tools(
 /// The order the bound cuts this route's functions in (the first builder
 /// on #2614 and #2644): the search's fetch, then the time elsewhere, then
 /// `skills` ([`crate::tools::uncut`]'s cut: `reports_state` with
-/// `LAMP_REPORTS=on`, then those not a core skill's), then the search. A
-/// core skill's function, `reports_stop` and the lamp's own actions are
-/// never in it.
+/// `LAMP_REPORTS=on`, then those not a core skill's), then the weather
+/// (`LAMP_SECOND_WEATHER=on`), then the search. A core skill's function,
+/// `reports_stop` and the lamp's own actions are never in it.
 pub fn chat_cut(skills: Vec<String>) -> Vec<String> {
     let first = [super::net::search::FETCH, crate::tools::THE_TIME];
     first
         .into_iter()
         .map(str::to_owned)
         .chain(skills)
-        .chain([super::net::search::NAME.to_owned()])
+        .chain([super::net::weather::NAME, super::net::search::NAME].map(str::to_owned))
         .collect()
 }
 
@@ -1435,25 +1435,119 @@ pub(crate) fn early_query(heard: &str, month_and_year: Option<String>) -> Option
     (!query.is_empty() && query.chars().count() <= 128).then_some(query)
 }
 
-/// The weather last fetched, and when.
-type Weather = Arc<Mutex<Option<(Instant, String)>>>;
+/// The weather the model may ask for, with `switch` (`LAMP_SECOND_WEATHER`)
+/// exactly `on` (the owner on 22 Oct): looked up with `fetch` only when a
+/// call asks, for the place and the day asked, the lamp's own place
+/// (`here`) for a call that names none. Nothing is fetched here and no
+/// task is started; with the switch off there is no weather at all.
+fn weather_asked(
+    switch: Option<&str>,
+    here: Option<String>,
+    fetch: crate::second_provider::net::weather::Fetch,
+) -> Option<Arc<crate::second_provider::net::weather::Weather>> {
+    use crate::second_provider::net::weather;
+    weather::on(switch).then(|| Arc::new(weather::Weather::new(here, fetch)))
+}
 
-/// What the model is told of the weather fetched at `at`, while it is
-/// fresh ([`crate::second_provider::net::weather::FRESH`]).
-fn weather_told(fetched: Option<(Instant, String)>, now: Instant) -> Option<String> {
-    let (at, said) = fetched?;
-    let ago = now.checked_duration_since(at)?;
-    (ago <= crate::second_provider::net::weather::FRESH).then(|| {
-        format!(
-            " The weather where you are, as of {} minutes ago: {said} Use it when someone asks about the weather here; never bring it up unasked.",
-            ago.as_secs() / 60
-        )
+/// The search's functions, then the weather's when it is on: what a spoken
+/// turn's chat is given beside the lamp's ([`chat_tools`]).
+fn with_weather_tool(searched: &[lamp_gemini::Tool], weather: bool) -> Vec<lamp_gemini::Tool> {
+    let mut tools = searched.to_vec();
+    if weather {
+        tools.push(crate::second_provider::net::weather::declaration());
+    }
+    tools
+}
+
+/// One call of the weather's, answered as the search's are: within its
+/// bound ([`crate::second_provider::net::weather::WITHIN`]), and journalled
+/// with what it asked and its time, never a word the person said.
+async fn weather_answer(
+    weather: &crate::second_provider::net::weather::Weather,
+    request: u64,
+    args: &serde_json::Value,
+) -> serde_json::Value {
+    let began = Instant::now();
+    let answered = weather.answer(args).await;
+    eprintln!(
+        "lamp-voice second: request {request} asked for weather {}; answered in {} ms, {}",
+        answered.asked,
+        began.elapsed().as_millis(),
+        answered.how
+    );
+    answered.told
+}
+
+/// `runner` with the weather's call answered here first, by `weather`,
+/// when there is one; every other call goes to `runner` as before.
+pub(crate) fn answering_weather(
+    runner: ToolRunner,
+    weather: Option<Arc<crate::second_provider::net::weather::Weather>>,
+) -> ToolRunner {
+    let Some(weather) = weather else {
+        return runner;
+    };
+    Arc::new(move |request, heard, name, args| {
+        if name != crate::second_provider::net::weather::NAME {
+            return runner(request, heard, name, args);
+        }
+        let weather = weather.clone();
+        Box::pin(async move { weather_answer(&weather, request, &args).await })
     })
 }
 
-/// Ask the weather in `place` every 15 minutes, on the worker's runtime:
-/// its coordinates once, then the forecast. A failure is said once until
-/// the next success; the weather kept goes stale on its own.
+/// [`answering_weather`] for the runner with the admitted request's memory
+/// authority: the weather's call needs none.
+pub(crate) fn scoped_answering_weather(
+    runner: crate::second_provider::ScopedToolRunner,
+    weather: Option<Arc<crate::second_provider::net::weather::Weather>>,
+) -> crate::second_provider::ScopedToolRunner {
+    let Some(weather) = weather else {
+        return runner;
+    };
+    Arc::new(move |request, heard, name, args, scope| {
+        if name != crate::second_provider::net::weather::NAME {
+            return runner(request, heard, name, args, scope);
+        }
+        let weather = weather.clone();
+        Box::pin(async move { weather_answer(&weather, request, &args).await })
+    })
+}
+
+/// [`answering_weather`] for a spoken request's private audio runner: the
+/// weather's call offers no audio.
+pub(crate) fn audio_answering_weather(
+    runner: super::RequestedAudioRunner,
+    weather: Option<Arc<crate::second_provider::net::weather::Weather>>,
+) -> super::RequestedAudioRunner {
+    let Some(weather) = weather else {
+        return runner;
+    };
+    Arc::new(move |context, call, scope| {
+        if call.name != crate::second_provider::net::weather::NAME {
+            return runner(context, call, scope);
+        }
+        let weather = weather.clone();
+        Box::pin(async move {
+            crate::tools::ToolAnswer::plain(
+                weather_answer(&weather, context.request, &call.args).await,
+            )
+        })
+    })
+}
+
+/// [`answered_here`] with the weather's call too when it is on: a lookup,
+/// never the lamp's action, so the Policy never holds it.
+pub(crate) fn answered_here_with_weather(
+    here: crate::second_provider::policy::AnsweredHere,
+    weather: bool,
+) -> crate::second_provider::policy::AnsweredHere {
+    if !weather {
+        return here;
+    }
+    Arc::new(move |name| name == crate::second_provider::net::weather::NAME || here(name))
+}
+
 /// The air as `air/state` says it, read every five seconds while the
 /// voice runs (`LAMP_AIR_FACTS=on`): a fresh reading feeling stuffy or very
 /// stuffy keeps the count going, anything else starts it again, as the Live
@@ -1617,67 +1711,6 @@ fn noting_once(
     (note, heard)
 }
 
-async fn weather_task(place: String, weather: Weather) {
-    use crate::second_provider::net::weather;
-    let mut every = tokio::time::interval(weather::EVERY);
-    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-    let mut at = None;
-    let mut failing = false;
-    loop {
-        every.tick().await;
-        if at.is_none() {
-            at = match weather::locate(&place).await {
-                Ok(Some(found)) => Some(found),
-                Ok(None) => {
-                    if !std::mem::replace(&mut failing, true) {
-                        eprintln!(
-                            "lamp-voice second: no place named {place} was found for the weather"
-                        );
-                    }
-                    None
-                }
-                Err(error) => {
-                    if !std::mem::replace(&mut failing, true) {
-                        eprintln!(
-                            "lamp-voice second: the weather's place was not looked up: {error}"
-                        );
-                    }
-                    None
-                }
-            };
-        }
-        let Some((latitude, longitude)) = at else {
-            continue;
-        };
-        let began = Instant::now();
-        match weather::fetch(latitude, longitude, &place).await {
-            Ok(Some(said)) => {
-                if std::mem::replace(&mut failing, false)
-                    || weather.lock().is_ok_and(|kept| kept.is_none())
-                {
-                    eprintln!(
-                        "lamp-voice second: the weather in {place} came in {} ms",
-                        began.elapsed().as_millis()
-                    );
-                }
-                if let Ok(mut kept) = weather.lock() {
-                    *kept = Some((Instant::now(), said));
-                }
-            }
-            Ok(None) => {
-                if !std::mem::replace(&mut failing, true) {
-                    eprintln!("lamp-voice second: the weather came with nothing for now");
-                }
-            }
-            Err(error) => {
-                if !std::mem::replace(&mut failing, true) {
-                    eprintln!("lamp-voice second: the weather was not fetched: {error}");
-                }
-            }
-        }
-    }
-}
-
 /// What the model is told of the time, with the lamp's place after it
 /// ([`crate::local_time::place_told`]); the place alone when the time is not
 /// known.
@@ -1796,6 +1829,27 @@ pub fn serve(
         .as_ref()
         .map(|search| search.declarations())
         .unwrap_or_default();
+    // The weather for any place and day, with LAMP_SECOND_WEATHER=on (the
+    // owner on 22 Oct): a function of its own, looked up only when it is
+    // called, for the place asked or else the lamp's own (LAMP_PLACE, or
+    // the place its zone names).
+    let weather = weather_asked(
+        std::env::var(crate::second_provider::net::weather::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+        crate::local_time::place_here().or_else(crate::local_time::zone_place_here),
+        crate::second_provider::net::weather::open_meteo(),
+    );
+    if let Some(weather) = &weather {
+        eprintln!(
+            "lamp-voice second: the model may ask for the weather of any place and day, looked up at Open-Meteo only when it asks and kept {} minutes a place; here is {} ({})",
+            crate::second_provider::net::weather::KEPT_FOR.as_secs() / 60,
+            weather
+                .here()
+                .unwrap_or("not known, so a call must name its place"),
+            crate::second_provider::net::weather::ENVIRONMENT
+        );
+    }
     let declared = tools.clone();
     // The time here is told in every request; the_time is for elsewhere.
     let clock = tools.clock;
@@ -1820,11 +1874,11 @@ pub fn serve(
     // With a full look, spoken turns look by a call of their own (#1712);
     // texts, which see nothing, are not offered it.
     let look_by_call = files.look.is_some() && files.look_full;
-    let spoken_declare: crate::second_provider::net::Declare = if look_by_call {
-        Arc::new(move || chat_tools(&declared, &searched, true))
-    } else {
-        declare.clone()
-    };
+    // Spoken turns alone are given the weather's function: a text was never
+    // told the weather (#1712), and its runner answers none.
+    let spoken_searched = with_weather_tool(&searched, weather.is_some());
+    let spoken_declare: crate::second_provider::net::Declare =
+        Arc::new(move || chat_tools(&declared, &spoken_searched, look_by_call));
     // With `LAMP_NAME_SIGNAL=on`, spoken turns are offered `heard_my_name`
     // as the Live route's sessions are, and the journal says how long
     // before a line's first sound the model said it heard its name. Texts,
@@ -1986,17 +2040,6 @@ pub fn serve(
     if let Some(place) = &place {
         eprintln!("lamp-voice second: the lamp's place is {place} (LAMP_PLACE)");
     }
-    // The weather where the lamp stands, asked ahead (#1712): of its place,
-    // or else the place its zone names.
-    let weather: Weather = Arc::default();
-    let weather_place = crate::second_provider::net::weather::on(
-        std::env::var(crate::second_provider::net::weather::ENVIRONMENT)
-            .ok()
-            .as_deref(),
-    )
-    .then(|| place.clone().or_else(crate::local_time::zone_place_here))
-    .flatten();
-    let weather_now = weather.clone();
     // What stays first, and the rest after the exchanges (#1712).
     let steady_first = std::env::var(crate::second_provider::STEADY_FIRST_ENVIRONMENT)
         .ok()
@@ -2033,18 +2076,12 @@ pub fn serve(
             } else {
                 String::new()
             };
-            // The lamp's own place, with `LAMP_PLACE`, beside its time (#1712),
-            // and the weather there while it is fresh.
+            // The lamp's own place, with `LAMP_PLACE`, beside its time
+            // (#1712). The weather is never told here: it is the weather's
+            // function's to say, when asked (LAMP_SECOND_WEATHER).
             let time = with_place(
                 crate::local_time::told_asked_here(clock, places),
                 crate::local_time::place_told(place.as_deref()),
-            );
-            let time = with_place(
-                time,
-                weather_told(
-                    weather_now.lock().ok().and_then(|weather| weather.clone()),
-                    Instant::now(),
-                ),
             );
             let time = crate::agent_tasks::noted(time, tasks.as_ref());
             let facts = facts(session_fact && !going_on, room)
@@ -2127,16 +2164,27 @@ pub fn serve(
     );
     let policed = verdicts.is_some();
     let policy_settings = tools.clone();
-    let policy_here = answered_here(search.clone());
+    let policy_here = answered_here_with_weather(answered_here(search.clone()), weather.is_some());
     // A held line's `reports_stop` is done, its answer kept held, as on the
     // Live route (`crate::attention::DONE_THOUGH_HELD`), with LAMP_REPORTS=on.
     let though_held = tools.reports_stop;
-    let audio_runner = tools
-        .requested_audio
-        .then(|| requested_audio_runner(tools.clone(), search.clone(), early.clone(), policed));
-    let runner = tool_runner(tools, search.clone(), early.clone(), policed);
+    // The weather's call is answered before any of these, as the search's
+    // is inside them, with LAMP_SECOND_WEATHER=on.
+    let audio_runner = tools.requested_audio.then(|| {
+        audio_answering_weather(
+            requested_audio_runner(tools.clone(), search.clone(), early.clone(), policed),
+            weather.clone(),
+        )
+    });
+    let runner = answering_weather(
+        tool_runner(tools, search.clone(), early.clone(), policed),
+        weather.clone(),
+    );
     // The same calls with the admitted request's memory authority (#1794).
-    let scoped_runner = scoped_tool_runner(scoped_settings, search.clone(), early.clone(), policed);
+    let scoped_runner = scoped_answering_weather(
+        scoped_tool_runner(scoped_settings, search.clone(), early.clone(), policed),
+        weather,
+    );
     let system: crate::second_provider::System = Arc::new(system);
     // The relay's routes, asked on the runtime below (#2882).
     let routes_task = net.routes_task();
@@ -2914,13 +2962,6 @@ pub fn serve(
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
-    if let Some(place) = weather_place {
-        eprintln!(
-            "lamp-voice second: the weather in {place} is asked of Open-Meteo every 15 minutes ({})",
-            crate::second_provider::net::weather::ENVIRONMENT
-        );
-        runtime.spawn(weather_task(place, weather));
-    }
     if let Some(task) = routes_task {
         runtime.spawn(task);
     }
@@ -3075,8 +3116,9 @@ pub(crate) const MORE_GIVEN: &str =
 /// `LAMP_SECOND_FEW_TOOLS=on` (#1712, the first builder at 18:56: "light,
 /// volume, timer, search, look, tasks"): the light's and the volume's, the
 /// timer's and the reminders', the tasks', the web search's and its fetch,
-/// the look's, and the decline, the skills' one function and setup's walk,
-/// which a busy room, the skills' lines and a setup talk need at every turn.
+/// the weather's, the look's, and the decline, the skills' one function and
+/// setup's walk, which a busy room, the skills' lines and a setup talk need
+/// at every turn.
 pub(crate) fn given_at_once(name: &str) -> bool {
     name.starts_with("light_")
         || name.starts_with("volume_")
@@ -3090,6 +3132,7 @@ pub(crate) fn given_at_once(name: &str) -> bool {
             crate::onboarding::REDO,
             crate::second_provider::net::search::NAME,
             crate::second_provider::net::search::FETCH,
+            crate::second_provider::net::weather::NAME,
             crate::second_provider::LOOK_CALL,
             // Asked of a lamp all day; behind `more_functions` DeepSeek
             // answered "remember …" and "forget that" in words (#1712, the
@@ -13144,24 +13187,183 @@ mod tests {
         assert!(!super::name_counts(sure - 0.01, from + 200_000, from));
     }
 
-    /// #1712: the weather is told while fresh, never once stale.
-    #[test]
-    fn the_weather_is_told_while_fresh() {
-        let now = Instant::now();
-        let said = "In Hanoi now: 31°C, partly cloudy.".to_owned();
-        let fresh = super::weather_told(
-            Some((now, said.clone())),
-            now + Duration::from_secs(20 * 60),
-        )
-        .unwrap();
-        assert!(
-            fresh.starts_with(" The weather where you are, as of 20 minutes ago: In Hanoi now"),
-            "{fresh}"
+    /// A fetcher of Open-Meteo's answers with no network, counting each
+    /// fetch: every name found as Hanoi, and one forecast for it.
+    fn counted_weather_fetch() -> (
+        Arc<std::sync::atomic::AtomicUsize>,
+        crate::second_provider::net::weather::Fetch,
+    ) {
+        let fetched = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let count = fetched.clone();
+        let fetch: crate::second_provider::net::weather::Fetch = Arc::new(move |url: String| {
+            count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            Box::pin(async move {
+                Ok(if url.contains("geocoding-api") {
+                    serde_json::json!({"results": [{"name": "Hanoi", "country": "Vietnam",
+                                                    "latitude": 21.0245, "longitude": 105.84117}]})
+                } else {
+                    serde_json::json!({
+                        "current": {"temperature_2m": 24.0, "weather_code": 61},
+                        "daily": {"time": ["2026-10-22", "2026-10-23"],
+                                  "weather_code": [61, 3],
+                                  "temperature_2m_max": [27, 29],
+                                  "temperature_2m_min": [22, 23],
+                                  "precipitation_probability_max": [80, 20]}
+                    })
+                })
+            })
+        });
+        (fetched, fetch)
+    }
+
+    /// The owner on 22 Oct: no weather is fetched every 15 minutes any
+    /// more. With the switch on nothing is fetched at start or as time
+    /// passes, only when a call asks, and the call is answered by the
+    /// route's runners, each of them, before the lamp's own calls.
+    #[tokio::test(start_paused = true)]
+    async fn the_weather_is_fetched_only_when_a_call_asks() {
+        use std::sync::atomic::Ordering;
+        let (fetched, fetch) = counted_weather_fetch();
+        let weather =
+            super::weather_asked(Some("on"), Some("Hanoi, Vietnam".into()), fetch).expect("on");
+        tokio::time::advance(Duration::from_secs(60 * 60)).await;
+        assert_eq!(fetched.load(Ordering::Relaxed), 0, "nothing ahead");
+        let settings = crate::tools::Settings::default();
+        let runner = super::answering_weather(
+            super::tool_runner(settings.clone(), None, None, false),
+            Some(weather.clone()),
         );
-        assert!(fresh.contains("never bring it up unasked"));
-        let stale = now + crate::second_provider::net::weather::FRESH + Duration::from_secs(1);
-        assert_eq!(super::weather_told(Some((now, said)), stale), None);
-        assert_eq!(super::weather_told(None, now), None);
+        let asked = serde_json::json!({"place": "Hanoi", "day": "tomorrow"});
+        let told = runner(7, true, "weather".into(), asked.clone()).await;
+        assert_eq!(
+            told,
+            serde_json::json!({"place": "Hanoi, Vietnam",
+                               "weather": "In Hanoi, Vietnam: Tomorrow, Friday, 23 to 29°C, overcast, 20% chance of rain."})
+        );
+        assert_eq!(fetched.load(Ordering::Relaxed), 2);
+        let other = runner(7, true, "light_on".into(), serde_json::json!({})).await;
+        assert!(other.get("place").is_none(), "{other}");
+        let (owner, context) = audio_runner_scope();
+        let scoped = super::scoped_answering_weather(
+            super::scoped_tool_runner(settings.clone(), None, None, false),
+            Some(weather.clone()),
+        );
+        assert_eq!(
+            scoped(7, true, "weather".into(), asked.clone(), owner.lease()).await,
+            told
+        );
+        let audio = super::audio_answering_weather(
+            super::requested_audio_runner(settings, None, None, false),
+            Some(weather),
+        );
+        let call = lamp_gemini::ToolCall {
+            id: context.call_id.clone(),
+            name: "weather".into(),
+            args: asked,
+        };
+        let answered = audio(context, call, owner.lease()).await;
+        assert_eq!(answered.told, told);
+        assert!(answered.requested_audio.is_none());
+        assert_eq!(
+            fetched.load(Ordering::Relaxed),
+            2,
+            "kept for the follow-ups"
+        );
+    }
+
+    /// With the switch off (anything but `on`) there is no weather: no
+    /// function declared, nothing answered or fetched for one, and the
+    /// Policy is told nothing new. With it on, spoken turns are given it
+    /// after the search's, and the Policy never holds it.
+    #[tokio::test]
+    async fn the_weather_switch_off_declares_and_fetches_nothing() {
+        use std::sync::atomic::Ordering;
+        let (fetched, fetch) = counted_weather_fetch();
+        for switch in [None, Some(""), Some("yes"), Some("ON")] {
+            assert!(super::weather_asked(switch, Some("Hanoi".into()), fetch.clone()).is_none());
+        }
+        let settings = crate::tools::Settings::default();
+        let named = |tools: Vec<lamp_gemini::Tool>| -> Vec<String> {
+            tools.into_iter().map(|tool| tool.name).collect()
+        };
+        let search = lamp_gemini::Tool {
+            name: crate::second_provider::net::search::NAME.into(),
+            description: String::new(),
+            parameters: None,
+            silent: false,
+        };
+        let off = named(chat_tools(
+            &settings,
+            &super::with_weather_tool(std::slice::from_ref(&search), false),
+            false,
+        ));
+        assert!(!off.iter().any(|name| name == "weather"), "{off:?}");
+        let on = named(super::with_weather_tool(&[search], true));
+        assert_eq!(on, ["web_search", "weather"]);
+        let runner =
+            super::answering_weather(super::tool_runner(settings, None, None, false), None);
+        let told = runner(
+            8,
+            true,
+            "weather".into(),
+            serde_json::json!({"place": "Hanoi"}),
+        )
+        .await;
+        assert!(told.get("place").is_none(), "not the weather's: {told}");
+        assert_eq!(fetched.load(Ordering::Relaxed), 0);
+        let here = super::answered_here_with_weather(super::answered_here(None), false);
+        assert!(!here("weather"));
+        let here = super::answered_here_with_weather(super::answered_here(None), true);
+        assert!(here("weather") && here(super::MORE) && !here("light_on"));
+        assert!(super::given_at_once("weather"));
+    }
+
+    /// The weather is cut at the bound with the search's group: after the
+    /// skills' that aren't a core skill's, before `web_search`.
+    #[test]
+    fn the_weather_is_cut_after_the_skills_and_before_the_search() {
+        let cut = super::chat_cut(vec!["installed".into()]);
+        let at = |name: &str| cut.iter().position(|cut| cut == name).unwrap();
+        assert!(at("installed") < at("weather") && at("weather") < at("web_search"));
+        let tool = |name: String| lamp_gemini::Tool {
+            name,
+            description: "A function.".into(),
+            parameters: None,
+            silent: false,
+        };
+        let told = |lamp: usize| -> Vec<lamp_gemini::Tool> {
+            (0..lamp)
+                .map(|i| format!("tool_{i}"))
+                .chain(["dance", "installed", "weather", "web_search"].map(String::from))
+                .map(tool)
+                .collect()
+        };
+        let kept = |lamp: usize| -> Vec<String> {
+            crate::tools::within_bound(told(lamp), &cut)
+                .unwrap()
+                .into_iter()
+                .map(|tool| tool.name)
+                .collect()
+        };
+        let one_over = kept(lamp_gemini::MAX_TOOLS - 3);
+        assert!(
+            !one_over.iter().any(|name| name == "installed"),
+            "{one_over:?}"
+        );
+        assert!(
+            one_over.iter().any(|name| name == "weather"),
+            "{one_over:?}"
+        );
+        let two_over = kept(lamp_gemini::MAX_TOOLS - 2);
+        assert!(
+            !two_over.iter().any(|name| name == "weather"),
+            "{two_over:?}"
+        );
+        assert!(
+            two_over.iter().any(|name| name == "web_search"),
+            "{two_over:?}"
+        );
+        assert!(two_over.iter().any(|name| name == "dance"), "{two_over:?}");
     }
 
     /// #1712: the lamp's place follows its time, or stands alone.
