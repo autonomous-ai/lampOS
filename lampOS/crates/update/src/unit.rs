@@ -318,6 +318,132 @@ mod tests {
         assert_eq!(environment(generic_eyes, "LAMP_BUS").as_deref(), Some("on"));
     }
 
+    /// Setup's product units a lamp moved from V1 does not get yet, and why
+    /// (#2937). Every other product setup unit has a generic twin.
+    const SETUP_LEFT_OUT: [(&str, &str); 9] = [
+        (
+            "lampos-setup-done.path",
+            "main's adapter starts the target itself once setup writes the marker (#2977)",
+        ),
+        (
+            "lamp-setup-wifi.socket",
+            "the app's Wi-Fi change: main's adapter takes no socket units yet",
+        ),
+        ("lamp-setup-wifi@.service", "the socket's template"),
+        (
+            "lamp-setup-wifi-restore.service",
+            "the Wi-Fi change's restore at boot, before the network; under /run it would come too late",
+        ),
+        (
+            "lamp-setup-change.socket",
+            "the app's settings change: main's adapter takes no socket units yet",
+        ),
+        ("lamp-setup-change@.service", "the socket's template"),
+        (
+            "lamp-setup-keys.socket",
+            "own keys after setup: main's adapter takes no socket units yet",
+        ),
+        ("lamp-setup-keys@.service", "the socket's template"),
+        (
+            "lamp-setup-reset.service",
+            "no 5 s reset on a moved lamp: its line 100 may be a head pad (the first builder, 22:47 on #2975)",
+        ),
+    ];
+
+    /// #2937: a lamp moved from V1 joins a new Wi-Fi as a product lamp does.
+    /// Each of setup's product units has a generic twin that runs the same
+    /// command under the same conditions and hardening, or is left out above
+    /// with why (the reset, which a moved lamp doesn't get). The
+    /// generic controls run without `--touch`, so no 5 s hold ever reaches
+    /// the reset on a moved lamp: its line 100 may be a head pad, which idles
+    /// high as the button does (the first builder on #2975, after El's P1).
+    #[test]
+    fn the_generic_package_sets_up_and_resets_as_the_product_does() {
+        let deploy = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy");
+        let mut product_setup: Vec<String> = std::fs::read_dir(deploy.join("product"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .filter(|name| name.starts_with("lamp-setup") || name.starts_with("lampos-setup"))
+            .collect();
+        product_setup.sort();
+        assert!(product_setup.contains(&"lamp-setup.service".to_owned()));
+        let lines = |text: &str, key: &str| -> Vec<String> {
+            text.lines()
+                .filter(|line| line.starts_with(key))
+                .map(str::to_owned)
+                .collect()
+        };
+        // The command from the program on, so the build folder is not compared.
+        let command = |text: &str| -> Vec<String> {
+            lines(text, "ExecStart=")
+                .iter()
+                .map(|line| line.split_once("/lamp-setup ").unwrap().1.to_owned())
+                .collect()
+        };
+        for name in &product_setup {
+            let generic = deploy.join("units").join(name);
+            if let Some((_, why)) = SETUP_LEFT_OUT.iter().find(|(left, _)| left == name) {
+                assert!(
+                    !generic.exists(),
+                    "{name} is left out ({why}) but has a twin"
+                );
+                continue;
+            }
+            let product = std::fs::read_to_string(deploy.join("product").join(name)).unwrap();
+            let generic = std::fs::read_to_string(&generic)
+                .unwrap_or_else(|_| panic!("{name}: no generic twin and not left out"));
+            assert_eq!(command(&generic), command(&product), "{name}");
+            for key in [
+                "ConditionPathExists=",
+                "User=",
+                "WantedBy=",
+                "PartOf=",
+                "ExecStopPost=",
+            ] {
+                assert_eq!(lines(&generic, key), lines(&product, key), "{name}: {key}");
+            }
+            assert!(
+                generic.contains("/opt/lampOS/setup/@SETUP_SHA256@/lamp-setup "),
+                "{name}"
+            );
+            // Recovery moves the radio as root: the twin keeps the
+            // product's hardening and runtime folder (#3020, Fourteen's P2
+            // on #2977: a moved lamp's only way to a new Wi-Fi).
+            for key in [
+                "RuntimeDirectory=",
+                "NoNewPrivileges=",
+                "ProtectSystem=",
+                "ReadWritePaths=",
+                "ProtectHome=",
+                "PrivateTmp=",
+                "RestrictAddressFamilies=",
+            ] {
+                assert_eq!(lines(&generic, key), lines(&product, key), "{name}: {key}");
+            }
+        }
+        for (left, _) in SETUP_LEFT_OUT {
+            assert!(
+                product_setup.iter().any(|name| name == left),
+                "{left} is named left out but is no product unit"
+            );
+        }
+
+        let flags = |text: &str| -> Vec<String> {
+            let exec = lines(text, "ExecStart=").pop().unwrap();
+            ["--touch", "--enable"]
+                .into_iter()
+                .filter(|flag| exec.split_whitespace().any(|word| word == *flag))
+                .map(str::to_owned)
+                .collect()
+        };
+        let product_controls =
+            std::fs::read_to_string(deploy.join("product/lamp-controls.service")).unwrap();
+        let generic_controls =
+            std::fs::read_to_string(deploy.join("units/lamp-controls.service")).unwrap();
+        assert_eq!(flags(&product_controls), ["--touch", "--enable"]);
+        assert!(flags(&generic_controls).is_empty(), "{generic_controls}");
+    }
+
     #[test]
     fn lamp_4aces_own_units_are_read() {
         // As they are in the repository: what the lamp runs.

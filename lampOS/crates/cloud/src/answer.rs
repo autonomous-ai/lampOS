@@ -57,6 +57,13 @@ pub trait Lamp {
     fn recovery(&self) -> bool {
         false
     }
+    /// Whether the reset button's 5 s hold takes this lamp back into setup
+    /// (#2937, for the app's Re-set up): `hold` when the controls' pins name
+    /// a reset, `none` when they don't (a lamp moved from V1, which never
+    /// has one). None, said by no field: not known, read as before.
+    fn reset(&self) -> Option<&'static str> {
+        None
+    }
     /// Whether texts from the app are taken (`LAMP_MESSAGES=on`,
     /// `crate::chat`). Off unless a lamp says so.
     fn texting(&self) -> bool {
@@ -268,6 +275,11 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             // hotspot only to a lamp that will open one.
             if lamp.recovery() {
                 info["recovery"] = json!(true);
+            }
+            // `reset` (#2937): a lamp that can't tell says none, so the
+            // app reads it as before, the 5 s hold.
+            if let Some(reset) = lamp.reset() {
+                info["reset"] = json!(reset);
             }
             some(info)
         }
@@ -484,11 +496,16 @@ pub mod tests {
         pub restart: bool,
         /// What `recovery` says (#3020).
         pub recovery: bool,
+        /// What `reset` says (#2937).
+        pub reset: Option<&'static str>,
     }
 
     impl Lamp for Fake {
         fn recovery(&self) -> bool {
             self.recovery
+        }
+        fn reset(&self) -> Option<&'static str> {
+            self.reset
         }
         fn versions(&mut self) -> Value {
             json!({"lamp-voice": "0.1.0+abc"})
@@ -633,6 +650,19 @@ pub mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(told["recovery"], true);
+        // #2937: a lamp that can't tell its reset says nothing of it; one
+        // that can says hold or none.
+        assert!(info.get("reset").is_none(), "{info}");
+        for said in ["hold", "none"] {
+            let mut told = Fake {
+                reset: Some(said),
+                ..Fake::default()
+            };
+            let info = answer(&mut told, "system.info", &Value::Null)
+                .unwrap()
+                .unwrap();
+            assert_eq!(info["reset"], said);
+        }
         assert_eq!(
             answer(&mut lamp, "system.network", &Value::Null).unwrap(),
             Some(json!({"private_ip": "192.168.1.42", "interface": "wlan0"}))
