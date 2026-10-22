@@ -1,5 +1,27 @@
 # Tests work log
 
+## 2026-10-22 23:13 +0700 — Skills add-on terminal CI recorded; parent/review hold remains
+
+Ready for lamp-voice: **no, #2693**. Both actual required jobs and final
+workflow metadata are SUCCESS on `381e5ce54`: [ARM64](https://github.com/autonomous-ai/lampOS/actions/runs/39807795375)
+**10,519/0/67** including one passing leaky, and [Linux Clippy](https://github.com/autonomous-ai/lampOS/actions/runs/39807795409).
+ARM tested merge `18a1b3e29` into `ec5428a34`; Skills passes **499/0**
+(155 library + 23 binary + 290 integration + 31 requested-audio).
+The three extra binary cases are Linux-gated; native **496/0/1** and all
+source/equal-range receipts remain unchanged. Every add-on row passes.
+
+[Terminal appendix](verification/skills-addon-refresh-20261022/#terminal-ci-appendix)
+preserves the earlier successful-jobs/pending-workflow snapshot, final
+metadata, exact selected raw rows and the full external log digest. The
+workflow watcher and log download now completed; the previous entry's
+pending aggregation is historical. This records no new gate or source change.
+
+[Reviewer-two's ancestry rule](https://github.com/autonomous-ai/lampOS/pull/2693#issuecomment-6333157595)
+requires the owned head to include the current parent; a synthetic merge is
+not enough. Parent `ee832b293` is behind the tested target. First and
+Reviewer-two retain the coordinated current-parent window and independent
+Skills read. Green CI alone does not make this PR ready or merged.
+
 ## 2026-10-22 23:05 +0700 — broker TLS required CI complete
 
 Ready for lamp-voice: **yes, [#3062](https://github.com/autonomous-ai/lampOS/pull/3062)**.

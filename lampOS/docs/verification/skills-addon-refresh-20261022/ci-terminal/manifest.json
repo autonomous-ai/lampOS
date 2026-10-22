@@ -1,0 +1,104 @@
+{
+  "format_version": 1,
+  "scope": "Appendix-only terminal CI documentation; no native source/range/gate receipt changed. The original package-manifest README hash remains a historical native-publication hash.",
+  "files": {
+    "arm64-early-check-run-disagreement.json": {
+      "bytes": 5154,
+      "sha256": "6448c51994da38875b76b47988883e993ffb0e1d15836cfae95c4f89b04a6e5d"
+    },
+    "arm64-final-run.json": {
+      "bytes": 5159,
+      "sha256": "f71bd543c6aa906cda36fb32e5e5c89d0fe252b647f5d0f111f69b8dd743ac79"
+    },
+    "arm64-final-watch.txt.json": {
+      "bytes": 9930,
+      "sha256": "f5a0950c89c55f83e6d45d2db58c2bdca62dbf8d57ac66f26359d565fc3f3900"
+    },
+    "arm64-log-fetch.json": {
+      "bytes": 32,
+      "sha256": "0734f70e8e81d0427abd5b257f2876a36dda78aa3701eb0073f24689a6eccd1b"
+    },
+    "arm64-summary.json": {
+      "bytes": 515,
+      "sha256": "88f98d2bb4e390716e5eca7bd308c767808efacafff09b960b4bd530f20372e2"
+    },
+    "clippy-early-check-run-disagreement.json": {
+      "bytes": 2044,
+      "sha256": "0db3765dc48105a59dd9b388406ab82ad573c68ecfbc60b3d77ae30845079eb2"
+    },
+    "clippy-final-run.json": {
+      "bytes": 2044,
+      "sha256": "0db3765dc48105a59dd9b388406ab82ad573c68ecfbc60b3d77ae30845079eb2"
+    },
+    "required-checks-result.json": {
+      "bytes": 966,
+      "sha256": "745c3e8e8d87408d5e3b5676fc987eb26b1684ea6643a7aad9dff38df6f612d3"
+    },
+    "selected-arm64-output.json": {
+      "bytes": 29258,
+      "sha256": "f0ff6963c2fbbc2ec6244d08999330ba69c364ee4bf0ae363a52eeea9a243fae"
+    },
+    "skills-count-audit.json": {
+      "bytes": 3044,
+      "sha256": "101997b9f37c7a7a4c2e6e914054d5346ed5ba96d5a8fe34a95cabdc38befde4"
+    },
+    "summary.json": {
+      "bytes": 2601,
+      "sha256": "2f57fd71f5c7d2232179da74ce59766be5ad6c0bea6746118710dbc6652b3a7e"
+    },
+    "../README.md": {
+      "bytes": 6774,
+      "sha256": "5c2f837007965cb23287ae193d999d36691abe301ebf2bd30079e67b7f912ef5"
+    }
+  },
+  "external_raw": [
+    {
+      "external_source": "/private/tmp/tests-skills-addon-refresh-20261022/ci/arm64-full-log.txt",
+      "bytes": 2512709,
+      "sha256": "b471f49ddcaca1cf5b29848eb873b45854f6f5c12d907671f2245227b3ae106e"
+    },
+    {
+      "external_source": "/private/tmp/tests-skills-addon-refresh-20261022/ci/skills-counts.json",
+      "bytes": 112928,
+      "sha256": "6910a95f1601161698578837b3f5616eca337549b7722da4bf20f4754b4a73fd"
+    }
+  ],
+  "copied_sources": [
+    {
+      "external_source": "/private/tmp/tests-skills-addon-refresh-20261022/required-checks-result.json",
+      "bytes": 966,
+      "sha256": "745c3e8e8d87408d5e3b5676fc987eb26b1684ea6643a7aad9dff38df6f612d3"
+    },
+    {
+      "external_source": "/private/tmp/tests-skills-addon-refresh-20261022/ci/arm64-final-run.json",
+      "bytes": 5159,
+      "sha256": "f71bd543c6aa906cda36fb32e5e5c89d0fe252b647f5d0f111f69b8dd743ac79"
+    },
+    {
+      "external_source": "/private/tmp/tests-skills-addon-refresh-20261022/ci/clippy-final-run.json",
+      "bytes": 2044,
+      "sha256": "0db3765dc48105a59dd9b388406ab82ad573c68ecfbc60b3d77ae30845079eb2"
+    },
+    {
+      "external_source": "/private/tmp/tests-skills-addon-refresh-20261022/ci/arm64-summary.json",
+      "bytes": 515,
+      "sha256": "88f98d2bb4e390716e5eca7bd308c767808efacafff09b960b4bd530f20372e2"
+    },
+    {
+      "external_source": "/private/tmp/tests-skills-addon-refresh-20261022/ci/arm64-early-check-run-disagreement.json",
+      "bytes": 5154,
+      "sha256": "6448c51994da38875b76b47988883e993ffb0e1d15836cfae95c4f89b04a6e5d"
+    },
+    {
+      "external_source": "/private/tmp/tests-skills-addon-refresh-20261022/ci/clippy-early-check-run-disagreement.json",
+      "bytes": 2044,
+      "sha256": "0db3765dc48105a59dd9b388406ab82ad573c68ecfbc60b3d77ae30845079eb2"
+    },
+    {
+      "external_source": "/private/tmp/tests-skills-addon-refresh-20261022/ci/arm64-log-fetch.json",
+      "bytes": 32,
+      "sha256": "0734f70e8e81d0427abd5b257f2876a36dda78aa3701eb0073f24689a6eccd1b"
+    }
+  ],
+  "limitations": "No full ARM log, complete Skills-row inventory, runner script, executable or Cargo message JSON is committed. Exact selected UTF-8 sections and final metadata are portable."
+}

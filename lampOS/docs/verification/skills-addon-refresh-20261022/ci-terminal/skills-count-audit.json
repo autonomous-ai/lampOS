@@ -1,0 +1,74 @@
+{
+  "source_head": "381e5ce544c2514f5c93808313a05124024803e2",
+  "tested_base": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+  "tested_merge_from_checkout_log": "18a1b3e2935c5eb6654b740e3fddc36a765a1cf9",
+  "main_interval_1_based": [
+    632,
+    11153
+  ],
+  "main_nextest": {
+    "PASS": 10518,
+    "LEAK": 1,
+    "FAIL": 0,
+    "passed_including_leaky": 10519,
+    "skipped": 67,
+    "seconds": 192.894,
+    "unique_indices": 10519,
+    "post_summary_repeated_diagnostic_rows_excluded": 35
+  },
+  "skills_passed_by_binary": {
+    "lamp-skills::it": 290,
+    "lamp-skills": 155,
+    "lamp-skills::requested_audio": 31,
+    "lamp-skills::bin/lamp-skills": 23
+  },
+  "skills_passed_total": 499,
+  "skills_failed_total": 0,
+  "native_passed_by_binary": {
+    "lamp-skills": 155,
+    "lamp-skills::bin/lamp-skills": 20,
+    "lamp-skills::it": 290,
+    "lamp-skills::requested_audio": 31
+  },
+  "native_passed_total": 496,
+  "native_ignored_total": 1,
+  "platform_delta": {
+    "linux_only_main_cases": [
+      {
+        "name": "tests::a_broken_socket_still_lets_a_wake_end_the_wait",
+        "source_line_1_based": 4366,
+        "exact_source": "    #[cfg(target_os = \"linux\")]\n    #[test]\n    fn a_broken_socket_still_lets_a_wake_end_the_wait() {\n"
+      },
+      {
+        "name": "tests::a_broken_socket_still_lets_another_topics_message_end_the_wait",
+        "source_line_1_based": 4388,
+        "exact_source": "    #[cfg(target_os = \"linux\")]\n    #[test]\n    fn a_broken_socket_still_lets_another_topics_message_end_the_wait() {\n"
+      },
+      {
+        "name": "tests::a_late_hang_up_waits_out_only_the_rest_of_the_wait",
+        "source_line_1_based": 4415,
+        "exact_source": "    #[cfg(target_os = \"linux\")]\n    #[test]\n    fn a_late_hang_up_waits_out_only_the_rest_of_the_wait() {\n"
+      }
+    ],
+    "source_path": "lampOS/crates/skills/src/main.rs",
+    "main_source_sha256": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+    "source_identical_at_owned_head_and_tested_base": true,
+    "method": "Compare the 20 native main-binary names with 23 primary ARM main-binary names. The only three additions each have cfg(target_os = linux); the source file is byte-identical at the owned head and tested base. Other binary result counts match."
+  },
+  "all_addon_main_rows_passed": 14,
+  "external_full_skills_row_inventory": {
+    "external_source": "/private/tmp/tests-skills-addon-refresh-20261022/ci/skills-counts.json",
+    "bytes": 112928,
+    "sha256": "6910a95f1601161698578837b3f5616eca337549b7722da4bf20f4754b4a73fd"
+  },
+  "native_raw_provenance": {
+    "external_source": "/private/tmp/tests-skills-addon-refresh-20261022/package-serial.txt",
+    "bytes": 93896,
+    "sha256": "d2e5a1bff389156ecef8b12c1a862f8dec4feb967963b71bc7be23481b0ffaf5"
+  },
+  "arm_raw_provenance": {
+    "external_source": "/private/tmp/tests-skills-addon-refresh-20261022/ci/arm64-full-log.txt",
+    "bytes": 2512709,
+    "sha256": "b471f49ddcaca1cf5b29848eb873b45854f6f5c12d907671f2245227b3ae106e"
+  }
+}

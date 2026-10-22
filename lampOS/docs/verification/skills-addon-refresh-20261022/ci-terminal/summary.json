@@ -1,0 +1,48 @@
+{
+  "packaged_at_utc": "2026-10-22T16:13:01.903981+00:00",
+  "pr": "https://github.com/autonomous-ai/lampOS/pull/2693",
+  "ready_for_lamp_voice": false,
+  "source_head": "381e5ce544c2514f5c93808313a05124024803e2",
+  "source_parent": "ee832b293c279cc2786f10eb111c85e3521830cd",
+  "tested_merge": "18a1b3e2935c5eb6654b740e3fddc36a765a1cf9",
+  "tested_base": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+  "identity_evidence": "CI fetch, checkout and logged commit, including the merge message. No local synthetic merge object was used.",
+  "arm64": {
+    "run_id": 39807795375,
+    "job_id": 119925572030,
+    "run_status": "completed",
+    "run_conclusion": "success",
+    "job_status": "completed",
+    "job_conclusion": "success",
+    "nextest_passed": 10519,
+    "nextest_failed": 0,
+    "nextest_skipped": 67,
+    "passing_leaky_in_total": 1,
+    "skills_passed": 499,
+    "skills_failed": 0,
+    "docs_passed": 4,
+    "docs_failed": 0,
+    "relay_signals": "ok (no numeric count reported)",
+    "turn_end_process_passed": 12,
+    "turn_end_process_failed": 0
+  },
+  "clippy": {
+    "run_id": 39807795409,
+    "job_id": 119925572673,
+    "run_status": "completed",
+    "run_conclusion": "success",
+    "job_status": "completed",
+    "job_conclusion": "success"
+  },
+  "required_checks_watch_exit": 0,
+  "arm64_workflow_watch_exit": 0,
+  "history": "Earlier ARM metadata reported actual jobs completed successfully but workflow in_progress with an empty conclusion. Clippy was already terminal success in its paired snapshot. Final metadata and available log supersede the ARM workflow-pending observation.",
+  "reviewer_rule": "https://github.com/autonomous-ai/lampOS/pull/2693#issuecomment-6333157595",
+  "remaining": "The explicit head-ancestry rule is not satisfied by a synthetic merge. Source parent ee832b293 is behind the tested target ec5428a34, and a coordinated current-parent window plus independent Skills read remain with First and Reviewer-two. No merge/readiness claim.",
+  "limits": [
+    "No new gates, source edits, PR or Queue actions were made for this documentation-only publication.",
+    "Native 496/0/1 and equal-source/range receipts remain unchanged, with their historical source scope and blank-EOF warnings.",
+    "The complete 2,512,709-byte ARM output and 499-row external Skills inventory remain external with SHA-256; portable selected output includes checkout, summary, every addon case, all three Linux-only binary cases, docs and own-harness results.",
+    "This CI receipt is not a latency comparison, device activation qualification or local ARM64 build."
+  ]
+}
