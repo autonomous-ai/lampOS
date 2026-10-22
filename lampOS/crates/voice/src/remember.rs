@@ -776,8 +776,10 @@ const RETRY: Duration = Duration::from_secs(5);
 /// How long starting waits for what is kept, so that the first session,
 /// which opens within milliseconds, is told it. On lamp-4ace on 2026-10-13
 /// the memory answered this in under a millisecond; a memory that is not
-/// there costs nothing, and one that hangs costs this once.
-const FIRST_READ: Duration = Duration::from_millis(300);
+/// there costs nothing, and one that hangs costs this once. The second
+/// route asks its note as a line begins and waits for no more than what is
+/// left of this from that ask (`second_provider::worker`'s `Ahead`).
+pub(crate) const FIRST_READ: Duration = Duration::from_millis(300);
 /// What a recall asks for: enough to answer from, and small enough to go
 /// to the model in one answer ([`lamp_gemini::MAX_TOOL_JSON_BYTES`]).
 const RECALL_ENTRIES: u64 = 6;
@@ -1856,6 +1858,13 @@ pub fn kept_since_note() -> bool {
     days_client().is_some_and(DaysClient::kept_since_note)
 }
 
+/// [`kept_since_note`], the mark left: whether a note asked now would be
+/// asked for something kept. The mark is taken only as a read begins, so a
+/// keep after it marks the note again.
+pub fn kept_since_note_peek() -> bool {
+    days_client().is_some_and(DaysClient::kept_since_note_peek)
+}
+
 /// Whether the next session should be opened fresh, with no resumption
 /// ([`DaysClient::wants_fresh_session`]); never without the Days client.
 pub fn wants_fresh_session() -> bool {
@@ -1894,7 +1903,7 @@ pub(crate) struct SessionNote {
 }
 
 impl SessionNote {
-    fn unavailable() -> Self {
+    pub(crate) fn unavailable() -> Self {
         Self {
             text: UNAVAILABLE.into(),
             complete: false,
@@ -1910,9 +1919,21 @@ pub(crate) fn fresh_session_note(
     person: Option<&str>,
     fresh: bool,
 ) -> SessionNote {
+    fresh_session_note_within(socket, session, person, fresh, FIRST_READ)
+}
+
+/// [`fresh_session_note`] within `deadline`: the second route reads it off
+/// its loop as a line begins, and a line is often longer than 300 ms.
+pub(crate) fn fresh_session_note_within(
+    socket: &Path,
+    session: u64,
+    person: Option<&str>,
+    fresh: bool,
+    deadline: Duration,
+) -> SessionNote {
     if DAYS_MODE.get() != Some(&true) {
         return SessionNote {
-            text: theirs_too(socket, told(), person, FIRST_READ),
+            text: theirs_too(socket, told(), person, deadline),
             complete: true,
         };
     }
@@ -1922,7 +1943,7 @@ pub(crate) fn fresh_session_note(
         .filter(|client| client.socket == socket)
     {
         Some(client) => {
-            client.session_note_within(session, person, crate::rules::on(), FIRST_READ, fresh)
+            client.session_note_within(session, person, crate::rules::on(), deadline, fresh)
         }
         None => SessionNote::unavailable(),
     }
@@ -2183,8 +2204,10 @@ const CONVERSATION_IDLE: Duration = Duration::from_secs(45);
 /// What a forget waits, at most, for the writer to finish an exchange it
 /// has in hand ([`HandOns::settle`]).
 const FORGET_SETTLE: Duration = Duration::from_millis(300);
-/// Minimum interval between retries of an incomplete note or a fresh open
-/// that did not resume journalling ([`DaysClient::wants_fresh_session`]).
+/// Minimum interval between a fresh open that did not resume journalling
+/// and the next ([`DaysClient::wants_fresh_session`]), and on the second
+/// route between notes that fail back to back: one failure is asked again
+/// on the next turn (`second_provider::worker`'s `Sessions`).
 pub(crate) const FRESH_RETRY: Duration = Duration::from_secs(30);
 const ANSWER_BYTES: usize = 8_192;
 
@@ -4116,6 +4139,11 @@ impl DaysClient {
     /// again, so a name told mid-run is in the run's next turns.
     pub fn kept_since_note(&self) -> bool {
         self.kept_since_note.swap(false, Ordering::AcqRel)
+    }
+
+    /// [`Self::kept_since_note`], the mark left.
+    pub fn kept_since_note_peek(&self) -> bool {
+        self.kept_since_note.load(Ordering::Acquire)
     }
 
     /// Whether the next session should be a fresh one

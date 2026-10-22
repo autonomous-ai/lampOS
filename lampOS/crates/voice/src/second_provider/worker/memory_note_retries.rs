@@ -23,15 +23,17 @@ fn note(text: &str, complete: bool) -> SessionNote {
     }
 }
 
+/// A memory slow once costs one turn its note, not the 30 s after it
+/// (lamp-4ace, 22 Oct 17:45): the next turn asks again.
 #[test]
-fn an_incomplete_note_retries_at_thirty_seconds_and_then_stays_cached() {
+fn an_incomplete_note_retries_on_the_next_turn_and_then_stays_cached() {
     let mut sessions = Sessions::default();
     let start = Instant::now();
     let mut asked = Vec::new();
     for (seconds, expected) in [
         (0, "unavailable"),
-        (1, "unavailable"),
-        (29, "unavailable"),
+        (1, "kept name"),
+        (29, "kept name"),
         (30, "kept name"),
         (360, "kept name"),
     ] {
@@ -48,8 +50,10 @@ fn an_incomplete_note_retries_at_thirty_seconds_and_then_stays_cached() {
     assert_eq!(asked, [1, 2], "each attempt has its own Days session");
 }
 
+/// One failure is asked again on the next turn; two back to back, and the
+/// store is asked no more than once each 30 s from the last attempt.
 #[test]
-fn repeated_failures_get_one_attempt_per_interval() {
+fn repeated_failures_after_the_next_turn_get_one_attempt_per_interval() {
     let mut sessions = Sessions::default();
     let start = Instant::now();
     let mut asked = Vec::new();
@@ -59,7 +63,7 @@ fn repeated_failures_get_one_attempt_per_interval() {
             note("room only", false)
         });
     }
-    assert_eq!(asked, [(0, 1), (30, 2), (60, 3), (90, 4)]);
+    assert_eq!(asked, [(0, 1), (1, 2), (31, 3), (61, 4), (91, 5)]);
 }
 
 #[test]
@@ -120,9 +124,10 @@ fn a_held_person_change_cannot_leave_the_previous_persons_note_cached() {
         sessions.frozen(true, now, |_| note("room only", false)),
         "room only"
     );
+    // The next turn asks the room's again; B's never comes back.
     assert!(
         !sessions
-            .frozen(false, now, |_| panic!("backoff"))
+            .frozen(false, now, |_| note("room again", true))
             .contains("B's")
     );
 }
@@ -357,6 +362,13 @@ fn a_kept_name_recovers_after_a_failed_refresh_without_another_keep() {
         !client.kept_since_note(),
         "the original keep marker is consumed once"
     );
+    // The next turn asks again, and the store still refuses: two failures
+    // back to back, so none is asked for 30 s from this one.
+    assert!(
+        !sessions
+            .frozen(false, start + Duration::from_secs(2), ask)
+            .contains("Pippa")
+    );
     memory.refused.store(false, Ordering::Release);
     let cached = Instant::now();
     assert!(
@@ -367,7 +379,7 @@ fn a_kept_name_recovers_after_a_failed_refresh_without_another_keep() {
     let cached_us = cached.elapsed().as_micros();
     assert_eq!(
         memory.opens.load(Ordering::Acquire),
-        2,
+        3,
         "no I/O before retry eligibility"
     );
 
@@ -397,7 +409,7 @@ fn a_kept_name_recovers_after_a_failed_refresh_without_another_keep() {
         recovered.contains("Pippa"),
         "the snapshot recovers the name independently of chat history"
     );
-    assert_eq!(memory.opens.load(Ordering::Acquire), 3);
+    assert_eq!(memory.opens.load(Ordering::Acquire), 4);
     assert_eq!(
         sessions.frozen(false, later + FRESH_RETRY, |_| panic!(
             "healthy note retried"
@@ -405,7 +417,7 @@ fn a_kept_name_recovers_after_a_failed_refresh_without_another_keep() {
         recovered
     );
     eprintln!(
-        "memory note timings: ask_us={:?} cached_us={cached_us} opens=3",
+        "memory note timings: ask_us={:?} cached_us={cached_us} opens=4",
         timings.into_inner().unwrap()
     );
 }
@@ -538,17 +550,12 @@ fn a_timed_out_note_retries_and_recovers_without_a_keep() {
         },
     );
     assert!(!failed.contains("recovered fact"));
-    assert_eq!(sessions.note_retry_at, Some(start + FRESH_RETRY));
+    // Asked again on the next turn, not 30 s later.
+    assert_eq!(sessions.note_retry_at, Some(start));
     assert_eq!(memory.opens().len(), 1);
-    assert_eq!(
-        sessions.frozen(false, start + FRESH_RETRY - Duration::from_secs(1), |_| {
-            panic!("timeout retried before eligibility")
-        }),
-        failed
-    );
     let (recovered, _) = socket_attempt(
         &mut memory,
-        || sessions.frozen(false, start + FRESH_RETRY, ask),
+        || sessions.frozen(false, start + Duration::from_secs(1), ask),
         |memory, _| {
             let (mut stream, request) = memory.next_open();
             writeln!(
@@ -639,10 +646,7 @@ fn a_non_held_person_change_bypasses_the_failed_persons_backoff() {
     );
     assert!(partial.contains("old partial room"));
     assert_eq!(loads.load(Ordering::Relaxed), 1);
-    assert_eq!(
-        sessions.lock().unwrap().note_retry_at,
-        Some(start + FRESH_RETRY)
-    );
+    assert_eq!(sessions.lock().unwrap().note_retry_at, Some(start));
     a.revoke();
     let (theirs, _) = socket_attempt(
         &mut memory,
@@ -717,7 +721,8 @@ fn an_eligible_retry_shares_one_budget_between_room_and_person() {
             vec![]
         },
     );
-    assert_eq!(sessions.note_retry_at, Some(start + FRESH_RETRY));
+    // One failure: eligible on the next turn; this retry is a later one.
+    assert_eq!(sessions.note_retry_at, Some(start));
     let (_, elapsed) = socket_attempt(
         &mut memory,
         || sessions.frozen(false, start + FRESH_RETRY, ask),
@@ -755,4 +760,371 @@ fn an_eligible_retry_shares_one_budget_between_room_and_person() {
         "retry note I/O: configured_us=300000 observed_us={} scopes=2",
         elapsed.as_micros()
     );
+}
+
+/// A memory on its own thread that answers each request in turn, as
+/// lamp-memory does: each snapshot open after what `pace` says for its count
+/// from 0, with one fact naming that count and whose it is, and everything
+/// else at once. A wake connection stops it.
+struct Paced {
+    socket: PathBuf,
+    opens: Arc<Mutex<Vec<Value>>>,
+    stop: Arc<AtomicBool>,
+    worker: Option<std::thread::JoinHandle<()>>,
+}
+impl Paced {
+    fn new(label: &str, pace: impl Fn(usize) -> Duration + Send + 'static) -> Self {
+        let socket =
+            std::env::temp_dir().join(format!("note-ahead-{label}-{}.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        let opens = Arc::new(Mutex::new(Vec::new()));
+        let stop = Arc::new(AtomicBool::new(false));
+        let (seen, stopping) = (opens.clone(), stop.clone());
+        let worker = std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else {
+                    continue;
+                };
+                if stopping.load(Ordering::Acquire) {
+                    break;
+                }
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                let mut line = String::new();
+                if BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap_or(0)
+                    == 0
+                {
+                    continue;
+                }
+                let request: Value = serde_json::from_str(&line).unwrap();
+                let answer = if request["op"] == "session_open" {
+                    let count = {
+                        let mut seen = seen.lock().unwrap();
+                        seen.push(request.clone());
+                        seen.len() - 1
+                    };
+                    std::thread::sleep(pace(count));
+                    let whose = request["person"].as_str().unwrap_or("the room");
+                    SocketScript::snapshot(
+                        &request,
+                        11 + count as u64,
+                        &format!("fact {count} of {whose}"),
+                    )
+                } else {
+                    json!({"ok":true})
+                };
+                // A client that left before its answer is not an error here.
+                let _ = writeln!(stream, "{answer}");
+            }
+        });
+        Self {
+            socket,
+            opens,
+            stop,
+            worker: Some(worker),
+        }
+    }
+
+    fn opens(&self) -> usize {
+        self.opens.lock().unwrap().len()
+    }
+}
+impl Drop for Paced {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Release);
+        let _ = UnixStream::connect(&self.socket);
+        self.worker.take().unwrap().join().unwrap();
+        let _ = std::fs::remove_file(&self.socket);
+    }
+}
+
+/// The worker's note asked ahead and its turn's context, as the engine
+/// uses them, against `memory`, with the process's one thread set aside
+/// (a turn's context opens it) and put back after.
+struct Turns {
+    sessions: Arc<Mutex<Sessions>>,
+    ahead: super::Ahead,
+    _client: Arc<DaysClient>,
+    kept: Option<crate::thread::Thread>,
+    _one: crate::provider_worker::tests::OneThread,
+}
+impl Turns {
+    fn new(memory: &Paced) -> Self {
+        let one = crate::provider_worker::tests::one_thread();
+        let kept = std::mem::take(
+            &mut *crate::thread::THREAD
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+        );
+        let client = Arc::new(DaysClient::new(memory.socket.clone()).unwrap());
+        let sessions = Arc::new(Mutex::new(Sessions::default()));
+        let reading = client.clone();
+        let ahead = super::Ahead {
+            sessions: sessions.clone(),
+            who: None,
+            ask: Arc::new(move |session, person, within| {
+                reading.session_note_within(session, person, false, within, true)
+            }),
+        };
+        Self {
+            sessions,
+            ahead,
+            _client: client,
+            kept: Some(kept),
+            _one: one,
+        }
+    }
+
+    /// The memory note a turn told in `scope` is given, as the worker's
+    /// context callback composes it.
+    fn told(&self, scope: &RequestScope) -> String {
+        let socket = Some(PathBuf::from("/unused/the note is asked ahead"));
+        let context =
+            super::memory_context(self.sessions.clone(), socket, None, true, |_, _, note| {
+                Told::from(note)
+            });
+        context(Some(&scope.lease())).text
+    }
+
+    async fn ready(&self, scope: &RequestScope) {
+        self.ahead.clone().ready(Some(scope.lease())).await;
+    }
+}
+impl Drop for Turns {
+    fn drop(&mut self) {
+        *crate::thread::THREAD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = self.kept.take().unwrap();
+    }
+}
+
+fn scoped(request: u64, snapshot: ScopeSnapshot) -> RequestScope {
+    RequestScope::new(
+        RequestKey {
+            worker: lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+            session: 1,
+            request,
+        },
+        snapshot,
+    )
+}
+
+fn runtime() -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+}
+
+/// The longest the runtime's one thread went without running this, from
+/// its start until `stop`: how long the worker's loop was held up.
+async fn longest_gap(stop: Arc<AtomicBool>) -> Duration {
+    let mut longest = Duration::ZERO;
+    let mut last = Instant::now();
+    while !stop.load(Ordering::Acquire) {
+        tokio::time::sleep(Duration::from_millis(5)).await;
+        let now = Instant::now();
+        longest = longest.max(now - last);
+        last = now;
+    }
+    longest
+}
+
+/// lamp-4ace, 22 Oct 17:45: the note asked as the line ended held the
+/// worker's loop 300 ms and came 60 ms after the voice gave up. Asked as a
+/// 1 s line begins, an answer 350 ms after the ask is in by its end, the
+/// turn is told it at once, and nothing on the loop waits on the memory.
+#[test]
+fn a_note_asked_as_the_line_begins_is_in_by_its_end_and_the_loop_never_waits() {
+    let memory = Paced::new("ahead", |_| Duration::from_millis(350));
+    let turns = Turns::new(&memory);
+    let room = scoped(1, ScopeSnapshot::room());
+    let (note, held_up, begin, end) = runtime().block_on(async {
+        let stop = Arc::new(AtomicBool::new(false));
+        let gaps = tokio::spawn(longest_gap(stop.clone()));
+        tokio::task::yield_now().await;
+        let began = Instant::now();
+        turns.ahead.begin(Some(&room.lease()), began);
+        let begin = began.elapsed();
+        // The line.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        let ended = Instant::now();
+        turns.ready(&room).await;
+        let note = turns.told(&room);
+        let end = ended.elapsed();
+        stop.store(true, Ordering::Release);
+        (note, gaps.await.unwrap(), begin, end)
+    });
+    assert!(held_up < Duration::from_millis(150), "held up {held_up:?}");
+    assert!(begin < Duration::from_millis(50), "{begin:?}");
+    assert!(end < Duration::from_millis(100), "{end:?}");
+    assert!(note.contains("fact 0 of the room"), "{note}");
+    assert_eq!(memory.opens(), 1);
+    eprintln!(
+        "note ahead: begin_us={} end_us={} longest_gap_us={}",
+        begin.as_micros(),
+        end.as_micros(),
+        held_up.as_micros()
+    );
+}
+
+/// A note not in by what is left of its 300 ms from the ask is late: the
+/// turn waits only that, is told none, and the next turn asks again, not
+/// 30 s later.
+#[test]
+fn a_late_note_is_asked_again_on_the_next_turn_not_thirty_seconds_later() {
+    let memory = Paced::new("late", |count| {
+        Duration::from_millis(if count == 0 { 900 } else { 0 })
+    });
+    let turns = Turns::new(&memory);
+    let (first_line, second_line) = (
+        scoped(1, ScopeSnapshot::room()),
+        scoped(2, ScopeSnapshot::room()),
+    );
+    let (first, waited, second) = runtime().block_on(async {
+        let start = Instant::now();
+        turns.ahead.begin(Some(&first_line.lease()), Instant::now());
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let ended = Instant::now();
+        turns.ready(&first_line).await;
+        let first = turns.told(&first_line);
+        let waited = ended.elapsed();
+        // The late read ends; the next line begins 1.2 s after the first.
+        tokio::time::sleep_until((start + Duration::from_millis(1_200)).into()).await;
+        turns
+            .ahead
+            .begin(Some(&second_line.lease()), Instant::now());
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        turns.ready(&second_line).await;
+        (first, waited, turns.told(&second_line))
+    });
+    assert!(!first.contains("fact"), "{first}");
+    assert!(
+        waited < Duration::from_millis(250),
+        "only what was left of 300 ms: {waited:?}"
+    );
+    assert!(second.contains("fact 1 of the room"), "{second}");
+    assert_eq!(memory.opens(), 2);
+    assert!(turns.sessions.lock().unwrap().note_retry_at.is_none());
+}
+
+/// A line begun as one person's and found by its end to be someone else's
+/// (a face not theirs seen speaking it): the early answer is let go, and
+/// the note asked again for the room.
+#[test]
+fn a_person_change_during_the_line_asks_again_for_whoever_it_is_at_its_end() {
+    let memory = Paced::new("change", |_| Duration::ZERO);
+    let turns = Turns::new(&memory);
+    let a = crate::remember::person_id("Scope A");
+    let line = scoped(1, ScopeSnapshot::of("Scope A"));
+    let note = runtime().block_on(async {
+        turns.ahead.begin(Some(&line.lease()), Instant::now());
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        line.lease().narrow_to_room();
+        turns.ready(&line).await;
+        turns.told(&line)
+    });
+    assert!(!note.contains(&a), "{note}");
+    assert!(note.contains("fact 2 of the room"), "{note}");
+    let opens = memory.opens.lock().unwrap().clone();
+    assert_eq!(opens.len(), 3);
+    assert_eq!(opens[1]["person"], a);
+    assert!(opens[2]["person"].is_null());
+    assert_ne!(opens[0]["session"], opens[2]["session"]);
+}
+
+/// A line held by a gap asks nothing and is told no note; a note in flight
+/// when the camera or the microphone closes or opens is never told, and no
+/// second read starts beside it; a revoked scope is told nothing, and the
+/// room's next line gets the room's note alone.
+#[test]
+fn a_held_line_a_privacy_close_and_a_revoked_scope_never_get_another_scopes_note() {
+    let a = crate::remember::person_id("Scope A");
+    // Held.
+    {
+        let memory = Paced::new("held", |_| Duration::ZERO);
+        let turns = Turns::new(&memory);
+        let (theirs, held, room) = (
+            scoped(1, ScopeSnapshot::of("Scope A")),
+            scoped(2, ScopeSnapshot::held_of("Scope A")),
+            scoped(3, ScopeSnapshot::room()),
+        );
+        let (told, during, after) = runtime().block_on(async {
+            turns.ahead.begin(Some(&theirs.lease()), Instant::now());
+            turns.ready(&theirs).await;
+            let told = turns.told(&theirs);
+            turns.ahead.begin(Some(&held.lease()), Instant::now());
+            turns.ready(&held).await;
+            let during = turns.told(&held);
+            turns.ahead.begin(Some(&room.lease()), Instant::now());
+            turns.ready(&room).await;
+            (told, during, turns.told(&room))
+        });
+        assert!(told.contains(&format!("fact 1 of {a}")), "{told}");
+        assert!(during.is_empty(), "{during}");
+        assert!(
+            after.contains("fact 2 of the room") && !after.contains(&a),
+            "{after}"
+        );
+        assert_eq!(memory.opens(), 3, "the held line asked nothing");
+    }
+    // A privacy change with the read in flight.
+    {
+        let memory = Paced::new("privacy", |count| {
+            Duration::from_millis(if count == 0 { 400 } else { 0 })
+        });
+        let turns = Turns::new(&memory);
+        let (theirs, room) = (
+            scoped(1, ScopeSnapshot::of("Scope A")),
+            scoped(2, ScopeSnapshot::room()),
+        );
+        let (during, again) = runtime().block_on(async {
+            turns.ahead.begin(Some(&theirs.lease()), Instant::now());
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            turns.ahead.forget();
+            // The room's line while it is still read.
+            turns.ahead.begin(Some(&room.lease()), Instant::now());
+            turns.ready(&room).await;
+            let during = turns.told(&room);
+            // The first read ends; the first line is told with a new read.
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            turns.ready(&theirs).await;
+            (during, turns.told(&theirs))
+        });
+        assert!(!during.contains(&a) && !during.contains("fact"), "{during}");
+        assert!(again.contains(&format!("fact 3 of {a}")), "{again}");
+        assert!(
+            !again.contains("fact 1 of"),
+            "the read before is never told: {again}"
+        );
+        assert_eq!(memory.opens(), 4, "one read at a time, then one more");
+    }
+    // Revoked.
+    {
+        let memory = Paced::new("revoked", |_| Duration::ZERO);
+        let turns = Turns::new(&memory);
+        let (theirs, room) = (
+            scoped(1, ScopeSnapshot::of("Scope A")),
+            scoped(2, ScopeSnapshot::room()),
+        );
+        let (revoked, after) = runtime().block_on(async {
+            turns.ahead.begin(Some(&theirs.lease()), Instant::now());
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            theirs.revoke();
+            turns.ready(&theirs).await;
+            let revoked = turns.told(&theirs);
+            turns.ahead.begin(Some(&room.lease()), Instant::now());
+            turns.ready(&room).await;
+            (revoked, turns.told(&room))
+        });
+        assert!(revoked.is_empty(), "{revoked}");
+        assert!(
+            after.contains("fact 2 of the room") && !after.contains(&a),
+            "{after}"
+        );
+    }
 }

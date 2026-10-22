@@ -634,6 +634,32 @@ pub enum Policed {
 /// turn's decision, at most `crate::policy_holds::WAIT`.
 pub type PolicyGate = Arc<dyn Fn(u64, String) -> BoxFuture<'static, Policed> + Send + Sync>;
 
+/// Told as a spoken line begins, with the scope its turn is told in
+/// ([`NoteAhead::begin`]).
+pub type NoteBegin = Arc<dyn Fn(Option<&crate::memory_scope::ScopeLease>) + Send + Sync>;
+/// Awaited just before a turn is told, with the scope it is told in
+/// ([`NoteAhead::ready`]).
+pub type NoteReady =
+    Arc<dyn Fn(Option<crate::memory_scope::ScopeLease>) -> BoxFuture<'static, ()> + Send + Sync>;
+
+/// The memory's note for a run of turns, asked as a spoken line begins and
+/// read off the worker's loop ([`Engine::asking_the_note_ahead`]). Each is
+/// given the scope the turn is told in ([`told`]): its lease when this route
+/// scopes context, none otherwise.
+#[derive(Clone)]
+pub struct NoteAhead {
+    /// Told as a spoken line begins: the note is asked then, on a thread of
+    /// its own, if it is due. It never waits.
+    pub begin: NoteBegin,
+    /// Awaited just before a turn is told: done once the note asked for its
+    /// scope is in, or once what is left of the note's 300 ms from that ask
+    /// has passed. Building the turn then reads nothing.
+    pub ready: NoteReady,
+    /// Told when the camera or the microphone closes or opens: a note asked
+    /// before is never told after.
+    pub forget: Arc<dyn Fn() + Send + Sync>,
+}
+
 /// What every turn task shares.
 struct Shared {
     services: Arc<dyn Services>,
@@ -718,6 +744,9 @@ struct Shared {
     /// What memory holds that may fit a spoken request's words
     /// ([`Engine::remembering`]).
     remembered: Option<Remembered>,
+    /// The memory's note asked as a spoken line begins
+    /// ([`Engine::asking_the_note_ahead`]).
+    note_ahead: Option<NoteAhead>,
     /// With `LAMP_NAME_NOTE=on`: the note for a line the lamp's name began.
     name_note: Option<NameNote>,
     /// The note for a line let out only as the conversation going on.
@@ -1650,6 +1679,7 @@ impl Engine {
                 though_held: false,
                 staff: None,
                 remembered: None,
+                note_ahead: None,
                 name_note: None,
                 conversation_alone: None,
                 named_ask: None,
@@ -1734,10 +1764,13 @@ impl Engine {
     /// installed authority; a change from the last tells
     /// [`Self::forgetting_on_privacy`]'s hook.
     pub(crate) fn privacy(&mut self, now: (bool, u64, bool, u64)) {
-        if self.privacy.replace(now).is_some_and(|was| was != now)
-            && let Some(forget) = self.on_privacy.as_mut()
-        {
-            forget();
+        if self.privacy.replace(now).is_some_and(|was| was != now) {
+            if let Some(forget) = self.on_privacy.as_mut() {
+                forget();
+            }
+            if let Some(ahead) = &self.shared.note_ahead {
+                (ahead.forget)();
+            }
         }
     }
 
@@ -2292,6 +2325,16 @@ impl Engine {
     pub fn remembering(mut self, note: Remembered) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.remembered = Some(note);
+        }
+        self
+    }
+
+    /// The memory's note is asked as each spoken line begins, off the
+    /// worker's loop, and a turn waits for it without blocking the loop
+    /// ([`NoteAhead`]). Before any turn only.
+    pub fn asking_the_note_ahead(mut self, ahead: NoteAhead) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.note_ahead = Some(ahead);
         }
         self
     }
@@ -2960,6 +3003,13 @@ impl Engine {
                 });
                 let memory_scope = self.memory_scope(request, session, true);
                 let lease = memory_scope.as_ref().map(|scope| scope.lease());
+                // The memory's note, asked now while the person speaks, off
+                // the loop, so it is in by the line's end (lamp-4ace, 22 Oct
+                // 17:45: asked at the end, it held the loop 300 ms and came
+                // 60 ms too late).
+                if let Some(ahead) = &self.shared.note_ahead {
+                    (ahead.begin)(told_scope(&self.shared, lease.as_ref()));
+                }
                 let task = tokio::spawn(spoken(
                     self.shared.clone(),
                     (
@@ -5557,6 +5607,24 @@ fn told(shared: &Shared, scope: Option<&crate::memory_scope::ScopeLease>) -> Tol
     }
 }
 
+/// The scope [`told`] tells a turn in: its lease when this route scopes
+/// context, none otherwise.
+fn told_scope<'a>(
+    shared: &Shared,
+    scope: Option<&'a crate::memory_scope::ScopeLease>,
+) -> Option<&'a crate::memory_scope::ScopeLease> {
+    scope.filter(|_| shared.scoped_system.is_some())
+}
+
+/// The memory's note for the turn about to be told, waited for here, off
+/// the worker's loop, at most what is left of its 300 ms from its ask
+/// ([`NoteAhead::ready`]). Nothing without it.
+async fn note_ready(shared: &Shared, scope: Option<&crate::memory_scope::ScopeLease>) {
+    if let Some(ahead) = &shared.note_ahead {
+        (ahead.ready)(told_scope(shared, scope).cloned()).await;
+    }
+}
+
 /// What a turn's prepared chat is once `said` comes: begun on new early
 /// words, kept on the same, dropped when the person went on.
 fn prepared_on(
@@ -5908,6 +5976,10 @@ async fn done_though_held(
     let gone = || scope.is_some_and(|scope| !scope.is_current());
     let began = Instant::now();
     let asking = async {
+        if gone() {
+            return None;
+        }
+        note_ready(shared, scope).await;
         if gone() {
             return None;
         }
@@ -6608,6 +6680,12 @@ async fn answer(
     let turn_tools = Mutex::new(TurnTools::default());
     let tools_noted = shared.note_tools.then_some(&turn_tools);
     let writing = async move {
+        if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+            return Err(Stop::Gone);
+        }
+        // The memory's note asked as the line began, waited for here, never
+        // on the loop: building the context below reads nothing.
+        note_ready(shared, scope.as_ref()).await;
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
         }
