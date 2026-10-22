@@ -7123,6 +7123,30 @@ Ready for lamp-voice: yes (#3072); no (#3097, #3064, #3014, #2988)
   preserving their separate activation values and acceptance holds.
 - No lamp, model call, physical acceptance or memory score increase is claimed.
 
+## 2026-10-23, 02:16: accepted queued-forget writer prerequisite claimed
+
+Ready for lamp-voice: no
+
+- First accepted the truthful deadline limit in Queue 6349065318. A missed
+  response deadline keeps storage Committing or unknown, never NotWritten;
+  one priority forget runs next on the same writer after it returns. An
+  indefinitely blocked kernel write has no promised deletion time. The
+  spoken fallback is “I'll forget that as soon as I can”, never “done”.
+- Claiming the inactive Eyes writer prerequisite under #2539 on
+  `fourth/face-repair-writer-20261023`, based on core `421bb5b2a` with
+  pinned main `001a3d714` integration staged. Scope: new bounded writer
+  module, narrow store checkpoint seam, library export and owned English
+  Eyes/reuse docs. One exact People owner, one priority forget, actual
+  results separated from timeliness, no second writer or false completion.
+- Planned real-store controls hold sync before/after rename, cross deadline,
+  queue forget, disconnect, refuse excess queue work, preserve another
+  person's identity, and inspect cleanup before reopening. Status/admission
+  host target is under 1 ms with no I/O. No device timing is established.
+- This prerequisite adds no runtime caller, RPC, consent/account ingress,
+  environment reader, capability or product unit change. Restart loses a
+  RAM-only queued operation; that limit is explicit, not a deletion promise.
+  No lamp, model call, runtime or person acceptance is claimed.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
