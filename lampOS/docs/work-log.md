@@ -1,3 +1,20 @@
+## Current checkpoint: 2026-10-22 15:20 +07, installer correction native green
+
+#2767 `daa23b283` now has [fresh ARM64/Clippy qualification](verification/install-exit-notes-doc-native-20261022/README.md):
+**10,337 passed / 0 failed / 67 skipped**, including
+1 leaky pass, plus 4 doc tests,
+12 custom-harness tests and relay. All six original
+installer/template fixtures passed. The reviewed code and unit directives
+remain unchanged; stale-doc P3s are fixed. Restart overhead remains
+unmeasured on a lamp. First owns the remaining default-install merge step.
+
+Music #1757, Cloud #2764, voice-state #2879, metadata carry #2903 and updater
+carry #2908 are merged. No new item was started; all current work is pushed.
+The original #2810 acceptance-scope decision remains First's, separate from
+its merged fixtures. No device was touched.
+
+---
+
 ## Current checkpoint: 2026-10-22 15:02 +07, merged work confirmed; installer prose corrected
 
 #2764 merged at authored head `0b125f49b`. Its [final Mac/range receipt](verification/report-failed-units-rebase-140e7-20261022/README.md)
