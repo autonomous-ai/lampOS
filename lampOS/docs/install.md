@@ -255,8 +255,9 @@ or muted: what `voice/state` says then was not checked). Task news takes news th
 stopped or asks something too (#1722), with a look, and a curious tilt for a
 question; the voice only words it, as it does done and failed. Left out, with
 why (`install::NOT_PRODUCT_SKILLS`): Desk tutor, which reads handwriting
-from the full look (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`) that
-the product doesn't run, and its marks, called only after its look; the
+from the full look (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`, in the
+product since #2791's product half) but whose two functions with its marks'
+would take a Live session past its 32, and its marks, called only after its look; the
 other installable skills, which their owner puts on; and Laugh glance,
 parked (#1669). A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a

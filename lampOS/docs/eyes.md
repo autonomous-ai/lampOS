@@ -265,8 +265,10 @@ sees" with what has and has not been shown of it.
   on #2602, 22 Oct 05:4x). It's the same file and size, and no reader
   changes. It's kept just after the decode, so a frame that doesn't decode
   leaves the one before it, and the stage still counts it as "sight file".
-  The product passes no `--full-look`, so its sight file is the camera's own
-  frame, as before.
+  The product passes `--full-look 1280x960` with `--sight-from-look on`
+  since #2791's product half: on lamp-75c9 a look went from about 125 ms
+  at 320 by 240 to 137.5 ms (an empty desk, 4 minutes each), for a
+  "what do you see" still 1024 across instead of 320.
   It goes on to say why each
   glance was detected, or not because the lamp's own light changed
   (the picture changed, it was settling within two glances of

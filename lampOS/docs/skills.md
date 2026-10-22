@@ -575,7 +575,7 @@ but disabled pending its lamp comparison, `install::PRODUCT_SKILLS`, which
 is every core skill; Light out, Watches you leave, Music sway, Light
 scenes, Point the light, Light show, Smoky air and Dusty air are installed
 disabled until their lamp checks or replays, `install::PRODUCT_SKILLS_OFF`;
-Desk tutor and its marks wait for the full look in the product, and the
+Desk tutor and its marks wait for a Live session to take their functions, and the
 other installable skills and the parked Laugh glance are left out,
 `install::NOT_PRODUCT_SKILLS`), and the product voice with the say service
 on, its own hello off, and its reminders and task news waiting for their
@@ -1076,7 +1076,7 @@ and version and held to the add-on limits, for a judge. Without
 | Who was here | installable | "Was anyone here while I was out?" (#1685): the owner's call, 19 Oct: an installable skill. The model is told the lamp's record of the room from `room/presence` (#1721), times only, never a picture or who (with `LAMP_WHO_WAS_HERE_KNOWN=on`, at most "someone the lamp knows", and with `LAMP_WHO_WAS_HERE_NAMES=on` the name of someone who said yes to being named, #1997). Not in the product's install: not yet tried on a lamp, `room/presence` is off in the product, and a session past its 32 functions without `LAMP_USE_SKILL=on` |
 | Night sleep (#940) | core | When the lamp sleeps at night, moved out of Expression with today's numbers: 23:00 to 06:00, nobody seen, the voice resting and the lamp awake for 15 minutes, then Expression's rest; no light, sound or words, asked of nobody. Expression's bow, breath and reflex wakes are unchanged ([alive.md](alive.md#night-sleep-is-a-skill)). Inert for now: the product units leave `LAMP_SKILL_ROUTINES` and `LAMP_REST_REQUESTS` off, so Expression's built-in sleep runs; the switch-on is a later PR |
 | Bedtime and Morning | core, disabled | Installed for every product lamp, with authored evening glow, morning hum and output-limit data; its own rest and wake moved to Night sleep (#940); no active trigger or tool until enabled after its lamp comparison |
-| Desk tutor, Desk tutor's marks | installable | Desk tutor reads handwriting from the full look's still (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`), which a product lamp does not take: its working frame, 320 across, cannot read a page. With its marks, its two functions would also take a product session past its 32 (#1667's count). Its marks are called only after its look. Both become core once the full look is in the product and a session can take their functions (#1668) |
+| Desk tutor, Desk tutor's marks | installable | Desk tutor reads handwriting from the full look's still (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`), which a product lamp takes since #2791's product half. With its marks, its two functions would take a product Live session past its 32 (#1667's count). Its marks are called only after its look. Both become core once a session can take their functions (#1668) |
 
 Which of the skills to come are core and which installable is the owner's
 list in [v1-verdicts.md](v1-verdicts.md), "The owner's scope decisions,
