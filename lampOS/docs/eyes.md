@@ -1213,13 +1213,22 @@ kept **unconfirmed**, until its person says yes at the lamp:
   (`{"photo_asked":NAME}`). `asked` is that face's own: a face let go and
   added again under the same name is a new face, not asked yet, and the voice
   asks it once more (Mobile on #1968, lamp-0c89).
+- **As the lamp sees them** (#2854): each print of that face at the lamp, of
+  nobody who asked, is kept beside its photo's, the newest four, **in memory
+  only** (`photo::Unconfirmeds::saw`, `SEEN_PRINTS`), never in the file. A
+  selfie is one view, the phone's: kept with it alone, the face was named
+  only where it looked most like it, near the middle of the view (lamp-0c89,
+  21 Oct, #1968). They go with the face on a no, no answer, a forget, a new
+  photo under the name or its 30 days, and at a restart.
 - **Their answer, taken only for the face at the lamp now** (seen within
   `KNOWN_FOR`, `photo::is_here`), so nothing elsewhere can say yes for
   someone (the reviewer on #1968, 22:28): `photo_asked` for a face not here
   is `not_here`, and `photo_yes` is `not_here` or, if it wasn't asked,
   `not_asked`.
-  - `{"photo_yes":NAME}` makes it an ordinary print (`People::remember_one`),
-    with the remembering's own answers. A yes the store refuses (`full`)
+  - `{"photo_yes":NAME}` makes it an ordinary person (`People::remember_one`),
+    with the photo's print and those the lamp took of them (`Taken::prints`),
+    five at most, as one remembered at the lamp keeps, and the remembering's
+    own answers. A yes the store refuses (`full`)
     leaves it unconfirmed as it was.
   - `{"photo_no":NAME}` deletes it (`{"let_go":true}`).
   - **No answer:** once asked, a face not seen for 20 s, the meeting over,

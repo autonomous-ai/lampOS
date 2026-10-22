@@ -153,6 +153,11 @@ pub const MOST_UNCONFIRMED: usize = 20;
 /// A meeting is over once an asked face hasn't been seen this long: its
 /// person gave no answer, and the face is let go.
 pub const MEETING_GAP_US: u64 = 20_000_000;
+/// The prints of an unconfirmed face seen at the lamp kept beside its photo's,
+/// the newest: with the photo's, the most a person keeps (#2854). A selfie is
+/// one view, the phone's; seen only by it, the face was named only where it
+/// looked most like the selfie, near the middle (lamp-0c89, 21 Oct, #1968).
+pub const SEEN_PRINTS: usize = crate::who::MOST_PRINTS - 1;
 
 /// One face added from a photo, not yet agreed to by its person.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -179,6 +184,10 @@ struct UnconfirmedFile {
 pub struct Unconfirmeds {
     path: std::path::PathBuf,
     kept: Vec<Unconfirmed>,
+    /// Each face's prints as the lamp saw it, the newest [`SEEN_PRINTS`]: in
+    /// memory only, never in the file, kept with its photo's on a yes and
+    /// gone with it otherwise.
+    seen: Vec<(String, Vec<Vec<f32>>)>,
 }
 
 impl Unconfirmeds {
@@ -208,7 +217,11 @@ impl Unconfirmeds {
             },
             Err(_) => Vec::new(),
         };
-        Self { path, kept }
+        Self {
+            path,
+            kept,
+            seen: Vec::new(),
+        }
     }
 
     fn save(&self) -> io::Result<()> {
@@ -245,7 +258,45 @@ impl Unconfirmeds {
             asked: false,
         });
         let before = std::mem::replace(&mut self.kept, next);
-        self.save().inspect_err(|_| self.kept = before)
+        self.save().inspect_err(|_| self.kept = before)?;
+        // A new face under the name: nothing the lamp saw of the last.
+        self.take_seen(name);
+        Ok(())
+    }
+
+    /// `print` of the unconfirmed face `name`, as the lamp saw it, kept in
+    /// memory with the newest [`SEEN_PRINTS`] of it. Only for a face that is
+    /// `name`'s by [`Self::here`] and nobody known's.
+    pub fn saw(&mut self, name: &str, print: Vec<f32>) {
+        if self.find(name).is_none() {
+            return;
+        }
+        let at = match self
+            .seen
+            .iter()
+            .position(|(seen, _)| crate::who::same_name(seen, name))
+        {
+            Some(at) => at,
+            None => {
+                self.seen.push((name.to_owned(), Vec::new()));
+                self.seen.len() - 1
+            }
+        };
+        let prints = &mut self.seen[at].1;
+        prints.push(print);
+        let over = prints.len().saturating_sub(SEEN_PRINTS);
+        prints.drain(..over);
+    }
+
+    fn take_seen(&mut self, name: &str) -> Vec<Vec<f32>> {
+        match self
+            .seen
+            .iter()
+            .position(|(seen, _)| crate::who::same_name(seen, name))
+        {
+            Some(at) => self.seen.remove(at).1,
+            None => Vec::new(),
+        }
     }
 
     /// The unconfirmed face this print is, if any, by the likeness that
@@ -295,8 +346,12 @@ impl Unconfirmeds {
             return Ok(None);
         };
         let kept = self.kept.remove(at);
-        self.save()?;
-        Ok(Some(Taken(kept)))
+        if let Err(error) = self.save() {
+            self.kept.insert(at, kept);
+            return Err(error);
+        }
+        let seen = self.take_seen(name);
+        Ok(Some(Taken(kept, seen)))
     }
 
     /// A yes the people's store refused (full, or not written): the face is
@@ -304,6 +359,9 @@ impl Unconfirmeds {
     pub fn put_back(&mut self, taken: Taken) -> io::Result<()> {
         self.kept
             .retain(|kept| !crate::who::same_name(&kept.name, &taken.0.name));
+        if !taken.1.is_empty() {
+            self.seen.push((taken.0.name.clone(), taken.1));
+        }
         self.kept.push(taken.0);
         self.save()
     }
@@ -314,6 +372,7 @@ impl Unconfirmeds {
             return Ok(false);
         };
         self.kept.remove(at);
+        self.take_seen(name);
         self.save().map(|()| true)
     }
 
@@ -323,6 +382,11 @@ impl Unconfirmeds {
         self.kept
             .retain(|kept| now_unix_s.saturating_sub(kept.added_unix_s) < UNCONFIRMED_FOR_S);
         let gone = before - self.kept.len();
+        let kept = &self.kept;
+        self.seen.retain(|(name, _)| {
+            kept.iter()
+                .any(|face| crate::who::same_name(&face.name, name))
+        });
         if gone > 0 {
             self.save()?;
         }
@@ -345,9 +409,9 @@ impl Unconfirmeds {
     }
 }
 
-/// A face taken out on its person's yes: its name and print, and what to put
+/// A face taken out on its person's yes: its name and prints, and what to put
 /// back if the people's store refuses it.
-pub struct Taken(Unconfirmed);
+pub struct Taken(Unconfirmed, Vec<Vec<f32>>);
 
 impl Taken {
     pub fn name(&self) -> &str {
@@ -356,6 +420,14 @@ impl Taken {
 
     pub fn print(&self) -> Vec<f32> {
         self.0.print.clone()
+    }
+
+    /// What is kept on the yes: the photo's print, then the newest prints
+    /// the lamp took of the face (#2854).
+    pub fn prints(&self) -> Vec<Vec<f32>> {
+        std::iter::once(self.0.print.clone())
+            .chain(self.1.iter().cloned())
+            .collect()
     }
 }
 
@@ -618,6 +690,111 @@ mod tests {
         assert!(Unconfirmeds::open(path.clone()).is_empty());
         assert!(!path.exists());
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    fn mixed(parts: &[(usize, f32)]) -> Vec<f32> {
+        let mut print = vec![0.0f32; crate::who::PRINT];
+        for (n, share) in parts {
+            print[*n] = *share;
+        }
+        let length = print.iter().map(|v| v * v).sum::<f32>().sqrt();
+        print.iter().map(|v| v / length).collect()
+    }
+
+    /// #2854: the prints the lamp took of an unconfirmed face are kept in
+    /// memory only, the newest four, and go with its photo's on a yes, or
+    /// with it on a no, a new photo under the name or its 30 days.
+    #[test]
+    fn the_lamps_own_prints_of_a_face_from_a_photo_go_with_it() {
+        let dir = folder("seen");
+        let path = Unconfirmeds::beside(&dir.join("people.json"));
+        let mut faces = Unconfirmeds::open(path.clone());
+        faces.add("Lan", unit(0), 1_000).unwrap();
+        // Nothing kept for a face that isn't one of these.
+        faces.saw("Minh", unit(9));
+        for n in 1..=6 {
+            faces.saw("Lan", unit(n));
+        }
+        // Never written: read back, the photo's print alone.
+        let file = std::fs::read_to_string(&path).unwrap();
+        assert!(!file.contains("seen"));
+        let mut again = Unconfirmeds::open(path.clone());
+        assert_eq!(again.confirmed("Lan").unwrap().unwrap().prints(), [unit(0)]);
+        // The yes: the photo's, then the newest four as the lamp saw them.
+        let mut faces = Unconfirmeds::open(path.clone());
+        faces.add("Lan", unit(0), 1_000).unwrap();
+        for n in 1..=6 {
+            faces.saw("lan", unit(n));
+        }
+        let taken = faces.confirmed("Lan").unwrap().unwrap();
+        assert_eq!(
+            taken.prints(),
+            [unit(0), unit(3), unit(4), unit(5), unit(6)]
+        );
+        assert_eq!(taken.prints().len(), crate::who::MOST_PRINTS);
+        // Refused by the people's store: put back with them.
+        faces.put_back(taken).unwrap();
+        assert_eq!(faces.confirmed("Lan").unwrap().unwrap().prints().len(), 5);
+        // A no, a new photo under the name, or 30 days: they go too.
+        for end in ["no", "new photo", "expired"] {
+            faces.add("Lan", unit(0), 1_000).unwrap();
+            faces.saw("Lan", unit(7));
+            match end {
+                "no" => assert!(faces.let_go("Lan").unwrap()),
+                "new photo" => {}
+                _ => assert_eq!(faces.expire(1_000 + UNCONFIRMED_FOR_S).unwrap(), 1),
+            }
+            // Gone at once on a no or the 30 days, not only at the next add.
+            assert_eq!(faces.seen.is_empty(), end != "new photo", "{end}");
+            faces.add("Lan", unit(0), 1_000).unwrap();
+            assert_eq!(
+                faces.confirmed("Lan").unwrap().unwrap().prints(),
+                [unit(0)],
+                "{end}"
+            );
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #2854, lamp-0c89 on 21 Oct: a face from a photo was named only near
+    /// the middle of the view. The selfie is one view; at the side the face
+    /// is turned and seen through the lens's edge, unlike it, but like the
+    /// lamp's own views of the same face. Kept with those on the yes, it is
+    /// named there too; with the photo's print alone, it isn't.
+    #[test]
+    fn a_face_from_a_photo_is_named_at_the_side_as_at_the_middle() {
+        let selfie = unit(0);
+        // At the middle: like the selfie, so found as the face here.
+        let middle = mixed(&[(0, 0.8), (1, 0.6)]);
+        // At the side: unlike the selfie, like the lamp's middle view.
+        let side = mixed(&[(0, 0.2), (1, 0.6), (2, 0.77)]);
+        assert!(crate::who::likeness(&selfie, &middle) >= crate::who::SAME_PERSON);
+        assert!(crate::who::likeness(&selfie, &side) < crate::who::SAME_PERSON);
+        // Before #2854 nothing the lamp saw was kept: as if it saw nothing.
+        for (seen_kept, named_at_side) in [(false, false), (true, true)] {
+            let dir = folder(if seen_kept { "side-seen" } else { "side-photo" });
+            let mut people = crate::who::People::open(dir.join("people.json")).unwrap();
+            let mut faces = Unconfirmeds::open(Unconfirmeds::beside(&dir.join("people.json")));
+            faces.add("Lan", selfie.clone(), 1_000).unwrap();
+            let here = faces.here(&middle).unwrap();
+            if seen_kept {
+                faces.saw(&here, middle.clone());
+            }
+            let taken = faces.confirmed("Lan").unwrap().unwrap();
+            people
+                .remember_one(taken.name(), taken.prints(), 1_000, false, true)
+                .unwrap();
+            assert_eq!(
+                people.who(&middle).map(|(name, _)| name).as_deref(),
+                Some("Lan")
+            );
+            assert_eq!(
+                people.who(&side).map(|(name, _)| name).as_deref(),
+                named_at_side.then_some("Lan"),
+                "kept with the lamp's prints: {seen_kept}"
+            );
+            std::fs::remove_dir_all(dir).unwrap();
+        }
     }
 
     /// An answer is taken only for the face at the lamp now.

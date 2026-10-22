@@ -1261,7 +1261,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     // near-name question (`apart`).
                                     let kept = who.people.remember_one(
                                         taken.name(),
-                                        vec![taken.print()],
+                                        taken.prints(),
                                         now_unix_s,
                                         false,
                                         true,
@@ -1943,9 +1943,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 // Nobody who asked: a face from a photo, maybe,
                                 // never named, only noted so the voice can ask.
                                 if who.known.is_none()
-                                    && let Some(name) =
-                                        who.unconfirmed.as_ref().and_then(|u| u.here(&print))
+                                    && let Some(unconfirmed) = who.unconfirmed.as_mut()
+                                    && let Some(name) = unconfirmed.here(&print)
                                 {
+                                    // As the lamp sees them, kept beside the
+                                    // photo's on their yes (#2854).
+                                    unconfirmed.saw(&name, print.clone());
                                     who.photo_seen.retain(|(seen, _)| seen != &name);
                                     who.photo_seen.push((name.clone(), lamp_ipc::monotonic_us()));
                                     who.photo_here = Some((name, Instant::now()));
