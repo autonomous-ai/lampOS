@@ -1836,12 +1836,22 @@ mod tests {
             assert!(!answered);
             assert!(listener.accept().is_err(), "{name} reached the eyes");
         }
-        // Heard: it goes to the eyes (here nobody answers, which is told).
+        // Heard, on a room's line: Sam's face must be at the lamp (the first
+        // builder on #2602); then it goes to the eyes (here nobody answers,
+        // which is told).
         let call = ToolCall {
             id: String::new(),
             name: crate::known_faces::FORGET.into(),
             args: json!({"name": "Sam"}),
         };
+        let (_, (told, answered)) = run_call(&route, &call, 2, true);
+        assert_eq!(told["error"], crate::known_faces::NOT_THEIRS);
+        assert!(answered);
+        assert!(
+            listener.accept().is_err(),
+            "a forget of nobody at the lamp reached the eyes"
+        );
+        std::fs::write(crate::known_faces::known_file_of(&socket), "Sam\n").unwrap();
         let asking = std::thread::spawn(move || run_call(&route, &call, 2, true));
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
         let reached = loop {
