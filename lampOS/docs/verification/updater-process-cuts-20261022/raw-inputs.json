@@ -1,0 +1,401 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "name": "second-process-cuts-podman-20261022/baseline.json",
+      "bytes": 10413,
+      "sha256": "b51de7db214d39024f436777fcf62f5458499b45560d807a61b34a659189691d"
+    },
+    {
+      "name": "second-process-cuts-podman-20261022/baseline.log",
+      "bytes": 15973,
+      "sha256": "bc2fa4912680f074758f82930bc8e5c74fa3c2a48f6650bc7733d53c95225738"
+    },
+    {
+      "name": "second-process-cuts-podman-20261022/clippy.json",
+      "bytes": 8954,
+      "sha256": "0bfab59fff430ed7333329e8bfe88f36a43314b650dedc7b67b049b4e472227b"
+    },
+    {
+      "name": "second-process-cuts-podman-20261022/clippy.log",
+      "bytes": 7612,
+      "sha256": "af6fe260071542813eb9fc1b5220ea7a94316abd5f3aa92e58070fb98671e138"
+    },
+    {
+      "name": "second-process-cuts-podman-v2-20261022/baseline.json",
+      "bytes": 10413,
+      "sha256": "78221ae522fde76addd557a8c50476cf84c0d591def38967c67fb659ec07f43c"
+    },
+    {
+      "name": "second-process-cuts-podman-v2-20261022/baseline.log",
+      "bytes": 1569,
+      "sha256": "0f340ef7f797c8a2aa027c0a9213135bd16c90b1331f0797937f0b0c5928a409"
+    },
+    {
+      "name": "second-process-cuts-podman-v2-20261022/clippy.json",
+      "bytes": 8949,
+      "sha256": "114ff68ff508825cfefe86e48ed9df8cc27e1af563d44a0120c7e78a96ec2696"
+    },
+    {
+      "name": "second-process-cuts-podman-v2-20261022/clippy.log",
+      "bytes": 367,
+      "sha256": "ac98d3010d5af440dbc366535ec7ec6c33142c444dfdc9c551d981eeeb11b963"
+    },
+    {
+      "name": "second-process-cuts-podman-final-20261022/baseline.json",
+      "bytes": 10413,
+      "sha256": "cf6e8bdf1212ccf5db80420271acd9439b0d84683e7ffb16e7efcd78503cfacb"
+    },
+    {
+      "name": "second-process-cuts-podman-final-20261022/baseline.log",
+      "bytes": 1816,
+      "sha256": "98aa77fcd25846123e60bb8d36e33989917705e1bfe9c7e03f2afa50a967603f"
+    },
+    {
+      "name": "second-process-cuts-podman-final-20261022/clippy.json",
+      "bytes": 8952,
+      "sha256": "3e47d22b3c6f6c113fab6cf894cee1a1e34cb4ff6d52580da103acb69abff5b4"
+    },
+    {
+      "name": "second-process-cuts-podman-final-20261022/clippy.log",
+      "bytes": 614,
+      "sha256": "1fa4f4c30c1b686364a0d52fb0ed9a0fee7fa56a78d3a8224494fd839e194b09"
+    },
+    {
+      "name": "second-process-cuts-podman-final-20261022/nextest.json",
+      "bytes": 6828,
+      "sha256": "c292a6971c34f02649d11872eae0b090c3d47c74ba02c7c6016c4919af79ffc2"
+    },
+    {
+      "name": "second-process-cuts-podman-final-20261022/nextest.log",
+      "bytes": 6351,
+      "sha256": "13da6bac4e1fd5707e989142ec36a725ec5320798b86f11abb9b400e188c672a"
+    },
+    {
+      "name": "second-process-cuts-podman-20261022/baseline-tested-process_cuts.rs",
+      "bytes": 14509,
+      "sha256": "c3ea8fd45140a51390ca48de339163619759c7d6d44d034dff6396860af74bea"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/controls-tested-entrypoint.rs",
+      "bytes": 3869,
+      "sha256": "79632be13580fa08162281b6d6df2d4aa18781b9e876b8762c107cfd234d077d"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/controls.json",
+      "bytes": 14205,
+      "sha256": "0b0d15551490541df66628fb4b6c8b0764caeab3cbf7a6f897d1a44cff484d1d"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/R1.patch",
+      "bytes": 532,
+      "sha256": "e54ad4ab81a1ebcfd34d8e8ab03028362bde75282899c5bc61119a85fcde3f22"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/R1.log",
+      "bytes": 965,
+      "sha256": "943468160657e84de4fa476eac1bb614462c29977df6cbf41debad9300e978bc"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/R2.patch",
+      "bytes": 532,
+      "sha256": "4f3f307ce879934b733c9f8dafdce1863871e58931fb424a0a404c88f34f3c29"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/R2.log",
+      "bytes": 1099,
+      "sha256": "48ad4a1bfba763edbbcc8bb7dd82606513313fa3b6f9203ce08217cba6f8500f"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/R3.patch",
+      "bytes": 532,
+      "sha256": "3d037009f97cc20f0e803e32420f4f03733ad5052edf9111ab9accf69aadf7f9"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/R3.log",
+      "bytes": 1158,
+      "sha256": "5d98d95011c1cf2aa3ae09def103a66d09d82e30a82396c5c03d1f36918018c3"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/R4.patch",
+      "bytes": 532,
+      "sha256": "59958e4c2823dc0956e1faa1ac848c09ff3b3ef687747cc66015f19cf8b57459"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/R4.log",
+      "bytes": 1290,
+      "sha256": "78de20b191b65652111b11c72967c4b350a65a5b56d8e302b43b2bd569299f2d"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/R5.patch",
+      "bytes": 532,
+      "sha256": "3ed0ae1ea7bd3720c4ed46da39cdb098fe6f6b78135df72cdfa671c75f3e6545"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/R5.log",
+      "bytes": 1508,
+      "sha256": "bf05eabfc6816506ab6ed07cabcf793a2ec4a190682e0a97d80fd2914c0a079a"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/R6.patch",
+      "bytes": 532,
+      "sha256": "8cb40929990d815a16a1b61daa6129759ae73c62ab9a195433de2e5acb4dbc3d"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/R6.log",
+      "bytes": 1646,
+      "sha256": "632b6056b241b3a22b35a2a1c5cd055fa230a20ba722be27b3645599ff94699d"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/R7.patch",
+      "bytes": 532,
+      "sha256": "f5398cb019d2270daafba63f2d0a11a06696bd275897ab466a78ecef637c0d1b"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/R7.log",
+      "bytes": 1782,
+      "sha256": "8a3a68121562554a5b76923302d4c3d9036594e91e01c487dca86129811dd061"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/T1.patch",
+      "bytes": 463,
+      "sha256": "59e276d7a89d9b13e6fe603dcd191c1fffc622af9202b62f7c66a265b37035f6"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/T1.log",
+      "bytes": 881,
+      "sha256": "5009f6441c2804f5c7f86fbcc0b7d0fd06a67596d0e3e61c5c3e1f31618d8741"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/T2.patch",
+      "bytes": 514,
+      "sha256": "957a1ad9696181950d761969a30ff8e002a29d91ad64a79891305590b4662349"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/T2.log",
+      "bytes": 886,
+      "sha256": "231dff392d3e3850490aa2ebd14cc7061e276720edb1f47fbdbf33131fe4e503"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/B1.patch",
+      "bytes": 456,
+      "sha256": "98f011dc0b27dba682dd7f14d35b0735d1c769da42ec1a4db0ca35e026b0127a"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/B1.log",
+      "bytes": 886,
+      "sha256": "a1db00de8e702b422d5e6788531e1089e80a548ee3719c3921f7edfc4448a250"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/initial-control-classifier.json",
+      "bytes": 3329,
+      "sha256": "3a382b57a592a79ec9f7f3ed9989ab5b761f623a49c0b8e411d125fce6f04412"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022/before-signal-control-refinement.json",
+      "bytes": 12386,
+      "sha256": "e22224c6edf4518cd9743083ed884e8d4eccdd7e432440419bb9e3118f019ff0"
+    },
+    {
+      "name": "second-process-cuts-controls-20261022.py",
+      "bytes": 4150,
+      "sha256": "44dabad2d71f5376c7974c04f2d03c4799f80f3645e583be0d5983b1973e8c20"
+    },
+    {
+      "name": "second-process-cuts-controls-resume-20261022.py",
+      "bytes": 5515,
+      "sha256": "ef9650896205f466e606d0769b05ecd73bbac7fbc11a36d10840869e4e77136a"
+    },
+    {
+      "name": "second-process-cuts-controls-final-20261022.py",
+      "bytes": 5806,
+      "sha256": "59ed0ffa64f22059e3d269e79c25a09e5963ac0f2aadfbfecfcdac1f58d913e7"
+    },
+    {
+      "name": "second-process-cuts-mac-20261022/gate.json",
+      "bytes": 10159,
+      "sha256": "c683544d659f5f31f0961b449dbcae1be084e0d91cc605179a7f411e03220e75"
+    },
+    {
+      "name": "second-process-cuts-mac-20261022/fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "second-process-cuts-mac-20261022/clippy.log",
+      "bytes": 2621,
+      "sha256": "2c30d610c927fc60b932fd857640fa1bb5dc90f6c79eadaaf6d67e5c6b8d23db"
+    },
+    {
+      "name": "second-process-cuts-mac-20261022/tests.log",
+      "bytes": 27898,
+      "sha256": "2ca5ffa7f7d9054225bb0d8bd9cbd5528d7ab0276fdc0621f74bf2155c93f25b"
+    },
+    {
+      "name": "second-process-cuts-mac-final-20261022/gate.json",
+      "bytes": 10159,
+      "sha256": "691417068925d6e6a0e71306d35a1813aea40f274870f486f99f01b1340e96f0"
+    },
+    {
+      "name": "second-process-cuts-mac-final-20261022/fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "second-process-cuts-mac-final-20261022/clippy.log",
+      "bytes": 374,
+      "sha256": "d8b1fa7935bfe1052264e66887532504a5916fde735e4a10155126a4433bab9f"
+    },
+    {
+      "name": "second-process-cuts-mac-final-20261022/tests.log",
+      "bytes": 25651,
+      "sha256": "9615102b305574acec4ab817a039b429b2aa68060673124ed849b09ca11f6049"
+    },
+    {
+      "name": "tmp/second-process-cuts-mac-listing-20261022.json",
+      "bytes": 1024,
+      "sha256": "cd6470705433fd594bab476931df0b729f8519dcb189f4911ba952c1acf93b9a"
+    },
+    {
+      "name": "second-process-cuts-podman-20261022/image.json",
+      "bytes": 7509,
+      "sha256": "ee08d4f8fa1203fab6dbc1e691fa660644a4d090090cd5c496dd42ae6699c45c"
+    },
+    {
+      "name": "second-process-cuts-podman-20261022/runtime.txt",
+      "bytes": 111,
+      "sha256": "a42bfcf081db66e79070b2c918671796e313979ad64e730157c0372305071a84"
+    },
+    {
+      "name": "second-process-cuts-podman-f012-20261022/baseline.json",
+      "bytes": 10413,
+      "sha256": "6e5cd361cc0edfff8cf78fa2b9c0732a05e241f4780d28c8c577918b9da13eb7"
+    },
+    {
+      "name": "second-process-cuts-podman-f012-20261022/baseline.log",
+      "bytes": 1631,
+      "sha256": "688bca839bd11db100deb25a0451ef4287087ebbca188baf5241056596701731"
+    },
+    {
+      "name": "second-process-cuts-podman-f012-20261022/clippy.json",
+      "bytes": 8950,
+      "sha256": "1db223765fa012a5c36351e620a62d9dc245c069f647cdd46ca104ccb77ee83c"
+    },
+    {
+      "name": "second-process-cuts-podman-f012-20261022/clippy.log",
+      "bytes": 428,
+      "sha256": "ef0a630de0bec3f5ba2ad58509c4bd63d63f0d8f7eb6026f0fd52bf54cffb84d"
+    },
+    {
+      "name": "second-process-cuts-podman-f012-20261022/nextest.json",
+      "bytes": 6828,
+      "sha256": "239eede3164bbf784a4f3bdde2d09f3e4fda9ff18c10587357a27f884a67a8df"
+    },
+    {
+      "name": "second-process-cuts-podman-f012-20261022/nextest.log",
+      "bytes": 1956,
+      "sha256": "0d167c6d094f2249258e1786b20ba5d74636120769053922b70dd043358c1179"
+    },
+    {
+      "name": "second-process-cuts-mac-f012-20261022/gate.json",
+      "bytes": 10158,
+      "sha256": "1b6304da6b0ea53b057f83b85c543b21687e2dee23e3e96dccc95474b868f21b"
+    },
+    {
+      "name": "second-process-cuts-mac-f012-20261022/fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "second-process-cuts-mac-f012-20261022/clippy.log",
+      "bytes": 270,
+      "sha256": "97a8d400567f4c747f6e8429f0871c72de3dd2884f2e13eb011f0e2851d4ece3"
+    },
+    {
+      "name": "second-process-cuts-mac-f012-20261022/tests.log",
+      "bytes": 25615,
+      "sha256": "03657a3caf7c48fc7b89b91fa5f7247bf6f54daf66fd59d775f0ec6d4c72554a"
+    },
+    {
+      "name": "second-process-cuts-no-updater-controls-20261022/controls.json",
+      "bytes": 11219,
+      "sha256": "37b08d626331bec9dea72d3a8e214524c8d52aeee62e69c5c4762de5bf3fd003"
+    },
+    {
+      "name": "tmp/second-process-cuts-no-updater-controls-20261022.py",
+      "bytes": 5607,
+      "sha256": "48d2221728cdd0cdc884f2deb6baff29a74af6223fb24c3b500d1f4fc4d573d2"
+    },
+    {
+      "name": "second-process-cuts-no-updater-controls-20261022/A1.log",
+      "bytes": 955,
+      "sha256": "814d28db8390c1f723d1cba4fb6fa488ff1eba06b999eebb432dfe19ba3e1e0f"
+    },
+    {
+      "name": "second-process-cuts-no-updater-controls-20261022/A1.patch",
+      "bytes": 992,
+      "sha256": "91a729c77c94e17b8f7e92834e00fb978e8108f513e8a50c9594eab5017c7c84"
+    },
+    {
+      "name": "second-process-cuts-no-updater-controls-20261022/A2.log",
+      "bytes": 1087,
+      "sha256": "ffec824c118a66353c08fb923003669a065ebd8289b31a6e8bb6ca571802e2a6"
+    },
+    {
+      "name": "second-process-cuts-no-updater-controls-20261022/A2.patch",
+      "bytes": 992,
+      "sha256": "656e2f72f7fb1e972873371d50961a198639d32f1edbf203eac8a3e0fa1e6bcc"
+    },
+    {
+      "name": "second-process-cuts-no-updater-controls-20261022/A3.log",
+      "bytes": 1223,
+      "sha256": "14ce5a4de04f46bb64784f97cdcaca8c1ebc18b03f3f3db772970e2defac62cd"
+    },
+    {
+      "name": "second-process-cuts-no-updater-controls-20261022/A3.patch",
+      "bytes": 992,
+      "sha256": "7812916b6ead47a8fe927c2e3d40573e2321f4706f9956f008ffd2283fbe0c32"
+    },
+    {
+      "name": "second-process-cuts-no-updater-controls-20261022/A4.log",
+      "bytes": 1360,
+      "sha256": "94670067b0c3c1a8edf69be6aa2e24d583b985342e51362a903d155566c7894e"
+    },
+    {
+      "name": "second-process-cuts-no-updater-controls-20261022/A4.patch",
+      "bytes": 992,
+      "sha256": "c0d78bf7e86e16ad57bef84d6ea53dd0b12c91388e0a95a99ab50da23c22c640"
+    },
+    {
+      "name": "second-process-cuts-no-updater-controls-20261022/A5.log",
+      "bytes": 1502,
+      "sha256": "bebf39b0fdf3c21f7b0c70e2420454f1daf82a6bda561cfcb0fa95c6616ff5dd"
+    },
+    {
+      "name": "second-process-cuts-no-updater-controls-20261022/A5.patch",
+      "bytes": 992,
+      "sha256": "99a24cb2d97ef67756e55cd04a642ac40fc3b071a8ac56511984f59ba92c30a4"
+    },
+    {
+      "name": "second-process-cuts-no-updater-controls-20261022/A6.log",
+      "bytes": 1634,
+      "sha256": "323524711343e020d57187c9fd257878d54d80751486fca23d9e8397de4cf416"
+    },
+    {
+      "name": "second-process-cuts-no-updater-controls-20261022/A6.patch",
+      "bytes": 992,
+      "sha256": "7252b7768a4ed4472e5e76c3ae1b96ba5ed5effa92145236b59785774abc868a"
+    },
+    {
+      "name": "second-process-cuts-no-updater-controls-20261022/A7.log",
+      "bytes": 1779,
+      "sha256": "72285f12cce43389fa6683c19e1dcaecd3911174aa66cb0d1bcf68a73851475c"
+    },
+    {
+      "name": "second-process-cuts-no-updater-controls-20261022/A7.patch",
+      "bytes": 992,
+      "sha256": "9851024b180220d538862bfb22b587a14b99a6b352b647068a6dfc702d2854d7"
+    }
+  ],
+  "note": "Original files stay private. Full byte hashes bind raw records, distinct from hashes of compact normalized exports."
+}

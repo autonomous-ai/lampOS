@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "deltas": [
+    {
+      "path": "lampOS/crates/update/tests/round/process_cuts.rs",
+      "historical_file": {
+        "name": "second-process-cuts-podman-20261022/baseline-tested-process_cuts.rs",
+        "bytes": 14509,
+        "sha256": "c3ea8fd45140a51390ca48de339163619759c7d6d44d034dff6396860af74bea"
+      },
+      "current_sha256": "e5a04534cb6878c2f1656918d95677292167ddff1cee597800ed590ac6846d6c",
+      "patch_sha256": "17b9ff83bddcce373ac26265778a84858f1cef3ccf45ba548dae633056bf5b05",
+      "patch_utf8": "--- historical/lampOS/crates/update/tests/round/process_cuts.rs\n+++ current/lampOS/crates/update/tests/round/process_cuts.rs\n@@ -313,8 +313,18 @@\n         reaped: false,\n     };\n     let deadline = Instant::now() + Duration::from_secs(5);\n-    let status = guard.wait(deadline);\n-    assert!(libc::WIFEXITED(status) && libc::WEXITSTATUS(status) == 0);\n+    let status = loop {\n+        if let Some(status) = child.try_wait().unwrap() {\n+            guard.reaped = true;\n+            break status;\n+        }\n+        assert!(Instant::now() < deadline, \"updater fixture did not exit\");\n+        std::thread::sleep(Duration::from_millis(5));\n+    };\n+    // try_wait already reaped it; wait returns Child's cached terminal status.\n+    // Keep Rust's ownership explicit while the raw guard bounds error cleanup.\n+    assert_eq!(child.wait().unwrap(), status);\n+    assert!(status.success(), \"updater fixture exited as {status}\");\n     let mut text = String::new();\n     child\n         .stdout\n",
+      "in_memory_reconstruction_verified": true
+    },
+    {
+      "path": "lampOS/crates/update/tests/self_process_cuts.rs",
+      "historical_file": {
+        "name": "second-process-cuts-controls-20261022/controls-tested-entrypoint.rs",
+        "bytes": 3869,
+        "sha256": "79632be13580fa08162281b6d6df2d4aa18781b9e876b8762c107cfd234d077d"
+      },
+      "current_sha256": "34e68d2c1964c42b12f9d5c88af041133c891737ff683c1c25118f50deacf8a3",
+      "patch_sha256": "d569422ed20e65e20cfda45079d31870989ea2a719eebd87d8beeb4d7f5e5724",
+      "patch_utf8": "--- historical/lampOS/crates/update/tests/self_process_cuts.rs\n+++ current/lampOS/crates/update/tests/self_process_cuts.rs\n@@ -58,7 +58,9 @@\n         }\n         index += 1;\n     }\n-    let selected = !ignored\n+    // nextest asks for the ignored list separately. On Mac this case must\n+    // appear there, rather than running a skip and being counted as a pass.\n+    let selected = (!ignored || cfg!(not(target_os = \"linux\")))\n         && (filters.is_empty()\n             || filters.iter().any(|filter| {\n                 if exact {\n",
+      "in_memory_reconstruction_verified": true
+    }
+  ],
+  "purpose": "Historical helper and entrypoint are reconstructable from current source and these exact deltas; no redundant full source snapshots/maps are published."
+}

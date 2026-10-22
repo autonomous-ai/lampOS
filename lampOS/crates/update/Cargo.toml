@@ -15,6 +15,16 @@ publish.workspace = true
 name = "lamp-update"
 path = "src/main.rs"
 
+[[test]]
+name = "self-process-cuts"
+path = "tests/self_process_cuts.rs"
+harness = false
+
+[[test]]
+name = "self-cli-exec"
+path = "tests/self_cli_exec.rs"
+harness = false
+
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
@@ -43,6 +53,10 @@ lamp-skills = { path = "../skills" }
 lamp-gemini = { path = "../gemini" }
 # Controls' own check of the pins and settings install leaves (#1798).
 lamp-controls = { path = "../controls" }
+
+# Linux-only process tracing in the external cut harness, never runtime code.
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+libc = "0.2"
 
 [lints]
 workspace = true
