@@ -1459,7 +1459,40 @@ fn the_strip_timing_is_the_boards_and_defaults_without_it() {
             strip_sleep_ms: Some(60_000),
             ..wiring()
         },
+        // Below the 2 s a strip Hold must be old enough for (TouchEvent::check).
+        TouchPinsConfig {
+            strip_sleep_ms: Some(1_999),
+            ..wiring()
+        },
     ] {
         assert!(wrong.check(&config(true)).is_err());
+    }
+}
+
+/// #2896: a still hand held past the board's sleep is a Hold the message
+/// check accepts, at the lowest sleep allowed and above it.
+#[test]
+fn a_strip_hold_at_the_boards_sleep_is_a_valid_event() {
+    for sleep_ms in [2_000, 3_000] {
+        let mut rig = Rig::with(
+            true,
+            TouchPinsConfig {
+                strip_sleep_ms: Some(sleep_ms),
+                ..wiring()
+            },
+        );
+        let mut hold = None;
+        for at in (0..=(sleep_ms + 200) * 1_000).step_by(10_000) {
+            rig.gpio(at, false, false, false);
+            rig.strip(at, if at >= 40_000 { 7 } else { 0 });
+            // Rig::step checks every event against its message rules.
+            for event in rig.step(at).events {
+                if event.source == TouchSource::Strip && event.gesture == TouchGesture::Hold {
+                    hold.get_or_insert(at);
+                }
+            }
+        }
+        let hold = hold.unwrap_or_else(|| panic!("no Hold at sleep {sleep_ms} ms"));
+        assert!(hold >= 40_000 + sleep_ms * 1_000, "{sleep_ms}: {hold}");
     }
 }

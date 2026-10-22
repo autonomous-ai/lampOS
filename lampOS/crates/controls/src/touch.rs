@@ -155,11 +155,11 @@ impl TouchConfig {
         if !(10_000..=200_000).contains(&strip.qualify_us)
             || !(10_000..=500_000).contains(&strip.release_us)
             || !(100_000..=2_000_000).contains(&strip.stroke_us)
-            || !(1_000_000..=5_000_000).contains(&strip.sleep_us)
+            || !(2_000_000..=5_000_000).contains(&strip.sleep_us)
         {
             return Err(error(
                 ControlFault::Invalid,
-                "strip timing: qualify 10..200 ms, release 10..500 ms, stroke 100..2000 ms, sleep 1000..5000 ms",
+                "strip timing: qualify 10..200 ms, release 10..500 ms, stroke 100..2000 ms, sleep 2000..5000 ms",
             ));
         }
         if names.is_empty() && self.strip_pads.is_none() {
