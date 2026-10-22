@@ -209,8 +209,15 @@ minutes." ([guard-mode.md](guard-mode.md), #1685).
 - **The topic:** `messages/out`, `lamp_msgs::MessageOut`: `from`
   (`skill:<name>`, stamped by `lamp-skills`, never by the skill's files) and
   `text`, one line of at most 280 bytes (`MESSAGE_TEXT_BYTES`), never a
-  picture. An event that lasts 10 minutes (`MessageOut::LASTS`): older is
-  old news.
+  picture; and, set only by guard mode on a text that names someone
+  (`LAMP_GUARD_NAMES=on`, #2562), `unnamed`, the same line as it reads with
+  names off, held to the same bounds, and `named`, who it names as the
+  eyes' person ids (`lamp_msgs::known::person_id`, at most 3), never their
+  names: both or neither. Left out when there is no name, so an older
+  reader reads the message as before. Guard mode sends a named text whose
+  named line would be past the 280 bytes as its unnamed words alone, with
+  neither field, rather than lose it. An event that lasts 10
+  minutes (`MessageOut::LASTS`): older is old news.
 - **Who sends:** `lamp-skills`, for a skill whose `[permissions]` give
   `messages = true`, checked again as each text leaves the program
   ([skills.md](skills.md), "A watch").
@@ -247,6 +254,25 @@ minutes." ([guard-mode.md](guard-mode.md), #1685).
     took before it goes again with the same event `id` and `time`, so the
     backend pushes it once. A restart of `lamp-cloud` loses those waiting,
     and the bus hands none older than 10 minutes.
+  - **Named only as it goes, on the eyes' word then** (#2562): a text with
+    `unnamed` is sent as its `text` only when it goes as it is taken, with
+    the broker there, and the eyes' `tellable` beside their known file
+    (`LAMP_CLOUD_KNOWN_FILE`, `/run/lampos-eyes/known` in the product
+    unit), read just then (`lamp_msgs::known::still_tellable`, the same
+    reading `lamp-skills` uses), still has a yes from each one in `named`.
+    Otherwise (a yes taken back, even for one of them, a forget, no known
+    file, or one that can't be read) it goes as its `unnamed` words, so a
+    text that waited on the bus behind a slow call never names anyone who
+    took their yes back: `a named text sent as unnamed: the eyes did not
+    confirm each yes as it went`. Held because the broker is away, or owed
+    after a failed send or one lost before its ack, it waits as its
+    `unnamed` words, its event's `id` and `time` kept, so a held or
+    retried text never names anyone: `a named text held as unnamed: the
+    broker was away`. And only straight to the wire: with any publish of
+    lamp-cloud's own handed to the client and not yet acknowledged, the
+    client may hold a new one behind it (a broker's receive maximum), so it
+    goes unnamed: `a named text sent unnamed: an earlier send was still
+    unacknowledged`. Each line once each time.
   - **The journal:** one line a piece sent, the skill and the count, never
     the text: `a text from the skill guard-mode went to the phone (3 since
     the start)`; and one for a piece not sent, and why: `a text from the

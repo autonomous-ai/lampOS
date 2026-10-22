@@ -943,10 +943,13 @@ fn serve(
         unplug: RefCell::default(),
         looks: RefCell::new(HashMap::new()),
         watching: RefCell::new(Watching {
-            // Arrivals by sound only with LAMP_GUARD_SOUNDS=on (#2562).
+            // Arrivals by sound only with LAMP_GUARD_SOUNDS=on (#2562), and
+            // names only with LAMP_GUARD_NAMES=on: those the eyes'
+            // `tellable` says said yes, read as each text goes.
             watches: Watches::hearing(watch::switched_on(
                 std::env::var(watch::SOUNDS_ENVIRONMENT).ok().as_deref(),
-            )),
+            ))
+            .naming(guard_tellable(options.known_file.as_deref())),
             marks: HashMap::new(),
             texts: None,
             known_file: options.known_file.clone(),
@@ -1701,6 +1704,24 @@ const MARK_AGAIN: Duration = Duration::from_secs(30);
 /// nothing.
 const KNOWN_FRESH: Duration = Duration::from_secs(5);
 
+/// The eyes' `tellable` file beside their known file, read as a guard
+/// text goes, with `LAMP_GUARD_NAMES=on` and a known file; else none, and
+/// nobody is named (#2562).
+fn guard_tellable(known_file: Option<&Path>) -> Option<PathBuf> {
+    let on = watch::switched_on(std::env::var(watch::NAMES_ENVIRONMENT).ok().as_deref());
+    match (on, known_file) {
+        (true, Some(known)) => Some(lamp_skills::known::tellable_of(known)),
+        (true, None) => {
+            eprintln!(
+                "lamp-skills: {}=on, but no known file: guard mode names nobody",
+                watch::NAMES_ENVIRONMENT
+            );
+            None
+        }
+        (false, _) => None,
+    }
+}
+
 /// The name in the eyes' known file, if it is fresh: kept in the program
 /// only, to tell a known face from one it does not know and the person who
 /// asked from anyone else; never in a text, an event or the journal.
@@ -1788,17 +1809,25 @@ fn watched(outs: Outs, watching: &mut Watching, out: &mut Publisher, runner: &Ru
                     said(out, format!("mark: {back}"));
                 }
             }
-            Out::Text(text) => {
-                if let Some(why) = may.refuses(&Call::Text(text.clone())) {
-                    eprintln!("lamp-skills: skill:{skill}: refused its text: {why}");
+            Out::Text(_) | Out::Named { .. } => {
+                // A text that names someone goes the same, with its unnamed
+                // words and who it names (ids) beside it for lamp-cloud to
+                // check as it sends, but its words are never in the journal
+                // or `skills/events`; too long to go named, it goes unnamed
+                // (#2562, `watch::text_message`).
+                let Some(message) = watch::text_message(&skill, did) else {
                     continue;
-                }
-                let message = MessageOut {
-                    from: format!("skill:{skill}").chars().take(64).collect(),
-                    text,
                 };
-                if let Err(why) = message.check() {
-                    said(out, format!("text: not sent: {why}"));
+                let message = match message {
+                    Ok(message) => message,
+                    Err(why) => {
+                        said(out, format!("text: not sent: {why}"));
+                        continue;
+                    }
+                };
+                let named = message.unnamed.is_some();
+                if let Some(why) = may.refuses(&Call::Text(message.text.clone())) {
+                    eprintln!("lamp-skills: skill:{skill}: refused its text: {why}");
                     continue;
                 }
                 if watching.texts.is_none() {
@@ -1822,6 +1851,13 @@ fn watched(outs: Outs, watching: &mut Watching, out: &mut Publisher, runner: &Ru
                     .as_mut()
                     .map(|texts| texts.publish_json(lamp_ipc::monotonic_us(), &message));
                 match sent {
+                    Some(Ok(_)) if named => said(
+                        out,
+                        format!(
+                            "text: sent on {}, naming someone the eyes say said yes",
+                            MessageOut::TOPIC
+                        ),
+                    ),
                     Some(Ok(_)) => said(
                         out,
                         format!("text: sent on {}: {}", MessageOut::TOPIC, message.text),

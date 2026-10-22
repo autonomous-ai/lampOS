@@ -37,7 +37,14 @@
 //! - **One text a while.** At a visit's end it sends one line, "Someone was
 //!   at your desk at 14:31, for about 2 minutes.", at most once each
 //!   `[watch] every`. Who it was is said only as "someone you've introduced
-//!   me to" or "someone I don't know", never a name.
+//!   me to" or "someone I don't know", never a name, unless names are on.
+//! - **Names** (#2562 item 1, with [`NAMES_ENVIRONMENT`] on and
+//!   `known_faces = true`). A known face whose person said yes to being
+//!   named, the eyes' `tellable` that Who was here reads
+//!   (`crate::known::tellable_in`), is named: "Minh and someone the lamp
+//!   knows came in at 18:10". The file is read as the text goes, never as
+//!   the face is seen, so a yes taken back before then names nobody. Only
+//!   the eyes' known file gives a name, so a voice alone never does.
 //! - **Arrivals by sound** (#2562, with [`SOUNDS_ENVIRONMENT`] on and
 //!   [`SOUNDS`] in the skill's permissions). A door or footsteps on the
 //!   ears' room sound classes is someone come in only when a face or speech
@@ -63,7 +70,8 @@
 //! scores for a door, footsteps and speech, and whether the face at the
 //! lamp is known, from the eyes' known file, which the program reads. A
 //! name read there is kept in the program only to tell the person who asked
-//! from anyone else: it is never in a text, an event or the journal.
+//! from anyone else, and, with names on, for the visit's text: it is never
+//! in an event or the journal, and in a text only on the eyes' yes.
 use crate::{Call, LightFile, Skill, Words as SayWords, duration_us, light_call, words};
 use lamp_msgs::{Faces, OwnVoiceEvidence, SoundClasses};
 use serde::Deserialize;
@@ -94,6 +102,14 @@ pub const SOUNDS_ENVIRONMENT: &str = "LAMP_GUARD_SOUNDS";
 /// socket; off unless set (#2562). lamp-cloud checks the same switch in its
 /// own unit, so this is not the only gate.
 pub const FROM_APP_ENVIRONMENT: &str = "LAMP_GUARD_FROM_APP";
+/// `on` names, in a visit's text, a known face whose person said yes to
+/// being named: the eyes' `tellable`, as Who was here reads it
+/// (`crate::known::tellable_in`), read again as the text is made; off
+/// unless set (#2562 item 1, the first builder's ruling of 22 Oct).
+pub const NAMES_ENVIRONMENT: &str = "LAMP_GUARD_NAMES";
+/// The most names a visit keeps, and so the most a text may say: a text is
+/// one short line (`lamp_msgs::MESSAGE_TEXT_BYTES`).
+pub const MOST_NAMES: usize = 3;
 /// How long lamp-cloud waits for lamp-skills' answer to the app's
 /// `guard.on` or `guard.off` (#2562, the reviewer's P2 on #2688): it puts
 /// the moment that wait ends on the op, as [`DEADLINE`], so an op that
@@ -234,6 +250,15 @@ pub struct Words {
     pub unknown: String,
     /// ...or no face seen.
     pub someone: String,
+    /// With [`NAMES_ENVIRONMENT`] on (#2562): `{who}` when known faces that
+    /// may be named came with one that may not, `{names}` once: "Minh and
+    /// someone the lamp knows". A file from before it says the built-in.
+    #[serde(default = "built_in_named_and_known")]
+    pub named_and_known: String,
+    /// Two or more names, the last `{name}` after the rest as `{names}`,
+    /// each once: "Minh and Lan".
+    #[serde(default = "built_in_and")]
+    pub and: String,
     /// `{at}`, with `{time}` once (`14:31`); nothing when the time isn't
     /// known.
     pub at: String,
@@ -275,6 +300,8 @@ impl Words {
             known: "Someone you've introduced me to".into(),
             unknown: "Someone I don't know".into(),
             someone: "Someone".into(),
+            named_and_known: built_in_named_and_known(),
+            and: built_in_and(),
             at: " at {time}".into(),
             under_a_minute: "for under a minute".into(),
             a_minute: "for about a minute".into(),
@@ -319,6 +346,8 @@ impl Words {
                 ("known", &self.known, &[]),
                 ("unknown", &self.unknown, &[]),
                 ("someone", &self.someone, &[]),
+                ("named_and_known", &self.named_and_known, &["names"]),
+                ("and", &self.and, &["name", "names"]),
                 ("at", &self.at, &["time"]),
                 ("under_a_minute", &self.under_a_minute, &[]),
                 ("a_minute", &self.a_minute, &[]),
@@ -327,6 +356,16 @@ impl Words {
         )?;
         Ok(self)
     }
+}
+
+/// `named_and_known` for a `[watch.words]` from before it (#2562).
+fn built_in_named_and_known() -> String {
+    "{names} and someone the lamp knows".into()
+}
+
+/// `and` for a `[watch.words]` from before it (#2562).
+fn built_in_and() -> String {
+    "{names} and {name}".into()
 }
 
 /// Each line of a skill's own words is checked as the voice checks its
@@ -422,6 +461,18 @@ pub enum Out {
     Gaze(Call),
     /// Words said aloud as written, "I'm off guard" alone (#2562).
     Say(SayWords),
+    /// A [`Out::Text`] that names someone who said yes to being named
+    /// ([`NAMES_ENVIRONMENT`], #2562): sent the same, with `unnamed`, the
+    /// line as it reads with names off, and `named`, who it names as their
+    /// `lamp_msgs::known::person_id`s, beside it on `messages/out`
+    /// ([`text_message`]), so `lamp-cloud` sends it named only while each
+    /// yes still stands. The journal and `skills/events` never say its
+    /// words.
+    Named {
+        text: String,
+        unnamed: String,
+        named: Vec<String>,
+    },
     /// What happened, for `skills/events` and the journal: never a name.
     Said(String),
 }
@@ -438,6 +489,11 @@ struct Visit {
     face: bool,
     /// A face the eyes know, not the person who asked, was seen.
     known: bool,
+    /// With [`NAMES_ENVIRONMENT`] on: the known faces' names, in the order
+    /// first seen, at most [`MOST_NAMES`], kept in the program only. Whether
+    /// each may be said is asked of the eyes' `tellable` as the text is
+    /// made, never as the face is seen.
+    names: Vec<String>,
     /// It began with a door or footsteps, a face or speech after (#2562).
     came_in: bool,
     /// The head turned to it, or was let be: once a visit.
@@ -446,14 +502,35 @@ struct Visit {
 
 impl Visit {
     /// "Someone was at your desk at 14:31, for about 2 minutes.": who only
-    /// as known or not, never a name.
-    fn text(&self, words: &Words) -> String {
-        let who = if self.known {
-            &words.known
-        } else if self.face {
-            &words.unknown
-        } else {
-            &words.someone
+    /// as known or not, and by name only for the names in `tellable`, the
+    /// eyes' word now on who said yes to being named (#2562).
+    fn text(&self, words: &Words, tellable: &[String]) -> String {
+        let named: Vec<&str> = self
+            .names
+            .iter()
+            .filter(|name| tellable.contains(name))
+            .map(String::as_str)
+            .collect();
+        let who = match named.split_last() {
+            Some((last, rest)) => {
+                let names = if rest.is_empty() {
+                    (*last).to_owned()
+                } else {
+                    words
+                        .and
+                        .replace("{names}", &rest.join(", "))
+                        .replace("{name}", last)
+                };
+                // Anyone else known, not to be named, is said as known.
+                if self.names.len() > named.len() {
+                    words.named_and_known.replace("{names}", &names)
+                } else {
+                    names
+                }
+            }
+            None if self.known => words.known.clone(),
+            None if self.face => words.unknown.clone(),
+            None => words.someone.clone(),
         };
         let at = self.began_minute.map_or(String::new(), |minute| {
             words
@@ -472,7 +549,7 @@ impl Visit {
         } else {
             &words.visit
         };
-        text.replace("{who}", who)
+        text.replace("{who}", &who)
             .replace("{at}", &at)
             .replace("{long}", &long)
     }
@@ -537,6 +614,7 @@ impl On {
             seen_us: now_us,
             face: false,
             known: false,
+            names: Vec::new(),
             came_in: false,
             turned: false,
         });
@@ -586,8 +664,16 @@ impl On {
         ]
     }
 
-    /// A visit over: its text, unless one went within `every`.
-    fn ended(&mut self, visit: Visit, now_us: u64, spec: &Spec) -> Vec<Out> {
+    /// A visit over: its text, unless one went within `every`. With names
+    /// on, `tellable` is the eyes' file, read now, as the text goes: a yes
+    /// taken back since the face was seen names nobody (#2562).
+    fn ended(
+        &mut self,
+        visit: Visit,
+        now_us: u64,
+        spec: &Spec,
+        tellable: Option<&std::path::Path>,
+    ) -> Vec<Out> {
         if let Some(texted_us) = self.texted_us
             && now_us.saturating_sub(texted_us) < spec.every_us
         {
@@ -598,8 +684,71 @@ impl On {
             ))];
         }
         self.texted_us = Some(now_us);
-        vec![Out::Text(visit.text(&spec.words))]
+        let tellable = match tellable {
+            Some(path) if !visit.names.is_empty() => crate::known::tellable_in(path),
+            _ => Vec::new(),
+        };
+        let named: Vec<String> = visit
+            .names
+            .iter()
+            .filter(|name| tellable.contains(name))
+            .map(|name| lamp_msgs::known::person_id(name))
+            .collect();
+        let text = visit.text(&spec.words, &tellable);
+        vec![if named.is_empty() {
+            Out::Text(text)
+        } else {
+            Out::Named {
+                text,
+                unnamed: visit.text(&spec.words, &[]),
+                named,
+            }
+        }]
     }
+}
+
+/// The `messages/out` message for a watch's text ([`Out::Text`] or
+/// [`Out::Named`]), from `skill`, checked as it is published; none for any
+/// other `out`. A named text carries its unnamed words and who it names
+/// (#2562). One whose named words would not pass `MessageOut::check`, such
+/// as long names past one line, goes as its unnamed words alone: the visit's
+/// text is never lost for a name.
+pub fn text_message(
+    skill: &str,
+    out: Out,
+) -> Option<Result<lamp_msgs::MessageOut, lamp_msgs::Invalid>> {
+    let from: String = format!("skill:{skill}").chars().take(64).collect();
+    let message = match out {
+        Out::Text(text) => lamp_msgs::MessageOut {
+            from,
+            text,
+            unnamed: None,
+            named: Vec::new(),
+        },
+        Out::Named {
+            text,
+            unnamed,
+            named,
+        } => {
+            let message = lamp_msgs::MessageOut {
+                from: from.clone(),
+                text,
+                unnamed: Some(unnamed.clone()),
+                named,
+            };
+            if message.check().is_ok() {
+                return Some(Ok(message));
+            }
+            lamp_msgs::MessageOut {
+                from,
+                text: unnamed,
+                unnamed: None,
+                named: Vec::new(),
+            }
+        }
+        _ => return None,
+    };
+    Some(message.check().map(|()| message))
 }
 
 /// One watch: off, or on with what it has seen.
@@ -725,13 +874,16 @@ impl Watch {
         ))
     }
 
-    /// `room/presence`: someone at the lamp or not.
+    /// `room/presence`: someone at the lamp or not. A visit's text names
+    /// only those in the eyes' `tellable` file, read as it goes, with names
+    /// on ([`NAMES_ENVIRONMENT`]).
     pub fn presence(
         &mut self,
         someone: bool,
         now_us: u64,
         minute: Option<u16>,
         spec: &Spec,
+        tellable: Option<&std::path::Path>,
     ) -> Vec<Out> {
         let Some(on) = &mut self.on else {
             return Vec::new();
@@ -751,7 +903,7 @@ impl Watch {
             return Vec::new();
         }
         match on.visit.take() {
-            Some(visit) => on.ended(visit, now_us, spec),
+            Some(visit) => on.ended(visit, now_us, spec, tellable),
             None => Vec::new(),
         }
     }
@@ -813,12 +965,15 @@ impl Watch {
 
     /// The eyes know the face at the lamp as `name`, or no face there is
     /// known. The person who asked, back after they left, ends the watch.
+    /// With `naming`, the name is kept with the visit, to be said only if
+    /// the eyes say, as the text goes, that its person said yes.
     pub fn known(
         &mut self,
         name: Option<&str>,
         now_us: u64,
         minute: Option<u16>,
         spec: &Spec,
+        naming: bool,
     ) -> Vec<Out> {
         let (Some(on), Some(name)) = (&mut self.on, name) else {
             return Vec::new();
@@ -843,6 +998,10 @@ impl Watch {
         let visit = on.visit(now_us, minute);
         visit.face = true;
         visit.known = true;
+        if naming && visit.names.len() < MOST_NAMES && !visit.names.iter().any(|kept| kept == name)
+        {
+            visit.names.push(name.to_owned());
+        }
         outs
     }
 
@@ -963,6 +1122,9 @@ struct Entry {
     /// Its `[permissions]` topics name [`SOUNDS`]: it may hear a door,
     /// footsteps and speech (#2562).
     sounds: bool,
+    /// Its `[permissions]` have `known_faces = true`: with names on, it may
+    /// name someone who said yes (#2562).
+    known_faces: bool,
 }
 
 /// Every watch skill's watch, by skill, when the lamp last heard someone
@@ -977,6 +1139,10 @@ pub struct Watches {
     pub sounds: bool,
     /// The privacy switch was last seen closed: no watch goes on.
     closed: bool,
+    /// With [`NAMES_ENVIRONMENT`] on: the eyes' `tellable` file beside
+    /// their known file (`crate::known::tellable_of`), for a watch whose
+    /// skill has `known_faces = true` (#2562). None: nobody is named.
+    pub tellable: Option<std::path::PathBuf>,
 }
 
 /// What a watch skill does, by skill.
@@ -991,6 +1157,14 @@ impl Watches {
             sounds,
             ..Self::default()
         }
+    }
+
+    /// Naming, in a visit's text, those the eyes' `tellable` file at
+    /// `tellable` says said yes, read as each text goes
+    /// ([`NAMES_ENVIRONMENT`], #2562); none names nobody.
+    pub fn naming(mut self, tellable: Option<std::path::PathBuf>) -> Self {
+        self.tellable = tellable;
+        self
     }
 
     /// The skills loaded again. A watch kept as it was stays as it was; one
@@ -1026,6 +1200,7 @@ impl Watches {
                     choice: choice.name.clone(),
                     watch,
                     sounds: skill.permissions.refuses_reading(SOUNDS).is_none(),
+                    known_faces: skill.permissions.known_faces,
                 },
             );
         }
@@ -1161,7 +1336,12 @@ impl Watches {
             "room/presence" => {
                 if let Some(someone) = value["someone"].as_bool() {
                     for (name, entry) in &mut self.each {
-                        for out in entry.watch.presence(someone, now_us, minute, &entry.spec) {
+                        let tellable = self.tellable.as_deref().filter(|_| entry.known_faces);
+                        for out in
+                            entry
+                                .watch
+                                .presence(someone, now_us, minute, &entry.spec, tellable)
+                        {
                             made.push((name.clone(), out));
                         }
                     }
@@ -1213,7 +1393,8 @@ impl Watches {
     pub fn known(&mut self, name: Option<&str>, now_us: u64, minute: Option<u16>) -> Outs {
         let mut made = Vec::new();
         for (skill, entry) in &mut self.each {
-            for out in entry.watch.known(name, now_us, minute, &entry.spec) {
+            let naming = self.tellable.is_some() && entry.known_faces;
+            for out in entry.watch.known(name, now_us, minute, &entry.spec, naming) {
                 made.push((skill.clone(), out));
             }
         }
@@ -1425,19 +1606,23 @@ mod tests {
         watch
             .turn(true, &spec, SECOND, heard(0), Some("known-a"), true)
             .unwrap();
-        assert!(watch.presence(false, MINUTE, None, &spec).is_empty());
+        assert!(watch.presence(false, MINUTE, None, &spec, None).is_empty());
         assert!(
             watch
-                .presence(true, 2 * MINUTE, Some(600), &spec)
+                .presence(true, 2 * MINUTE, Some(600), &spec, None)
                 .is_empty()
         );
         watch.face(NEAR_FACE, 2 * MINUTE, None);
         assert!(
             watch
-                .known(Some("known-a"), 3 * MINUTE, None, &the_spec())
+                .known(Some("known-a"), 3 * MINUTE, None, &the_spec(), false)
                 .is_empty()
         );
-        assert!(watch.presence(false, 4 * MINUTE, None, &spec).is_empty());
+        assert!(
+            watch
+                .presence(false, 4 * MINUTE, None, &spec, None)
+                .is_empty()
+        );
         assert!(watch.is_on(), "the asker's face ends nothing unseen");
         let shown = watch.mark_shown(true, None, 4 * MINUTE);
         assert!(matches!(&shown[..], [Out::Said(why)] if why.contains("shows")));
@@ -1445,11 +1630,11 @@ mod tests {
             watch.mark_shown(true, None, 4 * MINUTE).is_empty(),
             "said once"
         );
-        watch.presence(false, 5 * MINUTE, None, &spec);
-        watch.presence(true, 10 * MINUTE, Some(14 * 60 + 31), &spec);
-        watch.presence(true, 12 * MINUTE, None, &spec);
+        watch.presence(false, 5 * MINUTE, None, &spec, None);
+        watch.presence(true, 10 * MINUTE, Some(14 * 60 + 31), &spec, None);
+        watch.presence(true, 12 * MINUTE, None, &spec, None);
         assert_eq!(
-            texts(&watch.presence(false, 12 * MINUTE + SECOND, None, &spec)),
+            texts(&watch.presence(false, 12 * MINUTE + SECOND, None, &spec, None)),
             ["Someone was at your desk at 14:31, for about 2 minutes."]
         );
     }
@@ -1467,15 +1652,15 @@ mod tests {
     /// `stays`: what the watch does when they go.
     fn visit(watch: &mut Watch, at: u64, stays: u64) -> Vec<Out> {
         let spec = spec();
-        let mut outs = watch.presence(false, at - MINUTE, None, &spec);
-        outs.extend(watch.presence(true, at, Some(14 * 60 + 31), &spec));
+        let mut outs = watch.presence(false, at - MINUTE, None, &spec, None);
+        outs.extend(watch.presence(true, at, Some(14 * 60 + 31), &spec, None));
         // `room/presence` once a second while they are there.
         let mut now = at;
         while now < at + stays {
             now += SECOND;
-            outs.extend(watch.presence(true, now, Some(14 * 60 + 31), &spec));
+            outs.extend(watch.presence(true, now, Some(14 * 60 + 31), &spec, None));
         }
-        outs.extend(watch.presence(false, now + 20 * SECOND, None, &spec));
+        outs.extend(watch.presence(false, now + 20 * SECOND, None, &spec, None));
         outs
     }
 
@@ -1485,12 +1670,16 @@ mod tests {
         let mut watch = Watch::default();
         assert!(!watch.is_on());
         // Nothing it sees turns it on.
-        assert!(watch.presence(false, MINUTE, None, &spec).is_empty());
-        assert!(watch.presence(true, 2 * MINUTE, None, &spec).is_empty());
+        assert!(watch.presence(false, MINUTE, None, &spec, None).is_empty());
+        assert!(
+            watch
+                .presence(true, 2 * MINUTE, None, &spec, None)
+                .is_empty()
+        );
         watch.face(NEAR_FACE, 2 * MINUTE, None);
         assert!(
             watch
-                .known(Some("known-a"), 2 * MINUTE, None, &the_spec())
+                .known(Some("known-a"), 2 * MINUTE, None, &the_spec(), false)
                 .is_empty()
         );
         assert!(watch.privacy(true, &the_spec()).is_empty());
@@ -1571,11 +1760,11 @@ mod tests {
         // No local time: no time said.
         let mut watch = on(None);
         let spec = spec();
-        watch.presence(false, MINUTE, None, &spec);
-        watch.presence(true, 2 * MINUTE, None, &spec);
-        watch.presence(true, 5 * MINUTE, None, &spec);
+        watch.presence(false, MINUTE, None, &spec, None);
+        watch.presence(true, 2 * MINUTE, None, &spec, None);
+        watch.presence(true, 5 * MINUTE, None, &spec, None);
         assert_eq!(
-            texts(&watch.presence(false, 5 * MINUTE + SECOND, None, &spec)),
+            texts(&watch.presence(false, 5 * MINUTE + SECOND, None, &spec, None)),
             ["Someone was at your desk, for about 3 minutes."]
         );
     }
@@ -1602,13 +1791,19 @@ mod tests {
         // Still at the desk, being recognised as they leave.
         assert!(
             watch
-                .known(Some("known-a"), 2 * SECOND, None, &the_spec())
+                .known(Some("known-a"), 2 * SECOND, None, &the_spec(), false)
                 .is_empty()
         );
         assert!(watch.is_on());
-        watch.presence(false, MINUTE, None, &spec);
-        watch.presence(true, 30 * MINUTE, Some(15 * 60), &spec);
-        let back = watch.known(Some("known-a"), 30 * MINUTE + 2 * SECOND, None, &the_spec());
+        watch.presence(false, MINUTE, None, &spec, None);
+        watch.presence(true, 30 * MINUTE, Some(15 * 60), &spec, None);
+        let back = watch.known(
+            Some("known-a"),
+            30 * MINUTE + 2 * SECOND,
+            None,
+            &the_spec(),
+            false,
+        );
         assert_eq!(back[0], Out::Unmark);
         assert!(!watch.is_on());
         assert!(texts(&back).is_empty());
@@ -1617,23 +1812,27 @@ mod tests {
             matches!(&back[1], Out::Say(words) if words.words == guard_words().off_guard && words.exact)
         );
         // Nothing after: they are back.
-        assert!(watch.presence(false, 32 * MINUTE, None, &spec).is_empty());
-        // Someone else known does not end it.
-        let mut watch = on(Some("known-a"));
-        watch.presence(false, MINUTE, None, &spec);
-        watch.presence(true, 30 * MINUTE, Some(15 * 60), &spec);
         assert!(
             watch
-                .known(Some("known-b"), 30 * MINUTE, None, &the_spec())
+                .presence(false, 32 * MINUTE, None, &spec, None)
+                .is_empty()
+        );
+        // Someone else known does not end it.
+        let mut watch = on(Some("known-a"));
+        watch.presence(false, MINUTE, None, &spec, None);
+        watch.presence(true, 30 * MINUTE, Some(15 * 60), &spec, None);
+        assert!(
+            watch
+                .known(Some("known-b"), 30 * MINUTE, None, &the_spec(), false)
                 .is_empty()
         );
         assert!(watch.is_on());
         // An asker the eyes did not know is never ended by a face.
         let mut watch = on(None);
-        watch.presence(false, MINUTE, None, &spec);
+        watch.presence(false, MINUTE, None, &spec, None);
         assert!(
             watch
-                .known(Some("known-a"), 2 * MINUTE, None, &the_spec())
+                .known(Some("known-a"), 2 * MINUTE, None, &the_spec(), false)
                 .is_empty()
         );
         assert!(watch.is_on());
@@ -1644,32 +1843,39 @@ mod tests {
     fn a_text_says_known_or_not_and_never_a_name() {
         let spec = spec();
         let mut watch = on(Some("known-a"));
-        watch.presence(false, MINUTE, None, &spec);
-        watch.presence(true, 10 * MINUTE, Some(14 * 60 + 31), &spec);
-        watch.known(Some("known-b"), 10 * MINUTE + SECOND, None, &the_spec());
-        watch.presence(true, 12 * MINUTE, None, &spec);
-        let outs = watch.presence(false, 12 * MINUTE + SECOND, None, &spec);
+        watch.presence(false, MINUTE, None, &spec, None);
+        watch.presence(true, 10 * MINUTE, Some(14 * 60 + 31), &spec, None);
+        watch.known(
+            Some("known-b"),
+            10 * MINUTE + SECOND,
+            None,
+            &the_spec(),
+            false,
+        );
+        watch.presence(true, 12 * MINUTE, None, &spec, None);
+        let outs = watch.presence(false, 12 * MINUTE + SECOND, None, &spec, None);
         assert_eq!(
             texts(&outs),
             ["Someone you've introduced me to was at your desk at 14:31, for about 2 minutes."]
         );
         assert!(!format!("{outs:?}").contains("known-b"));
         let mut watch = on(None);
-        watch.presence(false, MINUTE, None, &spec);
-        watch.presence(true, 10 * MINUTE, Some(9 * 60 + 5), &spec);
+        watch.presence(false, MINUTE, None, &spec, None);
+        watch.presence(true, 10 * MINUTE, Some(9 * 60 + 5), &spec, None);
         watch.face(NEAR_FACE, 10 * MINUTE, None);
-        watch.presence(true, 13 * MINUTE, None, &spec);
+        watch.presence(true, 13 * MINUTE, None, &spec, None);
         assert_eq!(
-            texts(&watch.presence(false, 13 * MINUTE + SECOND, None, &spec)),
+            texts(&watch.presence(false, 13 * MINUTE + SECOND, None, &spec, None)),
             ["Someone I don't know was at your desk at 9:05, for about 3 minutes."]
         );
         // A face far off is not someone at the desk's.
         let mut watch = on(None);
-        watch.presence(false, MINUTE, None, &spec);
-        watch.presence(true, 10 * MINUTE, Some(9 * 60 + 5), &spec);
+        watch.presence(false, MINUTE, None, &spec, None);
+        watch.presence(true, 10 * MINUTE, Some(9 * 60 + 5), &spec, None);
         watch.face(FAR_FACE, 10 * MINUTE, None);
         assert!(
-            texts(&watch.presence(false, 13 * MINUTE, None, &spec))[0].starts_with("Someone was")
+            texts(&watch.presence(false, 13 * MINUTE, None, &spec, None))[0]
+                .starts_with("Someone was")
         );
     }
 
@@ -1699,29 +1905,33 @@ mod tests {
     fn while_its_mark_is_not_shown_nothing_about_the_desk_is_taken() {
         let spec = spec();
         let mut watch = on(Some("known-a"));
-        watch.presence(false, MINUTE, None, &spec);
+        watch.presence(false, MINUTE, None, &spec, None);
         let hidden = watch.mark_shown(false, Some("person"), MINUTE);
         assert!(matches!(&hidden[..], [Out::Said(why)] if why.contains("outranked by person")));
         assert!(watch.mark_shown(false, Some("person"), MINUTE).is_empty());
         assert!(
             watch
-                .presence(true, 2 * MINUTE, Some(600), &spec)
+                .presence(true, 2 * MINUTE, Some(600), &spec, None)
                 .is_empty()
         );
         watch.face(NEAR_FACE, 2 * MINUTE, None);
         assert!(
             watch
-                .known(Some("known-a"), 3 * MINUTE, None, &the_spec())
+                .known(Some("known-a"), 3 * MINUTE, None, &the_spec(), false)
                 .is_empty()
         );
-        assert!(watch.presence(false, 4 * MINUTE, None, &spec).is_empty());
+        assert!(
+            watch
+                .presence(false, 4 * MINUTE, None, &spec, None)
+                .is_empty()
+        );
         assert!(watch.is_on());
         let shown = watch.mark_shown(true, None, 5 * MINUTE);
         assert!(matches!(&shown[..], [Out::Said(why)] if why.contains("shows")));
-        watch.presence(true, 10 * MINUTE, Some(14 * 60 + 31), &spec);
-        watch.presence(true, 12 * MINUTE, None, &spec);
+        watch.presence(true, 10 * MINUTE, Some(14 * 60 + 31), &spec, None);
+        watch.presence(true, 12 * MINUTE, None, &spec, None);
         assert_eq!(
-            texts(&watch.presence(false, 12 * MINUTE + SECOND, None, &spec)),
+            texts(&watch.presence(false, 12 * MINUTE + SECOND, None, &spec, None)),
             ["Someone was at your desk at 14:31, for about 2 minutes."]
         );
         // Off, nothing.
@@ -1737,7 +1947,7 @@ mod tests {
     fn a_mark_the_ring_has_not_confirmed_for_thirty_seconds_counts_nothing() {
         let spec = spec();
         let mut watch = on(None);
-        watch.presence(false, 2 * SECOND, None, &spec);
+        watch.presence(false, 2 * SECOND, None, &spec, None);
         // Confirmed at 10 s: still counting 30 s after.
         watch.mark_shown(true, None, 10 * SECOND);
         assert!(watch.tick(40 * SECOND, &spec).is_empty());
@@ -1750,19 +1960,29 @@ mod tests {
         // A visit now: nothing taken, nothing texted.
         assert!(
             watch
-                .presence(true, MINUTE, Some(14 * 60 + 21), &spec)
+                .presence(true, MINUTE, Some(14 * 60 + 21), &spec, None)
                 .is_empty()
         );
         watch.face(NEAR_FACE, MINUTE, None);
-        assert!(watch.presence(false, 3 * MINUTE, None, &spec).is_empty());
+        assert!(
+            watch
+                .presence(false, 3 * MINUTE, None, &spec, None)
+                .is_empty()
+        );
         assert!(watch.is_on());
         // The ring's word again: the next visit counts.
         let shown = watch.mark_shown(true, None, 4 * MINUTE);
         assert!(matches!(&shown[..], [Out::Said(why)] if why.contains("shows")));
         assert!(watch.tick(4 * MINUTE + SECOND, &spec).is_empty());
-        watch.presence(true, 4 * MINUTE + 5 * SECOND, Some(14 * 60 + 31), &spec);
+        watch.presence(
+            true,
+            4 * MINUTE + 5 * SECOND,
+            Some(14 * 60 + 31),
+            &spec,
+            None,
+        );
         assert_eq!(
-            texts(&watch.presence(false, 4 * MINUTE + 20 * SECOND, None, &spec)),
+            texts(&watch.presence(false, 4 * MINUTE + 20 * SECOND, None, &spec, None)),
             ["Someone was at your desk at 14:31, for under a minute."]
         );
     }
@@ -1774,7 +1994,7 @@ mod tests {
     fn the_persons_light_pauses_it_until_they_ask_again() {
         let spec = spec();
         let mut watch = on(None);
-        watch.presence(false, MINUTE, None, &spec);
+        watch.presence(false, MINUTE, None, &spec, None);
         let paused = watch.paused_by_person(&the_spec());
         assert_eq!(texts(&paused), [guard_words().paused.as_str()]);
         assert!(watch.paused_by_person(&the_spec()).is_empty());
@@ -1782,10 +2002,14 @@ mod tests {
         assert!(watch.mark_shown(true, None, MINUTE).is_empty());
         assert!(
             watch
-                .presence(true, 2 * MINUTE, Some(600), &spec)
+                .presence(true, 2 * MINUTE, Some(600), &spec, None)
                 .is_empty()
         );
-        assert!(watch.presence(false, 4 * MINUTE, None, &spec).is_empty());
+        assert!(
+            watch
+                .presence(false, 4 * MINUTE, None, &spec, None)
+                .is_empty()
+        );
         // Asked with no words for it: still paused.
         let quiet = watch.turn(
             true,
@@ -1809,12 +2033,16 @@ mod tests {
             .unwrap();
         assert_eq!(answer["next"], guard_words().on_again);
         assert_eq!(outs[0], Out::Mark(spec.mark.clone()));
-        assert!(watch.presence(true, 7 * MINUTE, None, &spec).is_empty());
+        assert!(
+            watch
+                .presence(true, 7 * MINUTE, None, &spec, None)
+                .is_empty()
+        );
         watch.mark_shown(true, None, 7 * MINUTE);
-        watch.presence(true, 10 * MINUTE, Some(14 * 60 + 31), &spec);
-        watch.presence(true, 12 * MINUTE, None, &spec);
+        watch.presence(true, 10 * MINUTE, Some(14 * 60 + 31), &spec, None);
+        watch.presence(true, 12 * MINUTE, None, &spec, None);
         assert_eq!(
-            texts(&watch.presence(false, 12 * MINUTE + SECOND, None, &spec)),
+            texts(&watch.presence(false, 12 * MINUTE + SECOND, None, &spec, None)),
             ["Someone was at your desk at 14:31, for about 2 minutes."]
         );
         // Not paused, asked again: already on.
@@ -1876,23 +2104,27 @@ mod tests {
     fn once_the_switch_has_ended_it_nothing_about_the_desk_is_taken() {
         let spec = spec();
         let mut watch = on(Some("known-a"));
-        watch.presence(false, MINUTE, None, &spec);
+        watch.presence(false, MINUTE, None, &spec, None);
         assert_eq!(
             texts(&watch.privacy(true, &the_spec())),
             [guard_words().blind.as_str()]
         );
         assert!(
             watch
-                .presence(true, 2 * MINUTE, Some(600), &spec)
+                .presence(true, 2 * MINUTE, Some(600), &spec, None)
                 .is_empty()
         );
         assert!(watch.face(NEAR_FACE, 2 * MINUTE, None).is_empty());
         assert!(
             watch
-                .known(Some("known-a"), 3 * MINUTE, None, &the_spec())
+                .known(Some("known-a"), 3 * MINUTE, None, &the_spec(), false)
                 .is_empty()
         );
-        assert!(watch.presence(false, 4 * MINUTE, None, &spec).is_empty());
+        assert!(
+            watch
+                .presence(false, 4 * MINUTE, None, &spec, None)
+                .is_empty()
+        );
         assert!(!watch.is_on());
         // Closed, it is not turned on.
         let mut watches = guard();
@@ -2025,7 +2257,7 @@ mod tests {
 
     /// The watch on, the desk empty and its mark confirmed at `now`.
     fn away(watch: &mut Watch, now: u64) {
-        watch.presence(false, now, None, &spec());
+        watch.presence(false, now, None, &spec(), None);
         watch.mark_shown(true, None, now);
     }
 
@@ -2052,7 +2284,11 @@ mod tests {
         // A face far off after: no visit, no arrival, no turn.
         let late = watch.face(FAR_FACE, 10 * MINUTE + 40 * SECOND, None);
         assert!(late.is_empty(), "{late:?}");
-        assert!(watch.presence(false, 11 * MINUTE, None, &spec).is_empty());
+        assert!(
+            watch
+                .presence(false, 11 * MINUTE, None, &spec, None)
+                .is_empty()
+        );
         assert!(watch.is_on());
     }
 
@@ -2077,10 +2313,10 @@ mod tests {
         let mut now = 10 * MINUTE + 12 * SECOND;
         while now < 12 * MINUTE {
             now += SECOND;
-            outs.extend(watch.presence(true, now, None, &spec));
+            outs.extend(watch.presence(true, now, None, &spec, None));
             outs.extend(watch.face(NEAR_FACE, now, None));
         }
-        outs.extend(watch.presence(false, now + 20 * SECOND, None, &spec));
+        outs.extend(watch.presence(false, now + 20 * SECOND, None, &spec, None));
         assert!(
             !outs.iter().any(|out| matches!(out, Out::Gaze(_))),
             "{outs:?}"
@@ -2095,9 +2331,9 @@ mod tests {
         watch.sound(true, false, 10 * MINUTE, Some(9 * 60 + 5));
         let spoke = watch.sound(false, true, 10 * MINUTE + 5 * SECOND, None);
         assert!(matches!(&spoke[..], [Out::Said(why)] if why.contains("then speech")));
-        watch.presence(true, 10 * MINUTE + 6 * SECOND, None, &spec);
+        watch.presence(true, 10 * MINUTE + 6 * SECOND, None, &spec, None);
         assert_eq!(
-            texts(&watch.presence(false, 10 * MINUTE + 50 * SECOND, None, &spec)),
+            texts(&watch.presence(false, 10 * MINUTE + 50 * SECOND, None, &spec, None)),
             ["Someone came in at 9:05 and was here for under a minute."]
         );
     }
@@ -2115,10 +2351,10 @@ mod tests {
                 .count()
         };
         let arrive = |watch: &mut Watch, at: u64| {
-            let mut outs = watch.presence(true, at, None, &spec);
+            let mut outs = watch.presence(true, at, None, &spec, None);
             outs.extend(watch.face(NEAR_FACE, at, None));
             outs.extend(watch.face(NEAR_FACE, at + SECOND, None));
-            outs.extend(watch.presence(false, at + 30 * SECOND, None, &spec));
+            outs.extend(watch.presence(false, at + 30 * SECOND, None, &spec, None));
             outs
         };
         assert_eq!(turns(&arrive(&mut watch, 10 * MINUTE)), 1);
@@ -2192,7 +2428,7 @@ mod tests {
         away(&mut watch, MINUTE);
         assert!(
             watch
-                .known(Some("known-a"), 2 * MINUTE, None, &the_spec())
+                .known(Some("known-a"), 2 * MINUTE, None, &the_spec(), false)
                 .is_empty()
         );
         assert!(watch.is_on());
@@ -2279,5 +2515,317 @@ mod tests {
         assert_eq!(LISTENS[2], lamp_msgs::Speech::TOPICS[0]);
         assert_eq!(PRIVACY, lamp_msgs::MicrophonePrivacy::TOPIC);
         assert_eq!(SOUNDS, SoundClasses::TOPIC);
+    }
+
+    /// What went to the phone: each text, and whether it names someone
+    /// (#2562).
+    fn sent(outs: &[Out]) -> Vec<(&str, bool)> {
+        outs.iter()
+            .filter_map(|out| match out {
+                Out::Text(text) => Some((text.as_str(), false)),
+                Out::Named { text, .. } => Some((text.as_str(), true)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// `room/presence`'s payload.
+    fn presence_of(someone: bool) -> Vec<u8> {
+        json!({ "someone": someone }).to_string().into_bytes()
+    }
+
+    /// Guard mode on from the app, its mark shown, the desk empty at 1 min;
+    /// a door at 18:10 (10 min), then the eyes' known names `seen` in turn,
+    /// a second apart, at the desk until 12 min; `before_text` just before
+    /// they go: everything it did.
+    fn came_in(
+        watches: &mut Watches,
+        seen: &[Option<&str>],
+        before_text: impl FnOnce(&mut Watches) -> Outs,
+    ) -> Vec<Out> {
+        let mut outs: Outs = Vec::new();
+        outs.extend(
+            watches
+                .from_app(true, SECOND, true)
+                .unwrap()
+                .1
+                .into_iter()
+                .map(|out| (GUARD.to_owned(), out)),
+        );
+        outs.extend(watches.ring_said(GUARD, true, None, SECOND));
+        outs.extend(watches.observe("room/presence", &presence_of(false), MINUTE, None));
+        outs.extend(watches.observe(
+            SOUNDS,
+            &classes(0.9, 0.0, "clear"),
+            10 * MINUTE,
+            Some(18 * 60 + 10),
+        ));
+        let mut now = 10 * MINUTE;
+        for name in seen {
+            now += SECOND;
+            outs.extend(watches.known(*name, now, None));
+        }
+        outs.extend(watches.observe("room/presence", &presence_of(true), 12 * MINUTE, None));
+        outs.extend(before_text(watches));
+        outs.extend(watches.observe(
+            "room/presence",
+            &presence_of(false),
+            12 * MINUTE + SECOND,
+            None,
+        ));
+        outs.into_iter().map(|(_, out)| out).collect()
+    }
+
+    /// Guard mode with `LAMP_GUARD_NAMES=on`: the eyes' `tellable` beside
+    /// their known file in `dir`, holding `yes`.
+    fn naming(dir: &std::path::Path, yes: &str) -> Watches {
+        let tellable = crate::known::tellable_of(&dir.join("known"));
+        std::fs::write(&tellable, yes).unwrap();
+        let mut watches = guard();
+        watches.tellable = Some(tellable);
+        watches
+    }
+
+    /// #2562 item 1, the first builder's test: two known people arriving
+    /// together, one who said yes to being named and one who didn't. The
+    /// text names the one and says "someone the lamp knows" for the other;
+    /// both who said yes are both named.
+    #[test]
+    fn two_known_one_tellable_names_one_and_says_someone_the_lamp_knows_for_the_other() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut watches = naming(dir.path(), "Minh\n");
+        let outs = came_in(&mut watches, &[Some("Minh"), Some("Lan")], |_| Vec::new());
+        assert_eq!(
+            sent(&outs),
+            [(
+                "Minh and someone the lamp knows came in at 18:10 and was here for about 2 minutes.",
+                true
+            )]
+        );
+        // Beside it, for lamp-cloud's check as it sends: the line with
+        // names off, and who it names, by id, Minh alone.
+        let message = outs
+            .iter()
+            .find(|out| matches!(out, Out::Named { .. }))
+            .and_then(|out| text_message(GUARD, out.clone()))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            message.unnamed.as_deref(),
+            Some(
+                "Someone you've introduced me to came in at 18:10 and was here for about 2 minutes."
+            )
+        );
+        assert_eq!(message.named, [lamp_msgs::known::person_id("Minh")]);
+        assert_eq!(message.from, "skill:guard-mode");
+        // The name is in the text alone, never in what the journal says.
+        assert!(outs.iter().all(
+            |out| !matches!(out, Out::Said(why) if why.contains("Minh") || why.contains("Lan"))
+        ));
+        // Lan first, or Minh alone: the same, or just the name.
+        let mut watches = naming(dir.path(), "Minh\n");
+        let outs = came_in(
+            &mut watches,
+            &[Some("Lan"), Some("Minh"), Some("Lan")],
+            |_| Vec::new(),
+        );
+        assert_eq!(
+            sent(&outs)[0].0,
+            "Minh and someone the lamp knows came in at 18:10 and was here for about 2 minutes."
+        );
+        let mut watches = naming(dir.path(), "Minh\n");
+        let outs = came_in(&mut watches, &[Some("Minh")], |_| Vec::new());
+        assert_eq!(
+            sent(&outs)[0].0,
+            "Minh came in at 18:10 and was here for about 2 minutes."
+        );
+        // Both said yes.
+        let mut watches = naming(dir.path(), "Lan\nMinh\n");
+        let outs = came_in(&mut watches, &[Some("Minh"), Some("Lan")], |_| Vec::new());
+        assert_eq!(
+            sent(&outs)[0].0,
+            "Minh and Lan came in at 18:10 and was here for about 2 minutes."
+        );
+        // Neither did: as without names.
+        let mut watches = naming(dir.path(), "Thu\n");
+        let outs = came_in(&mut watches, &[Some("Minh"), Some("Lan")], |_| Vec::new());
+        assert_eq!(
+            sent(&outs),
+            [(
+                "Someone you've introduced me to came in at 18:10 and was here for about 2 minutes.",
+                false
+            )]
+        );
+    }
+
+    /// #2562: with `LAMP_GUARD_NAMES` off (no `tellable` given), nobody is
+    /// named, whoever said yes: today's words, and no name kept or said.
+    #[test]
+    fn with_names_off_nobody_is_ever_named() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut watches = naming(dir.path(), "Minh\nLan\n");
+        watches.tellable = None;
+        let outs = came_in(&mut watches, &[Some("Minh"), Some("Lan")], |_| Vec::new());
+        assert_eq!(
+            sent(&outs),
+            [(
+                "Someone you've introduced me to came in at 18:10 and was here for about 2 minutes.",
+                false
+            )]
+        );
+        assert!(!format!("{outs:?}").contains("Minh"), "{outs:?}");
+        assert!(!format!("{watches:?}").contains("Minh"), "no name kept");
+        assert_eq!(NAMES_ENVIRONMENT, "LAMP_GUARD_NAMES");
+    }
+
+    /// #2562: a skill without `known_faces = true` is never told a name,
+    /// with names on.
+    #[test]
+    fn a_watch_without_known_faces_names_nobody() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut watches = naming(dir.path(), "Minh\n");
+        for entry in watches.each.values_mut() {
+            entry.known_faces = false;
+        }
+        let outs = came_in(&mut watches, &[Some("Minh")], |_| Vec::new());
+        assert!(
+            sent(&outs)
+                .iter()
+                .all(|(text, named)| !named && !text.contains("Minh")),
+            "{outs:?}"
+        );
+    }
+
+    /// #2562: a yes taken back while the text still waits (the visit not
+    /// over) names nobody: the eyes' `tellable` is read as the text goes,
+    /// never as the face was seen. A forget, which removes the file, is the
+    /// same.
+    #[test]
+    fn a_yes_taken_back_before_the_text_goes_names_nobody() {
+        let dir = tempfile::tempdir().unwrap();
+        let tellable = crate::known::tellable_of(&dir.path().join("known"));
+        for took_back in ["Lan\n", ""] {
+            let mut watches = naming(dir.path(), "Minh\nLan\n");
+            let outs = came_in(&mut watches, &[Some("Minh")], |_| {
+                if took_back.is_empty() {
+                    std::fs::remove_file(&tellable).unwrap();
+                } else {
+                    std::fs::write(&tellable, took_back).unwrap();
+                }
+                Vec::new()
+            });
+            assert_eq!(
+                sent(&outs),
+                [(
+                    "Someone you've introduced me to came in at 18:10 and was here for about 2 minutes.",
+                    false
+                )],
+                "{took_back:?}"
+            );
+        }
+    }
+
+    /// #2562: never a name from a voice. Speech after the door, with the
+    /// person saying who they are, and no face the eyes know: "someone".
+    #[test]
+    fn a_voice_alone_never_names() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut watches = naming(dir.path(), "Minh\n");
+        let mut outs: Outs = Vec::new();
+        watches.from_app(true, SECOND, true).unwrap();
+        outs.extend(watches.ring_said(GUARD, true, None, SECOND));
+        outs.extend(watches.observe("room/presence", &presence_of(false), MINUTE, None));
+        outs.extend(watches.observe(
+            SOUNDS,
+            &classes(0.9, 0.0, "clear"),
+            10 * MINUTE,
+            Some(18 * 60 + 10),
+        ));
+        let heard = json!({ "text": "Hi, it's Minh, I'm back", "finished": true }).to_string();
+        outs.extend(watches.observe(
+            "voice/heard",
+            heard.as_bytes(),
+            10 * MINUTE + 5 * SECOND,
+            None,
+        ));
+        let mut now = 10 * MINUTE + 5 * SECOND;
+        while now < 12 * MINUTE {
+            outs.extend(watches.observe("room/presence", &presence_of(true), now, None));
+            // The eyes know no face at the desk.
+            outs.extend(watches.known(None, now, None));
+            now += SECOND;
+        }
+        outs.extend(watches.observe("room/presence", &presence_of(false), now, None));
+        let outs: Vec<Out> = outs.into_iter().map(|(_, out)| out).collect();
+        assert_eq!(
+            sent(&outs),
+            [(
+                "Someone came in at 18:10 and was here for about 2 minutes.",
+                false
+            )]
+        );
+        assert!(!format!("{outs:?}").contains("Minh"), "{outs:?}");
+    }
+    /// #2562 (reviewer-two's P2 on #2769): three names the eyes allow, 40
+    /// letters of two bytes each, are past one line named; the visit's
+    /// text is not lost: the message published is its unnamed words alone,
+    /// and passes `MessageOut::check`.
+    #[test]
+    fn names_too_long_for_one_line_send_the_unnamed_text_not_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let names: Vec<String> = ["é", "ñ", "ü"]
+            .iter()
+            .map(|letter| letter.repeat(40))
+            .collect();
+        assert!(
+            names
+                .iter()
+                .all(|name| name.chars().count() == 40 && name.len() == 80)
+        );
+        let mut watches = naming(dir.path(), &names.join("\n"));
+        let seen: Vec<Option<&str>> = names.iter().map(|name| Some(name.as_str())).collect();
+        let outs = came_in(&mut watches, &seen, |_| Vec::new());
+        let named = outs
+            .iter()
+            .find(|out| matches!(out, Out::Named { .. }))
+            .cloned()
+            .expect("named before the bound");
+        let Out::Named { text, .. } = &named else {
+            unreachable!()
+        };
+        assert!(text.len() > lamp_msgs::MESSAGE_TEXT_BYTES, "{}", text.len());
+        let message = text_message(GUARD, named)
+            .unwrap()
+            .expect("published, not dropped");
+        assert_eq!(message.check(), Ok(()));
+        assert_eq!(
+            message.text,
+            "Someone you've introduced me to came in at 18:10 and was here for about 2 minutes."
+        );
+        assert_eq!((message.unnamed, message.named.len()), (None, 0));
+        // A plain text is its words; anything else is no message.
+        let plain = text_message(GUARD, Out::Text("Someone came in.".into()))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (plain.text.as_str(), plain.unnamed),
+            ("Someone came in.", None)
+        );
+        assert!(text_message(GUARD, Out::Unmark).is_none());
+    }
+
+    /// #2562: the named lines' slots are checked as the others are.
+    #[test]
+    fn the_named_lines_have_only_their_own_slots() {
+        let broken = |change: fn(&mut Words)| {
+            let mut words = guard_words();
+            change(&mut words);
+            words.checked().unwrap_err()
+        };
+        assert!(
+            broken(|w| w.named_and_known = "someone the lamp knows".into())
+                .contains("named_and_known")
+        );
+        assert!(broken(|w| w.and = "{names} and {who}".into()).contains("and"));
     }
 }

@@ -18,6 +18,16 @@
 //! (the same publisher, boot and `seq`) is dropped. While the broker is away at
 //! most [`KEPT_OFFLINE`] wait in memory, the oldest dropped first, and go
 //! on reconnect; a restart of `lamp-cloud` loses them.
+//!
+//! A named text (guard mode with `LAMP_GUARD_NAMES=on`, #2562) is sent
+//! named only when it can go at once, with the broker there, and the eyes'
+//! `tellable` file, read just then, still has a yes from each one it names
+//! (`lamp_msgs::known::still_tellable`, [`Outbox::due_checked`]): a text
+//! that waited on the bus while a yes was taken back goes unnamed. Held
+//! instead, because the broker is away or the send failed or was lost
+//! before its ack, it holds its `unnamed` words in place of its text: a held
+//! or retried text never names anyone. The journal says so once each time
+//! ([`HELD_UNNAMED`], [`NOT_CONFIRMED`]).
 use lamp_msgs::MessageOut;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -35,6 +45,19 @@ pub const PER_HOUR: usize = 6;
 pub const KEPT_OFFLINE: usize = 4;
 /// An hour, in ms.
 const HOUR_MS: u64 = 3_600_000;
+/// The journal's line when a named text is held as its unnamed words.
+pub const HELD_UNNAMED: &str = "a named text held as unnamed: the broker was away";
+/// The journal's line when a named text goes as its unnamed words because
+/// a publish of lamp-cloud's own was still not acknowledged as it was
+/// handed to the client: the client may hold it behind that one (a broker's
+/// receive maximum) past the eyes' word, so it never waits there named
+/// (#2562, the reviewer's correction read on #2769).
+pub const UNACKED_AHEAD: &str =
+    "a named text sent unnamed: an earlier send was still unacknowledged";
+/// The journal's line when a named text goes as its unnamed words because
+/// the eyes no longer say, or can't be read to say, each one named said yes.
+pub const NOT_CONFIRMED: &str =
+    "a named text sent as unnamed: the eyes did not confirm each yes as it went";
 
 /// One piece to send: the skill it came from, for the journal, and the
 /// `chat.event`'s `data`, made once when it was taken, so a piece sent
@@ -44,6 +67,27 @@ const HOUR_MS: u64 = 3_600_000;
 pub struct Piece {
     pub skill: String,
     pub data: Value,
+    /// A named text's words with no name (`MessageOut::unnamed`): put in
+    /// `data` in place of the text when the piece is held (#2562).
+    pub unnamed: Option<String>,
+    /// Who it names, as person ids (`MessageOut::named`), checked against
+    /// the eyes' `tellable` as it goes.
+    pub named: Vec<String>,
+}
+
+impl Piece {
+    /// Held: a named piece's text becomes its unnamed words, its event's
+    /// `id` and `time` kept. Whether it named anyone. Also as it is handed
+    /// to the client behind a publish of lamp-cloud's not yet acknowledged
+    /// ([`UNACKED_AHEAD`]).
+    pub fn hold(&mut self) -> bool {
+        let Some(unnamed) = self.unnamed.take() else {
+            return false;
+        };
+        self.named.clear();
+        crate::chat::retell(&mut self.data, &unnamed);
+        true
+    }
 }
 
 /// What was heard on `messages/out`: the pieces to send now, and the
@@ -83,6 +127,10 @@ pub struct Outbox {
     refused: HashSet<String>,
     /// Pieces the broker has acknowledged since the start.
     sent: u64,
+    /// A named piece was held as unnamed since the journal last said so.
+    held_named: bool,
+    /// A named piece went unnamed, a yes not confirmed, since last said.
+    not_confirmed: bool,
 }
 
 impl Outbox {
@@ -122,23 +170,56 @@ impl Outbox {
         self.waiting.push_back(Piece {
             skill: skill_of(&out.from),
             data: event(&out.text),
+            unnamed: out.unnamed.clone(),
+            named: out.named.clone(),
         });
         self.trim();
         Taken::Kept
     }
 
-    /// The pieces to send now, oldest first.
+    /// The pieces to send now, oldest first, none named (#2562): with
+    /// nobody to confirm a yes, a named piece goes as its unnamed words.
     pub fn due(&mut self) -> Vec<Piece> {
-        self.waiting.drain(..).collect()
+        self.due_checked(|_| false)
+    }
+
+    /// The pieces to send now, oldest first: a named one as it is only if
+    /// `still` says each one it names still said yes, asked now, as it goes
+    /// (`lamp_msgs::known::still_tellable`); else as its unnamed words.
+    pub fn due_checked(&mut self, still: impl Fn(&[String]) -> bool) -> Vec<Piece> {
+        let mut due: Vec<Piece> = self.waiting.drain(..).collect();
+        for piece in &mut due {
+            if piece.unnamed.is_some() && !still(&piece.named) {
+                self.not_confirmed |= piece.hold();
+            }
+        }
+        due
     }
 
     /// Pieces not sent, or lost before the broker's ack, waiting again
-    /// before any newer, in their order.
+    /// before any newer, in their order: held, so with no name (#2562).
     pub fn owe(&mut self, pieces: Vec<Piece>) {
-        for piece in pieces.into_iter().rev() {
+        for mut piece in pieces.into_iter().rev() {
+            self.held_named |= piece.hold();
             self.waiting.push_front(piece);
         }
         self.trim();
+    }
+
+    /// The broker is away: every piece waiting is held, a named one as its
+    /// unnamed words (#2562).
+    pub fn hold(&mut self) {
+        for piece in &mut self.waiting {
+            self.held_named |= piece.hold();
+        }
+    }
+
+    /// [`HELD_UNNAMED`] and [`NOT_CONFIRMED`], once each, if a named piece
+    /// was held, or went unnamed, since last asked.
+    pub fn held_lines(&mut self) -> Vec<&'static str> {
+        let held = std::mem::take(&mut self.held_named).then_some(HELD_UNNAMED);
+        let unconfirmed = std::mem::take(&mut self.not_confirmed).then_some(NOT_CONFIRMED);
+        held.into_iter().chain(unconfirmed).collect()
     }
 
     /// A piece the broker acknowledged: how many have been since the start.
@@ -206,11 +287,94 @@ mod tests {
         MessageOut {
             from: "skill:guard-mode".into(),
             text: text.into(),
+            unnamed: None,
+            named: Vec::new(),
         }
     }
 
     fn event(text: &str) -> Value {
-        json!({"event": {"type": "task_news", "detail": {"message": text}}})
+        json!({"event": {"type": "task_news", "id": "evt-1", "summary": text, "detail": {"message": text}}})
+    }
+
+    const NAMED: &str = "Minh came in at 18:10 and was here for about 2 minutes.";
+    const UNNAMED: &str =
+        "Someone you've introduced me to came in at 18:10 and was here for about 2 minutes.";
+
+    fn named() -> MessageOut {
+        MessageOut {
+            unnamed: Some(UNNAMED.into()),
+            named: vec![lamp_msgs::known::person_id("Minh")],
+            ..guard(NAMED)
+        }
+    }
+
+    fn message(piece: &Piece) -> (&Value, &Value) {
+        (
+            &piece.data["event"]["summary"],
+            &piece.data["event"]["detail"]["message"],
+        )
+    }
+
+    /// #2562: a named text taken with the broker there goes at once, named,
+    /// only while each yes is confirmed as it goes; unconfirmed, or held
+    /// while the broker is away, or owed after a failed or lost send, it is
+    /// its unnamed words, its event's id kept, and the journal says so once.
+    #[test]
+    fn a_named_text_goes_named_only_at_once_and_is_held_unnamed() {
+        let mut outbox = Outbox::default();
+        assert_eq!(
+            outbox.take(("skills", "b1", 1), &named(), 0, event),
+            Taken::Kept
+        );
+        let due = outbox.due_checked(|ids| ids == [lamp_msgs::known::person_id("Minh")]);
+        assert_eq!(message(&due[0]), (&json!(NAMED), &json!(NAMED)));
+        assert!(outbox.held_lines().is_empty());
+        // Lost before its ack: again, with no name.
+        outbox.owe(due);
+        assert_eq!(outbox.held_lines(), [HELD_UNNAMED]);
+        assert!(outbox.held_lines().is_empty(), "once");
+        let again = outbox.due_checked(|_| true);
+        assert_eq!(message(&again[0]), (&json!(UNNAMED), &json!(UNNAMED)));
+        assert_eq!(again[0].data["event"]["id"], "evt-1");
+        assert_eq!((&again[0].unnamed, again[0].named.len()), (&None, 0));
+        // Taken while the broker is away: held unnamed, sent so later.
+        assert_eq!(
+            outbox.take(("skills", "b1", 2), &named(), 1, event),
+            Taken::Kept
+        );
+        assert_eq!(
+            outbox.take(("skills", "b1", 3), &guard("Someone was here."), 2, event),
+            Taken::Kept
+        );
+        outbox.hold();
+        assert_eq!(outbox.held_lines(), [HELD_UNNAMED]);
+        let later = outbox.due_checked(|_| true);
+        assert_eq!(message(&later[0]), (&json!(UNNAMED), &json!(UNNAMED)));
+        assert_eq!(
+            later[1].data["event"]["detail"]["message"],
+            "Someone was here."
+        );
+        // A yes no longer confirmed as it goes: unnamed, said once; and
+        // `due` alone never names.
+        for checked in [true, false] {
+            outbox.take(
+                ("skills", "b1", 4 + u64::from(!checked)),
+                &named(),
+                3,
+                event,
+            );
+            let due = if checked {
+                outbox.due_checked(|_| false)
+            } else {
+                outbox.due()
+            };
+            assert_eq!(message(&due[0]), (&json!(UNNAMED), &json!(UNNAMED)));
+            assert_eq!(outbox.held_lines(), [NOT_CONFIRMED]);
+        }
+        // Nothing named held: no line.
+        outbox.take(("skills", "b1", 9), &guard("Someone was here."), 3, event);
+        outbox.hold();
+        assert!(outbox.held_lines().is_empty());
     }
 
     fn take(outbox: &mut Outbox, seq: u64, text: &str, now_ms: u64) -> Taken {

@@ -35,33 +35,10 @@ pub fn naming() -> bool {
     std::env::var(NAMES_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
-/// The eyes' file of names Who was here may say: `tellable` beside the
-/// known file (`lamp-eyes`, `who::tellable_of`), the names of those who
-/// said yes, one a line, kept current by the eyes.
-pub fn tellable_of(known: &Path) -> std::path::PathBuf {
-    known.with_file_name("tellable")
-}
-
-/// The most names read from `tellable`: the eyes keep twenty people.
-const MOST_TELLABLE: usize = 20;
-
-/// The names in the `tellable` file at `path`: none when there is no file,
-/// it can't be read, or it is larger than twenty names could be, so a name
-/// is only ever said on the eyes' word that its person said yes.
-pub fn tellable_in(path: &Path) -> Vec<String> {
-    let Ok(text) = std::fs::read_to_string(path) else {
-        return Vec::new();
-    };
-    if text.len() > MOST_TELLABLE * (MOST_NAME_BYTES + 1) {
-        return Vec::new();
-    }
-    text.lines()
-        .map(str::trim)
-        .filter(|name| !name.is_empty() && name.len() <= MOST_NAME_BYTES)
-        .take(MOST_TELLABLE)
-        .map(str::to_owned)
-        .collect()
-}
+/// The eyes' file of names Who was here and guard mode may say, and how it
+/// is read: one copy, in `lamp_msgs::known`, which `lamp-cloud` reads too
+/// as it sends guard mode's named text (#2562).
+pub use lamp_msgs::known::{tellable_in, tellable_of};
 
 /// The name in the known file at `path`, if it is no older than `fresh`.
 /// A memory id on the line after it (`LAMP_MEMORY_STABLE_ID=on` in the

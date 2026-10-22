@@ -6746,7 +6746,7 @@ pub fn replay_watch(
             let call = match out {
                 watch::Out::Mark(call) => call,
                 watch::Out::Unmark => Call::Ends,
-                watch::Out::Text(text) => Call::Text(text),
+                watch::Out::Text(text) | watch::Out::Named { text, .. } => Call::Text(text),
                 watch::Out::Gaze(call) => call,
                 watch::Out::Say(words) => Call::Words(words),
                 watch::Out::Said(_) => continue,

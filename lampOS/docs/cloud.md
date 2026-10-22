@@ -133,7 +133,18 @@ its `data.event` a `task_news` event with its own `id` and `time` and the
 skill's text whole, as the voice's unasked task news (`crate::unasked`,
 [messages.md](messages.md), "Unasked texts"). At most 6 in any hour, in
 order, one heard again dropped; at most 4 wait while the broker is away and
-go on reconnect, each kept until the broker's ack. The journal says one line
+go on reconnect, each kept until the broker's ack. A named text (guard mode
+with `LAMP_GUARD_NAMES=on`, `MessageOut::unnamed` and `named`, #2562) goes
+named only when it is sent as it is taken and the eyes' `tellable`, read
+just then beside `LAMP_CLOUD_KNOWN_FILE` (`lamp_msgs::known::still_tellable`),
+still has a yes from each one it names; else, and held or owed, it goes as
+its unnamed words, so a late, held or retried text never names anyone who
+took their yes back. It is also sent unnamed when a send of lamp-cloud's own
+is still not acknowledged, since the MQTT client may hold it behind that one
+(a broker's receive maximum) past the eyes' word. The journal says each
+once: "a named text sent as unnamed: the eyes did not confirm each yes as it
+went", "a named text sent unnamed: an earlier send was still
+unacknowledged", "a named text held as unnamed: the broker was away". The journal says one line
 a piece, the skill and the count, never the text.
 
 ### The light: V1's colours on this lamp's
@@ -166,7 +177,12 @@ is the same light. Two differences from V1 the page should know:
 - **The unit** (`deploy/product/lamp-cloud.service`) runs it as `lampos` and
   hands it those two files and `lamp-update`'s `state.json` (for the build)
   through `LoadCredential=`, so no file is widened. It starts only once all
-  three are there and setup is done.
+  three are there and setup is done. It sets
+  `LAMP_CLOUD_KNOWN_FILE=/run/lampos-eyes/known` (#2562): beside it, the
+  eyes' `tellable`, read as guard mode's named text goes. Read only, as
+  `lampos`, under `ProtectSystem=strict` (`/run/lampos-eyes` is 0755 and
+  `tellable` the eyes' 0600 file of the same user); missing or unreadable,
+  the text goes unnamed.
 - **On in the product (#1815).** The unit itself carries
   `Environment=LAMP_CLOUD=on`. V1's `os-server` holds the same client id,
   so the unit stops it as `lamp-cloud` really starts:
