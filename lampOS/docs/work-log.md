@@ -1,3 +1,32 @@
+## Current checkpoint: 2026-10-22 08:08 +07, installer ready; failed-unit rebase pushed
+
+**Ready for lamp-voice: yes (#2767, `19d1a46d9`).** ARM64 **39701589308**
+and Linux Clippy **39701589363** are green. Exact ARM results are
+**9951 passed / 0 failed / 63 skipped** (one leaky pass), four doc tests,
+relay and twelve custom-harness tests. All six added fixtures passed,
+including the **76** install and **99** round-test subsets. [Native evidence](verification/install-exit-notes-native-20261022/README.md)
+verifies checkout merge `46795a662` and both parents; warnings/skips and
+artifact metadata are retained. The PR is non-draft and awaits its reader.
+Mac and failure/control evidence remain in the prior entries.
+
+**#2764:** Reviewer-two found P1/P2 none at `99d920738`, with an independent
+**177/0/1** Cloud gate, and requested a plain rebase. Pushed
+`1299399e1dd6390361ff44cccf9145a9f8b9eb7f` on `bf8c3f2e1`, with equal
+range-diff and the entire Cloud tree unchanged. [Rebase identity](verification/report-failed-units-rebase-20261022/README.md)
+retains the local **177/0/1/0** gate without claiming a new execution.
+Linux Clippy **39703359401** is green; ARM64 **39703359459** is running.
+Ready for lamp-voice: **no**, the new head needs its ARM64 result.
+
+**#1757:** `bd1d79a5a` is pushed and its complete reviewed-head range-diff
+is [posted on #2602](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6330032189).
+Fresh Linux Clippy **39702508955** is green; ARM64 **39702508957** continues.
+First merges Music, and the assigned readers merge their other PRs.
+No device or local ARM64 action.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 07:55 +07, Music second rebase pushed
 
 **Music #1757:** `bd1d79a5ad1c4ce1fcd4f6674702265cc879b8b0` is pushed on
