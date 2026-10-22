@@ -21,12 +21,15 @@
 //!   (`attention::Attention::face_shows`). It still confirms the lamp's name
 //!   heard: `LAMP_NAME_SECOND_SIGN`'s second sign, the strict busy form's
 //!   name heard with someone turned, and a short sound with the name.
-//! - A line is in the conversation going on only when it began within
-//!   [`FOLLOW_UP_FOR`] of the end of the lamp's own last words, however long
-//!   it then goes on; on the second route a call let out carries the next
-//!   lines that long too. A line begun later needs the name, a tap or its
-//!   words calling the lamp. What the model is told of the conversation is
-//!   not changed.
+//! - A line is in the conversation going on when it began while the lamp's
+//!   own words played or within [`FOLLOW_UP_FOR`] of their end, however long
+//!   it then goes on, and nobody has talked past the lamp since; on the
+//!   second route a call let out carries the next lines that long too. The
+//!   windows read as the line is judged (the thread's 45 s, a busy room's
+//!   15 s) don't decide: on lamp-52e6 on 22 October, follow-ups begun about
+//!   7 s after their asks, as the answers played, went unanswered. A line
+//!   begun later needs the name, a tap or its words calling the lamp. What
+//!   the model is told of the conversation is not changed.
 //!
 //! In a room not known to be busy the lamp is as without the switch: a face
 //! turned to it is a reason, and the conversation keeps its windows. The
@@ -39,7 +42,10 @@
 //! talk counted, and two people seen or heard (two faces in the eyes'
 //! newest look, `bus_out::faces_in_view`, or a line in another voice than
 //! the conversation's) make the room busy at once
-//! (`room_told::RoomTold::two_people`).
+//! (`room_told::RoomTold::two_people`). Its costs: a colleague off camera,
+//! with no voice model, is answered while the person faces the lamp, since
+//! nothing is held, until a line is held; and a face on a screen or in a
+//! photo keeps the room busy, so the name is needed.
 //!
 //! Everything else is as without it: the name, a tap, the text calling the
 //! lamp, said close to it, an answer to its own question inside the window,

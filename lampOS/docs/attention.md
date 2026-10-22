@@ -2304,10 +2304,13 @@ their sign, and each answer's window let the next lines of the talk in. With
 `LAMP_NAME_OR_FOLLOW_UP=on` (the worker's `--name-or-follow-up`, right after
 `--live-scoped-session`, on both routes), in a busy room a face turned to the
 lamp is never a reason on its own and only confirms the name heard in the
-sound, and a line is in the conversation going on only when it began within
-8 s of the end of the lamp's own last words (`name_or_follow_up::FOLLOW_UP_FOR`),
-however long it then goes on; later, it needs the name, a tap or its words
-calling the lamp. In a room not known to be busy the rule is as without the
+sound, and a line is in the conversation going on when it began while the
+lamp's own words played or within 8 s of their end
+(`name_or_follow_up::FOLLOW_UP_FOR`), however long it then goes on, and
+nobody has talked past the lamp since; the thread's 45 s and a busy room's
+15 s, read as the line is judged, don't decide there (on lamp-52e6 the same
+day, follow-ups begun as the answers played were answered 0 of 3). Later, a
+line needs the name, a tap or its words calling the lamp. In a room not known to be busy the rule is as without the
 switch, a face a reason and the windows as they were: on lamp-4ace from 17:06
 with the busy-room rule everywhere, the owner said at 18:0x that a person
 alone with the lamp does not say its name a thousand times a day. So the room
@@ -2319,7 +2322,10 @@ of the conversation is not changed. Off until a real desk-talk set passes.
 Its costs: in a busy room an answer to the lamp's own question begun more than
 8 s after its words needs the name; in a room not known to be busy a person
 alone facing the lamp on a phone call is answered line after line, as before
-the switch: the lamp holds none of it, and one face makes no busy room.
+the switch: the lamp holds none of it, and one face makes no busy room. So is
+a colleague off camera, with no voice model, while the person faces the lamp,
+until a line is held. And a face on a screen or in a photo keeps the room
+busy, so a person alone with it needs the name.
 
 ## Switch
 

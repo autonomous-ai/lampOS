@@ -377,16 +377,11 @@ const AFTER_QUESTION: &str =
 
 /// Whether a line held for `why` was said to nobody, or to someone else:
 /// with `LAMP_NAME_OR_FOLLOW_UP`, in a room not known to be busy, it is
-/// talk between people (`room_told::RoomTold::count_held_talk`).
+/// talk between people (`room_told::RoomTold::count_held_talk`). The holds
+/// given only in a busy room, [`AFTER_QUESTION`] and
+/// [`TURNED_NOT_SPOKEN_TO`], never come there, so they are not among them.
 pub(crate) fn said_to_nobody(why: &str) -> bool {
-    [
-        NOT_SPOKEN_TO,
-        TURNED_NOT_SPOKEN_TO,
-        ANSWERING_ANOTHER,
-        TO_ANOTHER,
-        AFTER_QUESTION,
-    ]
-    .contains(&why)
+    [NOT_SPOKEN_TO, ANSWERING_ANOTHER, TO_ANOTHER].contains(&why)
 }
 
 /// Words that open a sentence of their own before a comma, and are no
