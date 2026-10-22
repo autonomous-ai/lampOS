@@ -1364,6 +1364,43 @@ pub fn known_file_of(socket: &Path) -> PathBuf {
     socket.with_file_name("known")
 }
 
+/// What the eyes' known file says, and when the eyes last wrote their names
+/// file beside it, as one refresh of the face cache read them: a change
+/// from the last refresh's makes the cache cold
+/// ([`crate::memory_scope::FaceCache::known_file_read`], #2807), whoever
+/// wrote it (the eyes' own socket, the app, the voice's tool). The known
+/// file's words change when the known face at the lamp does (removed when
+/// nobody known is near); the eyes rewrite `tellable` (`lamp-eyes`'s
+/// `who::tellable_of`) after every face remembered, forgotten or renamed,
+/// while anyone has said yes to being named. Its mtime only, never its
+/// names. Not freshness: the known file's mtime alone, rewritten each look,
+/// is no change.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KnownMark {
+    known: Option<Vec<u8>>,
+    names_written: Option<SystemTime>,
+}
+
+impl KnownMark {
+    /// Bounded like [`FaceObservation::read`]; a missing or unreadable file
+    /// is `None` in its place.
+    pub fn read(known: &Path) -> Self {
+        use std::io::Read;
+        let words = std::fs::File::open(known).ok().and_then(|file| {
+            let mut bytes = Vec::new();
+            file.take(4097).read_to_end(&mut bytes).ok()?;
+            Some(bytes)
+        });
+        let names_written = std::fs::metadata(known.with_file_name("tellable"))
+            .and_then(|metadata| metadata.modified())
+            .ok();
+        Self {
+            known: words,
+            names_written,
+        }
+    }
+}
+
 /// How many faces the eyes see now, from their newest look on the bus
 /// (`humans/faces/tracked`), `None` when there is no unexpired look: for a
 /// known face's held gap ([`crate::memory_scope::FaceCache::replace_seen`]),
