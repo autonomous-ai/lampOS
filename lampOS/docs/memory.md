@@ -1451,10 +1451,17 @@ then use that person's scope:
   second route without `LAMP_SECOND_FACE_NAME` the model is never told the
   name, and on lamp-c0a4 its guess matched nobody. A line naming nobody
   whose line it is sends nothing. A room's line (no known person's) sends
-  nothing for a named person either, unless the known file names that same
-  person, their face at the lamp now: then they are asked for under the
-  eyes' name; else the model hears `NOT_THEIRS` and the eyes are never
-  asked (the first builder on #2602). Forgetting everything (`forget_all`) is as before.
+  nothing for a named person either, unless it is that person's own: the
+  eyes judged speaking through it (`LAMP_EYES_SPEAKING=on`), the known
+  file, as fresh when the line was heard, named that same person, and
+  their face was the only one seen saying it (read at the line's end with
+  its words, `speaking_faces::LineSeen`, and only for a line whose words
+  ask to forget). Then they are asked for under the eyes' name; else, with
+  someone else's face speaking while they sit nearest, no face read
+  speaking, a line not judged or a stale known file, the model hears
+  `NOT_THEIRS` and the eyes are never asked (the first builder on #2602,
+  El's P2 and P3 on #3018). The eyes read a moving mouth, not a living
+  face: a photo or a screen showing them is a limit of the eyes. Forgetting everything (`forget_all`) is as before.
 - **With nobody known**, or without eyes, every line to the memory is
   exactly what it was: no `person` field, the same limits, the same note
   (`remember::tests::with_nobody_known_every_line_to_the_memory_is_as_before`
