@@ -482,3 +482,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - **18:02, reviewer-two on #2889:** P1/P2 none at `d4d0873e1`; the base moved again. Rebased at 18:06 onto `bf38a1890`, now `fd92eb059` (`=`). lamp-cloud passes.
 - **18:13, reviewer-two on #2889:** the full local gate passed at `fd92eb059` (Cloud 192/0, Voice-Eval 623/0; P1/P2 none). The base moved again: rebased at 18:15 onto `e2232b836`, now `f2af29ab6` (`=`).
 - **18:37, reviewer-two on #2889:** everything was green at `f2af29ab6` (ARM64, Linux, the full local check and the fake suite), but the final guard caught the base moving to `f012c4725` (#2998). Rebased at 18:38 to `b4c7efdb1`; the only range-diff change is a base context row.
+- **18:42–18:44, #2889:** reviewer-two passed `b4c7efdb1` (P1/P2 none). The base moved again to `5e51ac016` (skills and switches docs), so rebased to `eaf6b9557` (`=`). Asked the first builder on #2602 for a carry or a merge in a quiet window, after six rebases.
