@@ -7,8 +7,8 @@
 //! a recording is replayed.
 use lamp_bus::Header;
 use lamp_msgs::{
-    Activity, Faces, Light, LightPattern, LightRequest, PatternKind, RoomActivity, RoomPresence,
-    SkillEvent, SkillStage, Speech, StoodUp, Voice, VoiceState,
+    Activity, Faces, Light, LightPattern, LightRequest, NameHeard, PatternKind, RoomActivity,
+    RoomPresence, SkillEvent, SkillStage, Speech, StoodUp, TouchEvent, Voice, VoiceState,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -51,6 +51,41 @@ pub const BODY_REQUESTS_ENVIRONMENT: &str = "LAMP_BODY_REQUESTS";
 /// on `addon/proposal` (`docs/addons.md`). Off unless set: without it they
 /// are not loaded, and nothing new is published.
 pub const ADDONS_ENVIRONMENT: &str = "LAMP_ADDONS";
+
+/// `LAMP_REST_THROUGH_SOUNDS=on`: a `[[while]]` with `through` carries its
+/// clock through those values, and only its `broken_by` begins it again
+/// (#1672: Night sleep sleeps through a sound heard as no words). Off unless
+/// set: both are read, checked and ignored, the clock begun again as before.
+pub const REST_THROUGH_SOUNDS_ENVIRONMENT: &str = "LAMP_REST_THROUGH_SOUNDS";
+
+/// The topics a `[[while]]`'s `broken_by` may name, each with its rule
+/// ([`breaks`]): words heard, the lamp's name heard, a hand pushing the
+/// lamp, and a touch.
+pub const BROKEN_BY: [&str; 4] = ["voice/heard", "name/heard", "body/hand", "controls/touch"];
+
+/// Why a skill reads a `broken_by` topic ([`Skill::listens`]).
+const BROKEN_BY_READ: &str = "a [[while]]'s broken_by";
+
+/// Whether `value` on `topic` begins again a clock carried `through`: what
+/// was heard, only with a letter or a digit in it (a sound heard as no words
+/// does not); the lamp's name, any hearing of it, written down or not (El's
+/// and reviewer-two's P2 on #3092: "Hey Lamp" from out of view may come with
+/// no words); a hand, only pushing; a touch, any one the controls say is on
+/// (reviewer-two on #3092: a tap on an awake lamp).
+fn breaks(topic: &str, value: &Value) -> bool {
+    match topic {
+        "voice/heard" => value["text"]
+            .as_str()
+            .is_some_and(|text| text.chars().any(char::is_alphanumeric)),
+        "name/heard" => serde_json::from_value::<NameHeard>(value.clone())
+            .is_ok_and(|name| name.check().is_ok()),
+        "body/hand" => value["pushed"].as_bool() == Some(true),
+        "controls/touch" => serde_json::from_value::<TouchEvent>(value.clone())
+            .is_ok_and(|touch| touch.enabled && touch.check().is_ok()),
+        _ => false,
+    }
+}
+
 /// The engine's local clock value, produced internally rather than by a
 /// bus publisher. Clock triggers still pass the usual conditions and gate.
 pub const LOCAL_CLOCK_TOPIC: &str = "clock/local";
@@ -582,6 +617,14 @@ struct TestFile {
     /// rule's topic on a lamp without the rules); a value that has run out
     /// still does not hold. Left out, a silent topic never holds.
     unknown: Option<String>,
+    /// Values of the field its clock is carried through (#1672): during a
+    /// spell of one of them it does not hold, so nothing runs then, but its
+    /// `for` is not begun again either. With `equals` and `for`, and only
+    /// with [`REST_THROUGH_SOUNDS_ENVIRONMENT`] on; off, read and ignored.
+    through: Option<Vec<toml::Value>>,
+    /// Topics whose messages begin that clock again ([`BROKEN_BY`]): words
+    /// heard, a push. With `through`.
+    broken_by: Option<Vec<String>>,
 }
 
 #[derive(Deserialize)]
@@ -1636,7 +1679,8 @@ impl Skill {
 
     /// The topics the program subscribes to for the skill ([`Engine::topics`]),
     /// once each, and what reads it: its triggers, its `[[while]]`
-    /// conditions, a look at a face (the faces the eyes see), and a tool's
+    /// conditions and what begins their clocks again (`broken_by`), a look
+    /// at a face (the faces the eyes see), and a tool's
     /// `[again]` (what was heard), and a routine's quiet Voice gate. A say's
     /// words come from the voice, so their topic is read ([`Skill::reads`])
     /// and not listened to.
@@ -1701,6 +1745,13 @@ impl Skill {
                 self.is_routine()
                     .then(|| (VoiceState::TOPIC.to_owned(), "a routine's quiet gate")),
             )
+            // Last, so a topic read for anything else keeps that reason, and
+            // only this one is left unheard with the switch off.
+            .chain(self.conditions.iter().flat_map(|test| {
+                test.broken_by
+                    .iter()
+                    .map(|topic| (topic.clone(), BROKEN_BY_READ))
+            }))
             .collect();
         let mut seen = Vec::new();
         reads.retain(|(topic, _)| {
@@ -1929,6 +1980,23 @@ struct Condition {
     for_us: u64,
     /// It holds while its topic has said nothing yet (`unknown = "holds"`).
     unknown_holds: bool,
+    /// The values its clock is carried through (`through`, #1672).
+    through: Vec<Value>,
+    /// The topics that begin its clock again (`broken_by`).
+    broken_by: Vec<String>,
+}
+
+impl Condition {
+    /// Whether `value` is one its clock is carried through (`through`).
+    fn carries(&self, value: &Value) -> bool {
+        match &self.test {
+            Test::Equals(field, _) => {
+                let got = at(value, field);
+                self.through.iter().any(|through| equal(got, through))
+            }
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -3015,11 +3083,66 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 ));
             }
         };
+        let through = match condition.through {
+            None => Vec::new(),
+            Some(_) if !matches!(test, Test::Equals(..)) || condition.lasting.is_none() => {
+                return Err(format!(
+                    "on {}: through goes with a field's equals and a for",
+                    condition.topic
+                ));
+            }
+            Some(values) if values.is_empty() => {
+                return Err(format!(
+                    "on {}: through lists at least one value",
+                    condition.topic
+                ));
+            }
+            Some(values) => {
+                let values: Vec<Value> = values
+                    .into_iter()
+                    .map(|value| serde_json::to_value(value).map_err(|error| error.to_string()))
+                    .collect::<Result<_, _>>()?;
+                // A value it is carried through never holds (reviewer-two's
+                // P3 on #3092).
+                if let Test::Equals(_, wanted) = &test
+                    && values.iter().any(|value| equal(value, wanted))
+                {
+                    return Err(format!(
+                        "on {}: through lists values other than the one it equals",
+                        condition.topic
+                    ));
+                }
+                values
+            }
+        };
+        let broken_by = match condition.broken_by {
+            None => Vec::new(),
+            Some(_) if through.is_empty() => {
+                return Err(format!(
+                    "on {}: broken_by goes with through: it begins again the clock through carries",
+                    condition.topic
+                ));
+            }
+            Some(topics) => {
+                if let Some(other) = topics
+                    .iter()
+                    .find(|topic| !BROKEN_BY.contains(&topic.as_str()))
+                {
+                    return Err(format!(
+                        "on {}: broken_by takes {BROKEN_BY:?}, not {other:?}",
+                        condition.topic
+                    ));
+                }
+                topics
+            }
+        };
         conditions.push(Condition {
             topic: condition.topic,
             test,
             for_us: condition.lasting.as_deref().map_or(Ok(0), duration_us)?,
             unknown_holds,
+            through,
+            broken_by,
         });
     }
     let quiet = match file.quiet {
@@ -4439,6 +4562,9 @@ pub struct Engine {
     judged: HashMap<(String, String), (i64, Option<u64>)>,
     /// The journal's lines of due chances dropped ([`dropped`]), not yet taken.
     dropped: Vec<String>,
+    /// With [`REST_THROUGH_SOUNDS_ENVIRONMENT`] on: a `[[while]]`'s
+    /// `through` and `broken_by` are kept (#1672).
+    rest_through_sounds: bool,
 }
 
 /// A skill's last run, for `[rest]`: when it began, whether anyone noticed
@@ -4628,7 +4754,17 @@ impl Engine {
             rested_day: None,
             judged: HashMap::new(),
             dropped: Vec::new(),
+            rest_through_sounds: false,
         }
+    }
+
+    /// A `[[while]]` with `through` carries its clock through a spell of
+    /// those values, and only a message its `broken_by` names begins it
+    /// again (`LAMP_REST_THROUGH_SOUNDS=on`, #1672). Without it both are
+    /// ignored: any value that does not hold begins the clock again.
+    pub fn resting_through_sounds(mut self) -> Self {
+        self.rest_through_sounds = true;
+        self
     }
 
     /// The lines of due chances dropped since the last take, each
@@ -5277,8 +5413,12 @@ impl Engine {
                 skill
                     .listens()
                     .into_iter()
+                    .filter(|(topic, _)| skill.permissions.refuses_reading(topic).is_none())
+                    // What only begins a carried clock again is heard only
+                    // with the switch on (reviewer-two on #3092): off, the
+                    // engine reads nothing it did not before.
+                    .filter(|(_, why)| self.rest_through_sounds || *why != BROKEN_BY_READ)
                     .map(|(topic, _)| topic)
-                    .filter(|topic| skill.permissions.refuses_reading(topic).is_none())
             })
             .collect();
         // What judges a `[rest]` is the program's own reading, as the voice's
@@ -5606,8 +5746,17 @@ impl Engine {
             .map(|ms| ms * 1_000);
         // A timed condition held only while its topic's value lasted: after a
         // value that expired, it begins again.
-        let lasted = Self::fresh(&self.latest, topic, now_us).is_some();
+        let before = Self::fresh(&self.latest, topic, now_us).cloned();
+        let lasted = before.is_some();
         let routine_voice_lasted = Self::routine_voice_fresh(&self.latest, now_us);
+        // The voice's last value said within the routine's 3 s, whatever it
+        // was: a carried clock never bridges a gap in what the voice said
+        // (reviewer-two's second P2 on #3092), since `voice/state` has a
+        // period and no lifespan.
+        let voice_recent = self
+            .latest
+            .get(VoiceState::TOPIC)
+            .is_some_and(|(_, at, _)| *at <= now_us && now_us - *at < ROUTINE_VOICE_FRESH_US);
         self.latest
             .insert(topic.to_owned(), (value.clone(), now_us, lifespan_us));
         for skill in &self.skills {
@@ -5616,14 +5765,42 @@ impl Engine {
                     continue;
                 }
                 let key = (skill.name.clone(), index);
+                // A spell it is carried through (#1672) does not hold now,
+                // but its clock goes on from where it was, while the last
+                // value lasted; and the value after it goes on with it,
+                // though a routine's quiet gate wanted the voice resting
+                // before. For a routine's voice, only while the voice's
+                // last value is within its 3 s: after a gap, it begins again.
+                let recent = !skill.is_routine() || topic != VoiceState::TOPIC || voice_recent;
+                let carried =
+                    self.rest_through_sounds && lasted && recent && condition.carries(&value);
+                let after_carried = self.rest_through_sounds
+                    && recent
+                    && before
+                        .as_ref()
+                        .is_some_and(|before| condition.carries(before));
                 let lasted = lasted
-                    && (!skill.is_routine() || topic != VoiceState::TOPIC || routine_voice_lasted);
+                    && (!skill.is_routine()
+                        || topic != VoiceState::TOPIC
+                        || routine_voice_lasted
+                        || after_carried);
                 if condition.test.holds(&value) && lasted {
                     self.holding.entry(key).or_insert(now_us);
                 } else if condition.test.holds(&value) {
                     self.holding.insert(key, now_us);
-                } else {
+                } else if !carried {
                     self.holding.remove(&key);
+                }
+            }
+        }
+        // Words heard or a push: the clocks carried through a sound begin
+        // again at the next value that holds.
+        if self.rest_through_sounds && breaks(topic, &value) {
+            for skill in &self.skills {
+                for (index, condition) in skill.conditions.iter().enumerate() {
+                    if condition.broken_by.iter().any(|by| by == topic) {
+                        self.holding.remove(&(skill.name.clone(), index));
+                    }
                 }
             }
         }

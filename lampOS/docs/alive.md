@@ -112,7 +112,12 @@ and every reflex that wakes it. The skill holds today's trigger exactly:
 nobody seen for 15 minutes (`present = false`, `for = "15m"`), the voice
 resting all those 15 minutes (`[[while]]` on `voice/state`, `for = "15m"`:
 the built-in clock began again whenever the voice was not resting, so not
-Bedtime's 30 s), awake all those 15 minutes (`[[while]]` on
+Bedtime's 30 s; with `LAMP_REST_THROUGH_SOUNDS=on`, #1672, the voice
+listening or thinking is carried through, `through`, so a sound heard as no
+words is slept through, a baby or an alarm with no words too, and only
+words heard, its name heard (written down or not), a push, a touch or
+the lamp speaking, `broken_by` and `speaking`, begin the 15 minutes again: on a real lamp small
+room sounds at 23:26 to 23:41 kept it awake), awake all those 15 minutes (`[[while]]` on
 `expression/state`'s `asleep`, `for = "15m"`: woken, it sleeps again only
 after nobody again for as long), and 23:00 to 06:00 as its `[active]`
 hours, so someone gone since 22:30 is slept on at 23:00 as before. Its one

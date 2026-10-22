@@ -2327,6 +2327,76 @@ fn an_unknown_holds_condition_holds_only_while_its_topic_has_said_nothing() {
     }
 }
 
+/// #1672: `through` goes with a field's `equals` and a `for`, `broken_by`
+/// with `through`, `through` never lists the value it equals, and
+/// `broken_by` names only words heard, the name heard, a push and a touch.
+#[test]
+fn through_and_broken_by_are_refused_where_they_mean_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let toml = |test: &str| {
+        format!(
+            "[trigger]\ntopic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200\n\
+             [[while]]\ntopic = \"voice/state\"\nfield = \"state\"\n{test}\
+             [ask]\npolicy = \"nudge\"\n[[do]]\nlight = {{ dim = 1 }}\n\
+             [permissions]\ntopics = [\"air/state\", \"voice/state\", \"voice/heard\", \"body/hand\"]\n\
+             light = true\n"
+        )
+    };
+    let fine = "equals = \"resting\"\nfor = \"15m\"\nthrough = [\"listening\"]\n\
+                broken_by = [\"voice/heard\", \"body/hand\"]\n";
+    load(&skill_with(dir.path(), "fine", &toml(fine))).unwrap();
+    // What breaks its clock is read, so its permissions name it.
+    let unread = skill_with(
+        dir.path(),
+        "unread",
+        &toml(fine).replace(", \"body/hand\"]\nlight", "]\nlight"),
+    );
+    assert!(
+        load(&unread)
+            .unwrap_err()
+            .contains("a [[while]]'s broken_by reads body/hand")
+    );
+    for (test, why) in [
+        (
+            "equals = \"resting\"\nthrough = [\"listening\"]\n",
+            "through goes with a field's equals and a for",
+        ),
+        (
+            "not_equals = \"speaking\"\nfor = \"15m\"\nthrough = [\"listening\"]\n",
+            "through goes with a field's equals and a for",
+        ),
+        (
+            "equals = \"resting\"\nfor = \"15m\"\nthrough = []\n",
+            "through lists at least one value",
+        ),
+        (
+            "equals = \"resting\"\nfor = \"15m\"\nthrough = [\"listening\", \"resting\"]\n",
+            "through lists values other than the one it equals",
+        ),
+        (
+            "equals = \"resting\"\nfor = \"15m\"\nbroken_by = [\"voice/heard\"]\n",
+            "broken_by goes with through",
+        ),
+        (
+            "equals = \"resting\"\nfor = \"15m\"\nthrough = [\"listening\"]\nbroken_by = [\"ears/classes\"]\n",
+            "broken_by takes [\"voice/heard\", \"name/heard\", \"body/hand\", \"controls/touch\"], not \"ears/classes\"",
+        ),
+    ] {
+        let bad = skill_with(dir.path(), "bad", &toml(test));
+        let error = load(&bad).unwrap_err();
+        assert!(error.contains(why), "{test}: {error}");
+    }
+    assert_eq!(
+        lamp_skills::BROKEN_BY,
+        [
+            lamp_msgs::Speech::TOPICS[0],
+            lamp_msgs::NameHeard::TOPIC,
+            lamp_msgs::Hand::TOPIC,
+            lamp_msgs::TouchEvent::TOPIC
+        ]
+    );
+}
+
 #[test]
 fn a_condition_changed_by_a_reload_begins_again() {
     let dir = tempfile::tempdir().unwrap();

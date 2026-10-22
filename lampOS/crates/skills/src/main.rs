@@ -875,6 +875,19 @@ fn serve(
         (None, None)
     };
     let mut engine = Engine::new(Vec::new(), skip_ask);
+    // A sound heard as no words is slept through, only with
+    // LAMP_REST_THROUGH_SOUNDS=on (#1672).
+    if watch::switched_on(
+        std::env::var(lamp_skills::REST_THROUGH_SOUNDS_ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    ) {
+        eprintln!(
+            "lamp-skills: a [[while]]'s clock carries through its through values ({})",
+            lamp_skills::REST_THROUGH_SOUNDS_ENVIRONMENT
+        );
+        engine = engine.resting_through_sounds();
+    }
     // Who was here's mark of someone the lamp knows, never a name, only
     // with LAMP_WHO_WAS_HERE_KNOWN=on and the eyes' known file (#1685).
     if lamp_skills::known::marking() {
