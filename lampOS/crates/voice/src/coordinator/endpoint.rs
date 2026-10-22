@@ -8,7 +8,10 @@
 #[cfg(test)]
 use crate::scenario_clock::monotonic_us;
 use crate::{
-    activity::{ConfirmPolicy, TurnDetector},
+    activity::{
+        ConfirmPolicy, TurnDetector, UNFINISHED_BELOW_RANGE, UNSURE_RANGE_MS, unfinished_below,
+        unsure_ms,
+    },
     options::{DirectedOptions, Endpoint, TurnTaking},
 };
 #[cfg(not(test))]
@@ -81,18 +84,11 @@ fn least_speech_ms(value: Option<&str>, least: u16) -> Option<u16> {
 /// name.
 pub const UNFINISHED_BELOW_SWITCH: &str = "LAMP_ENDPOINT_UNFINISHED_BELOW";
 
-/// The probabilities [`UNFINISHED_BELOW_SWITCH`] takes.
-pub const UNFINISHED_BELOW_RANGE: std::ops::RangeInclusive<f32> = 0.01..=0.6;
-
 /// The switch for the silence an uncertain verdict waits before the line
 /// ends (`ConfirmPolicy::uncertain_blocks`): whole ms from
 /// [`UNSURE_RANGE_MS`] in 10 ms steps; unset or `off`, the silence window
 /// (600 ms on lamp-4ace) as before. The same night A/B.
 pub const UNSURE_MS_SWITCH: &str = "LAMP_ENDPOINT_UNSURE_MS";
-
-/// The waits [`UNSURE_MS_SWITCH`] takes, in ms: from the lamp's window to
-/// the unfinished window.
-pub const UNSURE_RANGE_MS: std::ops::RangeInclusive<u16> = 600..=1500;
 
 /// A switch's value that asks for something: unset, empty and `off` are
 /// today's, with nothing said.
@@ -100,24 +96,6 @@ fn asked_for(value: Option<&str>) -> Option<&str> {
     value
         .map(str::trim)
         .filter(|value| !value.is_empty() && *value != "off")
-}
-
-/// The probability [`UNFINISHED_BELOW_SWITCH`]'s `value` asks for, if it
-/// is one in [`UNFINISHED_BELOW_RANGE`].
-fn unfinished_below(value: &str) -> Option<f32> {
-    value
-        .parse::<f32>()
-        .ok()
-        .filter(|probability| UNFINISHED_BELOW_RANGE.contains(probability))
-}
-
-/// The wait in ms [`UNSURE_MS_SWITCH`]'s `value` asks for, if it is a
-/// whole number in [`UNSURE_RANGE_MS`] and a multiple of 10.
-fn unsure_ms(value: &str) -> Option<u16> {
-    value
-        .parse::<u16>()
-        .ok()
-        .filter(|ms| UNSURE_RANGE_MS.contains(ms) && ms % 10 == 0)
 }
 
 /// `policy` with the night's two endpoint switches' values (`unfinished`
@@ -134,7 +112,7 @@ fn with_night_switches(
     if let Some(value) = asked_for(unfinished) {
         match unfinished_below(value) {
             Some(probability) => {
-                policy.incomplete_probability = probability;
+                policy = policy.with_dials(Some(probability), None);
                 said.push(format!(
                     "lamp-voice: a verdict under {probability} holds the line to the {} ms unfinished window ({UNFINISHED_BELOW_SWITCH})",
                     u64::from(policy.incomplete_blocks) * 10
@@ -151,7 +129,7 @@ fn with_night_switches(
     if let Some(value) = asked_for(unsure) {
         match unsure_ms(value) {
             Some(ms) => {
-                policy.uncertain_blocks = ms / 10;
+                policy = policy.with_dials(None, Some(ms));
                 said.push(format!(
                     "lamp-voice: an uncertain verdict ends the line after {ms} ms of silence, or the silence window if longer ({UNSURE_MS_SWITCH})"
                 ));

@@ -882,6 +882,36 @@ pub struct ConfirmPolicy {
     pub uncertain_blocks: u16,
 }
 
+/// The probabilities `LAMP_ENDPOINT_UNFINISHED_BELOW` takes for
+/// [`ConfirmPolicy::incomplete_probability`] (the first builder's night A/B
+/// on lamp-4ace, 22 Oct), and `turn_end_replay --unfinished-below` with it.
+pub const UNFINISHED_BELOW_RANGE: std::ops::RangeInclusive<f32> = 0.01..=0.6;
+
+/// The waits `LAMP_ENDPOINT_UNSURE_MS` takes for
+/// [`ConfirmPolicy::uncertain_blocks`], in ms: from the lamp's window to the
+/// unfinished window. `turn_end_replay --unsure-ms` takes the same.
+pub const UNSURE_RANGE_MS: std::ops::RangeInclusive<u16> = 600..=1500;
+
+/// The probability `value` asks for, if it is one in
+/// [`UNFINISHED_BELOW_RANGE`]: the voice's read of
+/// `LAMP_ENDPOINT_UNFINISHED_BELOW`, after trimming, shared with the replay.
+pub fn unfinished_below(value: &str) -> Option<f32> {
+    value
+        .parse::<f32>()
+        .ok()
+        .filter(|probability| UNFINISHED_BELOW_RANGE.contains(probability))
+}
+
+/// The wait in ms `value` asks for, if it is a whole number in
+/// [`UNSURE_RANGE_MS`] and a multiple of 10: the voice's read of
+/// `LAMP_ENDPOINT_UNSURE_MS`, after trimming, shared with the replay.
+pub fn unsure_ms(value: &str) -> Option<u16> {
+    value
+        .parse::<u16>()
+        .ok()
+        .filter(|ms| UNSURE_RANGE_MS.contains(ms) && ms % 10 == 0)
+}
+
 impl Default for ConfirmPolicy {
     fn default() -> Self {
         Self {
@@ -902,6 +932,20 @@ impl Default for ConfirmPolicy {
 }
 
 impl ConfirmPolicy {
+    /// This policy with the night's dials, as the voice's switches and
+    /// `turn_end_replay` both set them: a probability from
+    /// [`unfinished_below`] for `incomplete_probability`, and a wait from
+    /// [`unsure_ms`] for `uncertain_blocks`. `None` keeps each as it is.
+    pub fn with_dials(mut self, unfinished_below: Option<f32>, unsure_ms: Option<u16>) -> Self {
+        if let Some(probability) = unfinished_below {
+            self.incomplete_probability = probability;
+        }
+        if let Some(ms) = unsure_ms {
+            self.uncertain_blocks = ms / 10;
+        }
+        self
+    }
+
     /// Ends a confident verdict after 400 ms. On labelled human speech this
     /// adds cutoffs at pauses between sentences; it is for evaluation with a
     /// path that lets the person continue, never a default.
@@ -1544,5 +1588,39 @@ mod tests {
                 scores(DetectorInput::Linear, &evidence)
             );
         }
+    }
+
+    /// The night's dials (`LAMP_ENDPOINT_UNFINISHED_BELOW`,
+    /// `LAMP_ENDPOINT_UNSURE_MS`, `turn_end_replay`'s two flags) take only
+    /// their ranges, and `with_dials` sets exactly the two fields: none
+    /// leaves the policy as it was, as the replay's "before" is.
+    #[test]
+    fn the_night_dials_take_only_their_ranges_and_set_two_fields() {
+        for (value, taken) in [("0.01", 0.01), ("0.3", 0.3), ("0.6", 0.6)] {
+            assert_eq!(unfinished_below(value), Some(taken), "{value}");
+        }
+        for value in [
+            "0", "0.009", "0.61", "0.7", "1", "-0.2", "NaN", "on", " 0.3",
+        ] {
+            assert_eq!(unfinished_below(value), None, "{value}");
+        }
+        for (value, taken) in [("600", 600), ("900", 900), ("1500", 1500)] {
+            assert_eq!(unsure_ms(value), Some(taken), "{value}");
+        }
+        for value in ["599", "605", "1510", "1.2", "900ms", "-600", "on", " 900"] {
+            assert_eq!(unsure_ms(value), None, "{value}");
+        }
+        let policy = ConfirmPolicy::default();
+        assert_eq!(policy.with_dials(None, None), policy);
+        let dialed = policy.with_dials(Some(0.3), Some(900));
+        assert_eq!(
+            dialed,
+            ConfirmPolicy {
+                incomplete_probability: 0.3,
+                uncertain_blocks: 90,
+                ..policy
+            }
+        );
+        assert!(dialed.validate().is_ok());
     }
 }
