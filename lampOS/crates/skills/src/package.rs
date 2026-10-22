@@ -1148,7 +1148,7 @@ pub const STATE_DIR: &str = "/var/lib/lampos-skills-state";
 
 /// Why the skill `name`, granted `permissions`, can't be turned off, or
 /// nothing: one granted a core operation ([`super::CORE_GRANTS`]: night
-/// sleep, onboarding, prepare-to-unplug) is part of the lamp itself. The
+/// sleep, onboarding, prepare-to-unplug, the startle) is part of the lamp itself. The
 /// one rule, for the app's page and for [`turn`].
 pub fn cannot_turn_off(name: &str, permissions: &super::Permissions) -> Option<String> {
     (!permissions.core.is_empty())

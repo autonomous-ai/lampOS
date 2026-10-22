@@ -1,0 +1,45 @@
+# The startle (#2822): one glance at a sudden sound, a bang or something
+# dropped, then let go. Its move lives here, word for word what Expression's
+# catalogue had ("glance at a sound"); Expression reads `[startle]` once when
+# it starts (`lamp-expression serve`, from /var/lib/lampOS/skills/startle/)
+# and plays it as its reflex, within its own tick, because a startle answers
+# within 200 ms or not at all. lamp-skills only checks this file: the skill
+# has no trigger, no tool and no steps of its own.
+needs = ["ears", "body"]
+kind = "core"
+version = "1.0.0"
+
+[permissions]
+# The creature's own reflex: part of the lamp itself, never turned off.
+core = ["startle"]
+
+# A head-only clip of at most 2 s from rest and back, never while speaking,
+# with a 5 s cooldown or longer: Expression's check, here and at its start.
+[startle]
+weight = 1.0
+delay_us = 0
+cooldown_us = 30000000              # one glance; the next bangs within 30 s get nothing
+stroke_us = 200000
+quiet_only = false
+stop_when_concentrating = true
+states = ["resting", "listening", "thinking"]
+
+[[startle.keyframes]]
+at_us = 0
+offsets = { base_yaw = 0.0, shoulder = 0.0, elbow = 0.0, head_roll = 0.0, head_pitch = 0.0 }
+brightness = 0.0
+
+[[startle.keyframes]]               # the head up, quick
+at_us = 250000
+offsets = { base_yaw = 0.0, shoulder = 0.0, elbow = 0.0, head_roll = 0.0, head_pitch = -0.07 }
+brightness = 0.0
+
+[[startle.keyframes]]               # a slight tilt while it looks
+at_us = 800000
+offsets = { base_yaw = 0.0, shoulder = 0.0, elbow = 0.0, head_roll = 0.03, head_pitch = -0.07 }
+brightness = 0.0
+
+[[startle.keyframes]]               # and back to rest
+at_us = 1600000
+offsets = { base_yaw = 0.0, shoulder = 0.0, elbow = 0.0, head_roll = 0.0, head_pitch = 0.0 }
+brightness = 0.0

@@ -9,6 +9,7 @@ pub mod local_time;
 pub mod replay;
 pub mod runtime;
 mod speaking;
+pub mod startle;
 mod unplug;
 
 pub use alive::{

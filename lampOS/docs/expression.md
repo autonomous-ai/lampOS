@@ -163,11 +163,23 @@ choose one author, decide how an eligible rest request reaches the final
 writer, and preserve Body's local safety and privacy rules. See
 [What Expression may add](body.md#what-expression-may-add).
 
-## Optional glance at a sudden sound
+## The startle: a glance at a sudden sound
 
 Added by the first builder on 2026-10-14 for the ears ([ears.md](ears.md)).
-A catalogue may carry one or more `sudden` behaviours; one without any does
-not react, so the trigger is off unless a catalogue turns it on. A
+Since #2822 its move is the Startle skill's own file
+([`skills/startle/skill.toml`](../skills/startle/skill.toml), `[startle]`),
+not the catalogue's: `lamp-expression serve` reads
+`/var/lib/lampOS/skills/startle/skill.toml` once when it starts (or the file
+`--startle` names; `replay` reads one only with `--startle`), adds it to the
+catalogue as the clip "glance at a sound" (`src/startle.rs`), and the journal
+says `the startle from PATH`. Without the file, or with one that fails the
+check below, there is no startle until a restart, and the journal says why.
+A catalogue's own `sudden` clip (one written before #2822 and kept on a
+lamp) is never played: it is dropped as the catalogue is read and named once
+in the journal with the fields this build does not read. Expression still
+plays the skill's move as its reflex, within its own tick, because a startle
+answers within 200 ms or not at all; lamp-skills only checks the file (the
+`startle` core grant, [skills.md](skills.md)). A
 `SuddenSound` marked short (a knock, a clap, something dropped) starts the
 clip once, on the tick it is received, if that tick is inside the clip's
 stroke; a second sound inside the clip's cooldown gets nothing. A sound
@@ -184,11 +196,14 @@ lamp-4ace's own inputs from 2026-10-14 16:44 (a sound published by hand
 while the lamp was thinking in a busy office) gives the whole glance, from
 19 ms after the sound to 1.62 s.
 
-lamp-4ace's catalogue (`deploy/lamp-4ace/expression-rest-lamp-4ace.json`)
-has "glance at a sound": the head up 0.07 rad in 250 ms, a slight tilt
+The skill's move is the one lamp-4ace's and the product's catalogues had
+until #2822, frame for frame: the head up 0.07 rad in 250 ms, a slight tilt
 (0.03 rad) while it holds, back at rest by 1.6 s, then nothing for 30 s,
 so a run of knocks gets one glance, as a person glances at the first and
-lets the rest go (rule 8). Tests: `tests/it/sudden_engine.rs`.
+lets the rest go (rule 8). Tests: `tests/it/sudden_engine.rs` (the skill's
+file equals the old clip, the product with it glances exactly as before, a
+catalogue's own sudden clip is never played, and a file without a bounded
+`[startle]` is refused).
 
 ## Optional idle layer, sleep and waking
 
