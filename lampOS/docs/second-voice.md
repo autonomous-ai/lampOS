@@ -1125,12 +1125,18 @@ order is kept. A written turn is the same from the chat on.
     the words written for "Lamp" on lamp-4ace, `HEARD_FOR_THE_NAME`); and lamp-name's near hearing reached 0.5
     (`NAME_NEAR_LEAST`) from 0.3 s before the line's first sound to 1.3 s
     after (`Heeding::near_name`). A word of the shape alone
-    (`LikeTheName::Shape`) also needs a face turned to the lamp
-    (`Heeding::turned_to_the_lamp`): with the eyes reading speaking
-    (`LAMP_EYES_SPEAKING`), one turned to it and seen speaking the line,
-    as `LAMP_TURNED_SPEAKING` reads one, so the listener's face never
-    carries a colleague's "Leon, can you…"; without, the eyes' newest
-    look (reviewer-three's P3 on 1600b0a69). People's names
+    (`LikeTheName::Shape`) also needs a close face turned to the lamp
+    over the line (`Heeding::turned_to_the_lamp`), judged as
+    `--addressed` judges one (`addressed::Looks::between`, Sixth's P2s on
+    1600b0a69): the eyes' looks from 1.5 s before the line to its end,
+    kept by `Heeding::looking_for_near`, at least two, a face of
+    `CLOSE_FACE_HEIGHT` or more turned to it in `FACING_SHARE` (0.4) of
+    them, so neither a far face nor one turning to it after the line
+    counts. Then as the rule reads it: with `LAMP_TURNED_SPEAKING`, one
+    seen silent through the line is nobody (the P3); with the eyes
+    reading speaking (`LAMP_EYES_SPEAKING`), one turned to it must be seen
+    speaking the line too, so the listener's face never carries a
+    colleague's "Leon, can you…" (reviewer-three's P3). People's names
     have the shape ("Leon", "Lynne", "Laine", "Lon", "Lem"), and a list of
     them always trails (reviewer-three's P2 on 194accd24); the words
     written for "Lamp" need the near hearing alone. A line that begins
