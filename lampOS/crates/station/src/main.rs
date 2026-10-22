@@ -111,6 +111,20 @@ fn parse(given: &[String]) -> Result<Option<Arguments>, String> {
         out: need("--out")?.into(),
         records: get("--records").map(PathBuf::from),
     }))
+    .and_then(|arguments| {
+        // With a records' place, a `--device` that can't be a lamp's folder
+        // there is refused before anything is written, `--out` included:
+        // its record could never reach the place (El on #3091).
+        if let Some(Arguments {
+            records: Some(place),
+            device,
+            ..
+        }) = &arguments
+        {
+            store::lamp_dir(place, &device.id).map_err(|error| error.to_string())?;
+        }
+        Ok(arguments)
+    })
 }
 
 const FLAGS: [&str; 14] = [
@@ -450,7 +464,10 @@ fn main() -> ExitCode {
             Err(error) => {
                 // The run can't be made again (--out keeps it), so say how
                 // its record reaches the place by hand, unless it's there.
-                let by_hand = if error.kind() == std::io::ErrorKind::AlreadyExists {
+                let by_hand = if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::AlreadyExists | std::io::ErrorKind::InvalidInput
+                ) {
                     String::new()
                 } else {
                     format!(
@@ -533,6 +550,38 @@ mod tests {
         assert!(args(&later).is_err());
         assert!(args(&["--matrix"]).is_err());
         assert!(args(&["--help"]).unwrap().is_none());
+    }
+
+    /// El on #3091: with `--records`, a `--device` lamps share is refused
+    /// while parsing, before `--out` is written, saying what to give
+    /// instead; without `--records` it's taken as before.
+    #[test]
+    fn with_a_records_place_a_shared_device_is_refused_before_anything_is_written() {
+        let with_device = |device: &'static str, records: bool| {
+            let mut given = ALL.to_vec();
+            given[5] = device;
+            if records {
+                given.extend(["--records", "place"]);
+            }
+            args(&given)
+        };
+        for shared in ["autonomous", "orangepi", "lamp-"] {
+            let why = with_device(shared, true).unwrap_err();
+            assert!(why.contains("a name lamps share"), "{why}");
+            assert!(why.contains("lamp-<the last four of its serial>"), "{why}");
+            assert!(with_device(shared, false).unwrap().is_some(), "{shared}");
+        }
+        assert!(with_device("lamp-4ace", true).unwrap().is_some());
+    }
+
+    /// `records` refuses a shared name before it reads the place.
+    #[test]
+    fn records_refuses_a_shared_name_with_why() {
+        let place = tempfile::tempdir().unwrap();
+        std::fs::create_dir(place.path().join("autonomous")).unwrap();
+        let error = store::lamp_records(place.path(), "autonomous").unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(error.to_string().contains("a name lamps share"), "{error}");
     }
 
     /// The records' place is off unless given (#2794).
