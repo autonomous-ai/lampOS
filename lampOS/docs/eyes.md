@@ -778,8 +778,12 @@ this room" until someone asks to be recognised.
   - `{"forget":"Minh"}` answers `{"forgot":true}` once the file no longer
     has it, nor any set-aside file with a list of people (#1505: each is
     rewritten 0600, or removed when nothing is left in it). A set-aside
-    file that cannot be searched might hold the face: one with no list of
-    people, or with a person whose `name` is no plain string. **Then the
+    file that cannot be searched might hold the face: one that is no JSON,
+    one with something in it but no list of people (a newer build's
+    shape), or one with a person whose `name` is no plain string. JSON that
+    holds nothing (`{}`, `[]`, a number, `null`) holds nobody and counts as
+    searched (#2850: a 2-byte `{}` set aside on lamp-c0a4 kept every forget
+    waiting). **Then the
     forget waits for it** (#1586): the answer is `{"forgot":…,
     "unsearched":N}`, never "not known" and never a fault.
   - **The memory keys, with the answer** (#2176, #2330). With
@@ -832,9 +836,15 @@ this room" until someone asks to be recognised.
   - A forget also lets go a face from a photo by that name, and one let
     go is a face forgotten (`forgot: true`). A let-go its file couldn't be
     written for answers `{"error":"storage"}`, as a failed forget does.
-  - **A forget is the face only.** "Forget my face" at the lamp leaves what
-    memory keeps for that person, unless they also say "forget
-    everything"; a remove from the owner's page (`face.remove`) takes their
+  - **A forget is the face only, the eyes' side.** The eyes forget the
+    face alone. "Forget my face" at the lamp leaves what memory keeps for
+    that person, unless they also say "forget everything", or
+    `LAMP_MEMORY_FORGET_ALL=on` (#2850): then, once the eyes forgot the face
+    of the known person whose line it is, the voice empties their memory as
+    their `forget_everything` would (their scope only, never the room's;
+    memory.md). The voice asks the eyes for that person under the name the
+    eyes keep, read from the known file, never the model's guess, and never
+    for anyone else's face (voice-side, `known_faces::forget_name`). A remove from the owner's page (`face.remove`) takes their
     memory too (cloud.md, "The faces it knows"). Memory names a person by
     their name's hash, so until person ids are stable (#2176 row 3), a new
     face kept under the same name would be given those memories.
