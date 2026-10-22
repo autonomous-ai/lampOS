@@ -34,6 +34,8 @@ lamp-bus = { path = "../bus" }
 lamp-msgs = { path = "../msgs" }
 lamp-local-time = { path = "../local-time" }
 sha2.workspace = true
+# Opaque account repair tickets use OS entropy, as tasks and schedule do.
+getrandom = "0.4"
 # The same pure Rust ONNX runtime as the endpoint worker.
 tract-onnx = { version = "=0.23.8", default-features = false }
 # With --mouth-runtime: the voice's pinned ONNX Runtime and its check, for

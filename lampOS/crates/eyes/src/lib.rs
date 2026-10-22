@@ -29,6 +29,7 @@ pub mod blendshapes;
 pub mod bus_out;
 pub mod camera_helper;
 pub mod change;
+pub mod face_repair;
 pub mod faces;
 pub mod facing;
 pub mod full_look;
