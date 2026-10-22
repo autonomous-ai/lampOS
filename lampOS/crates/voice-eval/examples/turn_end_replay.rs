@@ -5,6 +5,7 @@
 //! `cargo run --release -p lamp-voice-eval --example turn_end_replay --
 //!  MODEL CLIPS.json [--end-silence-ms 600] [--verdict-ms 130]
 //!  [--speech-level-db DB] [--faint-floor-db DB [--faint-hold-ms MS]]
+//!  [--unfinished-below P] [--unsure-ms MS]
 //!  --profile NAME:COMMIT_MS:COMPLETE_P:LEAST_SPEECH_MS[:recheck][:short][:start] ...`
 //!
 //! `CLIPS.json` is `[{"id": "...", "wav": "/path.wav"}, ...]`, each a 16 kHz
@@ -18,8 +19,14 @@
 //! (`ring_face::level_of`); with `--faint-floor-db` a block under that level
 //! counts as no speech, with the voice's own hold after six blocks over it
 //! (`room_floor::Near`, `LAMP_FAINT_HOLD_MS`), as `--faint-floor-db` does in
-//! the voice. Prints one JSON
-//! line a clip and profile: each turn's start and end in milliseconds of
+//! the voice. `--unfinished-below` and `--unsure-ms` are the voice's night
+//! dials (`LAMP_ENDPOINT_UNFINISHED_BELOW`, `LAMP_ENDPOINT_UNSURE_MS`), read
+//! as the voice reads them (`lamp_voice::activity::unfinished_below` and
+//! `unsure_ms`, after trimming), and a value out of their range is refused,
+//! not ignored: with either, every clip and profile is replayed twice, once
+//! as the profile is (`"dials": "before"`) and once with them
+//! (`"dials": "after"`). Prints one JSON
+//! line a clip and profile (and dials): each turn's start and end in milliseconds of
 //! the clip's own audio, and the decision that ended it. Nothing is played.
 use lamp_audio::{CAPTURE_SAMPLES, CaptureBlock};
 use lamp_turn_end::{FeatureExtractor, SMART_TURN_V3_2, SmartTurn};
@@ -28,6 +35,7 @@ use lamp_turn_end_wire::{
 };
 use lamp_voice::activity::{
     Activity, ConfirmPolicy, ObservedAudio, SpeechProbability, TurnDetector,
+    UNFINISHED_BELOW_RANGE, UNSURE_RANGE_MS, unfinished_below, unsure_ms,
 };
 use lamp_voice::{ring_face::level_of, room_floor::Near};
 use serde_json::{Value, json};
@@ -225,6 +233,26 @@ fn scaled(samples: &[i16], target: f64) -> Vec<i16> {
         .collect()
 }
 
+/// The voice's night dials, as `--unfinished-below` and `--unsure-ms`
+/// give them: none, the profile as it is.
+#[derive(Clone, Copy, Default)]
+struct Dials {
+    unfinished_below: Option<f32>,
+    unsure_ms: Option<u16>,
+}
+
+impl Dials {
+    fn given(self) -> bool {
+        self.unfinished_below.is_some() || self.unsure_ms.is_some()
+    }
+
+    /// `policy` with the dials, through the voice's own
+    /// `ConfirmPolicy::with_dials`.
+    fn on(self, policy: ConfirmPolicy) -> ConfirmPolicy {
+        policy.with_dials(self.unfinished_below, self.unsure_ms)
+    }
+}
+
 #[derive(Clone, Copy)]
 struct Room {
     speech_level_db: Option<f64>,
@@ -331,7 +359,7 @@ fn replay(
 fn main() -> Result<(), Error> {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let [model_path, clips_path, rest @ ..] = &arguments[..] else {
-        return Err("turn_end_replay MODEL CLIPS.json [--end-silence-ms MS] [--verdict-ms MS] --profile NAME:COMMIT_MS:COMPLETE_P:LEAST_SPEECH_MS ...".into());
+        return Err("turn_end_replay MODEL CLIPS.json [--end-silence-ms MS] [--verdict-ms MS] [--unfinished-below P] [--unsure-ms MS] --profile NAME:COMMIT_MS:COMPLETE_P:LEAST_SPEECH_MS ...".into());
     };
     let mut end_silence_ms = 600u64;
     let mut verdict_ms = 130u64;
@@ -340,6 +368,7 @@ fn main() -> Result<(), Error> {
         faint_floor_db: None,
         faint_hold_ms: 0,
     };
+    let mut dials = Dials::default();
     let mut profiles = Vec::new();
     let mut flags = rest.iter();
     while let Some(flag) = flags.next() {
@@ -353,6 +382,22 @@ fn main() -> Result<(), Error> {
             "--speech-level-db" => room.speech_level_db = Some(value.parse()?),
             "--faint-floor-db" => room.faint_floor_db = Some(value.parse()?),
             "--faint-hold-ms" => room.faint_hold_ms = value.parse()?,
+            "--unfinished-below" => {
+                dials.unfinished_below = Some(unfinished_below(value.trim()).ok_or_else(|| {
+                    format!(
+                        "--unfinished-below {value}: not a probability from {} to {}",
+                        UNFINISHED_BELOW_RANGE.start(),
+                        UNFINISHED_BELOW_RANGE.end()
+                    )
+                })?)
+            }
+            "--unsure-ms" => dials.unsure_ms = Some(unsure_ms(value.trim()).ok_or_else(|| {
+                format!(
+                    "--unsure-ms {value}: not a whole number of ms from {} to {} in steps of 10",
+                    UNSURE_RANGE_MS.start(),
+                    UNSURE_RANGE_MS.end()
+                )
+            })?),
             _ => return Err(format!("unknown option {flag}").into()),
         }
     }
@@ -370,18 +415,31 @@ fn main() -> Result<(), Error> {
             clip["wav"].as_str().ok_or("a clip without a wav")?,
         ))?;
         for profile in &profiles {
-            let (turns, asked) = replay(
-                &samples,
-                profile.policy,
-                &model,
-                end_silence_blocks,
-                verdict_ms / 10,
-                room,
-            )?;
-            println!(
-                "{}",
-                json!({"clip": id, "profile": profile.name, "audio_ms": samples.len() as u64 / 16, "turns": turns, "verdicts": asked})
-            );
+            let runs: &[(Option<&str>, ConfirmPolicy)] = if dials.given() {
+                &[
+                    (Some("before"), profile.policy),
+                    (Some("after"), dials.on(profile.policy)),
+                ]
+            } else {
+                &[(None, profile.policy)]
+            };
+            for (said, policy) in runs {
+                let (turns, asked) = replay(
+                    &samples,
+                    *policy,
+                    &model,
+                    end_silence_blocks,
+                    verdict_ms / 10,
+                    room,
+                )?;
+                let mut line = json!({"clip": id, "profile": profile.name, "audio_ms": samples.len() as u64 / 16, "turns": turns, "verdicts": asked});
+                if let Some(said) = said {
+                    line["dials"] = json!(said);
+                    line["unfinished_below"] = json!(policy.incomplete_probability);
+                    line["unsure_ms"] = json!(u32::from(policy.uncertain_blocks) * 10);
+                }
+                println!("{line}");
+            }
         }
     }
     Ok(())
