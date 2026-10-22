@@ -192,8 +192,14 @@ const JOIN_POLL: Duration = Duration::from_millis(25);
 /// [`CARRY_AFTER_END`], as [`OPEN_NAME_WITHIN`] is, since a join needs one
 /// person's sign as well. On lamp-4ace on 21 Oct at 18:36 a played request
 /// with a 1.2 s pause in it began its second half 1635 ms after the first
-/// half's end, past 1.5 s.
-pub const JOIN_WITHIN: Duration = Duration::from_millis(2_500);
+/// half's end, past 1.5 s. 3 s, not 2.5: in the owner's test on lamp-4ace
+/// on 22 Oct (19:04-19:08), request 36 began about 2.6 s after request 35,
+/// which it cut short, ended (at least 2.14 s by the journal; 35's wait
+/// sound came 1.79 s after its end and was cut 0.81 s in), and the
+/// others 1.45 to 2.45 s after; the gap counts the coordinator's hold of a
+/// sound said while an answer is awaited (`LAMP_WAIT_KEEPS_ANSWER`, up to
+/// 1 s), not only the person's pause.
+pub const JOIN_WITHIN: Duration = Duration::from_millis(3_000);
 /// The function the model looks with on this route ([`Engine::looking_by_call`]).
 pub const LOOK_CALL: &str = "take_a_look";
 /// What the lamp says as it looks by a call the model made with no words.
