@@ -1025,8 +1025,9 @@ the unchanged legacy client, used unless the new Days client is selected.
   with the Days client only; off unless set; both voice routes since
   twelve-P2). A session opened for someone
   known asks the memory `follow_up` within the note's 300 ms (on the second
-  route, within its read's 2 s, and joining the note only when an answered
-  turn takes the read). The memory
+  route only for an answered turn, as it waits for its note: a note read
+  as a line begins, for a line that may never be answered, asks none, so it
+  spends no offer). The memory
   gives at most one open `thread` or `promise` observation of theirs, at
   least 6 hours old (not the same conversation) and at most 14 days old,
   newest first, never one given before, and none if one was given to them
@@ -1227,8 +1228,9 @@ the unchanged legacy client, used unless the new Days client is selected.
   ([second-voice.md](second-voice.md), "Asked as the line begins"). A read
   becomes the memory's context (its session, sources, rules and follow-up)
   only when an answered turn takes it; one taken after a forget, a rule
-  forgotten, a stop or a lost write began during it is let go. Nothing
-  polls between turns. Valid empty snapshots
+  forgotten, a stop or a lost write began during it is let go, and a
+  cached note read before one is dropped, so the next turn asks again
+  whatever the pacing. Nothing polls between turns. Valid empty snapshots
   are complete and stay cached. Keeps and person changes still force a
   fresh read immediately. Confirmed forgets retain the existing
   `LAMP_MEMORY_JOURNAL_RESUMES` policy and its backoff; when it requests a
