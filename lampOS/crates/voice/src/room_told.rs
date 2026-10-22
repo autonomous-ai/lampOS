@@ -190,8 +190,11 @@ pub struct RoomTold {
     /// Busy ends [`BUSY_ENDS_UNANSWERED_US`] after the last talk when the
     /// lamp has not answered since ([`Self::end_busy_sooner`]).
     ends_sooner: bool,
-    /// `LAMP_NAME_OR_FOLLOW_UP` ([`Self::count_held_talk`]).
+    /// `LAMP_NAME_OR_FOLLOW_UP` ([`Self::count_held_talk`]), and the request
+    /// said with someone in view and not turned to the lamp
+    /// ([`Self::seen_talking`]).
     held_talk: bool,
+    talking_seen: Option<u64>,
     room: Room,
     /// The session last told, and what it was told.
     told: Option<(u64, Room)>,
@@ -224,6 +227,7 @@ impl RoomTold {
             answered_us: None,
             ends_sooner: false,
             held_talk: false,
+            talking_seen: None,
             room: Room::Unknown,
             told: None,
         }
@@ -231,15 +235,29 @@ impl RoomTold {
 
     /// With `LAMP_NAME_OR_FOLLOW_UP` (`crate::name_or_follow_up`), from now
     /// on: in a room not known to be busy, a line the lamp's rule held as
-    /// said to nobody, or to someone else, is talk when it is closed, with
-    /// only talk counted too ([`Self::judged`]); and two people seen or
-    /// heard make the room busy at once ([`Self::two_people`]). The switch
+    /// said to someone else by name, or as said to nobody with someone in
+    /// view and not turned to the lamp ([`Self::seen_talking`]), is talk when
+    /// it is closed, with only talk counted too ([`Self::judged`]); and two
+    /// people seen or heard make the room busy at once ([`Self::two_people`]).
+    /// A lone voice's lines held with nobody in view are not talk: on
+    /// lamp-4ace on 22 October one person's call, heard from a speaker with
+    /// no face in view, was misheard and held, the next lines held as said
+    /// to nobody turned the room busy, and the whole scene was lost. The switch
     /// answers a person alone as before the switch, and keeps its strict
     /// rule for a busy room, so the room must turn busy from the talk it
     /// holds: at the owner's desk on 22 October it answered everything, and
     /// two lines in a row were never left alone.
     pub fn count_held_talk(&mut self, on: bool) {
         self.held_talk = on;
+    }
+
+    /// `request` was said with someone in view and not turned to the lamp
+    /// (`bus_out::someone_in_view_turned_away`): with [`Self::count_held_talk`]
+    /// and held as said to nobody, it is people talking to each other.
+    pub fn seen_talking(&mut self, request: u64) {
+        if self.held_talk {
+            self.talking_seen = Some(request);
+        }
     }
 
     /// Two people are at the lamp at `now_us`: the eyes see two faces or
@@ -417,9 +435,10 @@ impl RoomTold {
     /// talking on keep the room busy, and its minute runs from their last
     /// line (the reviewer's P2 on #2372, the first builder at 04:36). With
     /// [`Self::count_held_talk`], in a room not known to be busy, a line held
-    /// as said to nobody, or to someone else, is talk
-    /// (`attention::said_to_nobody`), and one in another voice makes the room
-    /// busy at once ([`Self::two_people`]).
+    /// as said to someone else (`attention::said_to_another`), or as said to
+    /// nobody with someone in view and not turned to the lamp
+    /// ([`Self::seen_talking`]), is talk, and one in another voice makes the
+    /// room busy at once ([`Self::two_people`]).
     pub fn judged(
         &mut self,
         request: u64,
@@ -446,12 +465,15 @@ impl RoomTold {
                     self.held_by_policy = Some(request);
                 }
             }
-            // `LAMP_NAME_OR_FOLLOW_UP`: said to nobody, or to someone else,
-            // in a room not known to be busy, it is talk.
+            // `LAMP_NAME_OR_FOLLOW_UP`: in a room not known to be busy, said to
+            // someone else, or to nobody with someone in view and turned
+            // away, it is talk; a lone voice's line is not.
             Some(crate::attention::Verdict::Hold(why))
                 if self.held_talk
                     && self.room != Room::Busy
-                    && crate::attention::said_to_nobody(why) => {}
+                    && (crate::attention::said_to_another(why)
+                        || why == crate::attention::NOT_SPOKEN_TO
+                            && self.talking_seen == Some(request)) => {}
             Some(crate::attention::Verdict::Hold(_)) => self.held(request),
             _ => {}
         }
@@ -2006,13 +2028,16 @@ mod tests {
     }
 
     /// `LAMP_NAME_OR_FOLLOW_UP`, with only talk counted (`LAMP_SPOKEN_TO`):
-    /// in a quiet room, two people's lines the lamp's rule held as said to
-    /// nobody are talk, and the second makes the room busy; without the
-    /// switch they are held lines and it stays quiet. A line held for
-    /// another reason, misheard as another script, is still no talk, and in
-    /// a busy room held lines are as before.
+    /// in a quiet room, lines the lamp's rule held as said to nobody, said
+    /// with someone in view and turned away, are talk, and the second makes
+    /// the room busy. A lone voice's held lines, nobody in view, are not: its
+    /// three leave the room quiet (lamp-4ace, 22 Oct: one unseen person's
+    /// misheard call and the lines after it turned the room busy, and the
+    /// scene was lost). Without the switch they are held lines; one misheard
+    /// as another script is no talk; and in a busy room held lines are as
+    /// before.
     #[test]
-    fn with_name_or_follow_up_lines_held_as_said_to_nobody_in_a_quiet_room_are_talk() {
+    fn with_name_or_follow_up_held_lines_are_talk_only_with_someone_in_view_turned_away() {
         use crate::attention::{NOT_SPOKEN_TO, Verdict};
         const S: u64 = 1_000_000;
         let quiet = |on: bool| {
@@ -2023,28 +2048,47 @@ mod tests {
             assert_eq!(room.at(301 * S), Room::Quiet);
             room
         };
-        let line = |room: &mut RoomTold, request: u64, at: u64, why: &'static str| {
+        let line = |room: &mut RoomTold, request: u64, at: u64, why: &'static str, seen: bool| {
             room.heard(request, at * S);
             room.ended(request, at * S + S / 2);
+            if seen {
+                room.seen_talking(request);
+            }
             room.judged(request, Some(Verdict::Hold(why)), false);
             room.left_unanswered(request, at * S + S)
         };
+        // A lone voice, nobody in view.
         let mut room = quiet(true);
-        assert_eq!(line(&mut room, 1, 310, NOT_SPOKEN_TO), Left::Talk);
+        for (request, at) in [(1, 310), (2, 315), (3, 320)] {
+            assert_eq!(
+                line(&mut room, request, at, NOT_SPOKEN_TO, false),
+                Left::Held
+            );
+        }
+        assert_eq!(room.at(322 * S), Room::Quiet);
+        // Someone in view, turned away.
+        let mut room = quiet(true);
+        assert_eq!(line(&mut room, 1, 310, NOT_SPOKEN_TO, true), Left::Talk);
         assert_eq!(room.at(312 * S), Room::Quiet);
-        assert_eq!(line(&mut room, 2, 315, NOT_SPOKEN_TO), Left::Talk);
+        assert_eq!(line(&mut room, 2, 315, NOT_SPOKEN_TO, true), Left::Talk);
         assert_eq!(room.at(317 * S), Room::Busy);
         // Busy now: a held line is a held line again.
-        assert_eq!(line(&mut room, 3, 320, NOT_SPOKEN_TO), Left::Held);
+        assert_eq!(line(&mut room, 3, 320, NOT_SPOKEN_TO, true), Left::Held);
         let mut room = quiet(false);
-        assert_eq!(line(&mut room, 1, 310, NOT_SPOKEN_TO), Left::Held);
-        assert_eq!(line(&mut room, 2, 315, NOT_SPOKEN_TO), Left::Held);
+        assert_eq!(line(&mut room, 1, 310, NOT_SPOKEN_TO, true), Left::Held);
+        assert_eq!(line(&mut room, 2, 315, NOT_SPOKEN_TO, true), Left::Held);
         assert_eq!(room.at(317 * S), Room::Quiet);
         let mut room = quiet(true);
         let misheard = crate::not_speech::OTHER_SCRIPT;
-        assert_eq!(line(&mut room, 1, 310, misheard), Left::Held);
-        assert_eq!(line(&mut room, 2, 315, misheard), Left::Held);
+        assert_eq!(line(&mut room, 1, 310, misheard, true), Left::Held);
+        assert_eq!(line(&mut room, 2, 315, misheard, true), Left::Held);
         assert_eq!(room.at(317 * S), Room::Quiet);
+        // Another voice, nobody in view: busy at once, as before.
+        let mut room = quiet(true);
+        room.heard(1, 310 * S);
+        room.ended(1, 311 * S);
+        room.judged(1, Some(Verdict::Hold(NOT_SPOKEN_TO)), true);
+        assert_eq!(room.at(312 * S), Room::Busy);
     }
 
     /// `LAMP_NAME_OR_FOLLOW_UP`: two people at the lamp, two faces in view

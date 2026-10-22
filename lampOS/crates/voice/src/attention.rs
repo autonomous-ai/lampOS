@@ -375,13 +375,16 @@ const TO_ANOTHER: &str = "said to someone it calls by name, not to the lamp";
 const AFTER_QUESTION: &str =
     "a busy room: a reply to a question the lamp left unanswered, not said to the lamp";
 
-/// Whether a line held for `why` was said to nobody, or to someone else:
-/// with `LAMP_NAME_OR_FOLLOW_UP`, in a room not known to be busy, it is
-/// talk between people (`room_told::RoomTold::count_held_talk`). The holds
-/// given only in a busy room, [`AFTER_QUESTION`] and
+/// Whether a line held for `why` was said to someone else by name, or in
+/// reply to someone the room had just called by name: people talking to
+/// each other. With `LAMP_NAME_OR_FOLLOW_UP`, in a room not known to be
+/// busy, it is talk (`room_told::RoomTold::count_held_talk`); a line held
+/// only as said to nobody ([`NOT_SPOKEN_TO`]) is talk only with someone in
+/// view and not turned to the lamp (`room_told::RoomTold::seen_talking`). The
+/// holds given only in a busy room, [`AFTER_QUESTION`] and
 /// [`TURNED_NOT_SPOKEN_TO`], never come there, so they are not among them.
-pub(crate) fn said_to_nobody(why: &str) -> bool {
-    [NOT_SPOKEN_TO, ANSWERING_ANOTHER, TO_ANOTHER].contains(&why)
+pub(crate) fn said_to_another(why: &str) -> bool {
+    [ANSWERING_ANOTHER, TO_ANOTHER].contains(&why)
 }
 
 /// Words that open a sentence of their own before a comma, and are no
