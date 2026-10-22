@@ -747,13 +747,17 @@ a sub-topic and `id`). This is the lamp side
 (`crates/cloud/src/reports.rs`); the app's screen and the backend's store
 are built by their own builders.
 
-**Off unless set.** Nothing is sent, read or written for reports unless all
+**Off unless set.** No health or crash report is queued or sent unless all
 three are on: `LAMP_CLOUD=on`; `LAMP_REPORTS=on` in `lamp-cloud`'s unit
 (and in the voice's, for the stop by voice); and the person's yes, read at
 each send, never kept past a change. Without the switch `lamp-cloud` starts
-no driver, subscribes to nothing, writes no file, and answers `reports.get`
-and `reports.set` as kinds it lacks. Without the yes, the driver only says
-`reports/state` (`share: false`) and reads nothing else.
+no reports driver, subscribes to nothing for reports, writes no reports
+file, and answers `reports.get` and `reports.set` as kinds it lacks.
+Without the yes, the driver says
+`reports/state` (`share: false`) and does not read health values or queue
+crashes. It still consumes local exit notes and keeps their bookkeeping.
+The separate local exit-note recorder below does not depend on these
+switches or consent; recording a note grants no permission to send it.
 
 ### What is sent
 
@@ -872,18 +876,41 @@ builder. The 15 s ping is unchanged.
 
 ### Crashes: the exit note
 
-`lamp-cloud exit-note UNIT` runs as `ExecStopPost=` of every lampOS unit,
-through one prefix drop-in, `/etc/systemd/system/lamp-.service.d/exit-note.conf`
-(`deploy/product/exit-note.conf`). It writes only systemd's
+`lamp-update install` places the reserved
+`/etc/systemd/system/UNIT.d/exit-note.conf` for every service in Cloud's
+fixed `reports::UNITS` list, including its five templates. An install test
+holds the installer list equal to Cloud's list and the product's service
+files. Each drop-in runs `lamp-cloud exit-note %n` as `ExecStopPost=` with
+the existing `-+` prefixes (`deploy/product/exit-note.conf`): the recorder
+runs as root and a failure never fails the service's stop. The installer
+adds no reporting switch, consent, service write path or network access,
+and starts no service. It records reload debt before writing these files;
+a failed install retries it. A reinstall leaves identical files alone,
+repairs a missing reserved file, and preserves every other drop-in,
+including an earlier prefix trial file.
+The recorder is appended to any existing `ExecStopPost` commands. If an
+earlier stop-post command fails without `-`, systemd skips the later ones
+([command ordering](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html#ExecStopPost=));
+installing a hook therefore cannot guarantee a note for every failure.
+
+The recorder writes only systemd's
 `$SERVICE_RESULT`, `$EXIT_CODE` and `$EXIT_STATUS`, the unit's name,
 `systemctl show`'s restarts and run time, the monotonic time and the boot,
 to `/run/lampos-exits/<unit>@<at_us>.json` (root, 0644), the newest 8 per
-unit. A `success`, or a unit not on the list, writes nothing; the note never
-fails a stop (`-`); no journal is read. `lamp-cloud` reads the folder every
-10 s and takes each note once, across its own restarts, until the next
-boot. `lamp-update install` writes no drop-in, so this one goes on a lamp
-with the switch, by hand for the trial. Core dumps and backtraces are never
-sent; step 2's panic hook (`{file, line}` only) comes after step 1 has run
+fixed unit name. An instance of a listed template is stored under the
+template name, such as `lamp-setup-change@.service`; its instance text is
+never in the note's contents, filename or report. The recorder still asks
+`systemctl show` about the actual instance for its run time and restart
+count. Empty or unrelated instances are refused. A `success`, or a unit
+not on the list, writes nothing; no journal is read.
+
+These bounded local notes can be written with sharing off. With its
+reporting switches on, `lamp-cloud` reads the folder every 10 s and takes
+each note once, across its own restarts, until the next
+boot, even without a yes; queueing and sending a crash still require the
+person's current yes. The recorder itself never connects to Cloud.
+Core dumps and backtraces are never sent; step 2's panic hook
+(`{file, line}` only) comes after step 1 has run
 a week.
 
 ### The person's choice
@@ -1249,9 +1276,12 @@ turning reports off; a no deleting the queue and its files with nothing
 after but `stopped`; a no given offline kept across a restart, sent on the
 next connection and once more on the one after; the bounds (12 an hour, 50
 a day, 64 reports, healths before crashes, 7 days) and the 4 KiB cut; exit
-notes (a success and a unit not lampOS's write nothing, 8 per unit, each
-taken once across a restart, a new boot starting again); the drop-in's
-line; the lists against the product's units; `reports.get` and
+notes (a success and a unit not lampOS's write nothing, 8 per fixed unit,
+each taken once across a restart, a new boot starting again); a listed
+template instance reduced to its fixed name in the note and report,
+unrelated or empty instances refused, and a local note granting no
+reporting consent; the drop-in's line; the lists against the product's
+units; `reports.get` and
 `reports.set` with and without the switch; and against the test broker, a
 report on `fd/…/report` with `info`'s id leaving the queue on the ack, and
 sent again after a dropped connection. `tests/it/report_contract.rs` pins the

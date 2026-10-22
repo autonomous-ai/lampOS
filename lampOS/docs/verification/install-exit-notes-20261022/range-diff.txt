@@ -1,0 +1,1 @@
+1:  74706c59e = 1:  8f798e749 lampOS: install exit-note hooks for product services

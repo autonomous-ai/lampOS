@@ -11,7 +11,8 @@
 //!
 //! Run again, it changes nothing that is as it should be, and says so.
 //! It never writes what is one lamp's own (`/etc/lampOS/body/lamp.env`) or
-//! what setup writes, and never a unit's drop-ins. A product setting
+//! what setup writes, and leaves a unit's other drop-ins alone: only the
+//! reserved `exit-note.conf` is install's. A product setting
 //! changed on the lamp since an install wrote it is the lamp's own too, and
 //! is kept ([`settings`]).
 use crate::{
@@ -198,6 +199,47 @@ pub const PRODUCT: &[(&str, &str)] = &[
         include_str!("../../../deploy/product/lamp-waking.service"),
     ),
 ];
+
+/// The fixed services whose stops Cloud may report. The install fixture
+/// holds this list equal to `lamp_cloud::reports::UNITS`, including the
+/// helpers installed by setup. No prefix drop-in reaches unlisted units.
+pub const EXIT_NOTE_UNITS: &[&str] = &[
+    "lamp-actions.service",
+    "lamp-addons.service",
+    "lamp-air-clock.service",
+    "lamp-air.service",
+    "lamp-body.service",
+    "lamp-cloud.service",
+    "lamp-controls.service",
+    "lamp-ears.service",
+    "lamp-expression.service",
+    "lamp-eyes.service",
+    "lamp-health.service",
+    "lamp-keeper-restart@.service",
+    "lamp-memory.service",
+    "lamp-mood.service",
+    "lamp-name.service",
+    "lamp-policy.service",
+    "lamp-records.service",
+    "lamp-schedule.service",
+    "lamp-selftest.service",
+    "lamp-setup-change@.service",
+    "lamp-setup-keys@.service",
+    "lamp-setup-reset.service",
+    "lamp-setup-wifi-restore.service",
+    "lamp-setup-wifi@.service",
+    "lamp-setup.service",
+    "lamp-skills-manage@.service",
+    "lamp-skills.service",
+    "lamp-tasks.service",
+    "lamp-update-apply.service",
+    "lamp-update-back.service",
+    "lamp-update.service",
+    "lamp-voice.service",
+    "lamp-waking.service",
+];
+/// The existing recorder command: local bounded notes, never a cloud send.
+pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf");
 
 /// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
@@ -1202,13 +1244,19 @@ pub fn install(
         put(config, crate::own::BACK, &bytes, 0o755, &mut changed)?;
     }
 
-    // The units and the tmpfiles. systemd must be told of any of them
-    // written, so that is recorded before the first is: a run stopped
-    // anywhere after leaves the debt for the next (the reviewer on #815,
+    // The units, their exit-note drop-ins and the tmpfiles. systemd must be
+    // told of any of them written, so that is recorded before the first is:
+    // a run stopped anywhere after leaves the debt for the next (the reviewer on #815,
     // 19:17 and 19:32).
     let for_systemd: Vec<(String, &[u8])> = PRODUCT
         .iter()
         .map(|(name, text)| (format!("{UNITS}{name}"), text.as_bytes()))
+        .chain(EXIT_NOTE_UNITS.iter().map(|name| {
+            (
+                format!("{UNITS}{name}.d/exit-note.conf"),
+                EXIT_NOTE.as_bytes(),
+            )
+        }))
         .chain([(TMPFILES_PATH.to_owned(), TMPFILES.as_bytes())])
         .collect();
     if !state.systemd_owed
