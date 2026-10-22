@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-22 16:47 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-22 17:49 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 89.3% over 72 rows. Quality 62.8% over 16 rows.**
+**Build 89.4% over 72 rows. Quality 64.4% over 16 rows.**
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -64,7 +64,7 @@ Written by the first builder from the team's review page at 2026-10-22 16:47 (+0
 | The light dims and goes out when nobody is there, a core skill | 1.00 | #1677 #1721 #1747 | nine | Built and tried on lamp-4ace 20 Oct 01:23 (trials.sh with Tests’ #1999 stages, lamp-skills at 782e6ef34): with nobody there the light-out skill asked the ring to fade the light over 30 s, held it while nobody was there, … |
 | What you teach it (“don’t say hello in the morning”) is kept and honoured | 1.00 | #813 | seventh | Built |
 | Forgets on request: that, everything, my face, and everything it came from | 0.90 | #1586 #1693 #2849 #2850 | fourth, twelve | 22 Oct 15:1x, up from 0.85: “forget everything” passed on lamp-c0a4 with two known faces (Twelve, #2849, closed): one thing forgotten alone, all of A’s gone across a restart, B’s and the room’s untouched. |
-| Remembers what matters without being asked (“how was the wedding?”) | 0.65 | #1693 #2648 #2680 #2805 #2806 #2807 #2808 | friday, twelve | 22 Oct 15:1x, up from 0.6: a correction kept as heard answers not_replaced, so the lamp doesn’t say the old fact changed (LAMP_MEMORY_REPLACES, part of #2510, cdc42cd21), and tests pin that a dated follow-up after its da… |
+| Remembers what matters without being asked (“how was the wedding?”) | 0.70 | #1693 #2648 #2680 #2805 #2806 #2807 #2808 | friday, twelve | 22 Oct 17:3x, up from 0.65: a dated event’s follow-up is worded in memory’s note and marked when the lamp asks it (LAMP_MEMORY_EVENTS, Twelve’s #2894, carried as #2980, a8564b52e). |
 | Keeps going when one part fails | 1.00 | — | — | Built: each part its own unit, restarted alone, health says how the lamp is |
 | Change the Wi-Fi, name or time zone after setup, without a reset | 0.95 | #1982 #1995 #2038 #2851 #2852 #2853 | fourteen, nine | 22 Oct 16:1x, up from 0.9: the settings and Wi-Fi helpers take a request only from lamp-cloud’s unit (#2696), and install puts their units on every product lamp (Sixth’s #2926, carried as #2955). |
 | Hand-overs from a home lamp: Harness installed, the person signed in | 0.80 | #751 #765 #798 #1854 #2702 #2838 #2839 #2840 #2841 #2842 | seventh, eighth | 22 Oct 09:10, up from 0.75: a task’s finish is told after the agent’s question, on lamp-75c9 (Eighth, #2543). |
@@ -90,16 +90,16 @@ Written by the first builder from the team's review page at 2026-10-22 16:47 (+0
 | Row | Now | Target | Where it is |
 |---|---|---|---|
 | Fast answers | 0.60 | 0.85 | 22 Oct 02:0x, down from 0.8, a correction: the 1.59 s and 1.61 s below were mostly the soft “Hm.” wait sound, not the answer. |
-| Knows when you have finished | 0.50 | 0.85 | 22 Oct 16:1x, down from 0.8, from the owner’s own conversation at the desk (lamp-4ace), not played lines: of six known lines read to it, two were cut in two at a small pause (“Tell me a short” answered alone; |
+| Knows when you have finished | 0.60 | 0.85 | 22 Oct 17:4x, up from 0.5, the owner’s own try at the desk on lamp-4ace (17:45–17:48): 0 of 27 lines cut at a pause, as 0 of 26 earlier (early finalize off since 15:51, short lines asked of the turn-end model since 16:10… |
 | Cutting in | 0.50 | 0.75 | 20 Oct 03:45 on the cheaper voice, lamp-4ace: two lines played over a long story each made the lamp pause and then go on, and after two such pauses it no longer lets anyone cut in on that story, so a third line 30 s late… |
 | Stop words | 0.50 | 0.75 | 21 Oct 22:5x, the speech-to-text path scored on the same two recordings, on lamp-4ace through the product’s own relay: it caught none of the ten “stop” lines. |
 | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |
-| Not spoken to | 0.55 | 0.90 | 22 Oct 16:1x, down from 0.7: talking to a colleague at the desk, the owner was answered: of 18 answers, 8 were let out only by a face turned to the lamp (at a desk the person faces it anyway) and 6 only as the conversati… |
+| Not spoken to | 0.65 | 0.90 | 22 Oct 17:4x, up from 0.55: with LAMP_NAME_OR_FOLLOW_UP on lamp-4ace since 17:06, all 44 office lines heard 17:06–17:45 were held with nobody calling it, and in the owner’s try 7 desk lines were held while its name and f… |
 | Several people | 0.65 | 0.85 | 22 Oct 07:38, up from 0.6: both halves of the going-on rows on lamp-52e6 with Mac voices and screen faces (Seventh). |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.80 | 0.85 | 18 Oct 15:39, everything the lamp said unasked since midnight (Jarvis’s readout, 14 sessions): 17 reminders and timers, a median 0.98 s after they were due (16 within 5 s, one held back by the link), and 17 pieces of tas… |
 | Remembers you: your name and what you told it | 0.65 | 0.90 | 22 Oct 12:23, up from 0.6: a memory note that failed mid-conversation is asked again within the same 300 ms, so a store that recovers is heard again in that conversation (Fourth, #2774). |
-| A good companion | 0.60 | 0.90 | 22 Oct 16:1x, down from 0.85, the owner: “the answers are all off”. |
+| A good companion | 0.65 | 0.90 | 22 Oct 17:4x, up from 0.6: in the owner’s try the weather was looked up for Hanoi and then the lamp’s place, tomorrow, and the time called for London: the functions the bound had left out are back (#2961, merged a0705aee… |
 | Both microphones | 0.65 | 0.80 | 22 Oct 06:41, up from 0.6: step 4 passed on lamp-75c9 from the privacy test input (Nine, #694, the lead’s 05:5x ruling): after the switch closes, the room microphone stops within one 100 ms level period and gives nothing… |
 | Body | 0.70 | 0.80 | 17 Oct: the guarded body (#1192) on lamp-4ace since 07:34: stands for a question, turns to the voice, gestures and folds, with no refused or bad-read stop; |
 | Head and eye | 0.60 | 0.80 | 22 Oct 05:0x, up from 0.55: the arm also leans toward you during a real answer (lamp-c0a4, 21 Oct 21:4x, Thirteen: a played story request answered, the arm at its 45/60 lean while the lamp spoke, the face looked at throu… |
