@@ -1,7 +1,7 @@
 //! A streamed OpenAI-compatible chat completion with function tools: text
 //! as it is written, then the tool calls the model asked for. The caller
 //! runs the tools and sends their results back as `tool` messages.
-use super::{Error, Result, chunk, http_client, openai_base, post};
+use super::{Error, Result, chat_client, chunk, openai_base, post};
 use crate::second_config::SecondConfig;
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -209,9 +209,14 @@ fn pinned(tool: &mut lamp_gemini::Tool, (parameter, value): (&str, &str)) {
 pub const GEMINI_REASONING: &str = "minimal";
 
 /// A chat connection idle this long is opened ahead as a line begins
-/// ([`Chat::warm`]): the client's pool keeps an idle one 90 s, and the
-/// service may close it sooner.
+/// ([`Chat::warm`]): the client's pool keeps an idle one 90 s (25 s with
+/// `LAMP_SECOND_CHAT_KEPT=on`, when a line after 25 s opens a new one
+/// anyway), and the service may close it sooner.
 pub const WARM_AFTER: std::time::Duration = std::time::Duration::from_secs(60);
+/// [`WARM_AFTER`] for a client that keeps an idle connection only
+/// `CHAT_POOL_IDLE` (`LAMP_SECOND_CHAT_KEPT=on`): a little under it, so a line
+/// after its connection went still finds one opened ahead.
+pub const WARM_AFTER_KEPT: std::time::Duration = std::time::Duration::from_secs(20);
 /// At most this much of the warming answer is read: enough to finish a
 /// models list, so its connection goes back to the pool.
 const WARM_BYTES: usize = 256 << 10;
@@ -231,12 +236,16 @@ pub struct Chat {
     /// Which function a request must call, if any.
     force: std::sync::OnceLock<Force>,
     /// When the last request went, for the journal: a connection idle past
-    /// the client's pool keep (`http_client`, 90 s) is made anew.
+    /// the client's pool keep (`chat_client`: 90 s, or 25 s with
+    /// `LAMP_SECOND_CHAT_KEPT=on`) is made anew.
     last_sent: std::sync::Mutex<Option<std::time::Instant>>,
     /// The last request's tools and first message, hashed, for the
     /// journal: a service's prompt cache holds only a prefix that is the
     /// same as before ([`Prefix`]).
     last_prefix: std::sync::Mutex<Option<Prefix>>,
+    /// Idle this long, a line's warm opens the connection ahead:
+    /// [`WARM_AFTER`], or [`WARM_AFTER_KEPT`] with a kept client.
+    warm_after: std::time::Duration,
 }
 
 /// A request's tools and first message, hashed: what has to stay the same
@@ -379,7 +388,8 @@ impl Chat {
     }
 
     /// The connection opened ahead, as a line begins, when no request went
-    /// in the last [`WARM_AFTER`] (`LAMP_SECOND_CHAT_WARM=on`, #1712): a GET
+    /// in the last [`WARM_AFTER`], or [`WARM_AFTER_KEPT`] with a kept client
+    /// (`LAMP_SECOND_CHAT_WARM=on`, #1712): a GET
     /// of the service's `models`, read whole, so the line's chat goes on a
     /// connection already made. Its status and how long it took; `None`
     /// when not due, or when it failed (the chat then connects as before).
@@ -388,7 +398,7 @@ impl Chat {
         let (status, took, ..) = super::warm_get(
             &self.client,
             &self.last_sent,
-            WARM_AFTER,
+            self.warm_after,
             &models,
             ("authorization", &self.auth),
             WARM_BYTES,
@@ -415,8 +425,10 @@ impl Chat {
     }
 
     fn with(base_url: &str, model: &str, key: &str, declare: Declare) -> Result<Self> {
+        let (client, kept) = chat_client()?;
         Ok(Self {
-            client: http_client()?,
+            client,
+            warm_after: if kept { WARM_AFTER_KEPT } else { WARM_AFTER },
             url: format!("{}/chat/completions", openai_base(base_url)),
             auth: format!("Bearer {key}"),
             model: model.to_owned(),
@@ -1529,6 +1541,59 @@ data: [DONE]
                     "parameters": {"type": "object", "properties": {"fact": {"type": "string"}}}}}),
             ]
         );
+    }
+
+    /// #2602 (`LAMP_SECOND_CHAT_KEPT`): a kept client lets an idle
+    /// connection go after its idle limit, so the next request opens a new
+    /// one; the default client reuses it.
+    #[tokio::test]
+    async fn a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        async fn connections(kept: Option<(std::time::Duration, std::time::Duration)>) -> usize {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let accepted = count.clone();
+            tokio::spawn(async move {
+                loop {
+                    let (mut socket, _) = listener.accept().await.unwrap();
+                    accepted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    tokio::spawn(async move {
+                        let mut buffer = [0; 4096];
+                        while let Ok(n) = socket.read(&mut buffer).await {
+                            if n == 0 {
+                                return;
+                            }
+                            let body = "{}";
+                            let reply = format!(
+                                "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n{body}",
+                                body.len()
+                            );
+                            if socket.write_all(reply.as_bytes()).await.is_err() {
+                                return;
+                            }
+                        }
+                    });
+                }
+            });
+            let client = super::super::client_kept(kept).unwrap();
+            for _ in 0..2 {
+                let answer = client
+                    .get(format!("http://{address}/v1/models"))
+                    .send()
+                    .await
+                    .unwrap();
+                answer.bytes().await.unwrap();
+                tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+            }
+            count.load(std::sync::atomic::Ordering::SeqCst)
+        }
+        let short = std::time::Duration::from_millis(200);
+        assert_eq!(
+            connections(Some((short, crate::second_provider::net::CHAT_KEEPALIVE))).await,
+            2
+        );
+        assert_eq!(connections(None).await, 1);
     }
 
     /// A local plain HTTP server sends a recorded stream in two pieces.
