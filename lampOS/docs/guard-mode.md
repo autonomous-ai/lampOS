@@ -126,8 +126,8 @@ yet seen on a lamp.
   room sound classes (`ears/classes`, `lamp_msgs::SoundClasses`, with
   `LAMP_EARS_CLASSES=on` in `lamp-ears`) now score a door and footsteps too
   (YAMNet's `Door` and `Walk, footsteps`). With nobody at the desk, a door
-  or footsteps scored at least 0.5, the lamp's own voice clear, is someone
-  come in only when a face (anywhere in view, or a known one) or speech
+  or footsteps scored at least 0.5 in a window the lamp didn't speak into
+  is someone come in only when a face (anywhere in view, or a known one) or speech
   (`voice/heard`, or the classes' speech at least 0.5) follows within 30 s:
   the visit then begins at the sound, and its text says so: "Someone I
   don't know came in at 14:31 and was here for about 2 minutes." **A sound
@@ -135,6 +135,17 @@ yet seen on a lamp.
   nobody came in. The thresholds are not measured on a lamp. Without the
   switch the watch takes nothing from `ears/classes`, and `lamp-skills`
   listens to it only for another skill that reads it.
+  A window the lamp didn't speak into: its classes' `own_voice` is `clear`,
+  or `unknown` and the watch's own reading of `voice/state` says the lamp
+  wasn't speaking over it. `lamp-ears` says `present` (the lamp spoke into
+  it, never taken) or `unknown`, never `clear`, since its speaking flag
+  maps a stale voice state to false (#2714). So `lamp-skills` keeps since
+  when every `voice/state` reading, each within 3 s of the one before
+  (the voice says it once a second), said anything but `speaking`, on the
+  same monotonic µs clock as the window: a window that starts before that
+  is taken, and one with the voice speaking in it, no fresh reading, or no
+  reading at all is not. `clear`, from an older or later producer, is
+  taken as before.
 - **The head turns once** (#2562, rule 8). As a visit's first face is
   seen, one gaze to the largest face in view, on the body's gaze socket as
   a skill's look at a face sends it, then the body rests. No patrol, no
@@ -223,6 +234,7 @@ thing leaves `lamp-skills`:
 | `topics`: `voice/heard` | that someone spoke just before the call: asked out loud |
 | `topics`: `voice/privacy` | the privacy switch, looked at as it goes (the voice says it a hundred times a second, so it is read, never listened to) |
 | `topics`: `ears/classes` | a door, footsteps and speech, as scores, with `LAMP_GUARD_SOUNDS=on` (#2562); no sound is read or kept |
+| `topics`: `voice/state` | that the lamp wasn't speaking over a window the ears scored with its own voice unknown (#2562) |
 | `known_faces` | whether the face at the lamp is one the eyes know, and whether it's yours, from the eyes' known file (`lamp-eyes --known-file`, read by `lamp-skills --known-file`); the name read there stays in the program, never in an event or the journal, and in a text only with `LAMP_GUARD_NAMES=on` and the eyes' `tellable` yes, read as it goes (#2562) |
 | `messages` | one short line on `messages/out` |
 | `light` | only its faint mark |
@@ -285,7 +297,10 @@ off guard" the voice's say service (`LAMP_SAY=on`).
   `a_second_arrival_within_two_minutes_does_not_turn_the_head`,
   `guard_from_the_app_is_on_without_a_voice_and_counts_only_once_its_mark_shows`,
   `only_lamp_clouds_unit_is_the_app`,
-  `sounds_are_taken_only_with_the_switch_and_the_lamps_voice_clear`,
+  `sounds_are_taken_only_with_the_switch_and_the_lamps_voice_clear`
+  (unknown with the voice resting over the window, then a face, is one
+  arrival; unknown while it spoke, with a stale state or none, and
+  present, are none; clear still is),
   `the_privacy_switch_closed_ends_it_with_one_text`,
   `once_the_switch_has_ended_it_nothing_about_the_desk_is_taken`, and
   "I'm off guard" in `the_face_of_the_person_who_asked_ends_it`.

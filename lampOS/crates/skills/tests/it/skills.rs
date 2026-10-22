@@ -8929,7 +8929,7 @@ fn a_watch_is_turned_only_by_its_tool_and_holds_to_its_permissions() {
     // What it may do, in words.
     assert_eq!(
         loaded.permissions.said(),
-        "reads room/presence, humans/faces/tracked, voice/heard, voice/privacy, ears/classes; speak, light, body, messages, known faces"
+        "reads room/presence, humans/faces/tracked, voice/heard, voice/privacy, ears/classes, voice/state; speak, light, body, messages, known faces"
     );
     // Its tool, with its choice, for the model.
     let file = tools_file(std::slice::from_ref(&loaded));

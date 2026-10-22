@@ -23,12 +23,13 @@ one_of = ["on", "off"]
 # What it may read and use, and nothing more: who is at the lamp (counts and
 # times), the faces' sizes and places, what was heard (it turns on only just
 # after someone spoke), the privacy switch; the ears' scores for a door,
-# footsteps and speech, with LAMP_GUARD_SOUNDS=on (#2562); whether a face is
+# footsteps and speech, with LAMP_GUARD_SOUNDS=on (#2562), and the voice's
+# state, that the lamp wasn't speaking over them; whether a face is
 # known, never whose; one short text out; the light only for its faint mark;
 # the body only for one turn of the head to an arrival; and its voice only
 # for "I'm off guard". No picture, no recording.
 [permissions]
-topics = ["room/presence", "humans/faces/tracked", "voice/heard", "voice/privacy", "ears/classes"]
+topics = ["room/presence", "humans/faces/tracked", "voice/heard", "voice/privacy", "ears/classes", "voice/state"]
 light = true
 messages = true
 known_faces = true
