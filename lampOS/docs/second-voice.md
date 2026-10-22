@@ -2880,7 +2880,7 @@ yesterday's as today's after its midnight. A forecast whose rows lack the
 place's today is no answer. A place not found
 answers `{"error": "I couldn't find that place"}`, and a failed lookup or
 fetch says the weather couldn't be reached: never another place's
-weather, nor any older than it is kept. Each place's forecast is kept 10
+weather, nor any older than it is kept. A call waits up to 6 s for its place and forecast (`net::weather::WITHIN`; two of five took past 3 s on lamp-4ace on 22 Oct). Each place's forecast is kept 10
 minutes, and never past that place's midnight, so a follow-up ("and
 Saturday?") is answered at once and the first call of the place's new day
 fetches again, with at most 16 places kept, the oldest out
