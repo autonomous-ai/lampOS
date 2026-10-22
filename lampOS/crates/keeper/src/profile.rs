@@ -13,6 +13,7 @@
 //!
 //! The probe is `scripts/provision/lamp-v2-migrate`'s (#1980), which moved
 //! lamp-a63e by hand.
+use sha2::Digest;
 use std::{
     fs,
     io::Write,
@@ -48,8 +49,40 @@ const PARTS: [&str; 9] = [
 /// The generic controls run without `--touch`, which refuses these keys, and
 /// without `LAMP_PRIVACY_CONTROLS=on`, which a `privacy` section needs: the
 /// product's pins carry it since #2143, and lamp-controls refused to start
-/// on a moved lamp-a63e with it (#2396's run, 21 Oct).
+/// on a moved lamp-a63e with it (#2396's run, 21 Oct). So a moved lamp has
+/// no `reset`, whatever its own files say (#2937, the first builder, 22:47):
+/// V1's head pad idles high (`hal/drivers/ttp223.py`), as a button does, so
+/// no idle read tells a pad on line 100 from the button, and a hand on the
+/// head must never wipe a lamp. Its way back is #3020's hotspot.
 const GENERIC_REFUSED_PINS: [&str; 3] = ["reset", "legacy_head", "privacy"];
+/// Setup's own page and its reset plan, the ones `lamp-update install
+/// --setup on` writes on a product lamp (#2937): setup's page and what a
+/// reset would wipe. A moved lamp has no reset line (`GENERIC_REFUSED_PINS`),
+/// so no hold acts on the plan until one is allowed. Not from the package's
+/// `provision/`, so a package built before #2937 needs nothing new to carry
+/// them.
+const SETUP_SETTINGS: [(&str, &str, u32); 2] = [
+    (
+        "/etc/lampOS/setup/serve.json",
+        include_str!("../../setup/fixtures/serve-own-page.json"),
+        0o644,
+    ),
+    (
+        SETUP_RESET_PLAN,
+        include_str!("../../setup/fixtures/reset-plan-product.json"),
+        0o644,
+    ),
+];
+/// Where setup's reset plan goes: what a reset would wipe. A moved lamp has
+/// no reset (`GENERIC_REFUSED_PINS`); the plan marks it prepared for setup.
+const SETUP_RESET_PLAN: &str = "/etc/lampOS/setup/reset-plan.json";
+/// Setup's marker, which lamp-setup writes once a lamp is set up and the
+/// reset removes. A lamp moved from V1 is already on its home's Wi-Fi (it
+/// got the package over it), so prepare writes the marker with the reset
+/// plan, and its setup never opens a hotspot at the move. Only then: a lamp
+/// with a plan and no marker had its marker removed (put back into setup),
+/// and stays there.
+pub const SETUP_MARKER: &str = "/var/lib/lampos-setup/done";
 /// The settings the package carries in `provision/`, where each goes, and its mode.
 const SETTINGS: [(&str, &str, u32); 3] = [
     (
@@ -408,6 +441,19 @@ fn write_new(path: &Path, content: &str, mode: u32) -> Result<(), String> {
     linked.map_err(say)
 }
 
+/// Write a file over the one there, whole, with its mode, by a temporary
+/// beside it renamed into place: one written over is never seen half done.
+fn write_over(path: &Path, content: &str, mode: u32) -> Result<(), String> {
+    let say = |error: std::io::Error| format!("{}: {error}", path.display());
+    let temporary = path.with_extension("keeper-new");
+    let mut file = fs::File::create(&temporary).map_err(say)?;
+    file.set_permissions(fs::Permissions::from_mode(mode))
+        .map_err(say)?;
+    file.write_all(content.as_bytes()).map_err(say)?;
+    file.sync_all().map_err(say)?;
+    fs::rename(&temporary, path).map_err(say)
+}
+
 /// What `prepare` writes: what is missing of the profile, the settings and
 /// the directories, under `root` (`/` on a lamp), from the package at
 /// `release`. Returns the paths written. A lamp with a profile is left as it
@@ -416,6 +462,22 @@ fn write_new(path: &Path, content: &str, mode: u32) -> Result<(), String> {
 pub fn prepare(
     root: &Path,
     release: &Path,
+    has_control: &mut dyn FnMut(&str, &str) -> bool,
+    say: &mut dyn FnMut(&str),
+) -> Result<Vec<String>, String> {
+    prepare_with(root, release, &[], has_control, say)
+}
+
+/// [`prepare`], and a reset plan an earlier build shipped written over with
+/// this build's (El on #2975): `shipped_plans` are the SHA-256 of every plan
+/// a build carried (`lamp_update::install::RESET_PLAN_SHIPPED`). A moved lamp
+/// keeps its first plan otherwise, so a store added later (#2947's face
+/// consent) would survive a reset, once one is allowed. A plan changed by
+/// hand is kept.
+pub fn prepare_with(
+    root: &Path,
+    release: &Path,
+    shipped_plans: &[&str],
     has_control: &mut dyn FnMut(&str, &str) -> bool,
     say: &mut dyn FnMut(&str),
 ) -> Result<Vec<String>, String> {
@@ -477,6 +539,22 @@ pub fn prepare(
         };
         settings.push((target, text, mode));
     }
+    let marker = absent(&on(root, SETUP_RESET_PLAN)) && absent(&on(root, SETUP_MARKER));
+    let mut plan_over = None;
+    for (target, text, mode) in SETUP_SETTINGS {
+        if absent(&on(root, target)) {
+            settings.push((target, text.to_owned(), mode));
+        } else if target == SETUP_RESET_PLAN {
+            let kept = fs::read(on(root, target)).map_err(|error| format!("{target}: {error}"))?;
+            let sum: String = sha2::Sha256::digest(&kept)
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect();
+            if kept != text.as_bytes() && shipped_plans.contains(&sum.as_str()) {
+                plan_over = Some((text, mode));
+            }
+        }
+    }
     // The account only when a directory it owns is missing: a lamp with
     // them all is never refused for its accounts (the reviewer on #2170).
     let owner = if DIRECTORIES
@@ -492,9 +570,32 @@ pub fn prepare(
         write_new(&profile_path, &text, 0o644)?;
         wrote.push(PROFILE.to_owned());
     }
+    // The marker before the plan (the Reviewer-lead on #2975): a power cut
+    // between the two leaves a marker and no plan, which the next prepare
+    // completes, never a plan and no marker, which reads as a lamp reset
+    // into setup and would open its hotspot by itself.
+    if marker {
+        // As lamp-setup keeps it: its state directory root's only (the
+        // unit's `StateDirectoryMode=0700`), the marker empty.
+        let folder = on(root, "/var/lib/lampos-setup");
+        let failed = |error: std::io::Error| format!("/var/lib/lampos-setup: {error}");
+        if absent(&folder) {
+            fs::create_dir_all(&folder).map_err(failed)?;
+            fs::set_permissions(&folder, fs::Permissions::from_mode(0o700)).map_err(failed)?;
+        }
+        write_new(&on(root, SETUP_MARKER), "", 0o600)?;
+        wrote.push(SETUP_MARKER.to_owned());
+    }
     for (target, text, mode) in settings {
         write_new(&on(root, target), &text, mode)?;
         wrote.push(target.to_owned());
+    }
+    if let Some((text, mode)) = plan_over {
+        write_over(&on(root, SETUP_RESET_PLAN), text, mode)?;
+        wrote.push(SETUP_RESET_PLAN.to_owned());
+        say(&format!(
+            "{SETUP_RESET_PLAN} was a plan an earlier build shipped: written over with this build's"
+        ));
     }
     for (path, mode, owned) in DIRECTORIES {
         let folder = on(root, path);
@@ -606,7 +707,53 @@ mod tests {
             "/release/provision/controls-pins.json",
             "{\"button\":12,\"reset\":7,\"legacy_head\":3,\"privacy\":{\"line\":9}}\n",
         );
+        // Its own wiring as V1 keeps it since 18 Sep: the reset button on
+        // line 100, the pads elsewhere (the parent repository's
+        // robots/lamp/gpio_button.json and ttp223.json).
+        dir.file("/opt/devices/lamp/gpio_button.json", V1_BUTTONS);
+        dir.file(
+            "/opt/devices/lamp/ttp223.json",
+            "{\"boards\":{\"orangepi_sun60\":{\"chip\":0,\"lines\":[37,96,97,98],\"detect\":true}}}\n",
+        );
         dir
+    }
+
+    /// The parent repository's `robots/lamp/gpio_button.json` since
+    /// `8b5c343e1` (18 Sep), the Orange Pi's part.
+    const V1_BUTTONS: &str = r#"{"boards":{"orangepi_sun60":{"buttons":[
+        {"name":"primary","chip":0,"line":99,"debounce_ns":200000000,"behavior":"standard","factory_reset":false},
+        {"name":"factory_reset","chip":0,"line":100,"debounce_ns":200000000,"behavior":"factory_reset","hold_s":5}]}}}"#;
+
+    /// Where the generic controls read their pins.
+    const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
+
+    fn pins_of(lamp: &Dir) -> serde_json::Value {
+        serde_json::from_str(&fs::read_to_string(on(&lamp.0, PINS)).unwrap()).unwrap()
+    }
+
+    /// #2937 (the first builder, 22:47 on #2975, after El's P1): a lamp
+    /// moved from V1 gets no `reset`, whatever its own wiring says: V1's
+    /// head pad idles high, as a button does, so a pad on line 100 can't be
+    /// told from the button. With a button file (V1's since 18 Sep), a pad
+    /// file naming line 100, and no files at all, the pins carry no `reset`,
+    /// nor `legacy_head` or the slide; the rest is the product's.
+    #[test]
+    fn a_moved_lamp_gets_no_reset_whatever_its_wiring_says() {
+        let pad_on_100 = "{\"boards\":{\"orangepi_sun60\":{\"chip\":0,\"lines\":[96,100]}}}";
+        for case in ["button", "pad", "none"] {
+            let lamp = v1_lamp();
+            match case {
+                "pad" => lamp.file("/opt/devices/lamp/ttp223.json", pad_on_100),
+                "none" => fs::remove_dir_all(on(&lamp.0, "/opt/devices/lamp")).unwrap(),
+                _ => {}
+            }
+            prepare(&lamp.0, &lamp.0.join("release"), &mut yes, &mut |_| {}).unwrap();
+            let pins = pins_of(&lamp);
+            for refused in ["reset", "legacy_head", "privacy"] {
+                assert!(pins.get(refused).is_none(), "{case}: {refused} in {pins}");
+            }
+            assert_eq!(pins["button"], 12, "{case}");
+        }
     }
 
     fn yes(_: &str, _: &str) -> bool {
@@ -760,6 +907,119 @@ mod tests {
                 && !pins.contains("legacy_head")
                 && !pins.contains("privacy"),
             "{pins}"
+        );
+        // #2937: setup's page and reset plan as install --setup on writes
+        // them, and the marker, so the moved lamp is set up.
+        for (path, text, _) in SETUP_SETTINGS {
+            assert!(wrote.contains(&path.to_owned()), "{path}");
+            assert_eq!(fs::read_to_string(on(&lamp.0, path)).unwrap(), text);
+            assert_eq!(mode(path), 0o644);
+        }
+        assert!(wrote.contains(&SETUP_MARKER.to_owned()));
+        assert_eq!(fs::read(on(&lamp.0, SETUP_MARKER)).unwrap(), b"");
+        assert_eq!(mode(SETUP_MARKER), 0o600);
+        assert_eq!(mode("/var/lib/lampos-setup"), 0o700);
+    }
+
+    /// #2937: a moved lamp put back into setup has setup's plan and no
+    /// marker. Prepare leaves it so, and setup opens its hotspot; nor does
+    /// it write the plan over a lamp's own.
+    #[test]
+    fn prepare_never_marks_set_up_a_lamp_reset_into_setup() {
+        let lamp = v1_lamp();
+        prepare(&lamp.0, &lamp.0.join("release"), &mut yes, &mut |_| {}).unwrap();
+        fs::remove_file(on(&lamp.0, SETUP_MARKER)).unwrap();
+        lamp.file(SETUP_RESET_PLAN, "{\"mine\":true}\n");
+        let again = prepare(&lamp.0, &lamp.0.join("release"), &mut yes, &mut |_| {}).unwrap();
+        assert!(again.is_empty(), "{again:?}");
+        assert!(absent(&on(&lamp.0, SETUP_MARKER)));
+        assert_eq!(
+            fs::read_to_string(on(&lamp.0, SETUP_RESET_PLAN)).unwrap(),
+            "{\"mine\":true}\n"
+        );
+    }
+
+    /// #2975 (the Reviewer-lead's P3): a prepare cut short between setup's
+    /// marker and its plan never leaves a plan without a marker, which would
+    /// read as a lamp put back into setup and open its hotspot by itself. Cut
+    /// here by a folder where the plan's temporary goes: the marker is there,
+    /// the plan not, and the next prepare completes it, the lamp set up.
+    #[test]
+    fn a_prepare_cut_between_the_marker_and_the_plan_leaves_the_lamp_set_up() {
+        let lamp = v1_lamp();
+        let blocker = on(&lamp.0, SETUP_RESET_PLAN).with_extension("keeper-new");
+        fs::create_dir_all(&blocker).unwrap();
+        assert!(prepare(&lamp.0, &lamp.0.join("release"), &mut yes, &mut |_| {}).is_err());
+        assert!(!absent(&on(&lamp.0, SETUP_MARKER)), "the marker first");
+        assert!(absent(&on(&lamp.0, SETUP_RESET_PLAN)));
+        fs::remove_dir(&blocker).unwrap();
+        let again = prepare(&lamp.0, &lamp.0.join("release"), &mut yes, &mut |_| {}).unwrap();
+        assert!(again.contains(&SETUP_RESET_PLAN.to_owned()), "{again:?}");
+        assert!(!again.contains(&SETUP_MARKER.to_owned()), "{again:?}");
+        assert!(!absent(&on(&lamp.0, SETUP_MARKER)));
+        // And a whole prepare writes the marker before the plan.
+        let lamp = v1_lamp();
+        let wrote = prepare(&lamp.0, &lamp.0.join("release"), &mut yes, &mut |_| {}).unwrap();
+        let at = |path: &str| wrote.iter().position(|written| written == path).unwrap();
+        assert!(at(SETUP_MARKER) < at(SETUP_RESET_PLAN), "{wrote:?}");
+    }
+
+    /// El on #2975: a moved lamp's reset plan that is byte for byte one an
+    /// earlier build shipped is written over with this build's, so a store
+    /// added since would be wiped too; one changed by hand is
+    /// kept; and one already this build's is left.
+    #[test]
+    fn a_shipped_reset_plan_is_written_over_and_a_changed_one_kept() {
+        let old = "{\"marker\":\"/var/lib/lampos-setup/done\",\"wipe\":[]}\n";
+        let sum: String = sha2::Sha256::digest(old.as_bytes())
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        let shipped = [sum.as_str()];
+        let lamp = v1_lamp();
+        prepare(&lamp.0, &lamp.0.join("release"), &mut yes, &mut |_| {}).unwrap();
+        lamp.file(SETUP_RESET_PLAN, old);
+        let mut said = Vec::new();
+        let wrote = prepare_with(
+            &lamp.0,
+            &lamp.0.join("release"),
+            &shipped,
+            &mut yes,
+            &mut |line| said.push(line.to_owned()),
+        )
+        .unwrap();
+        assert_eq!(wrote, [SETUP_RESET_PLAN], "{said:?}");
+        let (_, plan, _) = SETUP_SETTINGS[1];
+        assert_eq!(
+            fs::read_to_string(on(&lamp.0, SETUP_RESET_PLAN)).unwrap(),
+            plan
+        );
+        // This build's already: nothing; and the marker is untouched.
+        let again = prepare_with(
+            &lamp.0,
+            &lamp.0.join("release"),
+            &shipped,
+            &mut yes,
+            &mut |_| {},
+        )
+        .unwrap();
+        assert!(again.is_empty(), "{again:?}");
+        assert!(!absent(&on(&lamp.0, SETUP_MARKER)));
+        // Changed by hand: kept.
+        let mine = old.replace("[]", "[\"/var/lib/mine\"]");
+        lamp.file(SETUP_RESET_PLAN, &mine);
+        let kept = prepare_with(
+            &lamp.0,
+            &lamp.0.join("release"),
+            &shipped,
+            &mut yes,
+            &mut |_| {},
+        )
+        .unwrap();
+        assert!(kept.is_empty(), "{kept:?}");
+        assert_eq!(
+            fs::read_to_string(on(&lamp.0, SETUP_RESET_PLAN)).unwrap(),
+            mine
         );
     }
 

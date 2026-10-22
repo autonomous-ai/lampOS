@@ -1,0 +1,27 @@
+# lampOS setup: the lamp's hotspot and setup page while it is not set up (lampOS/docs/setup.md), as the
+# product's unit (deploy/product/lamp-setup.service), for a lamp moved from V1 (#2937).
+# Template: replace every @NAME@ (README.md here). Root's: it joins the Wi-Fi and writes the person's keys.
+# keeper prepare writes the marker with the reset plan at the move, so a moved lamp starts it only if
+# its marker is removed (it has no 5 s reset: lampOS/docs/setup.md, "A lamp moved from V1").
+[Unit]
+Description=lampOS setup: the lamp's hotspot and setup page, while it is not set up
+ConditionHost=@UNIT_ID@
+ConditionPathExists=!/var/lib/lampos-setup/done
+ConditionPathExists=/etc/lampOS/setup/serve.json
+ConditionPathExists=/etc/lampOS/setup/reset-plan.json
+After=local-fs.target
+
+[Service]
+Type=simple
+User=root
+StateDirectory=lampos-setup
+StateDirectoryMode=0700
+ExecStart=/opt/lampOS/setup/@SETUP_SHA256@/lamp-setup serve --config /etc/lampOS/setup/serve.json --plan /etc/lampOS/setup/reset-plan.json --enable
+# V1's nginx held port 80; setup's own page takes it, and stops it again when done.
+ExecStopPost=/usr/bin/systemctl stop nginx
+Restart=on-failure
+RestartSec=20
+SyslogIdentifier=lamp-setup
+
+[Install]
+WantedBy=multi-user.target

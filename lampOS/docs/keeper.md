@@ -363,7 +363,26 @@ keeps its own:
   `LAMP_PRIVACY_CONTROLS=on` takes (#2485): the generic controls refuse
   either and would not start. A lamp moved before #2485 keeps a pins file
   with `privacy`, since prepare writes only a missing file. lamp-a63e was the
-  only one, and was fixed by hand on 21 Oct.
+  only one, and was fixed by hand on 21 Oct. **A moved lamp never gets
+  `reset`**, whatever its own V1 wiring says (#2937, the first builder on
+  #2975 after El's P1): V1's wired head pad idles high and goes low on a
+  touch (`hal/drivers/ttp223.py` in the parent repository), as a pulled-up
+  button does, so no idle read tells a pad on line 100 from the reset
+  button, and a hand on the head must never wipe a lamp. Its way back to a
+  new Wi-Fi is setup's hotspot ([setup.md](setup.md), "When the saved
+  network is gone"), until a real V1 pad on line 100 has been measured.
+- Setup's page and reset plan (#2937), `/etc/lampOS/setup/serve.json` and
+  `reset-plan.json` (0644): the pair `lamp-update install --setup on`
+  writes (`serve-own-page.json`, `reset-plan-product.json`), carried in the
+  keeper itself, not in `provision/`. With the plan, setup's marker
+  (`/var/lib/lampos-setup/done`, empty, 0600, in a 0700 folder): a moved lamp
+  got the package over its home's Wi-Fi, so it is set up, and the move never
+  opens a hotspot. A lamp with the plan and no marker was put back into setup,
+  and prepare writes no marker for it ([setup.md](setup.md), "A lamp moved
+  from V1"). A plan that is byte for byte one an earlier build shipped
+  (`lamp_update::install::RESET_PLAN_SHIPPED`, passed to `prepare_with`) is
+  written over with this build's, so a store added since is wiped too (El
+  on #2975); one changed by hand is kept.
 - The runtime directories under `/var/lib` (`lampOS`, the memory's, the
   actions', and the motor and camera locks 0700, the last four the parts'
   account's, `orangepi` on a V1 image).
