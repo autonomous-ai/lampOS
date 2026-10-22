@@ -490,3 +490,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - **20:00, the first builder:** #2813 closed. Yes to the real-lamp app row on 75c9 tonight if Mobile can. **20:05:** read 75c9 under the lock: lamp-cloud is inactive (not paired) and it is on build 5900, before #3031. At 20:07 asked Mobile: 0c89 with drop-ins, or pair 75c9.
 - **20:33, the first builder:** #2813's app row goes to Mobile on 0c89 (75c9 can't take it tonight). At 20:38 sent Mobile the build, the two drop-ins, the yes and no tries, and what to record.
 - **21:03–21:2x, a piece nobody held (the new AGENTS.md rule):** proposed a developer's guide, then narrowed it at 21:08 because `skill-creator/` already has most of it. The first builder said yes. It is #3055: a section in `skill-creator/README.md`, every command run as written.
+- **21:2x–22:02, #3055:** folded El's two P3s (the binary's path, `needs`). The Reviewer-lead read it with no finding, and it merged as `a4eb3d11a`.
