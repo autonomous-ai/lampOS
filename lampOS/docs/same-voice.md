@@ -32,6 +32,16 @@ until its model is put there and the voice is told where.
   frames left open, so a clip of any length runs.
 - `lamp-same-voice pairs MODEL.onnx LIST.tsv` prints the cosine of every
   pair of clips and how long each took.
+- `cargo run --release -p lamp-voice-eval --example same_voice_pairs --
+  MODEL.onnx INDEX.tsv [--end-silence-ms 600] [--pairs]` reads the bars on
+  labelled clips (`file<TAB>voice`) as the voice prints them. Each clip is
+  cut into lines by the voice's `TurnDetector` (its silence window alone),
+  and each line is printed from its start, pre-roll included, at most
+  `ASKED_AT`; lines under `LEAST_SAMPLES` are counted, not printed. It
+  prints the spread of three groups: pieces of one clip (the join's
+  question), the same voice in two clips, and another voice. It also gives
+  how many fall on each side of `DIFFERENT_BELOW` and `SAME_FROM`, and the
+  bar with the fewest pairs on the wrong side. Numbers only.
 
 ## Measured (fourth builder's Intel Mac, 2026-10-15)
 

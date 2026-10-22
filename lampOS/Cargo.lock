@@ -2382,6 +2382,7 @@ dependencies = [
  "lamp-msgs",
  "lamp-observer",
  "lamp-policy",
+ "lamp-same-voice",
  "lamp-skills",
  "lamp-sound-fixtures",
  "lamp-turn-end",
