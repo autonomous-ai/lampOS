@@ -6,7 +6,8 @@
 # Every INTERVAL seconds for SECONDS seconds it prints one line:
 #   time, lamp-eyes' CPU (% of one core, from /proc/<pid>/stat), the core it last
 #   ran on, the hottest thermal zone (C), and the mesh's runs since the last line
-#   (the journal's "lamp-eyes: mouth open" lines).
+#   (the journal's "lamp-eyes: mouth open" lines, written only with
+#   --mouth-diagnostics on).
 # At the end, one summary line. It writes nothing on the lamp and changes nothing.
 #
 # Usage: eyes-cost.sh [SECONDS [INTERVAL]]   (default 1200 and 10)

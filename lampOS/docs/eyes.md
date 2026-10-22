@@ -1740,7 +1740,8 @@ and the product's unit passes it, for Blendshape V2 (#2799), so with
 `LAMP_EYES_SPEAKING=on` the product's speaking read takes the mesh. With it, the largest face in each look is cut out of the
 same 320 by 240 look: its box, widened by a quarter on every side and
 turned so the eyes are level, made 256 pixels square (`src/mesh.rs`).
-The mesh reads it under tract, and the journal says
+The mesh reads it under tract, and with `--mouth-diagnostics on` (never in
+the product: it is a line a look, up to four a second) the journal says
 `lamp-eyes: mouth open 0.0123 eyes 31 px mesh 84 ms`. That is the inner
 lips' gap (points 13 and 14) over the face's height (10 to 152), the eye
 distance in detector pixels, and the time. No picture is kept.

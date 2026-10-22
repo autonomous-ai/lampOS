@@ -1801,8 +1801,11 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
         .lines()
         .find(|line| line.starts_with("ExecStart="))
         .unwrap();
-    for absent in ["--seems ", "--seems-log", "ferplus"] {
-        assert!(!start.contains(absent), "{absent}");
+    for arg in start.split_whitespace() {
+        assert!(
+            !["--seems", "--seems-log"].contains(&arg) && !arg.contains("ferplus"),
+            "{arg}"
+        );
     }
     assert!(
         include_str!("../../../deploy/product/lamp-mood.service")
