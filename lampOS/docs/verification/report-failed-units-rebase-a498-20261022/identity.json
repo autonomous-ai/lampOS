@@ -1,0 +1,35 @@
+{
+  "old_head": "1299399e1dd6390361ff44cccf9145a9f8b9eb7f",
+  "old_base": "bf8c3f2e18695179bd70973821368f01d6a2d9e3",
+  "new_head": "1114e4b8f2030cac4ca1315d94bd07f94cf6ecd9",
+  "new_base": "a498ecc030a9c28419aef3b7de89486664868440",
+  "cloud_tree_before": "1dd3e10a85ee130c788c245b789a6ae779c6434f",
+  "cloud_tree_after": "1dd3e10a85ee130c788c245b789a6ae779c6434f",
+  "source_hashes_before": {
+    "lampOS/crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "lampOS/crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68",
+    "lampOS/docs/cloud.md": "d451ae1ddccefd377ef9fa7c103e5c4d376da773e9f0d31b7594004c74930d2b"
+  },
+  "source_hashes_after": {
+    "lampOS/crates/cloud/src/reports.rs": "9cb466d1d4c54aef14f78770085fcb47507a5557e247b579875abb0fcd9b60ce",
+    "lampOS/crates/cloud/tests/it/report_contract.rs": "e8cfd1e682d0bc844e9f4bc9b51a59e5cccfa3ee7c1c5abdf024c91e1895ad68",
+    "lampOS/docs/cloud.md": "d451ae1ddccefd377ef9fa7c103e5c4d376da773e9f0d31b7594004c74930d2b"
+  },
+  "range_diff": "1:  1299399e1 = 1:  1114e4b8f lampOS: report currently failed product units",
+  "upstream_changed_crate_files": [
+    "lampOS/crates/memory/tests/voice_follows_face.rs",
+    "lampOS/crates/skills/src/daily.rs",
+    "lampOS/crates/skills/src/lib.rs",
+    "lampOS/crates/skills/src/main.rs",
+    "lampOS/crates/skills/src/routine.rs",
+    "lampOS/crates/skills/tests/it/daily_engine.rs",
+    "lampOS/crates/voice/src/follows_face.rs",
+    "lampOS/crates/voice/src/lib.rs",
+    "lampOS/crates/voice/src/process.rs",
+    "lampOS/crates/voice/src/remember.rs",
+    "lampOS/crates/voice/src/same_voice.rs",
+    "lampOS/crates/voice/src/second_provider.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs",
+    "lampOS/crates/voice/src/tools.rs"
+  ]
+}

@@ -1,3 +1,28 @@
+## Current checkpoint: 2026-10-22 08:39 +07, failed-unit current-base rebase pushed
+
+**#2764:** Reviewer-two's final check kept **P1/P2 none** but requires the
+PR head to contain the current `lamp-voice` base. Pushed
+`1114e4b8f2030cac4ca1315d94bd07f94cf6ecd9` on
+`a498ecc030a9c28419aef3b7de89486664868440` with an exact lease over
+`1299399e1`. The range-diff is equal, the entire Cloud tree and all three
+source/doc hashes are unchanged. [Rebase and Mac receipt](verification/report-failed-units-rebase-a498-20261022/README.md)
+records fresh fmt, strict Cloud Clippy and **177 passed / 0 failed /
+1 ignored / 0 filtered out**. The new base changes dependencies, so Cloud's
+focused tests were repeated. No full local gate or local ARM64 build.
+
+Fresh native ARM64 **39706852548** and Linux Clippy **39706852627** are
+running. Ready for lamp-voice: **no**, until this head qualifies. The prior
+native receipt remains historical; no source correction was made.
+**Reviewer-two owns the merge** after its current-base check.
+
+**#1757** `bd1d79a5a` and **#2767** `19d1a46d9` remain qualified and
+mergeable, waiting on First's Music merge and installer read/merge.
+The two prepared Music follow-ups still depend on that merge.
+
+The previous checkpoint and complete log below are preserved byte-for-byte.
+
+---
+
 ## Current checkpoint: 2026-10-22 08:26 +07, all three requested PRs qualified
 
 **Ready for lamp-voice: yes, all three current heads.** Each has green native
