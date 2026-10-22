@@ -2,9 +2,10 @@
 //! No global registry, polling, speaker inference, or session authorization;
 //! a lease is only ever narrowed to the room, never widened. The one late
 //! look is a keep's ([`ScopeLease::keeper_within`]): a line admitted as the
-//! room's only because no known face was cached yet keeps for the known face
-//! the eyes name by the line's end plus [`KEEPER_WAIT`], unless another face
-//! was seen speaking it (#2807); its reads stay the room's.
+//! room's before the face cache's first answer (a voice restart, a privacy
+//! change, a face remembered) keeps for the known face the eyes name by the
+//! line's end plus [`KEEPER_WAIT`], unless another face was seen speaking it
+//! (#2807); its reads stay the room's.
 use crate::known_faces::FaceObservation;
 use lamp_turn_owner::BootId;
 use std::{
@@ -92,6 +93,9 @@ struct CachedFace {
 /// refresh work, even if its filesystem read completes afterwards.
 pub struct RefreshToken {
     generation: u64,
+    /// [`FaceCache::asked`] when the refresh began: only a refresh begun
+    /// after the cache went cold gives its first answer.
+    asked: u64,
 }
 
 /// The caller refreshes this slot off the audio path and owns that refresh's
@@ -107,6 +111,14 @@ pub struct FaceCache {
     /// The faces the eyes saw at the last refresh, plus one; 0 when not
     /// known. For the journal only ([`Self::gap_told`]).
     in_view: AtomicU64,
+    /// How many times the cache went cold: at start (0), and once more at
+    /// each privacy change ([`Self::invalidate`]) and each face remembered
+    /// ([`Self::face_remembered`]).
+    asked: AtomicU64,
+    /// The highest [`Self::asked`] a completed refresh began after, plus
+    /// one: the cache has given its first answer since it last went cold
+    /// when this is past `asked` ([`Self::answered_yet`]).
+    answered_after: AtomicU64,
 }
 impl FaceCache {
     /// The lamp has answered a turn of `scope`'s at `at`: a gap is held only
@@ -137,6 +149,7 @@ impl FaceCache {
     /// Acquire before starting the source read, never after it completes.
     pub fn begin_refresh(&self) -> RefreshToken {
         RefreshToken {
+            asked: self.asked.load(Ordering::Acquire),
             generation: self.generation.load(Ordering::Acquire),
         }
     }
@@ -149,6 +162,25 @@ impl FaceCache {
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |generation| {
                 Some(generation.saturating_add(1))
             });
+        // Nothing known in the new generation until the next refresh.
+        self.asked.fetch_add(1, Ordering::AcqRel);
+    }
+
+    /// A face was just remembered: the eyes' known file may name it at any
+    /// moment, so the cache has not answered for it until a refresh begun
+    /// after now completes (#2807). Never waits.
+    pub fn face_remembered(&self) {
+        self.asked.fetch_add(1, Ordering::AcqRel);
+    }
+
+    /// Whether a refresh begun since the cache last went cold (its start, a
+    /// privacy change, a face remembered) has completed, naming someone or
+    /// nobody. A line begun before that first answer is the only one a
+    /// late look is armed for ([`RequestScope::looking_later`]): a warm
+    /// cache that names nobody means nobody known is in view (El's P2 on
+    /// #3108).
+    pub fn answered_yet(&self) -> bool {
+        self.answered_after.load(Ordering::Acquire) > self.asked.load(Ordering::Acquire)
     }
 
     /// Only the off-path refresher calls replace. A token begun before a
@@ -221,7 +253,12 @@ impl FaceCache {
         );
         // Invalidation racing the assignment is enforced by the entry's
         // generation at snapshot, and reported here when already observed.
-        current()
+        let answered = current();
+        if answered {
+            self.answered_after
+                .fetch_max(token.asked.saturating_add(1), Ordering::AcqRel);
+        }
+        answered
     }
 
     /// For the journal, with a gap held ([`Self::holding_gaps`]): what a
@@ -309,9 +346,12 @@ struct RequestContext {
     narrowed: AtomicBool,
     room: ScopeSnapshot,
     active: AtomicBool,
-    /// A line admitted as the room's with the camera allowed: its late look
-    /// (#2807).
+    /// A line admitted as the room's with the camera allowed, before the
+    /// face cache's first answer: its late look (#2807).
     late: Option<LateLook>,
+    /// The face cache a line with the camera allowed was admitted from, told
+    /// when a face is remembered in it ([`ScopeLease::face_remembered`]).
+    cache: Option<Arc<FaceCache>>,
 }
 
 /// A keep's late look (#2807): the face cache and its generation when the
@@ -346,16 +386,23 @@ impl RequestScope {
                 room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
                 late: None,
+                cache: None,
             }),
         }
     }
-    /// A line admitted as the room's while the camera was allowed, with no
-    /// known face in `cache` yet: its keeps may look again
-    /// ([`ScopeLease::keeper_within`]). A person's or a held scope takes no
-    /// late look, nor does anything once `cache`'s generation moves on (a
-    /// privacy change).
+    /// A line admitted while the camera was allowed. Only one admitted as
+    /// the room's before `cache` gave its first answer
+    /// ([`FaceCache::answered_yet`]: right after a voice restart, a privacy
+    /// change or a face remembered) looks again for its keeps
+    /// ([`ScopeLease::keeper_within`]): a warm cache that named nobody
+    /// means nobody known was in view, and a known face first cached during
+    /// the line never takes the keep of a line someone off camera said (El's
+    /// P2 on #3108). A person's or a held scope takes no late look, nor does
+    /// anything once `cache`'s generation moves on (a privacy change).
     pub fn looking_later(key: RequestKey, scope: ScopeSnapshot, cache: Arc<FaceCache>) -> Self {
-        let late = (scope.person.is_none() && !scope.held).then(|| {
+        let cold = !cache.answered_yet();
+        let late = (cold && scope.person.is_none() && !scope.held).then(|| {
+            let cache = cache.clone();
             let generation = cache.generation();
             LateLook {
                 cache,
@@ -371,6 +418,7 @@ impl RequestScope {
                 room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
                 late,
+                cache: Some(cache),
             }),
         }
     }
@@ -419,6 +467,14 @@ impl ScopeLease {
         self.context.narrowed.store(true, Ordering::Release);
     }
 
+    /// A face was remembered in this line: the face cache it was admitted
+    /// from has not answered for it yet ([`FaceCache::face_remembered`]).
+    pub fn face_remembered(&self) {
+        if let Some(cache) = &self.context.cache {
+            cache.face_remembered();
+        }
+    }
+
     /// A line admitted as the room's because no known face was cached yet
     /// ([`RequestScope::looking_later`]): its keeper is decided at its end
     /// ([`Self::face_at_end`], [`Self::record_keeper`]).
@@ -437,7 +493,8 @@ impl ScopeLease {
     }
 
     /// The known face the face cache names as of the line's end (`ended`,
-    /// when its words were heard), waiting until `ended` + [`KEEPER_WAIT`]
+    /// when its audio ended; started then, not once its words are back),
+    /// waiting until `ended` + [`KEEPER_WAIT`]
     /// at most (#2807). Blocking. `None` for a line not looking later, a
     /// person's or narrowed line, a revoked one, a privacy change since
     /// admission, a face held only by its gap, or nobody known by then: a
@@ -1009,5 +1066,47 @@ mod tests {
         });
         ended(&line.lease());
         assert_eq!(line.lease().keeper_within(Duration::ZERO), None);
+    }
+
+    /// El's P2 on #3108: a late look is armed only for a line begun before
+    /// the face cache's first answer since it went cold (start, a privacy
+    /// change, a face remembered). A warm cache that answered nobody arms
+    /// none, so a known face first cached during a line someone off camera
+    /// said never takes its keep. A refresh begun before the cache went cold
+    /// is not its first answer.
+    #[test]
+    fn a_late_look_is_armed_only_before_the_caches_first_answer() {
+        let armed = |cache: &Arc<FaceCache>, request: u8| {
+            RequestScope::looking_later(key(request), cache.snapshot(Instant::now()), cache.clone())
+                .lease()
+                .looks_later()
+        };
+        let cache = Arc::new(FaceCache::default());
+        assert!(armed(&cache, 1), "cold at start");
+        assert!(cache.replace(cache.begin_refresh(), None));
+        assert!(!armed(&cache, 2), "warm: it answered nobody");
+
+        // A face remembered: cold again, even when a refresh begun before
+        // it completes after it.
+        let early = cache.begin_refresh();
+        let line = RequestScope::looking_later(key(3), ScopeSnapshot::room(), cache.clone());
+        assert!(!line.lease().looks_later());
+        line.lease().face_remembered();
+        assert!(cache.replace(early, None));
+        assert!(armed(&cache, 4), "cold after a face remembered");
+        assert!(cache.replace(cache.begin_refresh(), None));
+        assert!(!armed(&cache, 5), "warm again");
+
+        // A privacy change: cold until the next refresh in the new generation.
+        cache.invalidate();
+        assert!(armed(&cache, 6), "cold after a privacy change");
+        assert!(cache.replace(cache.begin_refresh(), None));
+        assert!(!armed(&cache, 7));
+
+        // A plain scope (camera not allowed) remembers into no cache.
+        RequestScope::new(key(8), ScopeSnapshot::room())
+            .lease()
+            .face_remembered();
+        assert!(!armed(&cache, 9));
     }
 }

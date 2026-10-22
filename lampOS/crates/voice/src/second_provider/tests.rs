@@ -13539,6 +13539,11 @@ async fn the_first_line_after_a_restart_keeps_for_the_face_the_eyes_name_later()
 /// - A is seen speaking it alone: the keep is A's.
 /// - Nobody is named by the line's end plus `KEEPER_WAIT`; A walks in while
 ///   the lamp answers, before the keep: the keep is not A's.
+/// - reviewer-three's P2: the final words come back 600 ms after the end,
+///   past `KEEPER_WAIT`: the keeper is still named as of the end.
+/// - El's P2: a warm cache (it answered nobody before the line) arms no
+///   late look: A first cached mid-line, nobody seen speaking (an unknown
+///   voice off camera), the keep stays the room's.
 #[tokio::test]
 async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
     use crate::memory_scope::{FaceCache, KEEPER_WAIT, ScopeLease};
@@ -13553,13 +13558,37 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
     std::fs::write(known_face_of(&path), "f1\n").unwrap();
     let a = crate::remember::person_id("A");
     // (what, the face speaking the line, A named during the line or only
-    // after its end and the wait, the keeper the keep is given)
-    for (what, speaking, during, expected) in [
-        ("B speaks, A in view", "f2", true, None),
-        ("A speaks alone", "f1", true, Some(a.clone())),
-        ("A walks in during the answer", "f1", false, None),
+    // after its end and the wait, when the final words come back after the
+    // line's end, the keeper the keep is given). Words back 600 ms after the
+    // end, past `KEEPER_WAIT`, as is common on a lamp (reviewer-three's P2).
+    // A warm cache answered nobody before the line began (El's P2); every
+    // other case is cold, as right after a restart.
+    let late = Some(Duration::from_millis(600));
+    for (what, speaking, during, finish_after, expected) in [
+        ("B speaks, A in view", "f2", true, None, None),
+        ("A speaks alone", "f1", true, None, Some(a.clone())),
+        ("A walks in during the answer", "f1", false, None, None),
+        (
+            "A speaks alone, words late",
+            "f1",
+            true,
+            late,
+            Some(a.clone()),
+        ),
+        ("B speaks, A in view, words late", "f2", true, late, None),
+        (
+            "warm: nobody seen speaking, A cached mid-line",
+            "",
+            true,
+            None,
+            None,
+        ),
     ] {
+        let warm = what.starts_with("warm");
+        // Fresh for this case: the known file names A for 3 s from now.
+        std::fs::write(&path, "A").unwrap();
         let script = Arc::new(Script {
+            finish_after,
             heard: Mutex::new(
                 [Ok(
                     "Lamp, remember my sister's wedding is Saturday.".to_owned()
@@ -13619,6 +13648,11 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
             .seeing_who_speaks(eyes.clone(), path.clone())
             .announcing(false);
         engine.memory_camera(true, 1);
+        if warm {
+            // The cache gave its first answer since the camera was allowed,
+            // before the line: nobody.
+            assert!(cache.replace(cache.begin_refresh(), None));
+        }
         let done = Arc::new(AtomicBool::new(false));
         let feeder = {
             let (eyes, done) = (eyes.clone(), done.clone());
@@ -13664,7 +13698,7 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
             .unwrap()
             .lease();
         assert_eq!(lease.scope().unwrap().person(), None, "{what}: the room's");
-        assert!(lease.looks_later(), "{what}");
+        assert_eq!(lease.looks_later(), !warm, "{what}");
         if during {
             // The eyes name A while the line is said.
             cache.replace(
