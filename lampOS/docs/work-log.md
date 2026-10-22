@@ -1,3 +1,22 @@
+## Current checkpoint: 2026-10-22 10:41 +07, voice-state regression opened
+
+#2879 is open at `4e060a224cb3d04bcd4404355aa5fc0bac187705`, on the actual
+Music merge `2d1d353965b6b9f9bdc043ee4d19832630b3a6d8`.
+[Fresh Mac evidence](verification/requested-audio-voice-state-rebase-2d1d3-20261022/README.md):
+fmt and strict Voice Clippy passed; **3,498 passed, 0 failed, 14 ignored**;
+Skills and Ears consumer checks passed one each. The equal patch, unchanged
+336 scoped source hashes, and unpublished intermediate gate remain distinct.
+ARM64 39718009844 and Clippy 39718009936 are running. A separate unshown-music
+negative-control branch is being qualified; neither native result is claimed.
+
+Music #1757 is merged. #2871 Clippy is green; ARM64 39716702065 continues.
+#2764 waits for the existing #2780 fixture fix before its next rebase and
+native gate. #2767 is green and awaits First's integration read.
+#2810's six persisted-prefix recovery fixtures passed locally; fault controls
+and the full scoped Update gate remain. No device was touched.
+
+---
+
 ## Current checkpoint: 2026-10-22 10:28 +07, metadata follow-up PR open
 
 **#2871**, `second/audio-metadata-diagnostics`, is open at `db7db7a5f` on
