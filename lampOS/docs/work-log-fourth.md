@@ -6046,6 +6046,37 @@ Ready for lamp-voice: yes (#2870 only; #2789 remains open for its other three pi
   #2789's remaining group/bus decisions and authorized lamp proof are
   still awaiting their owners; the proposal has no reply yet.
 
+## 2026-10-22 10:57 ICT: callback ready, retry unblocked, onboarding claimed
+
+Ready for lamp-voice: yes (#2782 and #2870; #2774 and #2824 are not ready).
+
+- #2782 is ready at `892fef9f226106784fe622190228290336c4d9af`.
+  ARM64 39717312576 passed 10,188 tests, zero failed, 63 skipped, with
+  one unchanged same-voice leaky pass. All three callback checks passed;
+  four doctests, 12 process checks and relay signals passed separately.
+  Clippy 39717312647 passed. CI merge `e312cf72b` used base `4f2df6bf6`.
+  Artifact 12400221781 has SHA-256
+  `862d0eaa4af41bc7ba97eb4b56485d1f7c458c1b119517bb4b3fa2856589deaf`.
+  Queue receipt: issuecomment-6332296642. No rerun was used.
+- #2780 merged as `fc082681a`, releasing #2774. Retry source rebased
+  cleanly (`b18ff0bc6 = 28b1c3eaa`). Formatting, strict workspace Clippy,
+  nine worker checks, six client checks and the repaired fixture pass:
+  16 passed, zero failed/ignored. The amendment clarifies leased authority
+  in both modes and preserves the accepted lamp receipt and two previous
+  native failures. Pushed `c7418b7654d84567c15967316e3b59bc250b7e16` with
+  the explicit lease. #2774 stays draft for fresh exact-head native gates.
+- First closed #2540 on the accepted retention run and explicitly assigned
+  #2824 next (Queue issuecomment-6332238551), as #2800 waits on #2797.
+  Claimed #2824 before code at issuecomment-6332297794:
+  `taken by fourth · session codex-20261022-memory · no lamp`.
+  The first claim is this session's. Current taken issues: #2789 and #2824.
+- #2824 moves the onboarding order, words and re-offers to its skill file,
+  preserving the shipped behavior and the physical/privacy gates. Its
+  #2526 dependency is merged. Initial audit is read-only; implementation
+  will use its own branch. The authorized lamp-52e6 walk remains a later
+  operator gate. #2789 piece 1 is ready; its group/bus contract still has
+  no owner reply. No lamp, account, unit or permission change was made.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
