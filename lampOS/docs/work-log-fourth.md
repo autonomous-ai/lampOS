@@ -6579,6 +6579,47 @@ Ready for lamp-voice: photo native-qualified; remaining host consumers, source r
   decisions still absent. #2800 still depends on the person's#2797
   session (assigned Sixth by First) and#1670. No gated follow-up started.
 
+## 2026-10-22 17:49 ICT: required photo corrections and replacement PR
+
+Ready for lamp-voice: no
+
+- Reviewer-lead6338178907 and First6338200991 require all three corrections:
+  admitted pending-photo No survives postlookup revocation; Yes stays gated;
+  plain sender label is untrusted JSON data; Cloud sweeps leftovers at startup.
+  Revised control RED0/1 under old unconditional gate, GREEN1/0 after restore:
+  bothYes lookup1/mutation0, bothNo lookup1/pinneddelete1. Outer revoked
+  result remains suppressed. Raw review-corrections/red; old all-four-zero
+  receipt is historical and superseded by First's refusal decision.
+- Cloud label permits at most40 Unicode letters, ASCIIspaces, hyphen/apostrophe,
+  with at leastoneletter. Sweep walks fromroot via descriptor-relative nofollow,
+  removes root files/links, preserves unexpecteddirs/error-disablesuploads,
+  leaves core Cloud working and missingfolder compatible. Bounded4096 entries,
+  independent empty scan and directoryidentity check; beforecredentials/network.
+  Sevenunit plus twoactualprocess controls. Existing rustix gained only Cloud
+  dependency edge; no newversion. No recurring sweep or source photo contents read.
+- Corrected2dd on18a passes44/0/0,fmt/strictworkspaceClippy/build. First48 merged
+  a0705aee3 duringgate; plainreplay range=, photo census alone adapted to
+  Live31/Second33 with fetch, emptyerrors/left_out, preserving upstream tests.
+  Finalscoped6cd960a99 ona070 passes44/0/0 and same gates. Source/evidence
+  amendmentd52d21d80 preserves22 source/unit hashes; onefeaturecommit.
+- Server refused force-push to own originalbranch. Safe newbranch
+  fourth/photo-product-activation-review pushed d52; replacementdraft#2988 says
+  Replaces#2965, oldPRclosed. Queue6338830949/issue6338833077. Mobile must
+  wait for correctedhead artifact; old8ee10389/0/67 is not newacceptance.
+- A real targetconflict blocks#2988 automaticCI: appendedphoto module vs
+  upstreamspeech-tags test. Integratedtargete9b0a46f onownbranch, preserving
+  both and movingmodule beside existingphotofixture; mergecommitb3aef2b2f
+  one-line/noattribution. No force retry. Fresh44scoped/Clippy/build running
+  before fast-forwardpush; currentPR stilld52 untilthen. Production auto-merges
+  retain relayroutes/heldACK/speechtags changes. First stillownsmerge.
+- Fullhost8ee completedVoice3575/0/14,Cloud187/0/2,Memory290/0/6,Keeper37/0/1,
+  Skills488/0/1,Setup162/0/1, then intentionallystopped143 for reviewfixes;
+  Eval/Update incomplete. Newd52 host stopped143 before sourceconflict resolution;
+  no completedpackage fromthat run claimed. Allraw interruptions preserved.
+- Complete host/native willrestart onintegratedpublishedhead. Mobile's
+  authorised0c89 fullupdate/selfie/onequestion/yes remains open. No lamp
+  actions, backendretention proof or row-score increase. Installableskill separate.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
