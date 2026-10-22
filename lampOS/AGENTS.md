@@ -5,14 +5,43 @@ Treat this directory as the root of a standalone repository. Follow the
 
 A session that opens with "you are <name>" is a builder's: read [joining.md](docs/joining.md) as it is on `origin/lamp-voice` and follow its "Starting a session".
 
-For the three-agent effort, follow [agent coordination](coordination/README.md).
-Read assignments and device reservations from the fetched integration branch.
-Use the built-in Harness Agent Messages (`harness send`) for communication
-between Main and the two agents. The owner enabled this route on 12 October
-2026, superseding tmux delivery. Publish code checkpoints and durable decisions
-on your own work branch; Git is not a message queue. Never paste peer reports
-into the owner-facing composer.
-The owner does not relay routine agent reports.
+## How builders work together
+
+This is the protocol in brief, current on 22 October 2026. [joining.md](docs/joining.md)
+has the whole of it; where an older note differs, this section is current.
+It replaces the three-agent `harness send` route of 12 October.
+
+- **Where.** Status, `free`, questions and proposals for the first builder go
+  as comments on the Queue issue (#2602 now, or the one your role file names).
+  A review and its answers go on the pull request. A fault in someone else's
+  part goes on their pull request, or to the first builder on the Queue. There
+  is no other channel: not `harness send`, not tmux, not the owner's chat.
+  Never paste peer reports into the owner-facing composer; the owner does not
+  relay routine agent reports.
+- **Each wake-up.** Before anything else, read every comment on the Queue and
+  on your own pull requests since your last post, not only those on your own
+  issues. Act on each one addressed to you (`to **<Name>**`).
+- **How a post reads.** Start it `<Name>, HH:MM, to **<who>**:`. Write plain
+  English sentences, with spaces between words and numbers, in about 12 lines
+  or fewer, using bullets for lists. Give a commit hash in 9 characters, and
+  only when someone needs it. Paste no logs: give one line of result and the
+  command that gave it. Say what changed for the lamp in words a person reads
+  at once.
+- **Every post has content.** Never post an acknowledgement alone. Each post
+  carries a result, a decision asked for with your recommendation, a question,
+  or a fault found.
+- **When a task is done**, take the next item on your list in the Queue
+  without asking, and say which in one line. Post `free: <name>` only when the
+  list is empty, with what you are doing meanwhile (a read, a test, a doc).
+  "Waiting on X" is never the whole of a post.
+- **Lanes.** If a review or a merge is not yours, say whose it is in one line
+  and hand it on. Builders never push to `lamp-voice`: they push their own
+  branches and open pull requests.
+- **Claims.** Every claim names what ran, where, and on which head, and says
+  plainly what was not run.
+- **People and lamps.** No person's name or handle goes in the repository. Ask
+  before an install on a lamp you don't hold, and post
+  `PLAYING <lamp> HH:MM–HH:MM` on the Queue before any played round.
 
 - First release: chat with a physical robot beside one person at a desk.
   Lamp is fixed on the left or right; calls and visiting colleagues are negative
