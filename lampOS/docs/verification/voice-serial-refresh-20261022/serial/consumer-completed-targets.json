@@ -1,0 +1,168 @@
+[
+  {
+    "target": "Running unittests src/lib.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-2690e4ad5cefe8ed)",
+    "summaries": [
+      "test result: ok. 163 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 49.56s"
+    ]
+  },
+  {
+    "target": "Running unittests src/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-18c76daa32578ac4)",
+    "summaries": [
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    ]
+  },
+  {
+    "target": "Running tests/it/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/it-4053bc13577bd447)",
+    "summaries": [
+      "test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.36s"
+    ]
+  },
+  {
+    "target": "Running unittests src/lib.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-94dd54385ee49181)",
+    "summaries": [
+      "test result: ok. 95 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 42.47s"
+    ]
+  },
+  {
+    "target": "Running unittests src/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-8df4145e234a6ee2)",
+    "summaries": [
+      "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    ]
+  },
+  {
+    "target": "Running unittests src/bin/lamp-memory-eval.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory_eval-e3a1b5bf22c00560)",
+    "summaries": [
+      "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    ]
+  },
+  {
+    "target": "Running tests/forget_person.rs (/private/tmp/tests-codex-1569-target/debug/deps/forget_person-0baa03b8deba96b5)",
+    "summaries": [
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.74s"
+    ]
+  },
+  {
+    "target": "Running tests/forgot.rs (/private/tmp/tests-codex-1569-target/debug/deps/forgot-0c056ee352039d59)",
+    "summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s"
+    ]
+  },
+  {
+    "target": "Running tests/health_control.rs (/private/tmp/tests-codex-1569-target/debug/deps/health_control-acc682c0c268f332)",
+    "summaries": [
+      "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s"
+    ]
+  },
+  {
+    "target": "Running tests/it/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/it-d204263de2013653)",
+    "summaries": [
+      "test result: ok. 146 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 260.01s"
+    ]
+  },
+  {
+    "target": "Running tests/paraphrase_fixture.rs (/private/tmp/tests-codex-1569-target/debug/deps/paraphrase_fixture-ac6df351bbe5e529)",
+    "summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    ]
+  },
+  {
+    "target": "Running tests/voice_early_words.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_early_words-7be3afb67f766235)",
+    "summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.99s"
+    ]
+  },
+  {
+    "target": "Running tests/voice_follows_face.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_follows_face-4b30c2ababa583b9)",
+    "summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.37s"
+    ]
+  },
+  {
+    "target": "Running tests/voice_forget.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_forget-e550be1633d1ad40)",
+    "summaries": [
+      "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.29s"
+    ]
+  },
+  {
+    "target": "Running tests/voice_forget_about.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_forget_about-c268e98640c1ed63)",
+    "summaries": [
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.43s"
+    ]
+  },
+  {
+    "target": "Running tests/voice_link_used.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_link_used-18cc5e8616816a4b)",
+    "summaries": [
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.12s"
+    ]
+  },
+  {
+    "target": "Running tests/voice_observe.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_observe-101594c218095598)",
+    "summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.56s"
+    ]
+  },
+  {
+    "target": "Running tests/voice_since_until.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_since_until-b89d75d73c205b05)",
+    "summaries": [
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.49s"
+    ]
+  },
+  {
+    "target": "Running unittests src/lib.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-8104fc26ce56967f)",
+    "summaries": [
+      "test result: ok. 155 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.23s"
+    ]
+  },
+  {
+    "target": "Running unittests src/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-371d58a2cd3caa88)",
+    "summaries": [
+      "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.26s"
+    ]
+  },
+  {
+    "target": "Running tests/it/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/it-67a38ca700330bc8)",
+    "summaries": [
+      "test result: ok. 290 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 191.78s"
+    ]
+  },
+  {
+    "target": "Running tests/requested_audio.rs (/private/tmp/tests-codex-1569-target/debug/deps/requested_audio-6ab71a82e86d3325)",
+    "summaries": [
+      "test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.30s"
+    ]
+  },
+  {
+    "target": "Running unittests src/lib.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-9029a4694ded781b)",
+    "summaries": [
+      "test result: ok. 110 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 9.06s"
+    ]
+  },
+  {
+    "target": "Running unittests src/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-40862d3277d6efc2)",
+    "summaries": [
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    ]
+  },
+  {
+    "target": "Running tests/functions.rs (/private/tmp/tests-codex-1569-target/debug/deps/functions-92af8661138433ef)",
+    "summaries": [
+      "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s"
+    ]
+  },
+  {
+    "target": "Running tests/install.rs (/private/tmp/tests-codex-1569-target/debug/deps/install-903b09c5968b662b)",
+    "summaries": [
+      "test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 496.61s"
+    ]
+  },
+  {
+    "target": "Running tests/it/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/it-ed9bb0f43c3dbf90)",
+    "summaries": [
+      "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.03s"
+    ]
+  },
+  {
+    "target": "Running tests/round.rs (/private/tmp/tests-codex-1569-target/debug/deps/round-dfc8ec2a48b28ab1)",
+    "summaries": []
+  }
+]

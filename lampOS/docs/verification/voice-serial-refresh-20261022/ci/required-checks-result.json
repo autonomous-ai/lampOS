@@ -1,0 +1,27 @@
+{
+  "watch_exit": 0,
+  "head": "6d45857eb3015e4963e186fdb50c8b77747b57e6",
+  "expected_head": "6d45857eb3015e4963e186fdb50c8b77747b57e6",
+  "checks": [
+    {
+      "link": "https://github.com/autonomous-ai/lampOS/actions/runs/39798045688/job/119898087759",
+      "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+      "state": "SKIPPED"
+    },
+    {
+      "link": "https://github.com/autonomous-ai/lampOS/actions/runs/39798045688/job/119898042995",
+      "name": "report-full-run-failure",
+      "state": "SKIPPED"
+    },
+    {
+      "link": "https://github.com/autonomous-ai/lampOS/actions/runs/39798045688/job/119890511089",
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/autonomous-ai/lampOS/actions/runs/39798045519/job/119890509386",
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "state": "SUCCESS"
+    }
+  ]
+}

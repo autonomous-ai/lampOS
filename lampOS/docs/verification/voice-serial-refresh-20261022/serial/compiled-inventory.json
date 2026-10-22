@@ -1,0 +1,13 @@
+{
+  "head": "6d45857eb3015e4963e186fdb50c8b77747b57e6",
+  "binary": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+  "binary_sha256": "478d1c774e4caf9033c8a70c721d4702f64adf030d83846b1ab06392b5adb78b",
+  "list_exit": 0,
+  "listed_test_count": 3390,
+  "list_sha256": "7d51866cb13464a836ccaf1df3f2f5f2c6330809cb48b3cef9313d674fafeeb6",
+  "argv": [
+    "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-2b7c1b6c7e6d4274",
+    "--list"
+  ],
+  "test_executions": 0
+}

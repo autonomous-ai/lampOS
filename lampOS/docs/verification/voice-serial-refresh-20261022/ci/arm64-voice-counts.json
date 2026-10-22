@@ -1,0 +1,96 @@
+{
+  "head": "6d45857eb3015e4963e186fdb50c8b77747b57e6",
+  "log_sha256": "e03f7ee38914b2b7e592f2087ec9bdf6e5d1f5bdc9c78722317e2151f19bfb87",
+  "counts": [
+    {
+      "binary": "lamp-voice",
+      "result": "LEAK",
+      "count": 1
+    },
+    {
+      "binary": "lamp-voice",
+      "result": "PASS",
+      "count": 3399
+    },
+    {
+      "binary": "lamp-voice::bin/lamp-voice",
+      "result": "PASS",
+      "count": 1
+    },
+    {
+      "binary": "lamp-voice::example/render_line_second",
+      "result": "PASS",
+      "count": 4
+    },
+    {
+      "binary": "lamp-voice::example/stop_words_stt_replay",
+      "result": "PASS",
+      "count": 6
+    },
+    {
+      "binary": "lamp-voice::it",
+      "result": "PASS",
+      "count": 318
+    }
+  ],
+  "checkout_and_summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T14:43:32.6018208Z HEAD is now at 5cdaa59 Merge 6d45857eb3015e4963e186fdb50c8b77747b57e6 into 0766811add1be85fd88ce2eb79c6a7ced297b3c9",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T14:55:43.8776249Z      Summary [ 177.550s] 10491 tests run: 10491 passed (1 leaky), 67 skipped"
+  ],
+  "selected_rows": [
+    {
+      "result": "PASS",
+      "binary": "lamp-voice",
+      "test": "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+      "raw_line": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T14:54:59.7118243Z         PASS [   0.115s] ( 6997/10491) lamp-voice coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news"
+    },
+    {
+      "result": "PASS",
+      "binary": "lamp-voice",
+      "test": "provider_worker::tests::kept_start::with_no_first_answer_the_patience_ends_in_the_strict_timeout_and_no_end",
+      "raw_line": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T14:55:15.8574384Z         PASS [   0.050s] ( 7852/10491) lamp-voice provider_worker::tests::kept_start::with_no_first_answer_the_patience_ends_in_the_strict_timeout_and_no_end"
+    },
+    {
+      "result": "PASS",
+      "binary": "lamp-voice",
+      "test": "provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet",
+      "raw_line": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T14:55:16.2157275Z         PASS [   0.013s] ( 7870/10491) lamp-voice provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet"
+    },
+    {
+      "result": "PASS",
+      "binary": "lamp-voice",
+      "test": "provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by",
+      "raw_line": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T14:55:16.5153994Z         PASS [   0.008s] ( 7895/10491) lamp-voice provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by"
+    },
+    {
+      "result": "PASS",
+      "binary": "lamp-voice",
+      "test": "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply",
+      "raw_line": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T14:55:16.8928237Z         PASS [   0.052s] ( 7915/10491) lamp-voice provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply"
+    },
+    {
+      "result": "PASS",
+      "binary": "lamp-voice",
+      "test": "remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked",
+      "raw_line": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T14:55:20.4606046Z         PASS [   0.007s] ( 8173/10491) lamp-voice remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked"
+    },
+    {
+      "result": "PASS",
+      "binary": "lamp-voice",
+      "test": "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply",
+      "raw_line": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T14:55:28.2036968Z         PASS [   0.012s] ( 9141/10491) lamp-voice second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply"
+    },
+    {
+      "result": "PASS",
+      "binary": "lamp-voice",
+      "test": "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going",
+      "raw_line": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T14:55:28.2329970Z         PASS [   0.007s] ( 9155/10491) lamp-voice second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going"
+    },
+    {
+      "result": "PASS",
+      "binary": "lamp-voice::it",
+      "test": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "raw_line": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T14:55:32.5109955Z         PASS [   0.070s] ( 9725/10491) lamp-voice::it light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them"
+    }
+  ]
+}

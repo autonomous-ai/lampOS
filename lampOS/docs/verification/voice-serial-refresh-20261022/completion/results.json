@@ -1,0 +1,116 @@
+{
+  "base": "6d45857eb3015e4963e186fdb50c8b77747b57e6",
+  "platform": "Darwin x86_64",
+  "cpu_count": 16,
+  "target": "/private/tmp/tests-codex-1569-target",
+  "source_files": 1379,
+  "source_sha256": "9a14f5b72ece7bc3b7f60fa86fa14313dd508c4d738e99326d80245ba73fe8f3",
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "0"
+  },
+  "rust_test_threads": "unset in environment; explicit --test-threads=1",
+  "commands": [
+    {
+      "name": "update-round-serial",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-update",
+        "--test",
+        "round",
+        "--offline",
+        "--",
+        "--test-threads=1"
+      ],
+      "started": "2026-10-22T15:11:36.313095+00:00",
+      "seconds": 664.3306225519627,
+      "exit": 0,
+      "watchdog_timeout": false,
+      "log": "update-round-serial.txt",
+      "sha256": "6cec7cc2eb74b0c46a02664adea0f7a1e0fbf2e1d7f6e7b174b24060a64189f9",
+      "summaries": [
+        "test result: ok. 106 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 615.41s"
+      ]
+    },
+    {
+      "name": "voice-eval-serial",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice-eval",
+        "--offline",
+        "--",
+        "--test-threads=1"
+      ],
+      "started": "2026-10-22T15:22:41.585200+00:00",
+      "seconds": 227.26476090680808,
+      "exit": 0,
+      "watchdog_timeout": false,
+      "log": "voice-eval-serial.txt",
+      "sha256": "5fd3093e43e0cb1b243505fbeb5e0ca852bec43b6dea4a61f9716a6be8611641",
+      "summaries": [
+        "test result: ok. 378 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.44s",
+        "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.21s",
+        "test result: ok. 238 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 118.28s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "name": "consumer-docs",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-update",
+        "--doc",
+        "--offline",
+        "--",
+        "--test-threads=1"
+      ],
+      "started": "2026-10-22T15:26:29.466393+00:00",
+      "seconds": 57.321455877274275,
+      "exit": 0,
+      "watchdog_timeout": false,
+      "log": "consumer-docs.txt",
+      "sha256": "1c3fa754212b852b314519634c00f99a14afa4bab239b0132bb01096f40d71b7",
+      "summaries": [
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "name": "workspace-build",
+      "argv": [
+        "cargo",
+        "build",
+        "--workspace",
+        "--offline"
+      ],
+      "started": "2026-10-22T15:27:26.954042+00:00",
+      "seconds": 85.60092017427087,
+      "exit": 0,
+      "watchdog_timeout": false,
+      "log": "workspace-build.txt",
+      "sha256": "926383d98dca0099cf1990a18c370c878575ca1db1ee1f10fc1020a68b5c1b5a",
+      "summaries": []
+    }
+  ],
+  "source_unchanged": true,
+  "status": "consumer-completion-gates-completed"
+}

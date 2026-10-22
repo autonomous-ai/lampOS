@@ -1,0 +1,312 @@
+{
+  "packaged_at": "2026-10-22 22:40 +0700",
+  "source_head": "6d45857eb3015e4963e186fdb50c8b77747b57e6",
+  "original_records": [
+    {
+      "path": "serial/manifest.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/manifest.json",
+      "kind": "unchanged JSON receipt",
+      "source_sha256": "1aaf22d376c8b3817937126007a1a12a28980dc9da97cbb4982d6750cbefa24f",
+      "source_bytes": 653
+    },
+    {
+      "path": "serial/results.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/results.json",
+      "kind": "unchanged JSON receipt",
+      "source_sha256": "a9f81f2c1473532ddffd286d7a20c20f475cc89f584311e89d3cd092a54ea678",
+      "source_bytes": 6390
+    },
+    {
+      "path": "serial/source.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/source.json",
+      "kind": "unchanged JSON receipt",
+      "source_sha256": "aafe398c33f027af128039cfa8baf0af3198e658f9a673527dc34cbad2034576",
+      "source_bytes": 160141
+    },
+    {
+      "path": "serial/fmt.txt.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/fmt.txt",
+      "kind": "lossless UTF-8 JSON wrapper",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_bytes": 0
+    },
+    {
+      "path": "serial/clippy.txt.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/clippy.txt",
+      "kind": "lossless UTF-8 JSON wrapper",
+      "source_sha256": "511478e9d4063ea4ce2b1b8f2f3c4625c86e2539239906d0a3c6480d03594018",
+      "source_bytes": 5698
+    },
+    {
+      "path": "serial/voice-serial.txt.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/voice-serial.txt",
+      "kind": "lossless UTF-8 JSON wrapper",
+      "source_sha256": "3e775fe373d266a8c265149161957bc10cac59db9f2f14e7b48165cc3cb8ce64",
+      "source_bytes": 364554
+    },
+    {
+      "path": "serial/consumers-serial.txt.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/consumers-serial.txt",
+      "kind": "lossless UTF-8 JSON wrapper",
+      "source_sha256": "d23164df76df0b7455706549cd0ba0690abb3d7e7c0c2afa578fde7516c8b1fd",
+      "source_bytes": 166822
+    },
+    {
+      "path": "completion/manifest.json",
+      "source": "/private/tmp/tests-voice-consumer-completion-20261022/manifest.json",
+      "kind": "unchanged JSON receipt",
+      "source_sha256": "6894aef3a561b25807b712853a08398966a14b9ebfd2ec42b617a52dba721b1e",
+      "source_bytes": 641
+    },
+    {
+      "path": "completion/results.json",
+      "source": "/private/tmp/tests-voice-consumer-completion-20261022/results.json",
+      "kind": "unchanged JSON receipt",
+      "source_sha256": "21fe76cd180e3b7912c6f149ef7b2ee2c5f1de64f7676176f7678e5c8a8e4058",
+      "source_bytes": 3753
+    },
+    {
+      "path": "completion/source.json",
+      "source": "/private/tmp/tests-voice-consumer-completion-20261022/source.json",
+      "kind": "unchanged JSON receipt",
+      "source_sha256": "aafe398c33f027af128039cfa8baf0af3198e658f9a673527dc34cbad2034576",
+      "source_bytes": 160141
+    },
+    {
+      "path": "completion/update-round-serial.txt.json",
+      "source": "/private/tmp/tests-voice-consumer-completion-20261022/update-round-serial.txt",
+      "kind": "lossless UTF-8 JSON wrapper",
+      "source_sha256": "6cec7cc2eb74b0c46a02664adea0f7a1e0fbf2e1d7f6e7b174b24060a64189f9",
+      "source_bytes": 10147
+    },
+    {
+      "path": "completion/voice-eval-serial.txt.json",
+      "source": "/private/tmp/tests-voice-consumer-completion-20261022/voice-eval-serial.txt",
+      "kind": "lossless UTF-8 JSON wrapper",
+      "source_sha256": "5fd3093e43e0cb1b243505fbeb5e0ca852bec43b6dea4a61f9716a6be8611641",
+      "source_bytes": 64736
+    },
+    {
+      "path": "completion/consumer-docs.txt.json",
+      "source": "/private/tmp/tests-voice-consumer-completion-20261022/consumer-docs.txt",
+      "kind": "lossless UTF-8 JSON wrapper",
+      "source_sha256": "1c3fa754212b852b314519634c00f99a14afa4bab239b0132bb01096f40d71b7",
+      "source_bytes": 2887
+    },
+    {
+      "path": "completion/workspace-build.txt.json",
+      "source": "/private/tmp/tests-voice-consumer-completion-20261022/workspace-build.txt",
+      "kind": "lossless UTF-8 JSON wrapper",
+      "source_sha256": "926383d98dca0099cf1990a18c370c878575ca1db1ee1f10fc1020a68b5c1b5a",
+      "source_bytes": 4481
+    },
+    {
+      "path": "serial/consumer-timeout-diagnostic.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/consumer-timeout-diagnostic.json",
+      "kind": "unchanged JSON receipt",
+      "source_sha256": "3e12f335d21b6f4eb9a615d7ad4d8604f962e8f4929cc4de2e6771be1a56f649",
+      "source_bytes": 397
+    },
+    {
+      "path": "serial/consumer-completed-targets.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/consumer-completed-targets.json",
+      "kind": "unchanged JSON receipt",
+      "source_sha256": "b70eefc258b78d29a6c3fd1ebabd2fc14e653d32ab5df3ce07c363d0a0cfb993",
+      "source_bytes": 7264
+    },
+    {
+      "path": "serial/assigned-and-disclosed.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/assigned-and-disclosed.json",
+      "kind": "unchanged JSON receipt",
+      "source_sha256": "71e736b57566723a0f30326175eb8e36f5779025534a7cadd648c9dfcdd8a747",
+      "source_bytes": 1287
+    },
+    {
+      "path": "serial/compiled-inventory.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/compiled-inventory.json",
+      "kind": "unchanged JSON receipt",
+      "source_sha256": "5ed51feae900ef95271e93f5c24c2d6139075755407f8d28c35af400ca0c160a",
+      "source_bytes": 504
+    },
+    {
+      "path": "serial/inventory-refresh.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/inventory-refresh.json",
+      "kind": "unchanged JSON receipt",
+      "source_sha256": "89c2288f9cc85defd9edae06df2bfeb7160bae3fc1548a6c090aaafdb4ffc542",
+      "source_bytes": 2784
+    },
+    {
+      "path": "ci/arm64-final-run.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/arm64/final-run.json",
+      "kind": "unchanged JSON receipt",
+      "source_sha256": "e016c001359602a658b638220b635d08246b6a683181ebde117722e46151ef8d",
+      "source_bytes": 7579
+    },
+    {
+      "path": "ci/clippy-final-run.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/clippy/final-run.json",
+      "kind": "unchanged JSON receipt",
+      "source_sha256": "11afde00cfcd5f334a5171e19690f7785fbefb2eaec10ecdcbae37f5637a8480",
+      "source_bytes": 3143
+    },
+    {
+      "path": "ci/required-checks-result.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/required-checks-result.json",
+      "kind": "unchanged JSON receipt",
+      "source_sha256": "e08af58c04a9c4bda6ed5cf2fa6c498cc20edee49703b7a8d093b129dad97bc5",
+      "source_bytes": 966
+    },
+    {
+      "path": "ci/arm64-voice-counts.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/arm64/voice-counts.json",
+      "kind": "unchanged JSON receipt",
+      "source_sha256": "8e9fa1d59a3f5051116a7f2e74af08b65ef105dc0e37d160733988bdf4aa6359",
+      "source_bytes": 5213
+    },
+    {
+      "path": "ci/required-checks-watch.txt.json",
+      "source": "/private/tmp/tests-voice-serial-refresh-20261022/required-checks-watch.txt",
+      "kind": "lossless UTF-8 JSON wrapper",
+      "source_sha256": "8bc447b42074ce5ea65a7b639b57b528f5d9b3f12ed1f70b3cd556ee5c3696ab",
+      "source_bytes": 10452
+    }
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "e6382f0ba5ae946b9c40a66c65734ace373e16b9e142feed688df5bf19d4c11e",
+      "bytes": 4936
+    },
+    {
+      "path": "ci/arm64-final-run.json",
+      "sha256": "e016c001359602a658b638220b635d08246b6a683181ebde117722e46151ef8d",
+      "bytes": 7579
+    },
+    {
+      "path": "ci/arm64-voice-counts.json",
+      "sha256": "8e9fa1d59a3f5051116a7f2e74af08b65ef105dc0e37d160733988bdf4aa6359",
+      "bytes": 5213
+    },
+    {
+      "path": "ci/clippy-final-run.json",
+      "sha256": "11afde00cfcd5f334a5171e19690f7785fbefb2eaec10ecdcbae37f5637a8480",
+      "bytes": 3143
+    },
+    {
+      "path": "ci/required-checks-result.json",
+      "sha256": "e08af58c04a9c4bda6ed5cf2fa6c498cc20edee49703b7a8d093b129dad97bc5",
+      "bytes": 966
+    },
+    {
+      "path": "ci/required-checks-watch.txt.json",
+      "sha256": "e739513f778696a8a7ad2e21bac901e5c1d210dafce7718245d0e9e59ce2c1f4",
+      "bytes": 11058
+    },
+    {
+      "path": "completion/consumer-docs.txt.json",
+      "sha256": "31e73174c5cd23aa0aefbfbba0fabebec7419e9ab4de72b722d2ce50885426db",
+      "bytes": 3175
+    },
+    {
+      "path": "completion/manifest.json",
+      "sha256": "6894aef3a561b25807b712853a08398966a14b9ebfd2ec42b617a52dba721b1e",
+      "bytes": 641
+    },
+    {
+      "path": "completion/results.json",
+      "sha256": "21fe76cd180e3b7912c6f149ef7b2ee2c5f1de64f7676176f7678e5c8a8e4058",
+      "bytes": 3753
+    },
+    {
+      "path": "completion/source.json",
+      "sha256": "aafe398c33f027af128039cfa8baf0af3198e658f9a673527dc34cbad2034576",
+      "bytes": 160141
+    },
+    {
+      "path": "completion/update-round-serial.txt.json",
+      "sha256": "c515838e01cdd910b55dce64f4546be2472bb57e8c638d44ab350415d647ae0f",
+      "bytes": 10526
+    },
+    {
+      "path": "completion/voice-eval-serial.txt.json",
+      "sha256": "64b639be041c3c46147e4238f3f6d88b39b0c5ce3e320556847149e01a18db53",
+      "bytes": 65652
+    },
+    {
+      "path": "completion/workspace-build.txt.json",
+      "sha256": "be9e2d3904e12a630ece7b68813b41715e083555a0fc4b7e989bd71dd0a47064",
+      "bytes": 4767
+    },
+    {
+      "path": "serial/assigned-and-disclosed.json",
+      "sha256": "71e736b57566723a0f30326175eb8e36f5779025534a7cadd648c9dfcdd8a747",
+      "bytes": 1287
+    },
+    {
+      "path": "serial/clippy.txt.json",
+      "sha256": "10633bc6123136cb46cac2e98b4cc350fb8f87d767b519ba1d8b983a3de78d5d",
+      "bytes": 6026
+    },
+    {
+      "path": "serial/compiled-inventory.json",
+      "sha256": "5ed51feae900ef95271e93f5c24c2d6139075755407f8d28c35af400ca0c160a",
+      "bytes": 504
+    },
+    {
+      "path": "serial/consumer-completed-targets.json",
+      "sha256": "b70eefc258b78d29a6c3fd1ebabd2fc14e653d32ab5df3ce07c363d0a0cfb993",
+      "bytes": 7264
+    },
+    {
+      "path": "serial/consumer-timeout-diagnostic.json",
+      "sha256": "3e12f335d21b6f4eb9a615d7ad4d8604f962e8f4929cc4de2e6771be1a56f649",
+      "bytes": 397
+    },
+    {
+      "path": "serial/consumers-serial.txt.json",
+      "sha256": "0a261b2795eb7267237e4d1bee92e66ddff1404f55df0cbda7a492881708dc76",
+      "bytes": 169575
+    },
+    {
+      "path": "serial/fmt.txt.json",
+      "sha256": "dee5d456cb7bae7d7317b2275413b009a6ddfe491553f6ecca4587d8b04a2d64",
+      "bytes": 222
+    },
+    {
+      "path": "serial/inventory-refresh.json",
+      "sha256": "89c2288f9cc85defd9edae06df2bfeb7160bae3fc1548a6c090aaafdb4ffc542",
+      "bytes": 2784
+    },
+    {
+      "path": "serial/manifest.json",
+      "sha256": "1aaf22d376c8b3817937126007a1a12a28980dc9da97cbb4982d6750cbefa24f",
+      "bytes": 653
+    },
+    {
+      "path": "serial/results.json",
+      "sha256": "a9f81f2c1473532ddffd286d7a20c20f475cc89f584311e89d3cd092a54ea678",
+      "bytes": 6390
+    },
+    {
+      "path": "serial/source.json",
+      "sha256": "aafe398c33f027af128039cfa8baf0af3198e658f9a673527dc34cbad2034576",
+      "bytes": 160141
+    },
+    {
+      "path": "serial/voice-serial.txt.json",
+      "sha256": "c628b050eff313184974eaa9d59202166b083a764746bd84ec8c4d6fbefa65e4",
+      "bytes": 368513
+    },
+    {
+      "path": "source-scope.json",
+      "sha256": "33bdf7604b867c41f0b29227263c266adc58160168af38407b2907aadb7f3869",
+      "bytes": 1942
+    },
+    {
+      "path": "summary.json",
+      "sha256": "a5d8ad3f848bdb7437dd7a726524ccd8ec87ef4c1c4137200a8825d01cee388c",
+      "bytes": 2634
+    }
+  ],
+  "note": "This manifest excludes its own self-hash; all raw wrappers decode to the original bytes. No source or runner was changed."
+}

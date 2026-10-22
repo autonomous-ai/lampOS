@@ -1,5 +1,35 @@
 # Tests work log
 
+## 2026-10-22 22:40 +0700 — Voice serial and consumer completion receipts
+
+Ready for lamp-voice: no; #3023 remains draft pending latest-parent and reviewer hold.
+
+Head `6d45857eb` on `c6d50559a`: fmt and strict all-target Voice/consumer Clippy
+pass. Full serial Voice passes **3,376/0/14** library, **261/0** integration,
+**1/0** binary unit, **10/0** examples and **0/0** docs. All seven assigned
+cases, kept-start and light-call pass; the earlier parallel failures remain.
+[New receipts](verification/voice-serial-refresh-20261022/) preserve exact
+commands, raw output, source scope and terminal CI metadata.
+
+The combined five-consumer command is still **incomplete**: its 1,800 s outer
+watchdog left Update round without a terminal result. Its exact output/hash
+is retained. Separate completion passes Update round **106/0**, full Voice
+Eval **623/0**, four zero-test consumer doc targets and workspace build.
+Together with targets completed before timeout, coverage is Cloud **193/0/2**,
+Memory **298/0/6**, Skills **496/0/1**, Update **306/0/2**, Voice Eval **623/0/0**.
+The interrupted round target ran once in full afterward; no partial counts
+are added twice. Both 1,379-file source maps match this head, scoped to crates
+and Cargo/toolchain inputs rather than the full repository.
+
+Required [ARM64 #6040](https://github.com/autonomous-ai/lampOS/actions/runs/39798045688)
+passed **10,491/0/67** (one passing leaky), Voice library **3,400/0**;
+[Clippy #2044](https://github.com/autonomous-ai/lampOS/actions/runs/39798045519)
+passed. Both actual required jobs are terminal SUCCESS. ARM64 tested merge
+`5cdaa59` into `0766811add`, so its inventory is newer than the local parent.
+No green parallel claim, failure waiver, device action or ARM64 build on Mac.
+Reviewer-two and the latest-parent merge window remain; recording receipts
+on lamp-tests does not change the PR head or retrigger its CI.
+
 ## 2026-10-22 22:23 +0700 — broker TLS carry published
 
 Ready for lamp-voice: no; draft [#3062](https://github.com/autonomous-ai/lampOS/pull/3062).

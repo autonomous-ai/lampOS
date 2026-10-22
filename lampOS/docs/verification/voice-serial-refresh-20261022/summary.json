@@ -1,0 +1,129 @@
+{
+  "head": "6d45857eb3015e4963e186fdb50c8b77747b57e6",
+  "base": "c6d50559aa54fe58699da5ba1c0e2d79f1a70dd8",
+  "readiness": "no; latest-parent and reviewer hold",
+  "native_platform": "Darwin x86_64",
+  "test_concurrency": "explicit --test-threads=1",
+  "voice": {
+    "library": [
+      3376,
+      0,
+      14
+    ],
+    "binary_unit": [
+      1,
+      0,
+      0
+    ],
+    "integration": [
+      261,
+      0,
+      0
+    ],
+    "examples": [
+      10,
+      0,
+      0
+    ],
+    "doc_tests": [
+      0,
+      0,
+      0
+    ]
+  },
+  "consumer_coverage": {
+    "cloud": [
+      193,
+      0,
+      2
+    ],
+    "memory": [
+      298,
+      0,
+      6
+    ],
+    "skills": [
+      496,
+      0,
+      1
+    ],
+    "update": [
+      306,
+      0,
+      2
+    ],
+    "voice_eval": [
+      623,
+      0,
+      0
+    ]
+  },
+  "counts_order": [
+    "passed",
+    "failed",
+    "ignored"
+  ],
+  "consumer_completion": {
+    "original_command": "incomplete; outer watchdog at1800.0245795650408s, exit=null",
+    "completed_before_timeout": {
+      "cloud": [
+        193,
+        0,
+        2
+      ],
+      "memory": [
+        298,
+        0,
+        6
+      ],
+      "skills": [
+        496,
+        0,
+        1
+      ],
+      "update_completed_targets": [
+        200,
+        0,
+        2
+      ]
+    },
+    "unfinished_target": "lamp-update::round; no terminal summary in timeout log",
+    "separate_completions": {
+      "update_round": [
+        106,
+        0,
+        0
+      ],
+      "voice_eval": [
+        623,
+        0,
+        0
+      ],
+      "cloud_memory_skills_update_doc_targets": "four targets, zero tests, all exit0",
+      "workspace_build": "exit0"
+    },
+    "note": "The completed Update round target was rerun in full; its partial first execution is retained but not added to the complete-target count. Previously completed package targets were not repeated."
+  },
+  "ci": {
+    "arm64": {
+      "run_id": 39798045688,
+      "run_number": 6040,
+      "conclusion": "success",
+      "passed": 10491,
+      "failed": 0,
+      "skipped": 67,
+      "passing_leaky": 1,
+      "voice_library_passed": 3400,
+      "voice_integration_passed": 318,
+      "tested_merge": "5cdaa59",
+      "merge_target": "0766811add1be85fd88ce2eb79c6a7ced297b3c9"
+    },
+    "clippy": {
+      "run_id": 39798045519,
+      "run_number": 2044,
+      "conclusion": "success"
+    }
+  },
+  "source_scope": "1379 unchanged crate and Cargo/toolchain files; not the full repository",
+  "historical_failures": "Retained in voice-full-run-events-final-20261022 and original PR evidence; no scheduling-cause inference or parallel pass claim."
+}

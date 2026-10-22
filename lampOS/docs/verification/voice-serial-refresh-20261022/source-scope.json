@@ -1,0 +1,29 @@
+{
+  "head": "6d45857eb3015e4963e186fdb50c8b77747b57e6",
+  "base": "c6d50559aa54fe58699da5ba1c0e2d79f1a70dd8",
+  "file_count": 1379,
+  "aggregate_sha256": "9a14f5b72ece7bc3b7f60fa86fa14313dd508c4d738e99326d80245ba73fe8f3",
+  "aggregate_algorithm": "SHA-256 of json.dumps(path-to-SHA256 mapping, sort_keys=True).encode() using Python defaults",
+  "selection": "git ls-files --cached --others --exclude-standard -z lampOS/crates lampOS/Cargo.toml lampOS/Cargo.lock lampOS/rust-toolchain.toml",
+  "serial_and_completion_maps_identical": true,
+  "all_1379_file_bytes_match_committed_head": true,
+  "runner_checks": "Serial runner checks this mapping before/after mtime refresh and after each stage, including the timeout; completion runner checks the same mapping after every command. Completion receipt has source_unchanged=true.",
+  "scope_limit": "This is not a whole-repository or full dependency-closure manifest. Files outside those paths, vendor/third_party trees, other fixtures/deploy files, system tools, environment and remote services are not covered.",
+  "raw_timeout_snapshot_identical": true,
+  "raw_timeout_sha256": "d23164df76df0b7455706549cd0ba0690abb3d7e7c0c2afa578fde7516c8b1fd",
+  "raw_timeout_bytes": 166822,
+  "retained_external_files": [
+    {
+      "path": "/private/tmp/tests-voice-serial-refresh-20261022/compiled-library-list.txt",
+      "sha256": "7d51866cb13464a836ccaf1df3f2f5f2c6330809cb48b3cef9313d674fafeeb6",
+      "bytes": 314985,
+      "reason": "Complete compiled inventory remains external; count, identity and added/removed names are packaged."
+    },
+    {
+      "path": "/private/tmp/tests-voice-serial-refresh-20261022/arm64/full.log",
+      "sha256": "e03f7ee38914b2b7e592f2087ec9bdf6e5d1f5bdc9c78722317e2151f19bfb87",
+      "bytes": 2507144,
+      "reason": "Bulk CI success output remains external; final terminal job metadata, exact checkout/summary and selected test rows are packaged."
+    }
+  ]
+}
