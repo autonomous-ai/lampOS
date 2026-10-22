@@ -306,6 +306,43 @@ pub fn stop_phrase(heard: &str) -> bool {
     stop_over(heard, "")
 }
 
+/// Where the voice reads whether a yield whose words are a backchannel is
+/// held as a yield, not committed as a turn (#2939): `on`. Off unless set,
+/// and inert without `LAMP_STOP_WORDS=heard`.
+pub const BACKCHANNEL_ENVIRONMENT: &str = "LAMP_BACKCHANNEL_HOLDS";
+
+/// Whether the environment asks for backchannels to be held.
+pub fn holds_backchannels() -> bool {
+    std::env::var(BACKCHANNEL_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// Words that only acknowledge, said while the lamp speaks: "Mm-hm.",
+/// "Yeah.", "Oh, okay." Hyphens are joined first, so "uh-huh" is "uhhuh".
+/// "Uh", "so", "no", "what" and "huh" are left out: they may begin a turn.
+const BACKCHANNELS: &[&str] = &[
+    "mm", "mhm", "mmhm", "mmhmm", "hm", "hmm", "uhhuh", "yeah", "yes", "yep", "yup", "ok", "okay",
+    "alright", "right", "oh", "ah", "sure",
+];
+/// The same, when the speech-to-text is told Vietnamese (`stt_language`).
+const BACKCHANNELS_VI: &[&str] = &["ừ", "ừm", "ờ", "à", "ồ", "dạ", "vâng", "ok", "đúng", "rồi"];
+
+/// Whether what was heard is a backchannel (#2939): one or two words, all
+/// on the list for the language, no question mark and no stop phrase.
+pub fn backchannel(heard: &str, vietnamese: bool) -> bool {
+    use unicode_normalization::UnicodeNormalization;
+    let heard: String = heard.nfc().filter(|c| *c != '-').collect();
+    let list = if vietnamese {
+        BACKCHANNELS_VI
+    } else {
+        BACKCHANNELS
+    };
+    let said = words(&heard);
+    !heard.contains('?')
+        && (1..=2).contains(&said.len())
+        && said.iter().all(|word| list.contains(&word.as_str()))
+        && !stop_phrase(&heard)
+}
+
 /// Whether `word`, lower case, is one of the stop words, or a word of a
 /// pair that stops ("hold", "hang", "on"): the one list, for a reader that
 /// needs to know a stop asks nothing more (`crate::wait_words`).
@@ -363,10 +400,12 @@ pub enum Tell {
     Nothing,
     /// A yield began: it waits for its words.
     Await,
-    /// Its words came: whether they were a stop phrase, and how many.
+    /// Its words came: whether they were a stop phrase, how many, and
+    /// whether they were a backchannel ([`backchannel`]).
     Words {
         stop: bool,
         count: usize,
+        backchannel: bool,
     },
     /// It ended before any words came.
     Unheard,
@@ -427,6 +466,9 @@ pub struct StopWords {
     /// long it waited (ms) and whether it acted.
     ahead_at: u64,
     holds: Vec<(u64, bool)>,
+    /// The speech-to-text is told Vietnamese: its backchannels are
+    /// Vietnamese ([`Self::with_language`]).
+    vietnamese: bool,
 }
 
 /// A stop heard over the lamp and held ([`HOLD_US`]): what was heard,
@@ -469,6 +511,7 @@ impl StopWords {
             held: None,
             ahead_at: 0,
             holds: Vec::new(),
+            vietnamese: false,
         }
     }
 
@@ -501,6 +544,16 @@ impl StopWords {
     /// ([`GAIN_ENVIRONMENT`]); the raw and linear blocks never are.
     pub fn with_gain(mut self, gain_db: Option<f32>) -> Self {
         self.gain = gain_db;
+        self
+    }
+
+    /// The speech-to-text's language (`stt_language`): Vietnamese (`vi`,
+    /// `vi-VN`) takes the Vietnamese backchannels (#2939).
+    pub fn with_language(mut self, language: Option<&str>) -> Self {
+        self.vietnamese = language.is_some_and(|language| {
+            let language = language.to_ascii_lowercase();
+            language == "vi" || language.starts_with("vi-")
+        });
         self
     }
 
@@ -845,6 +898,7 @@ impl StopWords {
             tell = Tell::Words {
                 stop: stop_phrase(&words),
                 count: words.split_whitespace().count(),
+                backchannel: backchannel(&words, self.vietnamese),
             };
         }
         tell
@@ -1623,6 +1677,41 @@ mod tests {
     }
     use std::sync::{Arc, Mutex};
 
+    /// #2939: one or two words, all on the language's list, no "?", no
+    /// stop phrase.
+    #[test]
+    fn backchannels_are_short_acknowledgments_and_nothing_else() {
+        for (heard, vietnamese, is) in [
+            ("Mm-hm.", false, true),
+            ("Uh-huh.", false, true),
+            ("Yeah.", false, true),
+            ("Oh, okay.", false, true),
+            ("MHM", false, true),
+            ("Sure", false, true),
+            ("Ừ.", true, true),
+            ("Dạ, vâng.", true, true),
+            // "Ừ" decomposed: U+0055 U+031B U+0300, read as NFC.
+            ("U\u{31b}\u{300}.", true, true),
+            ("Stop.", false, false),
+            ("Wait, I", false, false),
+            ("Okay, stop.", false, false),
+            ("What was that?", false, false),
+            ("Why?", false, false),
+            ("Yeah?", false, false),
+            ("Uh", false, false),
+            ("So", false, false),
+            ("No.", false, false),
+            ("Yeah, yeah, yeah.", false, false),
+            ("", false, false),
+            // Each list for its own language.
+            ("Ừ.", false, false),
+            ("Yeah.", true, false),
+            ("Hả?", true, false),
+        ] {
+            assert_eq!(backchannel(heard, vietnamese), is, "{heard:?}");
+        }
+    }
+
     #[test]
     fn stop_phrases_are_heard_alone_and_among_other_words() {
         for stop in [
@@ -1806,7 +1895,8 @@ mod tests {
             words.block(true, true, true, Some(11), None, 0, &block(7)),
             Tell::Words {
                 stop: true,
-                count: 2
+                count: 2,
+                backchannel: false
             }
         );
         script.lock().unwrap().words = Some("Stop.".into());

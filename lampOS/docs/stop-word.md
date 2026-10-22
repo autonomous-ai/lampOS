@@ -883,6 +883,47 @@ With the switch:
   made the lamp yield at all: that half is the canceller's, not this one's
   (the first builder, 09:49: a lone "Stop." yielded 0 of 3 that morning).
 
+### A backchannel held as a yield (#2939, 22 October)
+
+Off unless `LAMP_BACKCHANNEL_HOLDS=on`, and only with
+`LAMP_STOP_WORDS=heard`: without it the journal says once that
+backchannels aren't held, and nothing changes. On lamp-52e6 on 22 October,
+9 of 12 short cut-ins committed as a new turn; a person who only said
+"Mm-hm." lost the rest of the answer.
+
+- **The commit waits for the words.** A yield commits on 60 ms of speech
+  once the lamp's sound is gone, or on 400 ms of quiet after a word heard
+  plainly. With the switch, while its words are awaited, that commit is
+  held (`Interruption::hold_backchannels` in `audio/src/duplex.rs`): on the
+  quiet rule until they come, on the speech rule only while the speech is
+  under 400 ms (`BACKCHANNEL_SPEECH_BLOCKS`). No hold lasts over 500 ms
+  (`BACKCHANNEL_HOLD_BLOCKS`) or past the yield's 1.1 s deadline, so the
+  request kept for the commit is never older than the duplex hold allows;
+  the mask remembers as many blocks as for a waited sound (`WAITED_HEARD`).
+- **A backchannel resumes.** Words of one or two, all on the list, with no
+  "?" and no stop phrase (`stop_words::backchannel`, read after hyphens are
+  joined and NFC): mm, mhm, mmhm, mmhmm, hm, hmm, uhhuh, yeah, yes, yep,
+  yup, ok, okay, alright, right, oh, ah, sure; with `stt_language` vi, ừ,
+  ừm, ờ, à, ồ, dạ, vâng, ok, đúng, rồi. Left out, so they commit: uh, so,
+  no, what, huh, hả. The resume wait (400 ms of stillness) then resumes the
+  answer, and the candidate is suppressed, so no turn starts. A backchannel
+  commits only if its speech reaches 400 ms, a sentence.
+- **Anything else commits at once**, empty words included; no words commit
+  at the bound. A stop phrase ("wait" is one) and a forced `stop/heard` are
+  never held.
+- **A backchannel resume is not fruitless**, nor other-fruitless: two
+  "mm-hm"s don't stop the reply yielding for 20 s.
+- **Latency.** Words come about 350 ms after the word ends, inside the
+  400 ms of quiet, so a commit on the quiet rule is no later. A short word
+  that is no backchannel ("Why?") on the speech rule commits up to about
+  0.35 s later, while the lamp is already silent. Sentences, stops and
+  forced stops gain no time.
+- **Records.** `duplex_commit` and `duplex_resume` carry `held_ms` and
+  `backchannel` (true, false, or null when no words came, whether or not the
+  switch is on); `stop_words` carries `backchannel`; `duplex_policy` carries
+  `backchannel_holds`. The journal says "a yield's words came: 1 word, a
+  backchannel: the answer goes on". Counts only, never the words.
+
 ### Privacy: what goes where
 
 The first builder accepted this on lamp-4ace on 16 October at 09:49 (#828).

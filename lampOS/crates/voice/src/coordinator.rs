@@ -5775,7 +5775,10 @@ fn conversation_with_gate(
     }
     let mut stop_words = (duplex && listen != crate::stop_words::Listen::Off)
         .then(|| match crate::second_config::load_from_env() {
-            Ok(Some(config)) => crate::stop_words::RelayEars::start(
+            Ok(Some(config)) => {
+            // Its backchannels are the speech-to-text's language's (#2939).
+            let language = config.stt_language.clone();
+            crate::stop_words::RelayEars::start(
                 {
                     let keyterm = crate::stop_words::key_terms_from_environment();
                     let config = crate::stop_words::with_key_terms(config, keyterm);
@@ -5813,16 +5816,17 @@ fn conversation_with_gate(
                         // Heard in a yield the source stays the default
                         // (`Processed`), so the gain is passed only when the
                         // blocks handed on are that source (El's P2 on #2690).
-                        crate::stop_words::StopWords::new(Box::new(ears)).with_gain(
-                            crate::stop_words::yield_gain(
+                        crate::stop_words::StopWords::new(Box::new(ears))
+                            .with_gain(crate::stop_words::yield_gain(
                                 crate::stop_words::gain_from_environment(),
                                 crate::stop_words::source(),
-                            ),
-                        )
+                            ))
+                            .with_language(language.as_deref())
                     }
                 })
                 .map_err(|error| eprintln!("lamp-voice: stop words are not heard: {error}"))
-                .ok(),
+                .ok()
+            }
             Ok(None) => {
                 eprintln!(
                     "lamp-voice: LAMP_STOP_WORDS has no speech-to-text without the second voice's configuration: stop words are not heard"
@@ -5877,6 +5881,23 @@ fn conversation_with_gate(
                 "words_asked_after_quiet_blocks":wait_words.is_some().then_some(crate::wait_words::ASK_AFTER_QUIET_BLOCKS)}),
         )?;
     }
+    // A backchannel held as a yield (#2939, `LAMP_BACKCHANNEL_HOLDS=on`):
+    // only with a yield's words heard (`LAMP_STOP_WORDS=heard`).
+    let backchannel_holds = crate::stop_words::holds_backchannels()
+        && if stop_words.is_some() && !always {
+            eprintln!(
+                "lamp-voice: backchannel holds: a yield's commit waits up to {} ms for its words, and a backchannel resumes the answer",
+                lamp_audio::duplex::BACKCHANNEL_HOLD_BLOCKS * 10
+            );
+            true
+        } else {
+            eprintln!(
+                "lamp-voice: {} is set, but backchannels are held only with {}=heard: not held",
+                crate::stop_words::BACKCHANNEL_ENVIRONMENT,
+                crate::stop_words::ENVIRONMENT
+            );
+            false
+        };
     let mut admission = InputAdmission::with_hold(hold);
     let mut playback_mask = if duplex {
         record(
@@ -5902,6 +5923,7 @@ fn conversation_with_gate(
             "listen_gaps":listen_gaps.then_some(json!({"after_ms":crate::listen_gaps::AFTER_FRAMES * 1_000 / u64::from(lamp_audio::RENDER_RATE),"quiet_run_ms":crate::listen_gaps::LOW_RUN_CHUNKS * 10,"gap_ms":crate::listen_gaps::GAP_US / 1_000,"silence_heard":true})),
             "stop_words_after_still_blocks":(stop_words.is_some() && !always).then_some(crate::stop_words::FINALIZE_AFTER_STILL_BLOCKS),
             "stop_words_always":(stop_words.is_some() && always).then_some(true),
+            "backchannel_holds":backchannel_holds.then_some(json!({"hold_ms":u64::from(lamp_audio::duplex::BACKCHANNEL_HOLD_BLOCKS) * 10,"sentence_ms":u64::from(lamp_audio::duplex::BACKCHANNEL_SPEECH_BLOCKS) * 10})),
             "provider_queue_bound":provider_queue_bound(hold),
             "provider_total_queue_bound":provider_queue_bound(hold) + 1,
             "provider_terminal_allowance":1,
@@ -5921,6 +5943,9 @@ fn conversation_with_gate(
         }
         if counts_real {
             mask.count_real_cut_ins();
+        }
+        if backchannel_holds {
+            mask.hold_backchannels();
         }
         // A sound that waits holds its pre-roll and up to the hold's 1.2 s:
         // more than the mask's usual memory, which would reject it as
@@ -11320,14 +11345,19 @@ fn hear_capture_block(
         DuplexStep::Commit => "duplex_commit",
         DuplexStep::Resume => "duplex_resume",
     };
-    record(
-        trace,
-        json!({"kind":kind,"at_us":at_us,"frame_sequence":sequence,
-        "last_block_host_read_us":captured_at_us,"owner":owner,
-        "reply_queued_frames":reply.as_ref().map(|current| current.pcm.len()),
-        "hearing_margin_db":mask.hearing_margin_db(),
-        "boundary":"coordinator hearing decision; not acoustic onset or stopped output"}),
-    )?;
+    let mut event = json!({"kind":kind,"at_us":at_us,"frame_sequence":sequence,
+    "last_block_host_read_us":captured_at_us,"owner":owner,
+    "reply_queued_frames":reply.as_ref().map(|current| current.pcm.len()),
+    "hearing_margin_db":mask.hearing_margin_db(),
+    "boundary":"coordinator hearing decision; not acoustic onset or stopped output"});
+    if listened.step != DuplexStep::Yield {
+        // #2939: how long the commit was held for the yield's words, and
+        // whether they were a backchannel (null: none came).
+        let (held_ms, backchannel) = mask.yield_words();
+        event["held_ms"] = json!(held_ms);
+        event["backchannel"] = json!(backchannel);
+    }
+    record(trace, event)?;
     match listened.step {
         DuplexStep::Commit => finish_duplex_yield(
             trace,
@@ -11423,20 +11453,26 @@ fn hear_stop_words(
     ) {
         crate::stop_words::Tell::Nothing => {}
         crate::stop_words::Tell::Await => mask.await_words(),
-        crate::stop_words::Tell::Words { stop, count } => {
-            mask.words(stop);
+        crate::stop_words::Tell::Words {
+            stop,
+            count,
+            backchannel,
+        } => {
+            mask.words(stop, backchannel);
             eprintln!(
                 "lamp-voice: a yield's words came: {count} {}, {}",
                 if count == 1 { "word" } else { "words" },
                 if stop {
                     "a stop phrase"
+                } else if backchannel && mask.holds_backchannels() {
+                    "a backchannel: the answer goes on"
                 } else {
                     "not a stop phrase"
                 }
             );
             record(
                 trace,
-                json!({"kind":"stop_words","stop":stop,"words":count,"at_us":monotonic_us()}),
+                json!({"kind":"stop_words","stop":stop,"words":count,"backchannel":backchannel,"at_us":monotonic_us()}),
             )?;
         }
         crate::stop_words::Tell::Unheard => {

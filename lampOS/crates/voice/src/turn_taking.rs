@@ -472,11 +472,41 @@ impl PlaybackMask {
             .as_mut()
             .is_some_and(|duplex| duplex.interruption.force_yield())
     }
-    /// Its words came: whether they told the lamp to stop.
-    pub fn words(&mut self, stop: bool) {
+    /// Its words came: whether they told the lamp to stop, and whether they
+    /// were a backchannel (#2939).
+    pub fn words(&mut self, stop: bool, backchannel: bool) {
         if let Some(duplex) = self.duplex.as_mut() {
-            duplex.interruption.words(stop);
+            duplex.interruption.words(stop, backchannel);
         }
+    }
+    /// `LAMP_BACKCHANNEL_HOLDS=on` (#2939): a yield's commit is held for
+    /// its words, and a backchannel resumes the reply. See
+    /// `Interruption::hold_backchannels`. Only with ears. A commit held to
+    /// the yield's deadline (1.1 s) keeps its pre-roll and onset with it,
+    /// more than [`MAX_HEARD`] remembers: as much is kept as for a waited
+    /// sound ([`WAITED_HEARD`]).
+    pub fn hold_backchannels(&mut self) {
+        if let Some(duplex) = self.duplex.as_mut() {
+            duplex.interruption.hold_backchannels();
+            duplex.max_heard = duplex.max_heard.max(WAITED_HEARD);
+        }
+    }
+    /// Whether backchannels are held ([`Self::hold_backchannels`]).
+    pub fn holds_backchannels(&self) -> bool {
+        self.duplex
+            .as_ref()
+            .is_some_and(|duplex| duplex.interruption.holds_backchannels())
+    }
+    /// For the record of the latest commit or resume: how long its commit
+    /// was held for its words, in ms, and whether they were a backchannel
+    /// (`None` until they came).
+    pub fn yield_words(&self) -> (u64, Option<bool>) {
+        self.duplex.as_ref().map_or((0, None), |duplex| {
+            (
+                u64::from(duplex.interruption.held_blocks()) * 10,
+                duplex.interruption.backchannel(),
+            )
+        })
     }
     /// Blocks of stillness in a row in the yield in force, while one is.
     pub fn still_blocks(&self) -> Option<u8> {
@@ -676,7 +706,11 @@ impl PlaybackMask {
                 // With `LAMP_CUT_IN_COUNTS_REAL=on`, nor is one whose window
                 // did not point at the lamp's own voice ([`YieldEvidence`]):
                 // that counts on its own bound ([`OTHER_FRUITLESS_YIELDS`]).
-                if !duplex.interruption.yield_was_forced() {
+                // Nor is a backchannel held as a yield (#2939): a person
+                // saying "mm-hm" twice is not the lamp's own voice.
+                if !duplex.interruption.yield_was_forced()
+                    && !duplex.interruption.yield_was_backchannel()
+                {
                     if !duplex.counts_real || duplex.window.own_voice() {
                         duplex.fruitless = duplex.fruitless.saturating_add(1);
                     } else {

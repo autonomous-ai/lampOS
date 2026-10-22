@@ -1253,6 +1253,9 @@ functions:
 | `with_counts_real_the_lamps_own_voice_twice_still_falls_back` | With the switch: two yields whose windows the render mostly explains count, and a third line 5 s after makes no yield |
 | `with_counts_real_unknown_alone_is_not_the_lamps_own_voice` | With the switch: two yields with plain onsets and 60 `Unknown` blocks after don't count as the lamp's own voice, and the third line commits |
 | `with_counts_real_a_sound_that_is_never_a_line_stops_pausing_after_three` | With the switch: three yields that resume and are not the lamp's own voice fall back (`OTHER_FRUITLESS_YIELDS`); a fourth line within 20 s makes no yield and no candidate |
+| `with_backchannel_holds_a_backchannel_resumes_the_reply_on_either_rule` | `LAMP_BACKCHANNEL_HOLDS=on` with `LAMP_STOP_WORDS=heard` ([stop-word.md](stop-word.md), #2939): "Mm-hm.", "Yeah." and "Ừ." (Vietnamese) after a plain word then quiet, and before 250 ms of speech once the lamp is silent, resume with no turn; off, both commit as before |
+| `with_backchannel_holds_anything_else_commits` | With the switch: "Stop.", "Wait, I", "What was that?" and "Why?" commit on both rules; no words commit at the 500 ms bound (speech) or the yield's deadline (quiet); off, no words commit as before |
+| `with_backchannel_holds_two_backchannels_leave_the_reply_yielding` | With the switch: two backchannels the story goes on after cost no fruitless yield, and a third line 5 s after yields and commits as a sentence |
 | `without_echo_evidence_duplex_decides_as_the_conservative_baseline_does` | Same masked blocks, candidates and rejections as `v1-baseline` |
 | `a_microphone_that_stops_arriving_does_not_hold_the_reply_back` | Dispatch resumes after 100 ms without a block |
 | `a_person_who_speaks_once_the_lamp_is_silent_is_an_ordinary_turn` | Six blocks and admitted, as ever |
