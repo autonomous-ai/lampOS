@@ -664,6 +664,16 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
   is let go, each judged for the name and a face. The journal says `talk
   over the lamp's own line in a busy room, with no name or face turned to
   it, is let go; the line goes on` once a line.
+- **The name's wait, its limits:** `lamp-name --not-while-speaking` is
+  off in the product, and on lamp-4ace on 18 Oct the lamp's own "I've made
+  the light warmer" scored 0.990 as the name. So in the 600 ms wait an echo
+  of the lamp's own line with the name in it, over busy talk, stops the
+  line, where before it was let go on the first blocks; turning that flag
+  on would instead drop every "Lamp, wait" said over the lamp's own line.
+  The 600 ms runs from the talk's trigger, so "Okay so, Lamp, wait", its
+  name ending more than 600 ms in, is still let go. The cap at the decision
+  deadline less 100 ms leaves about 100 ms on a half-duplex
+  `Hold::STANDARD` lamp; the product is duplex.
 - **Its cost:** a bare "Stop." in a busy room no longer stops a say. The
   name, a face turned to it, or a tap still does, and once the sixth
   builder's stop-words fix (#2863) is on, `stop/heard` covers the bare
