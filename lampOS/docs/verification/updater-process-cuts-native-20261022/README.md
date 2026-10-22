@@ -55,5 +55,24 @@ flash durability, installed-daemon handover, or real signed-release result is
 claimed here.
 
 These are compact normalized records, not copies of private raw logs or
-receipts. [SHA256SUMS](SHA256SUMS) binds all three public files. No raw logs,
+receipts. [SHA256SUMS](SHA256SUMS) binds all public files except itself. No raw logs,
 artifact archive, updater binary, keys, or personal host paths are published.
+
+## Later checkpoint, 19:48 +07
+
+Intermediate head `53911e246558cfdfd7f7f371b51afdd235fdc5ea` passed ARM64
+39778575538 and Clippy39778575540, tested as merge
+`8e5b6f402cefb75e3babb898eeaff1fb85c4618b` with base6f1123f69.
+[rebase-539.json](rebase-539.json) preserves **10,460 passed / 0 failed /
+67 skipped**, one retained leaky Voice pass, explicit checker PASS3.678s,
+4 doctests, 12 process tests and relay success. Artifact12427315012 was
+recorded from API metadata only; this replacement archive was not downloaded
+or independently verified. The earlier authored archive verification remains
+separate.
+
+The latest-base guard then advanced to `135f14957e4a8560b3f72fa785ed62f605f800dc`,
+a Skills-only upstream change. Equal-range replacement
+`1030fb8ab5b05e25099e1946f83e4ab319919fd3` is now public. All bound Update source
+files still match the completed Mac receipt. Its fresh ARM64 39780978501 and
+Clippy39780978544 are running; neither older green qualifies this replacement.
+Physical unplug and #1812 remain unexecuted, awaiting First/owner prerequisites.

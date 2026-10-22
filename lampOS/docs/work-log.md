@@ -1,3 +1,27 @@
+## Current checkpoint: 2026-10-22 19:48 +07, second native green; newest integration qualifying
+
+Ready for lamp-voice: no
+
+Kind: tests/docs only, no lamp runtime/default/timing change. #3012 now holds
+`1030fb8ab5b05e25099e1946f83e4ab319919fd3`, one equal-range commit on latest
+`135f14957e4a8560b3f72fa785ed62f605f800dc`. The upstream change is Skills-only;
+all completed Mac-bound Update files remain unchanged. No code correction or
+retry-for-green occurred.
+
+[Native proof](verification/updater-process-cuts-native-20261022/README.md)
+now retains both qualified historical phases: authored33a ARM10451/0/67 and
+rebased539 ARM10460/0/67 (each one leaky pass), explicit new checker PASSes,
+4doc/12process/relay and matching Clippy successes. The first archive was fully
+verified; the second artifact is metadata-only, expressly not independently
+verified. The new third-head ARM39780978501 and Clippy39780978544 are running.
+Earlier greens are not transferred to it.
+
+First's lamp/person/window, candidate and approved trial/observer configuration
+still block the real #2810 unplug. #1812 follows and needs owner/key/publishing
+and attended Body inputs. No device connection, power action or publication.
+
+---
+
 ## Current checkpoint: 2026-10-22 19:37 +07, native qualification preserved; latest-base CI running
 
 Ready for lamp-voice: no
