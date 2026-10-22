@@ -566,6 +566,15 @@ skills".)
   the renewal thread has armed its next wait. The paused-light test keeps
   the original 500 ms allowance after light-on as an explicit no-text
   observation, followed by the original 300 ms check after the next visit.
+  The add-on hour-budget fixture (`a_fifth_say`, #1806) waits for each
+  `skills/events` Done before sending another trigger. After dropping four
+  says, it waits until all four report their actual 300 s drop hold before
+  asking a fifth add-on. One eight-second host watchdog starts before the
+  first proposals: this probe budget is below the unchanged ten-second
+  proposal allowance, and expiry fails the fixture. Final Done events fence
+  the journal read, because each line is written before its event. The
+  undecided case retains its full three-second no-proposal observation;
+  the product's hour budget and drop hold are unchanged.
 
 `lamp-update install` puts it on a home lamp (#811): the product unit
 `deploy/product/lamp-skills.service`, every product skill in

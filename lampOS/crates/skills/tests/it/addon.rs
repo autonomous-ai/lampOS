@@ -569,6 +569,7 @@ fn a_fifth_say(drop_the_four: bool) -> String {
     );
     let bus = Bus::new(root.join("bus")).unwrap();
     let mut proposals = bus.subscribe(AddonProposal::TOPIC, "judge").unwrap();
+    let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
     for (flag, path) in [
         ("--dir", root.join("skills")),
@@ -584,7 +585,7 @@ fn a_fifth_say(drop_the_four: bool) -> String {
         .env_remove("LAMP_SKILLS_ASK")
         .env(lamp_skills::ADDONS_ENVIRONMENT, "on")
         .stderr(std::fs::File::create(root.join("stderr")).unwrap());
-    let _running = Running(command.spawn().unwrap());
+    let mut running = Running(command.spawn().unwrap());
     let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline
         && (bus.subscribers(VoiceState::TOPIC).unwrap().is_empty()
@@ -598,6 +599,36 @@ fn a_fifth_say(drop_the_four: bool) -> String {
     let mut voice = bus
         .publisher_declared(VoiceState::TOPIC, &VoiceState::declaration(), "voice")
         .unwrap();
+    // The probe budget is shorter than the unchanged ten-second proposal
+    // limit and starts before any of the first four can be admitted.
+    let completion_deadline = Instant::now() + Duration::from_secs(8);
+    let mut completed = |names: &[&str], phase: &str| {
+        let mut seen = Vec::<SkillEvent>::new();
+        while seen.len() < names.len() {
+            let left = completion_deadline.saturating_duration_since(Instant::now());
+            let status = running.0.try_wait().unwrap();
+            assert!(
+                !left.is_zero() && status.is_none(),
+                "waiting for {phase}: child {status:?}, completions {seen:?}; journal:\n{}",
+                std::fs::read_to_string(root.join("stderr")).unwrap()
+            );
+            if let Some(message) = events.recv(left.min(Duration::from_millis(100))).unwrap() {
+                let event = message.parse::<SkillEvent>().unwrap();
+                if event.stage == lamp_msgs::SkillStage::Done
+                    && names.contains(&event.skill.as_str())
+                    && !seen.iter().any(|old| old.skill == event.skill)
+                {
+                    seen.push(event);
+                }
+            }
+        }
+        assert!(
+            Instant::now() < completion_deadline,
+            "the completion budget expired during {phase}; journal:\n{}",
+            std::fs::read_to_string(root.join("stderr")).unwrap()
+        );
+        seen
+    };
     voice
         .publish_json(1, &serde_json::json!({ "state": "resting" }))
         .unwrap();
@@ -609,6 +640,11 @@ fn a_fifth_say(drop_the_four: bool) -> String {
             .expect("four proposed");
         four.push(message.parse::<AddonProposal>().unwrap());
     }
+    let names: Vec<&str> = four
+        .iter()
+        .map(|proposal| proposal.addon.as_str())
+        .collect();
+    completed(&names, "the first four proposals");
     if drop_the_four {
         let mut judge = bus
             .publisher_declared(
@@ -632,17 +668,38 @@ fn a_fifth_say(drop_the_four: bool) -> String {
                 )
                 .unwrap();
         }
-        // Read on the decisions' thread, once a second at most.
-        std::thread::sleep(Duration::from_millis(1_500));
+        // The decision reader has its own thread. A main-loop clock
+        // acknowledgement cannot prove that it refunded all four says.
+        // Each probe finishes before the next, so no trigger coalesces or
+        // runs while its predecessor is busy. Only the real drop refusal
+        // proves that every decision was consumed before asking the fifth.
+        loop {
+            assert!(
+                Instant::now() < completion_deadline,
+                "the four drop decisions were not consumed; journal:\n{}",
+                std::fs::read_to_string(root.join("stderr")).unwrap()
+            );
+            voice
+                .publish_json(1, &serde_json::json!({ "state": "resting" }))
+                .unwrap();
+            if completed(&names, "the four drop refusals")
+                .iter()
+                .all(|event| event.why == "not proposed: 300 s after the judge dropped its say")
+            {
+                break;
+            }
+        }
     }
     voice
         .publish_json(2, &serde_json::json!({ "state": "listening" }))
         .unwrap();
     let fifth = proposals.recv(Duration::from_secs(3)).unwrap();
+    completed(&["says-e"], "the fifth proposal or its refusal");
     voice
         .publish_json(3, &serde_json::json!({ "state": "resting" }))
         .unwrap();
-    std::thread::sleep(Duration::from_millis(500));
+    // The program writes each journal line before publishing its Done.
+    completed(&names, "the final four refusals");
     let journal = std::fs::read_to_string(root.join("stderr")).unwrap();
     match fifth {
         Some(message) => format!(
