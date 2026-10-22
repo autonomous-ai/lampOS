@@ -22,6 +22,7 @@ mkdir -p "$T/bin"
 cat >"$T/bin/systemctl" <<'EOF'
 #!/usr/bin/env bash
 echo "systemctl $*" >>"$FAKE_LOG"
+[[ $1 == is-active && ($2 == lamp-voice || $2 == lamp-ears) ]] && { echo "${FAKE_VOICE_STATE:-inactive}"; [[ ${FAKE_VOICE_STATE:-inactive} == active ]]; exit; }
 [[ $1 == is-active && $2 == lamp-expression ]] && { echo "${FAKE_EXPRESSION_STATE:-inactive}"; [[ ${FAKE_EXPRESSION_STATE:-inactive} == active ]]; exit; }
 # "start lamp-body": active from then on, its mood socket opened unless
 # FAKE_BODY_NO_SOCKET.
@@ -183,6 +184,15 @@ check "step 4 dry stands nothing" '[[ $status == 0 ]] && ! grep -q "^mood\|^self
 # One step at a time, as a station with a person at it runs them.
 lamp; : >"$T/log"; ASK_ANSWER=y run --write --from 2 --to 3 --update-key "$KEYFILE"; status=$?
 check "--from 2 --to 3 runs only steps 2 and 3" '[[ $status == 0 ]] && grep -q "steps 2 to 3 done (write)" "$T/out" && ! grep -q "^measure\|^selftest" "$T/log" && grep -q "^controls discover-head" "$T/log"'
+# The voice and the ears lose the privacy switch while lamp-controls is
+# stopped (#2818): those running are restarted after Controls is back and
+# before the self-test, which needs fresh reads of them; none running, none.
+lamp; FAKE_VOICE_STATE=active ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
+check "the voice and ears are restarted after Controls is back, before the self-test" '[[ $status == 0 ]] && [[ $(grep -n "systemctl start lamp-controls" "$T/log" | tail -1 | cut -d: -f1) -lt $(grep -n "^systemctl restart lamp-voice lamp-ears$" "$T/log" | cut -d: -f1) ]] && [[ $(grep -n "^systemctl restart lamp-voice" "$T/log" | cut -d: -f1) -lt $(grep -n "^selftest" "$T/log" | cut -d: -f1) ]] && [[ $(grep -c "^systemctl restart lamp-voice" "$T/log") == 1 ]]'
+lamp; ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
+check "a voice and ears not running are not started" '[[ $status == 0 ]] && ! grep -q "^systemctl restart.*lamp-\(voice\|ears\)" "$T/log"'
+lamp; FAKE_VOICE_STATE=active FAKE_DISCOVERY_EXIT=1 ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
+check "a failed touch step still restarts the voice and ears" '[[ $status == 1 ]] && grep -q "^systemctl restart lamp-voice lamp-ears$" "$T/log"'
 lamp; run --from 3 --to 2; status=$?
 check "--to before --from is refused" '[[ $status == 2 ]]'
 
