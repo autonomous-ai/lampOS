@@ -586,17 +586,30 @@ lets go and says on `diagnostics` what it needs a person to do
 never another part's, a stop or a warning) on a thread of its own
 (`body_ask`), and hands the line to its own say service as `text`, skill
 `body`, priority 8, not begun after a minute: the same queue and gates as a
-skill's say, so the voice's loop never waits for it. It is said once when
-the body first lets go, not for each report; again only when the lamp's name
-is heard (`name/heard`, at the name note's 0.9), at most once in 10 s; and
-never as "stopped asking", for which a call says the last ask. Another body
-report, or 10 s with none, ends the let-go, and the next is said again. The
-journal has the outcome, never the words. Tests:
+skill's say, so the voice's loop never waits for it, and checked as a
+socket client's `text` is (1 to 900 bytes, no control characters): one that
+fails is refused, never queued. Like any say, it does not ask the Policy. It
+is said once when the body first lets go, not for each report; again only
+when the lamp's name is heard (`name/heard`, at the name note's 0.9), at most
+once in 2 minutes from when it was last handed over, longer than its minute's
+expiry so a second is never queued while the first may wait, and so a lamp
+named again and again in a meeting does not repeat its plea at each mention;
+and never as "stopped asking". An ask that changes within one let-go is not
+said by itself: a call says the last ask this voice read, and nothing if it
+read none (a voice started after the body stopped asking). Another body
+report, or 10 s with none, ends the let-go, and the next is said again;
+another part's report does not. The journal has the outcome, never the
+words. Tests:
 `body_ask::tests::the_ask_is_said_once_per_let_go_not_for_each_identical_report`,
-`called_by_name_it_is_said_again_never_twice_in_ten_seconds`,
+`called_by_name_it_is_said_again_never_twice_in_two_minutes`,
+`a_voice_that_read_only_stopped_asking_says_nothing_when_called`,
+`another_parts_report_does_not_end_the_bodys_let_go`,
+`only_a_name_heard_at_the_called_score_is_a_call`,
 `other_diagnostics_are_never_said`,
 `a_body_gone_quiet_ends_the_episode_and_its_next_ask_is_said`,
-`the_ask_reaches_the_say_service_as_written_text`. On a lamp: not yet run.
+`the_ask_reaches_the_say_service_as_written_text`,
+`an_ask_the_socket_would_refuse_is_refused_and_never_queued`. On a lamp: not
+yet run; off in the product unit until its lamp-52e6 row.
 ## Asking the policy (#752)
 
 Removed with the voice's own hello (#2825). It held a due hello up to 2 s

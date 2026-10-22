@@ -543,7 +543,9 @@ pub struct OwnAsks(mpsc::Sender<Asked>);
 
 impl OwnAsks {
     /// Ask for `text` said as written, as `skill`, at `priority`, not
-    /// begun after `expires_in_ms`: where its answer comes.
+    /// begun after `expires_in_ms`: where its answer comes. Checked as a
+    /// socket client's line is ([`parse_from`]): one that fails is answered
+    /// `refused` at once. The Policy is not asked here, as for any say.
     pub fn text(
         &self,
         skill: &str,
@@ -553,15 +555,19 @@ impl OwnAsks {
     ) -> mpsc::Receiver<Answer> {
         let (answer, answered) = mpsc::channel();
         let read_at_us = lamp_ipc::monotonic_us();
-        let request = Request {
-            skill: skill.into(),
-            words: Words::Text(text.into()),
-            priority,
-            expires_in_ms,
-            start_before_us: None,
-            task: None,
-            invitation: None,
-            unplug_request: None,
+        let line = json!({
+            "skill": skill,
+            "text": text,
+            "priority": priority,
+            "expires_in_ms": expires_in_ms,
+        })
+        .to_string();
+        let request = match parse_from(&line, Caller::Other) {
+            Ok(request) => request,
+            Err(why) => {
+                let _ = answer.send(Answer::Done(Outcome::Refused(why)));
+                return answered;
+            }
         };
         // A voice gone drops the answer's sender: the receiver says so.
         let _ = self.0.send(Asked {
