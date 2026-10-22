@@ -115,7 +115,8 @@ the built-in clock began again whenever the voice was not resting, so not
 Bedtime's 30 s; with `LAMP_REST_THROUGH_SOUNDS=on`, #1672, the voice
 listening or thinking is carried through, `through`, so a sound heard as no
 words is slept through, a baby or an alarm with no words too, and only
-words heard, its name heard (written down or not), a push, a touch or
+words heard, its name heard (written down or not), a new push (one
+held begins them once, at its start), a touch or
 the lamp speaking, `broken_by` and `speaking`, begin the 15 minutes again: on a real lamp small
 room sounds at 23:26 to 23:41 kept it awake), awake all those 15 minutes (`[[while]]` on
 `expression/state`'s `asleep`, `for = "15m"`: woken, it sleeps again only
