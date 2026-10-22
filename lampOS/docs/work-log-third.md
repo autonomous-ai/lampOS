@@ -5,6 +5,52 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-22 — rebases and the deliberate resume hold
+
+Ready for lamp-voice: no (fresh ARM64 runs pending; First owns both merges).
+
+- Owner's ordered work resumed on #2602. Rebased #2695 from `b854c0755`
+  to `4a549f24fa00fc37dcdf71f61f24787d2cbc8f87` and #2651 from `f9cfecded`
+  to `3e781ede68ca4b10ac6fad348504d62ee9bb9053`, both onto `e2b2f596d`.
+  Each one-commit range-diff is `=`. Formatting and diff checks passed,
+  and both own task branches were pushed with explicit leases.
+- Linux Clippy passed on the respective heads: runs
+  [39696407514](https://github.com/autonomous-ai/lampOS/actions/runs/39696407514)
+  and [39696653324](https://github.com/autonomous-ai/lampOS/actions/runs/39696653324).
+  Native ARM64 runs 39696407534 and 39696653561 were still running when
+  this entry was written; neither is claimed passed. No Mac ARM64 link.
+- #2651 leaves `CPUSchedulingResetOnFork` absent. First's 01:22 ruling
+  keeps the strip at RR 30 above Voice's RR 20. Preparing #2677 to remove
+  its added reset and pace the strip acquisition loop on CPU time too;
+  retarget/rebase waits for First to merge #2651. #1362 stays draft.
+- Posted the [design-only resume audit](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6329363812)
+  to Seventh and First. At pinned code `e2b2f596d`, Hearing requires 30
+  quiet render blocks before Still/Clear, and the interruption rule needs
+  40 Still blocks before resuming (unless stop-word results are pending),
+  with a 110-block fallback. The capture-clocked reference's five-block
+  target can add an offset; it is not a universal 750 ms timer. The 30th
+  quiet block may also be Still #1: with uninterrupted nonspeech, 75 blocks
+  means first Still at offset 36, or last active render at offset 6
+  (`6 + 30 + 39 = 75`). Clear resets Still; other non-Still states retain it.
+- The six preserved slices span 75 capture sequences, with source-read
+  intervals 748.623–750.929 ms, resume read-to-decision 1.462–4.873 ms,
+  and accepted reply audio 0.934–9.381 ms after resume. The main delay is
+  before the decision, consistent with that deliberate hearing hold.
+  Missing build/flags and interior hearing/stop-word results prevent exact
+  attribution of every block. Accepted zero PCM is not acoustic silence.
+- Lowering 40 risks resuming in a person's breath (the documented 150 ms
+  predecessor did); lowering 30 spends echo-tail protection (270 ms decay
+  recorded across sixteen stops); shrinking the reference target spends
+  packet-jitter/AEC margin; shortening 110 risks premature fallback while
+  speech or pending words settle. Seventh owns any policy change. No
+  threshold, provider or device action was taken.
+- [Answered Fifth's #2487 cue question](https://github.com/autonomous-ai/lampOS/issues/2602#issuecomment-6329397993)
+  from pinned source: no model exchange is needed, but a quiet,
+  listening-ready audio cycle is. Breath needs Head state during
+  2.000–2.200 s; wake must reach the new cycle under 2 s old, then has
+  under 1.5 s for readiness/quiet. Supplied timing-only diagnostic markers;
+  Fifth keeps the fix and lamp rerun.
+
 ## 2026-10-21 — Controls CPU pacing follow-up — PR #2677
 
 Ready for review: yes (native gates passed; stacked on #2651).
