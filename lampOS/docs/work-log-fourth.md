@@ -6552,6 +6552,33 @@ Ready for lamp-voice: retry delivered; photo draft2965 awaits native/full host a
   No deviceactions, realphotos/persondata, backendretention proof orscoreincrease.
   Sourceissue6337793934 and Queue6337795320. Installableskillmigration separate.
 
+## 2026-10-22 17:09 ICT: photo native gate passes; Mobile has the artifact
+
+Ready for lamp-voice: photo native-qualified; remaining host consumers, source review and Mobile acceptance open.
+
+- #2965 head8ee3f50e958d4fb41ad71882f105ddac00bcc6a2 passed
+  ARM39757954474:10,389/0/67, all29scoped controls,4doctests,
+  12process checks and relay signals. One unchanged same-voice leaky pass;
+  no rerun. Clippy39757954593 passed. Authored/CIbaseef1eb0cf2;
+  CImerge74c0e06eb7110a4e05b60181d38ade09a089b887.
+- Artifact12417447671 SHA-256
+  `8c5e9b097f8f30528037537a325f66114674d6f01628d9bebf3804f01cf4ec9d`.
+  Current PR head, artifact head and logged digest independently matched.
+  Raw `/private/tmp/fourth-photo-product-activation-ci-20261022/qualification.json`.
+  PRreceipt6338157980; Mobile handoff6338159045 on#2856;
+  immediate Queue6338160246. Mobile owns authorised0c89 full-update
+  selfie/onequestion/spokenyes proof. No lamp action or acceptance claimed.
+- Full serial published-head host Voice3575/0/14, Cloud187/0/2,
+  Memory290/0/6 and Keeper37/0/1 pass. Skills/Setup/Eval/Update
+  still running in exclusive root Cargo40780; scoped repeats are not added
+  to full package totals. Candidate remains draft/source-frozen.
+- First's separate#2961 gives Second its own48-tool bound. This
+  candidate records its ef1 baseline31Live/32Second; final integration
+  must preserve First's change rather than restoring32. No cap edit here.
+- Rechecked#2789: Voice/Records/session-reader and bus-only account
+  decisions still absent. #2800 still depends on the person's#2797
+  session (assigned Sixth by First) and#1670. No gated follow-up started.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
