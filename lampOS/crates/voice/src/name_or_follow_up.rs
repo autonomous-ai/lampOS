@@ -1,6 +1,6 @@
-//! At a desk, a line is the lamp's only by its name, a tap, its words
-//! calling the lamp, or a follow-up said soon after the lamp spoke: off
-//! unless `LAMP_NAME_OR_FOLLOW_UP=on`, on both voice routes.
+//! With people talking at a desk, a line is the lamp's only by its name, a
+//! tap, its words calling the lamp, or a follow-up said soon after the lamp
+//! spoke: off unless `LAMP_NAME_OR_FOLLOW_UP=on`, on both voice routes.
 //!
 //! Why: at the owner's desk on lamp-4ace on 22 October, the owner talked
 //! to a colleague and the lamp kept answering. Of its 18 answers, its
@@ -15,16 +15,31 @@
 //! a window (the thread's 45 s, 20 s after the lamp's words, a busy room's
 //! 15 s) that let the next lines of the desk talk in.
 //!
-//! With the switch, on Live and on the second route:
+//! With the switch, on Live and on the second route, in a busy room
+//! (`room_told::Room::Busy`):
 //! - A face turned to the lamp is never a reason on its own
 //!   (`attention::Attention::face_shows`). It still confirms the lamp's name
 //!   heard: `LAMP_NAME_SECOND_SIGN`'s second sign, the strict busy form's
 //!   name heard with someone turned, and a short sound with the name.
-//! - A line is in the conversation going on only within [`FOLLOW_UP_FOR`]
-//!   of the end of the lamp's own last words, in quiet and busy rooms; on
-//!   the second route a call let out carries the next lines that long too.
-//!   A line said later needs the name, a tap or its words calling the lamp.
-//!   What the model is told of the conversation is not changed.
+//! - A line is in the conversation going on only when it began within
+//!   [`FOLLOW_UP_FOR`] of the end of the lamp's own last words, however long
+//!   it then goes on; on the second route a call let out carries the next
+//!   lines that long too. A line begun later needs the name, a tap or its
+//!   words calling the lamp. What the model is told of the conversation is
+//!   not changed.
+//!
+//! In a room not known to be busy the lamp is as without the switch: a face
+//! turned to it is a reason, and the conversation keeps its windows. The
+//! owner, at 18:0x the same day with the switch on: "That's so weird if I
+//! had to say lamp a thousand times throughout the day." A person alone with
+//! the lamp does not say its name; one says it when others are around. So
+//! the room must turn busy from the talk the lamp holds
+//! (`room_told::RoomTold::count_held_talk`): in a room not known to be busy,
+//! a line held as said to nobody, or to someone else, is talk even with only
+//! talk counted, and two people seen or heard (two faces in the eyes'
+//! newest look, `bus_out::faces_in_view`, or a line in another voice than
+//! the conversation's) make the room busy at once
+//! (`room_told::RoomTold::two_people`).
 //!
 //! Everything else is as without it: the name, a tap, the text calling the
 //! lamp, said close to it, an answer to its own question inside the window,
