@@ -11502,6 +11502,8 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn requested_audio_crosses_the_live_worker_only_after_its_tool_reply() {
         use std::io::{BufRead, Read, Write};
+        // Own the process-wide worker state before starting a bounded peer.
+        let _one = one_thread();
         for wrapped in [false, true] {
             let home = crate::process::SessionDirectory::create().unwrap();
             std::fs::write(home.path.join(crate::tools::CATALOG_FILE),
