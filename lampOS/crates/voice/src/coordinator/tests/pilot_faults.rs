@@ -1432,6 +1432,7 @@ fn run_in(script: Script, trace: &mut SessionState) -> Run {
         early_end_blocks: None,
         early_finalize: false,
         open_name: false,
+        unfinished_wait: false,
         faint_level: None,
         speaker: spawn("speaker"),
         capture: spawn("capture"),

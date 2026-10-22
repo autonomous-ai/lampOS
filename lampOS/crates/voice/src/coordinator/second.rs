@@ -1507,6 +1507,7 @@ mod tests {
                     early_end_blocks: None,
                     early_finalize: false,
                     open_name: false,
+                    unfinished_wait: false,
                     faint_level: None,
                     speaker,
                     capture,

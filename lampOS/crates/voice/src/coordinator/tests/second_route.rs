@@ -1481,6 +1481,7 @@ fn run(script: Script) -> Run {
         early_end_blocks: None,
         early_finalize: false,
         open_name: script.open_name,
+        unfinished_wait: false,
         faint_level: None,
         speaker: spawn("speaker"),
         capture: spawn("capture"),

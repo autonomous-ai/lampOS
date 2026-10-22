@@ -7,7 +7,7 @@
 #[cfg(test)]
 use crate::scenario_clock::monotonic_us;
 use crate::{
-    activity::{Activity, ObservedAudio, TurnDetector},
+    activity::{Activity, EndpointDecision, ObservedAudio, TurnDetector},
     admission::{
         AcceptanceBasis, Accepted, CaptureLineage, Context as AdmissionContext, Decision, Hold,
         InputAdmission, Rejection, Step as AdmissionStep, Update as AdmissionUpdate,
@@ -1268,6 +1268,9 @@ struct Rig {
     /// A sound just after a line that ended before its name goes on from it
     /// (`LAMP_SECOND_OPEN_NAME`, [`open_name`]).
     open_name: bool,
+    /// A due end of the line in hand held while the second route's words so
+    /// far end unfinished (`LAMP_SECOND_UNFINISHED_WAIT`, [`crate::unfinished_words`]).
+    unfinished_wait: bool,
     faint_level: Option<u8>,
     playout_start: PlayoutStart,
     /// `directed-fixture --fixture-at-ms`: the fixture's own turn, this long
@@ -4085,6 +4088,7 @@ fn spawn_rig(
         early_end_blocks: options.early_end_blocks,
         early_finalize: early_finalize::from_environment(),
         open_name: open_name::from_environment(),
+        unfinished_wait: crate::unfinished_words::on(),
         faint_level: options.faint_level,
         playout_start: options.playout_start,
         fixture_at_ms,
@@ -5738,7 +5742,7 @@ fn conversation_with_gate(
         .then(early_finalize::EarlyFinalize::default);
     // A due end held while the second route's words so far end unfinished
     // (`LAMP_SECOND_UNFINISHED_WAIT`): off unless set.
-    let unfinished_wait = crate::unfinished_words::on();
+    let unfinished_wait = rig.unfinished_wait;
     if let Some(early) = early.as_ref() {
         record(
             trace,
@@ -8992,7 +8996,7 @@ fn conversation_with_gate(
                     if let Some(current) = reply.as_ref() {
                         let mut endpoint_record = json!({"kind":"local_endpoint","owner":current.owner,"turn":current.owner.turn(),"at_us":at,
                                 "last_block_host_read_us":audio.captured_at_us,
-                                "includes_silence_wait_ms":detector.last_endpoint().map_or(detector.endpoint_silence_ms(), |decision| decision.silence_ms),
+                                "includes_silence_wait_ms":detector.last_endpoint().map_or(detector.endpoint_silence_ms(), EndpointDecision::quiet_ms),
                                 "acoustic_speech_end":null});
                         if near_call {
                             endpoint_record["onboarding_near_call"] = json!(
@@ -9157,7 +9161,7 @@ fn conversation_with_gate(
                     }
                     answer_audio.decided(current.owner.turn(), at);
                     let mut endpoint_record = json!({"kind":"local_endpoint","owner":current.owner,"turn":current.owner.turn(),"at_us":at,"last_block_host_read_us":input_end_us,
-                        "includes_silence_wait_ms":detector.last_endpoint().map_or(detector.endpoint_silence_ms(), |decision| decision.silence_ms),
+                        "includes_silence_wait_ms":detector.last_endpoint().map_or(detector.endpoint_silence_ms(), EndpointDecision::quiet_ms),
                         "acoustic_speech_end":null});
                     if as_sound {
                         endpoint_record["let_through_as_sound"] = json!(true);
@@ -14286,6 +14290,7 @@ mod tests {
             early_end_blocks: None,
             early_finalize: false,
             open_name: false,
+            unfinished_wait: false,
             faint_level: None,
             microphone: crate::options::Microphone::Mic2,
             speaker,

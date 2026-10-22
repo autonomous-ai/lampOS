@@ -703,6 +703,7 @@ fn conversation_sends_hand_stop_before_a_provider_fault_queued_in_the_same_tick(
         early_end_blocks: None,
         early_finalize: false,
         open_name: false,
+        unfinished_wait: false,
     };
     let (mut owner, current, permit) = active_reply();
     let old_owner = current.owner;
@@ -1431,6 +1432,7 @@ fn run_loop_ringed(
         early_end_blocks: None,
         early_finalize: false,
         open_name: false,
+        unfinished_wait: false,
     };
     // Every worker's side is read while the loop runs, as a worker reads
     // it: a message is stale 100 ms after it is sent. The speaker's keeps
