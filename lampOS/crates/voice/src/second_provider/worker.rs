@@ -6470,6 +6470,11 @@ impl NoteAsk {
                 if let Ok(mut answer) = answer.lock() {
                     *answer = Some(read);
                 }
+                // Its hold let go before it says it is done: once done, the
+                // read is the ask's alone, so one let go then is dropped at
+                // once and gives back the keep it took before any note is
+                // chosen.
+                drop(answer);
                 let _ = said.send(true);
             }
         };
@@ -6558,18 +6563,41 @@ struct Ahead {
     sessions: Arc<Mutex<Sessions>>,
     who: Option<PathBuf>,
     ask: AskNote,
+    /// How long a turn waits for its note from the ask, then for its
+    /// follow-up: the note's 300 ms each on the lamp (`remember::FIRST_READ`,
+    /// [`FOLLOW_UP_WITHIN`]).
+    within: (Duration, Duration),
 }
 
 impl Ahead {
     /// Asked with the voice's Days client on `socket`.
     fn reading(sessions: Arc<Mutex<Sessions>>, who: Option<PathBuf>, socket: PathBuf) -> Self {
+        Self::asking(
+            sessions,
+            who,
+            Arc::new(move |session, person, within, follow_up| {
+                crate::remember::fresh_note_read(&socket, session, person, within, follow_up)
+            }),
+        )
+    }
+
+    /// Asked with `ask`, a turn waiting as the lamp's do.
+    fn asking(sessions: Arc<Mutex<Sessions>>, who: Option<PathBuf>, ask: AskNote) -> Self {
         Self {
             sessions,
             who,
-            ask: Arc::new(move |session, person, within, follow_up| {
-                crate::remember::fresh_note_read(&socket, session, person, within, follow_up)
-            }),
+            ask,
+            within: (crate::remember::FIRST_READ, FOLLOW_UP_WITHIN),
         }
+    }
+
+    /// A turn waits up to `within` for its note from the ask, and as long
+    /// again for its follow-up: for a test on a loaded machine, whose turns
+    /// then wait on the read's own done mark, not on the lamp's 300 ms.
+    #[cfg(test)]
+    fn waiting_up_to(mut self, within: Duration) -> Self {
+        self.within = (within, within);
+        self
     }
 
     /// A spoken line begins, its turn told in `lease`: the note asked now
@@ -6604,8 +6632,8 @@ impl Ahead {
     /// Just before a turn told in `lease` is built, which only an answered
     /// line is: its scope is the answered one now, the note asked for it if
     /// it is due and none is (someone else's answer let go), and what to
-    /// wait on, until `FIRST_READ` after that ask began. Reads nothing
-    /// itself.
+    /// wait on, until `FIRST_READ` after that ask began (`within`). Reads
+    /// nothing itself.
     fn ready_now(
         &self,
         lease: Option<&crate::memory_scope::ScopeLease>,
@@ -6631,7 +6659,7 @@ impl Ahead {
         asked.waited = true;
         Some((
             asked.done.clone(),
-            asked.at + crate::remember::FIRST_READ,
+            asked.at + self.within.0,
             Arc::clone(&asked.answer),
         ))
     }
@@ -6671,13 +6699,14 @@ impl Ahead {
         let Some(mut read) = wanted else {
             return;
         };
+        let within = self.within.1;
         let reading = tokio::task::spawn_blocking(move || {
-            read.follow_up(FOLLOW_UP_WITHIN);
+            read.follow_up(within);
             if let Ok(mut slot) = answer.lock() {
                 *slot = Some(read);
             }
         });
-        let _ = tokio::time::timeout(FOLLOW_UP_WITHIN + FOLLOW_UP_SLACK, reading).await;
+        let _ = tokio::time::timeout(within + FOLLOW_UP_SLACK, reading).await;
     }
 
     /// The camera or the microphone closed or opened: what was asked
