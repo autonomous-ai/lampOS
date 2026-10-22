@@ -454,6 +454,12 @@ pub const REST_GLANCE_REACH: [f32; 3] = [50.0, 25.0, 0.0];
 /// did not start for a goal 30 counts ahead, and lifted for one 40 to 80
 /// ahead and stopped about 30 short of it (see [`WAKE_LIFT_LEAD`]).
 const GLANCE_LIFT_LEAD: f32 = 40.0;
+/// A head led back up from a glance that comes no count closer to its way
+/// for this many steps (1 s at `TICK`) is led no more until it is back
+/// there: a hand or a stall. Not shorter: lamp-52e6's head creeps back up
+/// with pauses longer than 200 ms, and cut after 10 steps it lost its lead
+/// for good and rested 15 to 19 counts low (#2818).
+const GLANCE_LEAD_STILL_STEPS: u8 = 50;
 
 /// A shift at rest and a drift of Expression's rest layer are one layer:
 /// no shift starts this soon after a drift (Expression keeps the same
@@ -4115,6 +4121,8 @@ fn run_on<P: PortIo, R: Runtime>(
     // below it.
     let mut led_below = 0u8;
     let mut closest = u16::MAX;
+    // Whether the head's goal was led on the last step, for the journal.
+    let mut leading = false;
     // A joint that has arrived and is asked nothing until the wanted pose
     // moves far enough from it; the steps each has been arriving for; and
     // the pose last wanted of each.
@@ -5155,11 +5163,9 @@ fn run_on<P: PortIo, R: Runtime>(
             let below = last_at.is_some();
             // A glance is judged with a gesture's bounds, so nothing else
             // ends a lead into a hand or a stall: led without coming a count
-            // closer for as many steps as the tracking check lets a head stay
-            // off its goal, the head is no longer led until it is back at its
-            // way. A head rising slowly against its weight keeps closing, and
-            // keeps its lead: cut after a count of steps instead, lamp-52e6's
-            // reached its way 10 s late (#2818).
+            // closer for `GLANCE_LEAD_STILL_STEPS`, the head is no longer led
+            // until it is back at its way. A head rising slowly against its
+            // weight keeps closing, and keeps its lead (#2818).
             let lead = index == 0 && glance_from.is_some() && (extra[0] < 0.0 || below);
             if index == 0 {
                 match last_at {
@@ -5168,12 +5174,29 @@ fn run_on<P: PortIo, R: Runtime>(
                     None => (closest, led_below) = (u16::MAX, 0),
                 }
             }
-            let led = if lead && led_below <= limits.tracking_steps {
+            let leads = lead && led_below <= GLANCE_LEAD_STILL_STEPS;
+            let led = if leads {
                 (commanded[index] - GLANCE_LIFT_LEAD).max(low[index].min(commanded[index]))
             } else {
                 commanded[index]
             };
             goals[index] = (led + over).round().clamp(least, 4_095.0) as u16;
+            if index == 0 && leads != leading {
+                leading = leads;
+                let why = match (leads, below, lead) {
+                    (true, _, _) => "starts",
+                    (false, false, _) => "ends: arrived",
+                    (false, true, true) => "ends: no progress for 1 s",
+                    (false, true, false) => "ends: the glance is over",
+                };
+                eprintln!(
+                    "lamp-body: step {} glance lead {why}; head {:?} way {:.0} goal {}",
+                    report.steps,
+                    report.last.map(|last| last[COMMANDED[0].index()].position),
+                    commanded[0],
+                    goals[0]
+                );
+            }
         }
         // A joint told to stop pushing is held where it was until something
         // else is wanted of it.
