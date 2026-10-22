@@ -1461,14 +1461,15 @@ fn run_call_with_scope(
                 lease,
                 || match lease {
                     // A keep in a line admitted as the room's before the
-                    // eyes named anyone goes to the known face they name by
-                    // now (#2807); the room's only when nobody known is.
+                    // eyes named anyone goes to the keeper recorded at the
+                    // line's end: the known face named by then plus 300 ms,
+                    // none other seen speaking it (#2807); the room's else.
                     Some(lease) if model.name == crate::remember::REMEMBER => {
                         let started = std::time::Instant::now();
                         match lease.keeper_within(crate::memory_scope::KEEPER_WAIT) {
                             Some(person) => {
                                 eprintln!(
-                                    "lamp-voice: request {request}: a keep in a line admitted as the room's goes to the known face the eyes name now ({} ms)",
+                                    "lamp-voice: request {request}: a keep in a line admitted as the room's goes to the known face the eyes named by its end ({} ms)",
                                     started.elapsed().as_millis()
                                 );
                                 crate::remember::run_scoped_for(
@@ -4500,6 +4501,10 @@ mod tests {
             cache,
         );
         fill();
+        // The line ends now: its keeper is the known face named by then
+        // plus `KEEPER_WAIT`, as the second voice records it.
+        let lease = owner.lease();
+        lease.record_keeper(lease.face_at_end(std::time::Instant::now()));
         let settings = Settings {
             memory: Some(socket.clone()),
             ..Default::default()
@@ -4519,8 +4524,8 @@ mod tests {
     /// #2807 on lamp-c0a4: right after a voice restart, a face just
     /// remembered said a dated event in the session's first line, which was
     /// admitted before the eyes named them, as the room's; its keep went to
-    /// `everyone`. The keep now goes to the face the eyes name by then, or
-    /// within a short wait, never the room.
+    /// `everyone`. The keep now goes to the face the eyes name by the line's
+    /// end, or within 300 ms past it, never the room.
     #[test]
     fn the_restarts_first_line_from_a_remembered_face_is_kept_as_theirs() {
         let ann = crate::remember::person_id("Ann");
@@ -4532,7 +4537,7 @@ mod tests {
             std::fs::remove_file(path).unwrap();
             seen
         };
-        // Named between the line's start and its keep.
+        // Named between the line's start and its end.
         let cache = std::sync::Arc::new(crate::memory_scope::FaceCache::default());
         let filled = cache.clone();
         let seen = face("before");
@@ -4540,7 +4545,7 @@ mod tests {
             filled.replace(filled.begin_refresh(), seen);
         });
         assert_eq!(asked["person"], json!(ann), "{asked}");
-        // Named only while the keep waits for the eyes.
+        // Named only within the wait past the line's end.
         let cache = std::sync::Arc::new(crate::memory_scope::FaceCache::default());
         let filled = cache.clone();
         let seen = face("during");
