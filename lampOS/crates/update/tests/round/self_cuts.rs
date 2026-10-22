@@ -4,7 +4,7 @@
 //! the real library performs the signed install, round, confirmation and back.
 use super::*;
 use std::{
-    io::Read,
+    io::{Read, Write},
     os::unix::fs::PermissionsExt,
     panic::{AssertUnwindSafe, catch_unwind, panic_any, resume_unwind},
     process::{Child, Command, Stdio},
@@ -14,18 +14,50 @@ use std::{
 const OLD: &str = "#!/bin/sh\nprintf 'old-updater\\n'\n";
 const NEW: &str = "#!/bin/sh\nprintf 'new-updater\\n'\n";
 
+thread_local! {
+    static EXECUTABLE_CHECK: Cell<usize> = const { Cell::new(0) };
+}
+
 /// Only the two immediate, builtin-only scripts above are run here. Reap
 /// on both assertion failure and timeout; neither script creates children.
 struct Running(Child);
 
 impl Drop for Running {
     fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
+        let started = Instant::now();
+        let killed = self.0.kill();
+        let reaped = self.0.wait();
+        if std::thread::panicking() {
+            // Do not panic again if the test runner's stderr is unavailable.
+            let _ = writeln!(
+                io::stderr().lock(),
+                "updater fixture cleanup: pid={} kill={killed:?} reap={reaped:?} elapsed={:?}",
+                self.0.id(),
+                started.elapsed(),
+            );
+        }
     }
 }
 
+#[track_caller]
 fn executable(path: &Path, script: &str) {
+    let invocation = EXECUTABLE_CHECK.with(|count| {
+        let next = count.get() + 1;
+        count.set(next);
+        next
+    });
+    let expected = if script == OLD {
+        "old"
+    } else {
+        assert_eq!(script, NEW);
+        "new"
+    };
+    let context = format!(
+        "check={invocation} caller={} path={} expected={expected} sha256={}",
+        std::panic::Location::caller(),
+        path.display(),
+        sha(script),
+    );
     assert_eq!(fs::read(path).unwrap(), script.as_bytes());
     let metadata = fs::symlink_metadata(path).unwrap();
     assert!(metadata.is_file(), "the executable must be a regular file");
@@ -38,18 +70,39 @@ fn executable(path: &Path, script: &str) {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
-            .expect("the selected updater must execute"),
+            .unwrap_or_else(|error| {
+                panic!("the selected updater must execute: {context}; {error}")
+            }),
     );
-    let deadline = Instant::now() + Duration::from_secs(2);
+    let started = Instant::now();
+    let deadline = started + Duration::from_secs(2);
+    let mut polls = 0;
     let status = loop {
-        if let Some(status) = child.0.try_wait().unwrap() {
+        let poll_started = started.elapsed();
+        let observed = child.0.try_wait();
+        let poll_finished = started.elapsed();
+        polls += 1;
+        if let Some(status) = observed.unwrap_or_else(|error| {
+            panic!("cannot read updater fixture status: {context}; {error}")
+        }) {
             break status;
         }
-        assert!(Instant::now() < deadline, "updater fixture did not exit");
+        if Instant::now() >= deadline {
+            let elapsed = started.elapsed();
+            // The child may exit while the parent is descheduled after the
+            // previous poll. Preserve that evidence without clearing failure.
+            let final_status = child.0.try_wait();
+            panic!(
+                "updater fixture did not exit: {context}; pid={} elapsed={elapsed:?} \
+                 polls={polls} last_poll={poll_started:?}..{poll_finished:?} \
+                 final_status={final_status:?} (diagnostic only; timeout still fails)",
+                child.0.id(),
+            );
+        }
         // Polling bounds the child; it does not choose a cut or order writes.
         std::thread::sleep(Duration::from_millis(5));
     };
-    assert!(status.success(), "{status}");
+    assert!(status.success(), "{context}; {status}");
     let mut output = String::new();
     child
         .0
@@ -66,10 +119,12 @@ fn executable(path: &Path, script: &str) {
         } else {
             assert_eq!(script, NEW);
             "new-updater\n"
-        }
+        },
+        "{context}",
     );
 }
 
+#[track_caller]
 fn build(lamp: &Lamp, script: &str) {
     executable(
         &lamp
@@ -82,6 +137,7 @@ fn build(lamp: &Lamp, script: &str) {
 
 /// Check the selected executable before the expected link name: an unsafe
 /// unlink/target mutation must fail because the selected file is absent.
+#[track_caller]
 fn boundary(lamp: &Lamp, current: &str) {
     executable(&lamp.config.on(own::CURRENT).join(own::BINARY), current);
     assert_eq!(lamp.own_build(), sha(current));
@@ -91,6 +147,7 @@ fn boundary(lamp: &Lamp, current: &str) {
     executable(&lamp.config.on(own::BACK), OLD);
 }
 
+#[track_caller]
 fn prepared() -> Lamp {
     let mut lamp = Lamp::installed_with_updater(OLD);
     lamp.config.self_switch = true;
@@ -127,6 +184,7 @@ fn pending(lamp: &Lamp) -> own::Pending {
     pending
 }
 
+#[track_caller]
 fn switch(lamp: &mut Lamp) {
     assert_eq!(
         lamp.round(),
@@ -142,6 +200,7 @@ fn switch(lamp: &mut Lamp) {
     boundary(lamp, NEW);
 }
 
+#[track_caller]
 fn confirmed(lamp: &mut Lamp) {
     assert!(lamp.pending().is_none());
     assert!(own::refused(&lamp.records()).is_empty());
@@ -154,6 +213,7 @@ fn confirmed(lamp: &mut Lamp) {
     boundary(lamp, NEW);
 }
 
+#[track_caller]
 fn put_back(lamp: &mut Lamp) {
     assert!(matches!(
         lamp.back(update_unit("failed", "failed"), u64::MAX),

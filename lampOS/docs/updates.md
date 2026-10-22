@@ -808,6 +808,16 @@ prefix. These are logical filesystem-prefix checks, not physical power-loss
 or fsync durability proof, and the stubs do not exercise the daemon's `exec`
 handover.
 
+Each stub still has a two-second exit-observation bound after spawn, with
+five-millisecond polls. A timeout reports the check number on its test
+thread, call site, executable path, expected old/new bytes' hash, PID and
+poll timings; a last nonblocking status read is diagnostic only and cannot
+turn the timeout into a pass.
+Failure cleanup records the kill and reap results. These details distinguish
+the repeated checks when one fails; they do not establish why the original
+Mac consumer run timed out (#1569/#3012), extend its bound, or qualify that
+failed run. Runtime updater code and recovery assertions are unchanged.
+
 **Unclean process death at the write boundaries** (#2810). The separate
 Linux `self-process-cuts` test uses the same signed install/round fixture in
 a single-threaded driver. Its parent traces an owned child, stops immediately
