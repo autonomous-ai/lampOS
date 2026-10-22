@@ -5,6 +5,29 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-22 23:36 — wake gate running; gap-count docs proposed
+
+Ready for lamp-voice: no (wake full gate running; third-P2 not yet edited).
+
+- Wake correction: the unchanged `6b8cb6e8f` code reproduced the false
+  `conversation_ended` row at 104 ms of scenario time. The correction
+  passed 104 hand-controls tests, zero failed, three existing ignored,
+  and formatting on the Mac. Enabled wake times remain 60/60/62/64 ms
+  for permission/capture/decision/first speaker send; no acoustic claim.
+- The identical four-file patch is on `a37144927`. Strict workspace
+  Clippy failed only on Eyes' unused `ask_helper`; the failure is posted
+  on its owning #3071 and the Queue. #3071 is now merged as `7cedcc71c`.
+  The full twelve-crate Voice/dependent test command continues on the
+  frozen tree; after completion, take the upstream correction and repeat
+  Clippy before any task push. No local ARM64 linking or device access.
+- third-P2 is proposed on #2602 under the fifteen-minute self-pick rule:
+  the Controls checklist wrongly offers journal lines as a total count
+  of long gaps. `Pace` suppresses warnings for one second, and a final
+  suppressed count is never flushed without another long gap. Correct
+  only `docs/controls.md` and the owned row in `docs/lamp-runs.md` to use
+  diagnostics `long_gaps` deltas for totals. No runtime change or new
+  hardware run is proposed. Source read only; no doc edit yet.
+
 ## 2026-10-22 23:16 — disabled wake-cue review follow-up taken
 
 Ready for lamp-voice: no (new follow-up on `third/wake-cue-off-record`).
@@ -3570,6 +3593,7 @@ router, hotspot or lamp; step 4 of #806 needs a builder with a lamp.
 | Id | Proposal | Issue | Answer |
 |---|---|---|---|
 | third-P1 | Expression reads the system's time zone (`--zone system`), so a lamp outside Vietnam keeps its days across daylight saving; Memory's owner the same | #820 | Yes (First, 18:20; Second for the policy, 18:34); #844 |
+| third-P2 | Use diagnostic long-gap counter deltas for Controls totals; rate-limited journal warnings can omit the final suppressed gaps | #2602, 22 Oct 23:36 | Proposed under the fifteen-minute self-pick rule; two docs only |
 
 ## 2026-10-15 — Setup for a home (#806) ready as #817; #795 and #808 rebased
 
