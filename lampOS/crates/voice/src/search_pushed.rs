@@ -28,7 +28,7 @@ use std::{
 pub const NOTE: &str = "(For you to know, not to answer: the person stopped the search with a hand, pushing the lamp as it looked. The search is over: do not look again unless they ask you to in words, and say nothing about the push.)";
 
 /// What a look call held after a push is answered.
-pub const HELD: &str = "Not done: the person stopped the search with a hand. Do not look again unless they ask you to in words.";
+pub const HELD: &str = "Not done: the person stopped the search with a hand. Do not look again unless they ask you to in words, and say nothing about the push.";
 
 /// Why a look is dropped after a push, in the journal and the trace.
 pub const WHY: &str = "the body was pushed";
@@ -93,6 +93,17 @@ impl SearchPushed {
             name: name.to_owned(),
             skill: skill_of(name, args),
         });
+    }
+
+    /// A search's own turn (`Written { search: true }`: a look's, its
+    /// note's, or a walk step's look the coordinator asked itself) was
+    /// taken at `at_us`: the search goes on, and its [`SEARCH_HELD_US`]
+    /// counts from here (El's P2 on #2990: a walked search's later looks
+    /// are none the worker asked).
+    pub fn went_on(&mut self, at_us: u64) {
+        if let Some(search) = self.search.as_mut() {
+            search.at_us = search.at_us.max(at_us);
+        }
     }
 
     /// The body was pushed at `at_us`: whether a search was going on, now
@@ -331,6 +342,25 @@ mod tests {
         // Nor a search whose looks are long held out.
         let mut old = searching();
         assert!(!old.hand(S + SEARCH_HELD_US));
+    }
+
+    #[test]
+    fn a_walked_search_goes_on_with_its_turns_past_two_minutes() {
+        // The walk's look turns, none a look the worker asked: each one
+        // taken counts as the search's newest (El's P2 on #2990).
+        let mut walked = searching();
+        walked.went_on(S + 100 * S);
+        walked.went_on(S + 200 * S);
+        assert!(walked.hand(S + 250 * S));
+        // An older turn taken late never moves it back.
+        let mut late = searching();
+        late.went_on(S + 100 * S);
+        late.went_on(S);
+        assert!(late.hand(S + 200 * S));
+        // With no search, a search's turn begins none.
+        let mut none = SearchPushed::default();
+        none.went_on(S);
+        assert!(!none.hand(2 * S));
     }
 
     #[test]

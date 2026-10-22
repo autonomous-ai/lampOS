@@ -44,13 +44,17 @@ pub(crate) const CAPTURE_GAP: &str = "capture_gap";
 /// A stop phrase said over the lamp's voice and heard while it speaks
 /// (`LAMP_STOP_WORDS=heard-always`, #828): the hand's stop, by voice.
 pub(crate) const SPOKEN_STOP: &str = "spoken_stop";
-pub(crate) const LOCAL_CANCELS: [&str; 6] = [
+/// A push on the body while a skill's search goes on (`body/hand`, #2904):
+/// the search's turn in hand is cut as a spoken stop cuts it.
+pub(crate) const BODY_PUSHED: &str = "body_pushed";
+pub(crate) const LOCAL_CANCELS: [&str; 7] = [
     HEAD_SLEEP,
     SOFTWARE_MUTED,
     HAND_STOP,
     HEAD_STOP,
     CAPTURE_GAP,
     SPOKEN_STOP,
+    BODY_PUSHED,
 ];
 
 impl ReceiptHistory {

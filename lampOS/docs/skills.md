@@ -865,8 +865,9 @@ step dropped while its call is in flight (the person spoke within its
 ended the step came before it began, so it may hold until its `for`; a
 check for the lamp row, not yet handled. A push on the body that ends a
 search here ends it for the second route too (#2904): the held look's
-picture is dropped, no note or walk follows, no look runs for 30 s in a
-turn the lamp wrote, and the person's next request is told they stopped
+picture is dropped, the search's turn in hand is cut as a spoken stop
+cuts it, no note or walk follows, no look runs for 30 s in a turn the
+lamp wrote or one asked before the push, and the person's next request is told they stopped
 the search with a hand ([second-voice.md](second-voice.md)). When the turn is over the look's
 written turn goes with the still. The still cannot go in the call's answer
 itself: a function's answer to Gemini Live is words, and the call is

@@ -163,6 +163,10 @@ struct Script {
     /// The body says it is pushed (`body/hand`, #2904), from then on, on
     /// the bus `TEST_HAND_IN` reads.
     push: Option<When>,
+    /// Alone, the first look's turn is answered only this many capture
+    /// frames after the push, as a model thinks over a picture: the push
+    /// lands while the answer is awaited.
+    answer_after_push: Option<u64>,
     /// Privacy reports muted once this many turns are settled.
     turns: usize,
     /// The Live link is Ready again, with a new session, once this many
@@ -262,6 +266,7 @@ impl Script {
             murmur: None,
             hand_stop: None,
             push: None,
+            answer_after_push: None,
             turns: 1,
             live_back_after: None,
             live_late: None,
@@ -499,6 +504,11 @@ struct Peers {
     look_turns: usize,
     /// The capture frame the murmur began at (`Script::murmur`).
     murmur_at: Option<u64>,
+    /// The capture frame the push began at (`Script::push`).
+    pushed_at: Option<u64>,
+    /// A look's answer held for `Script::answer_after_push`: its peer and
+    /// what it says.
+    held_answer: Option<(usize, Vec<ProviderOutput>)>,
     /// Controls' queue into the voice's hand controls (`Script::hand_stop`).
     hand: Option<crate::hand_controls::TestControls>,
 }
@@ -584,12 +594,19 @@ impl Peers {
             };
             if due {
                 self.script.push = None;
+                self.pushed_at = Some(self.frames);
                 TEST_BODY_HAND.with(|slot| {
                     if let Some((pushed, _)) = slot.borrow_mut().as_mut() {
                         *pushed = true;
                     }
                 });
             }
+        }
+        if let (Some(after), Some(at)) = (self.script.answer_after_push, self.pushed_at)
+            && self.frames >= at + after
+            && let Some((index, answer)) = self.held_answer.take()
+        {
+            self.peers[index].queued.extend(answer);
         }
         // Held pushed, the body says so again and again, as it does every
         // 100 ms: one push, from when it began.
@@ -989,6 +1006,7 @@ impl Peers {
                         }
                         Written::Said(packets) => {
                             queued.push_back(started);
+                            let before = self.peers[index].queued.len();
                             // Alone, a look's turn or the look's note is
                             // answered as the script says.
                             let answer = if live {
@@ -1034,6 +1052,15 @@ impl Peers {
                                     .push_back(ProviderOutput::LookNoCall { request, session });
                             }
                             self.finish(index, request);
+                            // Alone, the first look's answer waits for the
+                            // push (`Script::answer_after_push`).
+                            if look
+                                && self.look_turns == 1
+                                && self.script.answer_after_push.is_some()
+                            {
+                                let answer = self.peers[index].queued.split_off(before);
+                                self.held_answer = Some((index, answer.into()));
+                            }
                         }
                     }
                 }
@@ -1639,6 +1666,8 @@ fn run(script: Script) -> Run {
         second_looked: false,
         look_turns: 0,
         murmur_at: None,
+        pushed_at: None,
+        held_answer: None,
         hand,
     };
     let started = crate::scenario_clock::instant();
@@ -2408,6 +2437,16 @@ fn a_hand_stop_after_a_looks_answer_drops_its_note() {
 /// A skill's search on the second route alone, with the note, and the
 /// body's `body/hand` on a bus of the run's own: pushed from `push` on.
 fn pushed_search(push: Option<When>) -> Run {
+    pushed_search_answering(push, &[LookAnswer::Nothing], None)
+}
+
+/// [`pushed_search`], its look's turns answered as `look_answers` says,
+/// the first only `answer_after_push` frames after the push if given.
+fn pushed_search_answering(
+    push: Option<When>,
+    look_answers: &'static [LookAnswer],
+    answer_after_push: Option<u64>,
+) -> Run {
     let root = PathBuf::from(format!("/tmp/lv-hand-loop-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(&root).unwrap();
@@ -2436,9 +2475,10 @@ fn pushed_search(push: Option<When>) -> Run {
         only: true,
         second: false,
         second_looks: true,
-        look_answers: &[LookAnswer::Nothing],
+        look_answers,
         note_answer: LookAnswer::Other,
         push,
+        answer_after_push,
         turn_taking: TurnTaking::VadOnly,
         mute_at_frame: Some(1_100),
         written: Written::Said(6),
@@ -2481,11 +2521,67 @@ fn a_push_mid_search_drops_its_looks_picture() {
     assert_eq!(pushed[0]["look_dropped"], 1);
     assert!(look_notes(&run).is_empty());
 
+    // The turn saying it will look was the search's: it is cut, as a spoken
+    // stop cuts it.
+    assert_eq!(pushed[0]["turn_cut"], true, "{}", run.summary());
+    assert!(
+        run.events("hand_control_cancel")
+            .iter()
+            .any(|e| e["reason"] == crate::receipt_history::BODY_PUSHED),
+        "{}",
+        run.summary()
+    );
+
     let unpushed = pushed_search(None);
     unpushed.assert_clean();
     assert_eq!(look_turns(&unpushed).len(), 1, "{}", unpushed.summary());
     assert_eq!(look_notes(&unpushed).len(), 1);
     assert!(unpushed.events("search_pushed").is_empty());
+    assert!(unpushed.events("hand_control_cancel").is_empty());
+}
+
+/// El's P2 on #2990: a push as the look's picture has gone to the model,
+/// while the head holds its pose, cuts that look's turn as a spoken stop
+/// cuts it: the model's answer to the pushed look's picture is never
+/// played, and its `look_for` for the next place is not taken, so no
+/// second round speaks. Unpushed, the same answers look again.
+#[test]
+fn a_push_once_the_looks_picture_went_cuts_its_answer() {
+    let _one = super::pilot_faults::one_session();
+    let answers = &[LookAnswer::Next, LookAnswer::Next];
+    let run = pushed_search_answering(Some(When::LookTurns(1)), answers, Some(30));
+    run.assert_clean();
+    let looks = look_turns(&run);
+    assert_eq!(looks.len(), 1, "{}", run.summary());
+    let look = looks[0];
+    let pushed = run.events("search_pushed");
+    assert_eq!(pushed.len(), 1, "{}", run.summary());
+    assert_eq!(pushed[0]["turn_cut"], true, "{}", run.summary());
+    assert_eq!(
+        run.finished(look)["outcome"],
+        crate::receipt_history::BODY_PUSHED,
+        "{}",
+        run.summary()
+    );
+    assert!(run.played(look).is_empty(), "{}", run.summary());
+    // Nothing after it: no look asked, no turn written, no audio.
+    assert!(
+        !run.events("look_asked")
+            .iter()
+            .any(|e| e["turn"].as_u64() >= Some(look)),
+        "{}",
+        run.summary()
+    );
+    assert!(
+        run.seen.chunks.iter().all(|c| c.turn <= look),
+        "{}",
+        run.summary()
+    );
+    assert!(look_notes(&run).is_empty());
+
+    let unpushed = pushed_search_answering(None, answers, None);
+    unpushed.assert_clean();
+    assert!(look_turns(&unpushed).len() >= 2, "{}", unpushed.summary());
 }
 
 /// (e) Without `LAMP_SECOND_LOOK_NOTE`, a look left with no call is as

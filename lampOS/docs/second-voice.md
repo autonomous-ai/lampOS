@@ -2653,9 +2653,10 @@ after a take-over, but now for every turn:
   a stop by hand or a pause comes; each step is `look_walk_asked` with
   `place`, each end `look_walk_dropped` with `why`. The journal says `a
   search's note answered with nothing called is told to the coordinator`.
-- **A push ends the search for the voice too** (#2904; with
-  `LAMP_SECOND_SKILL_LOOK=on` and the bus, `LAMP_BUS=on`; no switch of its
-  own, since it only acts on a push during a search). lamp-skills ends a
+- **A push ends the search for the voice too** (#2904; no switch of its
+  own: the coordinator's `HandIn` reads `body/hand` whenever
+  `LAMP_BUS=on`, and does nothing without a search going on, which needs
+  `LAMP_SECOND_SKILL_LOOK=on`). lamp-skills ends a
   search when the body says it is pushed (`body/hand`), and the voice reads
   the same topic (`search_pushed::HandIn`: its latest value every 50 ms,
   each push once by its `since_us`, nothing older than a second). On
@@ -2664,21 +2665,28 @@ after a take-over, but now for every turn:
   `look_for` again 4 s later, and the base turned again. Now the
   coordinator, on a push while a search goes on, drops the held look's
   picture (`look_dropped`, why "the body was pushed") and the search's note
-  and walk, and records `search_pushed`. The worker reads the push too
+  and walk, and records `search_pushed` (`turn_cut`: whether it cut a
+  turn). A search's turn in hand (the one that asked the look, saying
+  "Let me look on the left", or a look's, whose picture the model is
+  answering) is cut as a spoken stop cuts it (`hand_control_cancel` and
+  `turn_finished` with `body_pushed`), and what its request still sends
+  is fenced, so the model's answer to the pushed look's picture never
+  plays and no second round speaks (El's P2 on #2990). The worker reads the push too
   (`search_pushed::read_from`, `Engine::stopping_searches_by_hand`): for
   30 s (`search_pushed::QUIET_US`) it runs no `take_a_look` and no call of
   the search's skill (`look_for`, or `use_skill` naming it) in a turn the
   lamp wrote or one asked before the push; each is answered "Not done: the
   person stopped the search with a hand. Do not look again unless they ask
-  you to in words." and the journal says `request N chat round R: look_for
+  you to in words, and say nothing about the push." and the journal says `request N chat round R: look_for
   not run: the body was pushed`. The person's next request is told, once,
   as `LAMP_STOP_TOLD` tells a stop: "(For you to know, not to answer: the
   person stopped the search with a hand, pushing the lamp as it looked.
   The search is over: do not look again unless they ask you to in words,
   and say nothing about the push.)" (`search_pushed::NOTE`), and that
   request's own words may look again. A push counts only while a search
-  goes on: within two minutes of its newest look (look-for-things holds
-  each look's pose that long) and before the person's next words; any
+  goes on: within two minutes of its newest look or search turn taken (a
+  walk step's look turn, which the worker never asked, counts too;
+  look-for-things holds each look's pose that long) and before the person's next words; any
   other push changes nothing here.
 - **Live route only, so not on this route:**
   the head tap for whom it answers, sight and camera facts, and

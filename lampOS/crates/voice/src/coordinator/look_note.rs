@@ -162,6 +162,19 @@ struct Search {
     closing: bool,
     /// Its walk ended for good: dropped, or the places looked at.
     walk_over: bool,
+    /// Its turns: the one the person spoke, its looks', its note's and
+    /// those the walk asked from. A push cuts one of them in hand.
+    turns: Vec<u64>,
+}
+
+impl Search {
+    /// `turn` goes on with the search. Bounded: a search takes at most
+    /// [`SEARCH_LOOKS_AT_MOST`] looks, each with a turn or two.
+    fn took(&mut self, turn: u64) {
+        if !self.turns.contains(&turn) {
+            self.turns.push(turn);
+        }
+    }
 }
 
 /// A walk step's call to the skill, on its thread, and its answer.
@@ -259,14 +272,18 @@ impl LookNote {
                 places: place_of(call.as_ref(), walk.as_ref()).into_iter().collect(),
                 call,
                 walk,
+                turns: vec![turn],
                 ..Search::default()
             });
             self.pending = None;
             self.step = None;
-        } else if let (Some(search), Some(call)) = (self.search.as_mut(), call) {
-            search
-                .places
-                .extend(place_of(Some(&call), search.walk.as_ref()));
+        } else if let Some(search) = self.search.as_mut() {
+            search.took(turn);
+            if let Some(call) = call {
+                search
+                    .places
+                    .extend(place_of(Some(&call), search.walk.as_ref()));
+            }
         }
     }
 
@@ -278,6 +295,7 @@ impl LookNote {
             && let Some(search) = self.search.as_mut()
         {
             search.look_turn = Some(look_turn);
+            search.took(look_turn);
             search.looks += 1;
             if search.looks >= SEARCH_LOOKS_AT_MOST {
                 search.spent_turn = Some(look_turn);
@@ -380,14 +398,23 @@ impl LookNote {
 
     /// A push on the body (`body/hand`, #2904) ends the search as a stop by
     /// hand does. `None` with no search begun; else the turn whose skill's
-    /// look is held, if one: its picture is not to go.
-    pub fn pushed(&mut self) -> Option<Option<u64>> {
+    /// look is held, if one (its picture is not to go), and whether the
+    /// turn in hand, `in_hand`, is the search's (the look's answer, or
+    /// the one that asked the look): it is cut as a spoken stop cuts it.
+    pub fn pushed(&mut self, in_hand: Option<u64>) -> Option<(Option<u64>, bool)> {
         if self.search.is_none() && self.held.is_none() {
             return None;
         }
         let held = self.held;
+        let its_turn = in_hand.is_some_and(|turn| {
+            held == Some(turn)
+                || self
+                    .search
+                    .as_ref()
+                    .is_some_and(|search| search.turns.contains(&turn))
+        });
         self.clear();
-        Some(held)
+        Some((held, its_turn))
     }
 
     /// The person speaking, another turn, a session or worker change, or a
@@ -453,6 +480,7 @@ impl LookNote {
     fn noted_in(&mut self, turn: u64) {
         if let Some(search) = self.search.as_mut() {
             search.note_turn = Some(turn);
+            search.took(turn);
         }
     }
 

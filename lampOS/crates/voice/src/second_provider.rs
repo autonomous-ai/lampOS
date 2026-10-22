@@ -2513,6 +2513,12 @@ impl Engine {
                 if !self.begin(request, session) {
                     return;
                 }
+                // A search's own turn: the search a push may end goes on
+                // from now, the walk's looks included (#2904).
+                if search {
+                    self.shared
+                        .search_pushed(|pushed| pushed.went_on(monotonic_us()));
+                }
                 // The lamp taking a look: the eye's newest picture goes with
                 // the words, as on the Live route. With none, the model is
                 // told it saw nothing, never left to describe a picture it
