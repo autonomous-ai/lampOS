@@ -1,0 +1,59 @@
+# Updater process cuts: native checkpoint, 22 October 2026
+
+This checkpoint preserves the successful earlier phase of [PR #3012](https://github.com/autonomous-ai/lampOS/pull/3012)
+for [#2810](https://github.com/autonomous-ai/lampOS/issues/2810). It does **not** qualify the latest rebased PR head or close
+the physical-unplug work.
+
+[Official ARM64 run 39774177876](https://github.com/autonomous-ai/lampOS/actions/runs/39774177876)
+passed at head `33a43cdd245146bf674127b4792f28b3576de879`, tested as merge
+`d4668ab93d1fb89d8a535741b28da0b64ca3a268` with base
+`8e274b5e394b09ef5e5f18cb0d2382fbaddec95a`:
+
+- Nextest: **10,451 passed / 0 failed / 67 skipped**, **179.036 s**. One passing
+  test was marked LEAK: `same_voice::tests::each_line_the_check_says_is_said_to_its_journal`.
+- The updater process-cut checker explicitly passed in **3.755 s**. It is one
+  checker covering seven cuts; those seven cases are not added to the test total.
+- Separately: **4 doctests**, **12 process-harness tests**, and `relay_signals: ok`.
+  Captured nested test stdout is excluded from all additional counts.
+- [x86 Clippy 39774177794](https://github.com/autonomous-ai/lampOS/actions/runs/39774177794)
+  passed on that same old head. This checkpoint verifies its run/step metadata;
+  it does not claim an independent audit of a Clippy log.
+
+The ARM64 log retains eight Cargo example-output collision warnings and a
+Node action-runtime deprecation annotation. [native.json](native.json) records
+the exact warning and leak rows, counts, source identity, and raw-input hashes.
+
+Artifact **12425151983** was fully downloaded and rechecked offline: **50 ZIP
+members**, **49 checksummed payloads** (47 binaries and two examples). All
+member hashes match `SHA256SUMS`; archive digest matches the recorded API digest:
+`df8de6db01be5d1424567818c43b7f0adaf87b3bc1e28a0802ce95a56497b6e1`.
+The retained updater is ELF64 little-endian AArch64, SHA-256
+`a42dbaade44bc19a65addcb18bd09d1dbdf764c55d571f0e05551c6200dce535`. It was not executed or copied into this proof. A PR merge
+artifact is not a signed release or production-publication input.
+
+The later, **unpublished** local head `38aab2919d47b42a8b27c95448ca8ab7201b8923` on
+`d7492ca743141d9c8afbefbd390407e1e58132aa` passed Mac fmt (**5.160 s**), strict all-target
+Update Clippy (**17.400 s**), and Update tests (**345.358 s**):
+**306 passed / 0 failed / 3 ignored / 0 filtered**. [mac.json](mac.json) preserves
+all 35 unchanged source hashes and the equal (`=`) range comparison. The raw
+receipt's `base` field names the local head; this export labels that distinction.
+The Linux-only process checker is one of the Mac ignores.
+
+At this checkpoint, the public head is `53911e246558cfdfd7f7f371b51afdd235fdc5ea` on
+`6f1123f69b33e352d5ba5e149a47fc68ea079d7a`. Its patch range remains equal to the old
+qualified commit, with later integration changes. Fresh
+[ARM64 39778575538](https://github.com/autonomous-ai/lampOS/actions/runs/39778575538) and
+[Clippy 39778575540](https://github.com/autonomous-ai/lampOS/actions/runs/39778575540) are recorded as **running,
+not qualified**. Their eventual result belongs in a separate receipt.
+
+The [initial cut/control proof](https://github.com/autonomous-ai/lampOS/tree/33a43cdd245146bf674127b4792f28b3576de879/lampOS/docs/verification/updater-process-cuts-20261022) retains prior failures and the limits
+of syscall-stop recovery. The [attended-unplug plan](https://github.com/autonomous-ai/lampOS/blob/33a43cdd245146bf674127b4792f28b3576de879/lampOS/docs/verification/updater-attended-unplug-plan-20261022.md) remains unexecuted;
+physical interruption requires the assigned person and approved lamp access.
+The [#1812 signed-release exercise](https://github.com/autonomous-ai/lampOS/issues/1812) is also undone and still
+needs owner/key/publication and device prerequisites. No physical power-loss,
+flash durability, installed-daemon handover, or real signed-release result is
+claimed here.
+
+These are compact normalized records, not copies of private raw logs or
+receipts. [SHA256SUMS](SHA256SUMS) binds all three public files. No raw logs,
+artifact archive, updater binary, keys, or personal host paths are published.
