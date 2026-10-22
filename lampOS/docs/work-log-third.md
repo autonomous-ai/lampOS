@@ -5,6 +5,36 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 01:13 — wake fix landed with the combined native gate
+
+Ready for lamp-voice: yes (#3087 landed; #3088 read and rebased for the next train).
+
+- First merged train #3090 as `c7003f01d`, then closed #3087 with its
+  carry record. Source `b6d7377b5` and carried `b819200d5` compare equal
+  in range-diff. The train head `2a27a6278` and landed tree are identical.
+- [Combined ARM64 39825146547](https://github.com/autonomous-ai/lampOS/actions/runs/39825146547)
+  finished successfully on the train's merge with `28f796223`:
+  **10,624 passed, zero failed, 67 skipped**, including the disabled-hum
+  regression in 0.020 s. The existing same-voice journal test again
+  reported a leaky pass. Four doctests and twelve own-harness process
+  checks passed separately. The release build and artifact upload passed.
+- [Combined Linux Clippy 39825146557](https://github.com/autonomous-ai/lampOS/actions/runs/39825146557)
+  also finished successfully. `gh pr checks 3090 --watch --interval 60`
+  exited zero; both required job conclusions were checked individually.
+  No local ARM64 linking, install, acoustic measurement or device test.
+- #3088 is now `5de82a7d6` on `c7003f01d`, pushed with an exact old-head
+  lease. Its one documentation patch compares equal to reviewer-two's
+  cleanly read `5b6409c77`; `git diff --check` passes. First owns its
+  train inclusion and Fifth's additional hand-trial read remains assigned.
+- The clean working branch and log are current with `c7003f01d`; all 110
+  previous log patches compare equal. Local AGENTS.md matches origin's
+  current builder protocol. Queue and own-PR comments are read through
+  01:12 with no unhandled request to Third.
+- Remaining acceptance needs people: First's coherent #2948 carry and
+  Fifth/person's attended lamp-52e6 hand trial for #1798; First's full
+  same-lines comparisons for #2136. #2948 remains draft. No hardware
+  proof is inferred from the source or combined CI result.
+
 ## 2026-10-23 00:53 — documentation landed; wake carry verified
 
 Ready for lamp-voice: yes (#3087 in First's train 3; #3088 read for the next train).
