@@ -1294,9 +1294,10 @@ rule 8). Without it, a lamp at rest is not stirred, exactly as before.
   back up after a glance dipped it, for as long as it reads more than 6
   counts below its way back: unled, lamp-52e6's stopped 26 short of where
   it rested and rested there, and the factory's `head_move` failed (#2818).
-  Still below after as many steps as the tracking check allows (10), it
-  is led no more until it is back: a glance is judged as a gesture, so
-  nothing else ends a lead into a hand or a stall.
+  Led without coming a count closer for as many steps as the tracking
+  check allows (10), it is led no more until it is back: a glance is
+  judged as a gesture, so nothing else ends a lead into a hand or a stall.
+  A head rising slowly against its weight keeps closing and keeps its lead.
 - **Judged as a gesture.** While it glances and for half a second after,
   a head that lags or strains is let go as in a gesture, and the run goes
   on. The load, warmth and wire checks stay.

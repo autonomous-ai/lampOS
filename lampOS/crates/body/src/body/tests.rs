@@ -57,6 +57,9 @@ struct Lamp {
     /// reads this load while it does, as lamp-52e6's head pitch did after a
     /// power cut. Servo, above, counts, load.
     heavy: Option<(usize, f32, f32, u16)>,
+    /// One servo lifts (toward fewer counts) no faster than this many
+    /// counts a second, as a head rising slowly against its weight.
+    climb: Option<(usize, f32)>,
     silent_from: Option<Duration>,
     silent_until: Option<Duration>,
     event: Option<(Duration, usize, Event)>,
@@ -154,6 +157,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             wall: None,
             short: None,
             heavy: None,
+            climb: None,
             silent_from: None,
             silent_until: None,
             event: None,
@@ -276,7 +280,11 @@ impl Lamp {
                     wanted = (wanted + by).min(servo.position);
                 }
             }
-            let moved = (wanted - servo.position).clamp(-fastest * step, fastest * step);
+            let rising = match self.climb {
+                Some((slow, most)) if slow == index => most.min(fastest),
+                _ => fastest,
+            };
+            let moved = (wanted - servo.position).clamp(-rising * step, fastest * step);
             servo.position += moved;
             if let Some((walled, at)) = self.wall
                 && walled == index
@@ -3351,6 +3359,35 @@ fn a_head_held_part_way_back_from_a_glance_is_not_led_into_the_hand() {
     assert!(
         led <= tracking_steps + 1,
         "led {led} steps into a hand, bound {tracking_steps}"
+    );
+}
+
+/// A head that stops 26 short lifting and rises slowly, 2 counts a step,
+/// keeps closing on its way, so it stays led until it arrives: on #2818
+/// lamp-52e6's reached its way only 10 s later once its lead was cut after
+/// a count of steps rather than when it stopped closing.
+#[test]
+fn a_head_rising_slowly_back_from_a_glance_stays_led_until_it_arrives() {
+    let mut tracking_steps = 0;
+    let (report, seen) = rest_glance(|lamp, limits| {
+        lamp.heavy = Some((PITCH, 0.0, 26.0, 25));
+        lamp.climb = Some((PITCH, 100.0));
+        tracking_steps = usize::from(limits.tracking_steps);
+    });
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    // Led for longer than the tracking check's steps, while it closes.
+    let led = seen
+        .iter()
+        .filter(|step| step.0 >= GLANCE_UNTIL && lead_of(step) > GLANCE_LIFT_LEAD / 2.0)
+        .count();
+    assert!(led > tracking_steps + 1, "led {led} steps only");
+    // And back within the self-test's 12 counts within its 3 s.
+    let at = |when: Duration| seen.iter().rfind(|step| step.0 < when).unwrap().2;
+    let before = at(GLANCE_FROM);
+    let after = at(GLANCE_UNTIL + Duration::from_secs(3));
+    assert!(
+        after.abs_diff(before) <= 12,
+        "back at {after}, rested at {before}"
     );
 }
 
