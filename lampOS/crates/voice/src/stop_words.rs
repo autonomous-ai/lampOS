@@ -215,6 +215,87 @@ pub fn raised(samples: &[i16], gain_db: f32) -> Vec<i16> {
         .collect()
 }
 
+/// Whether the canceller's output is normalised toward a level before the
+/// stop stream hears it (`on` only; anything else, off): the processed
+/// source came back with no words in 21 of 24 results on a lamp, its level
+/// suspected too low. Only that source, as with [`GAIN_ENVIRONMENT`], which
+/// it wins over when both are set ([`StopWords::with_normalise`]).
+pub const NORMALISE_ENVIRONMENT: &str = "LAMP_STOP_WORDS_NORMALISE";
+/// The RMS level, dBFS, the tracked speech level is brought to.
+pub const NORMALISE_TARGET_DBFS: f32 = -20.0;
+/// Blocks quieter than this RMS, dBFS, are not tracked and not raised, so
+/// that silence is not raised into noise.
+pub const NORMALISE_FLOOR_DBFS: f32 = -60.0;
+/// The most a block's peak is raised to, dBFS: a near shout never clips.
+pub const NORMALISE_CEILING_DBFS: f32 = -1.0;
+/// The blocks (10 ms each) the level is averaged over: about 1.5 s.
+const NORMALISE_BLOCKS: f32 = 150.0;
+
+/// Whether the switch is on, as the environment says.
+pub fn normalises_from_environment() -> bool {
+    normalise_for(std::env::var(NORMALISE_ENVIRONMENT).ok().as_deref())
+}
+
+fn normalise_for(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// A slow automatic gain ([`NORMALISE_ENVIRONMENT`]): a running mean square
+/// of the blocks over [`NORMALISE_FLOOR_DBFS`], the gain that brings it to
+/// [`NORMALISE_TARGET_DBFS`], between 0 dB and [`MOST_GAIN_DB`], and each
+/// block's peak kept under [`NORMALISE_CEILING_DBFS`].
+#[derive(Default)]
+pub struct Normaliser {
+    mean_square: Option<f32>,
+    gain_db: f32,
+}
+
+impl Normaliser {
+    /// The gain the last block over the floor was given, in dB, before its
+    /// peak was bounded.
+    pub fn gain_db(&self) -> f32 {
+        self.gain_db
+    }
+
+    /// `samples` brought toward the target level; under the floor, as they are.
+    pub fn apply(&mut self, samples: &[i16]) -> Vec<i16> {
+        let full = f32::from(i16::MAX);
+        let dbfs = |linear: f32| 20.0 * (linear.max(f32::MIN_POSITIVE) / full).log10();
+        let square: f32 = samples
+            .iter()
+            .map(|&sample| f32::from(sample).powi(2))
+            .sum::<f32>()
+            / samples.len().max(1) as f32;
+        if dbfs(square.sqrt()) < NORMALISE_FLOOR_DBFS {
+            return samples.to_vec();
+        }
+        let mean_square = match self.mean_square {
+            Some(mean) => mean + (square - mean) / NORMALISE_BLOCKS,
+            None => square,
+        };
+        self.mean_square = Some(mean_square);
+        self.gain_db = (NORMALISE_TARGET_DBFS - dbfs(mean_square.sqrt())).clamp(0.0, MOST_GAIN_DB);
+        let peak = samples
+            .iter()
+            .map(|&sample| f32::from(sample).abs())
+            .fold(0.0, f32::max);
+        let ceiling = full * 10f32.powf(NORMALISE_CEILING_DBFS / 20.0);
+        // Never below 1: a block already over the ceiling is left as it came.
+        let factor = 10f32
+            .powf(self.gain_db / 20.0)
+            .min(ceiling / peak.max(1.0))
+            .max(1.0);
+        samples
+            .iter()
+            .map(|&sample| {
+                (f32::from(sample) * factor)
+                    .round()
+                    .clamp(f32::from(i16::MIN), full) as i16
+            })
+            .collect()
+    }
+}
+
 /// Where the coordinator reads whether a stop heard over the lamp is held
 /// for the lamp's own words (`own-words`, #828 section 2): at a reply's
 /// start, with nothing queued, the lamp's text for a block can come after
@@ -416,8 +497,10 @@ pub struct StopWords {
     /// What the coordinator hands on ([`Self::with_source`]), for the
     /// counts file.
     source: Source,
-    /// A makeup gain for the canceller's output ([`Self::with_gain`]).
+    /// A makeup gain for the canceller's output ([`Self::with_gain`]), and
+    /// its normalisation, which wins ([`Self::with_normalise`]).
     gain: Option<f32>,
+    normaliser: Option<Normaliser>,
     /// With `always`: a stop heard is held for the lamp's own words
     /// ([`Self::with_hold`]), and the one held.
     hold: bool,
@@ -465,6 +548,7 @@ impl StopWords {
             since_asked: 0,
             source: Source::Processed,
             gain: None,
+            normaliser: None,
             hold: false,
             held: None,
             ahead_at: 0,
@@ -504,12 +588,24 @@ impl StopWords {
         self
     }
 
-    /// `samples` as the ears hear them: raised with a gain, on the
-    /// canceller's output only.
-    fn heard<'a>(&self, samples: &'a [i16]) -> std::borrow::Cow<'a, [i16]> {
-        match self.gain.filter(|_| self.source == Source::Processed) {
-            Some(gain) => std::borrow::Cow::Owned(raised(samples, gain)),
-            None => std::borrow::Cow::Borrowed(samples),
+    /// With `on`, the canceller's output is normalised toward a level
+    /// before it is heard ([`NORMALISE_ENVIRONMENT`]), in place of any
+    /// fixed gain; the raw and linear blocks never are.
+    pub fn with_normalise(mut self, on: bool) -> Self {
+        self.normaliser = on.then(Normaliser::default);
+        self
+    }
+
+    /// `samples` as the ears hear them: normalised, or raised with a gain,
+    /// on the canceller's output only.
+    fn heard<'a>(&mut self, samples: &'a [i16]) -> std::borrow::Cow<'a, [i16]> {
+        if self.source != Source::Processed {
+            return std::borrow::Cow::Borrowed(samples);
+        }
+        match (self.normaliser.as_mut(), self.gain) {
+            (Some(normaliser), _) => std::borrow::Cow::Owned(normaliser.apply(samples)),
+            (None, Some(gain)) => std::borrow::Cow::Owned(raised(samples, gain)),
+            (None, None) => std::borrow::Cow::Borrowed(samples),
         }
     }
 
@@ -750,7 +846,7 @@ impl StopWords {
         self.lamp.clear();
         // Counts only: whether anything was sent and heard back.
         eprintln!(
-            "lamp-voice: stop words: the reply's {} blocks went to the speech-to-text, its words asked for at {} pauses, {} results came back{}{}",
+            "lamp-voice: stop words: the reply's {} blocks went to the speech-to-text, its words asked for at {} pauses, {} results came back{}{}{}",
             self.sent,
             self.flushes,
             self.results,
@@ -763,6 +859,12 @@ impl StopWords {
                 format!(", {} stops held", self.holds.len())
             } else {
                 String::new()
+            },
+            match &self.normaliser {
+                Some(normaliser) if self.source == Source::Processed => {
+                    format!(", normalised at {:.1} dB at its end", normaliser.gain_db())
+                }
+                _ => String::new(),
             }
         );
     }
@@ -1722,6 +1824,124 @@ mod tests {
                     .contains(&format!("hear {raised_to}")),
                 "{source:?}: {:?}",
                 script.lock().unwrap().told
+            );
+        }
+    }
+
+    /// A 1 kHz tone at `amplitude`, one 10 ms block at 16 kHz.
+    fn tone(amplitude: f32) -> Vec<i16> {
+        (0..160)
+            .map(|n| (amplitude * (n as f32 * std::f32::consts::TAU / 16.0).sin()).round() as i16)
+            .collect()
+    }
+
+    fn rms_dbfs(samples: &[i16]) -> f32 {
+        let square: f32 =
+            samples.iter().map(|&s| f32::from(s).powi(2)).sum::<f32>() / samples.len() as f32;
+        20.0 * (square.sqrt() / f32::from(i16::MAX)).log10()
+    }
+
+    fn peak(samples: &[i16]) -> i16 {
+        samples
+            .iter()
+            .map(|s| s.saturating_abs())
+            .max()
+            .unwrap_or(0)
+    }
+
+    fn ceiling() -> i16 {
+        (f32::from(i16::MAX) * 10f32.powf(NORMALISE_CEILING_DBFS / 20.0)).round() as i16
+    }
+
+    #[test]
+    fn the_normalise_switch_reads_on_only() {
+        assert!(normalise_for(Some("on")));
+        for other in [
+            None,
+            Some(""),
+            Some("ON"),
+            Some("1"),
+            Some("true"),
+            Some(" on"),
+        ] {
+            assert!(!normalise_for(other), "{other:?}");
+        }
+    }
+
+    /// Silence, and anything under the floor, is never raised into noise,
+    /// before speech or after it.
+    #[test]
+    fn normalising_leaves_silence_silent() {
+        let mut normaliser = Normaliser::default();
+        let hiss: Vec<i16> = (0..160).map(|n| if n % 2 == 0 { 2 } else { -2 }).collect();
+        assert_eq!(normaliser.apply(&[0; 160]), vec![0; 160]);
+        assert_eq!(normaliser.apply(&hiss), hiss);
+        assert_eq!(normaliser.gain_db(), 0.0);
+        for _ in 0..200 {
+            normaliser.apply(&tone(300.0));
+        }
+        assert!(normaliser.gain_db() > 0.0);
+        assert_eq!(normaliser.apply(&hiss), hiss);
+        assert_eq!(normaliser.apply(&[0; 160]), vec![0; 160]);
+    }
+
+    /// A quiet steady tone reaches the target within 2 s of blocks; one too
+    /// quiet for it is raised by the most gain and no more.
+    #[test]
+    fn normalising_raises_a_quiet_tone_to_the_target_and_no_further() {
+        let mut normaliser = Normaliser::default();
+        let mut out = Vec::new();
+        for _ in 0..200 {
+            out = normaliser.apply(&tone(1_000.0));
+        }
+        assert!(
+            (rms_dbfs(&out) - NORMALISE_TARGET_DBFS).abs() < 0.5,
+            "{}",
+            rms_dbfs(&out)
+        );
+        let mut normaliser = Normaliser::default();
+        for _ in 0..200 {
+            out = normaliser.apply(&tone(100.0));
+            assert!(normaliser.gain_db() <= MOST_GAIN_DB);
+        }
+        assert_eq!(normaliser.gain_db(), MOST_GAIN_DB);
+        assert!((rms_dbfs(&out) - (rms_dbfs(&tone(100.0)) + MOST_GAIN_DB)).abs() < 0.2);
+        assert!(rms_dbfs(&out) < NORMALISE_TARGET_DBFS);
+    }
+
+    /// A loud block is not raised, and a near shout after quiet speech,
+    /// with the gain still high, is kept under the ceiling, never clipped.
+    #[test]
+    fn normalising_never_raises_a_loud_block_or_clips() {
+        let mut normaliser = Normaliser::default();
+        let loud = tone(20_000.0);
+        assert_eq!(normaliser.apply(&loud), loud);
+        assert_eq!(normaliser.gain_db(), 0.0);
+        let mut normaliser = Normaliser::default();
+        for _ in 0..200 {
+            normaliser.apply(&tone(300.0));
+        }
+        let shout = normaliser.apply(&tone(10_000.0));
+        assert!(normaliser.gain_db() > 6.0, "{}", normaliser.gain_db());
+        assert!(peak(&shout) <= ceiling(), "{}", peak(&shout));
+        assert!(peak(&shout) > 10_000);
+    }
+
+    /// Normalising wins over a fixed gain, on the canceller's output only.
+    #[test]
+    fn normalising_wins_over_the_gain_on_the_cancellers_output_only() {
+        // A block of 100 is -50 dBFS: raised by the most gain, 24 dB.
+        for (source, heard) in [(Source::Processed, 1_585), (Source::Raw, 100)] {
+            let script = Arc::new(Mutex::new(Script::default()));
+            let mut words = StopWords::new(Box::new(Scripted(script.clone())))
+                .with_source(source)
+                .with_gain(Some(20.0))
+                .with_normalise(true);
+            words.block(true, true, true, None, None, 0, &block(100));
+            let told = &script.lock().unwrap().told;
+            assert!(
+                told.contains(&format!("hear {heard}")),
+                "{source:?}: {told:?}"
             );
         }
     }

@@ -5632,9 +5632,26 @@ fn conversation_with_gate(
                             crate::stop_words::KEYTERM_ENVIRONMENT
                         );
                     }
-                    if let Some(gain) = crate::stop_words::gain_from_environment()
-                        && crate::stop_words::source() == crate::stop_words::Source::Processed
-                    {
+                    let processed =
+                        crate::stop_words::source() == crate::stop_words::Source::Processed;
+                    let gain = crate::stop_words::gain_from_environment().filter(|_| processed);
+                    if processed && crate::stop_words::normalises_from_environment() {
+                        eprintln!(
+                            "lamp-voice: stop words: the canceller's output is normalised toward {} dBFS, at most {} dB up, peaks under {} dBFS, before it is heard ({}){}",
+                            crate::stop_words::NORMALISE_TARGET_DBFS,
+                            crate::stop_words::MOST_GAIN_DB,
+                            crate::stop_words::NORMALISE_CEILING_DBFS,
+                            crate::stop_words::NORMALISE_ENVIRONMENT,
+                            if gain.is_some() {
+                                format!(
+                                    "; {} is set too and is not applied: normalising wins",
+                                    crate::stop_words::GAIN_ENVIRONMENT
+                                )
+                            } else {
+                                String::new()
+                            }
+                        );
+                    } else if let Some(gain) = gain {
                         eprintln!(
                             "lamp-voice: stop words: the canceller's output is raised by {gain} dB before it is heard ({})",
                             crate::stop_words::GAIN_ENVIRONMENT
@@ -5656,16 +5673,22 @@ fn conversation_with_gate(
                             .with_source(crate::stop_words::source())
                             .with_hold(crate::stop_words::holds_for_own_words())
                             .with_gain(crate::stop_words::gain_from_environment())
+                            .with_normalise(crate::stop_words::normalises_from_environment())
                     } else {
                         // Heard in a yield the source stays the default
-                        // (`Processed`), so the gain is passed only when the
-                        // blocks handed on are that source (El's P2 on #2690).
-                        crate::stop_words::StopWords::new(Box::new(ears)).with_gain(
-                            crate::stop_words::yield_gain(
+                        // (`Processed`), so the gain and the normalising are
+                        // passed only when the blocks handed on are that
+                        // source (El's P2 on #2690).
+                        let processed = crate::stop_words::source()
+                            == crate::stop_words::Source::Processed;
+                        crate::stop_words::StopWords::new(Box::new(ears))
+                            .with_gain(crate::stop_words::yield_gain(
                                 crate::stop_words::gain_from_environment(),
                                 crate::stop_words::source(),
-                            ),
-                        )
+                            ))
+                            .with_normalise(
+                                processed && crate::stop_words::normalises_from_environment(),
+                            )
                     }
                 })
                 .map_err(|error| eprintln!("lamp-voice: stop words are not heard: {error}"))

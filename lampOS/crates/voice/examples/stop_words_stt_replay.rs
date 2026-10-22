@@ -12,7 +12,7 @@
 //! cargo run --release -p lamp-voice --example stop_words_stt_replay -- \
 //!     [--second-config /etc/lampOS/voice/second.json] [--sources raw,linear,processed] \
 //!     [--after-ms 1000] [--lamp-words TSV] [--all-sounding] [--words] \
-//!     [--keyterm] [--gain-db N] BUNDLE[:PLAYS] ...
+//!     [--keyterm] [--gain-db N] [--normalise] BUNDLE[:PLAYS] ...
 //! ```
 //!
 //! - `--keyterm` asks with the stop words as key terms, as the voice does
@@ -20,6 +20,9 @@
 //! - `--gain-db N` raises the `aec_only` (`processed`) source by N dB, over 0
 //!   and at most 24, as the voice does with `LAMP_STOP_WORDS_GAIN_DB`
 //!   ([`StopWords::with_gain`]); the other sources are never raised.
+//! - `--normalise` normalises the `aec_only` (`processed`) source toward a
+//!   level, as the voice does with `LAMP_STOP_WORDS_NORMALISE=on`
+//!   ([`StopWords::with_normalise`]), over `--gain-db` when both are given.
 //!
 //! - `--second-config` is the voice's own second route (default the
 //!   product's, [`lamp_voice::second_config::PRODUCT_PATH`]), read as the
@@ -94,7 +97,7 @@ const TAIL_US: u64 = 3_000_000;
 /// The lamp's words reach the stop words this long before they play.
 const LAMP_LEAD_US: u64 = 2_000_000;
 
-const USAGE: &str = "usage: stop_words_stt_replay [--second-config FILE] [--sources raw,linear,processed] [--after-ms MS] [--lamp-words TSV] [--all-sounding] [--words] [--keyterm] [--gain-db N] BUNDLE[:PLAYS] ...";
+const USAGE: &str = "usage: stop_words_stt_replay [--second-config FILE] [--sources raw,linear,processed] [--after-ms MS] [--lamp-words TSV] [--all-sounding] [--words] [--keyterm] [--gain-db N] [--normalise] BUNDLE[:PLAYS] ...";
 
 fn main() {
     if let Err(why) = run(std::env::args().skip(1).collect()) {
@@ -113,13 +116,14 @@ struct Options {
     words: bool,
     keyterm: bool,
     gain_db: Option<f32>,
+    normalise: bool,
     items: Vec<String>,
 }
 
 fn options(args: &[String]) -> Result<Options> {
     let (mut config, mut sources, mut after_us, mut lamp_words) = (None, None, None, None);
     let (mut all_sounding, mut words, mut keyterm) = (false, false, false);
-    let mut gain_db = None;
+    let (mut gain_db, mut normalise) = (None, false);
     let mut items = Vec::new();
     let mut args = args.iter();
     while let Some(arg) = args.next() {
@@ -137,6 +141,7 @@ fn options(args: &[String]) -> Result<Options> {
             "--all-sounding" => std::mem::replace(&mut all_sounding, true),
             "--words" => std::mem::replace(&mut words, true),
             "--keyterm" => std::mem::replace(&mut keyterm, true),
+            "--normalise" => std::mem::replace(&mut normalise, true),
             "--gain-db" => {
                 let gain = stop_words::gain_for(Some(&value()?)).ok_or_else(|| {
                     format!(
@@ -168,6 +173,7 @@ fn options(args: &[String]) -> Result<Options> {
         words,
         keyterm,
         gain_db,
+        normalise,
         items,
     })
 }
@@ -197,6 +203,7 @@ fn run(args: Vec<String>) -> Result<()> {
         stop_words::COUNTS_ENVIRONMENT,
         stop_words::KEYTERM_ENVIRONMENT,
         stop_words::GAIN_ENVIRONMENT,
+        stop_words::NORMALISE_ENVIRONMENT,
     ] {
         if std::env::var_os(name).is_some() {
             return Err(format!("{name} is set: unset it for a replay"));
@@ -463,10 +470,12 @@ impl Pace {
 }
 
 /// The source's samples heard by the voice's stop words, block by block.
+#[allow(clippy::too_many_arguments)]
 fn drive(
     ears: Box<dyn Ears>,
     source: Source,
     gain_db: Option<f32>,
+    normalise: bool,
     samples: &[i16],
     blocks: &[Block],
     lamp_words: &[(u64, String)],
@@ -479,7 +488,8 @@ fn drive(
     };
     let mut words = StopWords::always_counted(Box::new(tap), None)
         .with_source(source)
-        .with_gain(gain_db);
+        .with_gain(gain_db)
+        .with_normalise(normalise);
     let lamp0 = blocks[0].at_us;
     let live0 = lamp_ipc::monotonic_us();
     let stamp = |lamp_at: u64| {
@@ -607,6 +617,7 @@ fn hear_bundle_paced(
                                 ears,
                                 *source,
                                 options.gain_db,
+                                options.normalise,
                                 samples,
                                 blocks_ref,
                                 lamp_words,
@@ -991,6 +1002,7 @@ mod tests {
             words: false,
             keyterm: false,
             gain_db: None,
+            normalise: false,
             items: Vec::new(),
         }
     }
@@ -1246,8 +1258,11 @@ mod tests {
         assert!(options(&words("--sources pre_aec a")).is_err());
         assert!(options(&words("--words --words a")).is_err());
         assert!(options(&words("--after-ms 1")).is_err());
-        let asked = options(&words("--keyterm --gain-db 12 a")).unwrap();
+        let asked = options(&words("--keyterm --gain-db 12 --normalise a")).unwrap();
         assert!(asked.keyterm);
+        assert!(asked.normalise);
+        assert!(!default.normalise);
+        assert!(options(&words("--normalise --normalise a")).is_err());
         assert_eq!(asked.gain_db, Some(12.0));
         assert!(!default.keyterm);
         assert_eq!(default.gain_db, None);

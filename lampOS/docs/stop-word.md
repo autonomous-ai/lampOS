@@ -682,8 +682,9 @@ cargo run --release -p lamp-voice --example stop_words_stt_replay -- \
   it, with the voice unit's environment over the file. The default file
   is the product's `/etc/lampOS/voice/second.json`. Nothing prints a key:
   only the host the words go to. It refuses to run with
-  `LAMP_STOP_WORDS_AUDIO`, `LAMP_STOP_WORDS_COUNTS`, `LAMP_STOP_WORDS_KEYTERM`
-  or `LAMP_STOP_WORDS_GAIN_DB` set: those are its options.
+  `LAMP_STOP_WORDS_AUDIO`, `LAMP_STOP_WORDS_COUNTS`, `LAMP_STOP_WORDS_KEYTERM`,
+  `LAMP_STOP_WORDS_GAIN_DB` or `LAMP_STOP_WORDS_NORMALISE` set: those are its
+  options.
 - **`--keyterm`** asks every stream with the stop words as key terms, as
   the voice does with `LAMP_STOP_WORDS_KEYTERM=on`: "Stop", "Wait",
   "Hold on", "Hang on", "Enough" and "Pause", first among the unit's own
@@ -694,6 +695,16 @@ cargo run --release -p lamp-voice --example stop_words_stt_replay -- \
   (21 Oct 23:44), after #2661's replay: the stop path wrote the lamp's own
   story on `pre_aec` and `aec_linear` and no played "Stop.", and on
   `aec_only` gave 2 results in 81 pauses.
+- **`--normalise`** brings the `aec_only` (`processed`) source toward a
+  level instead of by a fixed number, as `LAMP_STOP_WORDS_NORMALISE=on`
+  does (`StopWords::with_normalise`), and wins over `--gain-db`: a running
+  mean square of the blocks over -60 dBFS (about 1.5 s), the gain that
+  brings it to -20 dBFS RMS, between 0 and +24 dB, and each block's peak
+  kept under -1 dBFS, so a near shout is not clipped. Blocks under the
+  floor are sent as they are, so silence is not raised into noise. The
+  journal's counts line at a reply's end adds `normalised at N dB at its
+  end`. It is the Stop words row's owner's (22 Oct), after a lamp run where
+  `processed` gave 3 results with words and 21 without in one reply.
 - **Real time.** Each source is heard as the lamp read it, 10 ms block by
   block, the sources side by side, each on a stream of its own: a 2.7 min
   bundle takes about 2.8 min.
