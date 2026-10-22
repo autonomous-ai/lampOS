@@ -1903,14 +1903,17 @@ as root) is how a seated lamp gets its standing file without the factory:
   (the bus stamp) at least 1.5 s after the ask's words ended, so the lamp's
   own words and their echo never count, nor a line begun while it spoke; a
   line that is a run of the ask's own words is passed over too, and so is a
-  line begun within 1.5 s of anything else the lamp says (`voice/said`). The
+  line begun within 1.5 s of anything else the lamp says (`voice/said`) or of
+  the voice last seen speaking (`voice/state`), so the tail runs from the end
+  of what it plays. The
   ask ends on words that aren't a yes. The line must be short (5 words at
   most), no question, open with yes, yeah, yep, yup, sure, okay, ok, ready or
-  go, and hold **only** those words and "please", "ahead", "I'm", "do",
-  "it", "let's" and "now": "Yeah, I'm ready" and "Yes, go ahead" are a yes,
-  "Yes?", "Go to sleep", "Okay, bye", "Yeah, nah" and "okay hold on" are not
-  (El on #2893 and #3093; `first_stand::is_yes`). A face must be near when it
-  is heard. And, since a
+  go, and hold **only** those words, "please", "now", and the whole phrases
+  "I'm ready", "do it", "let's go" and "go ahead"; and be more than "okay" or
+  "ok", which are only "I heard you". "Yeah, I'm ready" and "Yes, go ahead"
+  are a yes; "Yes?", "Go to sleep", "Okay, bye", "Yeah, nah", "okay hold on",
+  a line cut off as "okay let's" and a lone "okay" are not (El on #2893 and
+  #3093; `first_stand::is_yes`). A face must be near when it is heard. And, since a
   yes starts the arm (the first builder on #2602, 22 Oct 12:0x), **never in a
   busy room** (`room/state`): an ask made in one says only "Rest your hand on
   my head when you're ready", and takes the touch alone; nor once another

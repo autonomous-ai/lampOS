@@ -66,9 +66,18 @@ const YES_WORDS: [&str; 9] = [
 /// here is no yes ("go to sleep", "okay, bye", "yeah, nah", "okay hold on":
 /// El on #2893, since a list of words that take it back can never be
 /// whole, and the yes moves the arm).
-const YES_ALSO_WORDS: [&str; 9] = [
-    "please", "ahead", "i'm", "im", "do", "it", "let's", "lets", "now",
+const YES_ALSO_WORDS: [&str; 2] = ["please", "now"];
+/// And these, only whole: a line cut off inside one ("okay let's… not",
+/// "yeah do") is no yes (El on #3093).
+const YES_PHRASES: [[&str; 2]; 5] = [
+    ["i'm", "ready"],
+    ["im", "ready"],
+    ["do", "it"],
+    ["let's", "go"],
+    ["go", "ahead"],
 ];
+/// Words that alone are only "I heard you", never a yes (El on #3093).
+const HEARD_YOU_WORDS: [&str; 4] = ["okay", "ok", "please", "now"];
 /// A spoken yes is a short line: a longer one is someone talking.
 const YES_MOST_WORDS: usize = 5;
 /// Past this a line's pieces are not joined: a yes is far shorter (the
@@ -80,17 +89,39 @@ const LINE_MOST_BYTES: usize = 4_096;
 pub const ECHO_TAIL_US: u64 = 1_500_000;
 
 /// Whether `heard`, a finished line the voice heard, is a spoken yes to the
-/// ask: short, opening with a yes, every word of it a yes's own, and no
-/// question ("Yes?").
+/// ask: short, opening with a yes, every word of it a yes's own or in a
+/// whole phrase of one, more than "okay", and no question ("Yes?").
 pub fn is_yes(heard: &str) -> bool {
     let words = words(heard);
     !words.is_empty()
         && !heard.contains('?')
         && words.len() <= YES_MOST_WORDS
         && YES_WORDS.contains(&words[0].as_str())
-        && words.iter().all(|word| {
-            YES_WORDS.contains(&word.as_str()) || YES_ALSO_WORDS.contains(&word.as_str())
-        })
+        && only_yes_words(&words)
+        && !words
+            .iter()
+            .all(|word| HEARD_YOU_WORDS.contains(&word.as_str()))
+}
+
+/// Whether every word is a yes's own: a yes word, one of
+/// [`YES_ALSO_WORDS`], or within a whole [`YES_PHRASES`] phrase.
+fn only_yes_words(words: &[String]) -> bool {
+    let mut at = 0;
+    while at < words.len() {
+        if let Some(phrase) = YES_PHRASES
+            .iter()
+            .find(|phrase| words[at..].starts_with(&phrase.map(String::from)))
+        {
+            at += phrase.len();
+        } else if YES_WORDS.contains(&words[at].as_str())
+            || YES_ALSO_WORDS.contains(&words[at].as_str())
+        {
+            at += 1;
+        } else {
+            return false;
+        }
+    }
+    true
 }
 
 /// `text`'s words, lower case, without their marks.
@@ -115,6 +146,15 @@ pub fn is_echo(heard: &str, asked: &str) -> bool {
         && asked
             .windows(heard.len())
             .any(|run| run == heard.as_slice())
+}
+
+/// The unit's switch for the spoken yes: `off` makes every ask the
+/// touch-only one (El on #2893).
+pub const SPOKEN_SWITCH: &str = "LAMP_FIRST_STAND_SPOKEN";
+
+/// Whether [`SPOKEN_SWITCH`]'s value turns the spoken yes off.
+pub fn spoken_is_off(value: Option<&str>) -> bool {
+    value.is_some_and(|value| value.trim() == "off")
 }
 
 /// What became of a line the voice heard, for a spoken yes.
@@ -698,7 +738,7 @@ mod run {
         // In a busy room only the touch counts, and the ask says so; and
         // with `LAMP_FIRST_STAND_SPOKEN=off`, always.
         let busy = busy_now(bus);
-        let spoken_off = std::env::var("LAMP_FIRST_STAND_SPOKEN").is_ok_and(|value| value == "off");
+        let spoken_off = spoken_is_off(std::env::var(SPOKEN_SWITCH).ok().as_deref());
         let mut spoken_yes = SpokenYes::new(busy || spoken_off || heard.is_none());
         let told = match ask(options, spoken_yes.asked()) {
             Ok(told) => told,
@@ -740,6 +780,12 @@ mod run {
             // Every line waiting is read on every pass, and judged by when
             // the voice heard it: one begun before the window opened counts
             // for nothing, whenever it is read (the Reviewer-lead on #2893).
+            // While the lamp is heard speaking, its words may come back:
+            // the tail runs from the end of what it plays, not from when
+            // its text arrived (El on #3093).
+            if speaking_now(bus) {
+                spoken_yes.lamp_said(lamp_ipc::monotonic_us());
+            }
             let verdict = heard_lines(heard.as_mut(), said.as_mut(), &mut spoken_yes, bus, options);
             let Some(at) = spoken else {
                 if started.elapsed() > Duration::from_millis(SAY_EXPIRES_MS + 10_000) {
@@ -813,6 +859,16 @@ mod run {
             }
         }
         verdict
+    }
+
+    /// Whether the voice says it is speaking now (`voice/state`).
+    fn speaking_now(bus: &lamp_bus::Bus) -> bool {
+        bus.latest(lamp_msgs::VoiceState::TOPIC)
+            .ok()
+            .flatten()
+            .filter(|message| !message.expired)
+            .and_then(|message| message.parse::<lamp_msgs::VoiceState>().ok())
+            .is_some_and(|voice| voice.state == lamp_msgs::Voice::Speaking)
     }
 
     /// Whether the voice says the room is busy now (`room/state`).
@@ -1202,10 +1258,14 @@ mod tests {
             "yes.",
             "Yeah, go ahead",
             "Sure!",
-            "OK",
+            "OK, go",
             "okay, I'm ready",
             "Ready",
             "Yep",
+            "Yes, do it",
+            "Okay, let's go",
+            "Yes please",
+            "Go",
         ] {
             assert!(is_yes(yes), "{yes}");
         }
@@ -1253,6 +1313,15 @@ mod tests {
             "Okay, sit down",
             "Yeah, I'm on the phone",
             "Okay, shut up",
+            // Cut off inside a phrase, or only "I heard you" (El on #3093).
+            "okay I'm",
+            "yeah do",
+            "ok it",
+            "okay let's",
+            "yes ahead",
+            "okay",
+            "OK.",
+            "ok, please",
         ] {
             assert!(!is_yes(no), "{no}");
         }
@@ -1447,6 +1516,15 @@ mod tests {
         assert_eq!(message.header.at_us, 42);
         assert_eq!(message.parse::<lamp_msgs::Speech>().unwrap().text, "yes");
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn the_spoken_yes_is_turned_off_only_by_off() {
+        assert!(spoken_is_off(Some("off")));
+        assert!(spoken_is_off(Some(" off\n")));
+        assert!(!spoken_is_off(None));
+        assert!(!spoken_is_off(Some("on")));
+        assert!(!spoken_is_off(Some("")));
     }
 
     #[test]
