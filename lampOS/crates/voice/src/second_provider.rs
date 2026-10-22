@@ -200,6 +200,16 @@ const JOIN_POLL: Duration = Duration::from_millis(25);
 /// sound said while an answer is awaited (`LAMP_WAIT_KEEPS_ANSWER`, up to
 /// 1 s), not only the person's pause.
 pub const JOIN_WITHIN: Duration = Duration::from_millis(3_000);
+/// The most words a chain of lines cut short is asked with, its newest
+/// line's own among them ([`Engine::joining_cut_words`]): the oldest pieces
+/// past it are let go. People's requests broke into 3 or 4 pieces at
+/// natural pauses on lamp-4ace on 22 Oct ("Lamp. / I've been feeling a bit
+/// tired lately. / Like, every afternoon, / Why could that be?", 14 words);
+/// the longest played request was under 40 words.
+pub const CHAIN_MOST_WORDS: usize = 60;
+/// How long a chain of lines cut short keeps its oldest piece: past this
+/// since that piece's words were kept, it is let go.
+pub const CHAIN_MOST_FOR: Duration = Duration::from_secs(20);
 /// The function the model looks with on this route ([`Engine::looking_by_call`]).
 pub const LOOK_CALL: &str = "take_a_look";
 /// What the lamp says as it looks by a call the model made with no words.
@@ -825,6 +835,12 @@ struct Shared {
     /// was heard (a newer line began): answered in the next line's place
     /// if that line is held ([`CARRY_WITHIN`], #1712).
     cut: Mutex<Option<Carried>>,
+    /// The request last held, its words not answered: never chained into a
+    /// later line's ([`Engine::chain_heard`]).
+    held_last: Mutex<Option<u64>>,
+    /// The newest request whose words were put in flight: asked once, so
+    /// never chained again from what was heard ([`Engine::chain_heard`]).
+    asked_last: Mutex<Option<u64>>,
     /// Whether one person said a line cut short and the line that cut it
     /// ([`Engine::joining_cut_words`]).
     same_speaker: Option<SameSpeaker>,
@@ -871,6 +887,11 @@ struct KeptSound {
     said_from: u64,
     /// When it ended, by the engine's clock; `None` while it goes on.
     ended: Option<Instant>,
+    /// The line before it in this session and how long after that one's
+    /// end it began, or, when its sound or words began with the line just
+    /// before it, that line's own (`LAMP_JOIN_CUT_WORDS`): a chain goes on
+    /// across a line folded into the next.
+    link: Option<(u64, Duration)>,
 }
 
 /// A spoken request's words, kept while it is answered ([`Shared::in_flight`],
@@ -878,13 +899,63 @@ struct KeptSound {
 #[derive(Clone)]
 struct Carried {
     request: u64,
-    text: String,
+    /// Its words, oldest first: one part, or with `LAMP_JOIN_CUT_WORDS` the
+    /// chain of lines cut short before it and then its own.
+    parts: Vec<Part>,
     at: Instant,
     /// The request whose line said these words: `request`'s own, or, for
     /// words answered in a held line's place, the line they came from. A
     /// join compares that line's speaker, never the held line's
     /// ([`joined_with_cut`]).
     said_by: u64,
+    /// Links of the chain no line's verdict has judged one person's yet,
+    /// the earlier request and the later: a line cut short before it was
+    /// asked ([`Engine::chain_heard`]), or one cut while its join waited.
+    unchecked: Vec<(u64, u64)>,
+}
+
+/// One line's words in a chain cut short ([`Carried::parts`]): its request,
+/// its words, when they were kept by the engine's clock, and how many lines
+/// they are (two when its sound or words began with the line before it).
+#[derive(Clone)]
+struct Part {
+    request: u64,
+    text: String,
+    at: Instant,
+    lines: u16,
+}
+
+impl Carried {
+    /// `request`'s own `text`, kept at `at`, said by `said_by`.
+    fn own(request: u64, text: String, at: Instant, said_by: u64) -> Self {
+        Self {
+            request,
+            parts: vec![Part {
+                request,
+                text,
+                at,
+                lines: 1,
+            }],
+            at: Instant::now(),
+            said_by,
+            unchecked: Vec::new(),
+        }
+    }
+
+    /// All its words, oldest first.
+    fn text(&self) -> String {
+        words_of(&self.parts)
+    }
+}
+
+/// The words of `parts`, oldest first, one space between.
+fn words_of(parts: &[Part]) -> String {
+    parts
+        .iter()
+        .map(|part| part.text.trim())
+        .filter(|text| !text.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// A stop to be told beside a request's chat ([`crate::provider_worker::STOPPED_NOTE`]).
@@ -1110,8 +1181,12 @@ struct Marks {
     count_only: AtomicBool,
     /// The line before it in this session and how long after that one's
     /// end this one began, when none of that one's words or sound began
-    /// this one already ([`Engine::joining_cut_words`]).
+    /// this one already ([`Engine::joining_cut_words`]). When its sound or
+    /// words began with the line just before it (`folded`), that line's
+    /// own, so a chain goes on across it.
     after_end: Option<(u64, Duration)>,
+    /// Its sound or words began with the line just before it.
+    folded: bool,
     /// Begun while the lamp's answer could be heard, not only over its wait
     /// sound (`Start`'s `over_the_lamps_voice`): judged for its echo
     /// ([`Engine::holding_own_echo`]).
@@ -1287,6 +1362,8 @@ impl Engine {
                 in_flight: Mutex::new(None),
                 answered_request: Mutex::new(None),
                 cut: Mutex::new(None),
+                held_last: Mutex::new(None),
+                asked_last: Mutex::new(None),
                 same_speaker: None,
                 first_words: None,
                 speaking: None,
@@ -2287,6 +2364,8 @@ impl Engine {
                     .lock()
                     .ok()
                     .and_then(|mut last| last.take());
+                // The line before's words, for a chain (`LAMP_JOIN_CUT_WORDS`).
+                let heard_before = last.clone();
                 // The last line's sound, when this one goes on from it: the
                 // coordinator ends a line at a short pause, so "Lamp, …
                 // what's the weather?" came as pieces of about 1.3 s, each a
@@ -2319,6 +2398,13 @@ impl Engine {
                         kept.ended
                             .map(|end| (kept.request, now.saturating_duration_since(end)))
                     });
+                // The line before's own link, which one its sound or words
+                // begin goes on with.
+                let before_link = self
+                    .kept
+                    .as_ref()
+                    .filter(|kept| kept.session == session && kept.request < request)
+                    .map(|kept| (kept.request, kept.link));
                 let carried = self.kept.take().filter(|kept| {
                     let since = kept.ended.map(|end| now.saturating_duration_since(end));
                     // Only the name cut off on its own: a piece that came
@@ -2384,6 +2470,25 @@ impl Engine {
                         (false, None) => None,
                     };
                 }
+                // Its link: the line before's, when it begins with that
+                // line's sound or words, else its own.
+                let folded = carried.is_some() || before.is_some();
+                let link = if folded {
+                    before_link.and_then(|(_, link)| link)
+                } else {
+                    after_end
+                };
+                // The line before, cut short after its words came back but
+                // before it was asked, and not folded into this one: its
+                // words go on in the chain (`LAMP_JOIN_CUT_WORDS`).
+                if !folded
+                    && !after_stop
+                    && let Some((of, words)) = heard_before
+                    && let Some((before, before_link)) = before_link
+                    && of == before
+                {
+                    self.chain_heard(request, (of, words), before_link);
+                }
                 let (audio, heard) = mpsc::channel(AUDIO_QUEUE);
                 let sound = Arc::new(AtomicBool::new(false));
                 let checked = self.sounds_checked.then(|| sound.clone());
@@ -2394,9 +2499,8 @@ impl Engine {
                     called: AtomicBool::new(false),
                     privacy: privacy_generation,
                     count_only: AtomicBool::new(false),
-                    // Never twice: a line its sound or words begin already
-                    // goes on from it.
-                    after_end: after_end.filter(|_| carried.is_none() && before.is_none()),
+                    after_end: link,
+                    folded,
                     over_the_lamps_voice,
                 });
                 let said = Arc::new(Mutex::new((0, 0)));
@@ -2440,6 +2544,7 @@ impl Engine {
                         KeptSound {
                             request,
                             ended: None,
+                            link,
                             ..kept
                         }
                     }
@@ -2449,6 +2554,7 @@ impl Engine {
                         samples: VecDeque::new(),
                         said_from: 0,
                         ended: None,
+                        link,
                     },
                 });
                 let memory_scope = self.memory_scope(request, session, true);
@@ -2883,7 +2989,86 @@ impl Engine {
             );
         }
         self.let_go_cut("a stop came after it");
+        // Nor do its words heard and not yet asked go on in a chain
+        // ([`Self::chain_heard`]).
+        if let Ok(mut last) = self.shared.heard_last.lock() {
+            last.take_if(|(of, _)| *of <= through);
+        }
         self.retire_through(through);
+    }
+
+    /// With `LAMP_JOIN_CUT_WORDS`: the line `of`, just before `request`,
+    /// was cut short after its `words` came back but before it was asked, so
+    /// they were in no slot and its turn is over. They go on in the chain:
+    /// after the words cut short before it, when it began within
+    /// [`JOIN_WITHIN`] of that line's end (`link`), the link to be judged at
+    /// the next verdict; else on their own, and older ones are let go.
+    /// Never when the words are those already kept or in flight, a line
+    /// once asked (its answer may have been heard), nor a held line's.
+    fn chain_heard(&self, request: u64, (of, words): (u64, String), link: Option<(u64, Duration)>) {
+        let held = self
+            .shared
+            .held_last
+            .lock()
+            .ok()
+            .is_some_and(|last| *last == Some(of))
+            || self
+                .shared
+                .asked_last
+                .lock()
+                .ok()
+                .is_some_and(|last| last.is_some_and(|last| last >= of));
+        if self.shared.same_speaker.is_none() || words.trim().is_empty() || held {
+            return;
+        }
+        let Ok(mut cut) = self.shared.cut.lock() else {
+            return;
+        };
+        let in_flight = self
+            .shared
+            .in_flight
+            .lock()
+            .ok()
+            .is_some_and(|in_flight| in_flight.as_ref().is_some_and(|kept| kept.request >= of));
+        if in_flight || cut.as_ref().is_some_and(|kept| kept.request >= of) {
+            return;
+        }
+        let at = (self.shared.clock)();
+        let part = Part {
+            request: of,
+            text: words,
+            at,
+            lines: 1,
+        };
+        let chain = match cut.take() {
+            Some(mut chain)
+                if chain.said_by == chain.request
+                    && link.is_some_and(|(before, gap)| {
+                        before == chain.request && gap <= JOIN_WITHIN
+                    }) =>
+            {
+                chain.unchecked.push((chain.request, of));
+                chain.parts.push(part);
+                chain.request = of;
+                chain.said_by = of;
+                chain.at = Instant::now();
+                chain
+            }
+            older => {
+                if let Some(older) = older {
+                    eprintln!(
+                        "lamp-voice second: request {}'s words, cut short, are let go: request {of}, cut short before it was asked, did not go on from it (LAMP_JOIN_CUT_WORDS)",
+                        older.request
+                    );
+                }
+                Carried::own(of, part.text, at, of)
+            }
+        };
+        eprintln!(
+            "lamp-voice second: request {of}: cut short after its words came back, before it was asked; they wait for request {request}'s verdict, a chain of {} lines (LAMP_JOIN_CUT_WORDS)",
+            chain.parts.iter().map(|part| part.lines).sum::<u16>()
+        );
+        *cut = Some(chain);
     }
 
     /// Words cut short and not yet taken are let go, and the journal says
@@ -3567,6 +3752,9 @@ async fn spoken(
         }
     }
     if empty || held || heeded.is_some() {
+        if let Ok(mut last) = shared.held_last.lock() {
+            *last = Some(request);
+        }
         // A held line's named ask is said, as an answered one's is.
         if let Some(named) = shared.named_ask.as_ref().filter(|_| !empty) {
             shared.named_ask_said(named_ask_held_line(
@@ -3596,11 +3784,14 @@ async fn spoken(
             }
         };
         if let Some(carried) = carried {
+            // A chain's links no verdict judged, judged for a held line:
+            // only the voices or one face join them.
+            let carried = settled(shared.same_speaker.as_ref(), request, carried, false);
             // The same person going on: its own words after them
             // (`LAMP_JOIN_CUT_WORDS`), so a request's second half held on
             // its own is not lost either.
-            let (words, said_by) = if empty {
-                (carried.text.clone(), carried.said_by)
+            let (words, said_by, parts) = if empty {
+                (carried.text(), carried.said_by, carried.parts.clone())
             } else {
                 // While the join waits for a print, the carried words are
                 // where a newer line's cut finds them (the Reviewer on
@@ -3624,22 +3815,24 @@ async fn spoken(
                     return;
                 }
                 match joined {
-                    (joined, None) => (joined, request),
-                    (_, Some(carried)) => (carried.text, carried.said_by),
+                    (joined, None, parts) => (joined, request, parts),
+                    (_, Some(carried), _) => (carried.text(), carried.said_by, carried.parts),
                 }
             };
             eprintln!(
                 "lamp-voice second: request {request} is held, so request {}'s words, cut short by it, are answered in its place",
                 carried.request
             );
-            if let Ok(mut in_flight) = shared.in_flight.lock() {
-                *in_flight = Some(Carried {
+            put_in_flight(
+                &shared,
+                Carried {
                     request,
-                    text: words.clone(),
+                    parts,
                     at: carried.at,
                     said_by,
-                });
-            }
+                    unchecked: Vec::new(),
+                },
+            );
             let lease = scope.clone();
             tokio::join!(
                 though_held,
@@ -3700,19 +3893,17 @@ async fn spoken(
     let text = stripped.unwrap_or(text);
     // Words cut short by this line, the same person's: asked before its
     // own, as one line (`LAMP_JOIN_CUT_WORDS`).
-    let (text, carried) = match carried {
+    let own = own_part(&shared, request, &text, &marks);
+    let (text, carried, parts) = match carried {
         Some(carried) => {
             // While the join waits for a print, this line's own words are
             // where a newer line's cut finds them, as an answered line's are
-            // once it is asked (the Reviewer on #2657).
+            // once it is asked (the Reviewer on #2657); after the chain it
+            // goes on from, when it began soon enough after it, that link
+            // judged at the newer line's verdict.
             let joining = holding_while_joining(
                 &shared,
-                Carried {
-                    request,
-                    text: text.clone(),
-                    at: Instant::now(),
-                    said_by: request,
-                },
+                waiting_chain(request, &marks, &carried, own.clone()),
             );
             let joined = joined_with_cut(&shared, (request, true), &marks, carried, text).await;
             if joining && !still_holding(&shared, request) {
@@ -3720,7 +3911,7 @@ async fn spoken(
             }
             joined
         }
-        None => (text, None),
+        None => (text, None, vec![own]),
     };
     // The first request answered after a misheard cut-in was hummed for,
     // within `NOTE_WITHIN_US`: the model is told it did not catch it, as the
@@ -3872,14 +4063,16 @@ async fn spoken(
             carried.request
         );
     }
-    if let Ok(mut in_flight) = shared.in_flight.lock() {
-        *in_flight = Some(Carried {
+    put_in_flight(
+        &shared,
+        Carried {
             request,
-            text: text.clone(),
+            parts,
             at: Instant::now(),
             said_by: request,
-        });
-    }
+            unchecked: Vec::new(),
+        },
+    );
     if let Some(heard) = &shared.words_heard {
         heard(request, &text);
     }
@@ -3930,10 +4123,19 @@ fn holding_while_joining(shared: &Shared, held: Carried) -> bool {
     if shared.same_speaker.is_none() {
         return false;
     }
-    if let Ok(mut in_flight) = shared.in_flight.lock() {
-        *in_flight = Some(held);
-    }
+    put_in_flight(shared, held);
     true
+}
+
+/// `carried` in flight, its request recorded as asked
+/// ([`Shared::asked_last`]).
+fn put_in_flight(shared: &Shared, carried: Carried) {
+    if let Ok(mut asked) = shared.asked_last.lock() {
+        *asked = Some(asked.map_or(carried.request, |last| last.max(carried.request)));
+    }
+    if let Ok(mut in_flight) = shared.in_flight.lock() {
+        *in_flight = Some(carried);
+    }
 }
 
 /// The line still holds its words after its join's wait: no newer line's
@@ -3947,23 +4149,111 @@ fn still_holding(shared: &Shared, request: u64) -> bool {
     })
 }
 
+/// `request`'s own words in a chain: two lines when its sound or words
+/// began with the line before it.
+fn own_part(shared: &Shared, request: u64, text: &str, marks: &Marks) -> Part {
+    Part {
+        request,
+        text: text.to_owned(),
+        at: (shared.clock)(),
+        lines: if marks.folded { 2 } else { 1 },
+    }
+}
+
+/// What a line let out holds while its join waits for a print
+/// ([`holding_while_joining`]): after `carried`'s chain, with that link to
+/// be judged at a newer line's verdict, when it began within
+/// [`JOIN_WITHIN`] of that chain's end and the words are that line's own;
+/// else its own words alone.
+fn waiting_chain(request: u64, marks: &Marks, carried: &Carried, own: Part) -> Carried {
+    let linked = carried.said_by == carried.request
+        && marks
+            .after_end
+            .is_some_and(|(of, gap)| of == carried.request && gap <= JOIN_WITHIN);
+    if !linked {
+        return Carried::own(request, own.text, own.at, request);
+    }
+    let mut chain = carried.clone();
+    chain.unchecked.push((carried.request, request));
+    chain.parts.push(own);
+    Carried {
+        request,
+        at: Instant::now(),
+        said_by: request,
+        ..chain
+    }
+}
+
+/// `carried` with the links of its chain no verdict judged judged now for
+/// `request`, let out or held (`let_out`): one that fails breaks the chain
+/// there, and the pieces before it are let go, the journal says how many.
+/// Without a judge, as it came.
+fn settled(
+    same: Option<&SameSpeaker>,
+    request: u64,
+    mut carried: Carried,
+    let_out: bool,
+) -> Carried {
+    let Some(same) = same else {
+        return carried;
+    };
+    for (earlier, later) in std::mem::take(&mut carried.unchecked) {
+        if let Err(why) = link_holds(same, (earlier, later), let_out) {
+            let before = carried.parts.len();
+            carried.parts.retain(|part| part.request > earlier);
+            eprintln!(
+                "lamp-voice second: request {request}: the chain cut short breaks between requests {earlier} and {later}: {why}; its {} earlier pieces are let go (LAMP_JOIN_CUT_WORDS)",
+                before - carried.parts.len()
+            );
+        }
+    }
+    carried
+}
+
+/// Whether one person said `earlier` and `later`, a link of a chain no
+/// verdict judged, by `same` at once: a print still to come is not waited
+/// for again, what is known without it decides. No sign of a second person
+/// joins only a line let out.
+fn link_holds(
+    same: &SameSpeaker,
+    (earlier, later): (u64, u64),
+    let_out: bool,
+) -> Result<(), String> {
+    let said = match same(earlier, later) {
+        Joined::Coming(without) => *without,
+        said => said,
+    };
+    match said {
+        Joined::Same(_) => Ok(()),
+        Joined::NoSecond(_) if let_out => Ok(()),
+        Joined::NoSecond(why) => Err(format!("{why}, but this line was held")),
+        Joined::Not(why) => Err(why),
+        Joined::Coming(_) => Err("a voice print still to come".to_owned()),
+    }
+}
+
 /// `text`, the words of `request`, let out or held (`let_out`), and
 /// `carried`, the words of the line it cut short, none of whose answer was
-/// heard: the two asked as one line when one person said both
-/// ([`Engine::joining_cut_words`]), or, for a line let out, when nothing
-/// shows a second person ([`Joined::NoSecond`]); begun within
-/// [`JOIN_WITHIN`] of its end, and nothing carried then. A print still to
-/// come is waited for up to [`JOIN_WAIT`]. Otherwise both as they came, and
-/// the journal says why.
+/// heard, with the chain cut short before that line: all asked as one line
+/// when one person said each link ([`Engine::joining_cut_words`]), or, for
+/// a line let out, when nothing shows a second person ([`Joined::NoSecond`]);
+/// each line begun within [`JOIN_WITHIN`] of the one before's end, and the
+/// carried words that line's own. A print still to come is waited for up to
+/// [`JOIN_WAIT`]. A link of the chain no verdict judged that fails breaks it
+/// there, the pieces before it let go; past [`CHAIN_MOST_WORDS`] or
+/// [`CHAIN_MOST_FOR`] the oldest pieces are let go too. Otherwise both as
+/// they came, and the journal says why, in counts. The words asked, the
+/// words let go if not joined, and the parts to keep in flight.
 async fn joined_with_cut(
     shared: &Shared,
     (request, let_out): (u64, bool),
     marks: &Marks,
     carried: Carried,
     text: String,
-) -> (String, Option<Carried>) {
+) -> (String, Option<Carried>, Vec<Part>) {
+    let own = own_part(shared, request, &text, marks);
     let Some(same) = shared.same_speaker.as_ref() else {
-        return (text, Some(carried));
+        return (text, Some(carried), vec![own]);
     };
     let not_joined = |why: &str| {
         eprintln!(
@@ -3978,11 +4268,11 @@ async fn joined_with_cut(
             "its words were said in request {}, answered in a held line's place",
             carried.said_by
         ));
-        return (text, Some(carried));
+        return (text, Some(carried), vec![own]);
     }
     let Some((_, gap)) = marks.after_end.filter(|(of, _)| *of == carried.request) else {
         not_joined("its sound or words began this line already, or it was not the line before");
-        return (text, Some(carried));
+        return (text, Some(carried), vec![own]);
     };
     if gap > JOIN_WITHIN {
         not_joined(&format!(
@@ -3990,7 +4280,7 @@ async fn joined_with_cut(
             gap.as_millis(),
             JOIN_WITHIN.as_millis()
         ));
-        return (text, Some(carried));
+        return (text, Some(carried), vec![own]);
     }
     let bound = tokio::time::Instant::now() + JOIN_WAIT;
     let said = loop {
@@ -4021,15 +4311,37 @@ async fn joined_with_cut(
         Ok(why) => why,
         Err(why) => {
             not_joined(&why);
-            return (text, Some(carried));
+            return (text, Some(carried), vec![own]);
         }
     };
+    // The chain's links no verdict judged: one that fails breaks it there.
+    let mut parts = settled(Some(same), request, carried.clone(), let_out).parts;
+    parts.push(own);
+    // At most so many words, and so long since its oldest piece.
+    let now = (shared.clock)();
+    let mut dropped = 0;
+    while parts.len() > 1
+        && (words_of(&parts).split_whitespace().count() > CHAIN_MOST_WORDS
+            || now.saturating_duration_since(parts[0].at) > CHAIN_MOST_FOR)
+    {
+        parts.remove(0);
+        dropped += 1;
+    }
+    let lines: u16 = parts.iter().map(|part| part.lines).sum();
     eprintln!(
-        "lamp-voice second: request {request} goes on from request {}'s words, cut short {} ms before it began: {why}; both are asked as one line (LAMP_JOIN_CUT_WORDS)",
+        "lamp-voice second: request {request} goes on from request {}'s words, cut short {} ms before it began: {why}; {lines} lines are asked as one{} (LAMP_JOIN_CUT_WORDS)",
         carried.request,
-        gap.as_millis()
+        gap.as_millis(),
+        if dropped > 0 {
+            format!(
+                ", its {dropped} oldest pieces let go past {CHAIN_MOST_WORDS} words or {} s",
+                CHAIN_MOST_FOR.as_secs()
+            )
+        } else {
+            String::new()
+        }
     );
-    (format!("{} {}", carried.text.trim(), text.trim()), None)
+    (words_of(&parts), None, parts)
 }
 
 /// Opens a listener for the next line under privacy `generation` and keeps
@@ -4232,7 +4544,7 @@ fn tell_whose_words(shared: &Shared, request: u64, heard: &str) {
         .ok()
         .and_then(|cut| {
             cut.as_ref()
-                .map(|carried| (carried.request, carried.text.clone()))
+                .map(|carried| (carried.request, carried.text()))
         })
         .filter(|(of, _)| *of < request);
     let said = shared
