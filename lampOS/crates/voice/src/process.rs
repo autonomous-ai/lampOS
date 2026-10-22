@@ -1372,6 +1372,8 @@ fn second_route_worker_environment(
     [
         crate::second_config::GEMINI_BASE_URL_ENV,
         crate::second_config::DEEPSEEK_BASE_URL_ENV,
+        crate::second_config::SPEECH_BASE_URL_ENV,
+        crate::second_config::LISTENING_BASE_URL_ENV,
         crate::second_config::SPEECH_MODEL_ENV,
         crate::second_config::KEY_TERMS_ENV,
         crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
@@ -1965,6 +1967,10 @@ mod tests {
                     "https://relay.example.invalid/v1beta"
                 } else if name == crate::second_config::DEEPSEEK_BASE_URL_ENV {
                     "https://relay.example.invalid/deepseek"
+                } else if name == crate::second_config::SPEECH_BASE_URL_ENV
+                    || name == crate::second_config::LISTENING_BASE_URL_ENV
+                {
+                    "https://near.example.invalid/ai"
                 } else if name == crate::second_config::SPEECH_MODEL_ENV {
                     "gemini-3.8-flash-lite-tts"
                 } else if name == crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT {
@@ -2115,6 +2121,7 @@ mod tests {
                     "LAMP_SECOND_GEMINI_BASE_URL=https://relay.example.invalid/v1beta",
                     "LAMP_SECOND_KEY_TERMS=Hanoi",
                     "LAMP_SECOND_KNOWN_NAMES=on",
+                    "LAMP_SECOND_LISTENING_BASE_URL=https://near.example.invalid/ai",
                     "LAMP_SECOND_LOOK_NOTE=on",
                     "LAMP_SECOND_LOOK_WALK=on",
                     "LAMP_SECOND_MEMORY_HITS=on",
@@ -2125,6 +2132,7 @@ mod tests {
                     "LAMP_SECOND_SCOPED_CONTEXT=on",
                     "LAMP_SECOND_SKILL_LOOK=on",
                     "LAMP_SECOND_SPEAKING_FACE=on",
+                    "LAMP_SECOND_SPEECH_BASE_URL=https://near.example.invalid/ai",
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
                     "LAMP_SECOND_SPEECH_SOCKET=on",
                     "LAMP_SECOND_SPEECH_SOCKET_MODEL=eleven_flash_v2_5",
