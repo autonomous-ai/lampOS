@@ -1,0 +1,89 @@
+{
+  "refs": {
+    "full6055": "16b1a2a1582a0aeaaf8f3bbc5421800a1a51b3a6",
+    "baseline2693": "18a1b3e2935c5eb6654b740e3fddc36a765a1cf9",
+    "after3076": "9728c9064323ec29faff94440f2959f2df4667bf",
+    "source3076": "273f8fb96e8674d27495bb11176fa3170b385a40"
+  },
+  "files": {
+    "full6055": {
+      "lampOS/crates/skills/src/main.rs": {
+        "git_blob": "c3e1f86e10a036ed816197d9630fa0827decc986",
+        "sha256": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "bytes": 213929
+      },
+      "lampOS/crates/skills/src/addon.rs": {
+        "git_blob": "44fffd2e66cb5fc0e0c96c37da5164593d5a3028",
+        "sha256": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af",
+        "bytes": 8608
+      },
+      "lampOS/crates/skills/tests/it/addon.rs": {
+        "git_blob": "252a1842943510718714b5e5e4af43a40825fc0d",
+        "sha256": "694cea835cf83710b9db6b6e85d5232b5a32492645793408506f13236d6418e6",
+        "bytes": 24859
+      }
+    },
+    "baseline2693": {
+      "lampOS/crates/skills/src/main.rs": {
+        "git_blob": "c3e1f86e10a036ed816197d9630fa0827decc986",
+        "sha256": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "bytes": 213929
+      },
+      "lampOS/crates/skills/src/addon.rs": {
+        "git_blob": "44fffd2e66cb5fc0e0c96c37da5164593d5a3028",
+        "sha256": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af",
+        "bytes": 8608
+      },
+      "lampOS/crates/skills/tests/it/addon.rs": {
+        "git_blob": "3b65166a43b658aee84ee0dcf285066621336aad",
+        "sha256": "787a1f4da6480e3c53099a7db3be6eff9d1f2e6dabb9d0f0014dc6d937fe7d98",
+        "bytes": 26921
+      }
+    },
+    "after3076": {
+      "lampOS/crates/skills/src/main.rs": {
+        "git_blob": "c3e1f86e10a036ed816197d9630fa0827decc986",
+        "sha256": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "bytes": 213929
+      },
+      "lampOS/crates/skills/src/addon.rs": {
+        "git_blob": "44fffd2e66cb5fc0e0c96c37da5164593d5a3028",
+        "sha256": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af",
+        "bytes": 8608
+      },
+      "lampOS/crates/skills/tests/it/addon.rs": {
+        "git_blob": "61585b017da95feccd2d32b51ed80a2227f542e9",
+        "sha256": "46f570304cda5772f510eed12599a97e781db9f96d9ba258fe518cb02e0187bb",
+        "bytes": 27543
+      }
+    },
+    "source3076": {
+      "lampOS/crates/skills/src/main.rs": {
+        "git_blob": "c3e1f86e10a036ed816197d9630fa0827decc986",
+        "sha256": "d45a43a2ddfe5a1f8a8cfea5ea55f55ee5fc49973871655fb46d01b7c30d46a4",
+        "bytes": 213929
+      },
+      "lampOS/crates/skills/src/addon.rs": {
+        "git_blob": "44fffd2e66cb5fc0e0c96c37da5164593d5a3028",
+        "sha256": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af",
+        "bytes": 8608
+      },
+      "lampOS/crates/skills/tests/it/addon.rs": {
+        "git_blob": "61585b017da95feccd2d32b51ed80a2227f542e9",
+        "sha256": "46f570304cda5772f510eed12599a97e781db9f96d9ba258fe518cb02e0187bb",
+        "bytes": 27543
+      }
+    }
+  },
+  "a_fifth_say_sha256": {
+    "full6055": "0055a9164686238d86050241f08ce880a8b7f7b1c6f51ddba88f8751e787016c",
+    "baseline2693": "0055a9164686238d86050241f08ce880a8b7f7b1c6f51ddba88f8751e787016c",
+    "after3076": "34ae56335c06f3d89e59569c6be16da33955d0854bf41b80682ba84f7c411cba",
+    "source3076": "34ae56335c06f3d89e59569c6be16da33955d0854bf41b80682ba84f7c411cba"
+  },
+  "full6055_helper_equals_baseline2693": true,
+  "source3076_helper_equals_tested_merge": true,
+  "production_main_and_addon_blob_identical_across_all_four_refs": true,
+  "original_asserting_test_function_identical_across_all_four_refs": true,
+  "scope": "Exact helper and directly exercised production main.rs/addon.rs; not whole-workspace equivalence. ARM samples have different parents and profiles; no full-binary speedup inference."
+}

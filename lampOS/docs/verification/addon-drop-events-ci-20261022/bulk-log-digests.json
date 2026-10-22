@@ -1,0 +1,29 @@
+{
+  "availability": "Complete success logs remain external, not embedded here. Actions retention and local cleanup can remove them; their hashes cannot reconstruct missing logs. The original native/control proof is preserved on the PR source commit.",
+  "logs": {
+    "arm64": {
+      "external_path": "/private/tmp/tests-addon-drop-events-evidence-20261022/ci/arm64/job.log",
+      "actions_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39815285950/job/119952117592",
+      "bytes": 1799610,
+      "sha256": "220943c8d1f278ff85794d2008d2b1838658e6fc5aa68fc08def74c395a46498"
+    },
+    "clippy": {
+      "external_path": "/private/tmp/tests-addon-drop-events-evidence-20261022/ci/clippy/job.log",
+      "actions_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39815286125/job/119952118426",
+      "bytes": 37621,
+      "sha256": "e2b0026eb6006b7c93bdc539f8aa271929f094d027f9dfb24b643be2eca099a1"
+    },
+    "baseline2693": {
+      "external_path": "/private/tmp/tests-skills-addon-refresh-20261022/ci/arm64-full-log.txt",
+      "actions_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39807795375/job/119925572030",
+      "bytes": 2512709,
+      "sha256": "b471f49ddcaca1cf5b29848eb873b45854f6f5c12d907671f2245227b3ae106e"
+    },
+    "full6055_case_shard": {
+      "external_path": "/private/tmp/tests-search-head-probe-evidence-20261022/arm64/shard-3.stdout",
+      "actions_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39804008782",
+      "bytes": 750339,
+      "sha256": "d5796112058303d1a0cd04f30fcb868416b0f4a7d2a27012f1dda16e481417bb"
+    }
+  }
+}

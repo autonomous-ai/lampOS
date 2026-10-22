@@ -1,0 +1,6 @@
+Self-review against the [current builder checklist](https://github.com/autonomous-ai/lampOS/blob/bad1144960da9dcdbbcc29072e86a767bcbd0437/lampOS/AGENTS.md#L45):
+
+- Wrong-person and stop/forget: reviewed the actual diff. It changes only one integration fixture and documentation; it changes no identity, memory, privacy, cancellation, cached state, or retry path. All original assertions and negative observation windows remain. No dedicated new two-person, face-out-of-view, no-eyes, Unknown-room, privacy-close, or forget run is claimed.
+- Default-on side effects: no production source or switch behavior changes. The directly exercised production blobs are identical across the recorded baselines and tested after-merge; scratch controls were restored before qualification.
+- Census: no new product switch, topic, unit declaration, or message/schema field. The fixture subscribes to the existing SkillEvent topic.
+- Gates: native Mac fmt, strict Skills Clippy, nine focused add-on tests, full serial Skills, and workspace build passed on the stated branch-base overlay. Required Linux workspace Clippy and ARM64 build/tests passed on the stated synthetic merge. A separate Linux fmt invocation and a coordinated latest-parent qualification are not recorded here. Ready remains **NO** pending the ancestry window and independent review.

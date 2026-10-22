@@ -1,0 +1,218 @@
+{
+  "arm64": {
+    "source_sha256": "220943c8d1f278ff85794d2008d2b1838658e6fc5aa68fc08def74c395a46498",
+    "selection": "Exact selected UTF-8 lines with their original newline, line numbers, byte lengths and SHA-256; omitted intervals are not part of this portable receipt.",
+    "lines": [
+      {
+        "line": 240,
+        "bytes": 70,
+        "sha256": "16d0920dbebf941728fbccd77366bee9ac141bf5c4e24da141750d66b2f33aec",
+        "utf8": "2026-10-22T16:36:10.2528730Z [command]/usr/bin/git log -1 --format=%H\n"
+      },
+      {
+        "line": 241,
+        "bytes": 70,
+        "sha256": "ed2d70ad8efe14401e4c83e375ddbfc77747bcc47330395e3dcfa782eaca1777",
+        "utf8": "2026-10-22T16:36:10.2553505Z 9728c9064323ec29faff94440f2959f2df4667bf\n"
+      },
+      {
+        "line": 601,
+        "bytes": 172,
+        "sha256": "1f970653d40cb2c1d15c5e0e187627125b82865bd45c10fb2e31db9937a493dd",
+        "utf8": "2026-10-22T16:38:59.2530930Z The whole workspace: `lampOS/docs/verification/addon-drop-events-20261022/after-pause.patch.json` (lampOS/docs, read by tests this can't see).\n"
+      },
+      {
+        "line": 607,
+        "bytes": 91,
+        "sha256": "9c232d65adfbd7fca80fbc7453f67f8530d9d8862482cec69a0ab2b5b8927b25",
+        "utf8": "2026-10-22T16:38:59.2615475Z \u001b[36;1mcargo nextest run --locked --release --workspace \\\u001b[0m\n"
+      },
+      {
+        "line": 608,
+        "bytes": 57,
+        "sha256": "9f711dcd137a6ad04a5ea682abba4d5ca9937726bfa06cac663abc2ea6e772f7",
+        "utf8": "2026-10-22T16:38:59.2615793Z \u001b[36;1m  --profile pr \\\u001b[0m\n"
+      },
+      {
+        "line": 616,
+        "bytes": 38,
+        "sha256": "02cdbf54ca89bcd1cc99dd96b5f7e4996c92a9057723b011fe2fdb4c2b90c89e",
+        "utf8": "2026-10-22T16:38:59.3672518Z cores: 4\n"
+      },
+      {
+        "line": 645,
+        "bytes": 108,
+        "sha256": "b258d0b5a252c7e48ab8fe6708ececc65509068af4dabce7d8ecbe892b5141b1",
+        "utf8": "2026-10-22T16:40:30.1103668Z     Starting 10536 tests across 162 binaries (67 tests and 2 binaries skipped)\n"
+      },
+      {
+        "line": 5581,
+        "bytes": 146,
+        "sha256": "ffa51b26284e03e0d21b97a1ab74e46565b23521904430e55e67e10c27749f81",
+        "utf8": "2026-10-22T16:41:51.3833764Z         PASS [   0.005s] ( 4936/10536) lamp-skills::it addon::a_say_needs_the_quoted_grant_and_only_an_add_on_has_it\n"
+      },
+      {
+        "line": 5582,
+        "bytes": 115,
+        "sha256": "b54d51f0acd6ddac2d1f11571e4bd44b2aab1ccd2905d9d4192661d2ab37c9ee",
+        "utf8": "2026-10-22T16:41:51.3881245Z         PASS [   0.005s] ( 4937/10536) lamp-skills::it addon::only_an_add_on_proposes\n"
+      },
+      {
+        "line": 5583,
+        "bytes": 146,
+        "sha256": "78402e531732bbb2c0a5ffcbeefa8ad1e65e47f5dbffc8ec33b4a349fb4400b6",
+        "utf8": "2026-10-22T16:41:51.6346718Z         PASS [   0.257s] ( 4938/10536) lamp-skills::it addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing\n"
+      },
+      {
+        "line": 5584,
+        "bytes": 143,
+        "sha256": "ebd6980405a0fd4fb2b4a3d46e78e011cd202f629e0b22c1200edcfb76f47c14",
+        "utf8": "2026-10-22T16:41:51.6397852Z         PASS [   0.005s] ( 4939/10536) lamp-skills::it addon::the_documents_examples_load_as_add_ons_that_propose\n"
+      },
+      {
+        "line": 5585,
+        "bytes": 143,
+        "sha256": "09d56052aaffccd25a6c7d27e5f454b3bb25f2667ca6b44814e9e22002a7bd49",
+        "utf8": "2026-10-22T16:41:51.6467432Z         PASS [   0.007s] ( 4940/10536) lamp-skills::it addon::the_loader_refuses_an_add_on_anything_but_proposing\n"
+      },
+      {
+        "line": 5587,
+        "bytes": 163,
+        "sha256": "64ce592661872860f29dcb411b92a86a0de754054f00aa7fd662ff77c19cd845",
+        "utf8": "2026-10-22T16:41:53.2119453Z         PASS [   1.565s] ( 4942/10536) lamp-skills::it addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on\n"
+      },
+      {
+        "line": 5609,
+        "bytes": 153,
+        "sha256": "84dcdb1b610bee8359b74f264310f8dd342448eb3fe250b70ba93a3180d3a0a5",
+        "utf8": "2026-10-22T16:41:53.8108389Z         PASS [   1.823s] ( 4964/10536) lamp-skills::it addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written\n"
+      },
+      {
+        "line": 5642,
+        "bytes": 136,
+        "sha256": "dd671d22e25d4d7db271d86fc564e57a972aabe49c3327a52a94199bdebb7294",
+        "utf8": "2026-10-22T16:41:54.5009700Z         PASS [   3.113s] ( 4997/10536) lamp-skills::it addon::says_the_judge_dropped_do_not_spend_the_hour\n"
+      },
+      {
+        "line": 5667,
+        "bytes": 150,
+        "sha256": "186bac16dfa2e764c395330085d24bd4cceddf49827b82c2c36d5d602cefba6c",
+        "utf8": "2026-10-22T16:41:56.1442591Z         PASS [   4.762s] ( 5022/10536) lamp-skills::it addon::only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted\n"
+      },
+      {
+        "line": 9169,
+        "bytes": 146,
+        "sha256": "6d475bb849627d812a5b583cc29f60c22dd2ef48cb78f9c43b08baa22e42f9d8",
+        "utf8": "2026-10-22T16:43:08.6831667Z         LEAK [   0.217s] ( 8524/10536) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal\n"
+      },
+      {
+        "line": 11183,
+        "bytes": 106,
+        "sha256": "5f8e6baa836b35b4a46224f0dd1b297eb168e6dd2847fbaf8e55efb9c3e3af88",
+        "utf8": "2026-10-22T16:43:28.4250735Z      Summary [ 178.315s] 10536 tests run: 10536 passed (1 leaky), 67 skipped\n"
+      },
+      {
+        "line": 11652,
+        "bytes": 123,
+        "sha256": "e0e62429ac0ac48e07cdaee822c401e4475647007787d192987147ea164cf23a",
+        "utf8": "2026-10-22T16:43:29.7889951Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "line": 11714,
+        "bytes": 123,
+        "sha256": "2a379328c3b7ee929d5a7d128b24a87e9743d3573d19a861009721e1d9fe90b9",
+        "utf8": "2026-10-22T16:43:31.1728334Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "line": 11752,
+        "bytes": 123,
+        "sha256": "13ce3667ddce138cdbf342c4267970a6c756c6540ef8296286fc749c0caf8007",
+        "utf8": "2026-10-22T16:43:32.4490546Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "line": 11900,
+        "bytes": 118,
+        "sha256": "0373b1ac940a22630a52ebace615ce712e2f3283f1ce7d7f52e3be78939e647c",
+        "utf8": "2026-10-22T16:43:37.5538355Z      Running tests/relay_signals.rs (target/release/deps/relay_signals-2d7abb229f8ee97a)\n"
+      },
+      {
+        "line": 11901,
+        "bytes": 47,
+        "sha256": "8190486ccab49153a18d52241b83cde71602954bd80afa161f4601fb9ea54960",
+        "utf8": "2026-10-22T16:43:37.5557487Z relay_signals: ok\n"
+      },
+      {
+        "line": 11903,
+        "bytes": 106,
+        "sha256": "339f5d1a32ce4a403d7ebbc3450a39601645242eb490fa2627fb835c832c5f0b",
+        "utf8": "2026-10-22T16:43:37.6866231Z      Running tests/process.rs (target/release/deps/process-b3e70ad8a722a93b)\n"
+      },
+      {
+        "line": 11918,
+        "bytes": 62,
+        "sha256": "bb27cc1707cd9b86836e5f696016cd56be0d335d2d567fc8835696fc81f3385f",
+        "utf8": "2026-10-22T16:43:42.1078187Z test result: 12 passed; 0 failed\n"
+      }
+    ]
+  },
+  "clippy": {
+    "source_sha256": "e2b0026eb6006b7c93bdc539f8aa271929f094d027f9dfb24b643be2eca099a1",
+    "selection": "Exact selected UTF-8 lines with their original newline, line numbers, byte lengths and SHA-256; omitted intervals are not part of this portable receipt.",
+    "lines": [
+      {
+        "line": 319,
+        "bytes": 70,
+        "sha256": "913923230bcfa37a8ac987e683d39bc36c9f6655ab5d70fe3a4e19b72aa4c98e",
+        "utf8": "2026-10-22T16:37:50.3057988Z [command]/usr/bin/git log -1 --format=%H\n"
+      },
+      {
+        "line": 320,
+        "bytes": 70,
+        "sha256": "ee77a8e2cea6e410326a8a31dfde61ca0777efffbfa1c3a9819b606dc9122092",
+        "utf8": "2026-10-22T16:37:50.3074254Z 9728c9064323ec29faff94440f2959f2df4667bf\n"
+      },
+      {
+        "line": 407,
+        "bytes": 105,
+        "sha256": "973c72eade71fc4d947427caafc6cda1925a5e7ada190059994edc0fcef4c86b",
+        "utf8": "2026-10-22T16:38:23.2713532Z ##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings\n"
+      },
+      {
+        "line": 408,
+        "bytes": 103,
+        "sha256": "1eae392f6fc92dc0d0f71a9d7b1643ad4f236bcef65b3717fb0cdb73f26f8298",
+        "utf8": "2026-10-22T16:38:23.2713863Z \u001b[36;1mcargo clippy --locked --workspace --all-targets -- -D warnings\u001b[0m\n"
+      },
+      {
+        "line": 446,
+        "bytes": 102,
+        "sha256": "906b7f7feaf8b0d85992f692b498333ae53f8adb437926ce5147605ef1d16c81",
+        "utf8": "2026-10-22T16:39:27.5828483Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 02s\n"
+      }
+    ]
+  },
+  "baseline2693": {
+    "source_sha256": "b471f49ddcaca1cf5b29848eb873b45854f6f5c12d907671f2245227b3ae106e",
+    "selection": "Exact selected UTF-8 lines with their original newline, line numbers, byte lengths and SHA-256; omitted intervals are not part of this portable receipt.",
+    "lines": [
+      {
+        "line": 5657,
+        "bytes": 196,
+        "sha256": "e630a1d4c1112541d7b809143f202a5ec598254ba4269dfa3dbc65aa053dd14e",
+        "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-22T15:57:10.4257600Z         PASS [   5.655s] ( 5025/10519) lamp-skills::it addon::says_the_judge_dropped_do_not_spend_the_hour\n"
+      }
+    ]
+  },
+  "full6055_case_shard": {
+    "source_sha256": "d5796112058303d1a0cd04f30fcb868416b0f4a7d2a27012f1dda16e481417bb",
+    "selection": "Exact selected UTF-8 lines with their original newline, line numbers, byte lengths and SHA-256; omitted intervals are not part of this portable receipt.",
+    "lines": [
+      {
+        "line": 2452,
+        "bytes": 194,
+        "sha256": "02054cb9289ba6b88e82a1497473b624952c83bca5f1baea1802515574411e9d",
+        "utf8": "lampOS \u2014 build and test on Linux ARM64 (3/4)\tUNKNOWN STEP\t2026-10-22T15:43:33.3269472Z         PASS [   5.632s] (1226/2599) lamp-skills::it addon::says_the_judge_dropped_do_not_spend_the_hour\n"
+      }
+    ]
+  }
+}

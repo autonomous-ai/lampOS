@@ -1,0 +1,37 @@
+{
+  "scope": "Every file in this new appendix except this manifest; native/control proof is linked at its unchanged source commit.",
+  "files": {
+    "README.md": {
+      "bytes": 5325,
+      "sha256": "cefdf6dc97b9b798edbc15b3c681d8870c0d47e565bd1e18793d0af4c2b0f1d0"
+    },
+    "bulk-log-digests.json": {
+      "bytes": 1607,
+      "sha256": "ecbaa2b4a1f96d82a0c230cf852479ea6645a3254a8ac94320452728b519c89b"
+    },
+    "early-status-disagreements.json": {
+      "bytes": 13559,
+      "sha256": "579ddc701326b962fcb4b15bf5925bc3c90dee1087d20cf8116762a76fbccdcf"
+    },
+    "results.json": {
+      "bytes": 6853,
+      "sha256": "22d28e9da4b56933aa832b6763164dbb66fcc79b8ba02b317f1217f803d22258"
+    },
+    "selected-output.json": {
+      "bytes": 10293,
+      "sha256": "1f3738b369e31b3ae8b3badb281571482dac00a991e659b9d97cd9c46ae60e23"
+    },
+    "self-review.md": {
+      "bytes": 1338,
+      "sha256": "ef682373f45f13155811f4f782ab849cc45d9f21e08f8b575382b480e2ded616"
+    },
+    "source-comparison.json": {
+      "bytes": 3938,
+      "sha256": "b7f4d6e57c866782c9e7a16580f96bcee86a14ea979df9035f933576c010ce87"
+    },
+    "terminal-metadata.json": {
+      "bytes": 15307,
+      "sha256": "70f76f178071ed34603cd7bda3807cfcd9cfbf354cdc581da86a6846d3d7fd5f"
+    }
+  }
+}
