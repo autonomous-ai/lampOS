@@ -144,6 +144,13 @@ pub const GEMINI_BASE_URL_ENV: &str = "LAMP_SECOND_GEMINI_BASE_URL";
 /// The same for DeepSeek's chat and search through the relay (#1934): over
 /// `second.json`'s `deepseek_base_url`.
 pub const DEEPSEEK_BASE_URL_ENV: &str = "LAMP_SECOND_DEEPSEEK_BASE_URL";
+/// The same for text to speech (#2882): over `second.json`'s `tts_base_url`
+/// (or `llm_base_url`), so a lamp can speak through a near relay.
+pub const SPEECH_BASE_URL_ENV: &str = "LAMP_SECOND_SPEECH_BASE_URL";
+/// The same for speech to text through the relay (#2882): over
+/// `stt_base_url` (or `llm_base_url`). Deepgram's own address, with its own
+/// key, is not the relay's and stays.
+pub const LISTENING_BASE_URL_ENV: &str = "LAMP_SECOND_LISTENING_BASE_URL";
 pub const SPEECH_MODEL_ENV: &str = "LAMP_SECOND_SPEECH_MODEL";
 /// Words speech to text is told to expect, beside the lamp's name, from the
 /// voice unit's environment, comma-separated: the places people here ask
@@ -656,7 +663,8 @@ fn gemini_model(name: String) -> io::Result<String> {
 }
 
 impl SecondConfig {
-    /// With [`GEMINI_BASE_URL_ENV`], [`DEEPSEEK_BASE_URL_ENV`], [`SPEECH_MODEL_ENV`] and
+    /// With [`GEMINI_BASE_URL_ENV`], [`DEEPSEEK_BASE_URL_ENV`],
+    /// [`SPEECH_BASE_URL_ENV`], [`LISTENING_BASE_URL_ENV`], [`SPEECH_MODEL_ENV`] and
     /// [`KEY_TERMS_ENV`] as `var` gives them, over the file's; unset or
     /// empty, the file's stay. Refused as the file's fields are, naming the
     /// variable. [`FLUX_ENV`] is on for `on` alone.
@@ -683,6 +691,15 @@ impl SecondConfig {
         if let Some(url) = given(DEEPSEEK_BASE_URL_ENV)? {
             self.hosted.deepseek_base_url =
                 Some(checked_url(url).map_err(named(DEEPSEEK_BASE_URL_ENV))?);
+        }
+        if let Some(url) = given(SPEECH_BASE_URL_ENV)? {
+            self.tts_base_url = checked_url(url).map_err(named(SPEECH_BASE_URL_ENV))?;
+        }
+        if let Some(url) = given(LISTENING_BASE_URL_ENV)? {
+            let url = checked_url(url).map_err(named(LISTENING_BASE_URL_ENV))?;
+            if let Stt::Autonomous { base_url, .. } = &mut self.stt {
+                *base_url = url;
+            }
         }
         // The chosen voice's model: Gemini's, or the configured voice's
         // (ElevenLabs, OpenAI); only the voice in use reads its own (#1712:
@@ -984,6 +1001,8 @@ mod tests {
                 DEEPSEEK_BASE_URL_ENV,
                 "https://relay.example.invalid/?key=1",
             ),
+            (SPEECH_BASE_URL_ENV, "http://plain.example.invalid"),
+            (LISTENING_BASE_URL_ENV, "https://relay.example.invalid/#x"),
             (SPEECH_MODEL_ENV, "tts/../chat"),
             (KEY_TERMS_ENV, "Hanoi,,Hue"),
             (KEY_TERMS_ENV, "Hanoi&keyterm=x"),
@@ -995,6 +1014,40 @@ mod tests {
                 .to_string();
             assert!(refused.starts_with(name), "{refused}");
         }
+    }
+
+    /// #2882: speech's and listening's own addresses go over the file's,
+    /// unset or empty leave the file's, and listening's leaves Deepgram's.
+    #[test]
+    fn the_units_speech_and_listening_addresses_go_over_the_files() {
+        let (_, config) = written("speech-listening-env", "");
+        let route = || load_from_path(&config).unwrap();
+        // Another host than the company relay's: a complete API base.
+        let near = "https://near.example.invalid/api/v1/ai/v1";
+        let set = route()
+            .with_environment(|name| {
+                [SPEECH_BASE_URL_ENV, LISTENING_BASE_URL_ENV]
+                    .contains(&name)
+                    .then(|| near.into())
+            })
+            .unwrap();
+        assert_eq!(set.tts_base_url, near);
+        assert!(matches!(&set.stt, Stt::Autonomous { base_url, .. } if base_url == near));
+        assert_ne!(route().tts_base_url, near);
+        assert!(matches!(&route().stt, Stt::Autonomous { base_url, .. } if base_url != near));
+        let unset = route().with_environment(|_| Some("".into())).unwrap();
+        assert_eq!(unset.tts_base_url, route().tts_base_url);
+        assert!(
+            matches!((&unset.stt, &route().stt), (Stt::Autonomous { base_url: a, .. }, Stt::Autonomous { base_url: b, .. }) if a == b)
+        );
+        let mut deepgram = route();
+        deepgram.stt = Stt::Deepgram {
+            key: Key("deepgram-test-key".into()),
+        };
+        let kept = deepgram
+            .with_environment(|name| (name == LISTENING_BASE_URL_ENV).then(|| near.into()))
+            .unwrap();
+        assert!(matches!(kept.stt, Stt::Deepgram { .. }));
     }
 
     /// OpenRouter's pinned DeepSeek snapshot and DeepSeek's own Flash by
