@@ -3469,7 +3469,17 @@ impl Engine {
         if self.shared.same_speaker.is_none() || words.trim().is_empty() || held {
             return;
         }
-        // Not in a busy room: there a line cut while its verdict waits (the
+        // A stop or "never mind" withdraws the chain before it, as it does
+        // in a line's own verdict (a reviewer's P2 on the chain, 22 Oct), in
+        // any room (reviewer-three's P2, 23 Oct): before the busy room's
+        // return below, which only skips the chaining.
+        if says_stop(&words) {
+            self.let_go_cut(&format!(
+                "request {of}, cut short before it was asked, says stop or never mind (LAMP_JOIN_CUT_WORDS)"
+            ));
+            return;
+        }
+        // Chained not in a busy room: there a line cut while its verdict waits (the
         // Policy's, up to 2 s) is as likely talk to someone else
         // (reviewer-three, 23 Oct: "…after lunch." then "Lamp, what's on my
         // calendar?" was asked as one line).
@@ -3480,14 +3490,6 @@ impl Engine {
             eprintln!(
                 "lamp-voice second: request {of}: cut short before it was asked, in a busy room: its words are not chained (LAMP_JOIN_CUT_WORDS)"
             );
-            return;
-        }
-        // A stop or "never mind" withdraws the chain before it, as it does
-        // in a line's own verdict (a reviewer's P2 on the chain, 22 Oct).
-        if says_stop(&words) {
-            self.let_go_cut(&format!(
-                "request {of}, cut short before it was asked, says stop or never mind (LAMP_JOIN_CUT_WORDS)"
-            ));
             return;
         }
         let Ok(mut cut) = self.shared.cut.lock() else {
