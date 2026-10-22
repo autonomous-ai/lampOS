@@ -2520,7 +2520,10 @@ The journal says at start `lamp-body: hold from a test input: FILE
 a test input: the head's pitch held by a hand` and `... the hand lets go`
 as it changes, and each `ended`/`dropped` line about a hand while it holds
 ends `(the hand from a test input, --hold-from)`, so a lamp's result can
-name it. `body/gesture` says the same as for a real hand. Tests:
+name it. `body/gesture` says the same as for a real hand, and `body/hand`
+says `pushed` while it holds (#2904), so what a push ends, a skill's
+search and the voice's, can be run from it. Tests:
+`a_hand_from_the_test_input_is_said_as_a_push`,
 `a_skill_gesture_playing_ends_by_a_hand_from_the_test_input_eased_out`,
 `a_skill_gesture_still_waiting_is_dropped_by_a_hand_from_the_test_input`,
 and `hold_in`'s own for the file.
