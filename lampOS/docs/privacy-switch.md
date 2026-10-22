@@ -267,7 +267,7 @@ already running. The journal says once each time the yes comes or goes. The
 eyes still look: the camera, the gaze, presence, who is there and the
 speaking read are unchanged. The voice's
 onboarding writes it: with `LAMP_FACE_EXPRESSIONS_ASK=on` it asks once
-whether the lamp may notice from the faces it sees how people seem, to
+whether the lamp may notice whether people look happy or upset, to
 answer more warmly (never said aloud, no picture of a face kept), and keeps
 only a yes: a yes for this lamp, covering everyone it sees, not the yes of
 the one who answered; a no or silence leaves no file, as never asked does. `redo_setup`, a
