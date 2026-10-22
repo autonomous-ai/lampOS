@@ -534,6 +534,9 @@ pub struct Ticket {
     skill: String,
     answer: Option<mpsc::Sender<Answer>>,
     guard: Option<unplug_guard::Guard>,
+    /// A skill's own note, told who is at the lamp when it is said (#2825);
+    /// never exact words, a quoted line or what the voice keeps.
+    note: bool,
 }
 
 impl Ticket {
@@ -544,6 +547,11 @@ impl Ticket {
 
     pub fn skill(&self) -> &str {
         &self.skill
+    }
+
+    /// Whether its words are a skill's own note ([`Words::Note`]).
+    pub fn is_note(&self) -> bool {
+        self.note
     }
 
     /// The voice began the turn at `at_us`. A client that has gone is
@@ -579,6 +587,7 @@ pub(crate) fn ticket_for_test(skill: &str) -> (Ticket, mpsc::Receiver<Answer>) {
             skill: skill.to_owned(),
             answer: Some(answer),
             guard: None,
+            note: false,
         },
         answered,
     )
@@ -914,6 +923,7 @@ impl Says {
                 skill: waiting.request.skill,
                 answer: Some(waiting.answer),
                 guard: waiting.guard,
+                note: false,
             },
         ))
     }
@@ -959,6 +969,7 @@ impl Says {
             )));
         };
         let quoted = matches!(waiting.request.words, Words::Quoted(_));
+        let note = matches!(waiting.request.words, Words::Note(_));
         Some((
             waiting.request.words.turn()?,
             waiting.request.priority,
@@ -966,6 +977,7 @@ impl Says {
                 skill: waiting.request.skill,
                 answer: Some(waiting.answer),
                 guard: waiting.guard,
+                note,
             },
             quoted,
         ))
@@ -997,6 +1009,7 @@ impl Says {
             skill: waiting.request.skill,
             answer: Some(waiting.answer),
             guard: waiting.guard,
+            note: false,
         })
     }
 
@@ -1017,6 +1030,7 @@ impl Says {
             skill: waiting.request.skill,
             answer: Some(waiting.answer),
             guard: waiting.guard,
+            note: false,
         })
     }
 

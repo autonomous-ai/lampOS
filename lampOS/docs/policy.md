@@ -1762,10 +1762,12 @@ several tasks at once still more than a person wants.
 Built by the second builder on 2026-10-15. **Off unless `lamp-policy
 --hello` is given**, and shadow unless `--act hello` is given too.
 
-**What it is for.** The voice says hello to someone who comes back and sits
-down, by a fixed rule ([speaking-first.md](speaking-first.md)). With
-`LAMP_HELLO_ASKS_POLICY=on` it holds a due hello up to 2 s and asks this
-question on `voice/arrival` ([speaking-first.md](speaking-first.md#asking-the-policy-752)).
+**What it is for.** The Welcome back skill says hello to someone who comes
+back and sits down, and asks this question first (`--gate`, below). The
+voice's own hello, which held a due hello up to 2 s and asked on
+`voice/arrival` (`LAMP_HELLO_ASKS_POLICY=on`), was removed (#2825): nothing
+publishes `voice/arrival` now, and its reading here is unfed
+([speaking-first.md](speaking-first.md#asking-the-policy-752)).
 It is asked by a judge of its own, a third `Jev` with its own connection, on
 a thread of its own.
 
@@ -1890,9 +1892,9 @@ unmeasured.
 
 **Counting "spoke up unasked" in the hour.** Acting, the hellos are said
 and `voice/state` counts each as a turn the lamp began itself. In shadow,
-the hellos chosen are counted as notes. But the voice may still say its own
-rule's hello for the same arrival (`LAMP_SPEAK_FIRST=on`), and that turn
-is counted too. So a turn the lamp begins itself (its first `thinking` or
+the hellos chosen are counted as notes. But the hello may still be said
+for the same arrival (the voice's own rule's, `LAMP_SPEAK_FIRST=on`, until
+#2825 removed it), and that turn is counted too. So a turn the lamp begins itself (its first `thinking` or
 `speaking` with nobody listened to lately) within 5 s after a hello chosen
 in shadow is taken for that same greeting (`ONE_GREETING_WITHIN`; the
 reviewer on #883), and followed to its end, however late its first sound
@@ -1919,8 +1921,8 @@ gate for everything the lamp starts itself (`docs/skills.md` on
 `lamp-voice`): a skill asks on `skills/ask` (`lamp_msgs::SkillAsk`, an
 event: the ask's number, the skill's name, the act, the person if known,
 and for a hello its minutes away and seconds there), and is answered by a
-`Decision` on `policy/decisions` that names the ask (`ask`), within the 2 s
-the voice's own hello waits. With `--gate`, which needs `--hello` and
+`Decision` on `policy/decisions` that names the ask (`ask`), within 2 s
+(as long as the voice's own hello waited, before #2825 removed it). With `--gate`, which needs `--hello` and
 `--act hello`:
 - `act` `hello` is put to the hello question as an arrival of that number
   is: the same hard rules (someone talking, a hello within 20 minutes),
@@ -2008,8 +2010,8 @@ the voice's own hello waits. With `--gate`, which needs `--hello` and
 The diagnostics add `skill_asks` (asks taken), and `moment_decided`,
 `moment_said`, `moment_held_talking` and `moment_late`, with `--gate` only
 (and `moment_held_rule` with `--rules`), and the start line `gate=true`. Without `--gate` the topic is not listened to.
-Run only one hello: with a skill greeting through the gate, the voice's
-own (`LAMP_SPEAK_FIRST`) is to be off. Test: `tests/it/hello.rs`,
+One hello only: the voice's own was removed (#2825), so the skill's
+through the gate is the lamp's one. Test: `tests/it/hello.rs`,
 `with_the_gate_a_skills_ask_is_decided_by_its_question_and_names_the_ask`
 (a hello asked with 42 minutes away and 3 seconds there, `say_now` acting
 with `ask` and no `arrival`; the next held by `greeted_recently` with no
@@ -2059,13 +2061,11 @@ were (`without_the_switch_arrivals_are_not_listened_to_and_the_report_is_as_befo
 `crates/policy/tests/it/hello.rs`, which also covers shadow, acting and the
 twenty minutes, talking, and a failed model).
 
-**How long it takes** is in [speaking-first.md](speaking-first.md#asking-the-policy-752):
-on the development Mac, with a stand-in judge that answers at once, a held
-hello had its answer 22 to 38 ms after it was said on the bus; on the lamp
-Jev's own time (0.5 to 1 s, at most 1.5 s) comes on top.
-
-**On the lamp:** the steps are in
-[speaking-first.md](speaking-first.md#asking-the-policy-752), shadow first.
+**How long it took** the voice's own hello, before #2825 removed it
+([verification](verification/hello-asks-host-20261015/README.md)): on the
+development Mac, with a stand-in judge that answers at once, a held hello
+had its answer 22 to 38 ms after it was said on the bus; on the lamp Jev's
+own time (0.5 to 1 s, at most 1.5 s) comes on top.
 
 **Most likely wrong.** That Jev answers a question it was not built for
 the way a person would. That the hour, the room and facing are what a

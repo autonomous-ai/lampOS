@@ -5,9 +5,9 @@
 //! With `LAMP_PERSON_NAME` set to that file's absolute path, the name goes
 //! into the model's instruction on every voice route
 //! ([`crate::config::ProviderConfig::instruction`]), so a skill's "by name if
-//! you know it" (Welcome back) can use it; and the voice's own hello uses it
-//! when no face is known ([`hello`]). A face the lamp knows still wins: its
-//! name is the one at the lamp now. No file, before setup or after a reset,
+//! you know it" (Welcome back) can use it. A face the lamp knows still wins:
+//! its name, the one at the lamp now, is told with a skill's note
+//! ([`at_the_lamp`]). No file, before setup or after a reset,
 //! is no name. Off unless set.
 use std::{fs, io::Read, path::Path};
 
@@ -87,7 +87,7 @@ pub fn from_environment() -> Option<String> {
     match read(path) {
         Ok(Some(name)) => {
             // Said each time it is read (when a voice worker builds its
-            // instruction, and at each hello), so a journal shows it was
+            // instruction), so a journal shows it was
             // used; never the name itself.
             eprintln!(
                 "lamp-voice: the person's name from {} is used ({} characters)",
@@ -125,71 +125,51 @@ pub fn told(name: &str) -> String {
     )
 }
 
-/// The written turn for the voice's own hello: by the known face's name when
-/// there is one (`known_faces::hello`), else by the typed name, else
-/// `speak_up::NOTE` with no name.
-pub fn hello_for(known: Option<&str>, typed: Option<&str>) -> String {
-    match (known, typed) {
-        (Some(known), _) => crate::known_faces::hello(known),
-        (None, Some(typed)) => hello(typed),
-        (None, None) => crate::speak_up::NOTE.to_owned(),
+/// What a skill's note is told of someone who comes by often (#1670, Mood's
+/// `familiar`): one beat warmer.
+pub const OFTEN: &str = "(The person at the lamp comes by often: speak to them as you would someone you see most days, warmly and without fuss.)";
+
+/// What a skill's note is told about the person at the lamp now (#2825), so
+/// that Welcome back's "by name if you know it" greets a known face by name
+/// and someone who comes by often one beat warmer, as the voice's own hello
+/// did: the known face's name (`known_faces::note`), and [`OFTEN`] for a
+/// remembered person Mood calls `regular` or `close`. Nothing for nobody
+/// known. The typed name is in the model's instruction already ([`told`]).
+pub fn at_the_lamp(known: Option<&str>, familiar: Option<lamp_msgs::FamiliarLevel>) -> String {
+    let mut told = String::new();
+    if let Some(name) = known {
+        told.push_str("\n\n");
+        told.push_str(&crate::known_faces::note(name));
     }
-}
-
-/// The hello's words for someone who comes by often (#1670, Mood's
-/// `familiar`): the same hello, one beat warmer.
-pub const OFTEN: &str = "They come by often: greet them as you would someone you see most days, warmly and without fuss.";
-
-/// [`hello_for`], and for a remembered person who comes by often
-/// (`regular` or `close`), [`OFTEN`] inside its note.
-pub fn hello_for_familiar(
-    known: Option<&str>,
-    typed: Option<&str>,
-    familiar: Option<lamp_msgs::FamiliarLevel>,
-) -> String {
-    let hello = hello_for(known, typed);
-    match familiar {
-        Some(lamp_msgs::FamiliarLevel::Regular | lamp_msgs::FamiliarLevel::Close) => {
-            match hello.strip_suffix(')') {
-                Some(note) => format!("{note} {OFTEN})"),
-                None => format!("{hello} ({OFTEN})"),
-            }
-        }
-        _ => hello,
+    if matches!(
+        familiar,
+        Some(lamp_msgs::FamiliarLevel::Regular | lamp_msgs::FamiliarLevel::Close)
+    ) {
+        told.push_str("\n\n");
+        told.push_str(OFTEN);
     }
-}
-
-/// The voice's own hello when no face is known, in place of
-/// `speak_up::NOTE`: by the typed name.
-pub fn hello(name: &str) -> String {
-    format!(
-        "(Nobody has spoken. Someone has just come and sat down in front of you after being away for a while, most \
-         likely “{name}”, whose lamp you are. Say hello the way a friend at the next desk would, by name: a few warm \
-         words and no question they have to answer.)"
-    )
+    told
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// #1670: someone who comes by often gets the same hello with one more
-    /// sentence; someone new, or nobody known, gets it as before.
+    /// #1670, #2825: a skill's note is told a known face's name, and one
+    /// beat warmer for someone who comes by often; nobody known, nothing.
     #[test]
-    fn someone_who_comes_by_often_is_greeted_one_beat_warmer() {
+    fn a_skills_note_is_told_who_is_at_the_lamp() {
         use lamp_msgs::FamiliarLevel;
-        let plain = hello_for(Some("Minh"), None);
-        assert_eq!(hello_for_familiar(Some("Minh"), None, None), plain);
-        assert_eq!(
-            hello_for_familiar(Some("Minh"), None, Some(FamiliarLevel::New)),
-            plain
-        );
+        assert_eq!(at_the_lamp(None, None), "");
+        assert_eq!(at_the_lamp(None, Some(FamiliarLevel::New)), "");
+        let named = at_the_lamp(Some("Minh"), None);
+        assert_eq!(named, format!("\n\n{}", crate::known_faces::note("Minh")));
         for level in [FamiliarLevel::Regular, FamiliarLevel::Close] {
-            let warmer = hello_for_familiar(Some("Minh"), None, Some(level));
             assert_eq!(
-                warmer,
-                format!("{} {OFTEN})", plain.strip_suffix(')').unwrap())
+                at_the_lamp(Some("Minh"), Some(level)),
+                format!("{named}\n\n{OFTEN}")
             );
+            assert_eq!(at_the_lamp(None, Some(level)), format!("\n\n{OFTEN}"));
         }
     }
 
@@ -246,23 +226,7 @@ mod tests {
     }
 
     #[test]
-    fn the_name_is_in_what_the_model_is_told_and_in_the_hello() {
+    fn the_name_is_in_what_the_model_is_told() {
         assert!(told("Example Name").contains("gave their name as “Example Name”"));
-        assert!(
-            hello("Example Name").contains("most likely “Example Name”")
-                && hello("Example Name").starts_with("(Nobody has spoken.")
-        );
-    }
-
-    /// A face the lamp knows is the one at the lamp now: its name wins over
-    /// the typed one. With neither, the hello names nobody, as before.
-    #[test]
-    fn the_hello_names_a_known_face_first_then_the_typed_name() {
-        assert_eq!(
-            hello_for(Some("Other Name"), Some("Example Name")),
-            crate::known_faces::hello("Other Name")
-        );
-        assert_eq!(hello_for(None, Some("Example Name")), hello("Example Name"));
-        assert_eq!(hello_for(None, None), crate::speak_up::NOTE);
     }
 }

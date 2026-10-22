@@ -487,7 +487,6 @@ sessions with no real words (`crates/voice-eval/tests/data/waiting-cuts/`).
   - a skill's say;
   - a reminder;
   - news the lamp tells unasked (`lamp_tells_news`);
-  - its hello to someone arriving (`lamp_speaks_first`);
   - a line of the setup walk (`lamp_leads_setup`).
 
   A written turn that follows a person's, a look's or a "Sorry?", is as

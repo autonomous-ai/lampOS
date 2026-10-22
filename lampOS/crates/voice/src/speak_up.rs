@@ -1,146 +1,24 @@
-//! Speaking first: the lamp says hello to someone who comes and sits down.
+//! The lamp's own written notes for a look and an ask again, and whether
+//! someone is at the lamp.
 //!
-//! Everything else the lamp says is an answer. This is the one thing it
-//! says unasked, and it is meant to be as small as what a person at the
-//! next desk does when a colleague comes back: look up, a word or two, and
-//! nothing more. It does not announce itself to a room, greet people
-//! walking past, or speak into a conversation.
-//!
-//! The eyes (`lamp-eyes --presence-file`) keep a small file fresh while a
-//! face is near; its text is how large the face is in the picture. From
-//! that, [`Arrival`] decides. The lamp speaks when all of these hold:
-//!
-//! - someone has been there for three seconds without a break;
-//! - before that nobody was, for five minutes or more (a face lost for
-//!   under twenty seconds is someone who looked away, not someone who left);
-//! - nothing has been said to the lamp or by it for half a minute;
-//! - it has not greeted anyone in the last twenty minutes.
-//!
-//! What it then says is the model's: the turn is a written note in place of
-//! speech (`ProviderInput::Written`), not words chosen here.
-//!
-//! With [`ASK_ENVIRONMENT`] `on` (#752) a due hello asks the policy first:
-//! it is said on `voice/arrival` and held up to [`ASK_FOR_US`] for the
-//! policy's decision about it. `say_now` says it, `wait` keeps it, and a
-//! decision in shadow or none in time leaves it to the rule above
-//! ([`Hello`]). Without it nothing here touches the bus.
-use lamp_bus::{Bus, Message, Publisher, Subscriber};
-use lamp_msgs::{Decision, FamiliarLevel, MOOD_STATE_TTL_US, MoodState, VoiceArrival};
-use serde_json::{Value, json};
+//! The lamp's hello to someone who comes back to the desk is the Welcome
+//! back skill's alone (`lampOS/skills/welcome-back`, said through the say
+//! service): the voice's own hello, built here once, is gone (#2825), so
+//! one arrival can never get two. What stays here is [`Presence`]: the eyes
+//! (`lamp-eyes --presence-file`) keep a small file fresh while a face is
+//! near, and from it the voice knows someone is at the lamp, for a reminder
+//! or news that waits for a person, and how familiar Mood says that person
+//! is (#1670), told with a skill's note ([`crate::person::at_the_lamp`]).
+use lamp_bus::{Bus, Message};
+use lamp_msgs::{FamiliarLevel, MOOD_STATE_TTL_US, MoodState};
 use std::{
-    io,
     path::PathBuf,
     time::{Duration, SystemTime},
 };
 
 /// Where the coordinator reads the path of the eyes' presence file. Unset:
-/// the lamp never speaks first and nothing here runs.
+/// nobody is ever known to be at the lamp from the eyes.
 pub const ENVIRONMENT: &str = "LAMP_EYES_PRESENCE_FILE";
-/// `on` for the lamp to say its hello. Anything else, with the file set:
-/// the moments it would have are recorded and nothing is said, which is how
-/// the rule is watched in a room before it is given a voice.
-pub const SPEAK_ENVIRONMENT: &str = "LAMP_SPEAK_FIRST";
-/// `on` for a due hello to ask the policy first (`lamp-policy --hello`).
-/// Read at start; anything else, and the hello is as it was.
-pub const ASK_ENVIRONMENT: &str = "LAMP_HELLO_ASKS_POLICY";
-/// How long a due hello is held for the policy's decision.
-pub const ASK_FOR_US: u64 = 2_000_000;
-/// An answer that could not be acted on for this long (the lamp was busy)
-/// is old: the policy is asked again.
-const ANSWER_LASTS_US: u64 = 10_000_000;
-/// No more decisions than this are read in one tick.
-const MOST_READ: usize = 64;
-
-/// What to do with a due hello now.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Hello {
-    /// Nothing yet: not due and ready, or the policy is being asked.
-    NotYet,
-    /// As the rule says: said with [`SPEAK_ENVIRONMENT`] `on`, else
-    /// recorded. Without asking; or the policy only watches (its decision
-    /// is in shadow); or it did not answer in [`ASK_FOR_US`].
-    ByRule,
-    /// The policy, acting, says say it (with [`SPEAK_ENVIRONMENT`] `on`;
-    /// that stays the switch for the lamp to speak first at all).
-    SayNow,
-    /// The policy, acting, says not now: recorded, not said.
-    Wait,
-}
-
-/// A hello said on `voice/arrival` and not yet acted on.
-#[derive(Clone, Debug)]
-struct Pending {
-    number: u64,
-    asked_us: u64,
-    /// The answer, once known, and what the record calls it.
-    answer: Option<(Hello, &'static str)>,
-    answered_us: u64,
-}
-
-/// The bus, when a due hello asks the policy.
-struct Asking {
-    out: Publisher,
-    decisions: Subscriber,
-    pending: Option<Pending>,
-    /// What to write in the session record about the last answer acted on.
-    told: Option<Value>,
-}
-
-impl Asking {
-    fn on(bus: &Bus) -> io::Result<Self> {
-        Ok(Self {
-            // Subscribed before anything is asked: no answer is missed.
-            decisions: bus.subscribe_typed(Decision::TOPIC, "voice", Decision::TYPE)?,
-            out: bus.publisher_declared(
-                VoiceArrival::TOPIC,
-                &VoiceArrival::declaration(),
-                crate::bus_out::SOURCE,
-            )?,
-            pending: None,
-            told: None,
-        })
-    }
-
-    /// Read what the policy has decided, keeping the answer about the
-    /// hello held. Everything else on the topic is passed over: it is read
-    /// so that the socket's queue never fills.
-    fn read(&mut self, now_us: u64) {
-        for _ in 0..MOST_READ {
-            let Ok(Some(message)) = self.decisions.recv(Duration::ZERO) else {
-                break;
-            };
-            let Some(pending) = self.pending.as_mut() else {
-                continue;
-            };
-            let Ok(decision) = message.parse::<Decision>() else {
-                continue;
-            };
-            if decision.about != "hello"
-                || decision.arrival != Some(pending.number)
-                || pending.answer.is_some()
-            {
-                continue;
-            }
-            pending.answer = match (decision.shadow, decision.choice.as_str()) {
-                (true, _) => Some((Hello::ByRule, "shadow")),
-                (false, "say_now") => Some((Hello::SayNow, "say_now")),
-                (false, "wait") => Some((Hello::Wait, "wait")),
-                _ => None,
-            };
-            pending.answered_us = now_us;
-        }
-        if let Some(pending) = self.pending.as_mut()
-            && pending.answer.is_none()
-            && now_us.saturating_sub(pending.asked_us) >= ASK_FOR_US
-        {
-            pending.answer = Some((Hello::ByRule, "none"));
-            pending.answered_us = now_us;
-        }
-    }
-}
-
-/// What the model is given in place of something heard.
-pub const NOTE: &str = "(Nobody has spoken. Someone has just come and sat down in front of you after being away for a while. Say hello the way a friend at the next desk would: a few warm words and no question they have to answer.)";
 
 /// What the model is given with the picture when the lamp takes a look,
 /// and without one when its eyes are shut.
@@ -201,13 +79,6 @@ pub fn asks_to_look(opening: &str) -> bool {
 }
 
 const THERE_FOR_US: u64 = 3_000_000;
-const AWAY_FOR_US: u64 = 300_000_000;
-const LOOKED_AWAY_US: u64 = 20_000_000;
-const QUIET_FOR_US: u64 = 30_000_000;
-const AT_MOST_EVERY_US: u64 = 1_200_000_000;
-/// For someone `close` (#1670), at most one hello an hour: a friend
-/// wouldn't greet you twice (the first builder on #1670, 12:19).
-const CLOSE_AT_MOST_EVERY_US: u64 = 3_600_000_000;
 /// The file is read this often, and counts while it is this fresh.
 const READ_EVERY_US: u64 = 250_000;
 const FRESH: Duration = Duration::from_millis(1_500);
@@ -215,26 +86,13 @@ const FRESH: Duration = Duration::from_millis(1_500);
 /// room. People at the lamp were 0.12 to 0.27 on lamp-4ace.
 const NEAR: f32 = 0.14;
 
-pub struct Arrival {
-    speaks: bool,
-    /// The bus, when a due hello asks the policy first.
-    asking: Option<Asking>,
+/// Whether someone is at the lamp, from the eyes' presence file.
+pub struct Presence {
     path: Option<PathBuf>,
     read_us: u64,
     near: bool,
     /// Since when someone has been there without a break.
     there_since: Option<u64>,
-    /// When a face was last seen.
-    seen_us: Option<u64>,
-    /// Since when nobody has been there; none while unknown or while someone is.
-    gone_since: Option<u64>,
-    /// How long nobody had been there when the person now there arrived.
-    away_us: u64,
-    /// When the person now there arrived: a glance away and back is the
-    /// same arrival (Tests on #1775), unlike `there_since`.
-    arrived_us: Option<u64>,
-    greeted_us: Option<u64>,
-    greeted_this_arrival: bool,
     /// The bus Mood's state is read from, and how familiar the remembered
     /// person at the lamp is by it (#1670): none without a fresh level.
     mood: Option<Bus>,
@@ -252,157 +110,34 @@ pub fn familiar_in(message: Option<Message>, now_us: u64) -> Option<FamiliarLeve
     (since < MOOD_STATE_TTL_US).then_some(state.familiar)?
 }
 
-impl Arrival {
-    pub fn from_environment(now_us: u64) -> Option<Self> {
+impl Presence {
+    pub fn from_environment() -> Option<Self> {
         let path = std::env::var_os(ENVIRONMENT).filter(|path| !path.is_empty())?;
         let path = PathBuf::from(path);
-        let speaks = std::env::var(SPEAK_ENVIRONMENT).is_ok_and(|value| value == "on");
         if !path.is_absolute() {
             return None;
         }
-        let arrival = Self {
-            speaks,
+        Some(Self {
             // How familiar the person at the lamp is, where Mood says it
             // (#1670); without a bus, nothing changes.
             mood: Bus::from_environment().ok(),
-            ..Self::new(Some(path), now_us)
-        };
-        if std::env::var(ASK_ENVIRONMENT).as_deref() != Ok("on") {
-            return Some(arrival);
-        }
-        match Bus::from_environment().and_then(|bus| Asking::on(&bus)) {
-            Ok(asking) => Some(Self {
-                asking: Some(asking),
-                ..arrival
-            }),
-            Err(error) => {
-                eprintln!(
-                    "lamp-voice: a hello is to ask the policy and the bus cannot be used ({error}); the rule decides"
-                );
-                Some(arrival)
-            }
-        }
+            ..Self::new(Some(path))
+        })
     }
 
-    /// The same, watching a presence file the caller names; for a test or
-    /// a measurement, as `from_environment` with `speaks`.
-    pub fn watching(path: Option<PathBuf>, speaks: bool, now_us: u64) -> Self {
+    fn new(path: Option<PathBuf>) -> Self {
         Self {
-            speaks,
-            ..Self::new(path, now_us)
-        }
-    }
-
-    /// A due hello asks the policy on `bus` first ([`ASK_ENVIRONMENT`]).
-    pub fn asking(mut self, bus: &Bus) -> io::Result<Self> {
-        self.asking = Some(Asking::on(bus)?);
-        Ok(self)
-    }
-
-    /// What the eyes say, given directly instead of read from their file:
-    /// for a test or a measurement.
-    pub fn seen(&mut self, near: bool, now_us: u64) {
-        self.note(near, now_us);
-    }
-
-    /// What to do with the hello now. `ready` is whether it is due and the
-    /// lamp could begin it (no turn, a provider ready); `quiet_us` is how
-    /// long nothing has been said. Call every tick. Without asking, a ready
-    /// hello is [`Hello::ByRule`] at once, as it always was. Asking, the
-    /// first ready tick says it on `voice/arrival`, and it is
-    /// [`Hello::NotYet`] until the policy's answer or [`ASK_FOR_US`].
-    pub fn hello(&mut self, ready: bool, quiet_us: u64, now_us: u64) -> Hello {
-        let since_hello_min = self
-            .greeted_us
-            .map(|at| u32::try_from(now_us.saturating_sub(at) / 60_000_000).unwrap_or(u32::MAX));
-        let away_min = u32::try_from(self.away_us / 60_000_000).unwrap_or(u32::MAX);
-        let there_s = self.there_since.map_or(0, |since| {
-            u32::try_from(now_us.saturating_sub(since) / 1_000_000).unwrap_or(u32::MAX)
-        });
-        let Some(asking) = self.asking.as_mut() else {
-            return if ready { Hello::ByRule } else { Hello::NotYet };
-        };
-        asking.read(now_us);
-        // An answer that waited too long for the lamp to be ready is old.
-        if asking.pending.as_ref().is_some_and(|pending| {
-            pending.answer.is_some() && now_us.saturating_sub(pending.answered_us) > ANSWER_LASTS_US
-        }) {
-            asking.pending = None;
-        }
-        if !ready {
-            return Hello::NotYet;
-        }
-        let Some(pending) = asking.pending.as_ref() else {
-            let number = now_us.max(1);
-            let said = VoiceArrival {
-                arrival: number,
-                away_min,
-                there_s,
-                quiet_s: u32::try_from(quiet_us / 1_000_000).unwrap_or(u32::MAX),
-                since_hello_min,
-            };
-            if asking.out.publish_json(now_us, &said).is_err() {
-                return Hello::ByRule;
-            }
-            eprintln!("lamp-voice: a hello is due; asking the policy (arrival {number})");
-            asking.pending = Some(Pending {
-                number,
-                asked_us: now_us,
-                answer: None,
-                answered_us: 0,
-            });
-            return Hello::NotYet;
-        };
-        let Some((hello, said)) = pending.answer else {
-            return Hello::NotYet;
-        };
-        let waited_ms = pending.answered_us.saturating_sub(pending.asked_us) / 1_000;
-        asking.told = Some(json!({"kind":"hello_policy","at_us":now_us,
-            "arrival":pending.number,"answer":said,"waited_ms":waited_ms}));
-        eprintln!("lamp-voice: the policy's answer to the hello: {said} after {waited_ms} ms");
-        asking.pending = None;
-        hello
-    }
-
-    /// The session record's line about the last answer acted on, once.
-    pub fn take_told(&mut self) -> Option<Value> {
-        self.asking.as_mut().and_then(|asking| asking.told.take())
-    }
-
-    /// Whether a hello that is due is said, or only recorded.
-    pub fn speaks(&self) -> bool {
-        self.speaks
-    }
-
-    fn new(path: Option<PathBuf>, now_us: u64) -> Self {
-        Self {
-            speaks: false,
-            asking: None,
             path,
             read_us: 0,
             near: false,
             there_since: None,
-            seen_us: None,
-            // Nobody is known to be there when the service starts; whoever
-            // is turns up in the first read and was never away.
-            gone_since: Some(now_us),
-            away_us: 0,
-            arrived_us: None,
-            greeted_us: None,
-            greeted_this_arrival: false,
             mood: None,
             familiar: None,
         }
     }
 
-    /// How familiar the remembered person at the lamp is, given directly
-    /// instead of read from Mood: for a test or a measurement.
-    pub fn familiar_seen(&mut self, level: Option<FamiliarLevel>) {
-        self.familiar = level;
-    }
-
     /// How familiar the remembered person at the lamp is, as Mood last said
-    /// (#1670), for the hello's words.
+    /// (#1670), for a skill's note while someone is here.
     pub fn familiar(&self) -> Option<FamiliarLevel> {
         self.familiar
     }
@@ -439,80 +174,16 @@ impl Arrival {
 
     fn note(&mut self, near: bool, now_us: u64) {
         if near {
-            if self.there_since.is_none() {
-                // An arrival, unless it is the same person looking back.
-                if let Some(gone) = self.gone_since.take() {
-                    self.away_us = now_us.saturating_sub(gone);
-                    self.arrived_us = Some(now_us);
-                    self.greeted_this_arrival = false;
-                    // What was asked for someone before is not about them.
-                    if let Some(asking) = self.asking.as_mut() {
-                        asking.pending = None;
-                    }
-                }
-                self.there_since = Some(now_us);
-            }
-            self.seen_us = Some(now_us);
+            self.there_since.get_or_insert(now_us);
         } else {
             self.there_since = None;
-            if self.gone_since.is_none()
-                && self
-                    .seen_us
-                    .is_none_or(|seen| now_us.saturating_sub(seen) >= LOOKED_AWAY_US)
-            {
-                // Gone since they were last seen, not since this was noticed.
-                self.gone_since = Some(self.seen_us.unwrap_or(now_us));
-            }
         }
-    }
-
-    /// Whether the lamp should say hello now. `quiet_us` is how long it has
-    /// been since anything was said to the lamp or by it. Nothing changes
-    /// until [`Self::said`]: a hello that could not be begun is still due.
-    pub fn due(&self, quiet_us: u64, now_us: u64) -> bool {
-        !self.greeted_this_arrival
-            && self
-                .there_since
-                .is_some_and(|since| now_us.saturating_sub(since) >= THERE_FOR_US)
-            && self.away_us >= AWAY_FOR_US
-            && quiet_us >= QUIET_FOR_US
-            && self.greeted_us.is_none_or(|at| {
-                if self.familiar == Some(FamiliarLevel::Close) {
-                    // For someone close, an arrival that began within the
-                    // hour is not greeted at all, rather than greeted late
-                    // once the hour is up while they sit there, a glance
-                    // away and back included.
-                    self.arrived_us
-                        .or(self.there_since)
-                        .unwrap_or(now_us)
-                        .saturating_sub(at)
-                        >= CLOSE_AT_MOST_EVERY_US
-                } else {
-                    now_us.saturating_sub(at) >= AT_MOST_EVERY_US
-                }
-            })
     }
 
     /// Whether someone has been at the lamp for a moment now.
     pub fn present(&self, now_us: u64) -> bool {
         self.there_since
             .is_some_and(|since| now_us.saturating_sub(since) >= THERE_FOR_US)
-    }
-
-    /// The hello has been begun.
-    pub fn said(&mut self, now_us: u64) {
-        self.greeted_this_arrival = true;
-        self.greeted_us = Some(now_us);
-    }
-
-    #[cfg(test)]
-    fn decide(&mut self, near: bool, quiet_us: u64, now_us: u64) -> bool {
-        self.note(near, now_us);
-        let due = self.due(quiet_us, now_us);
-        if due {
-            self.said(now_us);
-        }
-        due
     }
 }
 
@@ -521,122 +192,67 @@ mod tests {
     use super::*;
 
     const S: u64 = 1_000_000;
-    const QUIET: u64 = 60 * S;
 
-    /// Run `seconds` of ticks with a face there or not; whether it greeted.
-    fn pass(arrival: &mut Arrival, now: &mut u64, seconds: u64, near: bool, quiet: u64) -> u32 {
-        let mut greetings = 0;
-        for _ in 0..seconds * 10 {
-            *now += S / 10;
-            greetings += u32::from(arrival.decide(near, quiet, *now));
-        }
-        greetings
-    }
-
+    /// #2825: the hello on an arrival is Welcome back's alone. Fails if the
+    /// voice grows a hello of its own again, which could speak to the same
+    /// arrival as the skill, or if the skill stops greeting.
     #[test]
-    fn it_says_hello_once_to_someone_who_comes_back_after_five_minutes() {
-        let mut now = 1_000 * S;
-        let mut arrival = Arrival::new(None, now);
-        // An empty desk for six minutes, then someone sits down.
-        assert_eq!(pass(&mut arrival, &mut now, 360, false, QUIET), 0);
-        assert_eq!(
-            pass(&mut arrival, &mut now, 2, true, QUIET),
-            0,
-            "not yet three seconds"
-        );
-        assert_eq!(pass(&mut arrival, &mut now, 2, true, QUIET), 1);
-        // They stay for an hour, looking away now and then: nothing more.
-        for _ in 0..60 {
-            assert_eq!(pass(&mut arrival, &mut now, 50, true, QUIET), 0);
-            assert_eq!(pass(&mut arrival, &mut now, 10, false, QUIET), 0);
-        }
-    }
-
-    #[test]
-    fn it_keeps_quiet_for_everything_else() {
-        // Someone already there when the service starts was never away.
-        let mut now = 1_000 * S;
-        let mut arrival = Arrival::new(None, now);
-        assert_eq!(pass(&mut arrival, &mut now, 600, true, QUIET), 0);
-        // Away for two minutes only.
-        assert_eq!(pass(&mut arrival, &mut now, 120, false, QUIET), 0);
-        assert_eq!(pass(&mut arrival, &mut now, 60, true, QUIET), 0);
-        // Someone walking past: a face for two seconds after a long absence.
-        assert_eq!(pass(&mut arrival, &mut now, 600, false, QUIET), 0);
-        assert_eq!(pass(&mut arrival, &mut now, 2, true, QUIET), 0);
-        assert_eq!(pass(&mut arrival, &mut now, 600, false, QUIET), 0);
-        // A room in conversation: they arrive, but it is not quiet. Once it
-        // has been quiet for half a minute with them still there, it does.
-        assert_eq!(pass(&mut arrival, &mut now, 30, true, 5 * S), 0);
-        assert_eq!(pass(&mut arrival, &mut now, 1, true, QUIET), 1);
-        // A hello that could not be begun stays due until it is.
-        let mut waiting = Arrival::new(None, now);
-        let mut later = now;
-        for _ in 0..4_000 {
-            later += S / 10;
-            waiting.note(later > now + 310 * S, later);
-        }
-        assert!(waiting.due(QUIET, later) && waiting.due(QUIET, later + S));
-        waiting.said(later + S);
-        assert!(!waiting.due(QUIET, later + 2 * S));
-        // And then not again for twenty minutes, whoever comes.
-        assert_eq!(pass(&mut arrival, &mut now, 400, false, QUIET), 0);
-        assert_eq!(pass(&mut arrival, &mut now, 30, true, QUIET), 0);
-        assert_eq!(pass(&mut arrival, &mut now, 800, false, QUIET), 0);
-        assert_eq!(pass(&mut arrival, &mut now, 10, true, QUIET), 1);
-    }
-
-    /// #1670: someone `close` comes back within the hour: no second hello,
-    /// where anyone else is greeted again after twenty minutes; after the
-    /// hour, `close` is greeted again too.
-    #[test]
-    fn someone_close_is_not_greeted_twice_in_an_hour() {
-        let greetings = |familiar: Option<FamiliarLevel>| {
-            let mut now = 1_000 * S;
-            let mut arrival = Arrival::new(None, now);
-            arrival.familiar_seen(familiar);
-            let mut said = Vec::new();
-            // Away six minutes, then there: greeted. Then away and back
-            // every 26 minutes, three times.
-            for _ in 0..4 {
-                pass(&mut arrival, &mut now, 360, false, QUIET);
-                said.push(
-                    pass(&mut arrival, &mut now, 20, true, QUIET)
-                        + pass(&mut arrival, &mut now, 1_180, true, QUIET),
-                );
+    fn only_welcome_back_says_hello_on_an_arrival() {
+        let crate_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        // Built from pieces, so this test's own text is not what it finds.
+        let own_hello = [
+            ["lamp_speaks", "_first"].concat(),
+            ["has just come ", "and sat down"].concat(),
+            ["LAMP_SPEAK", "_FIRST"].concat(),
+            ["LAMP_HELLO", "_ASKS_POLICY"].concat(),
+        ];
+        let mut folders = vec![crate_dir.join("src")];
+        let mut read = 0;
+        while let Some(folder) = folders.pop() {
+            for entry in std::fs::read_dir(&folder).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    folders.push(path);
+                } else if path.extension().is_some_and(|ext| ext == "rs") {
+                    let text = std::fs::read_to_string(&path).unwrap();
+                    read += 1;
+                    for needle in &own_hello {
+                        assert!(
+                            !text.contains(needle.as_str()),
+                            "{} has a hello of the voice's own ({needle})",
+                            path.display()
+                        );
+                    }
+                }
             }
-            said
-        };
-        // 0, 26, 52 and 78 minutes on: anyone is greeted at each.
-        assert_eq!(greetings(None), [1, 1, 1, 1]);
-        assert_eq!(greetings(Some(FamiliarLevel::Regular)), [1, 1, 1, 1]);
-        // Close: not at 26 or 52, again at 78.
-        assert_eq!(greetings(Some(FamiliarLevel::Close)), [1, 0, 0, 1]);
+        }
+        assert!(read > 100, "the voice's sources were read: {read}");
+        // And the skill greets: a face appearing after five minutes away,
+        // the Policy asked, said through the voice by a note.
+        let skill = std::fs::read_to_string(crate_dir.join("../../skills/welcome-back/skill.toml"))
+            .unwrap();
+        for line in [
+            "topic = \"humans/faces/tracked\"",
+            "when = \"appears\"",
+            "absent_for = \"5m\"",
+            "cooldown = \"20m\"",
+            "policy = \"hello\"",
+            "say = ",
+        ] {
+            assert!(skill.contains(line), "welcome-back lacks {line}");
+        }
     }
 
-    /// Peer read (Tests) on #1775: someone close who sat down within the
-    /// hour and glances away for two seconds once it is up is the same
-    /// arrival, and is not greeted mid-sitting.
     #[test]
-    fn tests_peer_read_someone_close_who_glances_away_after_the_hour_is_not_greeted_mid_sitting() {
-        let mut now = 1_000 * S;
-        let mut arrival = Arrival::new(None, now);
-        arrival.familiar_seen(Some(FamiliarLevel::Close));
-        // Away six minutes, then there: greeted, and there ten minutes.
-        assert_eq!(pass(&mut arrival, &mut now, 360, false, QUIET), 0);
-        assert_eq!(pass(&mut arrival, &mut now, 600, true, QUIET), 1);
-        // Away forty minutes, back fifty minutes after the hello: within
-        // the hour, so none, for the next twelve minutes of sitting.
-        assert_eq!(pass(&mut arrival, &mut now, 2_400, false, QUIET), 0);
-        assert_eq!(pass(&mut arrival, &mut now, 720, true, QUIET), 0);
-        // A glance away of two seconds, an hour and two minutes after the
-        // hello, and back: the same arrival, still sitting there.
-        assert_eq!(pass(&mut arrival, &mut now, 2, false, QUIET), 0);
-        assert_eq!(
-            pass(&mut arrival, &mut now, 60, true, QUIET),
-            0,
-            "greeted mid-sitting, after a glance away"
-        );
+    fn someone_is_present_after_three_seconds_and_gone_at_once() {
+        let mut presence = Presence::new(None);
+        presence.note(true, S);
+        assert!(!presence.present(3 * S));
+        assert!(presence.present(4 * S));
+        presence.note(true, 4 * S);
+        assert!(presence.present(4 * S), "still the same sitting");
+        presence.note(false, 5 * S);
+        assert!(!presence.present(5 * S));
     }
 
     /// #1670: Mood's familiar level is read from source `mood` only, fresh,
@@ -678,21 +294,6 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
-    /// An arrival after six minutes away, there three seconds: due.
-    fn arrived(asking: Option<&Bus>) -> (Arrival, u64) {
-        let mut now = 1_000 * S;
-        let mut arrival = Arrival::watching(None, true, now);
-        if let Some(bus) = asking {
-            arrival = arrival.asking(bus).unwrap();
-        }
-        now += 360 * S;
-        arrival.seen(true, now);
-        now += 3 * S;
-        arrival.seen(true, now);
-        assert!(arrival.due(QUIET, now));
-        (arrival, now)
-    }
-
     fn bus(name: &str) -> (Bus, PathBuf) {
         let root = PathBuf::from(format!("/tmp/lvh-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
@@ -703,153 +304,6 @@ mod tests {
                 .rescan_every(Duration::from_millis(20)),
             root,
         )
-    }
-
-    /// The policy, played by the test: it reads the arrival and answers.
-    fn decide(bus: &Bus, number: u64, choice: &str, shadow: bool) {
-        let mut out = bus
-            .publisher_declared(Decision::TOPIC, &Decision::declaration(), "policy")
-            .unwrap();
-        out.publish_json(
-            0,
-            &Decision {
-                about: "hello".into(),
-                choice: choice.into(),
-                probability: 0.7,
-                answers: Default::default(),
-                by: "stand-in".into(),
-                took_ms: 1,
-                shadow,
-                request: None,
-                task: None,
-                arrival: Some(number),
-                ask: None,
-                proposal: None,
-            },
-        )
-        .unwrap();
-        std::thread::sleep(Duration::from_millis(30));
-    }
-
-    #[test]
-    fn without_asking_a_ready_hello_is_the_rules_at_once() {
-        let (mut arrival, now) = arrived(None);
-        assert_eq!(arrival.hello(false, QUIET, now), Hello::NotYet);
-        assert_eq!(arrival.hello(true, QUIET, now), Hello::ByRule);
-        assert!(arrival.take_told().is_none());
-    }
-
-    #[test]
-    fn asking_holds_the_hello_for_the_policys_answer() {
-        let (bus, root) = bus("answers");
-        let mut heard = bus
-            .subscribe_typed(VoiceArrival::TOPIC, "test", VoiceArrival::TYPE)
-            .unwrap();
-        for (choice, shadow, expected, said) in [
-            ("say_now", false, Hello::SayNow, "say_now"),
-            ("wait", false, Hello::Wait, "wait"),
-            // The policy only watches: the rule says, at once.
-            ("say_now", true, Hello::ByRule, "shadow"),
-        ] {
-            let (mut arrival, now) = arrived(Some(&bus));
-            assert_eq!(arrival.hello(true, QUIET, now), Hello::NotYet);
-            std::thread::sleep(Duration::from_millis(30));
-            let asked: VoiceArrival = heard
-                .recv(Duration::from_secs(2))
-                .unwrap()
-                .expect("the arrival on the bus")
-                .parse()
-                .unwrap();
-            assert_eq!(
-                asked,
-                VoiceArrival {
-                    arrival: now,
-                    away_min: 6,
-                    there_s: 3,
-                    quiet_s: 60,
-                    since_hello_min: None,
-                }
-            );
-            // Another arrival's answer is not this one's.
-            decide(&bus, now + 1, "wait", false);
-            assert_eq!(arrival.hello(true, QUIET, now + 1_000), Hello::NotYet);
-            decide(&bus, now, choice, shadow);
-            // Not ready when it comes: kept until the lamp is.
-            assert_eq!(arrival.hello(false, QUIET, now + 50_000), Hello::NotYet);
-            assert_eq!(arrival.hello(true, QUIET, now + 60_000), expected);
-            let told = arrival.take_told().unwrap();
-            assert_eq!(told["kind"], "hello_policy");
-            assert_eq!(
-                (told["arrival"].as_u64(), told["answer"].as_str()),
-                (Some(now), Some(said))
-            );
-            assert_eq!(told["waited_ms"], 50);
-            assert!(arrival.take_told().is_none());
-        }
-        std::fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn no_answer_within_two_seconds_leaves_it_to_the_rule() {
-        let (bus, root) = bus("silent");
-        let (mut arrival, now) = arrived(Some(&bus));
-        assert_eq!(arrival.hello(true, QUIET, now), Hello::NotYet);
-        assert_eq!(
-            arrival.hello(true, QUIET, now + ASK_FOR_US - 1),
-            Hello::NotYet
-        );
-        assert_eq!(arrival.hello(true, QUIET, now + ASK_FOR_US), Hello::ByRule);
-        assert_eq!(arrival.take_told().unwrap()["answer"], "none");
-        // An answer that could not be acted on for long is asked again.
-        let (mut late, now) = arrived(Some(&bus));
-        assert_eq!(late.hello(true, QUIET, now), Hello::NotYet);
-        decide(&bus, now, "say_now", false);
-        assert_eq!(late.hello(false, QUIET, now + 100_000), Hello::NotYet);
-        assert_eq!(
-            late.hello(false, QUIET, now + 100_000 + ANSWER_LASTS_US + 1),
-            Hello::NotYet
-        );
-        assert_eq!(
-            late.hello(true, QUIET, now + 200_000 + ANSWER_LASTS_US),
-            Hello::NotYet
-        );
-        std::fs::remove_dir_all(root).unwrap();
-    }
-
-    /// An add-on's say decision (#2530 part 2, `about` `addon`) is never
-    /// a hello's answer, even naming this arrival's number: the hello waits
-    /// for its own, and the rule says at the end, as with none.
-    #[test]
-    fn an_add_ons_decision_is_never_the_hellos_answer() {
-        let (bus, root) = bus("addon");
-        let (mut arrival, now) = arrived(Some(&bus));
-        assert_eq!(arrival.hello(true, QUIET, now), Hello::NotYet);
-        let mut out = bus
-            .publisher_declared(Decision::TOPIC, &Decision::declaration(), "policy")
-            .unwrap();
-        out.publish_json(
-            0,
-            &Decision {
-                about: "addon".into(),
-                choice: "say_now".into(),
-                probability: 0.9,
-                answers: Default::default(),
-                by: "stand-in".into(),
-                took_ms: 1,
-                shadow: false,
-                request: None,
-                task: None,
-                arrival: Some(now),
-                ask: None,
-                proposal: Some(7),
-            },
-        )
-        .unwrap();
-        std::thread::sleep(Duration::from_millis(30));
-        assert_eq!(arrival.hello(true, QUIET, now + 1_000), Hello::NotYet);
-        assert_eq!(arrival.hello(true, QUIET, now + ASK_FOR_US), Hello::ByRule);
-        assert_eq!(arrival.take_told().unwrap()["answer"], "none");
-        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -893,7 +347,7 @@ mod tests {
         ));
         std::fs::create_dir_all(&directory).unwrap();
         let path = directory.join("present");
-        let mut arrival = Arrival::new(Some(path.clone()), 0);
+        let mut arrival = Presence::new(Some(path.clone()));
         assert!(!arrival.near_now(S));
         std::fs::write(&path, "0.21\n").unwrap();
         assert!(!arrival.near_now(S + 1), "read at most four times a second");

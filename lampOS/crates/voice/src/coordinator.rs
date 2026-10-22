@@ -203,8 +203,8 @@ const WAIT_KEEPS_WITHIN_US: u64 = 3_000_000;
 const AFTER_LET_GO_US: u64 = 1_000_000;
 
 /// `LAMP_OWN_LINE_KEEPS=on` (#2220, El on lamp-06c1, 20 Oct): a line the
-/// lamp starts on its own (a skill's say, a reminder, its hello to someone
-/// arriving, a line of the setup walk, news it tells) waiting for its first
+/// lamp starts on its own (a skill's say, a reminder, a line of the setup
+/// walk, news it tells) waiting for its first
 /// audio is not ended by room sound. On lamp-06c1 two of three of Welcome
 /// back's hellos were dropped as `user_interrupted` by a sound the room made
 /// about 2 s in, before any of their audio. Off unless set.
@@ -324,8 +324,8 @@ enum WhileOwnLineWaits {
 }
 
 /// A line the lamp started on its own, with no person's words it answers: a
-/// skill's say, a reminder, news it tells, or the turn `lamp_began` (its
-/// hello to someone arriving, or a line of the setup walk).
+/// skill's say, a reminder, news it tells, or the turn `lamp_began` (a line
+/// of the setup walk).
 fn own_line(current: &Reply, lamp_began: Option<u64>) -> bool {
     current.input_sequence == 0
         && (current.say.is_some()
@@ -682,7 +682,7 @@ fn while_answer_waits(
     pause_blocks: u16,
     at_us: u64,
 ) -> WhileAnswerWaits {
-    // Only an answer to someone heard: not the lamp's own hello, look,
+    // Only an answer to someone heard: not a skill's hello, the lamp's look,
     // reminder, news or "hm?", which a short "hi" or "not now" may answer
     // (the first builder on #1130). A written turn has no input.
     let Some(current) = reply.filter(|current| current.input_sequence > 0) else {
@@ -1314,8 +1314,8 @@ fn keeper_pause(bus: io::Result<lamp_bus::Bus>) -> KeeperPause {
     Box::new(move || pause.as_mut().is_some_and(|pause| pause.paused()))
 }
 
-/// The provider session a turn nobody asked for may begin on: the hello,
-/// the news, a reminder, the look the lamp said it would take, and the
+/// The provider session a turn nobody asked for may begin on: a skill's
+/// say, the news, a reminder, the look the lamp said it would take, and the
 /// second look. None while the keeper has paused the lamp; otherwise
 /// exactly the ready session.
 fn unasked_session(cloud: &CloudAvailability, paused: bool) -> Option<u64> {
@@ -5216,7 +5216,7 @@ fn conversation_with_gate(
     // it sounded, while it goes on (#2602).
     let mut own_let_go: Option<LetGoSound> = None;
     // The newest turn the lamp began itself with no ticket or news on it:
-    // its hello to someone arriving, or a line of the setup walk.
+    // a line of the setup walk.
     let mut lamp_began: Option<u64> = None;
     // The eyes' faces, for the person an own line is for (#2287's
     // follow-up): read every 100 ms off the audio path, only with either
@@ -5352,9 +5352,6 @@ fn conversation_with_gate(
     // audio is what follows them, a wait cue or the down line before them
     // being no answer (`AnswerAudio`).
     let mut answer_audio = AnswerAudio::default();
-    // Saying hello first to someone who comes and sits down, when the eyes
-    // keep a presence file for it; and when anything was last said to the
-    // lamp or by it.
     // A face added from a photo, asked about once at the lamp
     // (`LAMP_PHOTO_FACES=on`, #1968): the eyes' socket, and when they were
     // last asked whether one is here.
@@ -5362,11 +5359,16 @@ fn conversation_with_gate(
         .then(|| std::env::var_os(crate::known_faces::ENVIRONMENT))
         .flatten()
         .map(|socket| crate::photo_faces::Watch::start(PathBuf::from(socket)));
-    let mut arrival = if lifetime.continuous() {
-        crate::speak_up::Arrival::from_environment(monotonic_us())
+    // Whether someone is at the lamp, when the eyes keep a presence file
+    // for it: for a reminder or news that waits for a person, and who a
+    // skill's note is told is there. The hello on an arrival is Welcome
+    // back's alone (#2825).
+    let mut presence = if lifetime.continuous() {
+        crate::speak_up::Presence::from_environment()
     } else {
         None
     };
+    // When anything was last said to the lamp or by it.
     let mut last_turn_us = monotonic_us();
     // When the lamp's own words last finished playing: only a reply that
     // played to its end, never one cut off (`LAMP_FOLLOWS_ON=on`, #829, the
@@ -9206,7 +9208,7 @@ fn conversation_with_gate(
                             )?;
                         }
                         // Whose it is: the known person at the lamp, read
-                        // from the eyes' small file as the hello reads it.
+                        // from the eyes' small file as a skill's note reads it.
                         tone_person = crate::known_faces::known_from_environment()
                             .map(|name| crate::known_faces::memory_person(&name));
                         #[cfg(test)]
@@ -10364,9 +10366,9 @@ fn conversation_with_gate(
         // waits for someone at the lamp and is never told to an empty room.
         // While it waits it holds no skill's ask (the reviewer on #1103).
         let someone_here = crate::reminders::someone_here(
-            arrival
+            presence
                 .as_ref()
-                .is_some_and(|arrival| arrival.present(clock)),
+                .is_some_and(|presence| presence.present(clock)),
             said_at_us,
             clock,
         );
@@ -10426,13 +10428,13 @@ fn conversation_with_gate(
             begun_for(ticket, reply);
         }
         // A reminder held for its skill, and still offered, is said before
-        // anything else the lamp would say unasked: the say service, the
-        // hello and the news wait for it (Fourth on #1038).
+        // anything else the lamp would say unasked: the say service and the
+        // news wait for it (Fourth on #1038).
         let reminder_waiting = reminders.as_ref().is_some_and(|reminders| {
             reminder_waits(&reminder_held, reminders.offer(monotonic_us()).as_ref())
         });
         // What another part asked the voice to say (#939): after a due
-        // reminder, before the hello and the news, through a reminder's
+        // reminder, before the news, through a reminder's
         // gates and a quiet since the last turn that its priority sets.
         let say_now_us = if says.is_some() {
             monotonic_us()
@@ -10480,6 +10482,18 @@ fn conversation_with_gate(
                     trace,
                     json!({"kind":"skill_says","at_us":say_now_us,"skill":ticket.skill(),"priority":priority,"provider_session":provider_session}),
                 )?;
+                // A skill's note is told who is at the lamp: a known face
+                // by name, someone who comes by often one beat warmer, so
+                // Welcome back greets as the voice's own hello did (#2825).
+                let turn = match presence.as_ref() {
+                    Some(presence) if ticket.is_note() && presence.present(clock) => {
+                        turn + &crate::person::at_the_lamp(
+                            crate::known_faces::known_from_environment().as_deref(),
+                            presence.familiar(),
+                        )
+                    }
+                    _ => turn,
+                };
                 snapshot = commit_written_turn(
                     owner,
                     reply,
@@ -10940,8 +10954,8 @@ fn conversation_with_gate(
                 }
             }
         }
-        if let Some(arrival) = arrival.as_mut() {
-            arrival.watch(clock);
+        if let Some(presence) = presence.as_mut() {
+            presence.watch(clock);
         }
         // Memory has forgotten someone, asked by the app or by voice: their
         // tone baseline goes too (`memory/forgot`).
@@ -10984,77 +10998,6 @@ fn conversation_with_gate(
                 tone_person.as_deref(),
                 trace,
             )?;
-        }
-        // A hello that is due and could be begun; with
-        // `LAMP_HELLO_ASKS_POLICY=on` the policy is asked first and it
-        // waits up to 2 s for the answer (`speak_up::Hello`).
-        let hello_session = arrival
-            .as_ref()
-            .is_some_and(|arrival| {
-                onboarding.as_ref().is_none_or(|walk| !walk.leading())
-                    && !reminder_waiting
-                    && arrival.due(clock.saturating_sub(last_turn_us), clock)
-                    && reply.is_none()
-                    && provider_queue.is_empty()
-                    && !admission.owns_stream()
-                    && !submission_draining
-                    && snapshot.listening_ready(now())
-            })
-            .then(|| unasked_session(&cloud, paused))
-            .flatten();
-        let hello = arrival.as_mut().map(|arrival| {
-            arrival.hello(
-                hello_session.is_some(),
-                clock.saturating_sub(last_turn_us),
-                clock,
-            )
-        });
-        if let Some(told) = arrival.as_mut().and_then(|arrival| arrival.take_told()) {
-            record(trace, told)?;
-        }
-        if let Some(arrival) = arrival.as_mut()
-            && let Some(provider_session) = hello_session
-            && let Some(hello) = hello.filter(|hello| *hello != crate::speak_up::Hello::NotYet)
-        {
-            arrival.said(clock);
-            if hello == crate::speak_up::Hello::Wait {
-                eprintln!("lamp-voice: someone has sat down; the policy said not now");
-                record(
-                    trace,
-                    json!({"kind":"hello_due","at_us":clock,"said":false,"policy":"wait","provider_session":provider_session}),
-                )?;
-            } else if arrival.speaks() {
-                // By name: someone who asked the lamp to know their face,
-                // else the name typed at setup (`LAMP_PERSON_NAME`, #806).
-                // One beat warmer for someone who comes by often (#1670).
-                let by_name = crate::person::hello_for_familiar(
-                    crate::known_faces::known_from_environment().as_deref(),
-                    crate::person::from_environment().as_deref(),
-                    arrival.familiar(),
-                );
-                snapshot = commit_written_turn(
-                    owner,
-                    reply,
-                    &mut provider_queue,
-                    &by_name,
-                    false,
-                    "lamp_speaks_first",
-                    provider_session,
-                    rig.playout_start_now(),
-                    trace,
-                    |state| rig.publish(state),
-                )?;
-                last_publish = monotonic_us();
-                lamp_began = reply.as_ref().map(|current| current.owner.turn());
-            } else {
-                eprintln!(
-                    "lamp-voice: someone has sat down; a hello was due and is not switched on"
-                );
-                record(
-                    trace,
-                    json!({"kind":"hello_due","at_us":clock,"said":false,"provider_session":provider_session}),
-                )?;
-            }
         }
         // A face added from a photo at the lamp, unconfirmed: asked once,
         // gently, as the lamp's own written turn, while it is quiet (#1968).
@@ -11119,9 +11062,9 @@ fn conversation_with_gate(
                     last_capture,
                 ),
             )
-            && (arrival
+            && (presence
                 .as_ref()
-                .is_some_and(|arrival| arrival.present(clock))
+                .is_some_and(|presence| presence.present(clock))
                 || said_at_us
                     .is_some_and(|at| clock.saturating_sub(at) < crate::task_news::HEARD_WITHIN_US))
             && !room.busy()

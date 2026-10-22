@@ -189,13 +189,14 @@ port (eyes.md, #2190).
 **Different: one lamp behind the other.** lamp-4ace has switches lamp-52e6
 lacks: the voice's `LAMP_TASKS_DIR`, `LAMP_SCHEDULE_TOOLS`,
 `LAMP_SCHEDULE_SPEAK`, `LAMP_SCHEDULE_DELIVERY_DIR`, `LAMP_MEMORY_DAYS`,
-`LAMP_EYES_WHO_SOCKET`, `LAMP_SPEAK_FIRST`; the actions'
+`LAMP_EYES_WHO_SOCKET`; the actions'
 `LAMP_SCHEDULE_TOOLS`; health's `--expect policy`. By joining.md's rule
 ("The switch is for that first minute, not for life") a switch on for
 lamp-4ace becomes the product's default, so the product takes lamp-4ace's
-set, but for `LAMP_SPEAK_FIRST`: the product's hello is the Welcome back
-skill (`lamp-skills`, #811), spoken through the voice's say service, so the
-voice's own hello is off, as lamp-4ace now has it too.
+set. The product's hello is the Welcome back skill (`lamp-skills`, #811),
+spoken through the voice's say service; the voice's own hello and its
+`LAMP_SPEAK_FIRST` were removed (#2825), so the lamp greets once
+([speaking-first.md](speaking-first.md#one-hello-from-the-skill-2825)).
 
 **19 October: every behaviour that has a skill runs as the skill** (the
 owner: "everything is a skill"). Install puts every product skill in
@@ -229,8 +230,8 @@ each one's own `skill.toml`, so the folder in `lampOS/skills/`, and a lamp
 run from it, keeps its own default and its cases; each adds no trigger and
 no function, and a trial turns one on on the lamp itself. Each
 folder is installed whole but for its `tests/`. The voice's own paths still
-give way in the product's `lamp-voice.service`: its hello stays off
-(`LAMP_SPEAK_FIRST` unset), and `LAMP_SCHEDULE_SPEAK=skill` and
+give way in the product's `lamp-voice.service`: it has no hello of its own
+(#2825), and `LAMP_SCHEDULE_SPEAK=skill` and
 `LAMP_TASK_NEWS=skill` make a due reminder and the news of a task wait up
 to 10 s for the skill's ask (`from = "schedule"`, `from = "tasks"`). The
 voice says each once, with the skill's ticket when the skill asked, so the
@@ -1145,8 +1146,8 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   any lamp.
 - `lamp-skills` (#811, from lamp-06c1): installed with every product skill
   (since 19 October) and the voice's say service (`LAMP_SAY=on`, its socket
-  in the group `lampos`), the voice's own hello (`LAMP_SPEAK_FIRST`) off so
-  the lamp greets once, its reminders and task news waiting for their
+  in the group `lampos`), Welcome back the lamp's one hello (the voice's
+  own removed, #2825), its reminders and task news waiting for their
   skills (`LAMP_SCHEDULE_SPEAK=skill`, `LAMP_TASK_NEWS=skill`), and
   `LAMP_SKILLS_ASK=skip` until the Policy's gate (#939). Only in tests: no
   lamp has run the product unit with them yet, and Reminders and Task news
