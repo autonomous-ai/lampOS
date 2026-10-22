@@ -1185,9 +1185,13 @@ path it doesn't know, and ignores a field it doesn't know.
   read, and again by lamp-update-apply before its first write, as on
   put-back; a build that names any other path, or one path as both a
   setting and an image file, writes nothing): `/etc/asound.conf`,
-  `lamp-cmedia-speaker.service`, `respeaker-lite-softvol.service`,
+  ramlog's `/etc/default/orangepi-ramlog` (#2602; the base image's own
+  file is listed as shipped too, so it is replaced, and a lamp's own
+  `SIZE` is kept), `lamp-cmedia-speaker.service`, `respeaker-lite-softvol.service`,
   logrotate's `zz-lamp-ramlog.conf` and its `lamp-ramlog-postrotate`,
-  journald's `zz-lamp-journal.conf`, and the udev rules `90-respeaker-lite`,
+  ramlog's `zz-lamp-journal-keep.conf` and its `lamp-journal-keep` (#2602:
+  the last 2 boots' journal on the eMMC; a daemon-reload, so the next
+  shutdown keeps, and the boot after links), journald's `zz-lamp-journal.conf`, and the udev rules `90-respeaker-lite`,
   `91-pulseaudio-hal-ignore` and `99-lamp-device`. Never V1's HAL
   (`/opt/hal/.env`, `led-boot`/`led-shutdown`, `hal.service`'s drop-in),
   never the radio scripts (`device-ap-mode`/`device-sta-mode` are written
