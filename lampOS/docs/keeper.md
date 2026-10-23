@@ -392,7 +392,10 @@ keeps its own:
   `/opt/lampOS/voice/notices`, fetched from their release and checked by
   size and SHA-256 with `lamp-update install`'s own code
   (`install::place_moved_notices`). Only a missing one is fetched; one there
-  that is not the pinned one is kept and said. This is prepare's only
+  that is not the pinned one is kept and said. Nothing records what prepare
+  wrote, so when `models.json` re-pins a line, a moved lamp keeps the older one
+  (it still plays) until it is removed and prepare runs again, which the said
+  line tells. This is prepare's only
   network use. A line that cannot be fetched (no network, the release out of
   reach) is said and never refuses the update: the voice sighs in its place
   (failure-notices.md) and the next prepare tries again. Not under
