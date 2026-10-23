@@ -4024,6 +4024,10 @@ pub(crate) struct Heeding {
     /// The newest line carried by a sure sign of the same speaker: a print
     /// come late of a line before it ends nothing (reviewer-two at 03:07).
     carried_last: Option<u64>,
+    /// How much speech a print under `same_voice::DIFFERENT_BELOW` needs to
+    /// be a sure other voice under a carry: [`CARRY_SURE_OTHER_SPEECH_SAMPLES`],
+    /// lowered only by tests for a synthetic classification control.
+    sure_other_samples: usize,
     /// The newest request, if it began over the lamp's own answer (its
     /// Start's `over_the_lamps_voice`), as [`Self::hear`] is told.
     began_over: Option<u64>,
@@ -4648,6 +4652,7 @@ impl Heeding {
             carrying: false,
             carried: None,
             carried_last: None,
+            sure_other_samples: CARRY_SURE_OTHER_SPEECH_SAMPLES,
             began_over: None,
             voices: None,
             voice_ends_going_on: false,
@@ -5455,6 +5460,16 @@ impl Heeding {
     /// conversation's, and the faces seen speaking it (`speakers`), those
     /// turned to the lamp among them (`turned_speakers`).
     ///
+    /// The contract (the first builder at 04:33 on #3296): the first 8 s
+    /// after the lamp's words are not identity-gated. Within them an
+    /// uncertain, short or missing print is no evidence either way, and the
+    /// line goes as an ordinary follow-up; from 8 to 20 s only a sure sign of
+    /// the same speaker carries it. Always held, inside the 8 s too: another
+    /// face seen speaking it, the caller turned away, or a sure other voice,
+    /// which today is not reachable: prints carry at most 1.5 s of speech,
+    /// under the provisional 2.5 s. A print that was no evidence never
+    /// becomes the conversation's voice (`same_voice::Voices::adopt`).
+    ///
     /// - A sure other voice (under `same_voice::DIFFERENT_BELOW` from
     ///   [`CARRY_SURE_OTHER_SPEECH_SAMPLES`] of speech or more, which no
     ///   print reaches today), or a face seen speaking it that is not the
@@ -5493,7 +5508,7 @@ impl Heeding {
             .voices
             .as_ref()
             .and_then(|voices| voices.usable_speech(request));
-        let enough = speech.is_some_and(|speech| speech >= CARRY_SURE_OTHER_SPEECH_SAMPLES);
+        let enough = speech.is_some_and(|speech| speech >= self.sure_other_samples);
         let voice = likeness.and_then(|likeness| {
             if likeness >= crate::same_voice::SAME_FROM {
                 Some(true)
@@ -6165,10 +6180,8 @@ impl Heeding {
         if self.carries
             && let Some(voices) = self.voices.as_mut()
         {
-            voices.sure_of_another_only(
-                CARRY_SURE_OTHER_SPEECH_SAMPLES,
-                crate::same_voice::DIFFERENT_BELOW,
-            );
+            voices
+                .sure_of_another_only(self.sure_other_samples, crate::same_voice::DIFFERENT_BELOW);
         }
         let going_on_unheard = signs.going_on;
         let (mut going_on, mut other_voice, same_voice, likeness) =
@@ -9662,6 +9675,16 @@ mod tests {
             desk
         }
 
+        /// The conversation's voice is its caller's alone
+        /// (`LAMP_SAME_VOICE_CALLER_ONLY`), from the call on.
+        fn caller_only(&mut self) {
+            self.heeding.voices = self
+                .heeding
+                .voices
+                .take()
+                .map(|voices| voices.callers_only(true));
+        }
+
         /// The call is long past, so only the lamp's words carry.
         fn called_long_ago(&mut self) {
             self.heeding.called_at = Some(Instant::now() - Duration::from_secs(60));
@@ -10137,6 +10160,70 @@ mod tests {
         let mut off = CarryDesk::new(false);
         off.answered(3);
         assert!(off.line(2, "", words).is_some(), "without the switch");
+    }
+
+    /// Reviewer-two's P2 at 04:31 on #3296, and the first builder's contract
+    /// at 04:33: the first 8 s are not identity-gated, and a print that was
+    /// no evidence never becomes evidence. The owner, A, is answered; an
+    /// unknown B with no face and a short 0.27 print at 3 s goes on as the
+    /// ordinary follow-up, its print back at the verdict or after it; the
+    /// same B with no face at 12 s is held, since B's print was not kept as
+    /// the conversation's voice to match itself. Beside it the identified A,
+    /// face f1, at 12 s is carried. Caller-only on and off.
+    #[test]
+    fn an_unknown_voice_let_out_in_the_eight_seconds_is_no_identity_past_them() {
+        let _one = crate::provider_worker::tests::one_thread();
+        for caller_only in [false, true] {
+            for late in [false, true] {
+                let case = format!("caller-only {caller_only}, late {late}");
+                let mut desk = CarryDesk::new(true);
+                if caller_only {
+                    desk.caller_only();
+                }
+                desk.answered(3);
+                desk.late.store(late, std::sync::atomic::Ordering::Relaxed);
+                assert_eq!(
+                    desk.line(2, "", "I think it will rain in the afternoon."),
+                    None,
+                    "{case}: B at 3 s, the ordinary follow-up"
+                );
+                desk.late.store(false, std::sync::atomic::Ordering::Relaxed);
+                desk.later(12);
+                assert!(
+                    desk.line(2, "", "I think I will take an umbrella then.")
+                        .is_some(),
+                    "{case}: the same B at 12 s, no face"
+                );
+                assert_eq!(
+                    desk.line(1, "f1", "Should I take an umbrella then?"),
+                    None,
+                    "{case}: the identified A at 12 s"
+                );
+            }
+        }
+    }
+
+    /// The first builder's contract at 04:33 on #3296, rule 3: a sure other
+    /// voice is held inside the 8 s too. A synthetic classification
+    /// control: the sure bar is lowered to the 1.5 s of speech today's
+    /// prints carry, since none reaches the provisional 2.5 s
+    /// (`CARRY_SURE_OTHER_SPEECH_SAMPLES`), so this is no reachable acoustic
+    /// case. At the real bar the same colleague's print, no face, at 3 s is
+    /// no evidence, and the ordinary follow-up lets it go on.
+    #[test]
+    fn a_sure_other_voice_within_the_eight_seconds_is_held() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let words = "I sent the slides to the client this morning.";
+        for (least, admitted) in [
+            (CARRY_SURE_OTHER_SPEECH_SAMPLES, true),
+            (crate::same_voice::RATE * 3 / 2, false),
+        ] {
+            let mut desk = CarryDesk::new(true);
+            desk.heeding.sure_other_samples = least;
+            desk.answered(3);
+            let held = desk.line(-1, "", words);
+            assert_eq!(held.is_none(), admitted, "sure from {least}: {held:?}");
+        }
     }
 
     /// The reviewer's P3 on #2428: with `LAMP_QUIET_GOING_ON_SAME_ONE` and no

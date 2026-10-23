@@ -807,6 +807,14 @@ impl<P: Printer> Voices<P> {
     /// began a conversation of its own, and its print is that one's voice.
     /// With [`Self::callers_only`], a going-on line's print is never one
     /// more: the conversation's voice is its caller's alone.
+    /// With [`Self::sure_of_another_only`] (`LAMP_SAME_SPEAKER_CARRIES`), a
+    /// going-on line's print is one more only when it is surely the
+    /// conversation's voice (at [`SAME_FROM`] or over) or the line was seen
+    /// spoken by the caller ([`Self::seen_from_the_caller`]), at its verdict
+    /// or late: a print that was no evidence never becomes the evidence a
+    /// later line is judged by (reviewer-two's P2 at 04:31 on #3296, an
+    /// unknown voice let out by the ordinary follow-up at 3 s matched itself
+    /// at 12 s).
     fn adopt(&mut self, request: u64, print: Vec<f32>, going_on: bool) {
         let likeness = (going_on && self.judged != Some(request))
             .then(|| self.likest(&print))
@@ -833,6 +841,17 @@ impl<P: Printer> Voices<P> {
                     "lamp-voice provider: request {request}: another voice than the conversation's, known after its answer (cosine {likeness:.2}): the conversation is over"
                 );
                 self.late_other = Some(request);
+            }
+            _ if going_on
+                && self.sure_of_another.is_some()
+                && self.caller_seen != Some(request)
+                && self
+                    .likest(&print)
+                    .is_none_or(|likeness| likeness < SAME_FROM) =>
+            {
+                (self.journal)(&format!(
+                    "lamp-voice provider: request {request}: let out with no sure sign of the conversation's voice or the caller's face: its print is not kept as the conversation's voice"
+                ));
             }
             // The caller's voice only: a going-on line is judged against
             // it, never added to it.
@@ -1511,6 +1530,45 @@ exec sleep 30"#,
         voices.decided(4, true, true);
         voices.printer.slow = false;
         assert_eq!(voices.take_late_other(), Some(4), "sure");
+    }
+
+    /// `LAMP_SAME_SPEAKER_CARRIES` (reviewer-two's P2 at 04:31 on #3296):
+    /// another voice's line let out with no sure sign (the ordinary
+    /// follow-up), its print back at its verdict or after it, is not kept as
+    /// the conversation's voice, caller-only on or off: the same voice later
+    /// still reads as another, not 1.0 against itself. A line seen spoken by
+    /// the caller is kept, and so is a print surely the conversation's.
+    #[test]
+    fn an_unsure_print_let_out_is_not_the_conversations_voice() {
+        for caller_only in [false, true] {
+            for late in [false, true] {
+                let mut voices = Voices::new(StandIn::default()).callers_only(caller_only);
+                voices.sure_of_another_only(RATE * 5 / 2, DIFFERENT_BELOW);
+                said(&mut voices, 1, 1, 48_000);
+                voices.decided(1, true, false);
+                voices.printer.slow = late;
+                said(&mut voices, 2, -1, 48_000);
+                if !late {
+                    assert_eq!(voices.likeness(2), Some(0.0));
+                }
+                voices.decided(2, true, true);
+                voices.printer.slow = false;
+                said(&mut voices, 3, -1, 48_000);
+                let case = format!("caller-only {caller_only}, late {late}");
+                assert_eq!(voices.likeness(3), Some(0.0), "{case}: not kept");
+                // Control: the caller's own line, seen spoken, its print not
+                // sure, is kept (with caller-only, only into a voiceless
+                // conversation, as before).
+                if !caller_only {
+                    voices.seen_from_the_caller(4);
+                    // 0.50 against the caller's: not sure by itself.
+                    said(&mut voices, 4, 2, 48_000);
+                    voices.decided(4, true, true);
+                    said(&mut voices, 5, 2, 48_000);
+                    assert_eq!(voices.likeness(5), Some(1.0), "{case}: the caller's kept");
+                }
+            }
+        }
     }
 
     /// sv-ab on lamp-4ace (21 Oct 20:06, the first builder on #2602): with
