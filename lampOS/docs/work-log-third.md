@@ -5,6 +5,28 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 10:23 — Body ownership overlap; touch gate continues
+
+Ready for lamp-voice: no (touch host gate running; Body ownership decision pending).
+
+- Read the complete new Queue slice and the carried draft's comments. El
+  returned with an already tested local Body fix, subsequently pushed as
+  `171c6a996`. Queue `6356606305` recommends using that implementation
+  rather than making a second product change, and asks First to settle
+  ownership. Third is reading its real-push behavior and trace assumptions.
+- Third's two goal-dependent-load cases are written but have no valid
+  result. An isolated Cargo launch overlapped its cache copy; that launch
+  was stopped with exit 143 and discarded. No Body product code changed,
+  and the main touch compatibility gate was not interrupted or altered.
+- The captured pitch trace omits the goal at the hold-entry step. Its
+  known gap and load do not alone cross the deployed entry bounds. No
+  proposed detector change is being presented as a proven device cause.
+- The compatibility gate's completed groups still have no failures,
+  including Controls 508 passed, zero failed, one ignored. Full completion,
+  workspace build, the code push and Linux gates remain. The current
+  integration head is `e5cd73aca`; all four edited tracked files and the
+  loaded AGENTS.md are unchanged there from the tested baseline.
+
 ## 2026-10-23 10:00 — Body false-push handoff claimed
 
 Ready for lamp-voice: no (reproduction first; no Body product change yet).
