@@ -1,0 +1,435 @@
+diff --git a/lampOS/crates/voice/src/coordinator/second.rs b/lampOS/crates/voice/src/coordinator/second.rs
+index d5a949670c..18422cfda9 100644
+--- a/lampOS/crates/voice/src/coordinator/second.rs
++++ b/lampOS/crates/voice/src/coordinator/second.rs
+@@ -1866,6 +1866,8 @@ mod tests {
+     /// audio age bound when it is sent (lampOS#892).
+     #[test]
+     fn a_line_given_to_gemini_at_the_end_of_the_hold_is_never_too_old() {
++        let _clock =
++            crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
+         let mut bench = Bench::standing_in();
+         let (_owner, current) = unsent_reply();
+         let turn = current.owner.turn();
+@@ -1914,6 +1916,8 @@ mod tests {
+     /// Ready is there in the same tick.
+     #[test]
+     fn a_ready_after_the_hold_leaves_the_line_to_the_second_route() {
++        let _clock =
++            crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
+         let mut bench = Bench::standing_in();
+         let (_owner, current) = unsent_reply();
+         let turn = current.owner.turn();
+@@ -1975,6 +1979,8 @@ mod tests {
+     /// hold, rather than given to a slower route.
+     #[test]
+     fn a_ready_lost_in_the_same_drain_holds_the_next_request_for_the_reconnect() {
++        let _clock =
++            crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
+         let mut bench = Bench::standing_in();
+         bench.gemini_link(1, true);
+         bench.gemini_link(2, false);
+diff --git a/lampOS/crates/voice/src/coordinator/tests/hand_controls.rs b/lampOS/crates/voice/src/coordinator/tests/hand_controls.rs
+index 87b775273b..f7a2640063 100644
+--- a/lampOS/crates/voice/src/coordinator/tests/hand_controls.rs
++++ b/lampOS/crates/voice/src/coordinator/tests/hand_controls.rs
+@@ -1517,14 +1517,20 @@ fn run_loop_ringed(
+             height: 240,
+             max_frame_bytes: 128 * 1024,
+         };
+-        (
+-            // Opening for the whole run: the side never answers a start.
+-            Some(OptionalCamera::new(worker, source).opening_until(u64::MAX)),
+-            Some((false, peer, input)),
+-        )
++        (Some((worker, source)), Some((false, peer, input)))
+     } else {
+         (None, None)
+     };
++    // Every child has crossed its real readiness barrier. Enter the scenario
++    // before any runtime message is queued or any observer samples its clock:
++    // the first provider fault and the camera must share the loop's epoch too.
++    let mut scope = (clocking == Clocking::Stepped).then(|| {
++        crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap()
++    });
++    let camera = camera.map(|(worker, source)| {
++        // Opening for the whole run: the side never answers a start.
++        OptionalCamera::new(worker, source).opening_until(u64::MAX)
++    });
+     let mut rig = Rig {
+         expression_out: None,
+         second: None,
+@@ -1586,11 +1592,8 @@ fn run_loop_ringed(
+     .chain(ring_peer)
+     .chain(camera_peer)
+     .collect::<Vec<_>>();
+-    let (mut threads, mut stepped, mut scope) = (Vec::new(), None, None);
+-    if clocking == Clocking::Stepped {
+-        // Every child has crossed its readiness barrier: the loop, its
+-        // controls and these peers share the scenario clock from here.
+-        let clock = crate::scenario_clock::Scope::enter(Duration::from_secs(10)).unwrap();
++    let (mut threads, mut stepped) = (Vec::new(), None);
++    if let Some(clock) = scope.as_ref() {
+         let shared = Rc::new(RefCell::new(
+             peers
+                 .into_iter()
+@@ -1644,7 +1647,7 @@ fn run_loop_ringed(
+                 Ok(())
+             })
+             .unwrap();
+-        (stepped, scope) = (Some(shared), Some(clock));
++        stepped = Some(shared);
+     } else {
+         threads = peers
+             .into_iter()
+@@ -2034,6 +2037,8 @@ fn a_tap_while_muted_gets_the_asleep_face_once() {
+ /// is the one that lets it hear, and gets none.
+ #[test]
+ fn the_muted_waits_own_closures_count_the_slide_for_a_taps_face() {
++    let _clock =
++        crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
+     use crate::privacy::PrivacyState;
+     use crate::ring_asleep::{Asleep, TapFace};
+     use crate::service_privacy::WaitOutcome;
+@@ -2255,6 +2260,8 @@ fn the_muted_wait_shows_a_hands_sleep_and_gives_the_ring_to_the_closed_slide() {
+ /// it can be read, so the wait shows outside the journal.
+ #[test]
+ fn the_muted_wait_says_the_switch_cannot_be_read_while_workers_end_at_start() {
++    let _clock =
++        crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
+     use crate::privacy::PrivacyState;
+     use crate::service_privacy::WaitOutcome;
+     use lamp_msgs::{Diagnostic, Level};
+diff --git a/lampOS/crates/voice/src/coordinator/tests/turn_taking.rs b/lampOS/crates/voice/src/coordinator/tests/turn_taking.rs
+index 9330993909..8ac21f8f4c 100644
+--- a/lampOS/crates/voice/src/coordinator/tests/turn_taking.rs
++++ b/lampOS/crates/voice/src/coordinator/tests/turn_taking.rs
+@@ -2,6 +2,28 @@
+ use super::*;
+ use crate::{activity::START_BLOCKS, turn_taking::TAIL_US};
+ use lamp_audio::ownership::PlaybackCursor;
++use std::{cell::RefCell, rc::Rc};
++
++thread_local! {
++    static CLOCK: RefCell<std::rc::Weak<crate::scenario_clock::Scope>> =
++        const { RefCell::new(std::rc::Weak::new()) };
++}
++
++/// All live harnesses on this test thread share their dated history. The last
++/// one releases the scope, including when a test shadows an earlier harness.
++fn fixture_clock() -> Rc<crate::scenario_clock::Scope> {
++    CLOCK.with(|clock| {
++        let mut clock = clock.borrow_mut();
++        if let Some(scope) = clock.upgrade() {
++            return scope;
++        }
++        let scope = Rc::new(
++            crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap(),
++        );
++        *clock = Rc::downgrade(&scope);
++        scope
++    })
++}
+ 
+ struct Harness {
+     owner: Controller,
+@@ -40,6 +62,7 @@ struct Harness {
+     told: Vec<WordsTold>,
+     /// The answer was asked to stop by a waited sound's words.
+     stopped: bool,
++    _clock: Rc<crate::scenario_clock::Scope>,
+ }
+ impl Harness {
+     /// The product's turn-taking and mask with `LAMP_WAIT_KEEPS_ANSWER=on`:
+@@ -75,6 +98,7 @@ impl Harness {
+         Self::with_lag(policy, 500_000)
+     }
+     fn with_lag(policy: TurnTaking, lag: u64) -> Self {
++        let clock = fixture_clock();
+         let base = monotonic_us() - lag;
+         let time = MonoTime::from_micros(base);
+         let mut owner = Controller::new(new_boot().unwrap(), time);
+@@ -149,6 +173,7 @@ impl Harness {
+             words: None,
+             told: Vec::new(),
+             stopped: false,
++            _clock: clock,
+         }
+     }
+     fn old(&self) -> TurnOwner {
+diff --git a/lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs b/lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs
+index 8fe40927d3..707b3b2e97 100644
+--- a/lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs
++++ b/lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs
+@@ -785,7 +785,10 @@ async fn with_the_switch_two_lines_the_lamp_left_alone_end_its_conversation() {
+ /// clock, so that the long lines pass in a moment.
+ #[tokio::test(start_paused = true)]
+ async fn with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds() {
+-    let _clock = logical_clock();
++    // The worker and its backdated answer share an epoch with 15 s of history.
++    let clock =
++        crate::scenario_clock::Scope::enter_at(Duration::from_secs(60), 600_000_000).unwrap();
++    clock.set_pump(|_| Ok(())).unwrap();
+     let follow_up = "And what about tomorrow?";
+     for (on, busy, ago_s, long_s, line, answered) in [
+         (false, true, 12, 0, follow_up, true),
+diff --git a/lampOS/crates/voice/src/scenario_clock.rs b/lampOS/crates/voice/src/scenario_clock.rs
+index 46def4e92f..9d3491a633 100644
+--- a/lampOS/crates/voice/src/scenario_clock.rs
++++ b/lampOS/crates/voice/src/scenario_clock.rs
+@@ -52,6 +52,12 @@ pub(crate) struct Scope {
+ 
+ impl Scope {
+     pub(crate) fn enter(watchdog: Duration) -> io::Result<Self> {
++        Self::enter_at(watchdog, lamp_ipc::monotonic_us())
++    }
++
++    /// A fixture with backdated events supplies enough history explicitly.
++    /// Its readers and publishers must all use this thread's clock.
++    pub(crate) fn enter_at(watchdog: Duration, epoch_us: u64) -> io::Result<Self> {
+         let epoch = Instant::now();
+         let host_deadline = epoch
+             .checked_add(watchdog)
+@@ -72,7 +78,7 @@ impl Scope {
+             })?;
+             *active = Some(State {
+                 id,
+-                epoch_us: lamp_ipc::monotonic_us(),
++                epoch_us,
+                 epoch,
+                 elapsed: Duration::ZERO,
+                 host_deadline,
+diff --git a/lampOS/crates/voice/src/second_provider/worker.rs b/lampOS/crates/voice/src/second_provider/worker.rs
+index fdc1e5cba3..9dd43cd464 100644
+--- a/lampOS/crates/voice/src/second_provider/worker.rs
++++ b/lampOS/crates/voice/src/second_provider/worker.rs
+@@ -12,12 +12,15 @@ use super::{
+     net::{Message, search::Search},
+     output_request,
+ };
++#[cfg(test)]
++use crate::scenario_clock::monotonic_us;
+ use crate::{
+     provider_flow::OutputSender,
+     provider_worker::{ProviderInput, ProviderOutput},
+     transport::{Channel, WorkerChannels},
+     wire::{Control, WorkerEvent},
+ };
++#[cfg(not(test))]
+ use lamp_ipc::monotonic_us;
+ use lamp_turn_owner::{BootId, BoundaryGuard, MonoTime, Snapshot};
+ use std::{
+@@ -7993,6 +7996,12 @@ mod route_checks;
+ 
+ #[cfg(test)]
+ mod tests {
++    /// These synchronous fixtures backdate events by up to 400 seconds.
++    /// Heeding and its inputs share this epoch, independent of host uptime.
++    fn clock_with_history() -> crate::scenario_clock::Scope {
++        crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap()
++    }
++
+     /// The reviewer's P2 on #3050: with scoped context off, the owner's
+     /// turn, then the known file gone and one unknown face in view. The
+     /// session is still counted for the owner (their sticky presence, 30 s),
+@@ -8586,6 +8595,7 @@ mod tests {
+     fn with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy() {
+         // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+         let _one = crate::provider_worker::tests::one_thread();
++        let _clock = clock_with_history();
+         use crate::room_told::Room;
+         // A short root: a Unix socket's address holds 103 bytes.
+         let root = std::path::PathBuf::from(format!("/tmp/lnh-{}", std::process::id()));
+@@ -8618,7 +8628,7 @@ mod tests {
+                     Vec::new()
+                 },
+             };
+-            eyes.publish_json(lamp_ipc::monotonic_us(), &faces).unwrap();
++            eyes.publish_json(monotonic_us(), &faces).unwrap();
+             let now_us = monotonic_us();
+             {
+                 let mut room = crate::room_told::room().lock().unwrap();
+@@ -8685,6 +8695,7 @@ mod tests {
+     fn with_name_or_follow_up_a_follow_up_begun_while_the_answer_plays_goes_on() {
+         // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+         let _one = crate::provider_worker::tests::one_thread();
++        let _clock = clock_with_history();
+         use crate::room_told::Room;
+         let s = Duration::from_secs;
+         // The ask's answer began `began_s` s ago and its words play until
+@@ -9011,6 +9022,7 @@ mod tests {
+     fn with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds() {
+         // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+         let _one = crate::provider_worker::tests::one_thread();
++        let _clock = clock_with_history();
+         let s = Duration::from_secs;
+         let judged = |on: bool, busy: bool, ago: u64, long: u64, heard: &str| {
+             *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+@@ -9170,6 +9182,7 @@ mod tests {
+     fn a_line_4_s_after_an_answer_is_held_by_another_voice_or_goes_on_judged_without_it() {
+         // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+         let _one = crate::provider_worker::tests::one_thread();
++        let _clock = clock_with_history();
+         use crate::second_provider::{Did, Heard};
+         use std::sync::{Arc, Mutex};
+         /// Prints by a line's first sample: 1 is the asker's voice, -1
+@@ -9829,6 +9842,7 @@ mod tests {
+     fn the_lamps_own_answers_to_talk_keep_no_conversation_going() {
+         // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+         let _one = crate::provider_worker::tests::one_thread();
++        let _clock = clock_with_history();
+         let s = Duration::from_secs;
+         // Lines at a virtual second, each answered a second later if let
+         // out: `answer` says what the lamp answers it. A line with nothing
+@@ -14919,6 +14933,7 @@ mod tests {
+     /// the best of them; none outside that, or without the reader.
+     #[test]
+     fn a_near_hearing_counts_only_around_the_lines_start() {
++        let _clock = clock_with_history();
+         let root = std::path::PathBuf::from(format!("/tmp/lnn-{}", std::process::id()));
+         let _ = std::fs::remove_dir_all(&root);
+         std::fs::create_dir_all(&root).unwrap();
+@@ -15376,6 +15391,7 @@ mod tests {
+     /// it. Each of the turn judged last only.
+     #[test]
+     fn the_policy_is_told_the_name_a_line_left_unanswered_and_the_lamp_speaking_lately() {
++        let _clock = clock_with_history();
+         use crate::second_provider::policy::Turn;
+         let signs = |room, names: Vec<(u64, f32)>| super::Signs {
+             room,
+@@ -15387,7 +15403,7 @@ mod tests {
+             continues_from: None,
+         };
+         const S: u64 = 1_000_000;
+-        let now = lamp_ipc::monotonic_us();
++        let now = monotonic_us();
+         let mut heeding = super::Heeding::new(false, true, None, None);
+         heeding.judge(
+             1,
+@@ -15435,7 +15451,7 @@ mod tests {
+         // The lamp's words heard to their end 19 s ago, then 21 s ago.
+         heeding.lamp_did(crate::second_provider::Did::Said(
+             1,
+-            lamp_ipc::monotonic_us() - 19 * S,
++            monotonic_us() - 19 * S,
+         ));
+         heeding.judge(
+             5,
+@@ -15447,7 +15463,7 @@ mod tests {
+         let mut quiet = super::Heeding::new(false, true, None, None);
+         quiet.lamp_did(crate::second_provider::Did::Said(
+             1,
+-            lamp_ipc::monotonic_us() - 21 * S,
++            monotonic_us() - 21 * S,
+         ));
+         quiet.judge(
+             6,
+diff --git a/lampOS/crates/voice/src/stop_words.rs b/lampOS/crates/voice/src/stop_words.rs
+index 2bc236b4d7..34738eec91 100644
+--- a/lampOS/crates/voice/src/stop_words.rs
++++ b/lampOS/crates/voice/src/stop_words.rs
+@@ -1055,6 +1055,9 @@ struct Live {
+     holding_words: std::sync::atomic::AtomicBool,
+     #[cfg(test)]
+     over: std::sync::atomic::AtomicBool,
++    /// Shared with the real worker, only for an explicitly dated fixture.
++    #[cfg(test)]
++    fixture_clock: std::sync::OnceLock<(u64, std::time::Instant)>,
+ }
+ 
+ impl Live {
+@@ -1070,6 +1073,8 @@ impl Live {
+             holding_words: std::sync::atomic::AtomicBool::new(false),
+             #[cfg(test)]
+             over: std::sync::atomic::AtomicBool::new(false),
++            #[cfg(test)]
++            fixture_clock: std::sync::OnceLock::new(),
+         }
+     }
+ 
+@@ -1081,6 +1086,15 @@ impl Live {
+         *self.number()
+     }
+ 
++    #[cfg(test)]
++    fn fixture_now_us(&self) -> u64 {
++        self.fixture_clock
++            .get()
++            .map_or_else(lamp_ipc::monotonic_us, |(base, began)| {
++                base + u64::try_from(began.elapsed().as_micros()).expect("bounded fixture time")
++            })
++    }
++
+     /// Nothing of the yield in force goes on, from now: the next has a new
+     /// number. The thread is woken to drop what it holds of it.
+     fn revoke(&self) {
+@@ -1103,9 +1117,13 @@ impl Live {
+     /// `stream` if that yield is in force and the block is not too old:
+     /// checked and handed under the lock a revocation takes.
+     fn hand(&self, of: u64, captured_at_us: u64, samples: &[i16], stream: &SttStream) -> bool {
++        #[cfg(not(test))]
++        let clock = lamp_ipc::monotonic_us;
++        #[cfg(test)]
++        let clock = || self.fixture_now_us();
+         let number = self.number();
+         *number == of
+-            && lamp_ipc::monotonic_us().saturating_sub(captured_at_us) <= MOST_AGE_US
++            && clock().saturating_sub(captured_at_us) <= MOST_AGE_US
+             && stream.send(samples).is_ok()
+     }
+ }
+@@ -2505,10 +2523,14 @@ mod tests {
+         // Too old: captured 4 s ago, it never goes; the block after it does.
+         let service = Service::new(&[]);
+         let mut ears = RelayEars::with(false, None, None, service.connect()).unwrap();
++        ears.live
++            .fixture_clock
++            .set((600_000_000, std::time::Instant::now()))
++            .unwrap();
+         ears.ready();
+         until("a stream is asked for", || service.connections() == 1);
+-        ears.hear(lamp_ipc::monotonic_us() - 4_000_000, &[1; 160]);
+-        ears.hear(lamp_ipc::monotonic_us(), &[1; 160]);
++        ears.hear(ears.live.fixture_now_us() - 4_000_000, &[1; 160]);
++        ears.hear(ears.live.fixture_now_us(), &[1; 160]);
+         until("the fresh block goes", || service.audio() >= 320);
+         std::thread::sleep(Duration::from_millis(50));
+         assert_eq!(service.audio(), 320);
+diff --git a/lampOS/docs/voice-test-fixtures.md b/lampOS/docs/voice-test-fixtures.md
+index 1c14f56a59..a48624225a 100644
+--- a/lampOS/docs/voice-test-fixtures.md
++++ b/lampOS/docs/voice-test-fixtures.md
+@@ -6,6 +6,33 @@ fixture helpers are compiled only under `cfg(test)`. There is no runtime
+ flag, environment setting or wider production deadline. Ordinary builds
+ continue to use the existing monotonic clock.
+ 
++## Histories on a freshly booted host
++
++The #1569 Voice fixtures that place events before the present choose a
++600-second epoch with `Scope::enter_at`. Their timestamp producers and age
++readers share that scope, preserving the original 400-second room history,
++follow-up windows and every assertion. `Scope::enter` continues to choose
++its epoch from host uptime; unscoped tests continue to read the host clock.
++
++The hand-control scope starts after real child readiness, before the first
++queued fault and the camera observer's timestamp, and lasts through rig
++teardown. Multiple turn-taking harnesses on one thread share the same
++scope lifetime. The explicitly real-time hand-latency fixture stays on the
++host clock. Only the paused spoken-to follow-up fixture selects this epoch;
++its existing logical-time pump is unchanged.
++
++The stale-audio fixture uses a separate `cfg(test)` clock stored in its
++`Live` instance: 600 seconds plus real elapsed time. Both its sender and
++actual worker use that clock. The production three-second age bound and
++revocation lock remain unchanged, and unconfigured instances use the same
++raw clock as before. A control that admits four-second-old audio still
++fails the original audio-count assertion.
++
++The [verification record](https://github.com/autonomous-ai/lampOS/tree/lamp-tests/lampOS/docs/verification/voice-boot-clock-20261023)
++keeps original failures, exact case lists and Linux x86/Mac clock controls.
++These fixture results do not establish lamp latency or qualify the separate
++Policy service clock, privacy-lease history or ignored host-latency probe.
++
+ ## Stepped scenarios
+ 
+ The six endpoint cases with an in-process classifier explicitly select

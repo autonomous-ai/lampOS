@@ -1,0 +1,83 @@
+{
+  "created_utc": "2026-10-23T03:28:44.178481+00:00",
+  "old_base": "70cbefceee62c0bc4cad4ec0b7054335dd8f0a5d",
+  "old_head": "172389869129a7466623cc9b45d1c536f42f7429",
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "head": "0f2e6439e018680af247080983c9ec0c258c3229",
+  "clean": true,
+  "range_diff_identical": true,
+  "method": "Lexical assertion macro span comparison with comments and literals masked; byte spans preserved, not a Rust expansion or execution test.",
+  "assertion_count": 1827,
+  "files": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/second.rs",
+      "base_sha256": "428701e0e25869675634954b80356b9dfb18e4268f14a82683a7a4e1e4c1c984",
+      "head_sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+      "worktree_matches": true,
+      "assertions": 108,
+      "assertions_identical": true,
+      "assertion_digest": "057756ef4b2e8dd6d797eaad555b1a4cb3391961244cc6d3db363d4cae3296e1"
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "base_sha256": "805d7f55a0351c097d43e1f7c8f03c09bb7f1c116176545783be00a28f963128",
+      "head_sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+      "worktree_matches": true,
+      "assertions": 305,
+      "assertions_identical": true,
+      "assertion_digest": "eaf39df097991fd44af60a9590fd8fe54867041906643dad306418be642a2a45"
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "base_sha256": "47075418dac7fc54591976ca2557e3be698590b94e8cdbd49a8f4f5c379da0c8",
+      "head_sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "worktree_matches": true,
+      "assertions": 296,
+      "assertions_identical": true,
+      "assertion_digest": "46922a7fd642b8029a7ea0b2107ad5b71a612953933edea07206e8eba2f8323f"
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "base_sha256": "2fb8205fb7ebd46161f13f7403e4de713675b4c64c0438f34c4f01e2b6dfae26",
+      "head_sha256": "65af6a4a052ef808e094284373f4c155bf4f09250a09c2c090b9b225c77cda6e",
+      "worktree_matches": true,
+      "assertions": 79,
+      "assertions_identical": true,
+      "assertion_digest": "2aa9a32e6570d96edede24271006e572ce553d043ff0981a1177a058927fed30"
+    },
+    {
+      "path": "lampOS/crates/voice/src/scenario_clock.rs",
+      "base_sha256": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80",
+      "head_sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "worktree_matches": true,
+      "assertions": 43,
+      "assertions_identical": true,
+      "assertion_digest": "815cb89f2208224ee54cd6cee46972b9e5249ba8a0ff5f899537537f33f0898b"
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "base_sha256": "e17e6801444125077606b2dd7ffcb1e17a75be49becc5c3d1d93fd77528c3444",
+      "head_sha256": "b08a0665ba5c100795d391b5ceb9d74e44a0e40c84654ad85de15935b7d38177",
+      "worktree_matches": true,
+      "assertions": 867,
+      "assertions_identical": true,
+      "assertion_digest": "57f81bb363f5254820292c5f3c9288a19955c986e5dce1a28b2b7b4ba64d59ce"
+    },
+    {
+      "path": "lampOS/crates/voice/src/stop_words.rs",
+      "base_sha256": "64a87b6ed17e45db6eb2b0e0ef7d3458dc8055c9945299902a761a22edebed4f",
+      "head_sha256": "5524521c56061be6af4b8ee95d52ecc3b9b1d3c3ee4a2344db4fa75dbf4f9a0f",
+      "worktree_matches": true,
+      "assertions": 129,
+      "assertions_identical": true,
+      "assertion_digest": "2a25f491d6d5af9219286378b8dfd3cda8836eadd57e3c8456d59971449cf0e2"
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "base_sha256": "6f96999c5c3dd5182c7c7c958b47f831c25cadd6bb1697a255cc9ea376cbfe14",
+      "head_sha256": "7a3164aec84b4fb303944d8e97056e21e8c3563acc469779b376ae0b06510194",
+      "worktree_matches": true
+    }
+  ],
+  "execution_on_new_head": false
+}

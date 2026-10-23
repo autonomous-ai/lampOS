@@ -1,5 +1,23 @@
 # Tests work log
 
+## 2026-10-23 10:29 +0700 — boot-clock carry preserves the patch on train 29
+
+Ready for lamp-voice: no (#3190).
+
+The [new range-diff and assertion audit](verification/voice-boot-clock-20261023/train29-carry/)
+bind `0f2e6439e` to base `e5cd73aca`. The eight-file patch is unchanged, and
+all 1,827 assertions remain byte-identical. Upstream's counted memory note
+and second-worker test helpers are preserved. The source is pushed; its
+new gates are pending. The earlier ARM64 success belongs to `172389869`.
+The eight whitespace findings in its authored patch export and two in the
+upstream raw diff are preserved Git context lines, not authored whitespace.
+
+The phone-news measurements are complete on the frozen `70cbefcee` base:
+three passes before and three after, plus all five planned controls with
+their expected outcomes. Both owned candidate files carried byte-for-byte
+to `e5cd73aca`. Qualification will use the complete repository worktrees;
+no result is transferred from the old base to the new one.
+
 ## 2026-10-23 10:24 +0700 — complete boot-clock controls published; ARM64 passed
 
 Ready for lamp-voice: no (#3190, execution review hold remains).
