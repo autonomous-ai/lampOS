@@ -12681,6 +12681,216 @@ fn refused_with_its_head_tipped_up_it_keeps_holding_the_head() {
     assert!(!said.is_empty() && said.iter().all(|say| *say == Some(PROPPED)));
 }
 
+/// #2940, El's lamp-06c1 case (22 Oct 18:48–19:08): woken with the shoulder
+/// left up, it was lowered but stopped short (settled 2,140 for 2,053, past
+/// `Standing::FOUND_SLACK`), a `Stop::Tracking` before any pose was judged.
+/// Each start exited and systemd gave up after three, so a hand folding the
+/// arm started nothing. With `--refused-let-go` it lets go of all five, asks
+/// for its arm to be folded, and starts once a hand has folded it.
+#[test]
+fn a_shoulder_that_stops_short_while_lowered_is_let_go_and_waited_for() {
+    let start = |cancel_at: Duration, hand: Option<(Duration, Duration, usize, f32)>| {
+        let (mut lamp, mut clock) = folded(cancel_at);
+        lamp.may_take_hold = true;
+        lamp.arm_moves = true;
+        for (index, at) in [
+            (YAW, 1_979.0),
+            (1, 2_633.0),
+            (2, 2_074.0),
+            (ROLL, 2_101.0),
+            (PITCH, 1_771.0),
+        ] {
+            let servo = &mut lamp.servos[index];
+            (servo.position, servo.goal, servo.torque, servo.status) = (at, 0, 0, 0);
+        }
+        // The shoulder stops 87 counts short of any goal, so lowered to
+        // 2,053 it settles at 2,140, as 06c1's did.
+        lamp.short = Some((1, 87.0));
+        lamp.hand = hand;
+        let limits = Limits {
+            force: Some(600),
+            torque_on: true,
+            wake: true,
+            refused_let_go: true,
+            ..Limits::folded_with(Tuning {
+                reach: [150, 15, 1, 250],
+                speed: 120,
+                servo_speed: 1_000,
+                servo_acceleration: 60,
+            })
+            .unwrap()
+        };
+        let up = Standing::new(
+            [2_053, 2_069],
+            [1_772, 2_035, 2_035, 2_657, 2_602],
+            100,
+            5,
+            90,
+            [560, 560],
+        )
+        .unwrap();
+        let mut said = Vec::new();
+        let report = run_standing(
+            &mut lamp,
+            &mut clock,
+            limits,
+            Some([1_771, 2_035, 2_035]),
+            Some(up),
+            || None,
+            |glimpse: &Glimpse| said.push(glimpse.waiting),
+        );
+        (report, lamp, said)
+    };
+    // Nobody folds it: the arm let go, the head still held, asking, until
+    // asked to stop.
+    let (report, lamp, said) = start(Duration::from_secs(60), None);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.refused_let_go, Some(ARM_FOLD), "{report:?}");
+    for joint in ARM {
+        assert_eq!(
+            lamp.servos[usize::from(joint.id()) - 1].torque,
+            0,
+            "{joint:?}"
+        );
+    }
+    for joint in COMMANDED {
+        assert_eq!(
+            lamp.servos[usize::from(joint.id()) - 1].torque,
+            1,
+            "{joint:?}"
+        );
+    }
+    assert!(said.contains(&Some(ARM_FOLD)));
+    // A hand folds it at 40 s: the lamp takes hold again and starts.
+    let (report, lamp, said) = start(
+        Duration::from_secs(70),
+        Some((Duration::from_secs(40), Duration::from_secs(42), 1, 2_053.0)),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.refused_let_go, Some(ARM_FOLD), "{report:?}");
+    assert!(said.contains(&Some(ARM_FOLD)));
+    assert!(
+        said.last().is_some_and(Option::is_none),
+        "started again: {:?}",
+        said.last()
+    );
+    assert!(lamp.servos.iter().all(|servo| servo.torque == 1));
+}
+
+/// The Reviewer-lead's P2 on #3168: a start after a wait for a hand has
+/// sent READY=1, so systemd's 5 s watchdog is armed. A shoulder lowered then
+/// is watched each step, never 22 s unwatched (lamp-52e6's `Watchdog
+/// timeout`). Here `run_on` starts as after a wait, the shoulder left up.
+#[test]
+fn a_shoulder_lowered_in_a_start_after_a_wait_is_watched_each_step() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(40));
+    lamp.may_take_hold = true;
+    lamp.arm_moves = true;
+    for (index, at) in [
+        (YAW, 1_979.0),
+        (1, 2_633.0),
+        (2, 2_074.0),
+        (ROLL, 2_035.0),
+        (PITCH, 1_771.0),
+    ] {
+        let servo = &mut lamp.servos[index];
+        (servo.position, servo.goal, servo.torque, servo.status) = (at, 0, 0, 0);
+    }
+    let limits = Limits {
+        force: Some(600),
+        torque_on: true,
+        wake: true,
+        refused_let_go: true,
+        ..Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 120,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let up = Standing::new(
+        [2_053, 2_069],
+        [1_772, 2_035, 2_035, 2_657, 2_602],
+        100,
+        5,
+        90,
+        [560, 560],
+    )
+    .unwrap();
+    let time = clock.time.clone();
+    let mut watched = Vec::new();
+    let report = {
+        let mut bus = Bus::new(&mut lamp, &mut clock, Some(up));
+        run_on(
+            &mut bus,
+            limits,
+            Some([1_771, 2_035, 2_035]),
+            Some(up),
+            None,
+            || None,
+            || (Asked::default(), Priority::Conversation, None),
+            |_: &Glimpse| watched.push(time.get()),
+            10,
+        )
+    };
+    let lowered = report.lowered.clone().unwrap();
+    assert_eq!(lowered.from, vec![2_633], "{report:?}");
+    assert!(lowered.seconds > 20.0, "{}", lowered.seconds);
+    // Watched from the start, with no gap near the 5 s watchdog.
+    assert!(
+        watched
+            .first()
+            .is_some_and(|at| *at < Duration::from_secs(1)),
+        "{watched:?}"
+    );
+    let (at, widest) = watched
+        .windows(2)
+        .map(|two| (two[0], two[1] - two[0]))
+        .max_by_key(|(_, gap)| *gap)
+        .unwrap();
+    assert!(widest < Duration::from_secs(1), "{widest:?} from {at:?}");
+}
+
+/// El's P2 on #2940: a head tipped up keeps its pitch held while the rest
+/// waits, so that pitch is judged by the run's own bounds. Pressed over its
+/// load bound, or at its temperature bound, the wait ends on that stop as
+/// the run's check would, never holding on unchecked.
+#[test]
+fn a_head_held_while_it_waits_is_judged_by_the_runs_load_and_heat() {
+    let limits = let_go_when_refused();
+    let pressed = |lamp: &mut Lamp| {
+        lamp.strains = vec![(
+            Duration::from_secs(3),
+            Duration::from_secs(5),
+            PITCH,
+            limits.load[0] + 60,
+        )];
+    };
+    let heated = |lamp: &mut Lamp| {
+        lamp.heats = vec![(Duration::from_secs(3), PITCH, limits.temperature + 1)];
+    };
+    for (what, set, expect) in [
+        ("load", &pressed as &dyn Fn(&mut Lamp), "load"),
+        ("heat", &heated, "temperature"),
+    ] {
+        let (mut lamp, mut clock) = knocked(Duration::from_secs(60), None);
+        lamp.servos[PITCH].position = 1_500.0;
+        lamp.servos[PITCH].goal = 1_500;
+        set(&mut lamp);
+        let report = run(&mut lamp, &mut clock, limits, Some(HOME), || None, |_| {});
+        let pitch = Joint::WristPitch.id();
+        match (&report.stop, expect) {
+            (Stop::Load { joint, .. }, "load")
+            | (Stop::Temperature { joint, .. }, "temperature") => {
+                assert_eq!(*joint, pitch, "{what}");
+            }
+            (stop, _) => panic!("{what}: {stop:?}"),
+        }
+        assert_eq!(report.refused_let_go, Some(PROPPED), "{what}");
+    }
+}
+
 /// #2938: nobody setting it straight, after `WAIT_ASKING` it stops asking,
 /// stays let go and reads every `WAIT_READ_LATE` instead of `WAIT_READ`.
 #[test]
@@ -12716,6 +12926,32 @@ fn nobody_setting_it_straight_it_stops_asking_and_reads_less() {
 /// Once a hand has set the head in range and it has stayed there a second,
 /// the lamp takes hold where it is and starts as it would have: the wake
 /// brings it home slowly and it runs.
+#[test]
+fn after_a_wait_its_run_is_watched_without_a_gap() {
+    // The Reviewer-lead's P2 on #3168: the run that starts after a wait
+    // counts its schedule from the steps already taken, so its first step
+    // is due a tick later, never the wait's steps later.
+    let hand = (Duration::from_secs(1), Duration::from_secs(6), 2_150.0);
+    let (mut lamp, mut clock) = knocked(Duration::from_secs(40), Some(hand));
+    let time = clock.time.clone();
+    let mut watched = Vec::new();
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        let_go_when_refused(),
+        Some(HOME),
+        || Some((Mood::Resting, 0)),
+        |_| watched.push(time.get()),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let (at, widest) = watched
+        .windows(2)
+        .map(|two| (two[0], two[1] - two[0]))
+        .max_by_key(|(_, gap)| *gap)
+        .unwrap();
+    assert!(widest < Duration::from_secs(1), "{widest:?} from {at:?}");
+}
+
 #[test]
 fn set_back_in_range_it_takes_hold_where_it_is_and_starts_by_itself() {
     let hand = (Duration::from_secs(1), Duration::from_secs(6), 2_150.0);

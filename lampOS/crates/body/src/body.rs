@@ -2878,6 +2878,10 @@ const SET_STRAIGHT: [&str; 3] = [
 /// weight: its pitch keeps its torque, since let go it would drop onto the
 /// base or a hand (#2938), so no hand can set it straight while it waits.
 const PROPPED: &str = "My head is tipped up too far, and I am holding it so it does not drop. I need someone to help me set it straight.";
+/// Said instead when the shoulder, lowered on waking, stopped short of
+/// folded (#2940, El's lamp-06c1 case): the lamp lets go of its arm, holds
+/// its head, and starts again once a hand has folded the arm.
+const ARM_FOLD: &str = "My arm is not folded all the way down. Please fold it gently down, and I will start by myself.";
 /// How long the lamp asks before it stops (#2938): after this nobody has
 /// set it straight, and it stays let go, reads every `WAIT_READ_LATE` and
 /// says `STOPPED_ASKING` instead. Counted from the first time it let go in
@@ -2898,6 +2902,9 @@ struct PoseWait {
     ranges: [(u16, u16); 3],
     joints: Vec<Joint>,
     say: &'static str,
+    /// The shoulder's folded count, when the wait is for the arm to be
+    /// folded (#2940): within `Standing::FOUND_SLACK` of it, too.
+    arm: Option<u16>,
 }
 
 /// The pose `found` (pitch, roll, yaw) as the start's own checks in
@@ -2961,6 +2968,7 @@ fn pose_wait(
         ranges,
         joints,
         say: if propped { PROPPED } else { SET_STRAIGHT[out] },
+        arm: None,
     })
 }
 
@@ -2978,6 +2986,7 @@ fn pose_wait(
 fn wait_in_range<P: PortIo, R: Runtime>(
     bus: &mut Bus<'_, P, R>,
     report: &mut BodyReport,
+    limits: &Limits,
     wait: &PoseWait,
     asked_since: Duration,
     (news, asked): (
@@ -2989,6 +2998,9 @@ fn wait_in_range<P: PortIo, R: Runtime>(
     let mut holding = wait.joints.clone();
     let (mut misses, mut in_range) = (0u8, 0u8);
     let mut before: Option<[u16; 5]> = None;
+    // Steps in a row a commanded joint still held (a head tipped up,
+    // #2938) has read over its load bound, and at its temperature bound.
+    let (mut held_over, mut held_hot) = ([0u8; 3], [0u8; 3]);
     loop {
         let late = bus.runtime.now() >= asked_since + WAIT_ASKING;
         let (every, say) = if late {
@@ -3008,6 +3020,39 @@ fn wait_in_range<P: PortIo, R: Runtime>(
                 misses = 0;
                 report.steps += 1;
                 report.last = Some(now);
+                // A joint held while the rest wait is judged by the run's
+                // own load and heat bounds, however long the wait: a pitch
+                // held at a stale goal must not push or heat on unchecked
+                // (El's P2 on #2940). Over either, the wait ends as the
+                // run's check would.
+                for (slot, joint) in COMMANDED.iter().enumerate() {
+                    if wait.joints.contains(joint) {
+                        continue;
+                    }
+                    let is = now[joint.index()];
+                    held_over[slot] = if is.load > limits.load[slot] {
+                        held_over[slot].saturating_add(1)
+                    } else {
+                        0
+                    };
+                    held_hot[slot] = if is.temperature >= limits.temperature {
+                        held_hot[slot].saturating_add(1)
+                    } else {
+                        0
+                    };
+                    if held_over[slot] >= limits.load_steps.max(1) {
+                        return Err(Stop::Load {
+                            joint: joint.id(),
+                            load: is.load,
+                        });
+                    }
+                    if held_hot[slot] >= limits.temperature_steps.max(1) {
+                        return Err(Stop::Temperature {
+                            joint: joint.id(),
+                            temperature: is.temperature,
+                        });
+                    }
+                }
                 let pose = COMMANDED.map(|joint| now[joint.index()].position);
                 watch(&Glimpse {
                     waiting: Some(say),
@@ -3025,7 +3070,11 @@ fn wait_in_range<P: PortIo, R: Runtime>(
                     && pose
                         .iter()
                         .zip(wait.ranges)
-                        .all(|(at, (low, high))| (low..=high).contains(at));
+                        .all(|(at, (low, high))| (low..=high).contains(at))
+                    && wait.arm.is_none_or(|folded| {
+                        positions[Joint::BasePitch.index()].abs_diff(folded)
+                            <= Standing::FOUND_SLACK
+                    });
                 in_range = if inside { in_range + 1 } else { 0 };
                 if in_range >= IN_RANGE_READS && !bus.runtime.recovery_inhibited() {
                     match take_hold(bus, report, &wait.joints, &now) {
@@ -3370,6 +3419,7 @@ fn run_until_stopped(
         if let Err(stop) = wait_in_range(
             &mut bus,
             &mut report,
+            &limits,
             &wait,
             since,
             (&mut news, &mut asked),
@@ -3728,8 +3778,21 @@ fn run_on<P: PortIo, R: Runtime>(
             let head = COMMANDED.map(|joint| found[joint.index()].position);
             let elbow = found[Joint::ElbowPitch.index()].position;
             // Before the first step: READY=1 has not gone out, so systemd's
-            // watchdog is not armed yet (its start timeout is 90 s).
-            match lower_shoulder(bus, &mut report, &limits, up, head, elbow, found, None) {
+            // watchdog is not armed yet (its start timeout is 90 s). After a
+            // wait for a hand (#2602) it has, and the watchdog with it: each
+            // step of the lowering is watched then, as the wake's are (the
+            // Reviewer-lead's P2 on #3168).
+            let watching = watched.then(|| {
+                (
+                    &mut watch as &mut dyn FnMut(&Glimpse),
+                    Glimpse {
+                        stands: true,
+                        arm_goals: arm_written,
+                        ..Glimpse::default()
+                    },
+                )
+            });
+            match lower_shoulder(bus, &mut report, &limits, up, head, elbow, found, watching) {
                 Ok(now) => found = now,
                 Err(stop) => {
                     if let Some(last) = report.last {
@@ -3739,6 +3802,26 @@ fn run_on<P: PortIo, R: Runtime>(
                             report.goal_writes += 1;
                             report.held_at = Some(hold);
                         }
+                    }
+                    // Stopped short of folded (#2940): with
+                    // `--refused-let-go` a hand can fold it, so the lamp is
+                    // let go and waits for that, the head judged again when
+                    // it starts. Anything else ends the run, as before.
+                    if limits.refused_let_go && matches!(stop, Stop::Tracking { .. }) {
+                        // Only the arm is let go: it rests folded by its
+                        // own weight, and the head, held where it was, is
+                        // judged by the run's bounds while it waits
+                        // (#2938; the Reviewer-lead's P3 on #3168).
+                        report.pose_wait = Some(PoseWait {
+                            ranges: [(0, 4_095); 3],
+                            joints: ARM.to_vec(),
+                            say: ARM_FOLD,
+                            arm: Some(up.folded[0]),
+                        });
+                        report.stop = refused(format!(
+                            "the shoulder stopped short of folded while lowered: {stop:?}"
+                        ));
+                        return report;
                     }
                     // A hold refused is not written; the run ends on what
                     // ended it.
@@ -4442,8 +4525,13 @@ fn run_on<P: PortIo, R: Runtime>(
     // far from the pose they are, and whether the hand is above that.
     let mut lean_kept: [Option<(f32, bool)>; 2] = [None; 2];
     let mut started = bus.runtime.now();
-    // The step the schedule counts from: it starts again after a rest.
-    let mut first_step = 0u64;
+    // The step the schedule counts from: it starts again after a rest, and
+    // begins after any step already taken (a start after a wait for a hand
+    // carries the wait's steps, and its wake's and lowering's, #2602): else
+    // its first step would be due that many ticks later, an unwatched sleep
+    // that systemd's armed watchdog kills (the Reviewer-lead's P2 on #3168,
+    // lamp-52e6's `Watchdog timeout` 4.4 s after taking hold).
+    let mut first_step = report.steps;
     if let Some(up) = standing
         && stand > 0.0
     {
