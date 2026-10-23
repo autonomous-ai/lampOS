@@ -42,10 +42,10 @@ pub const OFFLINE_WILL_ENVIRONMENT: &str = "LAMP_CLOUD_OFFLINE_WILL";
 /// after its last ping or `info` (a check every 3 min, a 5 min bound). With
 /// the will, a killed or stopped lamp-cloud shows offline about 30 s after its
 /// connection closes (it never sends a DISCONNECT), and a lost network or a
-/// power cut within about 2 min (the keepalive's ~90 s, then this). Every
-/// connection asks for a clean start, which ends the old session, so a
-/// reconnect sends the old will at once, followed by this connection's `info`
-/// (the Reviewer on #2636, MQTT v5 3.1.2.5, 3.1.2.10, 3.1.3.2.2).
+/// power cut within about 2 min (the keepalive's ~90 s, then this). A
+/// reconnect within the delay sends no offline: on lamp-06c1 (23 Oct 09:11)
+/// a restart with the will on brought only the new connection's `info`, so
+/// the record stays online (docs/cloud.md, #3035).
 pub const WILL_DELAY_S: u32 = 30;
 // The broker says a will at the earlier of its delay and the session's end
 // (MQTT v5 3.1.2.11.2, 3.1.3.2.2): a session that ends first, or a session
