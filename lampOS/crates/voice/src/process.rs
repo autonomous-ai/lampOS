@@ -979,6 +979,10 @@ fn worker_command(
             role,
             var(crate::remember::LINK_USED_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_room_speaker_worker_environment(
+            role,
+            var(crate::remember::ROOM_SPEAKER_ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_observe_worker_environment(
             role,
             var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
@@ -1312,6 +1316,17 @@ fn memory_link_used_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::LINK_USED_ENVIRONMENT, "on"))
+}
+
+// Who said a room line (#2849), passed the same narrow way: the exact `on`,
+// to the second route alone, the one that reads which face was seen saying
+// each line (`speaking_faces`).
+fn memory_room_speaker_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::ROOM_SPEAKER_ENVIRONMENT, "on"))
 }
 
 // The clock's switch (#830), passed the same narrow way: the exact `on`, to
@@ -1917,6 +1932,12 @@ mod tests {
                         "LAMP_MEMORY_LINK_USED",
                         ["provider", "second"].as_slice(),
                     ),
+                    // Who said a room line, the second route alone (#2849).
+                    (
+                        memory_room_speaker_worker_environment,
+                        "LAMP_MEMORY_ROOM_SPEAKER",
+                        ["second"].as_slice(),
+                    ),
                     // The observation pass, the route with a model (#1693 (2)).
                     (
                         memory_observe_worker_environment,
@@ -2095,6 +2116,7 @@ mod tests {
                     crate::remember::FORGET_ABOUT_ENVIRONMENT,
                     crate::remember::JOURNAL_RESUMES_ENVIRONMENT,
                     crate::remember::LINK_USED_ENVIRONMENT,
+                    crate::remember::ROOM_SPEAKER_ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
@@ -2284,6 +2306,7 @@ mod tests {
                     "LAMP_MEMORY_REPLACES=on",
                     "LAMP_MEMORY_ROOM_AFTER_FORGET=on",
                     "LAMP_MEMORY_ROOM_NOT_ASKER=on",
+                    "LAMP_MEMORY_ROOM_SPEAKER=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_STABLE_ID=on",
                     "LAMP_MEMORY_THREADS=on",

@@ -83,6 +83,11 @@ pub enum Request {
         heard: String,
         #[serde(default)]
         said: String,
+        /// The Days store's (#2849, the voice's `LAMP_MEMORY_ROOM_SPEAKER`):
+        /// on a room line only, the id of the one known person seen saying
+        /// it, kept for their `forget_said`. The legacy store ignores it.
+        #[serde(default)]
+        speaker: Option<String>,
     },
     /// Something the lamp was asked to keep.
     Remember {
@@ -121,6 +126,10 @@ pub enum Request {
         /// ignores it.
         #[serde(default)]
         on: Option<String>,
+        /// The Days store's (#2849), as `append`'s. The legacy store
+        /// ignores it.
+        #[serde(default)]
+        speaker: Option<String>,
     },
     /// What it was asked to keep, for telling a new session.
     Kept {
@@ -407,6 +416,7 @@ fn done(store: &mut Store, request: Request, now_unix_ms: u64) -> Result<Respons
             at_unix_ms,
             heard,
             said,
+            ..
         } => {
             let id = store
                 .append(&one(person)?, at_unix_ms, &heard, &said, now_unix_ms)
@@ -985,6 +995,7 @@ mod tests {
                 at_unix_ms: 5,
                 heard: "hello".into(),
                 said: "hi".into(),
+                speaker: None,
             }
         );
         assert_eq!(
@@ -994,6 +1005,7 @@ mod tests {
                 at_unix_ms: 5,
                 heard: String::new(),
                 said: "hi".into(),
+                speaker: None,
             }
         );
         assert_eq!(
@@ -1007,6 +1019,7 @@ mod tests {
                 replaces: None,
                 shown: vec![],
                 on: None,
+                speaker: None,
             }
         );
         // The Days store's: where it came from (#1693).
@@ -1021,6 +1034,7 @@ mod tests {
                 replaces: None,
                 shown: vec![],
                 on: None,
+                speaker: None,
             }
         );
         assert_eq!(

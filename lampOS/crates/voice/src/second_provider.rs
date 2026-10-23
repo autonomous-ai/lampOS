@@ -4517,7 +4517,8 @@ async fn spoken(
                 .await
                 .ok()
                 .flatten();
-            if asks {
+            // And with `LAMP_MEMORY_ROOM_SPEAKER`, for who said it (#2849).
+            if asks || crate::remember::room_speaker_on() {
                 let seen = crate::speaking_faces::LineSeen {
                     request,
                     speakers: speakers.clone(),
@@ -4535,6 +4536,23 @@ async fn spoken(
             if held && let Ok(mut hold) = shared.held_forget.lock() {
                 hold.sight = Some((request, speakers, pair));
             }
+        } else if crate::remember::room_speaker_on() {
+            // Who said a room line (#2849, `LAMP_MEMORY_ROOM_SPEAKER`): the
+            // same reading, kept for the line's own writes (its exchange,
+            // a remember it asks for), never waited for: the known file is
+            // read beside the turn, and a line whose reading isn't in yet
+            // when it is written simply has no speaker.
+            let speakers = eyes.speakers_with_boot(begun, finishing);
+            let (eyes, known) = (eyes.clone(), known.clone());
+            drop(tokio::task::spawn_blocking(move || {
+                crate::speaking_faces::saw_line(crate::speaking_faces::LineSeen {
+                    request,
+                    speakers,
+                    known: eyes.known_with_boot(&known),
+                    // A room line's speaker, never an enrollment's proof.
+                    enrollment: None,
+                });
+            }));
         }
     }
     // Onboarding's sentence (#1803): its words go to the coordinator to
