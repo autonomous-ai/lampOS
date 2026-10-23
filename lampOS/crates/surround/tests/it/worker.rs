@@ -672,6 +672,8 @@ async fn active_update_on_restart_reconciles_and_never_reports_unproven_success(
 struct PendingAdapter {
     request: Option<network::OperationId>,
     observed: Arc<AtomicUsize>,
+    shared: operator::Shared,
+    polled: Option<oneshot::Sender<()>>,
 }
 impl NetworkAdapter for PendingAdapter {
     fn submit(&mut self, request: network::NetworkRequest) -> Result<(), network::NetworkError> {
@@ -683,6 +685,17 @@ impl NetworkAdapter for PendingAdapter {
         Ok(())
     }
     fn poll(&mut self) -> Option<network::Completion> {
+        // Check inside the adapter call: a later read could miss a lock
+        // held only while polling the network.
+        let view = self
+            .shared
+            .view
+            .try_read()
+            .expect("status lock held while the network is pending");
+        assert_eq!(view.operation.as_ref().unwrap().phase, Phase::Working);
+        if let Some(polled) = self.polled.take() {
+            polled.send(()).unwrap();
+        }
         None
     }
 }
@@ -690,11 +703,14 @@ impl NetworkAdapter for PendingAdapter {
 async fn slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline() {
     let host = Host::new(true);
     let calls = Arc::new(AtomicUsize::new(0));
+    let (polled, pending) = oneshot::channel();
     let mut worker = host.worker(
         "one",
         Box::new(PendingAdapter {
             request: None,
             observed: calls.clone(),
+            shared: host.shared.clone(),
+            polled: Some(polled),
         }),
     );
     let (admitted, rx) = oneshot::channel();
@@ -711,12 +727,18 @@ async fn slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline() 
             .await
     });
     assert_eq!(rx.await.unwrap(), Ok(()));
-    let start = Instant::now();
+    tokio::time::timeout(Duration::from_secs(10), pending)
+        .await
+        .expect("network adapter was not polled")
+        .expect("network adapter stopped before its pending observation");
     {
-        let view = host.shared.view.read().unwrap();
+        let view = host
+            .shared
+            .view
+            .try_read()
+            .expect("status lock held between network polls");
         assert_eq!(view.operation.as_ref().unwrap().phase, Phase::Working);
     }
-    assert!(start.elapsed() < Duration::from_millis(20));
     host.now.store(NOW + 46_000_000, Ordering::SeqCst);
     tokio::time::timeout(Duration::from_secs(1), task)
         .await

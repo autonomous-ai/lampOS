@@ -1,0 +1,20 @@
+--- BEGIN rustc-version.stdout; 191 bytes; sha256 4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281 ---
+rustc 1.96.0 (ac68faa20 2026-05-25)
+binary: rustc
+commit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96
+commit-date: 2026-05-25
+host: x86_64-apple-darwin
+release: 1.96.0
+LLVM version: 22.1.2
+
+--- END rustc-version.stdout ---
+--- BEGIN rustc-version.stderr; 0 bytes; sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ---
+
+--- END rustc-version.stderr ---
+--- BEGIN host-uname.stdout; 7 bytes; sha256 aaf631698ae5160ceb04a97681a14887fdcab47cd6e0f163c87485b3b1340b62 ---
+x86_64
+
+--- END host-uname.stdout ---
+--- BEGIN host-uname.stderr; 0 bytes; sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ---
+
+--- END host-uname.stderr ---

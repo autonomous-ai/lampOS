@@ -1,0 +1,10 @@
+--- a/lampOS/crates/surround/tests/it/worker.rs
++++ b/lampOS/crates/surround/tests/it/worker.rs
+@@ -712,6 +712,7 @@
+     });
+     assert_eq!(rx.await.unwrap(), Ok(()));
+     let start = Instant::now();
++    std::thread::sleep(Duration::from_millis(400));
+     {
+         let view = host.shared.view.read().unwrap();
+         assert_eq!(view.operation.as_ref().unwrap().phase, Phase::Working);

@@ -1,0 +1,147 @@
+{
+  "base": "9b6960e61e5758bb745c6e4d7ad043cc725cd018",
+  "baseline": {
+    "head": "9b6960e61e5758bb745c6e4d7ad043cc725cd018",
+    "tracked_files": 6515,
+    "bytes": 202228198,
+    "sha256": "0adec688a2ed04751e32e09aa7889e076c11c4a5a5d93088dd30580fcc60d0d4",
+    "scope": "Every tracked file under lampOS; sorted path NUL byte count NUL file SHA256 LF"
+  },
+  "candidate": {
+    "files": 6515,
+    "bytes": 202229510,
+    "sha256": "fab7ada43be805a54592b8881772907c17fa973594716d412edcdd56ca145d48",
+    "selected": {
+      "lampOS/crates/surround/tests/it/worker.rs": "9d186eb35aad685331e31c958d6d65e87bf4f21fa883a157e86aee313306f858",
+      "lampOS/crates/surround/src/worker.rs": "053805de31c7cddcc94ab33fcd83657685818bb3a8a0a68e72b9bec6f3a4c694",
+      "lampOS/docs/surround.md": "75337b047ce7598b804b009f403feda3bf7d43616d15f0802bb12ef74e20fd3f",
+      "lampOS/crates/surround/src/setup.rs": "ea3c8752c2994e9272d013957f6e2389fdc10c72b0009ad8151724fce1f74d2c",
+      "lampOS/crates/surround/Cargo.toml": "df922e176c16c3166befe98c1914117a10bd3b8ae1a0bedfb30d758ba12e2f73",
+      "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+      "lampOS/Cargo.lock": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c",
+      "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+    }
+  },
+  "freshness": {
+    "before": {
+      "files": 6515,
+      "bytes": 202229510,
+      "sha256": "fab7ada43be805a54592b8881772907c17fa973594716d412edcdd56ca145d48",
+      "selected": {
+        "lampOS/crates/surround/tests/it/worker.rs": "9d186eb35aad685331e31c958d6d65e87bf4f21fa883a157e86aee313306f858",
+        "lampOS/crates/surround/src/worker.rs": "053805de31c7cddcc94ab33fcd83657685818bb3a8a0a68e72b9bec6f3a4c694",
+        "lampOS/docs/surround.md": "75337b047ce7598b804b009f403feda3bf7d43616d15f0802bb12ef74e20fd3f",
+        "lampOS/crates/surround/src/setup.rs": "ea3c8752c2994e9272d013957f6e2389fdc10c72b0009ad8151724fce1f74d2c",
+        "lampOS/crates/surround/Cargo.toml": "df922e176c16c3166befe98c1914117a10bd3b8ae1a0bedfb30d758ba12e2f73",
+        "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+        "lampOS/Cargo.lock": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c",
+        "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+      }
+    },
+    "after": {
+      "files": 6515,
+      "bytes": 202229510,
+      "sha256": "fab7ada43be805a54592b8881772907c17fa973594716d412edcdd56ca145d48",
+      "selected": {
+        "lampOS/crates/surround/tests/it/worker.rs": "9d186eb35aad685331e31c958d6d65e87bf4f21fa883a157e86aee313306f858",
+        "lampOS/crates/surround/src/worker.rs": "053805de31c7cddcc94ab33fcd83657685818bb3a8a0a68e72b9bec6f3a4c694",
+        "lampOS/docs/surround.md": "75337b047ce7598b804b009f403feda3bf7d43616d15f0802bb12ef74e20fd3f",
+        "lampOS/crates/surround/src/setup.rs": "ea3c8752c2994e9272d013957f6e2389fdc10c72b0009ad8151724fce1f74d2c",
+        "lampOS/crates/surround/Cargo.toml": "df922e176c16c3166befe98c1914117a10bd3b8ae1a0bedfb30d758ba12e2f73",
+        "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+        "lampOS/Cargo.lock": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c",
+        "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+      }
+    },
+    "files_touched": 6515
+  },
+  "control_sources": [
+    {
+      "control": "before-host-stall",
+      "before_mutation_sha256": "0adec688a2ed04751e32e09aa7889e076c11c4a5a5d93088dd30580fcc60d0d4",
+      "controlled_sha256": "50c86b3b56713ad7402f9a1544ac8e227a7f269a843f1924f978199253d0e459",
+      "test_sha256": "46a120ceeed1e2db0c40f1367da4475730d7d3595a99ca8b0fe9dfbafc40880b",
+      "product_sha256": "053805de31c7cddcc94ab33fcd83657685818bb3a8a0a68e72b9bec6f3a4c694"
+    },
+    {
+      "control": "after-host-stall",
+      "before_mutation_sha256": "fab7ada43be805a54592b8881772907c17fa973594716d412edcdd56ca145d48",
+      "controlled_sha256": "7a345e828eb4c3e01f769571d5a271f43d4821ccb6d7ba4045272471629f4ba5",
+      "test_sha256": "6affc0793fd69ab1ba8d0ffaec0efb18559b91637b2252b1d0e58aae9d3c24e1",
+      "product_sha256": "053805de31c7cddcc94ab33fcd83657685818bb3a8a0a68e72b9bec6f3a4c694"
+    },
+    {
+      "control": "held-poll-lock",
+      "before_mutation_sha256": "fab7ada43be805a54592b8881772907c17fa973594716d412edcdd56ca145d48",
+      "controlled_sha256": "060b823b7365e366f6587769ace681475f75d27d84e5d0ae8eda6f0f37ffdde0",
+      "test_sha256": "9d186eb35aad685331e31c958d6d65e87bf4f21fa883a157e86aee313306f858",
+      "product_sha256": "9986498a8aac0408b35516ac6f45d0f1ca9bd3152bc91eb92bb842837c47368d"
+    },
+    {
+      "control": "missing-deadline",
+      "before_mutation_sha256": "fab7ada43be805a54592b8881772907c17fa973594716d412edcdd56ca145d48",
+      "controlled_sha256": "2257bdd1f006f184e15e30fc676d45813d4cdde077b2c3e6b920186e60c07766",
+      "test_sha256": "9d186eb35aad685331e31c958d6d65e87bf4f21fa883a157e86aee313306f858",
+      "product_sha256": "40cec3bda85ae6c7ff7816fe32f292ff0f9f85add52733c9951e084c16444d96"
+    }
+  ],
+  "restorations": [
+    {
+      "control": "before-host-stall",
+      "whole_tracked_source_sha256": "fab7ada43be805a54592b8881772907c17fa973594716d412edcdd56ca145d48",
+      "exact_candidate": true
+    },
+    {
+      "control": "after-host-stall",
+      "whole_tracked_source_sha256": "fab7ada43be805a54592b8881772907c17fa973594716d412edcdd56ca145d48",
+      "exact_candidate": true
+    },
+    {
+      "control": "held-poll-lock",
+      "whole_tracked_source_sha256": "fab7ada43be805a54592b8881772907c17fa973594716d412edcdd56ca145d48",
+      "exact_candidate": true
+    },
+    {
+      "control": "missing-deadline",
+      "whole_tracked_source_sha256": "fab7ada43be805a54592b8881772907c17fa973594716d412edcdd56ca145d48",
+      "exact_candidate": true
+    }
+  ],
+  "assertion_preservation": {
+    "admission_assertion_preserved": true,
+    "working_assertion_preserved": true,
+    "logical_clock_advance_preserved": true,
+    "completion_watchdog_preserved": true,
+    "failure_and_count_suffix_byte_identical": true,
+    "product_file_frozen_baseline_sha256": "053805de31c7cddcc94ab33fcd83657685818bb3a8a0a68e72b9bec6f3a4c694",
+    "pause_test_only": true
+  },
+  "patch_checks": [
+    {
+      "control": "before-host-stall",
+      "applies_to_declared_source": true,
+      "result_matches_compiled_control_hash": true
+    },
+    {
+      "control": "after-host-stall",
+      "applies_to_declared_source": true,
+      "result_matches_compiled_control_hash": true
+    },
+    {
+      "control": "held-poll-lock",
+      "applies_to_declared_source": true,
+      "result_matches_compiled_control_hash": true
+    },
+    {
+      "control": "missing-deadline",
+      "applies_to_declared_source": true,
+      "result_matches_compiled_control_hash": true
+    }
+  ],
+  "linux_snapshot": {
+    "files": 6515,
+    "sha256": "fab7ada43be805a54592b8881772907c17fa973594716d412edcdd56ca145d48",
+    "exact_frozen_candidate": true,
+    "contains_uncommitted_test_and_doc_delta": true
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "limitation": "These bulk streams and the source archive are not portable with this folder. Exact commands, exit status, hashes and sizes are retained; no Cargo JSON stream, script, archive or binary is committed. All actual test failures and native gate streams are included losslessly in raw/.",
+  "files": [
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/metadata.stdout",
+      "bytes": 2306867,
+      "sha256": "1c90b43634e6e624775e913ff0b5c6b698baeca697ed6df877887561d176e45d"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/metadata.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/before-host-stall-compile.stdout",
+      "bytes": 179252,
+      "sha256": "13e51ecec3da3034b820163da3220d52709d73317659e2178d09e86810dbec13"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/before-host-stall-compile.stderr",
+      "bytes": 1455,
+      "sha256": "b68d199f3fe22f6a70d5817fcde867d642c08fdd4b240a110a7f6cd76364e13a"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/before-host-stall-binary-file.stdout",
+      "bytes": 111,
+      "sha256": "ca3b62ccb804919b4b9771578b410edc1c694bb1f3f103fc89af1a20ae8cc4bf"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/before-host-stall-binary-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/before-host-stall-inventory.stdout",
+      "bytes": 21418,
+      "sha256": "ea955eb57bd58ab120de25f6ae21894bd28355445baa69e42b79f4ccb240ffa2"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/before-host-stall-inventory.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/after-host-stall-compile.stdout",
+      "bytes": 179219,
+      "sha256": "0acf5c773532cda301d977eb3fe0e04bbf29a0aebbc598a3977f8b808ccad0aa"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/after-host-stall-compile.stderr",
+      "bytes": 175,
+      "sha256": "1ff3aa5ae85ac2eaa5f653b6411bfc1e97f2d6e91d6ab7251440a4dd30ccd04a"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/after-host-stall-binary-file.stdout",
+      "bytes": 111,
+      "sha256": "ca3b62ccb804919b4b9771578b410edc1c694bb1f3f103fc89af1a20ae8cc4bf"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/after-host-stall-binary-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/after-host-stall-inventory.stdout",
+      "bytes": 21418,
+      "sha256": "ea955eb57bd58ab120de25f6ae21894bd28355445baa69e42b79f4ccb240ffa2"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/after-host-stall-inventory.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/held-poll-lock-compile.stdout",
+      "bytes": 179221,
+      "sha256": "2671783f74f62e8497b381142c4d843df647424daf8a8fd153d47fe2fa4dc21c"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/held-poll-lock-compile.stderr",
+      "bytes": 176,
+      "sha256": "dc1133d4374a799f7b65e665a895fae5d6a288d781e40e3b4e781fa2ba1f6c07"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/held-poll-lock-binary-file.stdout",
+      "bytes": 111,
+      "sha256": "ca3b62ccb804919b4b9771578b410edc1c694bb1f3f103fc89af1a20ae8cc4bf"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/held-poll-lock-binary-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/held-poll-lock-inventory.stdout",
+      "bytes": 21418,
+      "sha256": "ea955eb57bd58ab120de25f6ae21894bd28355445baa69e42b79f4ccb240ffa2"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/held-poll-lock-inventory.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/missing-deadline-compile.stdout",
+      "bytes": 179221,
+      "sha256": "f91bf7b73ae0cf3cdb17a56d2a93a83d9b520ee81c9bf704d972bd3b1c01f116"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/missing-deadline-compile.stderr",
+      "bytes": 176,
+      "sha256": "d2fbf29e2a335faadb5b5f28616ab747decbe676c9a3149adf9dadbad6ff006b"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/missing-deadline-binary-file.stdout",
+      "bytes": 111,
+      "sha256": "ca3b62ccb804919b4b9771578b410edc1c694bb1f3f103fc89af1a20ae8cc4bf"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/missing-deadline-binary-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/missing-deadline-inventory.stdout",
+      "bytes": 21418,
+      "sha256": "ea955eb57bd58ab120de25f6ae21894bd28355445baa69e42b79f4ccb240ffa2"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/missing-deadline-inventory.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/baseline-source-files.json",
+      "bytes": 956573,
+      "sha256": "35c414cb6ea24fef92aea0da0d7d439a8debc74d016f8d9e96302ee4a7990704"
+    },
+    {
+      "external_path": "/private/tmp/tests-codex-surround-status-evidence-20261023/run-20261023T002245Z/linux-source.tar",
+      "bytes": 215879680,
+      "sha256": "abe6c9876033ac2769add25c729bd097c6a39f8e1d64d0c5f7bcc1bafa0a29cc"
+    }
+  ]
+}

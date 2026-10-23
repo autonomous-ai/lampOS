@@ -1,0 +1,13 @@
+--- BEGIN linux-fmt.stdout; 196 bytes; sha256 f64c55ed9f210d80a9b248206104a47175faf5ec94a093e4ad132549209089fc ---
+rustc 1.96.0 (ac68faa20 2026-05-25)
+binary: rustc
+commit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96
+commit-date: 2026-05-25
+host: x86_64-unknown-linux-gnu
+release: 1.96.0
+LLVM version: 22.1.2
+
+--- END linux-fmt.stdout ---
+--- BEGIN linux-fmt.stderr; 0 bytes; sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ---
+
+--- END linux-fmt.stderr ---
