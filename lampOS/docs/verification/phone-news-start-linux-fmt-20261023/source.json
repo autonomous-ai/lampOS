@@ -1,0 +1,53 @@
+{
+  "label": "phone-e5",
+  "kind": "git_base_plus_two_frozen_snapshots",
+  "pr": null,
+  "source": {
+    "commit": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+    "root_tree": "753d9453602d19ec91543762119a422b1e0ce89c",
+    "parents": [
+      "14efb6ad7c77c2da4bbdde24becda5b57f43a802"
+    ],
+    "workspace_tree": "e7b38cca9ea57d7d59f9e4216d7a3acabda2585e"
+  },
+  "expected_parent": null,
+  "candidate_commit": null,
+  "overlays": [
+    {
+      "path": "lampOS/crates/voice/src/messages.rs",
+      "git_mode": "100644",
+      "snapshot": "snapshots/0-candidate.txt",
+      "base_sha256": "1bc28d917159472dcd6de1e2436c07b85f1215f9f67d8b39563e0bd339a62fb5",
+      "candidate_sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "candidate_bytes": 51731
+    },
+    {
+      "path": "lampOS/docs/messages.md",
+      "git_mode": "100644",
+      "snapshot": "snapshots/1-candidate.txt",
+      "base_sha256": "60ac65a303056dbf6829e3b3eda24a0d1163ab359cfa18ad92e97c930b632ec9",
+      "candidate_sha256": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3",
+      "candidate_bytes": 23556
+    }
+  ],
+  "image": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "original_frozen_evidence_directory": "/private/tmp/tests-phone-news-start-e5-gates-20261023",
+  "original_source_identity_sha256": "d242743a74eb88c3b95b79884bb5ede5918732a87e73a11f9576ec7c6455be46",
+  "original_complete_repository_source_aggregate_sha256": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97",
+  "original_source_map_sha256": "ecc2fbfa7db723cc481cf62576bf5eb0962fad2a42b352028af3191d38255d9d",
+  "lampOS_expected_entries": 6649,
+  "expected_lampOS_source_map_sha256": "89eb3e17fbbd30485c3b38f43d85b052b63714abaf8701d4543ef965f0931c90",
+  "base_archive_sha256": "47b09211053a8a4798891df7ee23fac0ab6acccc78fd275d6ebaa55e8e307c84",
+  "archive_file": "source-lampOS.tar",
+  "archive_bytes": 218234880,
+  "archive_sha256": "58156397b3550fd58852df6cced7df3982bb285b3c3ba2d1f6f5bf9b34139d76",
+  "input_scope": "All tracked lampOS files; exact Git commit or declared frozen two-file overlay only.",
+  "overlay_all_lampOS_bytes_and_modes_verified": true,
+  "runner_sha256": "62cb40972561bf66a12944df84357edbc6549034c7e0ffad7c0f0c6419ea6e37",
+  "preparation_plan_sha256": "8e597b032ffe305629465d7e01e8e7b84b03784bac5133a26833f7eee61148a8",
+  "original_run_source_json_sha256": "16506b545db9eb90f359258c27ec3c3b26dbcab479f6b7709ba09fd9931eba54",
+  "in_container_before_after_manifest_sha256": "a4294080e094b7bc80ddd833d28010e3d9a64851ce04ca0f5f5e2ed24bef88f4",
+  "fingerprint_scope": "All regular-file bytes and literal symlink targets under the extracted lampOS tree, not inode metadata. Complete per-file manifests were transient; their digests and construction/comparison commands were retained.",
+  "archive_availability": "External only; not bundled. Exact base archive is reproducible from the pinned Git commit. For the phone candidate, apply the two declared frozen snapshot replacements and verify against the frozen complete lampOS source map; never identify this overlay archive as the unchanged base tree.",
+  "expected_lampOS_map_external_bytes": 1470042
+}

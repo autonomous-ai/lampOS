@@ -1,0 +1,89 @@
+{
+  "representation": "Each text value decodes to the complete original UTF-8 command stream, without normalization or redaction. The raw image-inspect response is retained externally; only its minimal image/platform projection is published.",
+  "commands": {
+    "source-identity": {
+      "stdout": {
+        "encoding": "UTF-8",
+        "bytes": 123,
+        "sha256": "d1cede957db470f337a18e6dbc3cba9863b33eab701943d1e6ddd725edb0b2ac",
+        "text": "61a195a186c94de88d4039d1f963961c4c6c9685\naa8844bd87cf0ce228d83d59b264ccf730cea35b\n51186d5ea722933e13f0ff910dc56288e187945c\n"
+      },
+      "stderr": {
+        "encoding": "UTF-8",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      }
+    },
+    "workspace-tree": {
+      "stdout": {
+        "encoding": "UTF-8",
+        "bytes": 41,
+        "sha256": "383289dd85731a87b590c34f2f2abc4e6dad9c44bddee751ab55873bd75f96bf",
+        "text": "5ce20fd7279dbd0b3f3918adf89f498ed13821c0\n"
+      },
+      "stderr": {
+        "encoding": "UTF-8",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      }
+    },
+    "archive": {
+      "stdout": {
+        "encoding": "UTF-8",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      },
+      "stderr": {
+        "encoding": "UTF-8",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      }
+    },
+    "archive-commit": {
+      "stdout": {
+        "encoding": "UTF-8",
+        "bytes": 41,
+        "sha256": "c53efd9b3f8336096e686920150b53aaedd034e3af303c9a4df8d8bfa89d1cf5",
+        "text": "61a195a186c94de88d4039d1f963961c4c6c9685\n"
+      },
+      "stderr": {
+        "encoding": "UTF-8",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      }
+    },
+    "format": {
+      "stdout": {
+        "encoding": "UTF-8",
+        "bytes": 746,
+        "sha256": "9fcb6556c4a3259d9fe9a948c7f17e4cdfb09d3dad83092e1a6e8ba810b3f9d7",
+        "text": "Linux 88a3193fc78f 6.12.13-200.fc41.x86_64 #1 SMP PREEMPT_DYNAMIC Sat Feb  8 20:05:26 UTC 2025 x86_64 GNU/Linux\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nrustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.96.0\nLLVM version: 22.1.2\nhost: x86_64-unknown-linux-gnu\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nsource-before-manifest 82166a7f989e6f20aaa51936fa33c529888fb403287b01e2ff9dc21616dc13d5  /tmp/source-before.sha256\nsource-after-manifest 82166a7f989e6f20aaa51936fa33c529888fb403287b01e2ff9dc21616dc13d5  /tmp/source-after.sha256\ncargo_fmt_exit=0\n"
+      },
+      "stderr": {
+        "encoding": "UTF-8",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      }
+    },
+    "final-source-identity": {
+      "stdout": {
+        "encoding": "UTF-8",
+        "bytes": 123,
+        "sha256": "d1cede957db470f337a18e6dbc3cba9863b33eab701943d1e6ddd725edb0b2ac",
+        "text": "61a195a186c94de88d4039d1f963961c4c6c9685\naa8844bd87cf0ce228d83d59b264ccf730cea35b\n51186d5ea722933e13f0ff910dc56288e187945c\n"
+      },
+      "stderr": {
+        "encoding": "UTF-8",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      }
+    }
+  }
+}

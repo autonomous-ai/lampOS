@@ -1,0 +1,50 @@
+{
+  "source_kind": "exact_git_commit",
+  "source": "61a195a186c94de88d4039d1f963961c4c6c9685",
+  "candidate_commit": "61a195a186c94de88d4039d1f963961c4c6c9685",
+  "declared_overlays": [],
+  "format_container_exit": 0,
+  "timed_out": false,
+  "container_elapsed_seconds": 15.74119013408199,
+  "timing_boundary": "Entire container command including setup, extraction, rustfmt and source hashing.",
+  "formatting_success": true,
+  "source_archive_unchanged": true,
+  "git_identity_unchanged": true,
+  "snapshots_unchanged": true,
+  "compilation": false,
+  "tests": false,
+  "ARM_build": false,
+  "source_edits": false,
+  "evidence_directory": "/private/tmp/tests-3207-linux-fmt-20261023/run-20261023T050047.059094Z",
+  "formatting_execution_count": 1,
+  "cargo_fmt_exit": 0,
+  "started_utc": "2026-10-23T05:00:48.685514+00:00",
+  "finished_utc": "2026-10-23T05:01:04.426268+00:00",
+  "source_fingerprint_sha256": "82166a7f989e6f20aaa51936fa33c529888fb403287b01e2ff9dc21616dc13d5",
+  "platform": {
+    "os": "Linux",
+    "image_architecture": "amd64",
+    "rust_host": "x86_64-unknown-linux-gnu"
+  },
+  "toolchain": {
+    "cargo": "1.96.0 (30a34c682 2026-05-25)",
+    "rustfmt": "1.9.0-stable (ac68faa20c 2026-05-25)",
+    "rustc": "1.96.0 (ac68faa20 2026-05-25)"
+  },
+  "stdout": {
+    "bytes": 746,
+    "sha256": "9fcb6556c4a3259d9fe9a948c7f17e4cdfb09d3dad83092e1a6e8ba810b3f9d7"
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "container_isolation": {
+    "network": "none",
+    "rootfs": "read-only",
+    "tmpfs": "/tmp:rw,size=1g,mode=1777",
+    "pull": "never",
+    "host_mounts": [],
+    "shared_targets": []
+  }
+}

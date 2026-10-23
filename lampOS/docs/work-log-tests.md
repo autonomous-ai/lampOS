@@ -1,5 +1,26 @@
 # Tests work log
 
+## 2026-10-23 12:08 +0700 — phone PR and requested Linux formatting
+
+Ready for lamp-voice: no (#3218 is draft; #3190 keeps its execution HOLD).
+
+The phone event-wait change is pushed as #3218 at `47adb38fd`. The completed
+frozen Mac gate passed formatting, strict Clippy and build; Voice was
+**3,868 / 2 / 15** and readers **3,200 / 4 / 17**. All six failures remain
+unwaived in the forthcoming complete receipt. The changed phone test passed.
+
+[Linux formatting](verification/phone-news-start-linux-fmt-20261023/) passed
+once on the exact frozen e5-plus-two-file candidate, subsequently committed
+without source changes. The [requested #3207 formatting check](verification/touch-wire-docs-linux-fmt-3207-20261023/)
+passed once on `61a195a18`. Both ran `cargo fmt --all --check` in the isolated
+existing Linux x86 container, with equal input/output source fingerprints.
+No ARM compilation, tests or devices were used for these formatting checks.
+Native #3218 ARM64 run 39903799979 and Linux Clippy run 39903799949 have started.
+
+The boot-clock carry onto `62b1120fc` has an equal range-diff. Its separately
+claimed loading-child startup and relay PID-ready fixture corrections are
+being controlled before fresh qualification. Product behavior is unchanged.
+
 ## 2026-10-23 11:36 +0700 — boot-clock complete gates retain two failures
 
 Ready for lamp-voice: no (#3190, review disposition remains pending).

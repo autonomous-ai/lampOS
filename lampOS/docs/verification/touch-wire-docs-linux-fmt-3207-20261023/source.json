@@ -1,0 +1,59 @@
+{
+  "label": "3207",
+  "kind": "exact_git_commit",
+  "pr": 3207,
+  "source": {
+    "commit": "61a195a186c94de88d4039d1f963961c4c6c9685",
+    "root_tree": "aa8844bd87cf0ce228d83d59b264ccf730cea35b",
+    "parents": [
+      "51186d5ea722933e13f0ff910dc56288e187945c"
+    ],
+    "workspace_tree": "5ce20fd7279dbd0b3f3918adf89f498ed13821c0"
+  },
+  "expected_parent": "51186d5ea722933e13f0ff910dc56288e187945c",
+  "overlays": [],
+  "image": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "request": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6357444592",
+  "carry_review": "https://github.com/autonomous-ai/lampOS/pull/3207#issuecomment-6357483216",
+  "carry_queue_confirmation": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6357484121",
+  "pr_identity_read": {
+    "title": "lampOS: preserve optional wire field names between builds",
+    "state": "OPEN",
+    "draft": false,
+    "head_branch": "third/touch-wire-field-names",
+    "base_branch": "lamp-voice",
+    "head": "61a195a186c94de88d4039d1f963961c4c6c9685",
+    "base": "51186d5ea722933e13f0ff910dc56288e187945c",
+    "comments_read": 5,
+    "reviews_read": 0,
+    "latest_comment_utc": "2026-10-23T04:36:21Z"
+  },
+  "authored_scope": {
+    "path": "lampOS/docs/msgs.md",
+    "added_lines": 4,
+    "removed_lines": 0,
+    "git_mode": "100644",
+    "git_blob": "d0c1c48095f5ba5bf1c4683a0a430de8feed6949",
+    "bytes": 52296,
+    "sha256": "2701b4894628124508bc5da22de43ac4958c31d95c10f88fc7384728b3de13f1",
+    "patch_sha256": "4922e7add5483c81a937efd1ce1a4dda7b55efe021b1668e6914680d4b8ba605"
+  },
+  "all_tracked_lampOS_input": {
+    "entries": 6656,
+    "blob_bytes": 204448656,
+    "git_ls_tree_r_l_z_sha256": "360f5c7a01f85effcdc2f0d12e8a46bc48035df6fbeae758c4428df364aee3f9"
+  },
+  "limits": "Exact frozen-head formatting only. The read and existing CI are not reclassified; no new tests/builds, ARM run, device access, source edits, or merge action. An eventual changed PR head needs its own binding.",
+  "base_archive_sha256": "ca06ed8aa13986d7811656bf47080516a0889ed9422dab9b52afde828275af4a",
+  "archive_file": "source-lampOS.tar",
+  "archive_bytes": 210309120,
+  "archive_sha256": "ca06ed8aa13986d7811656bf47080516a0889ed9422dab9b52afde828275af4a",
+  "input_scope": "All tracked lampOS files; exact Git commit or declared frozen two-file overlay only.",
+  "overlay_all_lampOS_bytes_and_modes_verified": false,
+  "runner_sha256": "62cb40972561bf66a12944df84357edbc6549034c7e0ffad7c0f0c6419ea6e37",
+  "preparation_plan_sha256": "425f097dfabd1dcb04b2d891cb761770332f3cf04f96030d5feb018ea5d8da22",
+  "original_run_source_json_sha256": "1b0c3976a7b5f98e772c9b1e794a4785dd853d6cdb4a7038fc297a505f47e969",
+  "in_container_before_after_manifest_sha256": "82166a7f989e6f20aaa51936fa33c529888fb403287b01e2ff9dc21616dc13d5",
+  "fingerprint_scope": "All regular-file bytes and literal symlink targets under the extracted lampOS tree, not inode metadata. Complete per-file manifests were transient; their digests and construction/comparison commands were retained.",
+  "archive_availability": "External only; not bundled. Exact base archive is reproducible from the pinned Git commit. For the phone candidate, apply the two declared frozen snapshot replacements and verify against the frozen complete lampOS source map; never identify this overlay archive as the unchanged base tree."
+}

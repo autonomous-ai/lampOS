@@ -1,0 +1,18 @@
+{
+  "JSON_parsing": "passed",
+  "lossless_streams_verified": 12,
+  "lossless_method": "UTF-8 decoded content compared byte-for-byte with each retained original; byte counts and SHA-256 checked.",
+  "published_file_whitespace_check": "passed",
+  "whitespace_command": [
+    "git",
+    "diff",
+    "--no-index",
+    "--check",
+    "/dev/null",
+    "FILE"
+  ],
+  "formatting_rerun": false,
+  "old_3190_execution_marker_exists": false,
+  "published_api_metadata": "Minimal image provenance projection only; all raw metadata remains external.",
+  "publication_manifest_excludes_itself": true
+}
