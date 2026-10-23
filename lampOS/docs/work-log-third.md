@@ -5,6 +5,42 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 08:18 — Controls follow-up landed; every initiated gate finished
+
+Ready for lamp-voice: yes (#3162 landed through #3164; all initiated checks are complete).
+
+- First merged train #3164 as `b7700b7c2`. Source `22634785d`, carried
+  `9b7770f5e` and landed `b7700b7c2` compare equal in range-diff; the
+  landed and tested train trees are identical. Combined ARM64
+  `39879547074` passed **10,827/0/67**, one leaky pass, including the four
+  new cases. Combined Linux Clippy `39879547174` passed. Both required
+  jobs are terminal success, and the bounded watcher exited zero.
+- The remaining Mac downstream gate on unchanged `22634785d` finished:
+  **7,057 passed, zero failed, 31 ignored**, exit 0 in 2,589.5 s. Controls
+  separately passed **504/0/1**. With `CARGO_BUILD_JOBS=2`, the command was
+  `cargo test -q --offline --locked --no-fail-fast -p lamp-body -p lamp-cloud -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-peek -p lamp-selftest -p lamp-setup -p lamp-skills -p lamp-update -p lamp-voice -p lamp-voice-eval -- --test-threads=2`.
+  Both long updater groups and the full Voice group completed normally.
+  No failed case was excluded or retried in this gate. The final receipt
+  is #3162 comment `6355020556`; its body now contains all gate results.
+- Tests' explicit Linux formatting receipt is committed at `1a543ce642`
+  in `docs/verification/3162-linux-format-20261023/`: Rust/Cargo 1.96.0,
+  rustfmt 1.9.0-stable, `cargo fmt --all --check`, exit 0 in 13.981 s.
+  Its source/root-tree/lampOS-tree identities match `22634785d`. No build
+  or ARM64 compilation was part of that check. Mac formatting, strict
+  workspace Clippy and workspace build already passed.
+- The owner-directed 07:49 ready transition was applied at 07:54, with
+  unfinished checks still explicit. Fourteen's `READ-OK` and all source
+  receipts remain on the PR. The source task branch is preserved at its
+  reviewed head. The clean working checkout now uses
+  `third/session-20261023-current` at `b7700b7c2`; local AGENTS.md matches
+  origin. The latest Queue and owned-PR replies have been read and acted on.
+- #1798 and #2136 are not declared done: their checkpoints are comments
+  `6354826233` and `6354826570`. #2948 remains draft at `81f20ee31` for
+  First's coherent build and the lead/Fifth/person's attended #2857
+  trial. First owns #2136's two complete same-lines Live comparisons.
+  These are the remaining acceptance owners; no Third code or gate is
+  outstanding. No device, acoustic or physical-latency result is claimed.
+
 ## 2026-10-23 07:52 — native Controls gate green; current-base carry verified
 
 Ready for lamp-voice: no (#3162 still has downstream Mac tests and Linux formatting open).
@@ -3899,7 +3935,7 @@ router, hotspot or lamp; step 4 of #806 needs a builder with a lamp.
 |---|---|---|---|
 | third-P1 | Expression reads the system's time zone (`--zone system`), so a lamp outside Vietnam keeps its days across daylight saving; Memory's owner the same | #820 | Yes (First, 18:20; Second for the policy, 18:34); #844 |
 | third-P2 | Use diagnostic long-gap counter deltas for Controls totals; rate-limited journal warnings can omit the final suppressed gaps | #2602, 22 Oct 23:36 | Claimed after the self-pick window; delivered as #3083 for documentation review |
-| third-P3 | Test the real bus-to-Controls path for a push, its release or expiry, and recovery only after a fresh head contact | #1798; #3126, 23 Oct 07:02 | Claimed at 07:18; draft #3162 at 07:30, native gates and downstream tests running; Body implementation remains with its owner |
+| third-P3 | Test the real bus-to-Controls path for a push, its release or expiry, and recovery only after a fresh head contact | #1798; #3126, 23 Oct 07:02 | Delivered as #3162 through train #3164 at `b7700b7c2`; every initiated gate complete at 08:14; Body implementation and hand qualification remain with their owners |
 
 ## 2026-10-15 — Setup for a home (#806) ready as #817; #795 and #808 rebased
 
