@@ -132,3 +132,11 @@ Linux formatting passed; `linux-format-train23/` binds the latter's immutable
 image, source tree and output. The PR is ready under the 07:49 no-drafts rule;
 new-head official ARM64 and Clippy checks are in progress. No completed
 earlier-head check is represented as a result of this new head.
+
+## Checksum inventory correction
+
+Reviewer-two's 08:22 P3 found that the earlier `SHA256SUMS` still covered
+the original README and omitted the later receipts. The index is now
+regenerated over every current evidence file except itself, including all
+newer carries and complete manifests. The individual command receipts and
+raw output are unchanged.
