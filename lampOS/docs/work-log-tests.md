@@ -1,5 +1,19 @@
 # Tests work log
 
+## 2026-10-23 07:54 +0700 — requested Linux formatting receipt delivered
+
+Third's exact #3162 head `22634785d` passed `cargo fmt --all --check` once
+in the cached native Linux x86 environment, Rust 1.96.0: exit 0, 13.981 seconds,
+empty output. [Complete receipt](verification/3162-linux-format-20261023/)
+records immutable source/image identity, commands and lossless raw streams.
+No build, test, ARM64 compilation or device operation occurred. This covers
+the authored head; its later train carry belongs to the merge owner.
+
+First's 07:49/07:50 rule removes draft status from builder PRs but keeps every
+P1/P2 and required gate blocking. #3165 and #3023 are being marked ready for
+review under that rule; their pending checks and local comparison are not
+waived, and no READ-OK or merge qualification is claimed for either.
+
 ## 2026-10-23 07:50 +0700 — Surround pushed; Eyes merged; boot-clock controls prepared
 
 [#3165](https://github.com/autonomous-ai/lampOS/pull/3165) carries the

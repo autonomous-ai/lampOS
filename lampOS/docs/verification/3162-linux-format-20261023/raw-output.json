@@ -1,0 +1,92 @@
+{
+  "archive-commit.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "archive-commit.stdout": {
+    "bytes": 41,
+    "sha256": "244dc9192295b53b1e0515ef9d6119677529f92425c99637f72d030f9315641d",
+    "text": "22634785d607e5ae2d44cc45d540161246ee89de\n"
+  },
+  "archive.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "archive.stdout": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "final-source-identity.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "final-source-identity.stdout": {
+    "bytes": 82,
+    "sha256": "a65c4193b855b6c41a5a7279ea3bf73d14de692478ee07ea9a64237f70282b2e",
+    "text": "22634785d607e5ae2d44cc45d540161246ee89de\n87534e6e7590abe8b82027380e2e49989bb53ecd\n"
+  },
+  "format.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "format.stdout": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "image-inspect.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "image-inspect.stdout": {
+    "bytes": 7701,
+    "sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74",
+    "text": "[\n     {\n          \"Id\": \"eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c\",\n          \"Digest\": \"sha256:340a3bdf76419083569becb186cae71d5c97cb46b24314c917a0305b322162a9\",\n          \"RepoTags\": [\n               \"localhost/lampos-fourth-native-user-check:latest\"\n          ],\n          \"RepoDigests\": [\n               \"localhost/lampos-fourth-native-user-check@sha256:340a3bdf76419083569becb186cae71d5c97cb46b24314c917a0305b322162a9\"\n          ],\n          \"Parent\": \"09de8d2eb0b0a3075180387ddc675cd5ceec6f422da0e516dc9d8fadd6a22908\",\n          \"Comment\": \"debuerreotype 0.17\",\n          \"Created\": \"2026-10-14T17:55:59.324085844Z\",\n          \"Config\": {\n               \"User\": \"1000:1000\",\n               \"Env\": [\n                    \"CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc\",\n                    \"CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER=qemu-aarch64-static\",\n                    \"CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc\",\n                    \"CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++\",\n                    \"AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar\",\n                    \"PKG_CONFIG_ALLOW_CROSS=1\",\n                    \"PKG_CONFIG_PATH_aarch64_unknown_linux_gnu=/usr/lib/aarch64-linux-gnu/pkgconfig\",\n                    \"BINDGEN_EXTRA_CLANG_ARGS_aarch64_unknown_linux_gnu=--target=aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu\",\n                    \"CARGO_INCREMENTAL=0\",\n                    \"PATH=/root/.rustup/toolchains/1.96.0-x86_64-unknown-linux-gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\n                    \"CARGO_HOME=/cargo\"\n               ],\n               \"Cmd\": [\n                    \"bash\"\n               ],\n               \"WorkingDir\": \"/src\",\n               \"Labels\": {\n                    \"io.buildah.version\": \"1.39.4\"\n               }\n          },\n          \"Version\": \"\",\n          \"Author\": \"\",\n          \"Architecture\": \"amd64\",\n          \"Os\": \"linux\",\n          \"Size\": 2544081605,\n          \"VirtualSize\": 2544081605,\n          \"GraphDriver\": {\n               \"Name\": \"overlay\",\n               \"Data\": {\n                    \"LowerDir\": \"/var/home/core/.local/share/containers/storage/overlay/088872fbec000bd44b73c90fbd95cf123c91977d7ad7528981fe7827b58ab63e/diff:/var/home/core/.local/share/containers/storage/overlay/d283144b0729679456992e832ab57354ded1501be7ffe59d0db2de4141804347/diff:/var/home/core/.local/share/containers/storage/overlay/6c5391a24f46840f7872ae1d2f33df5da30d5badf2b053bba9237401ac56b57e/diff:/var/home/core/.local/share/containers/storage/overlay/6439a9e3affca36e4cc323dd241724b62721af4a3f4aa590ced4ae11f8083a4b/diff\",\n                    \"UpperDir\": \"/var/home/core/.local/share/containers/storage/overlay/134495c0219d703424de882260b883a09db1927b65b38554e4724d27cc7eaefb/diff\",\n                    \"WorkDir\": \"/var/home/core/.local/share/containers/storage/overlay/134495c0219d703424de882260b883a09db1927b65b38554e4724d27cc7eaefb/work\"\n               }\n          },\n          \"RootFS\": {\n               \"Type\": \"layers\",\n               \"Layers\": [\n                    \"sha256:6439a9e3affca36e4cc323dd241724b62721af4a3f4aa590ced4ae11f8083a4b\",\n                    \"sha256:0699a1bae29b829331deac0a591d798bd930ee93fed2cddaecadb8a33e664c16\",\n                    \"sha256:e2a10c29832b4b5829cccc5f739a92c3947f800c502962c199e55723e63d3272\",\n                    \"sha256:85f8cee76f8091687b2a0a2fa611cd2603721eb86e500e86b9ff24c9da305526\",\n                    \"sha256:d95e4bfd4fc04b7e4981face0d28fc72ae79348d8cabd22b3d0442fbfc90ba61\"\n               ]\n          },\n          \"Labels\": {\n               \"io.buildah.version\": \"1.39.4\"\n          },\n          \"Annotations\": {\n               \"org.opencontainers.image.base.digest\": \"sha256:cd9b3138f04268d06261c942637724b960a2c788358a3f09a5fe5428a2f1f12e\",\n               \"org.opencontainers.image.base.name\": \"localhost/lampos-fourth-native-check:latest\"\n          },\n          \"ManifestType\": \"application/vnd.oci.image.manifest.v1+json\",\n          \"User\": \"1000:1000\",\n          \"History\": [\n               {\n                    \"created\": \"2026-10-05T00:00:00Z\",\n                    \"created_by\": \"# debian.sh --arch 'amd64' out/ 'bookworm' '@1791158400'\",\n                    \"comment\": \"debuerreotype 0.17\"\n               },\n               {\n                    \"created\": \"2026-10-10T17:30:18.175114698Z\",\n                    \"created_by\": \"/bin/sh -c dpkg --add-architecture arm64  && apt-get update  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends       ca-certificates curl git build-essential pkg-config clang libclang-dev       gcc-aarch64-linux-gnu g++-aarch64-linux-gnu       libc6-dev:arm64 libasound2-dev:arm64 qemu-user-static file  && rm -rf /var/lib/apt/lists/*\",\n                    \"comment\": \"FROM docker.io/library/debian:bookworm\"\n               },\n               {\n                    \"created\": \"2026-10-10T17:31:03.930706138Z\",\n                    \"created_by\": \"/bin/sh -c curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs   | sh -s -- -y --profile minimal --default-toolchain 1.96.0       -c clippy -c rustfmt -t aarch64-unknown-linux-gnu\"\n               },\n               {\n                    \"created\": \"2026-10-10T17:31:11.271218503Z\",\n                    \"created_by\": \"/bin/sh -c #(nop) ENV PATH=/root/.cargo/bin:$PATH     CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc     CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER=qemu-aarch64-static     CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc     CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++     AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar     PKG_CONFIG_ALLOW_CROSS=1     PKG_CONFIG_PATH_aarch64_unknown_linux_gnu=/usr/lib/aarch64-linux-gnu/pkgconfig     BINDGEN_EXTRA_CLANG_ARGS_aarch64_unknown_linux_gnu=\\\"--target=aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu\\\"     CARGO_INCREMENTAL=0\",\n                    \"empty_layer\": true\n               },\n               {\n                    \"created\": \"2026-10-10T17:31:11.316345936Z\",\n                    \"created_by\": \"/bin/sh -c #(nop) WORKDIR /src\",\n                    \"empty_layer\": true\n               },\n               {\n                    \"created\": \"2026-10-14T04:39:43.319966965Z\",\n                    \"created_by\": \"/bin/sh -c apt-get update && apt-get install -y --no-install-recommends libasound2-dev:amd64 libudev-dev:amd64 procps && rm -rf /var/lib/apt/lists/*\",\n                    \"comment\": \"FROM localhost/lampos-arm64-cross:latest\"\n               },\n               {\n                    \"created\": \"2026-10-14T17:55:59.104432203Z\",\n                    \"created_by\": \"/bin/sh -c chmod 0755 /root\",\n                    \"comment\": \"FROM localhost/lampos-fourth-native-check:latest\"\n               },\n               {\n                    \"created\": \"2026-10-14T17:55:59.208671397Z\",\n                    \"created_by\": \"/bin/sh -c #(nop) ENV PATH=/root/.rustup/toolchains/1.96.0-x86_64-unknown-linux-gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\n                    \"empty_layer\": true\n               },\n               {\n                    \"created\": \"2026-10-14T17:55:59.265340319Z\",\n                    \"created_by\": \"/bin/sh -c #(nop) ENV CARGO_HOME=/cargo\",\n                    \"empty_layer\": true\n               },\n               {\n                    \"created\": \"2026-10-14T17:55:59.324311999Z\",\n                    \"created_by\": \"/bin/sh -c #(nop) USER 1000:1000\",\n                    \"empty_layer\": true\n               }\n          ],\n          \"NamesHistory\": [\n               \"localhost/lampos-fourth-native-user-check:latest\"\n          ]\n     }\n]\n"
+  },
+  "pr-identity.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "pr-identity.stdout": {
+    "bytes": 204,
+    "sha256": "e318eaf09c5c4ce6a8f8ebc1b0bcb393e389a4eaeb9fc476e1d4824a99927e79",
+    "text": "{\"baseRefName\":\"lamp-voice\",\"headRefName\":\"third/body-hand-controls-tests\",\"headRefOid\":\"22634785d607e5ae2d44cc45d540161246ee89de\",\"number\":3162,\"url\":\"https://github.com/autonomous-ai/lampOS/pull/3162\"}\n"
+  },
+  "source-identity.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "source-identity.stdout": {
+    "bytes": 148,
+    "sha256": "5bd259d21256cf18ee0cd5a2467a8cdcaba7a84cf9587716a5d161f1d23a25e5",
+    "text": "22634785d607e5ae2d44cc45d540161246ee89de\n87534e6e7590abe8b82027380e2e49989bb53ecd\nlampOS: cover body push suppression and recovery through Controls\n"
+  },
+  "toolchain.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "toolchain.stdout": {
+    "bytes": 389,
+    "sha256": "6bc04d21fa3237296f925db3115866ab2feb42321551ed0fca178e6b72d4441b",
+    "text": "Linux dd24bae9287b 6.12.13-200.fc41.x86_64 #1 SMP PREEMPT_DYNAMIC Sat Feb  8 20:05:26 UTC 2025 x86_64 GNU/Linux\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nrustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.96.0\nLLVM version: 22.1.2\n"
+  },
+  "workspace-tree.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "workspace-tree.stdout": {
+    "bytes": 41,
+    "sha256": "cfcd3cfb949750c3088f8bf79e24d9ad55a18b6e75a89fc67319fe5e75f44172",
+    "text": "fd36a5445df2af95abdc89c257bd186afe914411\n"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "pr": {
+    "baseRefName": "lamp-voice",
+    "headRefName": "third/body-hand-controls-tests",
+    "headRefOid": "22634785d607e5ae2d44cc45d540161246ee89de",
+    "number": 3162,
+    "url": "https://github.com/autonomous-ai/lampOS/pull/3162"
+  },
+  "commit": "22634785d607e5ae2d44cc45d540161246ee89de",
+  "root_tree": "87534e6e7590abe8b82027380e2e49989bb53ecd",
+  "title": "lampOS: cover body push suppression and recovery through Controls",
+  "workspace_tree": "fd36a5445df2af95abdc89c257bd186afe914411",
+  "input_scope": "All tracked lampOS files from exact commit via git archive; no worktree overlay.",
+  "archive_file": "source-lampOS.tar",
+  "archive_bytes": 207974400,
+  "archive_sha256": "2a40bc9eb52f8eeeb48090d467d5f32be4c69f1196f681f08a2a4310c4b3f72c",
+  "image_reference": "localhost/lampos-fourth-native-user-check:latest",
+  "image_id": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "original_runner": "/private/tmp/tests-linux-fmt-20261023.py",
+  "original_runner_sha256": "12eddebd16abd58d654dc6f62fe705b39c2f8aa0ea2653668a6dc8ffd244e305",
+  "runner_sha256": "fcb7ea4eb6fbab4c86a9c610fd4bebe627cdf6df66e52ef7200b77faf2528ced",
+  "scope": "One Linux x86 cargo fmt --all --check only. No compilation, tests, network in container, ARM execution, host mounts or shared Cargo targets."
+}

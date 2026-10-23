@@ -1,0 +1,90 @@
+{
+  "archive-commit.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "archive-commit.stdout": {
+    "bytes": 41,
+    "sha256": "244dc9192295b53b1e0515ef9d6119677529f92425c99637f72d030f9315641d"
+  },
+  "archive.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "archive.stdout": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "commands.json": {
+    "bytes": 7666,
+    "sha256": "26f2975ce2bf18fc4b2f6e580cb5daa65238caac2344876b0a5bed946eba798c"
+  },
+  "final-source-identity.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "final-source-identity.stdout": {
+    "bytes": 82,
+    "sha256": "a65c4193b855b6c41a5a7279ea3bf73d14de692478ee07ea9a64237f70282b2e"
+  },
+  "format.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "format.stdout": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "image-inspect.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "image-inspect.stdout": {
+    "bytes": 7701,
+    "sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74"
+  },
+  "pr-identity.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "pr-identity.stdout": {
+    "bytes": 204,
+    "sha256": "e318eaf09c5c4ce6a8f8ebc1b0bcb393e389a4eaeb9fc476e1d4824a99927e79"
+  },
+  "result.json": {
+    "bytes": 591,
+    "sha256": "b8f9ded3cdcfa2126f1ee7b42739f56a79fdea5563809a4bfc831c2708ee9d9f"
+  },
+  "source-identity.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "source-identity.stdout": {
+    "bytes": 148,
+    "sha256": "5bd259d21256cf18ee0cd5a2467a8cdcaba7a84cf9587716a5d161f1d23a25e5"
+  },
+  "source-lampOS.tar": {
+    "bytes": 207974400,
+    "sha256": "2a40bc9eb52f8eeeb48090d467d5f32be4c69f1196f681f08a2a4310c4b3f72c"
+  },
+  "source.json": {
+    "bytes": 1324,
+    "sha256": "768a40d1f79b919035f7fede92b9f0ff128bdb6377b8f70e5be173522d05a104"
+  },
+  "toolchain.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "toolchain.stdout": {
+    "bytes": 389,
+    "sha256": "6bc04d21fa3237296f925db3115866ab2feb42321551ed0fca178e6b72d4441b"
+  },
+  "workspace-tree.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "workspace-tree.stdout": {
+    "bytes": 41,
+    "sha256": "cfcd3cfb949750c3088f8bf79e24d9ad55a18b6e75a89fc67319fe5e75f44172"
+  }
+}
