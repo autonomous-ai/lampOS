@@ -308,7 +308,7 @@ pub fn stop_phrase(heard: &str) -> bool {
 
 /// Where the voice reads whether a yield whose words are a backchannel is
 /// held as a yield, not committed as a turn (#2939): `on`. Off unless set,
-/// and inert without `LAMP_STOP_WORDS=heard`.
+/// and inert without `LAMP_STOP_WORDS=heard` or `heard-always`.
 pub const BACKCHANNEL_ENVIRONMENT: &str = "LAMP_BACKCHANNEL_HOLDS";
 
 /// Whether the environment asks for backchannels to be held.
@@ -327,6 +327,17 @@ const BACKCHANNELS: &[&str] = &[
 /// "Rồi" and "đúng" are left out: as often a reply ("done", "that's right")
 /// as an acknowledgment (the reviewer-lead on #2959).
 const BACKCHANNELS_VI: &[&str] = &["ừ", "ừm", "ờ", "à", "ồ", "dạ", "vâng", "ok"];
+/// Pairs that acknowledge as one word does, as the speech-to-text may
+/// write them: "I see.", "All right.", "Uh huh." (#2939, lamp-52e6 on 23
+/// Oct: "Right" came as two words and committed).
+const BACKCHANNEL_PAIRS: &[(&str, &str)] = &[
+    ("i", "see"),
+    ("all", "right"),
+    ("uh", "huh"),
+    ("mm", "hm"),
+    ("mm", "hmm"),
+    ("got", "it"),
+];
 
 /// Whether the lamp's last finished sentence in `said` is a question: a
 /// "Yes." or "Sure." said then answers it, and is no backchannel (the
@@ -338,7 +349,9 @@ pub fn lamp_asked(said: &str) -> bool {
 }
 
 /// Whether what was heard is a backchannel (#2939): one or two words, all
-/// on the list for the language, no question mark and no stop phrase.
+/// on the list for the language, a pair of [`BACKCHANNEL_PAIRS`] counting
+/// as one ("Oh, I see.", "Okay, sure."), no question mark and no stop
+/// phrase.
 pub fn backchannel(heard: &str, vietnamese: bool) -> bool {
     use unicode_normalization::UnicodeNormalization;
     let heard: String = heard.nfc().filter(|c| *c != '-').collect();
@@ -348,10 +361,19 @@ pub fn backchannel(heard: &str, vietnamese: bool) -> bool {
         BACKCHANNELS
     };
     let said = words(&heard);
-    !heard.contains('?')
-        && (1..=2).contains(&said.len())
-        && said.iter().all(|word| list.contains(&word.as_str()))
-        && !stop_phrase(&heard)
+    let (mut at, mut units) = (0, 0);
+    while at < said.len() {
+        let pair = !vietnamese
+            && said.get(at + 1).is_some_and(|next| {
+                BACKCHANNEL_PAIRS.contains(&(said[at].as_str(), next.as_str()))
+            });
+        if !pair && !list.contains(&said[at].as_str()) {
+            return false;
+        }
+        at += if pair { 2 } else { 1 };
+        units += 1;
+    }
+    !heard.contains('?') && (1..=2).contains(&units) && !stop_phrase(&heard)
 }
 
 /// Whether `word`, lower case, is one of the stop words, or a word of a
@@ -397,12 +419,34 @@ pub trait Ears: Send {
     fn flush(&mut self) {}
     /// The words, once they came: at most once a yield.
     fn words(&mut self) -> Option<String>;
+    /// Listening to everything: the next result, and whether it may decide
+    /// a yield's words, being final and ending after the yield in force
+    /// began ([`Self::mark`], #2939). By default every result may.
+    fn result(&mut self) -> Option<Said> {
+        self.words().map(|words| Said {
+            words,
+            decides: true,
+        })
+    }
+    /// Listening to everything: a yield begins after the audio heard so
+    /// far, and a result that ends before it is not its words.
+    fn mark(&mut self) {}
     /// The yield is over: what it heard is dropped, nothing more of it goes
     /// out once this returns, and its words, if they come later, are not
     /// given.
     fn forget(&mut self);
     /// The reply is over: as `forget`, and no stream is kept.
     fn rest(&mut self);
+}
+
+/// A result listening to everything ([`Ears::result`]).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Said {
+    pub words: String,
+    /// Final, and ending after the yield in force began: it may decide the
+    /// yield's words. An interim result, or one of a flush or an utterance
+    /// before the yield, may not (reviewer-two's P2 on #3200).
+    pub decides: bool,
 }
 
 /// What the duplex rule is to be told after a block.
@@ -483,6 +527,13 @@ pub struct StopWords {
     /// The lamp's last finished sentence before the yield in force was a
     /// question: its words answer it, and are no backchannel.
     lamp_asked: bool,
+    /// With `always`: a yield is told its words as with `heard`
+    /// ([`Self::with_backchannel_holds`], #2939).
+    tells_yields: bool,
+    /// With `tells_yields`: the final words of the yield in force so far,
+    /// and whether they were last told as a backchannel.
+    yield_words: String,
+    yield_backchannel: bool,
 }
 
 /// A stop heard over the lamp and held ([`HOLD_US`]): what was heard,
@@ -527,7 +578,23 @@ impl StopWords {
             holds: Vec::new(),
             vietnamese: false,
             lamp_asked: false,
+            tells_yields: false,
+            yield_words: String::new(),
+            yield_backchannel: false,
         }
+    }
+
+    /// With `on`, listening to everything, a yield is told its words as with
+    /// `heard` ([`Tell::Await`], then [`Tell::Words`] with its own final
+    /// words only: a backchannel as it comes, told again as words if a
+    /// later final makes it more), and they are asked for at its
+    /// [`FINALIZE_AFTER_STILL_BLOCKS`]th still block if no pause has asked
+    /// yet: `LAMP_BACKCHANNEL_HOLDS=on` with `heard-always` (#2939). A stop
+    /// phrase is told as no stop: it stops the lamp as a hand Stop does,
+    /// as without the switch.
+    pub fn with_backchannel_holds(mut self, on: bool) -> Self {
+        self.tells_yields = on && self.always;
+        self
     }
 
     /// With `on`, listening to everything, a stop heard is acted on only
@@ -636,9 +703,10 @@ impl StopWords {
         replying: bool,
         sounding: bool,
         yielded: bool,
+        still: Option<u8>,
         captured_at_us: u64,
         samples: &[i16],
-    ) {
+    ) -> Tell {
         if replying && !self.replying {
             self.ears.ready();
             self.rested = false;
@@ -656,6 +724,24 @@ impl StopWords {
             self.holds.clear();
         }
         self.replying = replying;
+        let mut tell = Tell::Nothing;
+        if self.tells_yields {
+            if replying && yielded && !self.yielded {
+                self.yielded = true;
+                self.asked = false;
+                self.told = false;
+                self.yield_words.clear();
+                self.yield_backchannel = false;
+                self.lamp_asked = self.lamp_asked_by(captured_at_us);
+                self.ears.mark();
+                tell = Tell::Await;
+            } else if !yielded && self.yielded {
+                self.yielded = false;
+                if !self.told {
+                    tell = Tell::Unheard;
+                }
+            }
+        }
         if replying && (sounding || yielded) {
             let heard = self.heard(samples);
             self.ears.hear(captured_at_us, &heard);
@@ -672,7 +758,12 @@ impl StopWords {
                 self.still += 1;
             }
             let after_speech = self.voiced && self.still >= FLUSH_AFTER_STILL_BLOCKS;
-            if after_speech || self.cadence && self.since_asked >= CADENCE_BLOCKS {
+            // A yield told its words is asked for them as `heard` asks.
+            let yield_still = self.yielded
+                && !self.asked
+                && still.is_some_and(|still| still >= FINALIZE_AFTER_STILL_BLOCKS);
+            if after_speech || yield_still || self.cadence && self.since_asked >= CADENCE_BLOCKS {
+                self.asked |= self.yielded;
                 self.ears.flush();
                 self.flushes += 1;
                 self.voiced = false;
@@ -684,8 +775,33 @@ impl StopWords {
         while self.lamp.front().is_some_and(|(at, _)| *at < since) {
             self.lamp.pop_front();
         }
-        while let Some(heard) = self.ears.words() {
+        while let Some(Said {
+            words: heard,
+            decides,
+        }) = self.ears.result()
+        {
             self.results += 1;
+            // Only the yield's own final words decide it: an interim
+            // "Okay" before "Okay, what was that?", or a flush's words from
+            // before the yield, leave it undecided and its commit held
+            // (reviewer-two's P2 on #3200). A backchannel so far is told,
+            // and told again as words if a later final adds more.
+            if self.yielded && decides && (!self.told || self.yield_backchannel) {
+                if !self.yield_words.is_empty() {
+                    self.yield_words.push(' ');
+                }
+                self.yield_words.push_str(&heard);
+                let held = !self.lamp_asked && backchannel(&self.yield_words, self.vietnamese);
+                if !(self.told && held) {
+                    tell = Tell::Words {
+                        stop: false,
+                        count: self.yield_words.split_whitespace().count(),
+                        backchannel: held,
+                    };
+                }
+                self.told = true;
+                self.yield_backchannel = held;
+            }
             let lamp: Vec<&str> = self.lamp.iter().map(|(_, text)| text.as_str()).collect();
             let mut stops = replying && !self.stop_heard && stop_over(&heard, &lamp.join(" "));
             if stops && self.hold {
@@ -727,6 +843,19 @@ impl StopWords {
         if !replying && !self.rested {
             self.end_reply();
         }
+        tell
+    }
+
+    /// Whether the lamp's last finished sentence said by `at_us` was a
+    /// question ([`lamp_asked`]).
+    fn lamp_asked_by(&self, at_us: u64) -> bool {
+        let said: Vec<&str> = self
+            .lamp
+            .iter()
+            .filter(|(at, _)| *at <= at_us)
+            .map(|(_, text)| text.as_str())
+            .collect();
+        lamp_asked(&said.concat())
     }
 
     /// The stop held, at a block captured at `now_us`: let go if the lamp's
@@ -853,8 +982,7 @@ impl StopWords {
         samples: &[i16],
     ) -> Tell {
         if self.always {
-            self.listen_always(replying, sounding, yielded, captured_at_us, samples);
-            return Tell::Nothing;
+            return self.listen_always(replying, sounding, yielded, still, captured_at_us, samples);
         }
         let since = captured_at_us.saturating_sub(LAMP_WORDS_US);
         while self.lamp.front().is_some_and(|(at, _)| *at < since) {
@@ -877,13 +1005,7 @@ impl StopWords {
             self.asked = false;
             self.told = false;
             // What the lamp had said by the yield, not what it was to say.
-            let said: Vec<&str> = self
-                .lamp
-                .iter()
-                .filter(|(at, _)| *at <= captured_at_us)
-                .map(|(_, text)| text.as_str())
-                .collect();
-            self.lamp_asked = lamp_asked(&said.concat());
+            self.lamp_asked = self.lamp_asked_by(captured_at_us);
             match held {
                 Some(held) => {
                     for block in held {
@@ -937,7 +1059,11 @@ impl StopWords {
     pub fn close(&mut self) {
         if self.yielded {
             self.yielded = false;
-            self.ears.forget();
+            // Listening to everything, the stream is the reply's, not the
+            // yield's: it rests below.
+            if !self.always {
+                self.ears.forget();
+            }
         }
         if !self.rested {
             if self.always {
@@ -1002,9 +1128,13 @@ pub fn stt_check(config: &std::path::Path, wav: &std::path::Path) -> io::Result<
 /// Words are taken only for the yield in force.
 pub struct RelayEars {
     commands: queue::Sender<Command>,
-    heard: mpsc::Receiver<(u64, String)>,
+    /// Each result, its reply's number, and the number of the last yield
+    /// marked when it was classified ([`Command::Mark`]).
+    heard: mpsc::Receiver<(u64, Said, u64)>,
     live: Arc<Live>,
     ended: mpsc::Receiver<()>,
+    /// The yields marked so far ([`Ears::mark`]).
+    marks: u64,
 }
 
 #[derive(Debug)]
@@ -1019,6 +1149,11 @@ enum Command {
         of: u64,
     },
     Flush {
+        of: u64,
+    },
+    /// Listening to everything: the `of`th yield begins after the audio
+    /// sent so far.
+    Mark {
         of: u64,
     },
     Rest,
@@ -1197,6 +1332,7 @@ impl RelayEars {
             heard,
             live,
             ended,
+            marks: 0,
         })
     }
 
@@ -1231,12 +1367,24 @@ impl Ears for RelayEars {
         });
     }
     fn words(&mut self) -> Option<String> {
-        let live = self.live.now();
+        self.result().map(|said| said.words)
+    }
+    fn result(&mut self) -> Option<Said> {
+        let (live, marks) = (self.live.now(), self.marks);
         // Words of a yield that is over are not this one's (the
-        // reviewer's P2 on #970).
+        // reviewer's P2 on #970). A result classified before this yield's
+        // mark reached the thread decides nothing, however it was
+        // classified then (reviewer-two at 11:11 on #3200).
         std::iter::from_fn(|| self.heard.try_recv().ok())
-            .find(|(of, _)| *of == live)
-            .map(|(_, words)| words)
+            .find(|(of, _, _)| *of == live)
+            .map(|(_, said, marked)| Said {
+                decides: said.decides && marked == marks,
+                ..said
+            })
+    }
+    fn mark(&mut self) {
+        self.marks += 1;
+        self.send(Command::Mark { of: self.marks });
     }
     fn forget(&mut self) {
         self.live.revoke();
@@ -1394,7 +1542,7 @@ async fn serve<C, F>(
     record: Option<std::path::PathBuf>,
     counts: Option<std::path::PathBuf>,
     mut queued: queue::Receiver<Command>,
-    said: mpsc::Sender<(u64, String)>,
+    said: mpsc::Sender<(u64, Said, u64)>,
     live: &Live,
 ) where
     C: Fn() -> F,
@@ -1406,6 +1554,20 @@ async fn serve<C, F>(
     let mut current: Option<(u64, SttStream)> = None;
     // With `always`, the current stream's words as they come, and its yield.
     let mut listening: Option<(u64, tokio::sync::mpsc::UnboundedReceiver<String>)> = None;
+    // Beside it, whether each result is final and where it ends (#2939).
+    let mut finals: Option<tokio::sync::mpsc::UnboundedReceiver<(bool, f64)>> = None;
+    // On one clock, in samples, across the streams a reply opens and its
+    // pending connections: the samples handed to them so far, where the
+    // current stream's own audio began, where the yield in force began,
+    // and that yield's number ([`Command::Mark`]). A position that is off
+    // errs one way: the audio a stream holds back makes its results end
+    // early, and blocks waiting at a mark that are dropped make it late,
+    // so a result is at worst not the yield's and decides nothing
+    // (reviewer-two at 11:11 and 11:15 on #3200).
+    let mut total: u64 = 0;
+    let mut base: u64 = 0;
+    let mut mark: u64 = 0;
+    let mut marked: u64 = 0;
     let mut waiting: VecDeque<(u64, u64, Vec<i16>)> = VecDeque::new();
     let mut finalize_waiting: Option<u64> = None;
     let mut connecting: Option<tokio::task::JoinHandle<Result<SttStream, String>>> = None;
@@ -1444,6 +1606,7 @@ async fn serve<C, F>(
             && let Some((of, stream)) = current.as_mut()
         {
             listening = stream.take_words().map(|words| (*of, words));
+            finals = stream.take_finals();
         }
         waiting.retain(|(of, _, _)| *of == number);
         finalize_waiting = finalize_waiting.filter(|of| *of == number);
@@ -1481,16 +1644,19 @@ async fn serve<C, F>(
                         }
                         if current.is_none() {
                             current = ready.take().map(|stream| (of, stream));
+                            base = total;
                         }
                         match &current {
                             Some((_, stream)) => {
                                 for (of, at, block) in waiting.drain(..) {
                                     let taken = live.hand(of, at, &block, stream);
                                     handed.count(taken);
+                                    total += if taken { block.len() as u64 } else { 0 };
                                     keep(&mut kept, record.is_some() && taken, &block);
                                 }
                                 let taken = live.hand(of, captured_at_us, &samples, stream);
                                 handed.count(taken);
+                                total += if taken { samples.len() as u64 } else { 0 };
                                 keep(&mut kept, record.is_some() && taken, &samples);
                             }
                             None => {
@@ -1522,6 +1688,12 @@ async fn serve<C, F>(
                         {
                             let _ = stream.flush();
                         }
+                    }
+                    // Blocks still waiting for a stream go to it first.
+                    Some(Command::Mark { of }) => {
+                        let waited: usize = waiting.iter().map(|(_, _, block)| block.len()).sum();
+                        mark = total + waited as u64;
+                        marked = of;
                     }
                     Some(Command::Rest) => {
                         if always {
@@ -1609,9 +1781,11 @@ async fn serve<C, F>(
                         retry_at = None;
                         let number = live.now();
                         if current.is_none() && (!waiting.is_empty() || finalize_waiting.is_some()) {
+                            base = total;
                             for (of, at, block) in waiting.drain(..) {
                                 let taken = live.hand(of, at, &block, &stream);
                                 handed.count(taken);
+                                total += if taken { block.len() as u64 } else { 0 };
                                 keep(&mut kept, record.is_some() && taken, &block);
                             }
                             match finalize_waiting.take() {
@@ -1639,7 +1813,14 @@ async fn serve<C, F>(
             heard = async { listening.as_mut().expect("guarded").1.recv().await }, if listening.is_some() => {
                 match (heard, listening.as_ref()) {
                     (Some(words), Some((of, _))) => {
-                        let _ = said.send((*of, words));
+                        // Without a final's account, it decides nothing.
+                        let decides = finals
+                            .as_mut()
+                            .and_then(|finals| finals.try_recv().ok())
+                            .is_some_and(|(is_final, end)| {
+                                is_final && base + (end * 16_000.0) as u64 > mark
+                            });
+                        let _ = said.send((*of, Said { words, decides }, marked));
                     }
                     // The stream ended during the reply (#1047, the first
                     // builder at 20:58: nothing came back after the first
@@ -1667,7 +1848,7 @@ async fn serve<C, F>(
                         live.holding_words.store(true, std::sync::atomic::Ordering::SeqCst);
                         live.hold_words.lock().unwrap_or_else(PoisonError::into_inner)
                     };
-                    let _ = said.send((of, words));
+                    let _ = said.send((of, Said { words, decides: true }, marked));
                 }
             },
             _ = tokio::time::sleep_until(retry_at.unwrap_or_else(tokio::time::Instant::now)), if retry_at.is_some() && connecting.is_none() => {
@@ -1715,6 +1896,20 @@ mod tests {
             ("Oh, okay.", false, true),
             ("MHM", false, true),
             ("Sure", false, true),
+            // A pair, not two words of the list (#2939, 23 Oct on lamp-52e6).
+            ("I see.", false, true),
+            ("I see?", false, false),
+            ("All right.", false, true),
+            ("Oh, I see.", false, true),
+            ("Okay, sure.", false, true),
+            ("Uh huh.", false, true),
+            ("Mm hm.", false, true),
+            ("Got it.", false, true),
+            ("I see, I see, I see.", false, false),
+            ("Got", false, false),
+            ("All", false, false),
+            ("I", false, false),
+            ("See.", false, false),
             ("Ừ.", true, true),
             ("Dạ, vâng.", true, true),
             // "Ừ" decomposed: U+0055 U+031B U+0300, read as NFC.
@@ -2868,5 +3063,277 @@ mod tests {
         assert_eq!(written["stream"]["opened_again"], 1, "{written}");
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(&counts);
+    }
+
+    /// A stand-in for the speech-to-text that sends each result the test
+    /// pushes as it is pushed, and counts the audio bytes it is sent; its
+    /// connection completes only once `open` (#2939).
+    struct Pushed {
+        audio: Arc<std::sync::atomic::AtomicUsize>,
+        open: Arc<std::sync::atomic::AtomicBool>,
+        /// Each connection's way to its client, in the order they came: the
+        /// first is the stream the reply's audio goes to.
+        push: Arc<Mutex<Vec<tokio::sync::mpsc::UnboundedSender<String>>>>,
+        flux: bool,
+    }
+
+    impl Pushed {
+        fn new(flux: bool, open: bool) -> Self {
+            Self {
+                audio: Arc::default(),
+                open: Arc::new(open.into()),
+                push: Arc::default(),
+                flux,
+            }
+        }
+
+        fn connect(&self) -> impl Fn() -> Connected + Send + 'static {
+            let (audio, open, push, flux) = (
+                Arc::clone(&self.audio),
+                Arc::clone(&self.open),
+                Arc::clone(&self.push),
+                self.flux,
+            );
+            move || {
+                use futures_util::{SinkExt, StreamExt};
+                use tokio_tungstenite::{
+                    WebSocketStream,
+                    tungstenite::{Message, protocol::Role},
+                };
+                let (audio, open, push) =
+                    (Arc::clone(&audio), Arc::clone(&open), Arc::clone(&push));
+                Box::pin(async move {
+                    while !open.load(std::sync::atomic::Ordering::SeqCst) {
+                        tokio::time::sleep(Duration::from_millis(1)).await;
+                    }
+                    let (near, far) = tokio::io::duplex(1 << 20);
+                    let (pushing, mut pushed) = tokio::sync::mpsc::unbounded_channel::<String>();
+                    push.lock().unwrap().push(pushing);
+                    tokio::spawn(async move {
+                        let mut socket =
+                            WebSocketStream::from_raw_socket(far, Role::Server, None).await;
+                        loop {
+                            tokio::select! {
+                                message = socket.next() => match message {
+                                    Some(Ok(Message::Binary(bytes))) => {
+                                        audio.fetch_add(bytes.len(), std::sync::atomic::Ordering::SeqCst);
+                                    }
+                                    Some(Ok(_)) => {}
+                                    _ => break,
+                                },
+                                Some(text) = pushed.recv() => {
+                                    if text.is_empty() {
+                                        let _ = socket.close(None).await;
+                                        break;
+                                    }
+                                    let _ = socket.send(Message::text(text)).await;
+                                }
+                            }
+                        }
+                    });
+                    let socket = WebSocketStream::from_raw_socket(near, Role::Client, None).await;
+                    Ok(if flux {
+                        SttStream::on_flux(socket)
+                    } else {
+                        SttStream::on(socket)
+                    })
+                }) as Connected
+            }
+        }
+
+        /// A result ending at `end` seconds into the stream's audio.
+        fn result(&self, words: &str, is_final: bool, end: f64) {
+            self.result_on(0, words, is_final, end);
+        }
+
+        /// The same, on the `stream`th connection.
+        fn result_on(&self, stream: usize, words: &str, is_final: bool, end: f64) {
+            let text = format!(
+                r#"{{"type":"Results","is_final":{is_final},"speech_final":{is_final},"start":{start},"duration":0.3,"channel":{{"alternatives":[{{"transcript":"{words}"}}]}}}}"#,
+                start = end - 0.3
+            );
+            self.push.lock().unwrap()[stream].send(text).unwrap();
+        }
+
+        /// The first connection closes, as the relay may close a stream.
+        fn close_first(&self) {
+            self.push.lock().unwrap()[0].send(String::new()).unwrap();
+        }
+
+        /// A Flux `TurnInfo` of `event`, its window ending at `end`.
+        fn turn(&self, words: &str, event: &str, end: f64) {
+            let text = format!(
+                r#"{{"type":"TurnInfo","event":"{event}","turn_index":0,"audio_window_start":0.0,"audio_window_end":{end},"transcript":"{words}"}}"#
+            );
+            self.push.lock().unwrap()[0].send(text).unwrap();
+        }
+
+        /// Seconds of audio the service has been sent.
+        fn seconds(&self) -> f64 {
+            self.audio.load(std::sync::atomic::Ordering::SeqCst) as f64 / 32_000.0
+        }
+    }
+
+    /// `seconds` of audio heard, in 10 ms blocks.
+    fn hear_for(ears: &mut RelayEars, seconds: f64) {
+        for _ in 0..(seconds * 100.0).round() as usize {
+            ears.hear(lamp_ipc::monotonic_us(), &[1; 160]);
+        }
+    }
+
+    /// The next `count` results, as (words, whether they decide).
+    fn results(ears: &mut RelayEars, count: usize) -> Vec<(String, bool)> {
+        let mut got = Vec::new();
+        until("the results", || {
+            got.extend(ears.result().map(|said| (said.words, said.decides)));
+            got.len() >= count
+        });
+        got
+    }
+
+    /// Reviewer-two at 11:11 on #3200, through the real thread: a final
+    /// from before a yield, queued before the yield's mark reached the
+    /// thread, or published after it, decides nothing; the yield's own
+    /// final, ending after the mark, does. Positions are the stream's
+    /// audio, in the same seconds as its results' ends.
+    #[test]
+    fn only_a_final_ending_after_the_yields_mark_decides_it_through_the_thread() {
+        let service = Pushed::new(false, true);
+        let mut ears = RelayEars::with(true, None, None, service.connect()).unwrap();
+        ears.ready();
+        hear_for(&mut ears, 1.0);
+        until("the audio before the yield", || service.seconds() >= 1.0);
+        // Classified and queued while no yield was marked yet.
+        service.result("Yeah.", true, 0.5);
+        std::thread::sleep(Duration::from_millis(200));
+        ears.mark();
+        hear_for(&mut ears, 0.5);
+        until("the yield's audio", || service.seconds() >= 1.5);
+        // Late, of the audio before the mark; then the yield's own.
+        service.result("Yeah.", true, 0.8);
+        service.result("What", false, 1.3);
+        service.result("What was that?", true, 1.4);
+        assert_eq!(
+            results(&mut ears, 4),
+            [
+                ("Yeah.".to_owned(), false),
+                ("Yeah.".to_owned(), false),
+                ("What".to_owned(), false),
+                ("What was that?".to_owned(), true),
+            ]
+        );
+    }
+
+    /// Reviewer-two at 11:15 on #3200, through the real thread: audio
+    /// heard while the stream is still connecting, a yield marked, and
+    /// more heard before the connection completes. The mark stays where
+    /// the yield began in what the stream is sent: an old segment ending
+    /// before it decides nothing, the yield's own does.
+    #[test]
+    fn a_yield_marked_while_the_stream_connects_keeps_its_place_through_the_thread() {
+        let service = Pushed::new(false, false);
+        let mut ears = RelayEars::with(true, None, None, service.connect()).unwrap();
+        ears.ready();
+        hear_for(&mut ears, 1.0);
+        ears.mark();
+        hear_for(&mut ears, 0.5);
+        std::thread::sleep(Duration::from_millis(100));
+        assert_eq!(service.seconds(), 0.0);
+        service
+            .open
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        until("the waiting audio reaches the stream", || {
+            service.seconds() >= 1.5
+        });
+        service.result("Yeah.", true, 0.9);
+        service.result("Wait, what?", true, 1.4);
+        assert_eq!(
+            results(&mut ears, 2),
+            [
+                ("Yeah.".to_owned(), false),
+                ("Wait, what?".to_owned(), true),
+            ]
+        );
+    }
+
+    /// The stream closed mid-reply and replaced (#1047): a yield marked on
+    /// the new one is placed on its own audio, not the reply's, so the new
+    /// stream's segment from before the mark decides nothing and its own
+    /// after the mark does (#2939).
+    #[test]
+    fn a_yield_marked_after_the_stream_is_replaced_is_placed_on_the_new_one() {
+        let service = Pushed::new(false, true);
+        let mut ears = RelayEars::with(true, None, None, service.connect()).unwrap();
+        ears.ready();
+        hear_for(&mut ears, 1.0);
+        until("the first stream's audio", || service.seconds() >= 1.0);
+        until("another stream kept ready", || {
+            service.push.lock().unwrap().len() >= 2
+        });
+        service.close_first();
+        std::thread::sleep(Duration::from_millis(100));
+        hear_for(&mut ears, 0.5);
+        until("the new stream's audio", || service.seconds() >= 1.5);
+        ears.mark();
+        hear_for(&mut ears, 0.5);
+        until("the yield's audio", || service.seconds() >= 2.0);
+        service.result_on(1, "Okay.", true, 0.4);
+        service.result_on(1, "Okay, wait.", true, 0.9);
+        assert_eq!(
+            results(&mut ears, 2),
+            [
+                ("Okay.".to_owned(), false),
+                ("Okay, wait.".to_owned(), true),
+            ]
+        );
+    }
+
+    /// Reviewer-two at 11:15 on #3200, through the real thread on Flux: an
+    /// `Update`'s words, which may still change, decide nothing; the
+    /// turn's `EndOfTurn` after the mark does, read in a later drain.
+    #[test]
+    fn on_flux_only_an_end_of_turn_decides_a_yield_through_the_thread() {
+        let service = Pushed::new(true, true);
+        let mut ears = RelayEars::with(true, None, None, service.connect()).unwrap();
+        ears.ready();
+        ears.mark();
+        hear_for(&mut ears, 1.0);
+        until("the audio", || service.seconds() >= 0.9);
+        service.turn("Okay.", "Update", 0.4);
+        assert_eq!(results(&mut ears, 1), [("Okay.".to_owned(), false)]);
+        service.turn("Okay, what was that?", "EndOfTurn", 0.9);
+        assert_eq!(
+            results(&mut ears, 1),
+            [("Okay, what was that?".to_owned(), true)]
+        );
+    }
+
+    /// Reviewer-two on #3200, through the real thread on Flux: an idle
+    /// stream's keep-alive quiet (80 ms after 5 s) is audio the caller never
+    /// fed, so after one, an `EndOfTurn` ending before the yield's mark in
+    /// the caller's audio decides nothing, though its end on the wire is
+    /// past it; the yield's own does.
+    #[test]
+    fn on_flux_a_keep_alive_before_the_audio_does_not_move_the_yields_mark() {
+        let service = Pushed::new(true, true);
+        let mut ears = RelayEars::with(true, None, None, service.connect()).unwrap();
+        ears.ready();
+        std::thread::sleep(Duration::from_millis(5_200));
+        until("one keep-alive", || service.seconds() >= 0.08);
+        hear_for(&mut ears, 1.0);
+        until("the audio before the yield", || service.seconds() >= 1.04);
+        ears.mark();
+        hear_for(&mut ears, 0.5);
+        until("the yield's audio", || service.seconds() >= 1.52);
+        // 0.96 s of the caller's audio: before the mark.
+        service.turn("Yeah.", "EndOfTurn", 1.04);
+        service.turn("What was that?", "EndOfTurn", 1.5);
+        assert_eq!(
+            results(&mut ears, 2),
+            [
+                ("Yeah.".to_owned(), false),
+                ("What was that?".to_owned(), true),
+            ]
+        );
     }
 }

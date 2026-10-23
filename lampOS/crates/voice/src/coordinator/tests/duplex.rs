@@ -940,16 +940,31 @@ fn a_short_word_after(
     vietnamese: bool,
 ) -> (u64, usize, bool, Value) {
     let heard = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let stop_words = crate::stop_words::StopWords::new(Box::new(Ears {
+        words,
+        asked: false,
+        heard: std::sync::Arc::clone(&heard),
+        wait,
+    }))
+    .with_language(vietnamese.then_some("vi"));
+    let (at, committed, settled) = a_short_word_heard_by(stop_words, said, word, holds);
+    (
+        at,
+        heard.load(std::sync::atomic::Ordering::Relaxed),
+        committed,
+        settled,
+    )
+}
+
+/// [`a_short_word_after`] with its words heard by `stop_words`.
+fn a_short_word_heard_by(
+    stop_words: crate::stop_words::StopWords,
+    said: &str,
+    word: Word,
+    holds: bool,
+) -> (u64, bool, Value) {
     let mut h = Harness::new(TurnTaking::Duplex, 400);
-    h.stop_words = Some(
-        crate::stop_words::StopWords::new(Box::new(Ears {
-            words,
-            asked: false,
-            heard: std::sync::Arc::clone(&heard),
-            wait,
-        }))
-        .with_language(vietnamese.then_some("vi")),
-    );
+    h.stop_words = Some(stop_words);
     if holds {
         h.mask.hold_backchannels();
     }
@@ -997,10 +1012,216 @@ fn a_short_word_after(
     }
     (
         settled["frame_sequence"].as_u64().unwrap() - yielded_at,
-        heard.load(std::sync::atomic::Ordering::Relaxed),
         committed,
         settled,
     )
+}
+
+/// What `LAMP_STOP_WORDS=heard-always` hears (#828): one stream for the
+/// whole reply, never forgotten; each pause asks for its words with a
+/// flush, and they come once, at the flush.
+struct AlwaysEars {
+    words: Option<&'static str>,
+    flushed: bool,
+}
+
+impl crate::stop_words::Ears for AlwaysEars {
+    fn ready(&mut self) {}
+    fn hear(&mut self, _: u64, _: &[i16]) {}
+    fn finalize(&mut self) {}
+    fn flush(&mut self) {
+        self.flushed = true;
+    }
+    fn words(&mut self) -> Option<String> {
+        std::mem::take(&mut self.flushed)
+            .then_some(self.words)
+            .flatten()
+            .map(str::to_owned)
+    }
+    fn forget(&mut self) {
+        panic!("a stream heard always is never forgotten in a yield");
+    }
+    fn rest(&mut self) {}
+}
+
+/// A short word over the lamp, heard with `heard-always`, and
+/// `LAMP_BACKCHANNEL_HOLDS=on` as `holds` says.
+fn a_short_word_heard_always(words: &'static str, word: Word, holds: bool) -> (u64, bool, Value) {
+    let stop_words = crate::stop_words::StopWords::always_counted(
+        Box::new(AlwaysEars {
+            words: Some(words),
+            flushed: false,
+        }),
+        None,
+    )
+    .with_backchannel_holds(holds);
+    a_short_word_heard_by(stop_words, "", word, holds)
+}
+
+/// `heard-always` ears whose flush gives several results at once, in order,
+/// each with whether it may decide the yield ([`crate::stop_words::Said`]).
+struct ResultsEars {
+    results: Vec<(&'static str, bool)>,
+    flushed: bool,
+}
+
+impl crate::stop_words::Ears for ResultsEars {
+    fn ready(&mut self) {}
+    fn hear(&mut self, _: u64, _: &[i16]) {}
+    fn finalize(&mut self) {}
+    fn flush(&mut self) {
+        self.flushed = true;
+    }
+    fn words(&mut self) -> Option<String> {
+        self.result().map(|said| said.words)
+    }
+    fn result(&mut self) -> Option<crate::stop_words::Said> {
+        if !self.flushed || self.results.is_empty() {
+            return None;
+        }
+        let (words, decides) = self.results.remove(0);
+        Some(crate::stop_words::Said {
+            words: words.into(),
+            decides,
+        })
+    }
+    fn forget(&mut self) {
+        panic!("a stream heard always is never forgotten in a yield");
+    }
+    fn rest(&mut self) {}
+}
+
+/// A short word over the lamp heard with `heard-always` as `results`, all
+/// in one drain, the switch as `holds` says.
+fn results_heard_always(
+    results: &[(&'static str, bool)],
+    word: Word,
+    holds: bool,
+) -> (u64, bool, Value) {
+    let stop_words = crate::stop_words::StopWords::always_counted(
+        Box::new(ResultsEars {
+            results: results.to_vec(),
+            flushed: false,
+        }),
+        None,
+    )
+    .with_backchannel_holds(holds);
+    a_short_word_heard_by(stop_words, "", word, holds)
+}
+
+/// reviewer-two's P2 on #3200: with `heard-always` the first result no
+/// longer decides a yield. An interim "Okay." before the final "Okay, what
+/// was that?" commits it as a turn; a delayed "Yeah." of a flush before
+/// the yield, then this yield's "What was that?", commits it; a final
+/// "Okay." alone, after its interim, resumes; a backchannel final followed
+/// by a final question commits. The switch off: each commits as before.
+#[test]
+fn with_backchannel_holds_and_heard_always_only_the_yields_own_final_words_decide_it() {
+    let commits: [&[(&str, bool)]; 3] = [
+        &[("Okay.", false), ("Okay, what was that?", true)],
+        &[("Yeah.", false), ("What was that?", true)],
+        &[("Okay.", true), ("What was that?", true)],
+    ];
+    for results in commits {
+        for word in [Word::Plain, Word::Speech] {
+            let (_, committed, event) = results_heard_always(results, word, true);
+            assert!(committed, "{results:?}");
+            assert_eq!(event["backchannel"], false, "{results:?}");
+            let (_, committed, _) = results_heard_always(results, word, false);
+            assert!(committed, "{results:?} off");
+        }
+    }
+    let held: &[(&str, bool)] = &[("Okay", false), ("Okay.", true)];
+    let (at, committed, event) = results_heard_always(held, Word::Plain, true);
+    assert_eq!((at, committed), (71, false));
+    assert_eq!(event["backchannel"], true);
+    let (_, committed, event) = results_heard_always(held, Word::Speech, true);
+    assert!(!committed);
+    assert_eq!(event["backchannel"], true);
+    let (at, committed, _) = results_heard_always(held, Word::Plain, false);
+    assert_eq!((at, committed), (71, true), "off");
+    // No final of its own: held to the bound, then committed with no words.
+    let (_, committed, event) = results_heard_always(&[("Okay.", false)], Word::Plain, true);
+    assert!(committed);
+    assert_eq!(event["backchannel"], Value::Null);
+}
+
+/// #2939, lamp-52e6 at 09:44 on 23 Oct: with `heard-always` and the switch
+/// on, "Yeah", "Okay", "Right", "I see" and "Sure" said over a story are
+/// held as yields and the story resumes, as with `heard`, on either rule;
+/// the duplex rule takes no face, so one turned to the lamp changes
+/// nothing. With the switch off each commits, as at 09:44.
+#[test]
+fn with_backchannel_holds_and_heard_always_a_backchannel_resumes_the_reply() {
+    for words in [
+        "Yeah.", "Okay.", "Right.", "I see.", "Sure.", "Mm-hm.", "Uh-huh.",
+    ] {
+        let (at, committed, event) = a_short_word_heard_always(words, Word::Plain, true);
+        assert_eq!((at, committed), (71, false), "{words} plain");
+        assert_eq!(event["kind"], "duplex_resume");
+        assert_eq!(event["backchannel"], true, "{words} plain");
+        let (at, committed, event) = a_short_word_heard_always(words, Word::Speech, true);
+        assert_eq!((at, committed), (2 + 29 + 25 + 40, false), "{words} speech");
+        assert_eq!(event["held_ms"], 300, "{words} speech");
+        assert_eq!(event["backchannel"], true, "{words} speech");
+        // The switch off: committed as today.
+        let (at, committed, event) = a_short_word_heard_always(words, Word::Plain, false);
+        assert_eq!((at, committed), (71, true), "{words} off");
+        assert_eq!(event["backchannel"], Value::Null, "{words} off");
+        let (at, committed, _) = a_short_word_heard_always(words, Word::Speech, false);
+        assert_eq!((at, committed), (37, true), "{words} off");
+    }
+}
+
+/// #2939, lamp-52e6 at 09:44 on 23 Oct, with `heard` and the switch on:
+/// "Yeah" and "Okay" were held, but "Right" came as two words, and it,
+/// "I see" and "Sure" each committed and were let out as "someone is
+/// turned to the lamp". That verdict is the busy-room rule's on a turn
+/// already committed (`provider_worker`); the duplex rule that holds the
+/// yield takes no face. So, as the speech-to-text may write them, each
+/// resumes the reply on both rules and no turn starts, and nothing reaches
+/// that verdict.
+#[test]
+fn with_backchannel_holds_the_five_from_lamp_52e6_resume_even_with_a_face_turned() {
+    for words in [
+        "Yeah.",
+        "Okay.",
+        "Right.",
+        "I see.",
+        "Sure.",
+        "All right.",
+        "Right, right.",
+        "Oh, I see.",
+        "Okay, sure.",
+        "Uh huh.",
+        "Mm hm.",
+    ] {
+        let (at, _, committed, event) = a_short_word(Some(words), Word::Plain, true, false);
+        assert_eq!((at, committed), (71, false), "{words} plain");
+        assert_eq!(event["backchannel"], true, "{words} plain");
+        let (at, _, committed, event) = a_short_word(Some(words), Word::Speech, true, false);
+        assert_eq!((at, committed), (2 + 29 + 25 + 40, false), "{words} speech");
+        assert_eq!(event["backchannel"], true, "{words} speech");
+    }
+}
+
+/// #2939: with `heard-always` and the switch on, a call, a question or
+/// more than the backchannel words still cut in once their words come.
+#[test]
+fn with_backchannel_holds_and_heard_always_a_request_still_cuts_in() {
+    for words in [
+        "Lamp, wait.",
+        "What was that?",
+        "Yeah, but why?",
+        "Okay tell me more",
+    ] {
+        let (at, committed, event) = a_short_word_heard_always(words, Word::Plain, true);
+        assert_eq!((at, committed), (71, true), "{words} plain");
+        assert_eq!(event["backchannel"], false, "{words} plain");
+        let (at, committed, event) = a_short_word_heard_always(words, Word::Speech, true);
+        assert_eq!((at, committed), (2 + 29 + 25 + 11, true), "{words} speech");
+        assert_eq!(event["held_ms"], 300, "{words} speech");
+    }
 }
 
 #[test]
