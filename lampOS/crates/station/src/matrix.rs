@@ -254,6 +254,8 @@ pub(crate) mod tests {
 
     /// The matrix in the repository.
     pub(crate) const V0: &str = include_str!("../../../production/matrix-v0.toml");
+    /// Version 1: version 0 approved for the pilot (#1764).
+    pub(crate) const V1: &str = include_str!("../../../production/matrix-v1.toml");
 
     /// A small matrix for the verdict tests: two self-test parts, a manual
     /// step, a measured station step, a non-mandatory one, an optional
@@ -500,5 +502,19 @@ what = "temperature after moves"
         );
         assert!(Matrix::parse(&with("[rules]\nselftest_without_lamp = \"pass\"\n")).is_err());
         assert!(Matrix::parse(&with("[rules]\nlamp_names = \"any\"\n")).is_err());
+    }
+
+    #[test]
+    fn version_one_is_version_zero_approved_for_the_pilot() {
+        let v0 = Matrix::parse(V0).expect("version 0 reads");
+        let v1 = Matrix::parse(V1).expect("version 1 reads");
+        assert_eq!(v1.suite.version, "1");
+        assert!(v1.suite.approved, "version 1 is approved for the pilot");
+        assert_eq!(v0.checks, v1.checks, "the same checks and limits");
+        assert_eq!(v0.revisions, v1.revisions, "the same revisions");
+        assert_eq!(
+            v0.rules.selftest_without_lamp, v1.rules.selftest_without_lamp,
+            "the same rules"
+        );
     }
 }
