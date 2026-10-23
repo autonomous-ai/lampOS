@@ -1,0 +1,54 @@
+{
+  "base": "9b6960e61e5758bb745c6e4d7ad043cc725cd018",
+  "head": "5ce68c9a32de89abb8a52ac73698a791df972ebf",
+  "clean_at_start": true,
+  "host": "Darwin arm64; rustc 1.96.0; aarch64-apple-darwin",
+  "candidate_patch_sha256": "6804c726f2fb1838201471d9810a00af9257ba37397520b7edbb751923628e34",
+  "bound_files": 6520,
+  "input_manifest_sha256": "caf42a26ed25ee240cfdaf028d3039939c0b3552d00653b1b40e8fa90ad14e96",
+  "changed_files": {
+    "lampOS/crates/voice/src/provider_worker.rs": "fd0d0a3c6b3ff47b3eae544c4bd610475e5655f26e61171f0c17928efe5f9680",
+    "lampOS/crates/voice/src/second_provider/tests.rs": "5210b260510ab3fb16a4be2c1eb463d8478c2708d53fe195e05c43eaf4e06949",
+    "lampOS/crates/voice/src/remember.rs": "dc0bd9436e39fe675d8a83ec74726122d6405aacc3282b3f8ae897531bc83181"
+  },
+  "commands": [
+    {
+      "label": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 6.009,
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result_lines": []
+    },
+    {
+      "label": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--offline",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 32.868,
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result_lines": []
+    }
+  ],
+  "inputs_unchanged": true
+}
