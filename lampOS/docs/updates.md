@@ -1454,6 +1454,47 @@ committed, never the owner's real key). `L` is the runbook's SSH alias.
    `https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice/`
    with the owner's public key in `key.pub`.
 
+## What parts say to each other, one build apart
+
+The parts of one build are signed together, but they are not switched
+together. For a while, short or long, a part of the new build talks to a
+part of the one before. The rule (the first builder on #3126, 23 Oct):
+**any change to what one part says to another works with the previous
+build on the other side, both ways.** That covers the bus, the sockets,
+memory's protocol and the tool calls between crates.
+
+- **An old reader ignores new fields.** A field or a value the next build
+  adds is skipped by the build before, and it goes on as it did.
+- **A new reader refused by an old server acts safely and says so.** It
+  does not guess and does not act on half an answer. #3127 is the example:
+  an older lamp-memory refuses `observations`, so the voice removes nothing
+  and tells the person it couldn't forget.
+
+Why the window can't be zero (read at `02c8d3851`):
+
+- **Signed together.** lamp-voice and lamp-memory are both `core`
+  (`deploy/package-binaries.json:4-5`), and one envelope covers the whole
+  manifest (`.github/scripts/lampos-publish.py:196-231`). Publishing is
+  still off (`.github/workflows/lampos-arm64.yml:279`).
+- **Not switched as one step.** Each `current` link is renamed in turn
+  (`crates/update/src/round.rs:1632-1641`), and each unit is restarted
+  separately, the voice first (`round.rs:1868-1883`, step 8 above). The new
+  voice runs against the old memory until memory's restart comes round.
+- **Failures leave it longer.** If a later unit fails to restart, the round
+  puts the build back with the new voice running. The put-back restarts the
+  voice last and waits up to `--quiet-wait-s` (3600 s) for a gap between
+  turns (`round.rs:2066-2075`), all that time on the old memory. A power
+  cut between two renames, or a part that wasn't running (switched, not
+  started), leaves the same mix.
+- **Test lamps skew on purpose.** lamp-4ace's units pin each part's build,
+  and `deploy.sh` swaps the voice alone (`deploy/lamp-4ace/RUNBOOK.md:51`).
+  lamp-06c1 runs a hand-swapped voice on an older build
+  (`deploy/lamp-06c1/LAMP.md:2`).
+
+Restarting in dependency order, the voice last, shortens the window. It is
+a separate change (#3126, item 1). It does not remove the rule: a failed
+restart, a put-back or a power cut still leaves two builds talking.
+
 ## Every part's saved data, one version ahead
 
 An update can be put back, by a round, by `install` or by hand, after a
