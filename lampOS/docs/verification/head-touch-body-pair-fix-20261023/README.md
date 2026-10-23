@@ -6,8 +6,8 @@ on #3275 `92088b7ea`. Corrected head
 `a449e539fd539535d08ab0cc9f328b3a7bec6cc8`, on `822efff7c`.
 Repository tree `ab4d9cd6d049efb2c3481f0265b478b354c76f4f`, lampOS subtree
 `ffd1ceec4475747a24ba04d24b9eb2fd81b37aa1`.
-**Final carried-head ARM64 and Clippy pass; reads are carried and the PR is ready.
-The current-head Linux formatting receipt and First's merge remain.**
+**Merged through train 54 at `25452b88d`; train ARM64 and Clippy pass.
+The requested exact-head Linux formatting receipt and physical acceptance remain.**
 
 Latest carry, 24 October 00:19: `06ae9205fc10b39f7eb880941cadcf758043b11c`
 on train 51 `1291ef1f4`, repository tree
@@ -55,6 +55,30 @@ First confirmed all reads carry by patch-id and no HOLD at 00:55 on the
 The PR was marked ready at 00:58 for First's next train, which owns the latest-base
 carry. Current-head Linux formatting is still requested from Second/Fourth;
 the preceding head's receipt is not claimed for this whole tree.
+
+## Final train and merge
+
+At 24 October 01:21, train **#3284** merged the change into `lamp-voice`
+as `25452b88d508432cd996e4546d111a042e92b64a`. Its tree
+`de4275fcefa6f155586483d0e7ff5497a3519619` equals the train head
+`11e4d71268a888537684895b6e4e684f5ff01137` byte for byte. The
+[range-diff](train54-range.txt) keeps all six authored commits equal.
+Compared with `ff99df288`, only upstream `docs/build-rows.md` differs.
+
+Train ARM64 **39999565308** and Linux Clippy **39999565225** pass on
+attempt 1: **11,083/0/71 skipped**, with the same one reported Voice LEAK;
+docs **4/0**, process checks **12/0**. See the
+[primary summary](train54-native-summary.txt) and
+[run/tree/log bindings](train54-native-result.json). Reviewer-three also
+reported focused train checks: Controls **508/0**, Voice **118/0**, installer
+**6/0**. No ARM64 was linked on the Mac and no failed gate was retried.
+
+The separate Linux formatting receipt requested from Second/Fourth for this
+final head has not arrived; green Clippy and ARM64 do not claim it. The
+post-merge product publication run is **40002677144**, still in progress
+when this record was written. No installed build or device acceptance is
+claimed. #3276 retains the prepared hand trial; First owns routing the
+coherent build, lamp owner and hands.
 
 ## Failure retained
 
@@ -124,7 +148,7 @@ The original long-running shell's tool handle became unavailable while its
 test process remained alive. A native process-exit watcher was attached to
 that same shell; the suite was not restarted to recover the handle.
 
-The corrected head is pushed, ready, reviewed and native-green as recorded
-above. First owns the merge; Second/Fourth have the outstanding exact-head
-Linux formatting request. The prepared physical acceptance remains #3276.
+The change is merged and native-green as recorded above. Second/Fourth
+have the outstanding exact-head Linux formatting request. The prepared
+physical acceptance remains #3276, routed by First.
 No device action or physical acceptance was performed.

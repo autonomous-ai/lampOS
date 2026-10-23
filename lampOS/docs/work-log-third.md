@@ -5,6 +5,19 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 01:23 — product head touch landed in train 54
+
+- #3275 landed through #3284 as `25452b88d`; train and landed trees are
+  identical, and six authored patches remain equal. ARM64 **11,083/0/71
+  skipped** (one Voice LEAK), docs **4/0**, process **12/0**, Clippy green.
+- [Final receipt](verification/head-touch-body-pair-fix-20261023/README.md).
+  Original PR is closed by the train. Main checkout is clean and current.
+  Exact-head Linux formatting remains requested; no receipt is invented.
+- #3276 is next: First routes the coherent product build, lamp owner and
+  hands for the prepared trial. Following product publication **40002677144**;
+  no device action or physical result. Shared #2136 has no new Third code
+  request; First owns its remaining played comparisons.
+
 ## 2026-10-24 01:06 — final carried-head native gates pass
 
 - #3275 `ff99df288`: ARM64 **11,083/0/71 skipped**, including one Voice
