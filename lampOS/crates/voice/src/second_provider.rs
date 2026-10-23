@@ -4261,6 +4261,13 @@ async fn spoken(
             }
         }
     };
+    // The service's fillers were asked for the end's judgement alone
+    // (`LAMP_SECOND_UNFINISHED_WAIT`, #3126): nothing after it reads them.
+    let finished = if shared.unfinished_words {
+        finished.map(|words| crate::unfinished_words::without_fillers(&words))
+    } else {
+        finished
+    };
     // Every early word sent before the words were final counts: a
     // `TurnResumed` just before the end still takes them back.
     while let Some(said) = early.as_mut().and_then(|early| early.try_recv().ok()) {
@@ -5964,6 +5971,12 @@ fn prepared_on(
     }
     match said {
         net::Early::Words(words) => {
+            // Without the fillers, as the final words (#3126).
+            let words = if shared.unfinished_words {
+                crate::unfinished_words::without_fillers(&words)
+            } else {
+                words
+            };
             if prepared
                 .as_ref()
                 .is_some_and(|prepared| prepared.words == words)

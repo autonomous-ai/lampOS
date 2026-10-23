@@ -48,7 +48,13 @@ const MAX_MESSAGE: usize = 1 << 20;
 // ponytail: the name is the character's own ("Lamp"); a lamp renamed
 // would pass its name here.
 /// The unit's own key terms follow the name ([`SecondConfig::stt_key_terms`]).
-fn query<'a>(language: Option<&'a str>, key_terms: &'a [String]) -> Vec<(&'static str, &'a str)> {
+/// With `fillers`, the service keeps "um" and "uh" in its words
+/// ([`SttStream::connect_hearing_fillers`]).
+fn query<'a>(
+    language: Option<&'a str>,
+    key_terms: &'a [String],
+    fillers: bool,
+) -> Vec<(&'static str, &'a str)> {
     let mut query = vec![
         ("model", MODEL),
         ("encoding", "linear16"),
@@ -62,8 +68,11 @@ fn query<'a>(language: Option<&'a str>, key_terms: &'a [String]) -> Vec<(&'stati
         // End it could have spared (#779). At 300 ms it is usually there.
         ("endpointing", "300"),
         ("vad_events", "true"),
-        ("keyterm", "Lamp"),
     ];
+    if fillers {
+        query.push(("filler_words", "true"));
+    }
+    query.push(("keyterm", "Lamp"));
     query.extend(key_terms.iter().map(|term| ("keyterm", term.as_str())));
     query
 }
@@ -73,10 +82,11 @@ pub(crate) fn url(
     proxy: Option<&str>,
     language: Option<&str>,
     key_terms: &[String],
+    fillers: bool,
 ) -> Result<reqwest::Url> {
     let base = proxy.map_or_else(|| DEEPGRAM.to_owned(), proxied);
     secure(
-        reqwest::Url::parse_with_params(&base, query(language, key_terms))
+        reqwest::Url::parse_with_params(&base, query(language, key_terms, fillers))
             .map_err(|_| Error::Url)?,
     )
 }
@@ -547,6 +557,15 @@ pub enum Early {
 
 impl SttStream {
     pub async fn connect(config: &SecondConfig) -> Result<Self> {
+        Self::connect_hearing_fillers(config, false).await
+    }
+
+    /// [`Self::connect`], with `fillers` the service's words keep "um" and
+    /// "uh" (Deepgram's `filler_words`), which it drops by default: for a
+    /// request's line with `LAMP_SECOND_UNFINISHED_WAIT=on`, so that a line
+    /// ending on one waits ([`crate::unfinished_words`]). Flux takes no such
+    /// option and hears none either way.
+    pub async fn connect_hearing_fillers(config: &SecondConfig, fillers: bool) -> Result<Self> {
         let (proxy, key) = match &config.stt {
             Stt::Deepgram { key } => (None, key),
             Stt::Autonomous { base_url, key } => (Some(base_url.as_str()), key),
@@ -559,7 +578,7 @@ impl SttStream {
             ));
         }
         Self::open(
-            url(proxy, config.stt_language.as_deref(), &key_terms)?,
+            url(proxy, config.stt_language.as_deref(), &key_terms, fillers)?,
             key.expose(),
         )
         .await
@@ -802,7 +821,7 @@ pub async fn check(config: &SecondConfig, samples: &[i16]) -> Result<()> {
         )
     } else {
         (
-            url(proxy, config.stt_language.as_deref(), &key_terms)?,
+            url(proxy, config.stt_language.as_deref(), &key_terms, false)?,
             ("Finalize", r#"{"type":"Finalize"}"#),
         )
     };
@@ -1348,6 +1367,7 @@ mod tests {
             Some("https://campaign-api.autonomous.ai/api/v1/ai/"),
             None,
             &[],
+            false,
         )
         .unwrap();
         assert_eq!(
@@ -1364,17 +1384,35 @@ mod tests {
     fn the_units_key_terms_follow_the_name() {
         let terms = ["Hanoi".to_owned(), "Ho Chi Minh City".to_owned()];
         assert_eq!(
-            url(None, None, &terms).unwrap().as_str(),
+            url(None, None, &terms, false).unwrap().as_str(),
             format!(
                 "wss://api.deepgram.com/v1/listen?{QUERY}&keyterm=Hanoi&keyterm=Ho+Chi+Minh+City"
             )
         );
     }
 
+    /// #3126: with `LAMP_SECOND_UNFINISHED_WAIT=on` a request's line asks
+    /// for the service's fillers, so a line ending on "um" is heard to; with
+    /// it off the query is as before.
+    #[test]
+    fn fillers_are_asked_for_only_with_the_unfinished_wait() {
+        assert_eq!(
+            url(None, None, &[], true).unwrap().as_str(),
+            format!(
+                "wss://api.deepgram.com/v1/listen?{}",
+                QUERY.replace("&keyterm=Lamp", "&filler_words=true&keyterm=Lamp")
+            )
+        );
+        assert_eq!(
+            url(None, None, &[], false).unwrap().as_str(),
+            format!("wss://api.deepgram.com/v1/listen?{QUERY}")
+        );
+    }
+
     #[test]
     fn deepgram_is_called_directly_in_the_language_asked() {
         assert_eq!(
-            url(None, Some("vi"), &[]).unwrap().as_str(),
+            url(None, Some("vi"), &[], false).unwrap().as_str(),
             format!(
                 "wss://api.deepgram.com/v1/listen?{}",
                 QUERY.replace("language=en", "language=vi")
@@ -1592,6 +1630,7 @@ mod tests {
             Some(base_url),
             config.stt_language.as_deref(),
             &super::super::key_terms::listening(&config.stt_key_terms),
+            false,
         )
         .unwrap()
         .query_pairs()
@@ -1603,7 +1642,7 @@ mod tests {
     #[test]
     fn a_service_that_is_not_a_websocket_is_refused() {
         assert_eq!(
-            url(Some("ftp://example.com"), None, &[]).unwrap_err(),
+            url(Some("ftp://example.com"), None, &[], false).unwrap_err(),
             Error::Url
         );
     }

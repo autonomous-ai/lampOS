@@ -101,15 +101,48 @@ pub fn trailing(words: &str) -> Option<Trailing> {
     if last.ends_with(['?', '!']) {
         return None;
     }
+    class(last)
+}
+
+/// The class of `word`, any punctuation around it aside.
+fn class(word: &str) -> Option<Trailing> {
     // Composed before the trim: a decomposed accent is not alphanumeric.
-    let last: String = last.nfc().collect();
-    let word = last
+    let word: String = word.nfc().collect();
+    let word = word
         .trim_matches(|c: char| !c.is_alphanumeric())
         .to_lowercase();
     UNFINISHED_WORDS
         .iter()
         .find(|(unfinished, _)| unfinished.nfc().eq(word.chars()))
         .map(|(_, class)| *class)
+}
+
+/// `words` without its fillers ([`Trailing::Filler`]), each with its
+/// punctuation: the service's fillers are asked for only so that
+/// [`trailing`] sees them (#3126), and nothing else reads a line with
+/// them. A "." "?" or "!" that ended the words on a filler goes to the
+/// word before it, for a comma there ("eggs, um." is "eggs.").
+pub fn without_fillers(words: &str) -> String {
+    let mut kept: Vec<String> = Vec::new();
+    for word in words.split_whitespace() {
+        if class(word) != Some(Trailing::Filler) {
+            kept.push(word.to_owned());
+            continue;
+        }
+        let mark = word.chars().last().filter(|c| matches!(c, '.' | '?' | '!'));
+        if let (Some(mark), Some(last)) = (mark, kept.last_mut()) {
+            let bare = last.trim_end_matches(',').len();
+            last.truncate(bare);
+            if !last.ends_with(['.', '?', '!']) {
+                last.push(mark);
+            }
+        }
+    }
+    let mut words = kept.join(" ");
+    if words.ends_with(',') {
+        words.pop();
+    }
+    words
 }
 
 /// One held end, for the journal: counts only, never the words.
@@ -178,6 +211,22 @@ mod tests {
         assert_eq!(trailing(""), None);
         // "a" only as a word of its own.
         assert_eq!(trailing("Play some salsa"), None);
+    }
+
+    /// #3126: a filler goes, any case, with its punctuation; a mark that
+    /// ended the words stays at their end; a word that only begins with
+    /// one stays.
+    #[test]
+    fn fillers_are_taken_out_of_the_words() {
+        assert_eq!(
+            without_fillers("I need eggs, um, and some bread."),
+            "I need eggs, and some bread."
+        );
+        assert_eq!(without_fillers("I need eggs, um"), "I need eggs");
+        assert_eq!(without_fillers("I need eggs, Uh."), "I need eggs.");
+        assert_eq!(without_fillers("Um, what time is it?"), "what time is it?");
+        assert_eq!(without_fillers("uh-huh, umbrella"), "uh-huh, umbrella");
+        assert_eq!(without_fillers("um"), "");
     }
 
     #[test]

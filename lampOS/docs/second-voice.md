@@ -886,6 +886,18 @@ order is kept. A written turn is the same from the chat on.
     decomposed "và" matches. No question words: interim results rarely
     carry the "?", and "tell me why" or "show me how" are whole requests.
     A last word followed by "?" or "!" was said as an end and is finished;
+  - **the line's speech to text keeps the fillers** (#3126): Deepgram
+    drops "um" and "uh" from its words unless asked, so on lamp-4ace all
+    44 held ends were `joining` and none `filler`. With the switch a
+    request's line asks for them (`filler_words=true`,
+    `SttStream::connect_hearing_fillers` from `Net::listen`); the stop
+    words' and the wait words' streams do not, nor Flux, which takes no
+    such option. The fillers are only for this judgement: the line's final
+    words, and its early words for a prepared chat, have them taken out
+    (`unfinished_words::without_fillers`, in the worker as the words come
+    back), so the join, the not-for-me words, the name checks, the thread
+    and the model read the line as before. Without the switch nothing is
+    asked and nothing is taken out;
   - **the detector holds an end that comes due while they do**
     (`TurnDetector::words_end`) for at most 1.3 s more of quiet
     (`unfinished_words::WAIT_BLOCKS`, the first builder's guess for a real
@@ -912,9 +924,12 @@ order is kept. A written turn is the same from the chat on.
   doesn't wait, a stop after "um" is answered at the bound, with Smart Turn
   too, a line's holds add up to the bound, words going on keep one line,
   and without words told nothing changes);
-  `the_words_so_far_are_told_only_with_the_switch` on the worker;
-  `words_end_holds_the_lines_end_only_with_the_switch` through the
-  coordinator.
+  `the_words_so_far_are_told_only_with_the_switch` and
+  `a_line_ending_on_a_filler_is_told_and_the_filler_never_reaches_the_model`
+  on the worker; `fillers_are_asked_for_only_with_the_unfinished_wait` on
+  the query; `a_filler_ended_line_is_held_and_joined_with_what_follows` on
+  the detector; `words_end_holds_the_lines_end_only_with_the_switch`
+  through the coordinator.
 - **With `LAMP_SECOND_EARLY_FINALIZE=on` a line's words are asked for at a
   pause** (off unless set; the first builder on #1722, 20 Oct 07:20 and
   07:36). On lamp-4ace Deepgram never ends a line itself: the lamp's quiet

@@ -840,11 +840,14 @@ impl Services for Net {
     fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
         let config = self.config.clone();
         let near = self.near_hearing();
+        // A line ending on "um" waits only if the service keeps it
+        // (`LAMP_SECOND_UNFINISHED_WAIT`, #3126).
+        let fillers = crate::unfinished_words::on();
         Box::pin(async move {
             // Near, unless it fails on the link: then once at its own
             // address (#2882).
             if let Some((hearing, url, near)) = near {
-                match SttStream::connect(&hearing).await {
+                match SttStream::connect_hearing_fillers(&hearing, fillers).await {
                     Ok(stream) => return Ok(Box::new(stream) as Box<dyn Listener>),
                     Err(error) => match routes::fallback_why(&error) {
                         // Its own until the routes are next read (El's P2).
@@ -856,7 +859,7 @@ impl Services for Net {
                     },
                 }
             }
-            let stream = SttStream::connect(&config).await?;
+            let stream = SttStream::connect_hearing_fillers(&config, fillers).await?;
             Ok(Box::new(stream) as Box<dyn Listener>)
         })
     }
