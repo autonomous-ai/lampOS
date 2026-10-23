@@ -5,6 +5,37 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 07:32 — Controls regression pushed; journal follow-up landed
+
+Ready for lamp-voice: no (#3162 is draft for native gates, downstream tests and external review).
+
+- #3162 is `22634785d` on current `02c8d3851`, exactly the Controls
+  integration test file and its evidence README. Its carry from the gated
+  `389c39513` on `9b6960e61` compares equal. The base update changes only
+  six Markdown files; crates and Cargo manifests/lock are identical.
+  Local AGENTS.md matches the fetched 23 October protocol and names
+  successor Queue #3126. The pushed result is comment `6354441124`.
+- All four new real-bus-to-Service cases pass. Removing runtime push
+  propagation fails all four while the three prior predicate, recognizer
+  and replay tests still pass; a late poll fails two; never clearing a
+  push fails both recovery cases. Each is an executed assertion failure.
+  The production runtime is restored byte-for-byte. The tests' independent
+  source read found no P1/P2/P3; an external PR read remains required.
+- Rust 1.96.0 on the Mac, with `CARGO_BUILD_JOBS=2`: formatting, strict
+  all-target workspace Clippy, Controls tests and workspace build pass.
+  Controls is **504 passed, zero failed, one ignored**. Exact commands and
+  clock boundaries are in `docs/verification/controls-body-hand-20261023/`.
+  No production behavior, body detector, switch or device was changed.
+- Native ARM64 `39878486996` and Linux Clippy `39878487099` are running.
+  The Mac tests for all thirteen downstream crates run separately with
+  `--offline --locked --no-fail-fast -- --test-threads=2`; no completed
+  result is claimed for either gate. #2948 stays draft for the hand trial.
+- #3153 is closed after train #3157 merged as `02c8d3851`. Its carried
+  patch compares equal. ARM64 `39876440732`, attempt 2, passed
+  **10,799/0/67**, with one leaky pass; Linux Clippy `39876440639` passed.
+  Attempt 1's boot-clock failure remains recorded and assigned to Tests.
+  No local ARM64 link or lamp action was used to qualify this merge.
+
 ## 2026-10-23 07:18 — Controls consumer regression claimed
 
 Ready for lamp-voice: no (test-only third-P3 is taken under #1798).
@@ -3839,7 +3870,7 @@ router, hotspot or lamp; step 4 of #806 needs a builder with a lamp.
 |---|---|---|---|
 | third-P1 | Expression reads the system's time zone (`--zone system`), so a lamp outside Vietnam keeps its days across daylight saving; Memory's owner the same | #820 | Yes (First, 18:20; Second for the policy, 18:34); #844 |
 | third-P2 | Use diagnostic long-gap counter deltas for Controls totals; rate-limited journal warnings can omit the final suppressed gaps | #2602, 22 Oct 23:36 | Claimed after the self-pick window; delivered as #3083 for documentation review |
-| third-P3 | Test the real bus-to-Controls path for a push, its release or expiry, and recovery only after a fresh head contact | #1798; #3126, 23 Oct 07:02 | Claimed at 07:18 after the self-pick window; test-only, Body implementation remains with its owner |
+| third-P3 | Test the real bus-to-Controls path for a push, its release or expiry, and recovery only after a fresh head contact | #1798; #3126, 23 Oct 07:02 | Claimed at 07:18; draft #3162 at 07:30, native gates and downstream tests running; Body implementation remains with its owner |
 
 ## 2026-10-15 — Setup for a home (#806) ready as #817; #795 and #808 rebased
 
