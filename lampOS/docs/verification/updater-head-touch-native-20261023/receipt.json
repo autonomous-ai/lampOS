@@ -1,0 +1,61 @@
+{
+  "head": "46f5f384ad94f9c2dcc5f7050991ef4325621384",
+  "base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+  "runs": [
+    {
+      "databaseId": 39956841003,
+      "headSha": "46f5f384ad94f9c2dcc5f7050991ef4325621384",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39956841003",
+      "startedAt": "2026-10-23T12:54:02Z",
+      "updatedAt": "2026-10-23T13:14:34Z"
+    },
+    {
+      "databaseId": 39956840831,
+      "headSha": "46f5f384ad94f9c2dcc5f7050991ef4325621384",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39956840831",
+      "startedAt": "2026-10-23T12:54:02Z",
+      "updatedAt": "2026-10-23T12:57:22Z"
+    }
+  ],
+  "tested_merge": {
+    "parents": [
+      "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "46f5f384ad94f9c2dcc5f7050991ef4325621384"
+    ],
+    "sha": "690ab0d432e51426d82720ae5d813edeab36d923",
+    "tree": "c069dbad50071717a8cab4827d39ebc08bcac08b"
+  },
+  "authored_tree": "c069dbad50071717a8cab4827d39ebc08bcac08b",
+  "tree_equal": true,
+  "nextest": {
+    "passed": 11067,
+    "failed": 0,
+    "skipped": 69,
+    "leaky_passes": 1,
+    "seconds": 199.237
+  },
+  "doc_tests": {
+    "passed": 4,
+    "failed": 0
+  },
+  "own_harness_process": {
+    "passed": 12,
+    "failed": 0
+  },
+  "raw_native_log_sha256": "7b16d2cfb21e416a34693df8371a2077793c1ab19c33e9c55990556250944f04",
+  "artifacts": [
+    {
+      "id": 12504605591,
+      "name": "lampos-arm64-46f5f384ad94f9c2dcc5f7050991ef4325621384",
+      "size_in_bytes": 115881903,
+      "digest": "sha256:d5aef431d793c9119fd15c00260126ecfd3c18ad7912e0b88594870d91828c0d",
+      "expired": false
+    }
+  ]
+}

@@ -1,0 +1,618 @@
+//! Manual, provisional format checks: today's host writer and one pinned old
+//! ARM64 helper. These are not a supported release-pair selection, official
+//! release qualification, systemd recovery, device reboot or flash evidence.
+//! Run explicitly with LAMP_COMPAT_OLD_HELPER naming the pinned artifact.
+//! Only disposable, network-disabled containers see the real /etc and /var
+//! paths: no host mounts, credentials, lamp access or publication are used.
+use lamp_update::{
+    apply::{self, Op},
+    manifest::{self, File as BuildFile, Manifest, Setting},
+    records::{Records, State},
+};
+use ring::{
+    rand::SystemRandom,
+    signature::{Ed25519KeyPair, KeyPair},
+};
+use std::{
+    collections::BTreeMap,
+    ffi::OsString,
+    fs::{self, File},
+    io::{self, Read, Write},
+    os::unix::fs::PermissionsExt,
+    path::{Path, PathBuf},
+    process::{Child, Command, ExitStatus, Stdio},
+    sync::atomic::{AtomicU64, Ordering},
+    time::{Duration, Instant},
+};
+use tempfile::TempDir;
+
+const OLD_SHA: &str = "f731555d6b783a69eb00bc2ff774e8ad922988284c9f3a9114010fa75fa51778";
+const IMAGE: &str = "sha256:7dc3bb4b3b88bb00e16e37eeb5c98a74f9d926f956584eb8c009c9ca86023cd2";
+const CONTEXT: &str = "colima-lampos";
+const RECORDS: &str = "var/lib/lampos-update";
+const A: &str = "/etc/lampOS/records.json";
+const B: &str = "/etc/lampOS/controls/controls.json";
+const BEFORE_A: &str = "{\"fixture\":\"records before\"}\n";
+const BEFORE_B: &str = "{\"fixture\":\"controls before\"}\n";
+const AFTER_A: &str = "{\"fixture\":\"records after\"}\n";
+const AFTER_B: &str = "{\"fixture\":\"controls after\"}\n";
+const SEQUENCE: u64 = 2;
+const WITHIN: Duration = Duration::from_secs(120);
+static COMMAND_ID: AtomicU64 = AtomicU64::new(0);
+
+struct Running(Child);
+impl Drop for Running {
+    fn drop(&mut self) {
+        // Do not signal an exited/reaped child's recycled PID. Child caches
+        // terminal status, and the CLI is never invoked through a shell.
+        if matches!(self.0.try_wait(), Ok(Some(_))) {
+            return;
+        }
+        let _ = self.0.kill();
+        let until = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < until {
+            match self.0.try_wait() {
+                Ok(Some(_)) => return,
+                Err(_) => break,
+                Ok(None) => std::thread::sleep(Duration::from_millis(10)),
+            }
+        }
+        let _ = writeln!(
+            io::stderr().lock(),
+            "compatibility Docker CLI cleanup could not confirm reap within five seconds"
+        );
+    }
+}
+
+struct ResultOf {
+    status: ExitStatus,
+    stdout: String,
+    stderr: String,
+}
+
+fn bounded_text(path: &Path) -> io::Result<String> {
+    let mut text = String::new();
+    File::open(path)?.take(65_536).read_to_string(&mut text)?;
+    Ok(text)
+}
+
+fn docker(logs: &Path, args: &[OsString], within: Duration) -> Result<ResultOf, String> {
+    let id = COMMAND_ID.fetch_add(1, Ordering::Relaxed);
+    let stdout = logs.join(format!("command-{id}.stdout"));
+    let stderr = logs.join(format!("command-{id}.stderr"));
+    let mut child = Running(
+        Command::new("docker")
+            .args(["--context", CONTEXT])
+            .args(args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::from(
+                File::create(&stdout).map_err(|e| e.to_string())?,
+            ))
+            .stderr(Stdio::from(
+                File::create(&stderr).map_err(|e| e.to_string())?,
+            ))
+            .spawn()
+            .map_err(|e| format!("cannot start Docker CLI: {e}"))?,
+    );
+    let until = Instant::now() + within;
+    let status = loop {
+        if let Some(status) = child.0.try_wait().map_err(|e| e.to_string())? {
+            break status;
+        }
+        if Instant::now() >= until {
+            return Err(format!(
+                "Docker command {args:?} exceeded {within:?}; stdout={} stderr={}",
+                bounded_text(&stdout).unwrap_or_default(),
+                bounded_text(&stderr).unwrap_or_default()
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    Ok(ResultOf {
+        status,
+        stdout: bounded_text(&stdout).map_err(|e| e.to_string())?,
+        stderr: bounded_text(&stderr).map_err(|e| e.to_string())?,
+    })
+}
+
+fn arguments(parts: &[&str]) -> Vec<OsString> {
+    parts.iter().map(OsString::from).collect()
+}
+
+fn checked(logs: &Path, args: &[OsString]) -> ResultOf {
+    let result = docker(logs, args, WITHIN).unwrap_or_else(|why| panic!("{why}"));
+    assert!(
+        result.status.success(),
+        "Docker {args:?}: {}\n{}\n{}",
+        result.status,
+        result.stdout,
+        result.stderr
+    );
+    result
+}
+
+struct Container<'a> {
+    name: String,
+    owner: String,
+    logs: &'a Path,
+    attempted: bool,
+}
+impl Container<'_> {
+    fn remove(&mut self) -> Result<(), String> {
+        if !self.attempted {
+            return Ok(());
+        }
+        // Even a timed-out create can have succeeded at the daemon. Inspect
+        // our random name's label before removing anything by that name.
+        let inspect = docker(
+            self.logs,
+            &arguments(&[
+                "container",
+                "inspect",
+                "--format",
+                "{{index .Config.Labels \"lamp.compat.owner\"}}",
+                &self.name,
+            ]),
+            Duration::from_secs(20),
+        )?;
+        if !inspect.status.success() {
+            // Absence is the sole successful no-op; daemon/context failures
+            // must stay visible rather than being called successful cleanup.
+            if inspect.stderr.contains("No such container")
+                || inspect.stderr.contains("No such object")
+            {
+                self.attempted = false;
+                return Ok(());
+            }
+            return Err(format!(
+                "cannot inspect compatibility container for cleanup: {}",
+                inspect.stderr
+            ));
+        }
+        if inspect.stdout.trim() != self.owner {
+            return Err("refusing to remove a container without this fixture's owner label".into());
+        }
+        let removed = docker(
+            self.logs,
+            &arguments(&["container", "rm", "--force", &self.name]),
+            Duration::from_secs(30),
+        )?;
+        if !removed.status.success() {
+            return Err(format!(
+                "cannot remove compatibility container: {}",
+                removed.stderr
+            ));
+        }
+        self.attempted = false;
+        Ok(())
+    }
+}
+impl Drop for Container<'_> {
+    fn drop(&mut self) {
+        if let Err(why) = self.remove() {
+            let _ = writeln!(
+                io::stderr().lock(),
+                "compatibility container cleanup failed: {why}"
+            );
+        }
+    }
+}
+
+struct Fixture {
+    _folder: TempDir,
+    root: PathBuf,
+    logs: PathBuf,
+    key: Option<Ed25519KeyPair>,
+    helper: PathBuf,
+}
+impl Fixture {
+    fn transport(root: Option<PathBuf>) -> Self {
+        let folder = tempfile::Builder::new()
+            .prefix("second-helper-release-pair-")
+            .tempdir()
+            .unwrap();
+        let root = root.unwrap_or_else(|| folder.path().join("root"));
+        let logs = folder.path().join("logs");
+        fs::create_dir_all(&logs).unwrap();
+        let source = std::env::var_os("LAMP_COMPAT_OLD_HELPER").expect(
+            "manual fixture needs LAMP_COMPAT_OLD_HELPER pointing to the pinned ARM64 artifact",
+        );
+        let metadata = fs::metadata(&source).unwrap();
+        assert!(metadata.is_file() && metadata.len() <= 128 * 1024 * 1024);
+        let bytes = fs::read(&source).unwrap();
+        assert_eq!(
+            manifest::sha256_hex(&bytes),
+            OLD_SHA,
+            "old helper SHA mismatch: nothing may execute"
+        );
+        assert!(
+            bytes.starts_with(b"\x7fELF\x02\x01"),
+            "old helper must be little-endian 64-bit ELF"
+        );
+        assert_eq!(
+            bytes.get(18..20),
+            Some(&[0xb7, 0x00][..]),
+            "old helper must be AArch64"
+        );
+        // Copy the verified bytes into our own directory, avoiding any
+        // subsequent change of the supplied path before Docker copies it.
+        let helper = folder.path().join("old-helper");
+        fs::write(&helper, bytes).unwrap();
+        fs::set_permissions(&helper, fs::Permissions::from_mode(0o755)).unwrap();
+        Self {
+            _folder: folder,
+            root,
+            logs,
+            key: None,
+            helper,
+        }
+    }
+
+    fn new() -> Self {
+        let mut fixture = Self::transport(None);
+        let document = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new()).unwrap();
+        fixture.key = Some(Ed25519KeyPair::from_pkcs8(document.as_ref()).unwrap());
+        fixture.write(A, BEFORE_A, 0o640);
+        fixture.write(B, BEFORE_B, 0o600);
+        fixture.write(
+            "/etc/lampOS/update/key.pub",
+            &manifest::public_key_text(fixture.key.as_ref().unwrap()),
+            0o644,
+        );
+        let mut state = State::default();
+        for (path, text) in [(A, BEFORE_A), (B, BEFORE_B)] {
+            state
+                .settings
+                .insert(path.into(), manifest::sha256_hex(text.as_bytes()));
+        }
+        Records::new(fixture.records()).save_state(&state).unwrap();
+        fixture
+    }
+
+    fn records(&self) -> PathBuf {
+        self.root.join(RECORDS)
+    }
+    fn path(&self, path: &str) -> PathBuf {
+        self.root.join(path.trim_start_matches('/'))
+    }
+    fn write(&self, path: &str, text: &str, mode: u32) {
+        let path = self.path(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, text).unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+    }
+    fn stage_apply(&self) {
+        let mut a = Setting::new(A, AFTER_A);
+        a.mode = Some("0600".into());
+        let mut b = Setting::new(B, AFTER_B);
+        b.mode = Some("0644".into());
+        let manifest = Manifest {
+            schema: manifest::SCHEMA,
+            channel: "lamp-voice".into(),
+            sequence: SEQUENCE,
+            commit: "a".repeat(40),
+            files_url: "https://fixture.invalid/build/".into(),
+            files: vec![BuildFile {
+                name: "lamp-update".into(),
+                sha256: manifest::sha256_hex(b"unused fixture file"),
+                size: 19,
+            }],
+            units: Vec::new(),
+            min_updater: Some(manifest::SETTINGS_UPDATER),
+            models: Vec::new(),
+            settings: vec![a, b],
+            image: Vec::new(),
+            reset_plan: None,
+        };
+        let envelope = manifest::seal(
+            &serde_json::to_vec(&manifest).unwrap(),
+            self.key.as_ref().unwrap(),
+        )
+        .unwrap();
+        apply::stage(&self.records(), Op::Apply, SEQUENCE, Some(&envelope), false).unwrap();
+    }
+    fn stage_back(&self) {
+        apply::stage(&self.records(), Op::Back, SEQUENCE, None, false).unwrap();
+    }
+    fn merge(&self) -> State {
+        let records = Records::new(self.records());
+        let mut state = records.state(&mut |_| {}).unwrap();
+        assert!(apply::merge(&self.records(), &mut state).unwrap());
+        records.save_state(&state).unwrap();
+        state
+    }
+    fn current_apply(&self) {
+        let key: [u8; 32] = self
+            .key
+            .as_ref()
+            .unwrap()
+            .public_key()
+            .as_ref()
+            .try_into()
+            .unwrap();
+        apply::run(
+            &self.root,
+            &self.records(),
+            &key,
+            &mut |args| Err(format!("fixture must not launch {args:?}")),
+            &mut |_| {},
+        )
+        .unwrap();
+    }
+    fn assert_files(&self, before: bool) {
+        for (path, text, mode) in if before {
+            [(A, BEFORE_A, 0o640), (B, BEFORE_B, 0o600)]
+        } else {
+            [(A, AFTER_A, 0o600), (B, AFTER_B, 0o644)]
+        } {
+            let bytes = fs::read(self.path(path)).unwrap();
+            assert_eq!(bytes, text.as_bytes(), "{path}");
+            assert_eq!(
+                manifest::sha256_hex(&bytes),
+                manifest::sha256_hex(text.as_bytes())
+            );
+            assert_eq!(
+                fs::metadata(self.path(path)).unwrap().permissions().mode() & 0o7777,
+                mode,
+                "{path}"
+            );
+        }
+    }
+    fn assert_records(&self, state: &State, before: bool) {
+        for (path, text) in if before {
+            [(A, BEFORE_A), (B, BEFORE_B)]
+        } else {
+            [(A, AFTER_A), (B, AFTER_B)]
+        } {
+            assert_eq!(
+                state.settings.get(path),
+                Some(&manifest::sha256_hex(text.as_bytes()))
+            );
+        }
+    }
+
+    fn old_apply(&self) -> i64 {
+        // No Docker invocation precedes pinning the helper bytes in new().
+        let image = checked(
+            &self.logs,
+            &arguments(&[
+                "image",
+                "inspect",
+                "--format",
+                "{{.Id}} {{.Os}}/{{.Architecture}}",
+                IMAGE,
+            ]),
+        );
+        assert_eq!(image.stdout.trim(), format!("{IMAGE} linux/arm64"));
+        let owner = format!(
+            "{}-{}",
+            self._folder.path().file_name().unwrap().to_string_lossy(),
+            COMMAND_ID.fetch_add(1, Ordering::Relaxed)
+        );
+        let name = owner.to_ascii_lowercase();
+        let mut container = Container {
+            name,
+            owner,
+            logs: &self.logs,
+            attempted: false,
+        };
+        let args = arguments(&[
+            "container",
+            "create",
+            "--name",
+            &container.name,
+            "--platform",
+            "linux/arm64",
+            "--network",
+            "none",
+            "--label",
+            &format!("lamp.compat.owner={}", container.owner),
+            "--entrypoint",
+            "/compat-old-helper",
+            IMAGE,
+            "apply",
+        ]);
+        container.attempted = true;
+        checked(&self.logs, &args);
+        for (source, destination) in [
+            (self.helper.clone(), "/compat-old-helper"),
+            (self.root.join("etc/lampOS"), "/etc/"),
+            (self.records(), "/var/lib/"),
+        ] {
+            checked(
+                &self.logs,
+                &[
+                    OsString::from("container"),
+                    OsString::from("cp"),
+                    source.into_os_string(),
+                    OsString::from(format!("{}:{destination}", container.name)),
+                ],
+            );
+        }
+        let start = docker(
+            &self.logs,
+            &arguments(&["container", "start", "--attach", &container.name]),
+            WITHIN,
+        )
+        .unwrap_or_else(|why| panic!("{why}"));
+        // Emit captured helper streams before any later inspect/copy assertion
+        // can unwind and remove the disposable command-log directory.
+        println!(
+            "{}",
+            serde_json::json!({"phase":"old_helper_streams","docker_start_exit_code":start.status.code(),"stdout":start.stdout,"stderr":start.stderr})
+        );
+        let inspect = checked(
+            &self.logs,
+            &arguments(&[
+                "container",
+                "inspect",
+                "--format",
+                "{{json .State}}",
+                &container.name,
+            ]),
+        );
+        let state: serde_json::Value = serde_json::from_str(&inspect.stdout).unwrap();
+        assert_eq!(state["Running"], false);
+        assert_eq!(state["OOMKilled"], false);
+        assert_eq!(state["Error"], "");
+        assert_eq!(
+            state["Status"], "exited",
+            "helper must actually have run to completion"
+        );
+        let helper_code = state["ExitCode"]
+            .as_i64()
+            .expect("container helper exit code");
+        assert!((0..=255).contains(&helper_code));
+        let returned = self._folder.path().join(format!(
+            "returned-{}",
+            COMMAND_ID.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(returned.join("etc/lampOS")).unwrap();
+        fs::create_dir_all(returned.join(RECORDS)).unwrap();
+        for path in ["etc/lampOS", RECORDS] {
+            checked(
+                &self.logs,
+                &[
+                    OsString::from("container"),
+                    OsString::from("cp"),
+                    OsString::from(format!("{}:/{path}/.", container.name)),
+                    returned.join(path).into_os_string(),
+                ],
+            );
+        }
+        container.remove().unwrap_or_else(|why| panic!("{why}"));
+        // Both trees are strictly beneath this fixture's TempDir. Replacing
+        // these never follows host /etc, /var, /opt or a user-supplied root.
+        for path in ["etc/lampOS", RECORDS] {
+            fs::remove_dir_all(self.root.join(path)).unwrap();
+            fs::rename(returned.join(path), self.root.join(path)).unwrap();
+        }
+        println!(
+            "{}",
+            serde_json::json!({"old_helper_sha256":OLD_SHA,"image":IMAGE,"context":CONTEXT,"platform":"linux/arm64","network":"none","helper_arguments":["apply"],"helper_exit_code":helper_code,"docker_start_exit_code":start.status.code(),"stdout":start.stdout,"stderr":start.stderr,"evidence":"provisional current-host-writer/old-arm64-helper format only"})
+        );
+        helper_code
+    }
+}
+
+/// Run the already staged request in a caller-owned scratch lamp, preserving
+/// that lamp's existing signing trust. Only the transport is reused here.
+/// This is used by the path-imported round fixture, not by the four standalone
+/// tests in this integration target.
+#[allow(dead_code)]
+pub(crate) fn old_apply_in_test_root(root: &Path, owner: &TempDir) -> i64 {
+    let root = fs::canonicalize(root).unwrap();
+    let owner = fs::canonicalize(owner.path()).unwrap();
+    assert!(
+        root.starts_with(&owner),
+        "root must belong to the supplied TempDir"
+    );
+    let in_temp = [std::env::temp_dir(), PathBuf::from("/private/tmp")]
+        .iter()
+        .filter_map(|path| fs::canonicalize(path).ok())
+        .any(|base| owner.starts_with(&base) && owner != base);
+    assert!(
+        in_temp && root != Path::new("/"),
+        "caller root must be beneath an owned temporary directory"
+    );
+    // No replacement key is generated or written for the caller. The old
+    // helper sees exactly the caller's throwaway public key and envelope.
+    let key = fs::read_to_string(root.join("etc/lampOS/update/key.pub")).unwrap();
+    manifest::read_public_key(&key).expect("caller must supply its existing test signing key");
+    Fixture::transport(Some(root)).old_apply()
+}
+
+fn tree(root: &Path) -> BTreeMap<PathBuf, (Vec<u8>, u32)> {
+    fn visit(root: &Path, path: &Path, entries: &mut BTreeMap<PathBuf, (Vec<u8>, u32)>) {
+        for entry in fs::read_dir(path).unwrap() {
+            let path = entry.unwrap().path();
+            let metadata = fs::symlink_metadata(&path).unwrap();
+            assert!(
+                !metadata.file_type().is_symlink(),
+                "fixture trees contain no links"
+            );
+            if metadata.is_dir() {
+                visit(root, &path, entries);
+            } else {
+                assert!(metadata.is_file());
+                entries.insert(
+                    path.strip_prefix(root).unwrap().to_owned(),
+                    (
+                        fs::read(&path).unwrap(),
+                        metadata.permissions().mode() & 0o7777,
+                    ),
+                );
+            }
+        }
+    }
+    let mut entries = BTreeMap::new();
+    visit(root, root, &mut entries);
+    entries
+}
+
+#[test]
+#[ignore = "manual Docker ARM64 artifact compatibility fixture; needs LAMP_COMPAT_OLD_HELPER"]
+fn current_request_old_apply_current_merge() {
+    let fixture = Fixture::new();
+    fixture.stage_apply();
+    assert_eq!(fixture.old_apply(), 0);
+    fixture.assert_files(false);
+    fixture.assert_records(&fixture.merge(), false);
+}
+
+#[test]
+#[ignore = "manual Docker ARM64 artifact compatibility fixture; needs LAMP_COMPAT_OLD_HELPER"]
+fn old_apply_back_restores_exact_bytes_modes_and_hashes() {
+    let fixture = Fixture::new();
+    fixture.stage_apply();
+    assert_eq!(fixture.old_apply(), 0);
+    fixture.assert_files(false);
+    fixture.assert_records(&fixture.merge(), false);
+    apply::finish(&fixture.records()).unwrap();
+    fixture.stage_back();
+    assert_eq!(fixture.old_apply(), 0);
+    fixture.assert_files(true);
+    fixture.assert_records(&fixture.merge(), true);
+}
+
+#[test]
+#[ignore = "manual Docker ARM64 artifact compatibility fixture; needs LAMP_COMPAT_OLD_HELPER"]
+fn current_backup_is_read_by_old_back() {
+    let fixture = Fixture::new();
+    fixture.stage_apply();
+    fixture.current_apply();
+    fixture.assert_files(false);
+    fixture.assert_records(&fixture.merge(), false);
+    let backup = fs::read(fixture.records().join("apply/back.json")).unwrap();
+    let decoded: apply::Back = serde_json::from_slice(&backup).unwrap();
+    assert_eq!(
+        (decoded.version, decoded.sequence, decoded.files.len()),
+        (apply::VERSION, SEQUENCE, 2)
+    );
+    apply::finish(&fixture.records()).unwrap();
+    fixture.stage_back();
+    assert_eq!(fixture.old_apply(), 0);
+    assert_eq!(
+        fs::read(fixture.records().join("apply/back.json")).unwrap(),
+        backup
+    );
+    fixture.assert_files(true);
+    fixture.assert_records(&fixture.merge(), true);
+}
+
+#[test]
+#[ignore = "manual Docker ARM64 artifact compatibility fixture; needs LAMP_COMPAT_OLD_HELPER"]
+fn unknown_request_op_refuses_without_changing_files_or_writing_done() {
+    let fixture = Fixture::new();
+    fixture.stage_apply();
+    let request = fixture.records().join("apply/request.json");
+    let mut value: serde_json::Value =
+        serde_json::from_slice(&fs::read(&request).unwrap()).unwrap();
+    value["op"] = "future_operation".into();
+    fs::write(&request, serde_json::to_vec(&value).unwrap()).unwrap();
+    let before = tree(&fixture.root);
+    assert_ne!(fixture.old_apply(), 0);
+    assert_eq!(tree(&fixture.root), before);
+    assert!(!fixture.records().join("apply/done.json").exists());
+    fixture.assert_files(true);
+}

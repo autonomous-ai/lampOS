@@ -1,3 +1,32 @@
+## Current checkpoint: 2026-10-23 20:18 +07, corrected updater green and old helper exercised
+
+Ready for lamp-voice: #3269 is ready for review; current reviewer dispositions remain required
+
+#3269 at `46f5f384a`, based on `810e05109`, fixes the reviewed reader/pins and
+bus-root problems. Both exact Third controls are retained unchanged. Mac
+Update is **371 / 0 / 4 ignored**, including 28 head-touch cases; formatting
+and strict Clippy pass. [Current official gates](verification/updater-head-touch-native-20261023/README.md)
+pass: ARM64 **11,067 / 0 / 69 skipped** with one passing leaky Voice case,
+docs **4 / 0**, process harness **12 / 0**, and Linux Clippy. The tested merge
+tree equals the authored head. Third and Reviewer-lead own their current-head
+reads; First owns merge. No review HOLD is lifted by this result.
+
+[Actual old-helper evidence](verification/previous-helper-6408-20261023/README.md)
+passes **6 / 0**: four format/refusal/restore cases plus real old-helper
+mismatch-before-restart and logical-cut recovery in the current round harness.
+The old consumer is release 6408's pinned ARM64 executable; the coordinator
+runs on the Mac with fake systemd. This is provisional, not First's selected
+supported pair, a real process cut or physical durability acceptance.
+
+The whole-lamp state inventory is published for #2809. #1812 still requires
+Migrate's trusted public key for fingerprint `54213f8d3aa2f241`. #2810 still
+requires First's candidate/fallback and an assigned lamp holder with its
+attending person. No lamp access or signing action was performed. Next:
+respond to the corrected-head reviews and pair decision; run signature checks
+when the public key arrives, then hand the physical worksheet to the operator.
+
+---
+
 ## Current checkpoint: 2026-10-23 19:31 +07, head-touch fix in review and state inventory
 
 Ready for lamp-voice: audit evidence only; #3269 remains draft and held
