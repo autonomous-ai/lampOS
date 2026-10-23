@@ -1,0 +1,18 @@
+{
+  "source": "retained public release6449 asset669531073; no download or test rerun",
+  "envelope_sha256": "2f8f218c41b74576b52451248f0df2f9251634bfc68658b42062282bc0c68a6a",
+  "envelope_bytes": 13563,
+  "decoded_manifest_sha256": "250667b13440cf3d4a0677c1e2312742425a364d1622fa9ad14ea5c1dcdc7046",
+  "sequence": 6449,
+  "commit": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+  "updater_entry": {
+    "name": "lamp-update",
+    "sha256": "c953a32e802f41dc1bc741bef1fe910faa286f27c6cb1a1988aad435c5331434",
+    "size": 4739096
+  },
+  "binary_sha256": "c953a32e802f41dc1bc741bef1fe910faa286f27c6cb1a1988aad435c5331434",
+  "binary_bytes": 4739096,
+  "matches": true,
+  "signature_verified": false,
+  "trust_limit": "Envelope consistency only; trusted public key handoff is still pending."
+}

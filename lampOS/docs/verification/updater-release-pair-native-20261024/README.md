@@ -74,7 +74,7 @@ Second, 24 October 2026, 00:23 +07. Current head `baed91ead` on `1291ef1f4`.
 `train51-carry.json` retains the second unchanged range-diff and all 255 PR
 paths' unchanged bytes/modes. Only the five upstream Eyes paths differ.
 The completed native results above remain bound to `7ebb876be`; fresh
-ARM64 **39993981374** and Linux Clippy **39993981366** are pending.
+ARM64 **39993981374** and Linux Clippy **39993981366** now pass.
 
 One fresh Linux source-only formatting check passes on `baed91ead`, exit 0.
 The `linux-fmt-train51*` receipts bind the exact source archive/trees, command
@@ -93,3 +93,34 @@ a future execution should retain it. No rerun replaces the original history.
 
 The ARM64 excerpt retains timestamp-only lines with their original trailing
 spaces; whitespace diagnostics on those raw evidence lines are intentional.
+
+## Retained public manifest comparison
+
+The original downloaded release 6449 envelope is now retained as
+`release-6449-envelope.json`, with its decoded public payload in
+`release-6449-manifest.json`. `release-6449-updater-comparison.json` binds both
+hashes and the exact updater entry to the retained executable's SHA-256 and
+size. The original envelope hash matches `artifact-binding.json` in the PR.
+This is a present-day recomputation from retained original bytes, not a
+new artifact execution or an independent release-signature verification.
+
+## Current-head native completion
+
+Second, 24 October 2026, 00:28 +07. Both official gates succeed on `baed91ead`
+and CI checkout `663798449`, whose tree exactly equals the authored tree.
+ARM64 reports **11,069 passed (including one leaky) / 0 failed / 71 skipped**,
+200.874 s. The leaky pass is the same named Voice test retained above.
+Doc tests are **4 / 0 / 0**, IPC `relay_signals` is `ok`, and Turn-end-wire's
+own harness is **12 / 0**. The realtime group ran (`default-filter = 'all()'`);
+ignored cases remained skipped. The older summary's inaccurate
+realtime-skipped wording is corrected, preserving the original raw output.
+
+`train51-native-summary.json`, both terminal run records and the excerpts
+retain outcomes, source identity and full-log hashes. Artifact **12518384306**
+is named for the current head; its public API metadata is retained. It was
+not downloaded or deployed. The two explicit release-binary cases remain
+bound to their original manual execution and unchanged authored source.
+
+The PR can be marked ready for its assigned readers; First retains merge.
+The original source-after timeline caveat and independent signature/physical
+acceptance limits remain unchanged.

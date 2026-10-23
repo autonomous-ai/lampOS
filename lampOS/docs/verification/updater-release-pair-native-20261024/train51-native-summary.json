@@ -1,0 +1,38 @@
+{
+  "head": "baed91ead4cc9712ad053090fa2724b05897e2ce",
+  "merge": "6637984494f3e4d29f4e10cbacebe5a936fa0097",
+  "tree": "642c8009948a5ecd7af819a49226c9f450d762a2",
+  "arm64": {
+    "run": 39993981374,
+    "passed": 11069,
+    "failed": 0,
+    "skipped": 71,
+    "leaky_passes": 1,
+    "leaky_test": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+    "seconds": 200.874,
+    "doc_tests": [
+      4,
+      0,
+      0
+    ],
+    "relay_signals": "ok",
+    "turn_end_wire_process": {
+      "passed": 12,
+      "failed": 0
+    },
+    "full_log_sha256": "8f2228845a954cd36d7d40fb84f79712dd5014a645f999438f8a3f6415a4d93c"
+  },
+  "clippy": {
+    "run": 39993981366,
+    "conclusion": "success",
+    "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+    "full_log_sha256": "efeb92ff7ff3839656372068745de28dbc10dd568c8ba14742f00bb3ac9134fe"
+  },
+  "profile": "Official PR profile selected full workspace; realtime group ran with default-filter all(); 71 ignored cases skipped, including the two separately executed artifact cases. No local full-workspace gate.",
+  "artifact_downloaded": false,
+  "artifact_metadata": "arm64-train51-artifacts.json",
+  "excerpts": {
+    "arm64-train51-excerpt.txt": "1201522aa3a41e821ba35bf83f34509601c52b64a72105d9f8f5dcc30dc0b49c",
+    "clippy-train51-excerpt.txt": "33fca52b3b2fb9fe3dcae27d64b311d345ca9d96517db04cb8c5ca428a5b5298"
+  }
+}
