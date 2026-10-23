@@ -5,6 +5,17 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 00:16 — Body repair pushed on the latest base
+
+- #3275 `a449e539f`, based on `822efff7c`: full Mac Update **385/0/4 ignored**,
+  strict Clippy and formatting pass. Installer **90/0**, rounds **157/0**.
+  The native exit watcher recorded zero for the original command chain.
+- Rebase range-diff preserves all six commits; all tested repair files and
+  Update dependencies are unchanged. [Receipt](verification/head-touch-body-pair-fix-20261023/README.md).
+- Requested Second's repair read, the applicable privacy read and a final-head
+  Linux formatting receipt. Fresh native gates remain watched; First owns
+  disposition. Next is First's assigned #3278 actual-updater review.
+
 ## 2026-10-23 23:54 — Body admission repair under full gate
 
 - Second reproduced a P2 in #3275 `92088b7ea`: Body head-off in a

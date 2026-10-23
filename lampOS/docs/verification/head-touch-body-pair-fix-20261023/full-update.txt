@@ -1,0 +1,54 @@
+
+running 122 tests
+.................................i..................................................... 87/122
+......i............................
+test result: ok. 120 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 8.77s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+
+running 90 tests
+..............test a_failing_step_keeps_the_record_and_a_later_run_finishes has been running for over 60 seconds
+......................................................................... 87/90
+...
+test result: ok. 90 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 476.09s
+
+
+running 13 tests
+.............
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s
+
+
+running 157 tests
+.......................................................................test head_touch::absent_unused_product_pins_do_not_block_active_build_pins_updates has been running for over 60 seconds
+.......test head_touch::custom_active_pins_are_kept_and_checked_against_the_reader_pair has been running for over 60 seconds
+.......test head_touch::head_reader_mode_overrides_are_not_guessed_from_base_units has been running for over 60 seconds
+.. 87/157
+............test head_touch::semantic_head_reader_paths_cannot_expand_invocation_variables has been running for over 60 seconds
+..test head_touch::stale_unused_product_pins_do_not_block_active_build_pins_updates has been running for over 60 seconds
+...................................test self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart has been running for over 60 seconds
+..test self_recovery::an_unchanged_or_refused_updater_needs_no_recovery_query has been running for over 60 seconds
+...................
+test result: ok. 157 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1102.95s
+
+running 1 test
+test actual_cli_exec_confirms_before_the_next_round ... ignored, requires Linux ARM64/x86-64 ptrace
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out
+running 1 test
+test persisted_self_switches_survive_sigkill ... ignored, requires Linux syscall tracing
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -2,7 +2,11 @@
 
 Third, 23 October 2026. Repair of Second's
 [Body pairing P2](https://github.com/autonomous-ai/lampOS/pull/3275#issuecomment-6369844855)
-on #3275 `92088b7ea`. **Validation in progress; no corrected head qualified yet.**
+on #3275 `92088b7ea`. Corrected head
+`a449e539fd539535d08ab0cc9f328b3a7bec6cc8`, on `822efff7c`.
+Repository tree `ab4d9cd6d049efb2c3481f0265b478b354c76f4f`, lampOS subtree
+`ffd1ceec4475747a24ba04d24b9eb2fd81b37aa1`.
+**Local gate passed; fresh Linux gates and exact-head reviews remain.**
 
 ## Failure retained
 
@@ -52,13 +56,27 @@ cargo clippy -q --locked --offline -p lamp-update --all-targets -- -D warnings
 The first command is the retained pre-repair failure. The focused installer
 run passes **9/0/0** ([raw output](focused-install.txt)), including the
 original failure, refusal before mutation, and preserved factory calibration.
-The full package run and strict Clippy are pending. No gate retry has occurred.
+The [full package run](full-update.txt) passes **385/0/4 ignored**:
+unit **120/0/2**, install **90/0**, rounds **157/0**, other integration
+**18/0**, and two Linux-only harnesses ignored on Mac. No new ignored test.
+[Strict Clippy](clippy.txt) passes with empty output. The original command
+chain's [native exit event](process-exit.json) reports exit status zero.
+Formatting passes before the run and after the rebase. No gate retry occurred.
 The full-run source files are bound in [gate-source.sha256](gate-source.sha256).
+
+The tested commit was `4ba9b9d613`, rebased onto `822efff7c` as `a449e539f`.
+The [range-diff](rebase-range.txt) keeps all six commits equal. Every recorded
+repair hash matches after rebase, and Update source/tests, Cargo manifests,
+lockfile and toolchain are unchanged. The only integration addition was the
+standalone Skills test-fixture repair and its doc. The first post-rebase hash
+check was invoked one directory too deep and could not open its paths; the
+correct repository-root invocation passed all five, without source changes.
 
 The original long-running shell's tool handle became unavailable while its
 test process remained alive. A native process-exit watcher was attached to
 that same shell; the suite was not restarted to recover the handle.
 
-Fresh Linux formatting, ARM64 and Clippy, Second's re-read, and First's
-exact-head disposition remain required after the corrected head is pushed.
+The corrected head is pushed. Fresh Linux formatting, ARM64 and Clippy,
+Second's re-read, the applicable privacy read and First's exact-head
+disposition remain required.
 No device action or physical acceptance was performed.

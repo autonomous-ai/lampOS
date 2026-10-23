@@ -1,0 +1,6 @@
+1:  7869486592 = 1:  a2d271fa93 lampOS: head touch on in the product units, whole: the voice's LAMP_HEAD_TOUCH, sleep mute and restored mute, Expression's --head-touch, the body's LAMP_HEAD_TOUCH, pins without legacy_head (#711)
+2:  688bc98180 = 2:  2cf7741244 lampOS: the generic voice's census leaves head touch out of a moved lamp's group on purpose, with the product's own pins and try (#1362)
+3:  4133786237 = 3:  e24870b1bc lampOS: check effective head readers before install writes
+4:  4d00bc1144 = 4:  b61052b498 lampOS: check local system unit overrides before head activation
+5:  92088b7eaf = 5:  6100490bbd lampOS: raise the shared head cue default to the measured level
+6:  4ba9b9d613 = 6:  a449e539fd lampOS: require the Body sleep reader in head touch admission
