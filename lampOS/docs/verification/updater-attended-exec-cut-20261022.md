@@ -60,6 +60,23 @@ comparison](updater-attended-source-20261023.json) finds all seven relevant
 updater runtime and service/timer files byte-identical at integration head
 `7bfcb31b8`. This updates the source binding only; it does not qualify a new
 binary, an observer or a device. The actual trial artifact remains to select.
+
+After the ordinary restart and rollback work, the candidate source in #3186
+is `c02328dd7`. The [current source comparison](updater-attended-source-current-20261023.json)
+checks eight whole files, eight self-switch/persistence functions and two
+guard blocks against `7bfcb31b8`. Those checked blocks match exactly, including
+the same-sequence return before installed-unit discovery and the self-switch
+after `UpToDate`. Entire `round.rs` and `records.rs` no longer match: ordinary
+restart ordering, journal validation and cleanup have changed. The earlier
+seven-file identity claim applies only to its historical `7bfcb31b8` binding.
+
+With the required clean ordinary journal, the same-N self-only round skips
+those ordinary planning/recovery paths. Installed sequence N stays unchanged;
+candidate staging can still add its build folder to `state.made`, so do not
+require whole-state byte identity. This is source evidence only. The exact
+current PR's official CI, selected artifact/fallback hashes and all actual
+observer, configuration and attended inputs still need qualification.
+
 In `crates/update/src/round.rs`, `own_switch` stages and syncs the candidate,
 saves `made`, writes pending, then replaces and syncs `current`.
 `records::write_whole` syncs its temporary file and containing directory;
