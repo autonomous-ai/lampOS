@@ -1,5 +1,21 @@
 # Tests work log
 
+## 2026-10-23 18:30 +0700 — make Expression feature comparison independently checkable
+
+Ready for lamp-voice: no (#3218 execution HOLD remains).
+
+The Expression comparison now publishes all 418 candidate compiler
+feature/profile signatures, closing the review's availability gap for the
+reported 75-in-418 subset. Root reconstructed the complete canonical candidate
+list from the captured Cargo stream and verified every baseline signature.
+Original observations, diagnostics, binary identities and outcomes are unchanged.
+Full machine streams and executable bytes remain external; no full resolver
+identity or failure-cause claim is added.
+
+The requested bounded admission-age/counter and face-arm diagnostic is being
+prepared separately. Both latest-base full gate plans remain distinct from that
+investigation; boot-clock qualification is currently running.
+
 ## 2026-10-23 18:20 +0700 — relay merged and both test branches carried
 
 Ready for lamp-voice: no (#3190 and #3218 execution HOLDs remain).
