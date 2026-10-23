@@ -169,3 +169,35 @@ fn forgetting_everything_still_leaves_nothing_of_the_persons() {
     assert!(kept_texts(&store, &mai).is_empty());
     assert!(store.record(&an, theirs).unwrap().is_some());
 }
+
+/// Eighth's P3 on #3127: a forget that starts from the exchange itself (by
+/// its id, as `forget_last` with `kind: exchange` sends it) takes the
+/// observation noticed from it, but the kept thing remembered from it stays,
+/// as `descendants`' forget walk says: it goes only when it is named.
+#[test]
+fn forgetting_an_exchange_keeps_its_kept_thing_and_loses_its_observation() {
+    let scratch = Scratch::new("exchange");
+    let mut store = scratch.open();
+    let mai = Person::new("p-0123456789abcdef").unwrap();
+    let (said, wedding, colour) = conversation(&mut store, &mai);
+    assert_eq!(store.forget(&mai, said).unwrap(), 2);
+    for id in [said, colour] {
+        assert!(store.record(&mai, id).unwrap().is_none(), "{id} is gone");
+    }
+    let kept = store
+        .record(&mai, wedding)
+        .unwrap()
+        .expect("the wedding stays");
+    assert!(kept.source_ids.is_empty(), "{:?}", kept.source_ids);
+    assert_eq!(
+        kept_texts(&store, &mai),
+        ["Sister's wedding is on Saturday."]
+    );
+    // Reopened, the same.
+    drop(store);
+    let store = scratch.open();
+    assert_eq!(
+        kept_texts(&store, &mai),
+        ["Sister's wedding is on Saturday."]
+    );
+}
