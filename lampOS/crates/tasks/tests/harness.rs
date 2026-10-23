@@ -867,6 +867,184 @@ fn a_missing_folder_after_new_is_not_sent_with_the_switch_and_never_retried() {
     assert_eq!(rig.cli().launch(&launch()), uncertain("new_failed"));
 }
 
+/// Harness 0.4.55's refusal of a bare project name whose folder it made on
+/// an earlier `new` (Mobile on lamp-0c89, 23 Oct; the same words on the
+/// laptop beside lamp-75c9), as `--json` gives it.
+fn name_taken(name: &str, computer: &str) -> Value {
+    name_taken_at(name, computer, &format!("~/harnesses/{name}"))
+}
+
+/// The same refusal with the folder as the computer reports it: Harness
+/// prints another machine's folder whole (openharness `newCommand.ts`).
+fn name_taken_at(name: &str, computer: &str, folder: &str) -> Value {
+    let reply = json!({
+        "ok": false,
+        "error": format!(
+            "“{name}” already exists on {computer}: {folder}. Choose another name \
+             for the new project, or start in that folder: harness new claude --machine {MACHINE} \
+             {folder} --name lamp-task-001 -- …"
+        )
+    });
+    json!({"exit": 1, "stdout": format!("{reply}\n")})
+}
+
+/// The `new` calls' project arguments, in order.
+fn new_projects(rig: &Rig) -> Vec<String> {
+    rig.calls()
+        .iter()
+        .filter(|call| call["args"][0] == "new")
+        .map(|call| call["args"][4].as_str().unwrap().to_owned())
+        .collect()
+}
+
+/// A bare-name target gets one hand-over, then Harness refuses every later
+/// `new` because the folder it made is there (the first builder on #3126,
+/// 11:45). On that refusal alone, the launch is asked once more in
+/// `~/harnesses/<name>`, the folder Harness named, and starts there.
+#[test]
+fn a_bare_name_whose_folder_harness_made_is_started_in_that_folder() {
+    for computer in ["this computer", "lamp-office-mac"] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines": {"default": true},
+            "new": {"each": [name_taken("fixture-project", computer), step(created())]}
+        }));
+        assert_eq!(
+            rig.cli().launch(&launch()),
+            LaunchOutcome::Created {
+                agent_id: AGENT.into()
+            },
+            "{computer}"
+        );
+        assert_eq!(
+            new_projects(&rig),
+            ["fixture-project", "~/harnesses/fixture-project"]
+        );
+        // Everything else in the second `new` is the first's.
+        let calls = rig.calls();
+        let news: Vec<_> = calls
+            .iter()
+            .filter(|call| call["args"][0] == "new")
+            .collect();
+        let mut second = news[1]["args"].clone();
+        second[4] = json!("fixture-project");
+        assert_eq!(second, news[0]["args"]);
+    }
+}
+
+/// The folder is taken from Harness's words, as the computer reports it:
+/// for another machine its absolute path, spaces and all, after a label
+/// that may hold ": " itself (blue's P2 on #3217). It is asked with exactly
+/// that string. One that doesn't end in this name, or isn't a folder, is
+/// never asked.
+#[test]
+fn the_folder_is_the_one_harness_names_whole() {
+    for (computer, folder) in [
+        ("Mac mini", "/home/lee/Harness Projects/fixture-project"),
+        ("Office: desk 2", "/Users/lee/harnesses/fixture-project"),
+        ("lamp-office-mac", "~/harnesses/fixture-project"),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines": {"default": true},
+            "new": {"each": [name_taken_at("fixture-project", computer, folder), step(created())]}
+        }));
+        assert_eq!(
+            rig.cli().launch(&launch()),
+            LaunchOutcome::Created {
+                agent_id: AGENT.into()
+            },
+            "{computer} {folder}"
+        );
+        assert_eq!(new_projects(&rig), ["fixture-project", folder]);
+    }
+    for folder in [
+        "/home/lee/Harness Projects/other-project",
+        "/home/lee/fixture-project/sub",
+        "fixture-project",
+        "harnesses/fixture-project",
+    ] {
+        let rig = Rig::new();
+        rig.new_step(name_taken_at("fixture-project", "Mac mini", folder));
+        assert_eq!(
+            rig.cli().launch(&launch()),
+            uncertain("new_failed"),
+            "{folder}"
+        );
+        assert_eq!(new_projects(&rig).len(), 1, "{folder}");
+    }
+}
+
+/// Two tasks in a row on one name: the first makes the folder, the second
+/// is refused for it and starts in it. Neither is lost.
+#[test]
+fn two_hand_overs_in_a_row_on_one_name_both_start() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines": {"default": true},
+        "new": {"each": [step(created()), name_taken("fixture-project", "this computer"), step(created())]}
+    }));
+    let cli = rig.cli();
+    let started = LaunchOutcome::Created {
+        agent_id: AGENT.into(),
+    };
+    assert_eq!(cli.launch(&launch()), started);
+    assert_eq!(cli.launch(&launch()), started);
+    assert_eq!(
+        new_projects(&rig),
+        [
+            "fixture-project",
+            "fixture-project",
+            "~/harnesses/fixture-project"
+        ]
+    );
+}
+
+/// Only that refusal, for this name and its own folder, is asked again,
+/// and only once: a folder target, another name's folder, a second refusal,
+/// another error or a timeout is never asked twice, so nothing can start
+/// twice.
+#[test]
+fn only_the_name_taken_refusal_is_asked_again_and_only_once() {
+    // A folder target is never a name Harness made.
+    let mut rig = Rig::new();
+    let mut folder = launch();
+    folder.target.project = "~/fixture-project".into();
+    rig.new_step(name_taken("fixture-project", "this computer"));
+    assert_eq!(rig.cli().launch(&folder), uncertain("new_failed"));
+    assert_eq!(new_projects(&rig), ["~/fixture-project"]);
+    // Another name's folder.
+    rig = Rig::new();
+    rig.new_step(name_taken("other-project", "this computer"));
+    assert_eq!(rig.cli().launch(&launch()), uncertain("new_failed"));
+    assert_eq!(new_projects(&rig).len(), 1);
+    // The same words with success, or with `ok` true, are not the refusal.
+    rig = Rig::new();
+    let mut said_ok = name_taken("fixture-project", "this computer");
+    said_ok["exit"] = json!(0);
+    rig.new_step(said_ok);
+    assert_eq!(rig.cli().launch(&launch()), uncertain("new_failed"));
+    assert_eq!(new_projects(&rig).len(), 1);
+    // Refused again in the folder: uncertain, and not asked a third time.
+    rig = Rig::new();
+    rig.new_step(json!({"each": [
+        name_taken("fixture-project", "this computer"),
+        json!({"exit": 1, "stdout": "{\"ok\":false,\"error\":\"SPAWN_FAILED\"}\n"})
+    ]}));
+    assert_eq!(rig.cli().launch(&launch()), uncertain("new_failed"));
+    assert_eq!(new_projects(&rig).len(), 2);
+    // A first `new` that timed out is never asked again.
+    rig = Rig::new();
+    rig.config.launch_timeout = Duration::from_millis(300);
+    rig.new_step(json!({"delay_ms": 2000}));
+    let outcome = rig.cli().launch(&launch());
+    assert!(
+        matches!(outcome, LaunchOutcome::Uncertain { .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(new_projects(&rig).len(), 1);
+}
+
 #[test]
 fn errors_and_malformed_success_after_new_are_never_retried() {
     for (step, code) in [

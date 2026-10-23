@@ -27,10 +27,10 @@ const MARGIN: f32 = 0.25;
 /// The landmarks it gives, each x, y and z.
 pub const LANDMARKS: usize = 478;
 /// The inner lips' middle, upper and lower, and the face's top and chin.
-pub(crate) const UPPER_LIP: usize = 13;
-pub(crate) const LOWER_LIP: usize = 14;
-pub(crate) const BROW: usize = 10;
-pub(crate) const CHIN: usize = 152;
+const UPPER_LIP: usize = 13;
+const LOWER_LIP: usize = 14;
+const BROW: usize = 10;
+const CHIN: usize = 152;
 
 /// The eye line's angle in the frame, as its sine and cosine: what [`crop`]
 /// turns the face by. `None` for eyes on one point.
@@ -97,33 +97,6 @@ pub fn mouth_open(landmarks: &[f32]) -> Option<f32> {
     let tall = apart(point(BROW), point(CHIN));
     let gap = apart(point(UPPER_LIP), point(LOWER_LIP));
     (tall.is_finite() && gap.is_finite() && tall > 1e-3).then(|| gap / tall)
-}
-
-/// How old a mouth read off the look (`--seems-blendshapes`) may be when a
-/// look takes it for its largest face. On a small core the mesh (290 ms
-/// under tract) is slower than a look (250 ms): a crop waits in the slot
-/// up to one mesh, is read in another, and is taken by the next look, so
-/// up to 2 x 290 + 250 ms after its face was seen.
-pub const MOUTH_LASTS_US: u64 = 850_000;
-
-/// A mouth read off the look: how open, when its face was seen, and that
-/// face's box.
-pub type MouthRead = (f32, u64, Face);
-
-/// The openness of `newest`, the newest mouth the look found read off the
-/// look since the last (each read is taken by one look only: one given
-/// twice would read as a still mouth), for the
-/// look's `largest` face at `now_us`: only if its face was seen within
-/// [`MOUTH_LASTS_US`] and its box is the largest's (overlapping by more
-/// than the detector's [`crate::faces::SAME_FACE`]), so the mouth of
-/// someone who was the largest a look ago is never given to another.
-pub fn recent_mouth(newest: Option<&MouthRead>, largest: &Face, now_us: u64) -> Option<f32> {
-    newest
-        .filter(|(_, seen, face)| {
-            now_us.saturating_sub(*seen) <= MOUTH_LASTS_US
-                && crate::faces::overlap(face, largest) > crate::faces::SAME_FACE
-        })
-        .map(|(open, ..)| *open)
 }
 
 /// With `--mouth-on-heard on`: the mesh runs only while the voice hears a
@@ -300,51 +273,6 @@ fn read_pinned(path: &Path) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// The `eyes-seems` thread under tract on a small core: 290 ms a mesh,
-    /// one look every 250 ms, each look offering its largest face's crop to
-    /// the newest-only slot. Most looks still get that face's mouth.
-    #[test]
-    fn a_mesh_slower_than_a_look_still_gives_the_largest_its_mouth() {
-        const LOOK_US: u64 = 250_000;
-        const MESH_US: u64 = 290_000;
-        let still = face(100.0, 80.0, 60.0, [(115.0, 100.0), (145.0, 100.0)]);
-        // The worker: what it reads and when it finishes, and the slot.
-        let (mut busy, mut slot): (Option<(u64, u64)>, Option<u64>) = (None, None);
-        let mut given = 0;
-        for look in 0..40u64 {
-            let now = look * LOOK_US;
-            let mut newest = None;
-            while let Some((seen, done)) = busy.filter(|&(_, done)| done <= now) {
-                newest = Some((0.05, seen, still));
-                busy = slot.take().map(|next| (next, done + MESH_US));
-            }
-            given += u32::from(recent_mouth(newest.as_ref(), &still, now).is_some());
-            slot = Some(now);
-            if busy.is_none() {
-                busy = slot.take().map(|next| (next, now + MESH_US));
-            }
-        }
-        // 250 / 290 of looks find a new read; the first two none yet.
-        assert!(given >= 33, "{given} of 40 looks");
-    }
-
-    /// A mouth read from one face's crop is not given to another face that
-    /// has become the largest, nor to the same face once it is too old.
-    #[test]
-    fn a_mouth_goes_only_to_its_own_face_while_recent() {
-        let near = face(100.0, 80.0, 60.0, [(115.0, 100.0), (145.0, 100.0)]);
-        let moved = face(104.0, 82.0, 60.0, [(119.0, 102.0), (149.0, 102.0)]);
-        let other = face(200.0, 60.0, 80.0, [(220.0, 85.0), (260.0, 85.0)]);
-        let read = (0.05, 1_000_000, near);
-        assert_eq!(recent_mouth(Some(&read), &moved, 1_250_000), Some(0.05));
-        assert_eq!(recent_mouth(Some(&read), &other, 1_250_000), None);
-        assert_eq!(
-            recent_mouth(Some(&read), &near, 1_000_000 + MOUTH_LASTS_US + 1),
-            None
-        );
-        assert_eq!(recent_mouth(None, &near, 1_000_000), None);
-    }
 
     fn face(x: f32, y: f32, side: f32, eyes: [(f32, f32); 2]) -> Face {
         Face {

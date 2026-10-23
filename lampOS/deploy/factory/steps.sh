@@ -11,7 +11,9 @@
 #   4. the self-test: lamp-selftest --occasion factory, the lamp first stood
 #      up by its running lamp-body ("listening" on its mood socket) so
 #      that head_move is checked whether or not the voice is up (#2232),
-#      with lamp-expression stopped for the run and started again after
+#      with lamp-expression stopped for the run and started again after;
+#      then, passed, the lamp is paused (lamp-keeper pause, keeper.md) so it
+#      folds and stays at rest, taking no turn, until it is next started
 # Run on the lamp, as root. Every step is dry unless --write: it reads and
 # says what it would write, and nothing is written to /etc. A step that
 # fails stops the rest and says which. Written, steps 1, 2 and 4 need a
@@ -28,7 +30,7 @@
 #
 # The binaries are the installed ones; the body needs --let-go-at-stop (#1776).
 # For a test, MEASURE_BIN, BODY_BIN, MOOD_BIN, CONTROLS_BIN, SELFTEST_BIN,
-# SYSTEMCTL, JQ, SETPRIV and ETC_ROOT (a folder standing for /) replace them;
+# KEEPER_BIN, SYSTEMCTL, JQ, SETPRIV and ETC_ROOT (a folder standing for /) replace them;
 # STAND_WAIT is the seconds a stand is given (34), HEAD_STAND_WAIT the
 # seconds the running body is given to stand before the self-test (9),
 # BODY_START_WAIT the seconds lamp-body, started for step 4 when it is not
@@ -61,6 +63,7 @@ SETPRIV=${SETPRIV:-setpriv}
 CONTROLS_BIN=${CONTROLS_BIN:-/opt/lampOS/controls/current/lamp-controls}
 SELFTEST_BIN=${SELFTEST_BIN:-/opt/lampOS/selftest/current/lamp-selftest}
 SYSTEMCTL=${SYSTEMCTL:-systemctl}
+KEEPER_BIN=${KEEPER_BIN:-/usr/local/bin/lamp-keeper}
 JQ=${JQ:-jq}
 UNIT_ID='' WRITE=0 KEY='' FROM=1 TO=4
 DEVICE=/dev/ttyACM0 LOCKS=/run/lampos-locks/motor BODY_USER=lampos
@@ -508,6 +511,9 @@ BODY_MOOD=$ROOT/run/lampos-body/mood.sock
 HEAD_STOOD=0
 stand_for_head() {
   local body_state tenths=0
+  # A lamp paused by an earlier pass (below) takes every mood as rest and
+  # would not stand; the pause is the steps' own, so it is cleared first.
+  [[ -x $KEEPER_BIN ]] && "$KEEPER_BIN" resume
   body_state=$("$SYSTEMCTL" is-active lamp-body 2>/dev/null)
   # Step 1 needs lamp-body stopped and nothing after it starts it again, so a
   # body not running is started here, whatever step the run began at, and
@@ -553,6 +559,14 @@ step_selftest() {
   [[ $HEAD_STOOD == 1 ]] && say "the lamp folds by itself within 90 s of standing (lamp-body's --awake-seconds)"
   # Exit 3, a part not checked, counts as the unit's success (selftest.md).
   [[ $status == 0 || $status == 3 ]] || { fail "the self-test found a part that failed (exit $status)"; return 1; }
+  # Left as it is, an up voice wakes the lamp to anyone talking, and an awake
+  # lamp stands (#2818 on lamp-52e6, in a talking office; a factory is no
+  # quieter). The keeper's pause (keeper.md) makes every mood rest and drops
+  # calls, looks and Expression's requests, so the body folds once its awake
+  # time runs out and holds there; it lives in /run, so the lamp's next
+  # start is not paused.
+  "$KEEPER_BIN" pause || { fail "could not pause the lamp with $KEEPER_BIN, so it would wake to the room and stand: the steps passed, but the arm is not left at rest"; return 1; }
+  say "the lamp is paused until it is next started: it folds and stays at rest, taking no turn"
 }
 
 say "lamp $UNIT_ID, $MODE, from step $FROM"

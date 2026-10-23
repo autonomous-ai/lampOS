@@ -1880,7 +1880,8 @@ then use that person's scope:
 
 - **Nothing personal kept while nobody is known** (the owner's question 1,
   option (b); `LAMP_MEMORY_PERSONAL_NEEDS_FACE=on`, off unless set; both
-  voice routes, either memory client). On lamp-c0a4 "the user's favourite
+  voice routes, either memory client; on in the product unit since #3174,
+  the lead's decision 1 of 23 Oct). On lamp-c0a4 "the user's favourite
   colour is blue", said with no face known, was kept as the room's. With
   the switch, while nobody is known (the room's scope, a text from the app
   included):

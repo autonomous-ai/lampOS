@@ -53,13 +53,16 @@ pub const RESET_PLAN: &str = "/etc/lampOS/setup/reset-plan.json";
 /// made: only these paths.
 pub const IMAGE_FILES: &[&str] = &[
     "/etc/asound.conf",
+    "/etc/default/orangepi-ramlog",
     "/etc/systemd/system/lamp-cmedia-speaker.service",
     "/etc/systemd/system/respeaker-lite-softvol.service",
     "/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf",
+    "/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf",
     "/etc/systemd/journald.conf.d/zz-lamp-journal.conf",
     "/etc/udev/rules.d/90-respeaker-lite.rules",
     "/etc/udev/rules.d/91-pulseaudio-hal-ignore.rules",
     "/etc/udev/rules.d/99-lamp-device.rules",
+    "/usr/local/libexec/lamp-journal-keep",
     "/usr/local/libexec/lamp-ramlog-postrotate",
 ];
 /// At most this many of the image's files in one build, all variants.

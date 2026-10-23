@@ -33,25 +33,33 @@ pub const SESSION_EXPIRY_S: u32 = 60;
 pub const MOST_PACKET_BYTES: u32 = (crate::photos::MOST_BYTES.div_ceil(3) * 4 + (1 << 20)) as u32;
 
 /// Where lamp-cloud reads whether it leaves the broker a will: `on`, and
-/// nothing else ([`options_with_will`]). Off until the backend reads it
-/// (Backend3 on Queue #2602, 21 Oct 19:4x).
+/// nothing else ([`options_with_will`]). Off unless set; on in the product
+/// unit (#2636), once the backend read it (Backend3 on Queue #2602, 21 Oct
+/// 19:4x).
 pub const OFFLINE_WILL_ENVIRONMENT: &str = "LAMP_CLOUD_OFFLINE_WILL";
 /// How long the broker waits, after it finds the lamp's connection lost,
 /// before it says the will. The backend marks a lamp offline only 5 to 8 min
 /// after its last ping or `info` (a check every 3 min, a 5 min bound). With
 /// the will, a killed or stopped lamp-cloud shows offline about 30 s after its
 /// connection closes (it never sends a DISCONNECT), and a lost network or a
-/// power cut within about 2 min (the keepalive's ~90 s, then this). Every
-/// connection asks for a clean start, which ends the old session, so a
-/// reconnect sends the old will at once, followed by this connection's `info`
-/// (the Reviewer on #2636, MQTT v5 3.1.2.5, 3.1.2.10, 3.1.3.2.2).
+/// power cut within about 2 min (the keepalive's ~90 s, then this). A
+/// reconnect within the delay sends no offline: on lamp-06c1 (23 Oct 09:11)
+/// a restart with the will on brought only the new connection's `info`, so
+/// the record stays online (docs/cloud.md, #3035).
 pub const WILL_DELAY_S: u32 = 30;
+// The broker says a will at the earlier of its delay and the session's end
+// (MQTT v5 3.1.2.11.2, 3.1.3.2.2): a session that ends first, or a session
+// expiry of 0, would say it sooner than `WILL_DELAY_S`.
+const _: () = assert!(SESSION_EXPIRY_S > WILL_DELAY_S);
 
 /// [`options`] with the lamp's will: `offline` from `identity`, on its own
 /// reply channel `fd_channel`, at QoS 1, not retained, after
 /// [`WILL_DELAY_S`]. The backend takes an `offline` with the lamp's `id` on
 /// its own channel as the lamp gone, and its next ping or `info` as back.
-/// The will's `time` is when the connection was made.
+/// The will's `time`, `timezone` and `local_ip` are those of when the client
+/// was made (start, or a relink after a Wi-Fi join): a reconnect inside the
+/// event loop keeps them. The backend reads only `type`, `id` and `device` of
+/// an `offline`, and takes messages on a channel in the order they come.
 pub fn options_with_will(account: &Account, identity: &Identity) -> Option<MqttOptions> {
     let mut options = options(account)?;
     let properties = LastWillProperties {
@@ -2181,6 +2189,7 @@ mod tests {
         let seen = seen.lock().unwrap().clone();
         let Some(Seen::Connect {
             will: Some((topic, message, qos, retain, delay)),
+            expiry,
             ..
         }) = seen.first().cloned()
         else {
@@ -2190,6 +2199,12 @@ mod tests {
             (topic.as_str(), qos, retain, delay),
             ("fd/d-42", 1, false, Some(WILL_DELAY_S))
         );
+        // The broker says a will at the earlier of its delay and the
+        // session's end (MQTT v5 3.1.3.2.2): with a session expiry of 0 the
+        // will goes at once, so the session must outlast the delay.
+        // `SESSION_EXPIRY_S > WILL_DELAY_S` holds at build time (below
+        // `WILL_DELAY_S`); this is the expiry the connection asks for.
+        assert_eq!(expiry, Some(SESSION_EXPIRY_S));
         let said: serde_json::Value = serde_json::from_str(&message).unwrap();
         assert_eq!(said["type"], "offline");
         assert_eq!(said["id"], "d-42");

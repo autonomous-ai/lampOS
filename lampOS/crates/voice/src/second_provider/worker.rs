@@ -4387,12 +4387,12 @@ fn going_on_from(
 }
 
 /// With `LAMP_NAME_OR_FOLLOW_UP`, whether a line begun `began_ago` ago is
-/// a follow-up: begun within [`crate::name_or_follow_up::FOLLOW_UP_FOR`] of
+/// a follow-up: begun within [`crate::name_or_follow_up::follow_up_for`] of
 /// the end of the lamp's own last words (`said_ago`, now) or of a call let
 /// out (`called_ago`, now, which carries no longer than the words do), or
 /// while they still played, however long the line then went on. Only then
-/// does a conversation go on. The windows of [`going_on_from`] and
-/// [`went_on_told`] still bound it, so the switch only narrows them.
+/// does a conversation go on. In a busy room, in the check's `ended`, it
+/// alone decides, so [`went_on_told`]'s 15 s doesn't bound it there.
 fn follows_up(
     said_ago: Option<Duration>,
     called_ago: Option<Duration>,
@@ -4662,7 +4662,7 @@ impl Heeding {
     /// call that carries the next lines
     /// ([`crate::attention::Attention::face_shows`]); and a conversation goes
     /// on only for a line begun within
-    /// [`crate::name_or_follow_up::FOLLOW_UP_FOR`] of the end of the lamp's
+    /// [`crate::name_or_follow_up::follow_up_for`] of the end of the lamp's
     /// own last words, or of a call let out ([`follows_up`]). Two faces in
     /// view make the room busy ([`Self::signs_begun`]).
     pub(crate) fn needing_name_or_follow_up(&mut self) {

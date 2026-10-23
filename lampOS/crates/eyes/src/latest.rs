@@ -40,16 +40,6 @@ impl<T> Latest<T> {
         ready.notify_one();
         dropped
     }
-
-    /// Whether an item offered is still in the slot, not yet taken.
-    pub fn waiting(&self) -> bool {
-        self.shared
-            .0
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .item
-            .is_some()
-    }
 }
 
 impl<T> Drop for Latest<T> {
@@ -124,7 +114,6 @@ mod tests {
             item
         })
         .unwrap();
-        assert!(!latest.waiting());
         assert!(!latest.offer(1));
         assert_eq!(started.recv_timeout(Duration::from_secs(5)), Ok(1));
         // While it reads 1: looks keep their pace, each offer at once.
@@ -137,7 +126,6 @@ mod tests {
             thread::sleep(Duration::from_millis(5));
         }
         assert!(slowest < Duration::from_millis(50), "{slowest:?}");
-        assert!(latest.waiting());
         let read: Vec<u32> = (0..2)
             .map(|_| results.recv_timeout(Duration::from_secs(5)).unwrap())
             .collect();
