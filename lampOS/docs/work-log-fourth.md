@@ -7793,3 +7793,50 @@ Queue and own PR comments were read through 11:00:39; responses and next
 steps are on #3064 and #3126. Name and Photo remain parked until Common
 merges. The user explicitly approved ready-for-review updates after the
 required checks; First and reviewers retain merge control.
+
+
+## 2026-10-23 11:28 +07: Peek event-reader PR published; Common Checking boundaries being corrected
+
+Ready for lamp-voice: no
+
+Peek piece 2 is draft #3211 at `f1c0eb7dd`, one commit on its own branch,
+base `e5cd73aca`, exact candidate tree `1eb9d3c66`. It grants an explicitly
+configured reader access only to new session event files. No account, unit,
+bus grant, default or lamp installation is included. The current Mac gate
+passed `cargo fmt --all --check`, strict workspace/all-target Clippy,
+`cargo build -q --locked --workspace`, reader 4/0, switch census 6/0 and
+full Records 182/0/1 ignored. All 6,651 source files and the semantic index
+were verified unchanged. The current Linux results in the preceding entry
+remain on this identical source. ARM64 run 39900221416 and Linux Clippy run
+39900221378 are pending; they remain the native PR gates.
+
+The Mac gate receipt is
+`/private/tmp/fourth-peek-mac-final-checks-20261023/attempt3/terminal-summary.json`.
+Two prior preflight attempts ran no Cargo: the raw index guard rejected
+Git's stat-cache metadata refreshes. A byte-level comparison found all
+9,992 paths, modes, object IDs and flags unchanged; the runner now freezes
+that semantic index and records raw cache changes separately. A deliberately
+changed object-ID control still fails. This is not a product assertion change.
+The earlier full Mac failures remain retained and are not cleared by the
+focused gate. The PR body records them and the separate Linux privilege,
+rotation, old-reader and synthetic timing limits.
+
+Common's first integrated Checking Linux gate passed fmt but failed while
+compiling tests: eight callbacks still returned bool after the permission
+API became Ready/Pending/Lost. The fixtures are adapted without changing
+their assertions; the failed receipt remains under
+`/private/tmp/fourth-common-checking-linux-20261023/attempt1/`.
+Independent review found two further loss boundaries: completed note adoption
+could consume a read during Checking, and context composition could keep a
+neutral result after recognition resumed. The corrected adoption returns
+the same read without taking its text or changing its original ask. Context
+composition is being given an explicit Pending result and an async retry
+outside its locks; speculative preparation must not send a reduced context.
+A retained completed read's separately bounded follow-up is also preserved.
+These corrections and their new regression controls are not yet qualified.
+
+The checked-in 4ace source has the four coupled memory/speaking settings;
+its old cadence argument and executable pins remain unchanged pending the
+exact-pin CLI evidence/decision. The known-person lamp run remains First's.
+Queue and own PR comments were read through 11:25:52; publication/counts
+are posted on #2789 and #3126. Name and Photo wait for merged Common.
