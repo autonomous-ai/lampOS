@@ -1,5 +1,27 @@
 # Tests work log
 
+## 2026-10-23 08:10 +0700 — sign-in regression claimed; product gaps audited
+
+Taken: [#2839](https://github.com/autonomous-ai/lampOS/issues/2839#issuecomment-6354934999),
+first claim confirmed, test-only stand-in sign-in code counting and explicit
+repeat regression on `b7700b7c2`. Existing tool/news tests do not count actual
+delivery through the combined route. A queued-news/START overlap is a source
+risk to reproduce, not an established explanation of the lamp report. Product
+changes require a scope decision if the regression fails. No test has run.
+
+[Read-only audit](verification/tests-next-issues-20261023/) records #2839,
+#2848 and #2862 with 21 source hashes and the accepted #2847 prerequisite.
+#2848's unit is off and sysinit-only; enabling its flag alone does not implement
+the issue's voice-restart behavior. #2862's consent readers/writer are fail-closed,
+but both unit settings and the setup page's question/submission are absent.
+A writer-to-broker/reset regression fits a later test-only slice; shipping the
+unit/page changes and fresh-install/reset qualification need explicit scope
+and lamp ownership. The source audit is not a new device result.
+
+The boot-clock Linux exact-base control now reproduces the original overflow
+at **60.09 s**: **0/1**, worker.rs:8341, from a **3,583-test** compiled inventory.
+The frozen candidate is compiling next; no candidate pass is claimed yet.
+
 ## 2026-10-23 08:05 +0700 — Surround native gate and conversation-guard review complete
 
 #3165's authored `7a36051bd` passed both actual native jobs, checked as

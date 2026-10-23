@@ -1,0 +1,171 @@
+{
+  "created_utc": "2026-10-23T01:08:41.064788+00:00",
+  "source_head": "b7700b7c268c0c22e26c1c88c9e9ee359cddf550",
+  "v1_head": "1b5f7a78b86a0aac64a87950100e09d1bda6e42b",
+  "assigned_issues": [
+    2839,
+    2848,
+    2862
+  ],
+  "all_assigned_comments_read": true,
+  "assigned_comment_counts": {
+    "2839": 0,
+    "2848": 0,
+    "2862": 0
+  },
+  "prerequisite_2847_comments_read": 3,
+  "source_files": [
+    {
+      "path": "lampOS/crates/voice/src/sign_in.rs",
+      "sha256": "2714ab9cdc53a0c48a74b800be45c5098d88877f936d8d97d1e3aaf012cb27dd",
+      "git_blob": "29e841784c7ba239d9256c2d19a8842ed0dfe4ee"
+    },
+    {
+      "path": "lampOS/crates/voice/src/task_news.rs",
+      "sha256": "976bda631fd828868ed0816238fe5bffd74ec842f5af9c79836dfa8b23d2dba8",
+      "git_blob": "7861d06ac461eb6aa6ff529bf4fb9f199f2df681"
+    },
+    {
+      "path": "lampOS/crates/tasks/src/sign_in.rs",
+      "sha256": "0283f93dd374e2681ae1fc46ed6d531a836c114e87e3cf4e68970e94e2199dd9",
+      "git_blob": "1fa1fd03c048d70af28f92581f67b4020563c640"
+    },
+    {
+      "path": "lampOS/crates/tasks/src/runtime.rs",
+      "sha256": "dfc31dc9e888901c43bf5a3bbf0efb94ec273189a117ec3d83073625bb50a077",
+      "git_blob": "2a88e7ff4e63f14d5674119843fe65094d9e057e"
+    },
+    {
+      "path": "lampOS/crates/tasks/tests/fixtures/harness_cli.rs",
+      "sha256": "779532bc6e5875ae53314386906ff8c341f56e83c32278742c79c1ae73b64ed6",
+      "git_blob": "12ec55b8d69abc08e362f189732a139dc482b71e"
+    },
+    {
+      "path": "lampOS/tools/played/ask-again.sh",
+      "sha256": "32a2ae1f36879e9d94b39084087e9ad91fb1dd7a70f6dc9050be5b5562a6d6ca",
+      "git_blob": "c5f753f2f4a14011502c7233b6b27ef23da81b30"
+    },
+    {
+      "path": "lampOS/deploy/product/lamp-waking.service",
+      "sha256": "d574a8ee68409b2751c392409bdda41c1753f431dd3213ca24ffdfd5a33b6d83",
+      "git_blob": "30ce79ea5113ff8277ba8c9ca86e0a27bc74b227"
+    },
+    {
+      "path": "lampOS/deploy/product/lamp-cloud.service",
+      "sha256": "bcb5516b8cbfc3fa5cd4b49911904d6f92806ad729a66e38e430927ad2836f5d",
+      "git_blob": "14ab02ecd61126bef0e36db4703c59510575666f"
+    },
+    {
+      "path": "lampOS/deploy/product/lamp-voice.service",
+      "sha256": "ad4341a85fcf3e9c72266aa4190226e603ed585564f314e7aceea6ab5ce7c5de",
+      "git_blob": "ccc3ab266033c2c7268da7235cb9dd7b3705a275"
+    },
+    {
+      "path": "lampOS/deploy/product/lampos.target",
+      "sha256": "cdc90f174f669a873ef44ac575a6628b9de37f62b5dc6adfabf2b17731221b9b",
+      "git_blob": "ec66e9be8ed1c73dde3616ab26274e203dcdccb0"
+    },
+    {
+      "path": "lampOS/crates/setup/src/wake.rs",
+      "sha256": "788bdee814252222f6527c77903bb3cc39f84c82e7eddd906a8f0aada1050372",
+      "git_blob": "3245af023f77d035c997a26d0898441f5781d64d"
+    },
+    {
+      "path": "lampOS/crates/setup/tests/wake.rs",
+      "sha256": "ba56d0940098f25e7e3987438d8c9794b4f1673f9a095f6a2a58eb36177a1978",
+      "git_blob": "142ecced64e81da56145e962bc1b29714e69c956"
+    },
+    {
+      "path": "lampOS/crates/setup/src/page.html",
+      "sha256": "b6506657f304a1932ff15640b1a2218ca8f5e7469e27711a9f8eef766186a972",
+      "git_blob": "1d3f7c01911adc11d2b3ff8288810c3b4fc82182"
+    },
+    {
+      "path": "lampOS/crates/setup/src/serve.rs",
+      "sha256": "d6ef127f973d9aa93e2c246617f170db921e5096508ab94b23b3fca54649dab9",
+      "git_blob": "40de8bc8dbe046a0d21c9791114f01439118cc68"
+    },
+    {
+      "path": "lampOS/crates/setup/tests/it/serve.rs",
+      "sha256": "d08302222d697b4273d3787fe0b0b76e7724165f1d11b53d78862af3358ceeb4",
+      "git_blob": "aff2a828cd5942464f0e1cbcb29762a6ecd4453b"
+    },
+    {
+      "path": "lampOS/crates/setup/fixtures/reset-plan-product.json",
+      "sha256": "ad3fd11185bdf206f8622fef2c6d9bafac4efb7742e65b1c7df11de383cc83e6",
+      "git_blob": "751c938d8a073a0d1f1d93d740c1d7b4102e007e"
+    },
+    {
+      "path": "lampOS/crates/cloud/src/reports.rs",
+      "sha256": "917e4e88103a5985bf48370c2adb8ccbe5d2e2620662e0b139469a2d3b41a87b",
+      "git_blob": "83c683efcb77027a6568877b965d2f88f1cc0e13"
+    },
+    {
+      "path": "lampOS/crates/cloud/src/online.rs",
+      "sha256": "592abf21b9a93c55298c0d307b8c5a90397b36cdf8fb6173c768fa0bf532585b",
+      "git_blob": "d1f7d9aa1fe14e8756741439003735e259a29d1b"
+    },
+    {
+      "path": "lampOS/crates/update/tests/install.rs",
+      "sha256": "207780e6bdfb97193aee101ef02a1b65e2572d75e1ae327b101dbd9b341e33ed",
+      "git_blob": "711156e275202fb5186212d09f9e6108fb637743"
+    },
+    {
+      "path": "lampOS/crates/update/tests/functions.rs",
+      "sha256": "3448d8f0896888a5f424a82756818abc2f08b8ee2a05697e27392d3b2d15b5d5",
+      "git_blob": "234c9e18e30eb0d9b4a4aa4f4915cea36095350d"
+    },
+    {
+      "path": "lampOS/docs/lamp-runs.md",
+      "sha256": "1612202332448f997d3e4a5e4a718abf8777232141343e3b9ed6ae28ea8596f7",
+      "git_blob": "37ffcfeeb3f18c15864dd56f186d4ca34c9d5287"
+    }
+  ],
+  "raw_issue_receipts": [
+    {
+      "file": "issue-2839-comments.json",
+      "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+      "bytes": 4
+    },
+    {
+      "file": "issue-2839.json",
+      "sha256": "1e54343d1bfbffecd3b0faf6437456ce710a6dee6ab57c30b39fed2d3f115393",
+      "bytes": 3085
+    },
+    {
+      "file": "issue-2847-comments.json",
+      "sha256": "2ea9bb492777f02e010ab4ee9deda2527e39923081f89fc8979e39573f76d1ba",
+      "bytes": 6654
+    },
+    {
+      "file": "issue-2847.json",
+      "sha256": "492c15276a38d0f669c4965884861c0028d276325048613b1df6d67ec842fd5d",
+      "bytes": 4054
+    },
+    {
+      "file": "issue-2848-comments.json",
+      "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+      "bytes": 4
+    },
+    {
+      "file": "issue-2848.json",
+      "sha256": "1b51e3033986490720af863e4f9d5100cbebbcfe42a6ae72fc269cd700f5dbeb",
+      "bytes": 3048
+    },
+    {
+      "file": "issue-2862-comments.json",
+      "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+      "bytes": 4
+    },
+    {
+      "file": "issue-2862.json",
+      "sha256": "b653c18bcc4dc514c55ea596ea55547b2f452b43503b151c64b5875c71da5270",
+      "bytes": 3192
+    }
+  ],
+  "audit_markdown_sha256": "39cd134d3d3c7a90aa111f6d73fb5eead4683ef778801716f5690517005719b1",
+  "tests_run": false,
+  "code_edits": false,
+  "github_writes": false,
+  "device_access": false
+}
