@@ -266,7 +266,7 @@ def score(played, ev, J, L, heard_by):
                 m = re.search(rf'request {q} first answer audio (\d+) ms', l)
                 if m: firsts.append(int(m.group(1)))
                 if re.search(rf"request {q}'s words, cut short, are let go", l): let_go += 1
-                if re.search(rf'request {q}.*joined', l): joined += 1
+                if re.search(rf'request {q}\b.*joined', l): joined += 1
         # What was spoken is the journal's own line for the request ("first answer audio"): a transcript can hold words
         # the voice cancelled (a not_for_me after its text), and a sound's time is only when the Mac read it.
         answered = bool(firsts)
