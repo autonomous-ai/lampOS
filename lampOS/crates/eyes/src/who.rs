@@ -1399,8 +1399,13 @@ pub enum Ask {
     PhotoHere,
     /// The voice has asked them, in this meeting.
     PhotoAsked(String),
-    /// Their yes: kept as an ordinary print.
-    PhotoYes(String),
+    /// Their yes: kept as an ordinary print. With `LAMP_PHOTO_SPEAKER=on`
+    /// (#2856), `face` is the passing id, under its boot (`boot/f3`), of the
+    /// face the voice heard saying it.
+    PhotoYes {
+        name: String,
+        face: Option<String>,
+    },
     /// Their no: deleted.
     PhotoNo(String),
     /// Their yes to being named to others in Who was here (#1997), taken
@@ -1428,6 +1433,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
         photo_no: Option<String>,
         visits_yes: Option<String>,
         visits_no: Option<String>,
+        face: Option<String>,
     }
     if let Ok(consent) = serde_json::from_slice::<Consent>(line) {
         return match consent {
@@ -1438,6 +1444,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
                 photo_no: None,
                 visits_yes: None,
                 visits_no: None,
+                face: None,
             } => Some(Ask::PhotoHere),
             Consent {
                 photo_here: None,
@@ -1446,6 +1453,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
                 photo_no: None,
                 visits_yes: None,
                 visits_no: None,
+                face: None,
             } => Some(Ask::PhotoAsked(name)),
             Consent {
                 photo_here: None,
@@ -1454,7 +1462,8 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
                 photo_no: None,
                 visits_yes: None,
                 visits_no: None,
-            } => Some(Ask::PhotoYes(name)),
+                face,
+            } => Some(Ask::PhotoYes { name, face }),
             Consent {
                 photo_here: None,
                 photo_asked: None,
@@ -1462,6 +1471,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
                 photo_no: Some(name),
                 visits_yes: None,
                 visits_no: None,
+                face: None,
             } => Some(Ask::PhotoNo(name)),
             Consent {
                 photo_here: None,
@@ -1470,6 +1480,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
                 photo_no: None,
                 visits_yes: Some(name),
                 visits_no: None,
+                face: None,
             } => Some(Ask::VisitsYes(name)),
             Consent {
                 photo_here: None,
@@ -1478,6 +1489,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
                 photo_no: None,
                 visits_yes: None,
                 visits_no: Some(name),
+                face: None,
             } => Some(Ask::VisitsNo(name)),
             _ => None,
         };
@@ -3567,8 +3579,23 @@ mod tests {
         );
         assert_eq!(
             ask_of(br#"{"photo_yes":"A"}"#),
-            Some(Ask::PhotoYes("A".into()))
+            Some(Ask::PhotoYes {
+                name: "A".into(),
+                face: None
+            })
         );
+        // The face the voice heard saying it (`LAMP_PHOTO_SPEAKER=on`, #2856):
+        // only beside a yes.
+        assert_eq!(
+            ask_of(br#"{"photo_yes":"A","face":"b0/f3"}"#),
+            Some(Ask::PhotoYes {
+                name: "A".into(),
+                face: Some("b0/f3".into())
+            })
+        );
+        assert_eq!(ask_of(br#"{"photo_no":"A","face":"b0/f3"}"#), None);
+        assert_eq!(ask_of(br#"{"photo_here":true,"face":"b0/f3"}"#), None);
+        assert_eq!(ask_of(br#"{"photo_asked":"A","face":"b0/f3"}"#), None);
         assert_eq!(
             ask_of(br#"{"photo_no":"A"}"#),
             Some(Ask::PhotoNo("A".into()))

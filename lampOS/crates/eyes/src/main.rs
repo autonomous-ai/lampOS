@@ -688,8 +688,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         /// With `--photo-dir`: the faces added from photos, unconfirmed
         /// until their person says yes, in their own file (#1968).
         unconfirmed: Option<lamp_eyes::photo::Unconfirmeds>,
-        /// The unconfirmed face at the lamp now, and when it was last seen.
-        photo_here: Option<(String, Instant)>,
+        /// The unconfirmed face at the lamp now, its passing id under the
+        /// faces publisher's boot while speaking is judged (`boot/f3`), and
+        /// when it was last seen.
+        photo_here: Option<(String, Option<String>, Instant)>,
+        /// `LAMP_PHOTO_SPEAKER=on` (#2856): a yes is kept only with that id.
+        photo_speaker: bool,
         /// When each unconfirmed face was last seen, monotonic, for the end
         /// of a meeting with no answer.
         photo_seen: Vec<(String, u64)>,
@@ -948,6 +952,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     )
                 }),
                 photo_here: None,
+                photo_speaker: lamp_eyes::photo::speaker_from_environment(),
                 photo_seen: Vec::new(),
                 photos_looked: None,
             })
@@ -1367,7 +1372,11 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             unconfirmed,
                             who.photo_here
                                 .as_ref()
-                                .map(|(name, at)| (name.as_str(), at.elapsed())),
+                                .map(|(name, _, at)| (name.as_str(), at.elapsed())),
+                            who.photo_here
+                                .as_ref()
+                                .and_then(|(_, face, _)| face.as_deref()),
+                            who.photo_speaker,
                             KNOWN_FOR,
                         ),
                     },
@@ -1377,7 +1386,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         let here = lamp_eyes::photo::is_here(
                             who.photo_here
                                 .as_ref()
-                                .map(|(n, at)| (n.as_str(), at.elapsed())),
+                                .map(|(n, _, at)| (n.as_str(), at.elapsed())),
                             &name,
                             KNOWN_FOR,
                         );
@@ -1395,18 +1404,36 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             }
                         }
                     }
-                    // A yes only from the face here, and only once it was asked.
-                    Some(Ask::PhotoYes(name)) => {
+                    // With the switch off, a yes naming a face is not
+                    // understood, as before it (#2856).
+                    Some(Ask::PhotoYes { face: Some(_), .. }) if !who.photo_speaker => {
+                        serde_json::json!({"error": "not_understood"})
+                    }
+                    // A yes only from the face here, and only once it was
+                    // asked; with `LAMP_PHOTO_SPEAKER=on`, only with the id
+                    // of the face that matched the photo (#2856).
+                    Some(Ask::PhotoYes { name, face }) => {
                         let here = lamp_eyes::photo::is_here(
                             who.photo_here
                                 .as_ref()
-                                .map(|(n, at)| (n.as_str(), at.elapsed())),
+                                .map(|(n, _, at)| (n.as_str(), at.elapsed())),
                             &name,
                             KNOWN_FOR,
                         );
                         match who.unconfirmed.as_mut() {
                             None => serde_json::json!({"error": "photos_off"}),
                             Some(_) if !here => serde_json::json!({"error": "not_here"}),
+                            Some(_)
+                                if who.photo_speaker
+                                    && !lamp_eyes::photo::is_that_face(
+                                        who.photo_here
+                                            .as_ref()
+                                            .and_then(|(_, here, _)| here.as_deref()),
+                                        face.as_deref(),
+                                    ) =>
+                            {
+                                serde_json::json!({"error": "not_that_face"})
+                            }
                             Some(unconfirmed) if !unconfirmed.was_asked(&name) => {
                                 serde_json::json!({"error": "not_asked"})
                             }
@@ -2133,7 +2160,10 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     unconfirmed.saw(&name, print.clone());
                                     who.photo_seen.retain(|(seen, _)| seen != &name);
                                     who.photo_seen.push((name.clone(), lamp_ipc::monotonic_us()));
-                                    who.photo_here = Some((name, Instant::now()));
+                                    let face = near_id.as_ref().zip(bus_out.as_ref()).map(
+                                        |(id, bus)| format!("{}/{id}", bus.faces_boot()),
+                                    );
+                                    who.photo_here = Some((name, face, Instant::now()));
                                 }
                                 if who.visits {
                                     let level = familiar(&mut who.people, who.known.as_ref());
