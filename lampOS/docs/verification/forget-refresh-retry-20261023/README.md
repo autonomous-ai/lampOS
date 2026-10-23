@@ -45,3 +45,18 @@ The counter invokes the worker's next-session read through its public client
 API; it does not run the complete worker or a model. No lamp, played audio,
 transport EOF, physical cut or real release was exercised. The older-Memory
 compatibility change is a separate path and is not a cause of this failure.
+
+## Older-Memory path checked separately
+
+The same corrected Voice was also run with the exact Memory runtime from
+`ae4ab0022a5716b8b393956d5e26fd1480aac350`: the three changed runtime files
+were substituted, while the other 17 Memory runtime files and its Cargo
+manifest already matched. The modified expectation requires refusal, no
+`forget` or `forget_last` request, all three original rows and both evidence
+links unchanged. It passes **1 / 0**. `legacy-fixed-*` preserves the exact
+runtime/test patches, binding, raw output and clean restoration.
+
+This closes the original older-Memory deletion counter for this head; it
+does not clear the independent note-refresh HOLD above. Workspace
+dependencies and Voice are current, so this is a source-composition test,
+not a qualification of separately deployed release binaries.

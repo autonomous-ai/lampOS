@@ -1,0 +1,30 @@
+{
+  "current_head": "a1b8034bfed33e723b22e3779f98f81ea59c3511",
+  "legacy_head": "ae4ab0022a5716b8b393956d5e26fd1480aac350",
+  "substituted_files": {
+    "lampOS/crates/memory/src/days.rs": "16ec1c01724f9a5e22f2820f9aa724796adac702d4105a3a40f6fdab7232683b",
+    "lampOS/crates/memory/src/days_protocol.rs": "34170d0f133b4063ec53680d750176a9ad70b924030e78389696595fc3767a38",
+    "lampOS/crates/memory/src/protocol.rs": "c1a8966d418edb3e07bf5bc48dfcad1cf37e4b5b2bf60935e5e19e14119d7822"
+  },
+  "identical_runtime_files": [
+    "lampOS/crates/memory/src/application.rs",
+    "lampOS/crates/memory/src/application_factory_tests.rs",
+    "lampOS/crates/memory/src/bin/lamp-memory-eval.rs",
+    "lampOS/crates/memory/src/bin/lamp-memory-fixture.rs",
+    "lampOS/crates/memory/src/days.sql",
+    "lampOS/crates/memory/src/fixture_protocol.rs",
+    "lampOS/crates/memory/src/fixture_schedule.rs",
+    "lampOS/crates/memory/src/forgot.rs",
+    "lampOS/crates/memory/src/health.rs",
+    "lampOS/crates/memory/src/health_counts.rs",
+    "lampOS/crates/memory/src/lib.rs",
+    "lampOS/crates/memory/src/main.rs",
+    "lampOS/crates/memory/src/reporter_schedule_tests.rs",
+    "lampOS/crates/memory/src/search.rs",
+    "lampOS/crates/memory/src/server.rs",
+    "lampOS/crates/memory/src/store.rs",
+    "lampOS/crates/memory/src/tidy.rs"
+  ],
+  "cargo_toml_identical": true,
+  "limit": "Exact older Memory runtime, current Voice/workspace dependencies; not deployed binaries."
+}

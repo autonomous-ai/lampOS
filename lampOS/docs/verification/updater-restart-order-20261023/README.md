@@ -107,3 +107,17 @@ Rust 1.96.0, in the existing cached Linux aarch64 image with network off.
 `linux-format/` binds commit `ef85204dd`, source tree, image and raw output.
 Fresh Mac formatting passed after the carry as well. No local ARM64
 compilation/test ran; official PR jobs remain required.
+
+## Original-head native gate
+
+PR #3173 at `ef85204dd` passes official ARM64 run **39884293220**, job
+**120188738326**, attempt 1: **7,079 passed / 0 failed / 31 skipped**,
+including one leaky test. All nine new integration cases and all seven
+parser cases have explicit PASS lines. Strict Linux Clippy run
+**39884293240**, job **120188738516**, attempt 1 also passes.
+Both checked the merge with `7bfcb31b8`; the exact checkout hashes, job
+metadata, complete raw output and their hashes are in `native-ef85204dd.json`
+and the two job text files. This is historical evidence for that head,
+not the subsequent carry onto train 26. Nine and Reviewer-lead both posted
+READ-OK with no P1/P2; the saved rollback-order recovery P3 is tracked for
+a separate correction.

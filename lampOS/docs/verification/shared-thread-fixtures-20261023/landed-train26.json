@@ -1,0 +1,71 @@
+{
+  "source_pr": 3160,
+  "source_head": "96fa27cdf551cc142ed23f455cdb5331b6dba401",
+  "train_pr": 3172,
+  "landed_head": "e6b88eac27096cd395e1a7c8555a13cbd6b68cf5",
+  "source_pr_closed_at": "2026-10-23T01:50:03Z",
+  "train_merged_at": "2026-10-23T01:49:22Z",
+  "checks": [
+    {
+      "path": "lampOS/crates/voice/src/provider_worker.rs",
+      "test": "the_live_worker_sends_a_sign_ins_words_as_one_line_and_scrubs_the_persons",
+      "guard_present_at_entry": true,
+      "first_lines": [
+        "fn the_live_worker_sends_a_sign_ins_words_as_one_line_and_scrubs_the_persons() {",
+        "        let _thread = one_thread();",
+        "        let _one = crate::agent_tasks::tests::ONE_AT_A_TIME",
+        "            .lock()",
+        "            .unwrap_or_else(std::sync::PoisonError::into_inner);"
+      ]
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker.rs",
+      "test": "the_sentence_after_count_only_never_reaches_the_live_thread",
+      "guard_present_at_entry": true,
+      "first_lines": [
+        "fn the_sentence_after_count_only_never_reaches_the_live_thread() {",
+        "        let _one = one_thread();",
+        "        let kept = std::mem::take(&mut *crate::thread::THREAD.lock().unwrap());",
+        "        let mut owner = controller();",
+        "        let mut handoff = InputHandoff::default();"
+      ]
+    },
+    {
+      "path": "lampOS/crates/voice/src/remember.rs",
+      "test": "the_light_rule_is_kept_and_forgotten_in_the_rooms_scope",
+      "guard_present_at_entry": true,
+      "first_lines": [
+        "fn the_light_rule_is_kept_and_forgotten_in_the_rooms_scope() {",
+        "        use crate::rules::{FORGET_RULE, KEEP_RULE};",
+        "        let _one = crate::provider_worker::tests::one_thread();",
+        "        let call = |name: &str, args: Value| ToolCall {",
+        "            id: \"c1\".into(),"
+      ]
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "test": "the_owners_ten_lines_are_let_out_though_each_answer_was_cut_by_the_next",
+      "guard_present_at_entry": true,
+      "first_lines": [
+        "fn the_owners_ten_lines_are_let_out_though_each_answer_was_cut_by_the_next() {",
+        "    let _one = crate::provider_worker::tests::one_thread();",
+        "    let lines = [",
+        "        \"Lamp, what time is this?\",",
+        "        \"Hey, Lamp. Watch the weather in Hanoi today.\","
+      ]
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "test": "a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room",
+      "guard_present_at_entry": true,
+      "first_lines": [
+        "fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room() {",
+        "    let _one = crate::provider_worker::tests::one_thread();",
+        "    let photo = crate::photo_faces::note(\"Lan\");",
+        "    for (lamp_said, heard, called) in [",
+        "        ("
+      ]
+    }
+  ],
+  "limit": "Source verification of the five fixture guards in the landed integration head; this is not another test run."
+}
