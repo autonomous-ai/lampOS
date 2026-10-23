@@ -35,6 +35,20 @@ use std::{
 };
 
 pub const MAX_PROMPT_BYTES: usize = 2000;
+/// The most a task takes in a request line once JSON-escaped (P3 on #3239):
+/// a control character escapes to 6 bytes, so 2,000 of them would overflow
+/// the 8,192-byte line. Twice the raw bound, so that quotes, backslashes,
+/// newlines and tabs, at 2 bytes each, still fit.
+pub const MAX_ENCODED_PROMPT_BYTES: usize = 2 * MAX_PROMPT_BYTES;
+
+/// Whether a task can be handed over: at most [`MAX_PROMPT_BYTES`] as
+/// written, and at most [`MAX_ENCODED_PROMPT_BYTES`] as the request line
+/// carries it. The voice asks this before it sends anything.
+pub fn prompt_fits(prompt: &str) -> bool {
+    prompt.len() <= MAX_PROMPT_BYTES
+        && serde_json::to_string(prompt)
+            .is_ok_and(|encoded| encoded.len() - 2 <= MAX_ENCODED_PROMPT_BYTES)
+}
 pub const MAX_ANSWER_BYTES: usize = 16 * 1024;
 pub const MAX_ASK_BYTES: usize = 4 * 1024;
 const STDOUT_LIMIT: usize = 64 * 1024;
@@ -309,7 +323,7 @@ impl Launch {
         // The pinned --task parser refuses a value beginning with --. Do not
         // rewrite the task or silently select another CLI permission mode.
         if self.prompt.trim().is_empty()
-            || self.prompt.len() > MAX_PROMPT_BYTES
+            || !prompt_fits(&self.prompt)
             || self.prompt.starts_with("--")
             || self.prompt.contains('\0')
         {
