@@ -1,0 +1,2 @@
+{"at_unix_ms":1792774225786,"event":"rolled-back","line":"build 2 put back: the switch was cut short (lamp-update stopped, or the lamp lost power); the previous build is well","round":true,"sequence":2}
+{"at_unix_ms":1792774225800,"event":"refused","line":"refused, nothing switched: build 2 was put back on this lamp (the switch was cut short (lamp-update stopped, or the lamp lost power)); waiting for a newer one","round":true,"sequence":null}

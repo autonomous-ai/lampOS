@@ -1,0 +1,2 @@
+lamp-update-apply: put /etc/lampOS/records.json back as it was
+lamp-update-apply: put /etc/lampOS/controls/controls.json back as it was

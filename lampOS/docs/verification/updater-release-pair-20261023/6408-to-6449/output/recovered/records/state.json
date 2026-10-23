@@ -1,0 +1,23 @@
+{
+  "installed": {
+    "sequence": 1,
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "previous": null,
+  "refused": [
+    {
+      "sequence": 2,
+      "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "why": "the switch was cut short (lamp-update stopped, or the lamp lost power)",
+      "at_unix_ms": 1792774228133
+    }
+  ],
+  "made": [],
+  "settings": {
+    "/etc/lampOS/controls/controls.json": "b6e89f0a9c7d3584747056b3c4df699e73edc0d8fca0c4b4b583a82b99443575",
+    "/etc/lampOS/records.json": "425116d71cb03aba8fc4ecd3eee23c8c1068b3a67ef8392a4483d007568514c0"
+  },
+  "release_pair_canary": {
+    "kept": true
+  }
+}

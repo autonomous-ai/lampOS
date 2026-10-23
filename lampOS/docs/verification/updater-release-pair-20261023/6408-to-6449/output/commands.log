@@ -1,0 +1,17 @@
+forward show --property=Id,ActiveState,SubState,MainPID,NRestarts -- lamp-records.service lamp-air.service lamp-schedule.service
+forward show --property=Id,ActiveState,SubState,MainPID,NRestarts -- lamp-voice.service
+forward show --property=MainPID --value -- lamp-update-apply.service
+forward restart lamp-update-apply.service
+forward daemon-reload
+forward show --property=Id,ActiveState,SubState,MainPID,NRestarts -- lamp-voice.service
+forward show --property=MainPID --value -- lamp-records.service
+forward restart lamp-records.service
+recovery daemon-reload
+recovery show --property=MainPID --value -- lamp-update-apply.service
+recovery restart lamp-update-apply.service
+recovery show --property=MainPID --value -- lamp-air.service
+recovery restart lamp-air.service
+recovery show --property=MainPID --value -- lamp-records.service
+recovery restart lamp-records.service
+recovery show --property=Id,ActiveState,SubState,MainPID,NRestarts -- lamp-air.service lamp-records.service
+recovery show --property=Id,ActiveState,SubState,MainPID,NRestarts -- lamp-air.service lamp-records.service

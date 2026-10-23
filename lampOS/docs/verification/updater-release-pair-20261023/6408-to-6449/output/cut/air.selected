@@ -1,0 +1,2 @@
+#!/bin/sh
+printf 'synthetic air 2\n'

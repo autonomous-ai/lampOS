@@ -1,0 +1,38 @@
+{
+  "build": {
+    "sequence": 2,
+    "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "units": [
+    {
+      "unit": "lamp-records.service",
+      "was_active": true,
+      "link": {
+        "path": "/opt/lampOS/records/current",
+        "build": "c7f8e0c5c49fe959ddcc3702e99f2e12c0503e3f5675a86eea4c5fe3931836ad"
+      }
+    },
+    {
+      "unit": "lamp-air.service",
+      "was_active": true,
+      "link": {
+        "path": "/opt/lampOS/air/current",
+        "build": "d3f8d652ce330e5095eaf4904035b4a29f2bd93bfe5a3fe36b3286e226acd1d8"
+      }
+    },
+    {
+      "unit": "lamp-schedule.service",
+      "was_active": false,
+      "link": {
+        "path": "/opt/lampOS/schedule/current",
+        "build": "9d3c14ea8c076a256afb4541a451eaf63277626287fbccf85e7e5b682ec21903"
+      }
+    }
+  ],
+  "rollback_order": [
+    "lamp-air.service",
+    "lamp-records.service",
+    "lamp-schedule.service"
+  ],
+  "settings": true
+}

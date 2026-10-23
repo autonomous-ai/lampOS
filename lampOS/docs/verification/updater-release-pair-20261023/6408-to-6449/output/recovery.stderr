@@ -1,0 +1,6 @@
+lamp-update: once channel=lamp-voice url=file:///case/no-channel/ lamp=fixture apply=on self=off key=e8561199f628df3e
+lamp-update: putting build 2 back: the switch was cut short (lamp-update stopped, or the lamp lost power)
+lamp-update: putting build 2 back: the switch was cut short (lamp-update stopped, or the lamp lost power)
+lamp-update: removed /opt/lampOS/records/6803dba3e1a14dacf40306c2cfd821daaef83fd01d9562fd8e745b3f36fb5962/, which no unit names
+lamp-update: removed /opt/lampOS/air/95f7449551916f0559fd1dccb79177ef497572424783e1365282ed77df1986f0/, which no unit names
+lamp-update: removed /opt/lampOS/schedule/d2270a4d7e982b3a8e5019545637278478d7d3791489fe4a4aab12cfcde250ed/, which no unit names

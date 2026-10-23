@@ -1,0 +1,5 @@
+[Unit]
+Description=release-pair before air
+[Service]
+ExecStart=/opt/lampOS/air/current/lamp-air
+Restart=on-failure

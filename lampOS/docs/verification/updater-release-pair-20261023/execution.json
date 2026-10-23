@@ -1,0 +1,49 @@
+{
+  "base": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+  "host": "macOS Rust 1.96.0",
+  "executables": "actual published Linux ARM64 releases 6408 and 6449",
+  "image": "sha256:7dc3bb4b3b88bb00e16e37eeb5c98a74f9d926f956584eb8c009c9ca86023cd2",
+  "context": "colima-lampos",
+  "test_result": {
+    "passed": 2,
+    "failed": 0,
+    "ignored": 0,
+    "duration_seconds": 4.85,
+    "exit": 0
+  },
+  "cases": [
+    {
+      "writer": "6449",
+      "recoverer": "6408",
+      "result": "pass",
+      "writer_wait_status": 137,
+      "recovery_exit": 1,
+      "next_refusal_exit": 1,
+      "container_exit": 0,
+      "files": 117,
+      "evidence_directory": "6449-to-6408"
+    },
+    {
+      "writer": "6408",
+      "recoverer": "6449",
+      "result": "pass",
+      "writer_wait_status": 137,
+      "recovery_exit": 1,
+      "next_refusal_exit": 1,
+      "container_exit": 0,
+      "files": 117,
+      "evidence_directory": "6408-to-6449"
+    }
+  ],
+  "cleanup": "both owner-checked container removals succeeded; final filtered listing empty",
+  "limits": [
+    "one cut boundary per direction",
+    "fake systemctl and service health",
+    "successful SIGKILL plus shell wait137, not WIFSIGNALED",
+    "orphan reaping delegated to container init",
+    "no physical power loss, production service sandbox or independent release-key verification"
+  ],
+  "cargo_output_original_sha256": "d8321f33e5a3a1526fb190fad9cb950fb33f4e2ff6897fed6cda7bd699363c28",
+  "cargo_output_redaction": "Only local temporary directory prefixes replaced by relative evidence labels.",
+  "cargo_output_published_sha256": "47a20cf2e189212595ba0b14345f71adb5364b41a81a4d6aae6684bb418a9150"
+}

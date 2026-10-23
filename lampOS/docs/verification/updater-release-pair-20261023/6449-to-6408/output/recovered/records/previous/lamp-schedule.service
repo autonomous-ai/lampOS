@@ -1,0 +1,5 @@
+[Unit]
+Description=release-pair before schedule
+[Service]
+ExecStart=/opt/lampOS/schedule/current/lamp-schedule
+Restart=on-failure

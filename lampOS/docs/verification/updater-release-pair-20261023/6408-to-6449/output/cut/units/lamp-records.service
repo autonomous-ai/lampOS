@@ -1,0 +1,5 @@
+[Unit]
+Description=release-pair candidate records
+[Service]
+ExecStart=/opt/lampOS/records/current/lamp-records
+Restart=on-failure

@@ -1,0 +1,587 @@
+{
+  "output/artifact-checks": {
+    "sha256": "0b8d2e9a21b0d8518f38a39805139d1b1870674743eb34d5da8223ff466c3bc8",
+    "bytes": 60,
+    "mode": "0o644"
+  },
+  "output/barrier-pid": {
+    "sha256": "90d7ec0f0acef104d8b6252794295f661a0149634868d02a1ae0c358099638f5",
+    "bytes": 3,
+    "mode": "0o644"
+  },
+  "output/commands.log": {
+    "sha256": "9c037fe841a6fc5ad82bb8fd55079cbd8b9b0ef99da97a39f6ee897459a0ca97",
+    "bytes": 1089,
+    "mode": "0o644"
+  },
+  "output/cut/air.link": {
+    "sha256": "98002039bf169cbd3280d829351c9724a6c637a52cd595d195dc8152b7de3eaf",
+    "bytes": 65,
+    "mode": "0o644"
+  },
+  "output/cut/air.selected": {
+    "sha256": "95f7449551916f0559fd1dccb79177ef497572424783e1365282ed77df1986f0",
+    "bytes": 37,
+    "mode": "0o755"
+  },
+  "output/cut/etc/lampOS/controls/controls.json": {
+    "sha256": "735a35bc48681cfa3dab56af35e5456363e7ccd7d6c5a007a5361b9ebf630216",
+    "bytes": 29,
+    "mode": "0o644"
+  },
+  "output/cut/etc/lampOS/records.json": {
+    "sha256": "c436aaa54e8b649064cae3180f1eb49b6c66ef1205b1ca6e641e837805832bc7",
+    "bytes": 28,
+    "mode": "0o600"
+  },
+  "output/cut/etc/lampOS/unrelated.txt": {
+    "sha256": "edfda111d1893ad24df7b195d457b1eedcc7d2b975c79995a12a130890ea109e",
+    "bytes": 21,
+    "mode": "0o640"
+  },
+  "output/cut/etc/lampOS/update/key.pub": {
+    "sha256": "db246abb21f64b4de428a19dc293d91864f31f803a13419bad017ea61e6086d2",
+    "bytes": 44,
+    "mode": "0o644"
+  },
+  "output/cut/records/apply/back.json": {
+    "sha256": "e3bca6e1e53f0b5d0166bdbbc454c2023be58dc716633d6c5f6fd6703322c91c",
+    "bytes": 660,
+    "mode": "0o600"
+  },
+  "output/cut/records/journal.json": {
+    "sha256": "8eb60c95f2e6a2afcf58bd38f310c24c3a3a908a062d1b2879bfdd1ddc6c2527",
+    "bytes": 931,
+    "mode": "0o600"
+  },
+  "output/cut/records/lock": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o600"
+  },
+  "output/cut/records/previous/lamp-air.service": {
+    "sha256": "7b85da78f6a24013168289a08b14bbbcc28d9749d161c001a829cab7efcbf720",
+    "bytes": 115,
+    "mode": "0o600"
+  },
+  "output/cut/records/previous/lamp-air.service.link": {
+    "sha256": "91aacc20dcb36bdfb09eca9a853b2a3528582f7a3ceb7d56b017f02d4acc3f8a",
+    "bytes": 89,
+    "mode": "0o600"
+  },
+  "output/cut/records/previous/lamp-records.service": {
+    "sha256": "66e4f1d4cefe89896d60bd968af6ffdfcd65e6add9808c089821005030e014c4",
+    "bytes": 150,
+    "mode": "0o600"
+  },
+  "output/cut/records/previous/lamp-records.service.link": {
+    "sha256": "68afdbf00ad6f9a1dcf6f16de56bcbcd1a6e861fb5f91099769b23314d732b59",
+    "bytes": 93,
+    "mode": "0o600"
+  },
+  "output/cut/records/previous/lamp-schedule.service": {
+    "sha256": "0ddabc00a793912275002de869179ff3ded936acde8552144bfece3a77249450",
+    "bytes": 130,
+    "mode": "0o600"
+  },
+  "output/cut/records/previous/lamp-schedule.service.link": {
+    "sha256": "8edd6d9466ddd788a50663634b614fd5e3946e5e7a6eb309368751b7c5e7b2b4",
+    "bytes": 94,
+    "mode": "0o600"
+  },
+  "output/cut/records/state.json": {
+    "sha256": "71545f703718f4b608e175821fd463916a8519a7e35ce278c97938bcd5275133",
+    "bytes": 708,
+    "mode": "0o600"
+  },
+  "output/cut/records.link": {
+    "sha256": "74f26d5367e000df46fe176cd840d87d21cfe4ee8d6eb04676089ee2ec5fc071",
+    "bytes": 65,
+    "mode": "0o644"
+  },
+  "output/cut/records.selected": {
+    "sha256": "6803dba3e1a14dacf40306c2cfd821daaef83fd01d9562fd8e745b3f36fb5962",
+    "bytes": 41,
+    "mode": "0o755"
+  },
+  "output/cut/schedule.link": {
+    "sha256": "3ba08da2b282f86694e53a0d84d50e29f26a81104ad78ec3635791e5a9ac72e8",
+    "bytes": 65,
+    "mode": "0o644"
+  },
+  "output/cut/schedule.selected": {
+    "sha256": "d2270a4d7e982b3a8e5019545637278478d7d3791489fe4a4aab12cfcde250ed",
+    "bytes": 42,
+    "mode": "0o755"
+  },
+  "output/cut/units/lamp-air.service": {
+    "sha256": "cb6fdb0770294b4e9cfecb67a2d366c24565f609cdc7a5e123619ba8a623916b",
+    "bytes": 145,
+    "mode": "0o644"
+  },
+  "output/cut/units/lamp-records.service": {
+    "sha256": "919e92164eb1c0c4b7b933b01ef6bdcbe6f89405982c82b14a86a4afa5dac494",
+    "bytes": 130,
+    "mode": "0o644"
+  },
+  "output/cut/units/lamp-schedule.service": {
+    "sha256": "69c8d201f43c24a4d5ebaa75bbf9a63e9f2e49bc57c36ed4e8040f2bf082c7df",
+    "bytes": 133,
+    "mode": "0o644"
+  },
+  "output/forward-back.json": {
+    "sha256": "e3bca6e1e53f0b5d0166bdbbc454c2023be58dc716633d6c5f6fd6703322c91c",
+    "bytes": 660,
+    "mode": "0o600"
+  },
+  "output/forward-done.json": {
+    "sha256": "054fc53cfb0599721c9182eb3aa86db63fe239151427c1b31ca726c08b688894",
+    "bytes": 281,
+    "mode": "0o600"
+  },
+  "output/forward-helper": {
+    "sha256": "ac7e499bd761809a7daad8c50c1df4dbe41a31874f2e64f050226ee9e01a41e3",
+    "bytes": 5,
+    "mode": "0o644"
+  },
+  "output/forward-helper-status": {
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "bytes": 2,
+    "mode": "0o644"
+  },
+  "output/forward-helper.stderr": {
+    "sha256": "71c224c11268b6d6d596d5f0291d45429a1d8eb6dd3b151ead34d749dbf19f15",
+    "bytes": 110,
+    "mode": "0o644"
+  },
+  "output/forward-helper.stdout": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o644"
+  },
+  "output/forward-request.json": {
+    "sha256": "cb54f0960cc3b1d9f68a5d67014b2d43ee368dcbbfc5cdfcf549b8fff82ec486",
+    "bytes": 52,
+    "mode": "0o600"
+  },
+  "output/journal-before-recovery.sha256": {
+    "sha256": "ada8cfe2e48d5decf7a8300bfe60125801ad012708d69c34418f2345b4f38bb6",
+    "bytes": 102,
+    "mode": "0o644"
+  },
+  "output/next/air.link": {
+    "sha256": "59a8453a997f6556156665d1b09a6f431a68684fd95a10b4e484040a5eac03ad",
+    "bytes": 65,
+    "mode": "0o644"
+  },
+  "output/next/air.selected": {
+    "sha256": "d3f8d652ce330e5095eaf4904035b4a29f2bd93bfe5a3fe36b3286e226acd1d8",
+    "bytes": 37,
+    "mode": "0o755"
+  },
+  "output/next/etc/lampOS/controls/controls.json": {
+    "sha256": "b6e89f0a9c7d3584747056b3c4df699e73edc0d8fca0c4b4b583a82b99443575",
+    "bytes": 30,
+    "mode": "0o600"
+  },
+  "output/next/etc/lampOS/records.json": {
+    "sha256": "425116d71cb03aba8fc4ecd3eee23c8c1068b3a67ef8392a4483d007568514c0",
+    "bytes": 29,
+    "mode": "0o640"
+  },
+  "output/next/etc/lampOS/unrelated.txt": {
+    "sha256": "edfda111d1893ad24df7b195d457b1eedcc7d2b975c79995a12a130890ea109e",
+    "bytes": 21,
+    "mode": "0o640"
+  },
+  "output/next/etc/lampOS/update/key.pub": {
+    "sha256": "db246abb21f64b4de428a19dc293d91864f31f803a13419bad017ea61e6086d2",
+    "bytes": 44,
+    "mode": "0o644"
+  },
+  "output/next/records/apply/back.json": {
+    "sha256": "e3bca6e1e53f0b5d0166bdbbc454c2023be58dc716633d6c5f6fd6703322c91c",
+    "bytes": 660,
+    "mode": "0o600"
+  },
+  "output/next/records/lock": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o600"
+  },
+  "output/next/records/log.jsonl": {
+    "sha256": "2a806e8d57f86926b276a1f0913f2685169d09b9ba2af340ae3193df0fe07cb2",
+    "bytes": 447,
+    "mode": "0o600"
+  },
+  "output/next/records/previous/lamp-air.service": {
+    "sha256": "7b85da78f6a24013168289a08b14bbbcc28d9749d161c001a829cab7efcbf720",
+    "bytes": 115,
+    "mode": "0o600"
+  },
+  "output/next/records/previous/lamp-air.service.link": {
+    "sha256": "91aacc20dcb36bdfb09eca9a853b2a3528582f7a3ceb7d56b017f02d4acc3f8a",
+    "bytes": 89,
+    "mode": "0o600"
+  },
+  "output/next/records/previous/lamp-records.service": {
+    "sha256": "66e4f1d4cefe89896d60bd968af6ffdfcd65e6add9808c089821005030e014c4",
+    "bytes": 150,
+    "mode": "0o600"
+  },
+  "output/next/records/previous/lamp-records.service.link": {
+    "sha256": "68afdbf00ad6f9a1dcf6f16de56bcbcd1a6e861fb5f91099769b23314d732b59",
+    "bytes": 93,
+    "mode": "0o600"
+  },
+  "output/next/records/previous/lamp-schedule.service": {
+    "sha256": "0ddabc00a793912275002de869179ff3ded936acde8552144bfece3a77249450",
+    "bytes": 130,
+    "mode": "0o600"
+  },
+  "output/next/records/previous/lamp-schedule.service.link": {
+    "sha256": "8edd6d9466ddd788a50663634b614fd5e3946e5e7a6eb309368751b7c5e7b2b4",
+    "bytes": 94,
+    "mode": "0o600"
+  },
+  "output/next/records/state.json": {
+    "sha256": "3816d860146ce904c758a46b6f8e4caa103a78fcf0bb38cdb307413d71eec7e6",
+    "bytes": 647,
+    "mode": "0o600"
+  },
+  "output/next/records.link": {
+    "sha256": "7fe54986e94ce8368a79f237e2b44f8b6373353bec53a9a6095f9b300fa88a4a",
+    "bytes": 65,
+    "mode": "0o644"
+  },
+  "output/next/records.selected": {
+    "sha256": "c7f8e0c5c49fe959ddcc3702e99f2e12c0503e3f5675a86eea4c5fe3931836ad",
+    "bytes": 41,
+    "mode": "0o755"
+  },
+  "output/next/schedule.link": {
+    "sha256": "d208bf006699daa875d624ac47d577004e86d13efd4a78a4e1ead9cd880dda2d",
+    "bytes": 65,
+    "mode": "0o644"
+  },
+  "output/next/schedule.selected": {
+    "sha256": "9d3c14ea8c076a256afb4541a451eaf63277626287fbccf85e7e5b682ec21903",
+    "bytes": 42,
+    "mode": "0o755"
+  },
+  "output/next/units/lamp-air.service": {
+    "sha256": "7b85da78f6a24013168289a08b14bbbcc28d9749d161c001a829cab7efcbf720",
+    "bytes": 115,
+    "mode": "0o644"
+  },
+  "output/next/units/lamp-records.service": {
+    "sha256": "66e4f1d4cefe89896d60bd968af6ffdfcd65e6add9808c089821005030e014c4",
+    "bytes": 150,
+    "mode": "0o644"
+  },
+  "output/next/units/lamp-schedule.service": {
+    "sha256": "0ddabc00a793912275002de869179ff3ded936acde8552144bfece3a77249450",
+    "bytes": 130,
+    "mode": "0o644"
+  },
+  "output/next-status": {
+    "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "bytes": 2,
+    "mode": "0o644"
+  },
+  "output/next.stderr": {
+    "sha256": "0aa39c0935b64f757851d76ce6ef5a1968e9d9e3e7589eff2d7cc5945b19efca",
+    "bytes": 115,
+    "mode": "0o644"
+  },
+  "output/next.stdout": {
+    "sha256": "775ae0307e22db3f0000af59e01126b7c5734a6ab302e1d83d57f05c60df187e",
+    "bytes": 159,
+    "mode": "0o644"
+  },
+  "output/recovered/air.link": {
+    "sha256": "59a8453a997f6556156665d1b09a6f431a68684fd95a10b4e484040a5eac03ad",
+    "bytes": 65,
+    "mode": "0o644"
+  },
+  "output/recovered/air.selected": {
+    "sha256": "d3f8d652ce330e5095eaf4904035b4a29f2bd93bfe5a3fe36b3286e226acd1d8",
+    "bytes": 37,
+    "mode": "0o755"
+  },
+  "output/recovered/etc/lampOS/controls/controls.json": {
+    "sha256": "b6e89f0a9c7d3584747056b3c4df699e73edc0d8fca0c4b4b583a82b99443575",
+    "bytes": 30,
+    "mode": "0o600"
+  },
+  "output/recovered/etc/lampOS/records.json": {
+    "sha256": "425116d71cb03aba8fc4ecd3eee23c8c1068b3a67ef8392a4483d007568514c0",
+    "bytes": 29,
+    "mode": "0o640"
+  },
+  "output/recovered/etc/lampOS/unrelated.txt": {
+    "sha256": "edfda111d1893ad24df7b195d457b1eedcc7d2b975c79995a12a130890ea109e",
+    "bytes": 21,
+    "mode": "0o640"
+  },
+  "output/recovered/etc/lampOS/update/key.pub": {
+    "sha256": "db246abb21f64b4de428a19dc293d91864f31f803a13419bad017ea61e6086d2",
+    "bytes": 44,
+    "mode": "0o644"
+  },
+  "output/recovered/records/apply/back.json": {
+    "sha256": "e3bca6e1e53f0b5d0166bdbbc454c2023be58dc716633d6c5f6fd6703322c91c",
+    "bytes": 660,
+    "mode": "0o600"
+  },
+  "output/recovered/records/lock": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o600"
+  },
+  "output/recovered/records/log.jsonl": {
+    "sha256": "3b867ce2366a29b993ae5c7b9d12bc6ec0344677ab573cbd8f0552cec7f82102",
+    "bytes": 203,
+    "mode": "0o600"
+  },
+  "output/recovered/records/previous/lamp-air.service": {
+    "sha256": "7b85da78f6a24013168289a08b14bbbcc28d9749d161c001a829cab7efcbf720",
+    "bytes": 115,
+    "mode": "0o600"
+  },
+  "output/recovered/records/previous/lamp-air.service.link": {
+    "sha256": "91aacc20dcb36bdfb09eca9a853b2a3528582f7a3ceb7d56b017f02d4acc3f8a",
+    "bytes": 89,
+    "mode": "0o600"
+  },
+  "output/recovered/records/previous/lamp-records.service": {
+    "sha256": "66e4f1d4cefe89896d60bd968af6ffdfcd65e6add9808c089821005030e014c4",
+    "bytes": 150,
+    "mode": "0o600"
+  },
+  "output/recovered/records/previous/lamp-records.service.link": {
+    "sha256": "68afdbf00ad6f9a1dcf6f16de56bcbcd1a6e861fb5f91099769b23314d732b59",
+    "bytes": 93,
+    "mode": "0o600"
+  },
+  "output/recovered/records/previous/lamp-schedule.service": {
+    "sha256": "0ddabc00a793912275002de869179ff3ded936acde8552144bfece3a77249450",
+    "bytes": 130,
+    "mode": "0o600"
+  },
+  "output/recovered/records/previous/lamp-schedule.service.link": {
+    "sha256": "8edd6d9466ddd788a50663634b614fd5e3946e5e7a6eb309368751b7c5e7b2b4",
+    "bytes": 94,
+    "mode": "0o600"
+  },
+  "output/recovered/records/state.json": {
+    "sha256": "3816d860146ce904c758a46b6f8e4caa103a78fcf0bb38cdb307413d71eec7e6",
+    "bytes": 647,
+    "mode": "0o600"
+  },
+  "output/recovered/records.link": {
+    "sha256": "7fe54986e94ce8368a79f237e2b44f8b6373353bec53a9a6095f9b300fa88a4a",
+    "bytes": 65,
+    "mode": "0o644"
+  },
+  "output/recovered/records.selected": {
+    "sha256": "c7f8e0c5c49fe959ddcc3702e99f2e12c0503e3f5675a86eea4c5fe3931836ad",
+    "bytes": 41,
+    "mode": "0o755"
+  },
+  "output/recovered/schedule.link": {
+    "sha256": "d208bf006699daa875d624ac47d577004e86d13efd4a78a4e1ead9cd880dda2d",
+    "bytes": 65,
+    "mode": "0o644"
+  },
+  "output/recovered/schedule.selected": {
+    "sha256": "9d3c14ea8c076a256afb4541a451eaf63277626287fbccf85e7e5b682ec21903",
+    "bytes": 42,
+    "mode": "0o755"
+  },
+  "output/recovered/units/lamp-air.service": {
+    "sha256": "7b85da78f6a24013168289a08b14bbbcc28d9749d161c001a829cab7efcbf720",
+    "bytes": 115,
+    "mode": "0o644"
+  },
+  "output/recovered/units/lamp-records.service": {
+    "sha256": "66e4f1d4cefe89896d60bd968af6ffdfcd65e6add9808c089821005030e014c4",
+    "bytes": 150,
+    "mode": "0o644"
+  },
+  "output/recovered/units/lamp-schedule.service": {
+    "sha256": "0ddabc00a793912275002de869179ff3ded936acde8552144bfece3a77249450",
+    "bytes": 130,
+    "mode": "0o644"
+  },
+  "output/recovery-back.json": {
+    "sha256": "e3bca6e1e53f0b5d0166bdbbc454c2023be58dc716633d6c5f6fd6703322c91c",
+    "bytes": 660,
+    "mode": "0o600"
+  },
+  "output/recovery-done.json": {
+    "sha256": "eafbde217b3b7c12a88a99010e318cd73a792daa7be361129e24dd908cc27aad",
+    "bytes": 280,
+    "mode": "0o600"
+  },
+  "output/recovery-helper": {
+    "sha256": "6b256abd11b651e84494b9e283a710e7679921d528ac11d3f9abb0b43f6bf908",
+    "bytes": 5,
+    "mode": "0o644"
+  },
+  "output/recovery-helper-status": {
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "bytes": 2,
+    "mode": "0o644"
+  },
+  "output/recovery-helper.stderr": {
+    "sha256": "fdda132c76b68fafe297a180e0dc801d7326e2ed2c9b5c3b0e8a1f35af817882",
+    "bytes": 136,
+    "mode": "0o644"
+  },
+  "output/recovery-helper.stdout": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o644"
+  },
+  "output/recovery-request.json": {
+    "sha256": "2666295fce0e974c0a270c092b76e90fd6856822351d6a98bf6eeb877cd0c133",
+    "bytes": 51,
+    "mode": "0o600"
+  },
+  "output/recovery-status": {
+    "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "bytes": 2,
+    "mode": "0o644"
+  },
+  "output/recovery.stderr": {
+    "sha256": "2ceb4b3e10bb38eed91c9eab5d400292509fb40c9b414738ccd1dd58e802aac7",
+    "bytes": 711,
+    "mode": "0o644"
+  },
+  "output/recovery.stdout": {
+    "sha256": "c86fa5617b2ef5004e5af2e0596e291fecc3981e64c308056862ff6a48315fc6",
+    "bytes": 117,
+    "mode": "0o644"
+  },
+  "output/shim.stat": {
+    "sha256": "3a01729b91a3a960093066b25303bfc566922dd6bd89fa7a97e565c0da43a4c7",
+    "bytes": 306,
+    "mode": "0o444"
+  },
+  "output/writer-executable": {
+    "sha256": "48b831a2d7ac9297d6d79285aea9260c4317fa079bf191ce1213ae5e19b3a7e0",
+    "bytes": 79,
+    "mode": "0o644"
+  },
+  "output/writer-wait-status": {
+    "sha256": "e3b9c2844b5a5c2677b3a2279db2ec8487491dd9a23d6b22fac153391b3bb63c",
+    "bytes": 4,
+    "mode": "0o644"
+  },
+  "output/writer.stat": {
+    "sha256": "c7303bde06f2cf1b93473a2cc6d9cb22a64a66b7fdf79434b352a3e2e21a126a",
+    "bytes": 308,
+    "mode": "0o444"
+  },
+  "output/writer.stderr": {
+    "sha256": "3e366df06a270c736e8101d2babf8e062f8923f65cd65a00f6cf975011d9a0fa",
+    "bytes": 749,
+    "mode": "0o644"
+  },
+  "output/writer.stdout": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o644"
+  },
+  "logs/command-0.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o644"
+  },
+  "logs/command-0.stdout": {
+    "sha256": "8a68f8ddeae91fa77f009ea0134a8059c7d90f90557fe8e6fe1e2aedfeb9e68a",
+    "bytes": 84,
+    "mode": "0o644"
+  },
+  "logs/command-1.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o644"
+  },
+  "logs/command-1.stdout": {
+    "sha256": "08df62ec5e4afe18c15195f1089322ef89fb5b431acd7782887d3f6066e4543c",
+    "bytes": 65,
+    "mode": "0o644"
+  },
+  "logs/command-2.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o644"
+  },
+  "logs/command-2.stdout": {
+    "sha256": "7fe5d365801f59e7346bbeadd14d58261edf2cd338d5b87680c5e1bcbbcb52e7",
+    "bytes": 4879,
+    "mode": "0o644"
+  },
+  "logs/command-3.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o644"
+  },
+  "logs/command-3.stdout": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o644"
+  },
+  "logs/command-4.stderr": {
+    "sha256": "0089bb674406997eb0e6850cf01c46d23d8689610788516cebf2a31b9276d691",
+    "bytes": 7,
+    "mode": "0o644"
+  },
+  "logs/command-4.stdout": {
+    "sha256": "f39e29ca2fde7126adc3f0792a223e02293a0f0b024d3840dc5c46f87d55b759",
+    "bytes": 45,
+    "mode": "0o644"
+  },
+  "logs/command-5.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o644"
+  },
+  "logs/command-5.stdout": {
+    "sha256": "938cd2c91425b609cbe1efa929983fb6fdd9bf0dfc6525883dea8d9036d8a73e",
+    "bytes": 223,
+    "mode": "0o644"
+  },
+  "logs/command-6.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o644"
+  },
+  "logs/command-6.stdout": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o644"
+  },
+  "logs/command-7.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o644"
+  },
+  "logs/command-7.stdout": {
+    "sha256": "96a9c2ee3b0e4aa79e13803c411e54db57440bf95b4ab613dcfc3986a36863b1",
+    "bytes": 25,
+    "mode": "0o644"
+  },
+  "logs/command-8.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": "0o644"
+  },
+  "logs/command-8.stdout": {
+    "sha256": "96a9c2ee3b0e4aa79e13803c411e54db57440bf95b4ab613dcfc3986a36863b1",
+    "bytes": 25,
+    "mode": "0o644"
+  }
+}

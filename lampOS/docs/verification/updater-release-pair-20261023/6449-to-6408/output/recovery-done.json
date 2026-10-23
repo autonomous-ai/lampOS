@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "op": "back",
+  "sequence": 2,
+  "records": {
+    "/etc/lampOS/controls/controls.json": "b6e89f0a9c7d3584747056b3c4df699e73edc0d8fca0c4b4b583a82b99443575",
+    "/etc/lampOS/records.json": "425116d71cb03aba8fc4ecd3eee23c8c1068b3a67ef8392a4483d007568514c0"
+  }
+}
