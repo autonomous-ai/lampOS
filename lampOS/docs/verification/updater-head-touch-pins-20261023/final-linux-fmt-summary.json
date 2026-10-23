@@ -1,0 +1,13 @@
+{
+  "command": "cargo fmt --all --check",
+  "container_image": "sha256:7dc3bb4b3b88bb00e16e37eeb5c98a74f9d926f956584eb8c009c9ca86023cd2",
+  "source_only": true,
+  "network": "none",
+  "compilation": false,
+  "pipeline_exit_code": 0,
+  "raw_output_sha256": "93c8964b16c0c3f87665ab75c7d357b0c09cc5fcfeaf230f901a80bdb315df80",
+  "diagnostics": {
+    "tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'": 1570
+  },
+  "formatter_diagnostics": []
+}

@@ -1,0 +1,47 @@
+# lampOS controls: the button and the touch pads: what a hand did, on the bus (lampOS/docs/controls.md).
+# The product unit (lampOS/docs/install.md). --touch is the path that publishes controls/touch with the
+# reset button held 5 s, which lamp-setup-reset's watch-reset acts on (El on #705, 2026-10-16: without it
+# the reset button did nothing). The head pads are on controls/touch too, which the product's voice and
+# Expression do not read yet (no LAMP_HEAD_TOUCH, no --head-touch); "legacy_head" in the pins keeps a pat
+# the old engine's Pet on controls/gesture, which wakes a lamp asleep at night (the reviewer on #1167).
+[Unit]
+Description=lampOS controls (lamp-controls)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=lamp-voice.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+# Real-time round-robin at 30, above the voice's 20 (#2602): Controls' one loop also reads the privacy switch. At
+# ordinary priority it shared its core with the voice's real-time workers (Nine's ps on lamp-75c9, 21 Oct).
+# A coincident scheduling gap still needs measurement. Both touch and privacy-only loops rest for at least their
+# thread CPU work, without sleeping again for blocked time (health: slow_steps, longest_gap_us, long_gaps).
+# The kernel's real-time throttling stays as it is.
+CPUSchedulingPolicy=rr
+CPUSchedulingPriority=30
+# The strip child keeps RR 30 too: a hand must still be read while the voice is busy.
+# The privacy route (docs/privacy-switch.md): Controls reads the lamp's privacy switch (chip 1 line 9, the pins file's
+# privacy section), Voice leases the microphones from it and Ears captures only under that lease. Set in Controls,
+# Voice and Ears together (the lead on #1711, 20 Oct 09:33: the lamps have the switch; the first builder at 09:51).
+Environment=LAMP_PRIVACY_CONTROLS=on
+ExecStart=/opt/lampOS/controls/current/lamp-controls serve --touch --config /etc/lampOS/controls/controls.json --pins /etc/lampOS/controls/controls-pins.json --bus-root /run/lampos-bus --enable
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-controls
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=lampos.target
