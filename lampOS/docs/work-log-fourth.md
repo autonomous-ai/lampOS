@@ -7555,3 +7555,48 @@ advance the epoch, and unchanged unmatched candidates to keep the existing
 recognition cadence rather than retry every frame. Full local and native
 qualification, the amended push, formal re-read and Name/Photo carries
 remain ahead. No lamp, provider call, physical timing or readiness claim.
+
+## 2026-10-23 07:45 +07: corrected Common published and native gate verified
+
+Ready for lamp-voice: no. The formal re-read and the remaining Mac
+consumer/build stages are outstanding; the returning-speaker policy is
+resolved, implemented and pushed. Common #3064 is one commit `6225c78ef`
+on `9b6960e61`, source TREE `f4621f499`. The explicit lease push replaced
+`470b4ac8c`; the old head and all its failures/results remain historical.
+
+The new controls pass on the development Mac: Eyes returning 5/0 and Voice
+continuation 14/0. Full Voice is 3,898/0/14 ignored; full Eyes is 305/0/5
+ignored with the unchanged Linux `/dev/full` fixture filtered on this Mac.
+Body, Cloud, Expression, Keeper, Lean, Memory and Peek have passed their
+whole-package stages; the remaining sequential consumers/build continue.
+Formatting and strict all-target workspace Clippy pass. The original RED
+controls and first fixture-composition compile failure remain retained.
+
+Exact-head ARM64 run 39877345073 passed 10,902/0/67 skipped, including one
+leaky pass, plus 4 doc and 12 own-harness tests. All 28 required producer,
+consumer and final-output controls have PASS lines, including the unchanged
+Linux `/dev/full` test. Native checkout `d9707f7e5` merges `9b6960e61` and
+this authored head, and has the identical source tree. Linux Clippy run
+39877344911 passed. Explicit Linux `cargo fmt --all --check` also passed
+in the cached isolated x86_64 container, Cargo 1.96.0 / rustfmt 1.9.0,
+source mounted read-only and networking disabled. No new compiler target
+was shared with the running Mac gate.
+
+Artifact 12469173406 has verified archive SHA256
+`f914aaf78a4c9b73ec89f426b6b261be3ff6a5b7ad2e9cf67d6c41edea267275`;
+all 49 SHA256SUMS members match. Native evidence is under
+`/private/tmp/fourth-speaker-foundation-ci-20261023/final-6225c78ef/`.
+Host command/source evidence is under
+`/private/tmp/fourth-returning-speaker-checks-20261023/final/`.
+A local evidence-parser exact-name assertion was corrected before the
+artifact check; no native test was retried to obtain these counts.
+
+The Name and Photo carry previews retain Common's guards. Their actual
+held draft branches are now being prepared from the frozen public head,
+with the old branches preserved; their own gates and native runs still
+remain. Formal Common review and the separate person/privacy acceptance
+continue to hold release, not preparation. The original development tree
+is clean on fetched train22 `f477d6c49`; the current collaboration rules
+route status to Queue #3126. The train22 recognition-loop overlap is being
+checked for the eventual combined train. No lamp, provider call, acoustic
+measurement, activation or memory-row score increase is claimed.
