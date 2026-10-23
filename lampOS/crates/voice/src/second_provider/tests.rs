@@ -13464,6 +13464,67 @@ async fn the_words_so_far_are_told_only_with_the_switch() {
     }
 }
 
+/// #3126 (`LAMP_SECOND_UNFINISHED_WAIT`): the service's words keep "um"
+/// with the switch, so a line whose words so far end "eggs, um" is told
+/// unfinished (filler), and its end held; more speech ("and some bread")
+/// goes on with it and it is told finished. The words the model gets, and
+/// those heard, have no "um". Without the switch nothing is told and the
+/// words are as the service gave them.
+#[tokio::test(start_paused = true)]
+async fn a_line_ending_on_a_filler_is_told_and_the_filler_never_reaches_the_model() {
+    for on in [true, false] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("I need eggs, um, and some bread.".to_owned())].into()),
+            said: Mutex::new(
+                [vec![
+                    "I need eggs, um".to_owned(),
+                    "I need eggs, um, and some bread.".to_owned(),
+                ]]
+                .into(),
+            ),
+            chats: Mutex::new([vec![text("Added both."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.telling_unfinished_words(on);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        let mut told = Vec::new();
+        if on {
+            while told.len() < 2 {
+                match tokio::time::timeout(Duration::from_secs(2), engine.next())
+                    .await
+                    .expect("told")
+                {
+                    ProviderOutput::WordsEnd { unfinished, .. } => told.push(unfinished),
+                    ProviderOutput::Started { .. } => {}
+                    other => panic!("{other:?}"),
+                }
+            }
+        }
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let expected: Vec<Option<crate::unfinished_words::Trailing>> = if on {
+            vec![Some(crate::unfinished_words::Trailing::Filler), None]
+        } else {
+            Vec::new()
+        };
+        assert_eq!(told, expected, "on: {on}");
+        let words = if on {
+            "I need eggs, and some bread."
+        } else {
+            "I need eggs, um, and some bread."
+        };
+        assert!(
+            labels.contains(&format!("heard:{words}")),
+            "on {on}: {labels:?}"
+        );
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(asked.len(), 1, "one line, one chat; on {on}");
+        assert_eq!(asked[0].last(), Some(&Message::user(words)), "on {on}");
+    }
+}
+
 /// #2807: right after a restart the face cache holds nobody yet, so a
 /// remembered face's first line is admitted as the room's. With its turn
 /// told by its own scope (`LAMP_SECOND_SCOPED_CONTEXT`) its keep looks

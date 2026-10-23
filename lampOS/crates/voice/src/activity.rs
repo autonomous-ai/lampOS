@@ -1427,6 +1427,57 @@ mod tests {
             .collect()
     }
 
+    /// #3126 (`LAMP_SECOND_UNFINISHED_WAIT`): words so far ending on a
+    /// filler ("…eggs, um") hold the end that came due, and speech in the
+    /// hold ("and some bread") goes on with the same line: one Start, one
+    /// End, after the rest. The journal tells the filler class.
+    #[test]
+    fn a_filler_ended_line_is_held_and_joined_with_what_follows() {
+        let mut detector = TurnDetector::default();
+        let mut sequence = 0;
+        let mut push = |detector: &mut TurnDetector, probability: f32| {
+            sequence += 1;
+            detector.push(
+                ObservedAudio {
+                    sequence,
+                    captured_at_us: sequence * 10_000,
+                    samples: [0; CAPTURE_SAMPLES],
+                },
+                probability,
+            )
+        };
+        // How many Starts and Ends so far.
+        let mut seen = (0, 0);
+        let count = |activity: Activity, seen: &mut (u32, u32)| match activity {
+            Activity::Start(_) => seen.0 += 1,
+            Activity::End(_) => seen.1 += 1,
+            _ => {}
+        };
+        // "I need eggs, um", then 1 s of quiet: the 0.6 s window is past.
+        for _ in 0..50 {
+            count(push(&mut detector, 1.0), &mut seen);
+        }
+        detector.words_end(Some(Trailing::Filler));
+        for _ in 0..100 {
+            count(push(&mut detector, 0.0), &mut seen);
+        }
+        // "and some bread": the same line, the hold told.
+        for _ in 0..50 {
+            count(push(&mut detector, 1.0), &mut seen);
+        }
+        let waited = detector.take_unfinished_wait().expect("the end was held");
+        assert_eq!(
+            waited.told(Some(1)),
+            "lamp-voice: request 1: unfinished words (filler) held its end 400 ms, more speech came: yes"
+        );
+        assert_eq!(seen, (1, 0));
+        detector.words_end(None);
+        for _ in 0..END_SILENCE_BLOCKS {
+            count(push(&mut detector, 0.0), &mut seen);
+        }
+        assert_eq!(seen, (1, 1));
+    }
+
     /// The first builder's test for #828: the processed block suppressed to
     /// silence while the linear output still holds the speech scores speech
     /// with the switch and not without it.
