@@ -2979,6 +2979,20 @@ pub fn serve(
                 heeding.opening_the_eyes(files.bus_root.as_deref());
             }
         }
+        // A face turned to the lamp lets a line out only when it is seen
+        // speaking it, or the line is in the conversation's voice
+        // (`LAMP_TURNED_FACE_SPEAKS=on`).
+        if std::env::var(crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a face turned to the lamp lets a line out only when it is seen speaking it or the line is in the conversation's voice; one read and not seen speaking is nobody turned to it, and the line held is talk for the room; with no mouths read, as before (LAMP_TURNED_FACE_SPEAKS)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.needing_the_turned_face_to_speak();
+                heeding.opening_the_eyes(files.bus_root.as_deref());
+            }
+        }
         // What the caller said before their face was known follows them
         // (`LAMP_MEMORY_FOLLOWS_FACE=on`, #2176): each line's voice and the
         // faces seen speaking it tell whether it was theirs.
@@ -4055,6 +4069,11 @@ pub(crate) struct Heeding {
     busy_called_strict: bool,
     /// `LAMP_TURNED_SPEAKING=on` ([`Self::counting_only_turned_speakers`]).
     turned_speaking: bool,
+    /// `LAMP_TURNED_FACE_SPEAKS=on` ([`Self::needing_the_turned_face_to_speak`]),
+    /// and the request last judged whose turned face was so read as no
+    /// sign, for the room ([`crate::room_told::RoomTold::face_not_speaking`]).
+    turned_face_speaks: bool,
+    face_not_speaking: Option<u64>,
     /// `LAMP_NAME_OR_FOLLOW_UP=on` ([`Self::needing_name_or_follow_up`]).
     name_or_follow_up: bool,
     /// The faces the eyes saw speaking each of the last lines judged, newest
@@ -4277,7 +4296,10 @@ fn speakers_between(
 }
 
 /// Whether `eyes` saw only silent faces turned to the lamp from `began_us`
-/// to `ended_us`, by this process's clock; never without them.
+/// to `ended_us`, by this process's clock; never without them. With
+/// `unread_spoils`, a turned mouth unread in any look says no
+/// ([`crate::speaking_faces::SpeakingFaces::turned_only_silent`]); without,
+/// it doesn't (`turned_not_seen_speaking`).
 fn turned_only_silent(
     eyes: Option<&(
         Arc<crate::speaking_faces::SpeakingFaces>,
@@ -4285,6 +4307,7 @@ fn turned_only_silent(
     )>,
     began_us: u64,
     ended_us: u64,
+    unread_spoils: bool,
 ) -> bool {
     let Some((eyes, _)) = eyes else {
         return false;
@@ -4298,7 +4321,8 @@ fn turned_only_silent(
         }
     };
     match (at(began_us), at(ended_us)) {
-        (Some(from), Some(to)) => eyes.turned_only_silent(from, to),
+        (Some(from), Some(to)) if unread_spoils => eyes.turned_only_silent(from, to),
+        (Some(from), Some(to)) => eyes.turned_not_seen_speaking(from, to),
         _ => false,
     }
 }
@@ -4663,6 +4687,8 @@ impl Heeding {
             said_until_free_us: None,
             busy_called_strict: false,
             turned_speaking: false,
+            turned_face_speaks: false,
+            face_not_speaking: None,
             name_or_follow_up: false,
             spoke: std::collections::VecDeque::new(),
             near: None,
@@ -4725,6 +4751,13 @@ impl Heeding {
     /// [`crate::speaking_faces::SpeakingFaces::turned_only_silent`]).
     pub(crate) fn counting_only_turned_speakers(&mut self) {
         self.turned_speaking = true;
+    }
+
+    /// A face turned to the lamp lets a line out only when it is seen
+    /// speaking the line, or the line is in the conversation's voice
+    /// (`LAMP_TURNED_FACE_SPEAKS=on`, [`Self::silence_turned`]).
+    pub(crate) fn needing_the_turned_face_to_speak(&mut self) {
+        self.turned_face_speaks = true;
     }
 
     /// With people talking at a desk, a line is the lamp's by its name, a
@@ -5825,19 +5858,47 @@ impl Heeding {
     /// the lamp not talking to it. The sign goes before the rule and the
     /// name's note read it (the reviewer-lead's P2 on #2546), and nothing
     /// fresh from the eyes (`None`) stays as it is.
-    fn silence_turned(&self, request: u64, said: (u64, u64), signs: &mut Signs) {
-        if signs.turned == Some(true) && self.turned_but_silent(said) {
+    ///
+    /// `LAMP_TURNED_FACE_SPEAKS`: the same when the faces turned to it were
+    /// read and none was seen speaking the line, a look unread among them
+    /// ([`crate::speaking_faces::SpeakingFaces::turned_not_seen_speaking`]),
+    /// unless the line is in the conversation's voice
+    /// ([`crate::same_voice::SAME_FROM`] or over). The line, held, is then
+    /// talk for the room ([`crate::room_told::RoomTold::face_not_speaking`]).
+    /// With no speaking read (`LAMP_EYES_SPEAKING` off, or the turned
+    /// mouths never read), the face is a sign as before: fail open, so a
+    /// person alone at a lamp whose eyes can't read mouths is still answered.
+    fn silence_turned(&mut self, request: u64, said: (u64, u64), signs: &mut Signs) {
+        if signs.turned != Some(true) {
+            return;
+        }
+        if self.turned_but_silent(said) {
             eprintln!(
                 "lamp-voice second: request {request}: the only faces turned to the lamp were seen silent through the line: nobody is turned to it (LAMP_TURNED_SPEAKING)"
             );
             signs.turned = Some(false);
+        } else if self.turned_face_speaks
+            && turned_only_silent(self.eyes.as_ref(), said.0, said.1, false)
+        {
+            let likeness = self
+                .voices
+                .as_mut()
+                .and_then(|voices| voices.likeness_so_far(request));
+            if likeness.is_some_and(|likeness| likeness >= crate::same_voice::SAME_FROM) {
+                return;
+            }
+            eprintln!(
+                "lamp-voice second: request {request}: the face turned to the lamp was not seen speaking the line, nor is it in the conversation's voice: nobody is turned to it (LAMP_TURNED_FACE_SPEAKS)"
+            );
+            signs.turned = Some(false);
+            self.face_not_speaking = Some(request);
         }
     }
 
     /// `LAMP_TURNED_SPEAKING`: the only faces turned to the lamp were seen
     /// silent through `began_us..=ended_us` ([`turned_only_silent`]).
     fn turned_but_silent(&self, (began_us, ended_us): (u64, u64)) -> bool {
-        self.turned_speaking && turned_only_silent(self.eyes.as_ref(), began_us, ended_us)
+        self.turned_speaking && turned_only_silent(self.eyes.as_ref(), began_us, ended_us, true)
     }
 
     /// What the Policy's gate is told of `request`, as the Live worker
@@ -6561,6 +6622,9 @@ impl Heeding {
         if let Ok(mut room) = crate::room_told::room().lock() {
             if talking_seen {
                 room.seen_talking(request);
+            }
+            if self.face_not_speaking == Some(request) {
+                room.face_not_speaking(request);
             }
             room.judged(request, verdict, seen.other_voice);
             if called {
@@ -15245,6 +15309,279 @@ mod tests {
             judged(false, Some(No), None),
             "the eyes said nothing fresh"
         );
+    }
+
+    /// The eyes' looks of one face turned to the lamp, from `from_ms` after
+    /// `now`, five 400 ms apart, its mouth read as `states` gives, one by
+    /// one and round again (`None`: not judged at all).
+    fn turned_face_looks(
+        eyes: &crate::speaking_faces::SpeakingFaces,
+        now: Instant,
+        from_ms: u64,
+        states: &[Option<lamp_msgs::SpeakingState>],
+        seq: &mut u64,
+    ) {
+        use lamp_msgs::{Face, Faces, Speaking};
+        for look in 0..5u64 {
+            *seq += 1;
+            let faces = Faces {
+                faces: vec![Face {
+                    id: "f1".into(),
+                    xmin: 0.4,
+                    ymin: 0.3,
+                    xmax: 0.5,
+                    ymax: 0.45,
+                    confidence: 1.0,
+                    yaw: Some(0.1),
+                    facing: Some(true),
+                    speaking: states[look as usize % states.len()].map(|state| Speaking {
+                        state,
+                        score: 0.0,
+                        from: None,
+                    }),
+                }],
+            };
+            eyes.look(
+                now + Duration::from_millis(from_ms + look * 400),
+                Some((("b", *seq), &faces)),
+            );
+        }
+    }
+
+    /// The signs of a line said with a face turned to the lamp, in `room`.
+    fn turned_signs(room: crate::room_told::Room) -> super::Signs {
+        super::Signs {
+            room,
+            going_on: false,
+            lamp_asked: false,
+            turned: Some(true),
+            names: vec![],
+            near: false,
+            continues_from: None,
+        }
+    }
+
+    /// `LAMP_TURNED_FACE_SPEAKS` (lamp-52e6, 24 Oct 05:31: with a still face
+    /// turned to the lamp, two other voices' desk talk was answered as
+    /// "someone is turned to the lamp"): with `LAMP_SPOKEN_TO`, in a room
+    /// not known to be busy, quiet, or busy, a line let out by a face turned
+    /// to the lamp is held when that face was read and never seen speaking
+    /// it, a look unread among them; let out when it was seen speaking (its
+    /// mouth still between words too), when its mouth was never read, or
+    /// without the switch. `LAMP_TURNED_SPEAKING` alone lets the still face
+    /// with one unread look through, as it did on the lamp.
+    #[test]
+    fn with_turned_face_speaks_a_turned_face_lets_out_only_a_line_it_is_seen_speaking() {
+        use crate::room_told::Room;
+        use lamp_msgs::SpeakingState::{No, Unknown, Yes};
+        let judged = |on: bool,
+                      turned_speaking: bool,
+                      room: Room,
+                      states: &[Option<lamp_msgs::SpeakingState>]| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            turned_face_looks(&eyes, now, 200, states, &mut 0);
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.seeing_speaking_faces(eyes, None);
+            if turned_speaking {
+                heeding.counting_only_turned_speakers();
+            }
+            if on {
+                heeding.needing_the_turned_face_to_speak();
+            }
+            let verdict = heeding.heed_signs(
+                9,
+                (now_us, now_us + 2_200_000),
+                "So are we still doing lunch at noon?",
+                turned_signs(room),
+            );
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            verdict
+        };
+        let still = [Some(No), Some(No), Some(Unknown), Some(No), Some(No)];
+        let speaking = [Some(Yes), Some(No), Some(Yes), Some(No), Some(No)];
+        for room in [Room::Unknown, Room::Quiet, Room::Busy] {
+            assert_eq!(
+                judged(false, false, room, &still),
+                None,
+                "{room:?}: without the switch"
+            );
+            assert_eq!(
+                judged(false, true, room, &still),
+                None,
+                "{room:?}: LAMP_TURNED_SPEAKING alone, one look unread"
+            );
+            assert!(
+                judged(true, false, room, &still).is_some(),
+                "{room:?}: a still face"
+            );
+            assert_eq!(
+                judged(true, false, room, &speaking),
+                None,
+                "{room:?}: the face speaks"
+            );
+            assert_eq!(
+                judged(true, false, room, &[Some(Unknown)]),
+                None,
+                "{room:?}: its mouth never read"
+            );
+            assert_eq!(
+                judged(true, false, room, &[None]),
+                None,
+                "{room:?}: no speaking read"
+            );
+        }
+        assert_eq!(
+            judged(true, false, Room::Busy, &still),
+            Some(crate::attention::BUSY_UNCALLED)
+        );
+    }
+
+    /// `LAMP_TURNED_FACE_SPEAKS` (lamp-52e6, 24 Oct 05:31): desk talk between
+    /// two voices, neither saying the lamp's name, with someone at the lamp
+    /// turned to it and still, the room not yet known (as on the lamp). With
+    /// the switch none of it is answered, and the room is busy after the
+    /// third line within a minute; without it every line is answered, as on
+    /// the lamp.
+    #[test]
+    fn with_turned_face_speaks_desk_talk_past_a_still_face_is_held_and_makes_the_room_busy() {
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::room_told::Room;
+        use lamp_msgs::SpeakingState::{No, Unknown};
+        let still = [Some(No), Some(No), Some(Unknown), Some(No), Some(No)];
+        let run = |on: bool| {
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            {
+                let mut room = crate::room_told::room().lock().unwrap();
+                *room = crate::room_told::RoomTold::new();
+                room.count_only_talk(true);
+            }
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.seeing_speaking_faces(eyes.clone(), None);
+            if on {
+                heeding.needing_the_turned_face_to_speak();
+            }
+            let lines = [
+                "Did you get my message about the budget?",
+                "Yes, I'll read it after lunch.",
+                "Can we move the review to Thursday?",
+            ];
+            let mut seq = 0;
+            let mut seen = Vec::new();
+            for (request, line) in (1..).zip(lines) {
+                let at_ms = request * 10_000;
+                turned_face_looks(&eyes, now, at_ms + 200, &still, &mut seq);
+                let said = (now_us + at_ms * 1_000, now_us + at_ms * 1_000 + 2_200_000);
+                let room = {
+                    let mut room = crate::room_told::room().lock().unwrap();
+                    room.heard(request, said.0);
+                    room.at(said.0)
+                };
+                let held = heeding.heed_signs(request, said, line, turned_signs(room));
+                let mut room = crate::room_told::room().lock().unwrap();
+                room.ended(request, said.1);
+                room.unanswered(request, said.1);
+                seen.push((held.is_some(), room.at(said.1 + 1)));
+            }
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            seen
+        };
+        assert_eq!(
+            run(true),
+            [
+                (true, Room::Unknown),
+                (true, Room::Unknown),
+                (true, Room::Busy)
+            ]
+        );
+        assert_eq!(
+            run(false).iter().filter(|(held, _)| *held).count(),
+            0,
+            "as on the lamp"
+        );
+    }
+
+    /// `LAMP_TURNED_FACE_SPEAKS`: a line in the conversation's voice is let
+    /// out by a face turned to the lamp though the face was not seen speaking
+    /// it; another voice's line, past the same still face, is held.
+    #[test]
+    fn with_turned_face_speaks_the_conversations_voice_still_counts_with_a_still_face() {
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::room_told::Room;
+        use lamp_msgs::SpeakingState::No;
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+        let (now, now_us) = (Instant::now(), monotonic_us());
+        let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+        let mut heeding = Heeding::new(true, true, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        heeding.voices = Some(crate::same_voice::Voices::new(
+            Box::new(CarryVoice::default()) as Box<dyn crate::same_voice::Printer>,
+        ));
+        heeding.seeing_speaking_faces(eyes.clone(), None);
+        heeding.needing_the_turned_face_to_speak();
+        let mut seq = 0;
+        let mut line =
+            |heeding: &mut Heeding, request: u64, voice: i16, words: &str, turned: bool| {
+                let at_ms = request * 10_000;
+                if turned {
+                    turned_face_looks(&eyes, now, at_ms + 200, &[Some(No)], &mut seq);
+                }
+                heeding.hear(
+                    request,
+                    crate::second_provider::Heard::Began {
+                        over_the_lamps_voice: false,
+                    },
+                );
+                heeding.hear(
+                    request,
+                    crate::second_provider::Heard::Samples(&[voice; 48_000]),
+                );
+                heeding.hear(request, crate::second_provider::Heard::Ended);
+                let signs = super::Signs {
+                    turned: Some(turned),
+                    ..turned_signs(Room::Unknown)
+                };
+                let said = (now_us + at_ms * 1_000, now_us + at_ms * 1_000 + 2_200_000);
+                heeding.heed_signs(request, said, words, signs)
+            };
+        assert_eq!(
+            line(&mut heeding, 1, 1, "Lamp, what time is it?", false),
+            None,
+            "the call"
+        );
+        heeding.called_at = Some(Instant::now() - Duration::from_secs(60));
+        assert_eq!(
+            line(&mut heeding, 2, 1, "And what about tomorrow?", true),
+            None,
+            "the conversation's voice"
+        );
+        assert!(
+            line(&mut heeding, 3, -1, "Did you send the slides?", true).is_some(),
+            "another voice"
+        );
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    }
+
+    /// `LAMP_TURNED_FACE_SPEAKS` beside `LAMP_SAME_SPEAKER_CARRIES` (#3296):
+    /// the owner's five turns in a busy room are carried as before, by voice
+    /// and face, by voice alone, and by face alone.
+    #[test]
+    fn with_turned_face_speaks_the_same_speaker_still_goes_on_five_turns() {
+        let _one = crate::provider_worker::tests::one_thread();
+        for (voice, face) in [(1, "f1"), (1, ""), (0, "f1")] {
+            let mut desk = CarryDesk::new(true);
+            desk.heeding.needing_the_turned_face_to_speak();
+            assert_eq!(
+                desk.five(12, voice, face),
+                [None; 5],
+                "voice {voice}, face {face:?}"
+            );
+        }
     }
 
     /// `LAMP_JOIN_CUT_WORDS`: one person said a line cut short and the line

@@ -747,6 +747,14 @@ impl<P: Printer> Voices<P> {
         Some(likeness)
     }
 
+    /// [`Self::likeness`] without using up the line's one judgement, for a
+    /// sign read before its verdict (`LAMP_TURNED_FACE_SPEAKS`): nothing
+    /// while its print or the conversation's voice is not known.
+    pub fn likeness_so_far(&mut self, request: u64) -> Option<f32> {
+        self.poll();
+        self.likest(self.print(request)?)
+    }
+
     /// How alike the lines `a` and `b` sound: the cosine of their two
     /// prints, once both have come ([`SAME_FROM`]). Asked of a line going
     /// on from the one it cut short, which the rule judged already.
