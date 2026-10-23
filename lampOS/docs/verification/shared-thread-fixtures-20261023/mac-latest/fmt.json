@@ -1,0 +1,15 @@
+{
+  "head": "28cc2539ace71321dddfe89e37af3809a960bff1",
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "fmt",
+    "--all",
+    "--check"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 6.055,
+  "host": "Darwin arm64; Rust 1.96.0",
+  "log_bytes": 0,
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

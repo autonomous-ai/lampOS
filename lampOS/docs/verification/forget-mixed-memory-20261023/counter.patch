@@ -1,0 +1,118 @@
+diff --git a/lampOS/crates/memory/tests/it/voice.rs b/lampOS/crates/memory/tests/it/voice.rs
+--- a/lampOS/crates/memory/tests/it/voice.rs
++++ b/lampOS/crates/memory/tests/it/voice.rs
+@@ -613,6 +613,114 @@
+     }
+ }
+ 
++/// A follow-up observation and an unrelated keep can cite one exchange:
++/// this is the durable shape produced by `remember_from` with FORGET_ALL.
++/// Exercise the real Voice client, protocol and store, not a synthetic reply.
++/// Run this unchanged against both the reviewed store and the legacy store.
++#[test]
++fn a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence() {
++    const ABOUT: &str = "Synthetic exam on the hill";
++    const ASK: &str = "How did the exam on the hill go?";
++    const KEEP: &str = "The synthetic lantern inventory is complete.";
++    let id = person_id("Synthetic shared-evidence caller");
++    let person = Person::new(&id).unwrap();
++    let mut seeded = None;
++    let fixture = Fixture::new(
++        |store, now| {
++            let said = store
++                .append(
++                    &person,
++                    now - DAY,
++                    "Synthetic exam on the hill. The synthetic lantern inventory is complete.",
++                    "Good luck with the exam.",
++                    &[],
++                )
++                .unwrap();
++            let kept = store
++                .remember_from(&person, now - DAY + 1, KEEP, &[said])
++                .unwrap();
++            let job = store
++                .conversation_end(&person, &format!("shared{now}"), &[said])
++                .unwrap();
++            let noticed = store
++                .tidy_apply(
++                    &person,
++                    &job.job,
++                    &Output {
++                        observations: vec![Proposal {
++                            text: ABOUT.into(),
++                            category: Category::Thread,
++                            source_ids: vec![said],
++                            supersedes: None,
++                            on: None,
++                        }],
++                    },
++                )
++                .unwrap();
++            assert_eq!(noticed.len(), 1);
++            let noticed = noticed[0];
++            for entry in [kept, noticed] {
++                assert_eq!(
++                    store.record(&person, entry).unwrap().unwrap().source_ids,
++                    [said],
++                    "both entries must really share the same evidence"
++                );
++            }
++            seeded = Some((said, kept, noticed));
++        },
++        None,
++    );
++    let (said, kept, noticed) = seeded.unwrap();
++    let client = fixture.client();
++    client.following_up();
++    let note = client.told_for_session_within(1, Some(&id), false, SESSION);
++    assert!(note.contains(ABOUT), "offered: {note}");
++    assert_eq!(fixture.next("follow_up").1["follow_up"]["id"], noticed);
++    client.mark_if_asked(ASK, Some(&id));
++    assert_eq!(fixture.next("follow_up_asked").1["ok"], true);
++    let (told, ok) = client.run_for(
++        &call(FORGET, json!({})),
++        Duration::from_millis(1500),
++        Some(&id),
++    );
++    assert!(ok, "{told}");
++    assert_eq!(told, json!({"forgotten":true}));
++    assert_eq!(
++        fixture.next("forget").0,
++        json!({"op":"forget","person":id.as_str(),"id":noticed})
++    );
++    let db = Connection::open_with_flags(
++        fixture.root.join("store").join(DATABASE),
++        OpenFlags::SQLITE_OPEN_READ_ONLY,
++    )
++    .unwrap();
++    let left = db
++        .prepare("SELECT id,kind,text FROM entries WHERE person=?1 ORDER BY id")
++        .unwrap()
++        .query_map([id.as_str()], |row| {
++            Ok((
++                row.get::<_, u64>(0)?,
++                row.get::<_, String>(1)?,
++                row.get::<_, String>(2)?,
++            ))
++        })
++        .unwrap()
++        .collect::<Result<Vec<_>, _>>()
++        .unwrap();
++    assert_eq!(
++        left,
++        [(kept, "kept".to_owned(), KEEP.to_owned())],
++        "forgetting follow-up {noticed} and its evidence {said} must preserve unrelated keep {kept}"
++    );
++    let links: u64 = db
++        .query_row("SELECT count(*) FROM sources", [], |row| row.get(0))
++        .unwrap();
++    assert_eq!(
++        links, 0,
++        "the kept row must not retain a dangling evidence link"
++    );
++}
++
+ /// With no follow-up asked, "forget that" is the newest kept line, as
+ /// before: an observation is never it.
+ #[test]

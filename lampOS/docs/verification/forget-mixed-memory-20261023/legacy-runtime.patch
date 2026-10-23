@@ -1,0 +1,280 @@
+diff --git a/lampOS/crates/memory/src/days.rs b/lampOS/crates/memory/src/days.rs
+index 1d043540a..f23077907 100644
+--- a/lampOS/crates/memory/src/days.rs
++++ b/lampOS/crates/memory/src/days.rs
+@@ -735,23 +735,9 @@ impl Days {
+     }
+ 
+     pub fn kept(&self, person: &Person, max_bytes: usize) -> Result<Vec<Kept>> {
+-        self.kept_with(person, max_bytes, false)
+-    }
+-
+-    /// [`Self::kept`], with `observations` what was noticed of the person
+-    /// too (#3113): their current observations, by the same ids, so a
+-    /// forget by name reaches "my favourite colour" kept without being
+-    /// asked. Newest first up to `max_bytes`, given oldest first.
+-    pub fn kept_with(
+-        &self,
+-        person: &Person,
+-        max_bytes: usize,
+-        observations: bool,
+-    ) -> Result<Vec<Kept>> {
+-        // A replaced kept thing (#2510) is no longer kept: only its history;
+-        // and a superseded observation is no longer what was noticed.
+-        let mut statement=self.db.prepare("SELECT id,at_unix_ms,text FROM entries WHERE person=?1 AND (kind='kept' OR (?2 AND kind='observation')) AND active=1 ORDER BY id DESC")?;
+-        let rows = statement.query_map(params![person.as_str(), observations], |r| {
++        // A replaced kept thing (#2510) is no longer kept: only its history.
++        let mut statement=self.db.prepare("SELECT id,at_unix_ms,text FROM entries WHERE person=? AND kind='kept' AND active=1 ORDER BY id DESC")?;
++        let rows = statement.query_map([person.as_str()], |r| {
+             Ok(Kept {
+                 id: r.get(0)?,
+                 at_unix_ms: r.get(1)?,
+@@ -887,40 +873,6 @@ impl Days {
+         )?)
+     }
+ 
+-    /// An observation of `person`'s, as the observe pass keeps one, for
+-    /// tests: `active` false is one superseded.
+-    #[cfg(test)]
+-    pub(crate) fn observe_for_test(
+-        &mut self,
+-        person: &Person,
+-        at: u64,
+-        text: &str,
+-        active: bool,
+-    ) -> u64 {
+-        ensure_person(&self.db, person).unwrap();
+-        let id = next_id(&self.db, person).unwrap();
+-        insert_record(
+-            &self.db,
+-            &Record {
+-                id,
+-                person: person.as_str().into(),
+-                kind: "observation".into(),
+-                at_unix_ms: at,
+-                heard: String::new(),
+-                said: String::new(),
+-                text: text.into(),
+-                category: Some(tidy::Category::Preference),
+-                source_ids: vec![],
+-                supersedes: None,
+-                active,
+-            },
+-            &self.local,
+-            self.now,
+-        )
+-        .unwrap();
+-        id
+-    }
+-
+     pub fn forget(&mut self, person: &Person, id: u64) -> Result<u64> {
+         let count = self.forget_here(person, id)?;
+         self.forget_set_aside()?;
+@@ -947,27 +899,10 @@ impl Days {
+         // not where the fact came from, so climbing them removed kept things
+         // that were only shown (#2003). A rule the exchange followed, in the
+         // scope beside theirs, is not evidence either.
+-        //
+-        // The evidence goes, but nothing goes because it derives from the
+-        // evidence (#3113): with `LAMP_MEMORY_FORGET_ALL` a kept thing's
+-        // sources are its conversation's exchanges, so one exchange can be
+-        // the evidence of the colour and a source of the wedding, and of
+-        // other things noticed in it. Forgetting the colour took the wedding;
+-        // forgetting the wedding took the colour. So the walk below starts
+-        // from what is named (with its versions) only, and the evidence joins
+-        // after it; a link from something kept to a removed exchange goes by
+-        // the foreign key, as on expiry.
+-        let evidence: Vec<i64> = if record.kind == "observation" || record.kind == "kept" {
+-            tx.prepare("SELECT DISTINCT s.parent FROM sources s JOIN doomed d ON s.child=d.rid JOIN entries e ON e.rid=s.parent WHERE e.person=?1 AND e.kind='exchange'")?
+-                .query_map([person.as_str()], |r| r.get(0))?
+-                .collect::<rusqlite::Result<_>>()?
+-        } else {
+-            Vec::new()
+-        };
+-        descendants(&tx, None)?;
+-        for rid in evidence {
+-            tx.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid])?;
++        if record.kind == "observation" || record.kind == "kept" {
++            tx.execute("INSERT OR IGNORE INTO doomed SELECT s.parent FROM sources s JOIN doomed d ON s.child=d.rid JOIN entries e ON e.rid=s.parent WHERE e.person=?1 AND e.kind='exchange'",[person.as_str()])?;
+         }
++        descendants(&tx, None)?;
+         let count = erase(&tx)?;
+         tx.commit()?;
+         Ok(count)
+@@ -2201,9 +2136,8 @@ fn versions(db: &Connection) -> Result<()> {
+     Ok(())
+ }
+ /// What goes with the doomed rows: for a forget (`expiry` None), all that
+-/// derives from them and every version, except a kept thing that isn't
+-/// itself doomed already (#3113); for expiry, from the first day whose
+-/// events no longer hold (`expiry`), what derives from them only.
++/// derives from them and every version; for expiry, from the first day
++/// whose events no longer hold (`expiry`), what derives from them only.
+ fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
+     if let Some(event) = expiry {
+         // Expiry: a kept thing never expires, even one remembered with its
+@@ -2213,13 +2147,7 @@ fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
+         // its follow-up window. A forget, below, still follows those links.
+         db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept' AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=s.child AND d.day>=?1)) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[event])?;
+     } else {
+-        // A forget: a kept thing goes only when it is named (the doomed rows
+-        // this walk starts from, with their versions), never because it
+-        // derives from a doomed row (#3113). With `LAMP_MEMORY_FORGET_ALL` a
+-        // kept thing's sources are its conversation's exchanges, so a named
+-        // exchange would take every kept thing said in its conversation. Its
+-        // link to the exchange goes by the foreign key, as on expiry.
+-        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept' UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
++        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
+     }
+     Ok(())
+ }
+diff --git a/lampOS/crates/memory/src/days_protocol.rs b/lampOS/crates/memory/src/days_protocol.rs
+index 1b932f764..4d317432e 100644
+--- a/lampOS/crates/memory/src/days_protocol.rs
++++ b/lampOS/crates/memory/src/days_protocol.rs
+@@ -287,16 +287,8 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
+             (id, true) => json!({"ok":true,"id":id,"existing":true}),
+             (id, false) => value(Response::Added { id }),
+         },
+-        Request::Kept {
+-            person,
+-            max_bytes,
+-            observations,
+-        } => value(Response::Kept {
+-            entries: store.kept_with(
+-                &one(person)?,
+-                max_bytes.unwrap_or(4096).min(16384) as usize,
+-                observations,
+-            )?,
++        Request::Kept { person, max_bytes } => value(Response::Kept {
++            entries: store.kept(&one(person)?, max_bytes.unwrap_or(4096).min(16384) as usize)?,
+         }),
+         Request::Recall {
+             person,
+@@ -1128,81 +1120,4 @@ mod tests {
+         );
+         assert_eq!(submissions, [false, true]);
+     }
+-
+-    /// #3113: `kept` with `observations` lists what the lamp noticed of a
+-    /// person beside what they asked it to keep, current ones only, so a
+-    /// forget by name finds "my favourite colour" kept on its own. Without
+-    /// it the listing is what it was, and no other person's is listed.
+-    #[test]
+-    fn kept_with_observations_lists_the_persons_current_observations_too() {
+-        const MAI: &str = "p-0123456789abcdef";
+-        const AN: &str = "p-fedcba9876543210";
+-        let (_scratch, mut store) = Scratch::new("kept-observations");
+-        let mai = Person::new(MAI).unwrap();
+-        let an = Person::new(AN).unwrap();
+-        let ask = |store: &mut Days, request: Value| -> Value {
+-            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW + 9).line)
+-                .unwrap()
+-        };
+-        let wedding = ask(
+-            &mut store,
+-            json!({"op":"remember","person":MAI,"at_unix_ms":NOW,"text":"Sister's wedding is on Saturday."}),
+-        );
+-        assert_eq!(wedding, json!({"ok":true,"id":1}));
+-        let old = store.observe_for_test(&mai, NOW, "Favourite colour is blue.", false);
+-        let colour = store.observe_for_test(&mai, NOW + 1, "Favourite colour is violet.", true);
+-        store.observe_for_test(&an, NOW, "Favourite colour is green.", true);
+-        let texts = |line: &Value| -> Vec<(u64, String)> {
+-            line["entries"]
+-                .as_array()
+-                .unwrap()
+-                .iter()
+-                .map(|entry| {
+-                    (
+-                        entry["id"].as_u64().unwrap(),
+-                        entry["text"].as_str().unwrap().to_owned(),
+-                    )
+-                })
+-                .collect()
+-        };
+-        let plain = ask(&mut store, json!({"op":"kept","person":MAI}));
+-        assert_eq!(
+-            texts(&plain),
+-            [(1, "Sister's wedding is on Saturday.".into())]
+-        );
+-        let off = ask(
+-            &mut store,
+-            json!({"op":"kept","person":MAI,"observations":false}),
+-        );
+-        assert_eq!(off, plain);
+-        let both = ask(
+-            &mut store,
+-            json!({"op":"kept","person":MAI,"observations":true,"max_bytes":16384}),
+-        );
+-        assert_eq!(
+-            texts(&both),
+-            [
+-                (1, "Sister's wedding is on Saturday.".into()),
+-                (colour, "Favourite colour is violet.".into())
+-            ],
+-            "{both}"
+-        );
+-        assert!(!texts(&both).iter().any(|(id, _)| *id == old));
+-        // Forgotten by its id, it is listed no more; the kept line stays.
+-        let forgotten = ask(&mut store, json!({"op":"forget","person":MAI,"id":colour}));
+-        assert_eq!(forgotten["removed"], 1, "{forgotten}");
+-        let after = ask(
+-            &mut store,
+-            json!({"op":"kept","person":MAI,"observations":true}),
+-        );
+-        assert_eq!(
+-            texts(&after),
+-            [(1, "Sister's wedding is on Saturday.".into())]
+-        );
+-        let theirs = ask(
+-            &mut store,
+-            json!({"op":"kept","person":AN,"observations":true}),
+-        );
+-        assert_eq!(texts(&theirs).len(), 1);
+-    }
+ }
+diff --git a/lampOS/crates/memory/src/protocol.rs b/lampOS/crates/memory/src/protocol.rs
+index 9affbb141..420641726 100644
+--- a/lampOS/crates/memory/src/protocol.rs
++++ b/lampOS/crates/memory/src/protocol.rs
+@@ -128,12 +128,6 @@ pub enum Request {
+         person: Who,
+         #[serde(default)]
+         max_bytes: Option<u64>,
+-        /// The Days store's (#3113): what it noticed of the person
+-        /// (current observations) is listed too, by the same ids, for a
+-        /// forget by name. The legacy store, which notices nothing, ignores
+-        /// it.
+-        #[serde(default)]
+-        observations: bool,
+     },
+     Recall {
+         #[serde(default)]
+@@ -426,9 +420,7 @@ fn done(store: &mut Store, request: Request, now_unix_ms: u64) -> Result<Respons
+                 .map_err(not_added)?;
+             Response::Added { id }
+         }
+-        Request::Kept {
+-            person, max_bytes, ..
+-        } => {
++        Request::Kept { person, max_bytes } => {
+             let room = usize::try_from(max_bytes.unwrap_or(KEPT_BYTES)).unwrap_or(usize::MAX);
+             Response::Kept {
+                 entries: store.kept(&one(person)?, room).map_err(disk)?,
+@@ -1028,16 +1020,6 @@ mod tests {
+             Request::Kept {
+                 person: Who::Unsaid,
+                 max_bytes: Some(900),
+-                observations: false,
+-            }
+-        );
+-        // #3113: the Days store's; the legacy store lists kept things alone.
+-        assert_eq!(
+-            parse(r#"{"op":"kept","observations":true}"#),
+-            Request::Kept {
+-                person: Who::Unsaid,
+-                max_bytes: None,
+-                observations: true,
+             }
+         );
+         assert_eq!(

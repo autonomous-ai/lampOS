@@ -1,0 +1,22 @@
+
+running 1 test
+lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)
+lamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true
+lamp-voice provider: a bare forget after a follow-up forgets entry 3
+lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+
+thread 'voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence' (67215941) panicked at crates/memory/tests/it/voice.rs:710:5:
+assertion `left == right` failed: forgetting follow-up 3 and its evidence 1 must preserve unrelated keep 2
+  left: []
+ right: [(2, "kept", "The synthetic lantern inventory is complete.")]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence --- FAILED
+
+failures:
+
+failures:
+    voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 157 filtered out; finished in 0.40s
+
+error: test failed, to rerun pass `-p lamp-memory --test it`

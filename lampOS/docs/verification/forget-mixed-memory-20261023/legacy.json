@@ -1,0 +1,39 @@
+{
+  "variant": "legacy",
+  "head": "8dd86272e9f9bfec63e1c62df2d6a06c714e75b3",
+  "memory_runtime_head": "ae4ab0022a5716b8b393956d5e26fd1480aac350",
+  "host": "Darwin arm64; Rust 1.96.0",
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-memory",
+    "--test",
+    "it",
+    "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+    "--",
+    "--exact",
+    "--nocapture"
+  ],
+  "started_at_utc": "2026-10-23T00:34:42.551301+00:00",
+  "elapsed_seconds": 5.051,
+  "exit_code": 101,
+  "patch_sha256": "c24a9a451f72496d0ee081294f4f491a76469542479b9804a417a0e5a5b8d04b",
+  "test_source_sha256": "7052e978e06b4c620b68e76112dab1a70dbba041835ed9dd00b3075e7353ec16",
+  "bound_files": 6520,
+  "inputs_unchanged": true,
+  "log_bytes": 1099,
+  "log_sha256": "7ab6b83b7384ccaad32d947ffba8db6f05f90fb15bfd6c671d36cb4b62bc7bfb",
+  "result_lines": [
+    "thread 'voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence' (67215941) panicked at crates/memory/tests/it/voice.rs:710:5:",
+    "assertion `left == right` failed: forgetting follow-up 3 and its evidence 1 must preserve unrelated keep 2",
+    "  left: []",
+    " right: [(2, \"kept\", \"The synthetic lantern inventory is complete.\")]",
+    "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 157 filtered out; finished in 0.40s",
+    "error: test failed, to rerun pass `-p lamp-memory --test it`"
+  ]
+}
