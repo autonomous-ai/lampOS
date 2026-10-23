@@ -110,3 +110,33 @@ The original `3a332edd3` ARM64 run 39890406276 and Clippy run 39890406136
 both ended **cancelled** when the current-base carry was pushed. Their
 terminal states are retained in `superseded-native-state.json`; neither is
 counted as a successful native gate or substituted for the current-head run.
+
+## Final official PR gates
+
+The exact current head `c02328dd7` passed both official checks, first attempt:
+
+| Check | Run | Job | Result |
+| --- | --- | --- | --- |
+| Linux ARM64 build/test | 39891358014 | 120211963627 | **7,129 passed / 0 failed / 31 skipped**, one passing leaky case |
+| Linux Clippy, all crates and targets | 39891358186 | 120211950470 | Success |
+
+Both checked the PR merged with `70cbefcee`. `native/receipt.json` binds the
+actual checkout, logs and all 26 ordering/parser/quiet/record/self-switch
+results. It includes the actual CLI exec case (**0.135 s**) and persisted
+self-switch SIGKILL harness (**3.464 s**). Full raw logs are kept unchanged.
+Release test compilation took 11 min 11 s; nextest itself took 138.541 s.
+The long step was compilation, not a missing test result. Subsequent doc and
+own-harness checks passed; signing/publication was skipped on this PR.
+
+Artifact **12475646668**, `lampos-arm64-c02328dd77486b3b7c381ede9f0d4b5365cf3d4f`,
+is available from the ARM64 run. `native/artifact.json` records its API
+identity, archive SHA-256 and expiry. This metadata is not selection or
+verification of individual binaries for a lamp; First still owns the actual
+candidate/fallback pair and attended procedure.
+
+Nine and Reviewer-lead both posted READ-OK for `c02328dd7`, with no blocking
+finding. Integration advanced to `e5cd73aca` during CI. `integration-carry.json`
+records a clean computed merge with all eight authored files identical and
+the same builder rules. This comparison did not change the reviewed branch
+and is not a new execution: First must gate the later train composition.
+No lamp, physical unplug, flash durability or real-key release is claimed.
