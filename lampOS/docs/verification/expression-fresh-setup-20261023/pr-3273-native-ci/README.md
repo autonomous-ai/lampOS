@@ -4,7 +4,7 @@ Draft/HOLD at `809d8493f`: [Linux Clippy 39969098189](https://github.com/autonom
 and required job 120466698642 succeeded. [ARM64 39969098194](https://github.com/autonomous-ai/lampOS/actions/runs/39969098194)
 and required job 120466698823 failed. Watcher session 5834 exited 1 after both
 workflows and direct required jobs were terminal. No run was dispatched again
-or retried. The independent native light-call failure remains unwaived.
+or retried. The independent local Mac full-gate light-call failure remains unwaived.
 
 ARM ran **5,896 of 7,237 selected cases**: **5,895 passed (one leaky), one failed,
 33 separate skips, and 1,341 selected cases unrun**. All 5,896 unique case
@@ -31,9 +31,9 @@ count, not a named skip census. [outcomes.json](outcomes.json) and
 Both CI logs checked `f6f4d09615dac3d818a0d75f84aad0072ef44711`, parents
 `810e05109` and authored `809d8493f`; the checked tree equals the authored tree.
 All 10,033 committed blobs/modes equal the source overlay used by the earlier
-native gate, whose build identity remains explicitly pre-commit.
+local Mac full gate, whose build identity remains explicitly pre-commit.
 [source-binding.json](source-binding.json) binds Git objects, API projection,
-native source identity and CI configuration.
+local Mac source identity and CI configuration.
 
 Peer #3271 checked a6a267bf2 with head 55f671b12 on the same base. The complete
 worker.rs, room_told.rs, IPC clock and scenario_clock.rs are byte-identical
