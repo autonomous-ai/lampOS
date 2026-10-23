@@ -1,6 +1,35 @@
 # Tests work log
 
-## 2026-10-23 20:08 +0700 — latest carries and Expression controls
+## 2026-10-23 20:14 +0700 — both current native gates green
+
+Ready for lamp-voice: no; the local execution HOLDs remain with the reviewer.
+
+Both [current native runs](verification/test-carries-train49-20261023/native-ci/)
+passed: #3190 ARM64 39957082492 and Clippy 39957082564; #3218 ARM64
+39957090143 and Clippy 39957090152. Each selected parallel PR run completed
+7,237 passed (one LEAK), zero failed and 33 skipped across 62 binaries and
+12 of 46 packages. The checked merge trees equal their authored heads.
+Separate doctests passed four cases and the turn-end harness passed twelve;
+these are not added to nextest. The journal LEAK and emitted warnings remain.
+All selected clock, phone, relay and prior failure cases passed here; this
+neither identifies the old failures' cause nor moves old Mac results forward.
+
+Exact-source isolated Linux formatting passed for both new fixtures:
+[peer](verification/cue-peer-closure-20261023/linux-fmt-810e05109/) and
+[Expression](verification/expression-fresh-setup-20261023/linux-fmt-810e05109/).
+Both were base 810e05109 plus their two uncommitted overlays. No local ARM
+build, shared target or test execution occurred in these formatting checks.
+Root verified 114 retained CI segments against all four full logs and both
+formatter output sets against captured originals before publication.
+
+The Memory normal diagnostic target passed 154 / 0 / 5. The first control
+failed its original assertion, but the runner's panic parser omitted Rust's
+numeric thread ID and stopped. Its original exit remains 1; captured-output
+revalidation changes only two parser lookups. The two unrun controls are
+continuing once on the retained identical executable, with no compile, normal
+run or first-control repetition. The peer full gate follows that release.
+
+## 2026-10-23 20:06 +0700 — latest carries and Expression controls
 
 Ready for lamp-voice: no; both recorded execution HOLDs remain.
 

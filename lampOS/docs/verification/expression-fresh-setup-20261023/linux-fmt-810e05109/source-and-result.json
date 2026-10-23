@@ -1,0 +1,91 @@
+{
+  "source": {
+    "label": "expression-810e",
+    "kind": "Frozen uncommitted two-file fixture overlay on exact base",
+    "pr": null,
+    "source": {
+      "commit": "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "root_tree": "6e25adfa7d21377d28f31b2fcaac6f9497de26d5",
+      "parents": [
+        "2615c87b636d8e39d8df9548b00af7ed4e164f70"
+      ],
+      "workspace_tree": "5629cb0081646689551c886c4fe01a5460afdb37"
+    },
+    "expected_parent": "2615c87b636d8e39d8df9548b00af7ed4e164f70",
+    "overlays": [
+      {
+        "path": "lampOS/crates/expression/tests/runtime.rs",
+        "snapshot": "candidate-0.txt",
+        "git_mode": "100644",
+        "base_sha256": "ed1ed5d64f6338357b25bdcbda739985b1c68c501695d20d9bf2e374ce6318e4",
+        "candidate_sha256": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95",
+        "candidate_bytes": 47670
+      },
+      {
+        "path": "lampOS/docs/expression.md",
+        "snapshot": "candidate-1.txt",
+        "git_mode": "100644",
+        "base_sha256": "eed243fe00dd913f5ed11809b6d25c1123941c5da09192f27057de51ce1217be",
+        "candidate_sha256": "3a430011794fb6fd1768a92beca373c4c8276d1273a0bc69a20b2c385d623bc8",
+        "candidate_bytes": 77792
+      }
+    ],
+    "image": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+    "status": "Prepared and unexecuted; explicit separate CPU/container grant required. No MAIN/build/tests/device.",
+    "expected_lampOS_source_map_sha256": "b5bfa4fc2ac7b17ff8e4f597795a81a715d3732c00d91515b8098ab0c872bc2c",
+    "lampOS_expected_entries": 6687,
+    "candidate_repository_source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+    "source_scope": "All tracked lampOS archive paths plus exact two overlays. Full repository proof is separately frozen in the native plan.",
+    "mechanism": "Byte-identical approved rootless cached Linux amd64 formatter; pull=never/network=none/read-only, private 1GiB tmpfs, no host mounts/volumes/MAIN. Archive600s/container300s, one attempt.",
+    "base_archive_sha256": "2be677087ddf441a702953554de80e16ecd7555728e62fa6f7a7578133b18767",
+    "archive_file": "source-lampOS.tar",
+    "archive_bytes": 220088320,
+    "archive_sha256": "82b01bf4e58a3ccffba620ad8cef83fcfeeeb0ad3051ab81d894dfcb800bdaf6",
+    "input_scope": "All tracked lampOS files; exact Git commit or declared frozen two-file overlay only.",
+    "overlay_all_lampOS_bytes_and_modes_verified": true,
+    "runner_sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40"
+  },
+  "result": {
+    "source_kind": "Frozen uncommitted two-file fixture overlay on exact base",
+    "source": "810e05109bced3beca88a5b602930cfed5fba4e5",
+    "candidate_commit": null,
+    "declared_overlays": [
+      {
+        "path": "lampOS/crates/expression/tests/runtime.rs",
+        "snapshot": "candidate-0.txt",
+        "git_mode": "100644",
+        "base_sha256": "ed1ed5d64f6338357b25bdcbda739985b1c68c501695d20d9bf2e374ce6318e4",
+        "candidate_sha256": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95",
+        "candidate_bytes": 47670
+      },
+      {
+        "path": "lampOS/docs/expression.md",
+        "snapshot": "candidate-1.txt",
+        "git_mode": "100644",
+        "base_sha256": "eed243fe00dd913f5ed11809b6d25c1123941c5da09192f27057de51ce1217be",
+        "candidate_sha256": "3a430011794fb6fd1768a92beca373c4c8276d1273a0bc69a20b2c385d623bc8",
+        "candidate_bytes": 77792
+      }
+    ],
+    "format_container_exit": 0,
+    "timed_out": false,
+    "container_elapsed_seconds": 14.81957642128691,
+    "timing_boundary": "Entire container command including setup, extraction, rustfmt and source hashing.",
+    "formatting_success": true,
+    "source_archive_unchanged": true,
+    "git_identity_unchanged": true,
+    "snapshots_unchanged": true,
+    "compilation": false,
+    "tests": false,
+    "ARM_build": false,
+    "source_edits": false,
+    "evidence_directory": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z"
+  },
+  "input_manifest_before_sha256": "be035e992940b85ee86516672c7e26b745e2eac34eb1f02216b97876381ad23e",
+  "input_manifest_after_sha256": "be035e992940b85ee86516672c7e26b745e2eac34eb1f02216b97876381ad23e",
+  "format_plan_sha256": "bce5a74e8dbb5f28fc3a583f0b1c6effc91fef6aef55602abb3cc9f64f6d6f95",
+  "runner_sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40",
+  "historical_controls_remain_on_2615": true,
+  "current_full_native_gate_executed_here": false,
+  "uncommitted_overlay": "The source commit is the base only. Exact candidate identity is the base plus the two declared snapshot hashes; no candidate commit existed at this run."
+}

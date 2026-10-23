@@ -1,0 +1,20 @@
+{
+  "archive": {
+    "archive_file": "source-lampOS.tar",
+    "archive_bytes": 220088320,
+    "archive_sha256": "f0fc727c295d6557a672bb859fbcf6aba3521f3ab44444ed68a41da261f709a8",
+    "base_archive_sha256": "2be677087ddf441a702953554de80e16ecd7555728e62fa6f7a7578133b18767"
+  },
+  "expected_lampOS_source_map": {
+    "path": "/private/tmp/tests-cue-peer-closed-810e-linux-fmt-20261023/expected-lampOS-source-map.json",
+    "bytes": 1478230,
+    "sha256": "e2c73834eab9ce0e1224c20ca62f3828820e88538af19f3109c53b3e200b62f6",
+    "entries": 6687
+  },
+  "runner": {
+    "path": "/private/tmp/tests-cue-peer-closed-810e-linux-fmt-20261023/run.py",
+    "bytes": 9359,
+    "sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40"
+  },
+  "limits": "Archive, bulk source map and Python runner remain external. The receipt retains exact commands, commit/tree and overlay identities, verified input hashes, full format output and unchanged-source result."
+}

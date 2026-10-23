@@ -1,0 +1,75 @@
+{
+  "source_heads": [
+    "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+    "328f7da0f5c1fd729bd5d22a974f9c0a67cf07dd"
+  ],
+  "records": [
+    {
+      "pr": 3190,
+      "head": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+      "path": ".github/workflows/lampos-arm64.yml",
+      "sha256": "ad1a4cd650db5f2a721b510263ff5c1697b09f872646395fb4cab6173f8757f9",
+      "bytes": 18332,
+      "base_equal": true,
+      "base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "git_blob": "1c0ac73ea8f7c0970ebaec380bb057a0d17e3dd9"
+    },
+    {
+      "pr": 3190,
+      "head": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+      "path": ".github/workflows/lampos-clippy.yml",
+      "sha256": "2b41648cade7109e94995fd076f638166345867600e38e5e9aa9438a9b18c9ac",
+      "bytes": 4189,
+      "base_equal": true,
+      "base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "git_blob": "8e6dc386c08ece68de2c9a42446d2c9de080eb95"
+    },
+    {
+      "pr": 3190,
+      "head": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+      "path": "lampOS/.config/nextest.toml",
+      "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+      "bytes": 5157,
+      "base_equal": true,
+      "base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "git_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169"
+    },
+    {
+      "pr": 3218,
+      "head": "328f7da0f5c1fd729bd5d22a974f9c0a67cf07dd",
+      "path": ".github/workflows/lampos-arm64.yml",
+      "sha256": "ad1a4cd650db5f2a721b510263ff5c1697b09f872646395fb4cab6173f8757f9",
+      "bytes": 18332,
+      "base_equal": true,
+      "base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "git_blob": "1c0ac73ea8f7c0970ebaec380bb057a0d17e3dd9"
+    },
+    {
+      "pr": 3218,
+      "head": "328f7da0f5c1fd729bd5d22a974f9c0a67cf07dd",
+      "path": ".github/workflows/lampos-clippy.yml",
+      "sha256": "2b41648cade7109e94995fd076f638166345867600e38e5e9aa9438a9b18c9ac",
+      "bytes": 4189,
+      "base_equal": true,
+      "base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "git_blob": "8e6dc386c08ece68de2c9a42446d2c9de080eb95"
+    },
+    {
+      "pr": 3218,
+      "head": "328f7da0f5c1fd729bd5d22a974f9c0a67cf07dd",
+      "path": "lampOS/.config/nextest.toml",
+      "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+      "bytes": 5157,
+      "base_equal": true,
+      "base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "git_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169"
+    }
+  ],
+  "default_filter_evidence": "[profile.pr] default-filter = all(); source tree equality binds this config to the checked merges. Older workflow comment/step text claiming the realtime group is omitted is stale.",
+  "exact_command": "cargo nextest run --locked --release --workspace --profile pr --no-tests=pass -j num-cpus --partition hash:1/1 -E \"not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process)) & (PICKED)\"",
+  "separate_commands": [
+    "cargo test --locked --release --workspace --doc -- --test-threads=1",
+    "cargo test --locked --release -p lamp-ipc --test relay_signals",
+    "cargo test --locked --release -p lamp-turn-end-wire --test process"
+  ]
+}

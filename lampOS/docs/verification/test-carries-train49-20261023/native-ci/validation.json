@@ -1,0 +1,13 @@
+{
+  "all4_workflows_and_required_jobs_terminal_success": true,
+  "all_ancillary_jobs_terminal_and_separate": true,
+  "all4_log_hashes_verified_against_watcher_records": true,
+  "each7237_rows_unique_with_exact_ordinal_span": true,
+  "parse_ends_before_success_recap": true,
+  "all_selected_raw_offsets_and_hashes_verified": true,
+  "all_retained_raw_segments_exact": true,
+  "both_checked_merge_trees_equal_authored_heads": true,
+  "no_workflow_rerun": true,
+  "all_JSON_links_and_whitespace_checked": true,
+  "default_staged_diff_check_exit_code": 0
+}

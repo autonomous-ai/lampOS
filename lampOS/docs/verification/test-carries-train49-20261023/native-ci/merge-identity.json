@@ -1,0 +1,70 @@
+[
+  {
+    "pr": 3190,
+    "authored_head": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+    "authored_tree_from_local_Git_object": "6d032f9cda19dbce74a73c05a134c3878cbd8783",
+    "checkout_merge": "f3760f238afa8d249b3632d446b8246c578cd480",
+    "checkout_log": {
+      "external_path": "/private/tmp/tests-carry-post-train45-20261023/ci/pr-3190-clippy-39957082564/full-terminal-log.stdout.txt",
+      "bytes": 75978,
+      "sha256": "1e0ba463990569f3770d241f3462ac3ddeb36b33a51958771df4cae91ba247b2"
+    },
+    "checkout_log_line": 346,
+    "checked_merge_tree_from_GitHub_commit_API": "6d032f9cda19dbce74a73c05a134c3878cbd8783",
+    "checked_merge_parents": [
+      "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "f121d6391e53bf709ffbf07807e8657f7e86d3ce"
+    ],
+    "tree_equal_to_authored": true,
+    "API_response_sha256": "cd72f30e7c5fa4d86b25eb3ca25730f1b9a99e2bd97b2b7ece4acacf27113f9d",
+    "API_response_bytes": 2603,
+    "command": {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/git/commits/f3760f238afa8d249b3632d446b8246c578cd480"
+      ],
+      "started_at": "2026-10-23T13:09:20.394856+00:00",
+      "wall_seconds": 0.5886287759058177,
+      "exit_code": 0,
+      "stdout_sha256": "cd72f30e7c5fa4d86b25eb3ca25730f1b9a99e2bd97b2b7ece4acacf27113f9d",
+      "stdout_bytes": 2603,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    }
+  },
+  {
+    "pr": 3218,
+    "authored_head": "328f7da0f5c1fd729bd5d22a974f9c0a67cf07dd",
+    "authored_tree_from_local_Git_object": "7636b69a7317c7a0c7b1089d6b7325d39bfbb62a",
+    "checkout_merge": "75295b1ec17c8289bd3e953c57543684ed8733a7",
+    "checkout_log": {
+      "external_path": "/private/tmp/tests-carry-post-train45-20261023/ci/pr-3218-clippy-39957090152/full-terminal-log.stdout.txt",
+      "bytes": 72795,
+      "sha256": "bce6a91647bb879d6ecf01680e526a314295a617b140273cd001a4be67da2f05"
+    },
+    "checkout_log_line": 319,
+    "checked_merge_tree_from_GitHub_commit_API": "7636b69a7317c7a0c7b1089d6b7325d39bfbb62a",
+    "checked_merge_parents": [
+      "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "328f7da0f5c1fd729bd5d22a974f9c0a67cf07dd"
+    ],
+    "tree_equal_to_authored": true,
+    "API_response_sha256": "8576c6e50b466b27bd6de167cd23a6b4ae9a875cd81159c4ffca8901c0c26d69",
+    "API_response_bytes": 2603,
+    "command": {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/git/commits/75295b1ec17c8289bd3e953c57543684ed8733a7"
+      ],
+      "started_at": "2026-10-23T13:09:20.984002+00:00",
+      "wall_seconds": 0.6477065221406519,
+      "exit_code": 0,
+      "stdout_sha256": "8576c6e50b466b27bd6de167cd23a6b4ae9a875cd81159c4ffca8901c0c26d69",
+      "stdout_bytes": 2603,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    }
+  }
+]

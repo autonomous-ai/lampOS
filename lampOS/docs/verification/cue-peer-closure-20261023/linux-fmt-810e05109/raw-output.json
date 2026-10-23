@@ -1,0 +1,80 @@
+[
+  {
+    "path": "source-identity.stdout",
+    "bytes": 123,
+    "sha256": "59e4a09b2f94a3f397c8d0bc3da759748d23a72c530ee138be687158ade6c2b7",
+    "text": "810e05109bced3beca88a5b602930cfed5fba4e5\n6e25adfa7d21377d28f31b2fcaac6f9497de26d5\n2615c87b636d8e39d8df9548b00af7ed4e164f70\n"
+  },
+  {
+    "path": "source-identity.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  {
+    "path": "workspace-tree.stdout",
+    "bytes": 41,
+    "sha256": "e6d3424f57cdee76781c8e34a40e9fbf01e2c2b9a2bacf06de465bd3d110c7fb",
+    "text": "5629cb0081646689551c886c4fe01a5460afdb37\n"
+  },
+  {
+    "path": "workspace-tree.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  {
+    "path": "image-inspect.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  {
+    "path": "archive.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  {
+    "path": "archive.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  {
+    "path": "archive-commit.stdout",
+    "bytes": 41,
+    "sha256": "dc928aa458d208820b5d57ceeefd2b568dbeef25c51597d5e7e25b7cb6f7fc48",
+    "text": "810e05109bced3beca88a5b602930cfed5fba4e5\n"
+  },
+  {
+    "path": "archive-commit.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  {
+    "path": "format.stdout",
+    "bytes": 746,
+    "sha256": "b807233d2d705fbac2234ad98f24d108b2dbab98b70bd3b91cf4b34a39ee1628",
+    "text": "Linux 940381a7ec77 6.12.13-200.fc41.x86_64 #1 SMP PREEMPT_DYNAMIC Sat Feb  8 20:05:26 UTC 2025 x86_64 GNU/Linux\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nrustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.96.0\nLLVM version: 22.1.2\nhost: x86_64-unknown-linux-gnu\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nsource-before-manifest 8cc07a086a669f39514dde4dd4cd575d65ef8a2337970a1ea2c0181e3f7b2432  /tmp/source-before.sha256\nsource-after-manifest 8cc07a086a669f39514dde4dd4cd575d65ef8a2337970a1ea2c0181e3f7b2432  /tmp/source-after.sha256\ncargo_fmt_exit=0\n"
+  },
+  {
+    "path": "format.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  {
+    "path": "final-source-identity.stdout",
+    "bytes": 123,
+    "sha256": "59e4a09b2f94a3f397c8d0bc3da759748d23a72c530ee138be687158ade6c2b7",
+    "text": "810e05109bced3beca88a5b602930cfed5fba4e5\n6e25adfa7d21377d28f31b2fcaac6f9497de26d5\n2615c87b636d8e39d8df9548b00af7ed4e164f70\n"
+  },
+  {
+    "path": "final-source-identity.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  }
+]

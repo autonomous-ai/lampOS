@@ -1,0 +1,40 @@
+{
+  "scope": "All payloads except this manifest",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 2109,
+      "sha256": "71b17fb0da925f426e100a00b0ba7abc1ef41cdd501c83bca3d5ba313818ab4e"
+    },
+    {
+      "path": "commands.json",
+      "bytes": 6721,
+      "sha256": "d902dd06ce38f578f042774af384043f753b64edaba6cf26d16a3881ea239d44"
+    },
+    {
+      "path": "external-raw-index.json",
+      "bytes": 4897,
+      "sha256": "8e6809dd372e8c32efc9c5e348e90953f8aed8dd83c3010b1a33256f28408efc"
+    },
+    {
+      "path": "image-provenance.json",
+      "bytes": 576,
+      "sha256": "4016884f2f6991bf2507aca25c731a9d563cf7af6cebbd39ca144bed95ce66fb"
+    },
+    {
+      "path": "raw-streams.json",
+      "bytes": 7243,
+      "sha256": "13c12d6280693c5e9512a2cc9414af2b6b2bb20d952c302a55c602e594bf6704"
+    },
+    {
+      "path": "source-and-result.json",
+      "bytes": 4735,
+      "sha256": "8932d35f09f91f465100952c029bdc417d4e9358fedd46295125259ce99d53a2"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 1688,
+      "sha256": "70d04803b15c0bebeefa90c8c2856a7d3bcf591ba1b3c6602d3a077f40231786"
+    }
+  ]
+}

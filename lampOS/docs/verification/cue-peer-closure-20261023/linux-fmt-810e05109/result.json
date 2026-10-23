@@ -1,0 +1,36 @@
+{
+  "source_kind": "frozen_uncommitted_two_file_candidate_overlay",
+  "source": "810e05109bced3beca88a5b602930cfed5fba4e5",
+  "candidate_commit": null,
+  "declared_overlays": [
+    {
+      "path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "snapshot": "candidate-fixture_provider.rs",
+      "git_mode": "100644",
+      "base_sha256": "b50767957067efee6a502e372605a7bcc2b16e23097da1ddca85153cf966993a",
+      "candidate_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+      "candidate_bytes": 45782
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "snapshot": "candidate-voice-test-fixtures.md",
+      "git_mode": "100644",
+      "base_sha256": "6f96999c5c3dd5182c7c7c958b47f831c25cadd6bb1697a255cc9ea376cbfe14",
+      "candidate_sha256": "f28c90d1963e99f731c2457783d298750b10ee434b1163efbb719f6e0c65b0ee",
+      "candidate_bytes": 30804
+    }
+  ],
+  "format_container_exit": 0,
+  "timed_out": false,
+  "container_elapsed_seconds": 16.070776695851237,
+  "timing_boundary": "Entire container command including setup, extraction, rustfmt and source hashing.",
+  "formatting_success": true,
+  "source_archive_unchanged": true,
+  "git_identity_unchanged": true,
+  "snapshots_unchanged": true,
+  "compilation": false,
+  "tests": false,
+  "ARM_build": false,
+  "source_edits": false,
+  "evidence_directory": "/private/tmp/tests-cue-peer-closed-810e-linux-fmt-20261023/run-20261023T125421.807139Z"
+}

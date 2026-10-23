@@ -1,0 +1,1256 @@
+[
+  {
+    "pr": 3190,
+    "run_id": 39957082492,
+    "run_number": 6441,
+    "summary_text": "     Summary [ 144.846s] 7237 tests run: 7237 passed (1 leaky), 33 skipped",
+    "starting_text": "    Starting 7237 tests across 62 binaries (33 tests and 106 binaries skipped)",
+    "nextest": {
+      "run": 7237,
+      "passed_including_leaky": 7237,
+      "PASS_rows": 7236,
+      "LEAK_rows": 1,
+      "failed": 0,
+      "skipped_from_summary": 33,
+      "executed_binaries": 62,
+      "excluded_binaries_from_starting_summary": 106,
+      "unique_observed_result_rows": 7237,
+      "observed_row_identity_sha256": "73856d3943040b9ced337d8034c95ab782f8f46c99fb39acd42b2630908f7ec2",
+      "ordinal_span": "Every integer1..7237 observed once; parse ends at first Summary before repeated success-output recap.",
+      "skipped_limit": "Skipped names are not individually listed in this log;33 comes from nextest summary, not an inferred skipped-case census."
+    },
+    "scope": {
+      "selected_packages": [
+        "lamp-body",
+        "lamp-cloud",
+        "lamp-expression",
+        "lamp-keeper",
+        "lamp-lean",
+        "lamp-memory",
+        "lamp-peek",
+        "lamp-setup",
+        "lamp-skills",
+        "lamp-update",
+        "lamp-voice",
+        "lamp-voice-eval"
+      ],
+      "selected_packages_count": 12,
+      "workspace_packages": 46,
+      "profile": "pr",
+      "profile_default_filter": "all()",
+      "parallelism": "num-cpus, observed4cores",
+      "partition": "hash:1/1",
+      "full_dispatch": false,
+      "nextest_binary_exclusions": [
+        "lamp-ipc::relay_signals",
+        "lamp-turn-end-wire::process"
+      ]
+    },
+    "by_binary": {
+      "lamp-body": {
+        "PASS": 436
+      },
+      "lamp-body::it": {
+        "PASS": 125
+      },
+      "lamp-body::bin/lamp-body": {
+        "PASS": 32
+      },
+      "lamp-body::bin/lamp-body-inspect": {
+        "PASS": 2
+      },
+      "lamp-body::bin/lamp-body-measure": {
+        "PASS": 5
+      },
+      "lamp-body::bin/lamp-body-mood": {
+        "PASS": 3
+      },
+      "lamp-body::bin/lamp-body-worker": {
+        "PASS": 1
+      },
+      "lamp-cloud": {
+        "PASS": 166
+      },
+      "lamp-skills::it": {
+        "PASS": 304
+      },
+      "lamp-cloud::it": {
+        "PASS": 30
+      },
+      "lamp-expression": {
+        "PASS": 27
+      },
+      "lamp-expression::it": {
+        "PASS": 280
+      },
+      "lamp-voice": {
+        "PASS": 3682,
+        "LEAK": 1
+      },
+      "lamp-expression::runtime": {
+        "PASS": 27
+      },
+      "lamp-expression::bin/lamp-expression": {
+        "PASS": 4
+      },
+      "lamp-keeper": {
+        "PASS": 40
+      },
+      "lamp-keeper::bin/lamp-keeper": {
+        "PASS": 2
+      },
+      "lamp-lean": {
+        "PASS": 10
+      },
+      "lamp-lean::it": {
+        "PASS": 51
+      },
+      "lamp-memory": {
+        "PASS": 96
+      },
+      "lamp-voice::it": {
+        "PASS": 301
+      },
+      "lamp-memory::forget_person": {
+        "PASS": 3
+      },
+      "lamp-memory::forget_shared_exchange": {
+        "PASS": 4
+      },
+      "lamp-memory::health_control": {
+        "PASS": 23
+      },
+      "lamp-memory::it": {
+        "PASS": 154
+      },
+      "lamp-memory::forgot": {
+        "PASS": 1
+      },
+      "lamp-memory::paraphrase_fixture": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_early_words": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_follows_face": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_forget": {
+        "PASS": 5
+      },
+      "lamp-memory::voice_forget_about": {
+        "PASS": 2
+      },
+      "lamp-memory::voice_forget_named": {
+        "PASS": 2
+      },
+      "lamp-memory::voice_link_used": {
+        "PASS": 2
+      },
+      "lamp-memory::voice_observe": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_since_until": {
+        "PASS": 2
+      },
+      "lamp-memory::bin/lamp-memory": {
+        "PASS": 8
+      },
+      "lamp-memory::bin/lamp-memory-eval": {
+        "PASS": 8
+      },
+      "lamp-peek": {
+        "PASS": 15
+      },
+      "lamp-peek::peek": {
+        "PASS": 11
+      },
+      "lamp-setup": {
+        "PASS": 16
+      },
+      "lamp-setup::it": {
+        "PASS": 156
+      },
+      "lamp-setup::wake": {
+        "PASS": 6
+      },
+      "lamp-skills": {
+        "PASS": 157
+      },
+      "lamp-skills::requested_audio": {
+        "PASS": 31
+      },
+      "lamp-skills::bin/lamp-skills": {
+        "PASS": 23
+      },
+      "lamp-update": {
+        "PASS": 120
+      },
+      "lamp-update::functions": {
+        "PASS": 5
+      },
+      "lamp-update::install": {
+        "PASS": 82
+      },
+      "lamp-update::it": {
+        "PASS": 13
+      },
+      "lamp-update::round": {
+        "PASS": 123
+      },
+      "lamp-update::self-cli-exec": {
+        "PASS": 1
+      },
+      "lamp-update::self-process-cuts": {
+        "PASS": 1
+      },
+      "lamp-voice::bin/lamp-voice": {
+        "PASS": 1
+      },
+      "lamp-voice::example/render_line_second": {
+        "PASS": 4
+      },
+      "lamp-voice::example/stop_words_stt_replay": {
+        "PASS": 6
+      },
+      "lamp-voice-eval": {
+        "PASS": 378
+      },
+      "lamp-voice-eval::it": {
+        "PASS": 238
+      },
+      "lamp-voice-eval::bin/lamp-voice-eval": {
+        "PASS": 7
+      }
+    },
+    "doctests": {
+      "targets": 46,
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "target_headers": [
+        "lamp_actions",
+        "lamp_addons",
+        "lamp_air",
+        "lamp_audio",
+        "lamp_body",
+        "lamp_bus",
+        "lamp_camera",
+        "lamp_cloud",
+        "lamp_controls",
+        "lamp_ears",
+        "lamp_environment",
+        "lamp_expression",
+        "lamp_eyes",
+        "lamp_gemini",
+        "lamp_health",
+        "lamp_ipc",
+        "lamp_keeper",
+        "lamp_lean",
+        "lamp_local_time",
+        "lamp_memory",
+        "lamp_mood",
+        "lamp_msgs",
+        "lamp_name",
+        "lamp_near_call",
+        "lamp_observer",
+        "lamp_peek",
+        "lamp_policy",
+        "lamp_records",
+        "lamp_ring",
+        "lamp_same_voice",
+        "lamp_schedule",
+        "lamp_selftest",
+        "lamp_settings",
+        "lamp_setup",
+        "lamp_skills",
+        "lamp_sound_fixtures",
+        "lamp_station",
+        "lamp_surround",
+        "lamp_tasks",
+        "lamp_turn_end",
+        "lamp_turn_end_wire",
+        "lamp_turn_owner",
+        "lamp_update",
+        "lamp_voice",
+        "lamp_voice_eval",
+        "lamp_voice_processes"
+      ],
+      "result_summaries": [
+        {
+          "source_line": 8353,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8359,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8365,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8371,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8377,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8385,
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8392,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8398,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8404,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8410,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8416,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8422,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8428,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8434,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8440,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8447,
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8454,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8460,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8466,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8473,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8478,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8485,
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8492,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8498,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8504,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8510,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8516,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8522,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8528,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8534,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8540,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8546,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8552,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8558,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8564,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8570,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8576,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8582,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8588,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8594,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8600,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8606,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8612,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8618,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8624,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8630,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        }
+      ],
+      "binding_limit": "Doctest headers and stdout summaries interleave in one run; aggregate count and all raw sections are preserved without asserting strict per-target header/summary adjacency."
+    },
+    "own_harness": {
+      "relay_signals": "relay_signals: ok; no numeric case count claimed",
+      "turn_end_wire_process": {
+        "passed": 12,
+        "failed": 0
+      }
+    },
+    "selected": {
+      "boot_clock_and_child": 87,
+      "boot_selected_literal_name_passes": 86,
+      "boot_selected_masked_source_prefix_passes": 1,
+      "phone_passed": true,
+      "all10_prior_failure_cases_passed": true,
+      "relay_hardening_passed": 7
+    },
+    "leaky_case": {
+      "status": "LEAK",
+      "duration": "0.222s",
+      "ordinal": 5092,
+      "total": 7237,
+      "binary": "lamp-voice",
+      "name": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+    }
+  },
+  {
+    "pr": 3218,
+    "run_id": 39957090143,
+    "run_number": 6442,
+    "summary_text": "     Summary [ 142.351s] 7237 tests run: 7237 passed (1 leaky), 33 skipped",
+    "starting_text": "    Starting 7237 tests across 62 binaries (33 tests and 106 binaries skipped)",
+    "nextest": {
+      "run": 7237,
+      "passed_including_leaky": 7237,
+      "PASS_rows": 7236,
+      "LEAK_rows": 1,
+      "failed": 0,
+      "skipped_from_summary": 33,
+      "executed_binaries": 62,
+      "excluded_binaries_from_starting_summary": 106,
+      "unique_observed_result_rows": 7237,
+      "observed_row_identity_sha256": "73856d3943040b9ced337d8034c95ab782f8f46c99fb39acd42b2630908f7ec2",
+      "ordinal_span": "Every integer1..7237 observed once; parse ends at first Summary before repeated success-output recap.",
+      "skipped_limit": "Skipped names are not individually listed in this log;33 comes from nextest summary, not an inferred skipped-case census."
+    },
+    "scope": {
+      "selected_packages": [
+        "lamp-body",
+        "lamp-cloud",
+        "lamp-expression",
+        "lamp-keeper",
+        "lamp-lean",
+        "lamp-memory",
+        "lamp-peek",
+        "lamp-setup",
+        "lamp-skills",
+        "lamp-update",
+        "lamp-voice",
+        "lamp-voice-eval"
+      ],
+      "selected_packages_count": 12,
+      "workspace_packages": 46,
+      "profile": "pr",
+      "profile_default_filter": "all()",
+      "parallelism": "num-cpus, observed4cores",
+      "partition": "hash:1/1",
+      "full_dispatch": false,
+      "nextest_binary_exclusions": [
+        "lamp-ipc::relay_signals",
+        "lamp-turn-end-wire::process"
+      ]
+    },
+    "by_binary": {
+      "lamp-body": {
+        "PASS": 436
+      },
+      "lamp-body::it": {
+        "PASS": 125
+      },
+      "lamp-body::bin/lamp-body": {
+        "PASS": 32
+      },
+      "lamp-body::bin/lamp-body-inspect": {
+        "PASS": 2
+      },
+      "lamp-body::bin/lamp-body-measure": {
+        "PASS": 5
+      },
+      "lamp-body::bin/lamp-body-mood": {
+        "PASS": 3
+      },
+      "lamp-body::bin/lamp-body-worker": {
+        "PASS": 1
+      },
+      "lamp-cloud": {
+        "PASS": 166
+      },
+      "lamp-skills::it": {
+        "PASS": 304
+      },
+      "lamp-cloud::it": {
+        "PASS": 30
+      },
+      "lamp-expression": {
+        "PASS": 27
+      },
+      "lamp-expression::it": {
+        "PASS": 280
+      },
+      "lamp-voice": {
+        "PASS": 3682,
+        "LEAK": 1
+      },
+      "lamp-expression::runtime": {
+        "PASS": 27
+      },
+      "lamp-expression::bin/lamp-expression": {
+        "PASS": 4
+      },
+      "lamp-keeper": {
+        "PASS": 40
+      },
+      "lamp-keeper::bin/lamp-keeper": {
+        "PASS": 2
+      },
+      "lamp-lean": {
+        "PASS": 10
+      },
+      "lamp-lean::it": {
+        "PASS": 51
+      },
+      "lamp-memory": {
+        "PASS": 96
+      },
+      "lamp-voice::it": {
+        "PASS": 301
+      },
+      "lamp-memory::forget_person": {
+        "PASS": 3
+      },
+      "lamp-memory::forget_shared_exchange": {
+        "PASS": 4
+      },
+      "lamp-memory::health_control": {
+        "PASS": 23
+      },
+      "lamp-memory::it": {
+        "PASS": 154
+      },
+      "lamp-memory::forgot": {
+        "PASS": 1
+      },
+      "lamp-memory::paraphrase_fixture": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_early_words": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_follows_face": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_forget": {
+        "PASS": 5
+      },
+      "lamp-memory::voice_forget_about": {
+        "PASS": 2
+      },
+      "lamp-memory::voice_forget_named": {
+        "PASS": 2
+      },
+      "lamp-memory::voice_link_used": {
+        "PASS": 2
+      },
+      "lamp-memory::voice_observe": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_since_until": {
+        "PASS": 2
+      },
+      "lamp-memory::bin/lamp-memory": {
+        "PASS": 8
+      },
+      "lamp-memory::bin/lamp-memory-eval": {
+        "PASS": 8
+      },
+      "lamp-peek": {
+        "PASS": 15
+      },
+      "lamp-peek::peek": {
+        "PASS": 11
+      },
+      "lamp-setup": {
+        "PASS": 16
+      },
+      "lamp-setup::it": {
+        "PASS": 156
+      },
+      "lamp-setup::wake": {
+        "PASS": 6
+      },
+      "lamp-skills": {
+        "PASS": 157
+      },
+      "lamp-skills::requested_audio": {
+        "PASS": 31
+      },
+      "lamp-skills::bin/lamp-skills": {
+        "PASS": 23
+      },
+      "lamp-update": {
+        "PASS": 120
+      },
+      "lamp-update::functions": {
+        "PASS": 5
+      },
+      "lamp-update::install": {
+        "PASS": 82
+      },
+      "lamp-update::it": {
+        "PASS": 13
+      },
+      "lamp-update::round": {
+        "PASS": 123
+      },
+      "lamp-update::self-cli-exec": {
+        "PASS": 1
+      },
+      "lamp-update::self-process-cuts": {
+        "PASS": 1
+      },
+      "lamp-voice::bin/lamp-voice": {
+        "PASS": 1
+      },
+      "lamp-voice::example/render_line_second": {
+        "PASS": 4
+      },
+      "lamp-voice::example/stop_words_stt_replay": {
+        "PASS": 6
+      },
+      "lamp-voice-eval": {
+        "PASS": 378
+      },
+      "lamp-voice-eval::it": {
+        "PASS": 238
+      },
+      "lamp-voice-eval::bin/lamp-voice-eval": {
+        "PASS": 7
+      }
+    },
+    "doctests": {
+      "targets": 46,
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "target_headers": [
+        "lamp_actions",
+        "lamp_addons",
+        "lamp_air",
+        "lamp_audio",
+        "lamp_body",
+        "lamp_bus",
+        "lamp_camera",
+        "lamp_cloud",
+        "lamp_controls",
+        "lamp_ears",
+        "lamp_environment",
+        "lamp_expression",
+        "lamp_eyes",
+        "lamp_gemini",
+        "lamp_health",
+        "lamp_ipc",
+        "lamp_keeper",
+        "lamp_lean",
+        "lamp_local_time",
+        "lamp_memory",
+        "lamp_mood",
+        "lamp_msgs",
+        "lamp_name",
+        "lamp_near_call",
+        "lamp_observer",
+        "lamp_peek",
+        "lamp_policy",
+        "lamp_records",
+        "lamp_ring",
+        "lamp_same_voice",
+        "lamp_schedule",
+        "lamp_selftest",
+        "lamp_settings",
+        "lamp_setup",
+        "lamp_skills",
+        "lamp_sound_fixtures",
+        "lamp_station",
+        "lamp_surround",
+        "lamp_tasks",
+        "lamp_turn_end",
+        "lamp_turn_end_wire",
+        "lamp_turn_owner",
+        "lamp_update",
+        "lamp_voice",
+        "lamp_voice_eval",
+        "lamp_voice_processes"
+      ],
+      "result_summaries": [
+        {
+          "source_line": 8354,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8360,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8366,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8372,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8378,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8386,
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8393,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8399,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8405,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8411,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8417,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8423,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8429,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8435,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8441,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8448,
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8455,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8461,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8467,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8473,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8479,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8486,
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8493,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8499,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8505,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8511,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8517,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8523,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8529,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8535,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8541,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8547,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8553,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8559,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8565,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8571,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8577,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8583,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8589,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8595,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8601,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8607,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8613,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8619,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8625,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "source_line": 8631,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "raw_summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        }
+      ],
+      "binding_limit": "Doctest headers and stdout summaries interleave in one run; aggregate count and all raw sections are preserved without asserting strict per-target header/summary adjacency."
+    },
+    "own_harness": {
+      "relay_signals": "relay_signals: ok; no numeric case count claimed",
+      "turn_end_wire_process": {
+        "passed": 12,
+        "failed": 0
+      }
+    },
+    "selected": {
+      "boot_clock_and_child": 87,
+      "boot_selected_literal_name_passes": 86,
+      "boot_selected_masked_source_prefix_passes": 1,
+      "phone_passed": true,
+      "all10_prior_failure_cases_passed": true,
+      "relay_hardening_passed": 7
+    },
+    "leaky_case": {
+      "status": "LEAK",
+      "duration": "0.229s",
+      "ordinal": 5092,
+      "total": 7237,
+      "binary": "lamp-voice",
+      "name": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+    }
+  }
+]

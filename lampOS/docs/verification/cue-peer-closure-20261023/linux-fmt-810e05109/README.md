@@ -1,0 +1,7 @@
+# Peer fixture Linux formatting on 810e
+
+The single isolated Linux amd64 `cargo fmt --all --check` passed, exit 0. The source was exact base `810e05109bced3beca88a5b602930cfed5fba4e5` plus the two declared uncommitted peer-fixture overlays, not a fabricated candidate commit. The [carry proof](carry.json) preserves the exact reviewed patch and both authored blobs. All 6,687 tracked lampOS input files, modes and symlink values were verified against the frozen source map before formatting.
+
+The cached rootless image used Rust 1.96.0 and rustfmt 1.9.0, no network or pull, a read-only root and private tmpfs. No source/target host mounts, builds, tests, ARM target or MAIN access occurred. The whole container command took 16.070777 s, including extraction and source hashing; this is not rustfmt-only timing. Archive preparation took 1.286947 s. The input archive and source fingerprints remained unchanged.
+
+[Commands](commands.json), [exact source/overlay identity](source.json), [terminal result](result.json) and [lossless raw output](raw-output.json) retain the boundaries. Each JSON text entry decodes to its original UTF-8 bytes with the recorded size and SHA-256. The image identity is a minimal projection; unrelated cached-image configuration/attribution metadata remains external. Bulk input archive, all-input map and runner remain external with [digests and limits](external-input-digests.json). This formatting receipt is separate from the still-unexecuted full local gate and native required CI. The older 3e75 preparation remains unexecuted.

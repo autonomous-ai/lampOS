@@ -1,0 +1,50 @@
+{
+  "label": "cue-peer-closed-810e",
+  "kind": "frozen_uncommitted_two_file_candidate_overlay",
+  "pr": null,
+  "source": {
+    "commit": "810e05109bced3beca88a5b602930cfed5fba4e5",
+    "root_tree": "6e25adfa7d21377d28f31b2fcaac6f9497de26d5",
+    "parents": [
+      "2615c87b636d8e39d8df9548b00af7ed4e164f70"
+    ],
+    "workspace_tree": "5629cb0081646689551c886c4fe01a5460afdb37"
+  },
+  "expected_parent": "2615c87b636d8e39d8df9548b00af7ed4e164f70",
+  "overlays": [
+    {
+      "path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "snapshot": "candidate-fixture_provider.rs",
+      "git_mode": "100644",
+      "base_sha256": "b50767957067efee6a502e372605a7bcc2b16e23097da1ddca85153cf966993a",
+      "candidate_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+      "candidate_bytes": 45782
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "snapshot": "candidate-voice-test-fixtures.md",
+      "git_mode": "100644",
+      "base_sha256": "6f96999c5c3dd5182c7c7c958b47f831c25cadd6bb1697a255cc9ea376cbfe14",
+      "candidate_sha256": "f28c90d1963e99f731c2457783d298750b10ee434b1163efbb719f6e0c65b0ee",
+      "candidate_bytes": 30804
+    }
+  ],
+  "image": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "status": "Exact-source format-only execution authorized after source-plan verification; no compilation/tests/MAIN.",
+  "expected_lampOS_source_map_sha256": "e2c73834eab9ce0e1224c20ca62f3828820e88538af19f3109c53b3e200b62f6",
+  "lampOS_expected_entries": 6687,
+  "candidate_repository_source_aggregate_sha256": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f",
+  "source_scope": "Formatting consumes all tracked lampOS paths only, not a full repository build/test snapshot. Complete local-gate source proof separately pins all repository inputs.",
+  "mechanism": "Previously approved rootless cached Linux amd64 formatter, --pull=never --network=none --read-only, private 1 GiB /tmp, no host mounts/volumes or privilege. Archive 600 s; container 300 s; one attempt.",
+  "superseded_unexecuted_plan": {
+    "path": "/private/tmp/tests-cue-peer-closed-linux-fmt-20261023/plan.json",
+    "sha256": "76b7d7583ccc0cb06180a813c0eec25ae2ae5d4add0c44a95f98003ece213543"
+  },
+  "base_archive_sha256": "2be677087ddf441a702953554de80e16ecd7555728e62fa6f7a7578133b18767",
+  "archive_file": "source-lampOS.tar",
+  "archive_bytes": 220088320,
+  "archive_sha256": "f0fc727c295d6557a672bb859fbcf6aba3521f3ab44444ed68a41da261f709a8",
+  "input_scope": "All tracked lampOS files; exact Git commit or declared frozen two-file overlay only.",
+  "overlay_all_lampOS_bytes_and_modes_verified": true,
+  "runner_sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40"
+}

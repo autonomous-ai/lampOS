@@ -1,0 +1,106 @@
+{
+  "streams": [
+    {
+      "file": "source-identity.stdout",
+      "external_path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z/source-identity.stdout",
+      "bytes": 123,
+      "sha256": "59e4a09b2f94a3f397c8d0bc3da759748d23a72c530ee138be687158ade6c2b7"
+    },
+    {
+      "file": "source-identity.stderr",
+      "external_path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z/source-identity.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "workspace-tree.stdout",
+      "external_path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z/workspace-tree.stdout",
+      "bytes": 41,
+      "sha256": "e6d3424f57cdee76781c8e34a40e9fbf01e2c2b9a2bacf06de465bd3d110c7fb"
+    },
+    {
+      "file": "workspace-tree.stderr",
+      "external_path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z/workspace-tree.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "image-inspect.stdout",
+      "external_path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z/image-inspect.stdout",
+      "bytes": 7701,
+      "sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74"
+    },
+    {
+      "file": "image-inspect.stderr",
+      "external_path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z/image-inspect.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "archive.stdout",
+      "external_path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z/archive.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "archive.stderr",
+      "external_path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z/archive.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "archive-commit.stdout",
+      "external_path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z/archive-commit.stdout",
+      "bytes": 41,
+      "sha256": "dc928aa458d208820b5d57ceeefd2b568dbeef25c51597d5e7e25b7cb6f7fc48"
+    },
+    {
+      "file": "archive-commit.stderr",
+      "external_path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z/archive-commit.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "format.stdout",
+      "external_path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z/format.stdout",
+      "bytes": 746,
+      "sha256": "829a1d91db1021e31ffd3101afa6dcbb93ba5021d8b066f154a93cf22a3468ad"
+    },
+    {
+      "file": "format.stderr",
+      "external_path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z/format.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "final-source-identity.stdout",
+      "external_path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z/final-source-identity.stdout",
+      "bytes": 123,
+      "sha256": "59e4a09b2f94a3f397c8d0bc3da759748d23a72c530ee138be687158ade6c2b7"
+    },
+    {
+      "file": "final-source-identity.stderr",
+      "external_path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z/final-source-identity.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "raw_manifest_sha256": "d44d0f3d524e311ef213c2171ac8e3259f41e9e43a7b60a2b4a36f5f27318887",
+  "archive": {
+    "path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/run-20261023T131008.827460Z/source-lampOS.tar",
+    "bytes": 220088320,
+    "sha256": "82b01bf4e58a3ccffba620ad8cef83fcfeeeb0ad3051ab81d894dfcb800bdaf6"
+  },
+  "source_map": {
+    "path": "/private/tmp/tests-expression-810e05109-linux-fmt-20261023/expected-lampOS-source-map.json",
+    "sha256": "b5bfa4fc2ac7b17ff8e4f597795a81a715d3732c00d91515b8098ab0c872bc2c",
+    "entries": 6687
+  },
+  "excluded": [
+    "archive/source export",
+    "bulk source map",
+    "Python runner",
+    "full image-inspect response"
+  ],
+  "availability_limit": "External paths describe locally retained evidence, not remote availability. Complete formatting output and its exact command are published."
+}
