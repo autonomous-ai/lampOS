@@ -1,5 +1,18 @@
 # Tests work log
 
+## 2026-10-23 20:24 +0700 — claim bounded Update stdout diagnostic
+
+Ready for lamp-voice: no.
+
+Under already-taken #1569, prepare the reviewer-approved fixture-only stdout
+snapshot at Update's existing OLD-script timeout. Borrow the owned pipe,
+verify O_NONBLOCK, then attempt at most 128 bytes once. Flag/read errors are
+diagnostic data; preserve the unconditional two-second failure, scripts and
+kill/reap cleanup. Empty/WouldBlock is inconclusive, and available output
+proves only that output was produced. No product change or full-gate retry.
+The two active fixture gates remain first. No diagnostic code or execution
+has begun; the exact bounded control plan will be reviewed before execution.
+
 ## 2026-10-23 20:19 +0700 — bounded Memory phase observations complete
 
 Ready for lamp-voice: no; historical reader failures remain unwaived.
