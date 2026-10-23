@@ -1,5 +1,40 @@
 # Tests work log
 
+## 2026-10-23 07:07 +0700 — portable Eyes failure fixture pushed; Voice comparison prepared
+
+Ready for lamp-voice: **no, native checks and review pending** for
+[#3156](https://github.com/autonomous-ai/lampOS/pull/3156), head `a2da87221`
+on `ae4ab0022`. The original failed-write test gives **0/1** on x86_64 macOS
+because `/dev/full` is absent. The same three assertions pass **1/0** with a
+read-only real file. A separate Linux-only test retains the original full-device
+open and assertions; production bytes are identical.
+
+Mac fmt, strict Eyes all-target Clippy and workspace build pass. Full Eyes is
+**286/0/5 existing ignored**. The first sandboxed package invocation's
+**267/9/5** is preserved: nine local socket/helper operations were denied.
+The unchanged command then passed with local process permissions and the same
+library binary hash. [Complete native receipt](https://github.com/autonomous-ai/lampOS/tree/a2da87221/lampOS/docs/verification/eyes-failed-write-20261023)
+includes raw streams, source maps and artifact identity. Linux Clippy
+`39875582682` is terminal success; ARM64 `39875582729` and the assigned source
+read are pending. No ARM64 build ran on the Mac; separate Linux formatting has
+not run. The host has no Docker executable for that separate check.
+
+[#3023](https://github.com/autonomous-ai/lampOS/pull/3023) remains draft at
+pushed `157b800a1`, sole parent `ae4ab0022`. Rebase had no conflicts or manual
+edits: range-diff changes only upstream DeclineMusic context; authored lines,
+96 historical documentation/evidence files and 204 checked assertions match.
+The newer renewal, decline and Live-worker fixture fixes are retained. Current
+Mac formatting passes; native runs `39875221807` and `39875221768` are pending.
+The full parallel pair and serial consumer plan is prepared but unstarted,
+awaiting the merge owner's freeze decision. Old failed commands remain holds.
+
+The additional five shared-conversation writers now have a separate owner;
+this carry retains only its existing Music-stop guard. The old controlled
+Music overlap does not establish the cause of the later own-answers report.
+The next assigned sleeping-name stale-arrival fixture is being read without
+code changes while the current checks run. Coordination has moved from the
+full Queue #2602 to [#3126](https://github.com/autonomous-ai/lampOS/issues/3126).
+
 ## 2026-10-23 06:53 +0700 — Eyes failing-write fixture and Voice carry resumed
 
 Ready for lamp-voice: **no**.
