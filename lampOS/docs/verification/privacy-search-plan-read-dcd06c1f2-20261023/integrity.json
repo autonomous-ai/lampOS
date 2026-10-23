@@ -1,0 +1,70 @@
+{
+  "commit": "dcd06c1f2070d599c10ca91f8774482aae1502cc",
+  "manifest": [
+    {
+      "path": "README.md",
+      "bytes_match": true,
+      "sha_match": true
+    },
+    {
+      "path": "fixed-plan.json",
+      "bytes_match": true,
+      "sha_match": true
+    },
+    {
+      "path": "patches.json",
+      "bytes_match": true,
+      "sha_match": true
+    },
+    {
+      "path": "preservation.json",
+      "bytes_match": true,
+      "sha_match": true
+    },
+    {
+      "path": "review-inputs.json",
+      "bytes_match": true,
+      "sha_match": true
+    },
+    {
+      "path": "source-binding.json",
+      "bytes_match": true,
+      "sha_match": true
+    }
+  ],
+  "patches": [
+    {
+      "variant": "observation",
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "patch_hash_valid": true,
+      "exact_context_apply_and_result_hash_valid": true,
+      "removed_lines_contain_assertion": false,
+      "extra_state_read_api_lines": []
+    },
+    {
+      "variant": "observation",
+      "path": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+      "patch_hash_valid": true,
+      "exact_context_apply_and_result_hash_valid": true,
+      "removed_lines_contain_assertion": false,
+      "extra_state_read_api_lines": []
+    },
+    {
+      "variant": "forced_boundaries",
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "patch_hash_valid": true,
+      "exact_context_apply_and_result_hash_valid": true,
+      "removed_lines_contain_assertion": false,
+      "extra_state_read_api_lines": []
+    },
+    {
+      "variant": "forced_boundaries",
+      "path": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+      "patch_hash_valid": true,
+      "exact_context_apply_and_result_hash_valid": true,
+      "removed_lines_contain_assertion": false,
+      "extra_state_read_api_lines": []
+    }
+  ],
+  "execution": "Audit only; no formatter/Cargo/build/test/fixture execution; no actual source/index/ref writes."
+}

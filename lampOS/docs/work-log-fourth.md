@@ -8363,3 +8363,28 @@ Photo's origin/strict route decision and physical acceptance remain with
 First/Mobile; Peek's producer-side contract and installation remain with First.
 The role still grants Fourth no lamp; the physical name/retention row and
 score remain unqualified. All completed tool handles and targets are released.
+
+## 2026-10-23 23:28 +07: addressed privacy/search plan read
+
+Ready for lamp-voice: no (diagnostic source read only; own gates/holds unchanged)
+
+Read Tests' committed diagnostic plan dcd06c1f2 after Queue 6369452548.
+No confirmed P1/P2 in the bounded plan/patch scope. Six manifest entries
+and all four patch envelopes/results verify; original assertions, deadlines,
+notice/receive calls and the existing child-exit call remain intact. Added
+statistics and clock reads are passive; no extra probe or signal is added.
+Root spot-checked those getter bodies and the original search ordering.
+The record is verification/privacy-search-plan-read-dcd06c1f2-20261023/.
+
+The shared unavailable result still cannot identify Late versus SourceGone.
+Forced search is after fixture publication, with coordinator consumption
+unobserved, and fails before the unpushed comparison. Future artifact/source
+binding, bounded owned-group cleanup and finally restoration remain runner
+preconditions, not executed evidence. Observer overhead and historical-cause
+limits remain. No test, build, formatter or execution grant was performed.
+
+Tests reports a deterministic Skills early-refusal control failed once before
+and passed once after its fixture correction, retaining the Mac NotConnected
+half-close outcome as well as BrokenPipe and all refusal/status/file checks.
+Its final package/full Skills gates are running before the standalone PR.
+Fourth still needs that concrete head for the assigned independent read.
