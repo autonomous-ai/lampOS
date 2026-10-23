@@ -1,0 +1,26 @@
+{
+  "annotations": [
+    {
+      "raw_name": "coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup - should panic",
+      "compiled_identity": "coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup",
+      "display_annotation": " - should panic"
+    },
+    {
+      "raw_name": "coordinator::tests::early_end::fixture_policy_tests::unrequested_task_cancellation_is_rejected - should panic",
+      "compiled_identity": "coordinator::tests::early_end::fixture_policy_tests::unrequested_task_cancellation_is_rejected",
+      "display_annotation": " - should panic"
+    },
+    {
+      "raw_name": "coordinator::tests::endpoint_session::fixture_policy_tests::a_logical_clock_is_rejected_before_the_process_constructor - should panic",
+      "compiled_identity": "coordinator::tests::endpoint_session::fixture_policy_tests::a_logical_clock_is_rejected_before_the_process_constructor",
+      "display_annotation": " - should panic"
+    }
+  ],
+  "rule": "Only remove one terminal should-panic display annotation if the raw name is absent and the resulting compiled name occurs exactly once.",
+  "all_actual_rows_bound": 3885,
+  "actual_ignored_bound": 15,
+  "targets_bound": 6,
+  "candidate_census_identical_to_baseline": true,
+  "complete_binding": true,
+  "removed_rows": 0
+}

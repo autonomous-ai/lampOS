@@ -1,0 +1,40 @@
+{
+  "scope": "Completed full Voice step only; overall reader/build gates pending in this receipt.",
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "after": "0f2e6439e018680af247080983c9ec0c258c3229",
+  "before_totals": {
+    "passed": 3860,
+    "failed": 10,
+    "ignored": 15,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "after_totals": {
+    "passed": 3869,
+    "failed": 1,
+    "ignored": 15,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "both_command_exits": 101,
+  "before_wall_seconds": 618.682987,
+  "after_wall_seconds": 361.2403,
+  "compile_included_in_wall_times": true,
+  "complete_target_case_ignored_census_equal": true,
+  "targets_each": 6,
+  "case_identities_each": 3885,
+  "ignored_each": 15,
+  "affected_86_each": {
+    "passed": 86,
+    "failed": 0,
+    "ignored": 0
+  },
+  "baseline_failures": 10,
+  "baseline_failures_passing_after": 9,
+  "baseline_failures_still_failing_after": 1,
+  "new_failed_cases": [],
+  "baseline_package_manifest_sha256": "7810f3343053d2b7997ba96e7a15d1b0f12087cc8c3b3c4457eb3198e72c0e08",
+  "after_source_aggregate_sha256": "8a578a9ee91a8bc541bf4bebef46dda8cdee53afa48738600d67542c47e7034c",
+  "overall_ready": false,
+  "causal_limit": "One fixed observation per source; no matched-host-load, performance, root-cause, inherited-failure or waiver claim."
+}

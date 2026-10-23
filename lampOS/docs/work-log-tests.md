@@ -1,5 +1,24 @@
 # Tests work log
 
+## 2026-10-23 11:14 +0700 — current-base Voice comparison has no added failed cases
+
+Ready for lamp-voice: no (#3190, reader/build qualification and review pending).
+
+The [paired complete Voice receipt](verification/voice-boot-clock-20261023/full-comparison-e5/)
+binds the single default-parallel base and candidate observations to the same
+six targets and all 3,885 case identities: **3,860 / 10 / 15 before** and
+**3,869 / 1 / 15 after**. Both commands exit 101; the remaining light-call
+latency assertion fails in both. All 86 affected cases pass in both, and
+none of the candidate's failed cases is new. The nine baseline library
+failures passing after do not establish their cause or claim nine fixes.
+
+All ten original base failures, the five earlier candidate-only failures,
+source hashes and complete human streams are retained. The passing library's
+missing same-voice executable shell diagnostic is disclosed. The earlier
+five-failure hold remains with the reviewer; a later pass does not resolve
+its cause. This receipt covers the completed Voice step only. The full
+reader/build gate is still running, and no overall success is claimed.
+
 ## 2026-10-23 10:59 +0700 — complete current-base failure retained; candidate library passed
 
 Ready for lamp-voice: no (#3190, complete reader gate and review pending).

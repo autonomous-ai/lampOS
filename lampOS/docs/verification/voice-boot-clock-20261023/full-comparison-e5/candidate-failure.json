@@ -1,0 +1,31 @@
+{
+  "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+  "location": "crates/voice/tests/it/light_call.rs:90:5",
+  "full_failure_text": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [2.650224ms, 3.84791ms, 4.726831ms, 20.327662ms, 22.35015ms, 23.355538ms, 36.127921ms, 36.128975ms, 40.377043ms, 40.915243ms, 49.05573ms, 57.592053ms, 72.759314ms, 75.273485ms, 78.356909ms, 96.099228ms, 98.152995ms, 113.91967ms, 130.106484ms, 135.709386ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (706032536) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[2.650224ms, 3.84791ms, 4.726831ms, 20.327662ms, 22.35015ms, 23.355538ms, 36.127921ms, 36.128975ms, 40.377043ms, 40.915243ms, 49.05573ms, 57.592053ms, 72.759314ms, 75.273485ms, 78.356909ms, 96.099228ms, 98.152995ms, 113.91967ms, 130.106484ms, 135.709386ms]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+  "sorted_20_ms": [
+    2.650224,
+    3.84791,
+    4.726831,
+    20.327662,
+    22.35015,
+    23.355538,
+    36.127921,
+    36.128975,
+    40.377043,
+    40.915243,
+    49.05573,
+    57.592053,
+    72.759314,
+    75.273485,
+    78.356909,
+    96.099228,
+    98.152995,
+    113.91967,
+    130.106484,
+    135.709386
+  ],
+  "asserted_upper_middle_ms": 49.05573,
+  "limit_ms": 25,
+  "case_duration_seconds": null,
+  "target_duration_seconds": 10.1
+}

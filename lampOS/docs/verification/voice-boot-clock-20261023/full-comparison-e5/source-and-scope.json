@@ -1,0 +1,69 @@
+{
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "after": "0f2e6439e018680af247080983c9ec0c258c3229",
+  "after_tree": "ae902f07d55fec0816543294d866e6ab37043c74",
+  "tracked_paths": 9992,
+  "tracked_bytes": 265357721,
+  "after_source_aggregate_sha256": "8a578a9ee91a8bc541bf4bebef46dda8cdee53afa48738600d67542c47e7034c",
+  "aggregate_algorithm": "Sorted path + NUL + Git mode + NUL + u64 big-endian length + content; symlinks use literal target bytes.",
+  "all_source_bytes_independently_reconstructed_from_commit": true,
+  "changed_paths": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/second.rs",
+      "base_sha256": "428701e0e25869675634954b80356b9dfb18e4268f14a82683a7a4e1e4c1c984",
+      "after_sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf"
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "base_sha256": "805d7f55a0351c097d43e1f7c8f03c09bb7f1c116176545783be00a28f963128",
+      "after_sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1"
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "base_sha256": "47075418dac7fc54591976ca2557e3be698590b94e8cdbd49a8f4f5c379da0c8",
+      "after_sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf"
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "base_sha256": "2fb8205fb7ebd46161f13f7403e4de713675b4c64c0438f34c4f01e2b6dfae26",
+      "after_sha256": "65af6a4a052ef808e094284373f4c155bf4f09250a09c2c090b9b225c77cda6e"
+    },
+    {
+      "path": "lampOS/crates/voice/src/scenario_clock.rs",
+      "base_sha256": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80",
+      "after_sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2"
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "base_sha256": "e17e6801444125077606b2dd7ffcb1e17a75be49becc5c3d1d93fd77528c3444",
+      "after_sha256": "b08a0665ba5c100795d391b5ceb9d74e44a0e40c84654ad85de15935b7d38177"
+    },
+    {
+      "path": "lampOS/crates/voice/src/stop_words.rs",
+      "base_sha256": "64a87b6ed17e45db6eb2b0e0ef7d3458dc8055c9945299902a761a22edebed4f",
+      "after_sha256": "5524521c56061be6af4b8ee95d52ecc3b9b1d3c3ee4a2344db4fa75dbf4f9a0f"
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "base_sha256": "6f96999c5c3dd5182c7c7c958b47f831c25cadd6bb1697a255cc9ea376cbfe14",
+      "after_sha256": "7a3164aec84b4fb303944d8e97056e21e8c3563acc469779b376ae0b06510194"
+    }
+  ],
+  "candidate_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-voice",
+    "--no-fail-fast",
+    "--message-format=json-render-diagnostics"
+  ],
+  "candidate_cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+  "binary_architecture": "All five listed executables recorded as Mach-O 64-bit executable x86_64.",
+  "profile": "Captured Cargo test profiles have opt-level 0, debuginfo 0, debug assertions and overflow checks enabled.",
+  "runtime_environment_limit": "Only completed step outputs were read. Inherited environment, compiler -vV, source-freshness and final restoration/top-run status are not independently reread here while reader gates run. Frozen parent plan designated this default-parallel observation; argv has no test-thread override.",
+  "physical_hardware_or_translation": "Not established by this step receipt.",
+  "overall_gates": "Pending/outside this receipt; no top-run mutable results or reader folders read.",
+  "stderr_diagnostic": "The passing library step also emitted a /bin/sh no-such-file diagnostic for a temporary lamp-same-voice-loading child. Full raw stderr retained; no missing-file cause or extra failed test is inferred."
+}

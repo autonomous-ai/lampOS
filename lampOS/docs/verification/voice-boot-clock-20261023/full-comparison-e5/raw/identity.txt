@@ -1,0 +1,35 @@
+Raw stream: lamp-voice-it-ecfcbe7fe5/all.stderr
+Payload bytes: 0
+Payload SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+BEGIN RAW PAYLOAD
+END RAW PAYLOAD
+Raw stream: lamp-voice-it-ecfcbe7fe5/file.stdout
+Payload bytes: 101
+Payload SHA256: ffe6eb73f9fc834c3983a3dea33371d221dcb847ea31a79bb8cd0e054b104763
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: lamp-voice-lamp-voice-6f581d039b/file.stdout
+Payload bytes: 109
+Payload SHA256: 7acec4f4eea5570cda847dadb10df910daa5487e2eb3c42288d2b80251ac8d18
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: lamp-voice-lamp_voice-7a0ef81c33/file.stdout
+Payload bytes: 109
+Payload SHA256: d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: lamp-voice-render_line_second-8db8ae055c/file.stdout
+Payload bytes: 121
+Payload SHA256: 8818cae6fd13a952438433c2b8170ac8664b0886abd068f5dad75f58dcfcfff4
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: lamp-voice-stop_words_stt_replay-057fe6c3ae/file.stdout
+Payload bytes: 124
+Payload SHA256: f2d2f57ca3c4700e3cd53cf5290c10a1e35b0b669bc413ff0770c929346546e4
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
