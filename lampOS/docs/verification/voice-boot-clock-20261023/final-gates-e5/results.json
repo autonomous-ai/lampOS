@@ -1,0 +1,125 @@
+{
+  "status": "FAILED: all independent Mac gate commands completed; failed test steps remain unwaived",
+  "terminal_runner_exit": 1,
+  "terminal_exit_source": "Parent reported native session7973 terminal exit1; immutable result state and runner failure policy agree.",
+  "head": "0f2e6439e018680af247080983c9ec0c258c3229",
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "steps": [
+    {
+      "id": "fmt",
+      "exit_code": 0,
+      "wall_seconds": 11.757663,
+      "started_at": "2026-10-23T03:48:40.823917+00:00",
+      "finished_at": "2026-10-23T03:48:52.581441+00:00",
+      "timed_out": false,
+      "outcome": "passed"
+    },
+    {
+      "id": "clippy",
+      "exit_code": 0,
+      "wall_seconds": 83.775037,
+      "started_at": "2026-10-23T03:48:55.681126+00:00",
+      "finished_at": "2026-10-23T03:50:19.506550+00:00",
+      "timed_out": false,
+      "outcome": "passed"
+    },
+    {
+      "id": "voice-default-parallel",
+      "exit_code": 101,
+      "wall_seconds": 361.2403,
+      "started_at": "2026-10-23T03:50:25.152894+00:00",
+      "finished_at": "2026-10-23T03:56:26.386561+00:00",
+      "timed_out": false,
+      "outcome": "FAILED ordinary test result; independent gates continue without waiver"
+    },
+    {
+      "id": "readers-default-parallel",
+      "exit_code": 101,
+      "wall_seconds": 1219.158933,
+      "started_at": "2026-10-23T03:56:33.055777+00:00",
+      "finished_at": "2026-10-23T04:16:52.184174+00:00",
+      "timed_out": false,
+      "outcome": "FAILED ordinary test result; independent gates continue without waiver"
+    },
+    {
+      "id": "workspace-build",
+      "exit_code": 0,
+      "wall_seconds": 69.771501,
+      "started_at": "2026-10-23T04:17:10.486266+00:00",
+      "finished_at": "2026-10-23T04:18:20.255931+00:00",
+      "timed_out": false,
+      "outcome": "passed"
+    },
+    {
+      "id": "diff-check",
+      "exit_code": 0,
+      "wall_seconds": 2.862386,
+      "started_at": "2026-10-23T04:18:27.528356+00:00",
+      "finished_at": "2026-10-23T04:18:30.390777+00:00",
+      "timed_out": false,
+      "outcome": "passed"
+    }
+  ],
+  "completed_steps": [
+    "fmt",
+    "clippy",
+    "voice-default-parallel",
+    "readers-default-parallel",
+    "workspace-build",
+    "diff-check"
+  ],
+  "passed_steps": [
+    "fmt",
+    "clippy",
+    "workspace-build",
+    "diff-check"
+  ],
+  "failed_steps": [
+    "voice-default-parallel",
+    "readers-default-parallel"
+  ],
+  "unrun_steps": [],
+  "active_step": null,
+  "voice": {
+    "totals": {
+      "passed": 3869,
+      "failed": 1,
+      "ignored": 15,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "target_count": 6,
+    "executable_targets": 5,
+    "doc_targets": 1,
+    "case_identities": 3885,
+    "complete_binding": true,
+    "unrun_targets": [],
+    "incomplete_targets": []
+  },
+  "readers": {
+    "totals": {
+      "passed": 3203,
+      "failed": 1,
+      "ignored": 17,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "target_count": 68,
+    "executable_targets": 57,
+    "doc_targets": 11,
+    "case_identities": 3221,
+    "complete_binding": true,
+    "unrun_targets": [],
+    "incomplete_targets": []
+  },
+  "combined_candidate_test_totals": {
+    "passed": 7072,
+    "failed": 2,
+    "ignored": 32,
+    "case_identities": 7106,
+    "targets": 74
+  },
+  "source_final_unchanged": true,
+  "ready": false,
+  "qualification": "All planned local commands completed; two actual test gates remain failed. Successful formatting, strict Clippy, workspace build and diff do not waive them. No inherited classification."
+}

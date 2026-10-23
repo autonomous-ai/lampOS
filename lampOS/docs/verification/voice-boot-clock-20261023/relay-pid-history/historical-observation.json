@@ -1,0 +1,74 @@
+{
+  "command_record": {
+    "base": "a503d70f034990c72abe10ed55239372b7de8f23",
+    "stage": "voice-eval",
+    "command": "cargo test -p lamp-voice-eval",
+    "exit_code": 101,
+    "elapsed_seconds": 127.267,
+    "counts": {
+      "passed": 607,
+      "failed": 1,
+      "ignored": 0
+    },
+    "test_binaries_and_doc_groups": 3
+  },
+  "record_field_interpretation": "The runner stored git rev-parse HEAD in a field called base. The working tree also held the memory-note changes; this was not a clean base run or an exact immutable tested commit.",
+  "cwd_from_retained_runner": "/private/tmp/fourth-memory-row-20261022/lampOS",
+  "raw": {
+    "source": "/private/tmp/fourth-memory-note-retry-checks/before-serial-eval/voice-eval.log",
+    "copy": "raw/historical-voice-eval.log.txt",
+    "sha256": "2e9c9978c13665730c2e201becb3a0416b8845333e863accd5fac5a01792f767",
+    "bytes": 63242,
+    "duplicate_original_matches": true
+  },
+  "metadata_source": {
+    "path": "/private/tmp/fourth-memory-note-retry-checks/before-serial-eval/host-remainder.json",
+    "sha256": "52bce7addd4540a9f7da123a3e1b8b0d95f2abb3e6a7d752e16a974cc58fd50b",
+    "command_record_also_in_published_commit": "fdf8914f338dd0c1888be2581d90275e106a0cbe"
+  },
+  "published_receipt_url": "https://github.com/autonomous-ai/lampOS/blob/fdf8914f338dd0c1888be2581d90275e106a0cbe/lampOS/docs/verification/memory-note-retry-20261022/validation.json",
+  "published_receipt_sha256": "926e289cad19d46574012ae75781e9168f846e2ea31a53bd1a6cd63aec6b96c6",
+  "host_record": {
+    "platform": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+    "machine": "x86_64",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2"
+  },
+  "host_record_sha256": "6014ad41e5ee2cf9059908f6530c220d0f03f0100691736671668e59d9bc7bf9",
+  "failure": {
+    "test": "relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers",
+    "location": "crates/voice-eval/tests/it/relay_hardening.rs:126:54",
+    "message": "called `Result::unwrap()` on an `Err` value: ParseIntError { kind: Empty }",
+    "integration_counts": {
+      "passed": 233,
+      "failed": 1,
+      "ignored": 0
+    }
+  },
+  "historical_changed_source_hashes_vs_later_commit": [
+    {
+      "path": "lampOS/crates/voice/src/remember.rs",
+      "historical_recorded_sha256": "d3f23358431e4dd5e33b8007faa7390162db1be896d0d9759e1bffea6c212925",
+      "later_rebased_commit_sha256": "32a1655855664876ccd34ecceb04f6de0af4fc3a894216a3aa6ac97248a41224",
+      "same": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "historical_recorded_sha256": "3cddd0bf7b23f24d26fd6932747123b6c34842d69088814d153e0d2713e12d72",
+      "later_rebased_commit_sha256": "b5f24e11747503840e7cc7be48e2cd826afa8bbefe0bcb94e4b8ee624c8269ea",
+      "same": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker/memory_note_retries.rs",
+      "historical_recorded_sha256": "5c43fbc2456498115ddeedb36d8117767c9d2a2017198accd98ccae22bc4ce08",
+      "later_rebased_commit_sha256": "5c43fbc2456498115ddeedb36d8117767c9d2a2017198accd98ccae22bc4ce08",
+      "same": true
+    }
+  ],
+  "limits": [
+    "Historical metadata records a dirty memory-note working tree on a503d70f0; no complete immutable source manifest or executable hash is available in this receipt.",
+    "Two recorded changed Voice hashes do not equal the later rebased memory commit; do not relabel the old execution as that committed head.",
+    "The fixture, product relay and private helper Git blobs are identical across the recorded old HEAD, published receipt commit and current base/candidate. This is not a compiled-byte-identity proof.",
+    "The earlier same-line/same-type failure is an independent historical observation predating the boot-clock change. It does not prove the exact scheduler interleaving or cause of the current failure, and does not waive either failed gate.",
+    "The later serial pass is not counted or offered as qualification here."
+  ]
+}

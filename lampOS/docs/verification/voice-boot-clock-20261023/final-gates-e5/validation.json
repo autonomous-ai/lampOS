@@ -1,0 +1,31 @@
+{
+  "status": "passed",
+  "terminal_steps": 6,
+  "passed_steps": 4,
+  "failed_test_steps": 2,
+  "commands_audited": 193,
+  "original_streams_audited": 386,
+  "new_command_records": 177,
+  "new_raw_stream_references": 354,
+  "prior_voice_command_records_reused": 16,
+  "source_paths_verified": 9992,
+  "full_source_aggregate_unchanged": true,
+  "actual_test_targets_bound": 74,
+  "actual_case_identities_bound": 7106,
+  "ignored_identities_bound": 32,
+  "failure_blocks_verified": 2,
+  "compiled_test_census_targets": 62,
+  "no_unrun_or_incomplete_targets": true,
+  "full_json_links_offsets_hashes": "passed",
+  "prior_manifests_unchanged": true,
+  "non_raw_whitespace": "passed",
+  "preserved_raw_whitespace": [],
+  "main_artifact_or_live_source_access": false,
+  "cargo_test_execution_or_repo_mutation": false,
+  "ready": false,
+  "durationless_platform_skip_summaries": [
+    "lamp-update:test:self-cli-exec",
+    "lamp-update:test:self-process-cuts"
+  ],
+  "historical_companion_manifest_verified": true
+}

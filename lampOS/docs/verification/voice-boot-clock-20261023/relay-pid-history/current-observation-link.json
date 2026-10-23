@@ -1,0 +1,14 @@
+{
+  "gate_head": "0f2e6439e018680af247080983c9ec0c258c3229",
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "reader_stdout_source": "/private/tmp/tests-boot-clock-current-e5-gates-20261023/gates-20261023T034835.689767Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+  "reader_stdout_sha256": "b465906215158e51761936f0398550ef73e3a9b96a99bd06dcdad8d065845ad3",
+  "reader_stdout_bytes": 651837,
+  "integration_counts": {
+    "passed": 237,
+    "failed": 1,
+    "ignored": 0
+  },
+  "failure_excerpt": "current-failure-excerpt.txt",
+  "full_current_receipt_owned_by": "parent and early_end_diagnosis; not duplicated here"
+}

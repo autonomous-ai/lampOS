@@ -1,0 +1,54 @@
+{
+  "head": "0f2e6439e018680af247080983c9ec0c258c3229",
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "head_tree": "ae902f07d55fec0816543294d866e6ab37043c74",
+  "tracked_paths": 9992,
+  "lampOS_paths": 6649,
+  "tracked_symlinks": 1,
+  "tracked_bytes": 265357721,
+  "source_map": {
+    "path": "/private/tmp/tests-boot-clock-current-e5-gates-20261023/source-map.json",
+    "bytes": 2131971,
+    "sha256": "d5dcbc134a58bac312e7c820b477669d7f5b31e341876a07a4587d81a1748b5c",
+    "reason": "Full source map remains external; all entries and full aggregate independently verified against the exact committed Git tree."
+  },
+  "source_aggregate_sha256": "8a578a9ee91a8bc541bf4bebef46dda8cdee53afa48738600d67542c47e7034c",
+  "freshness": {
+    "tracked_files": 9992,
+    "mtime_ns": 1792727317359334000,
+    "before_sha256": "8a578a9ee91a8bc541bf4bebef46dda8cdee53afa48738600d67542c47e7034c",
+    "after_sha256": "8a578a9ee91a8bc541bf4bebef46dda8cdee53afa48738600d67542c47e7034c",
+    "identical_bytes": true,
+    "algorithm": "sorted path + NUL + Git mode + NUL + u64 big-endian length + exact bytes; symlinks use literal target bytes"
+  },
+  "each_step_source_after": [
+    {
+      "step": "fmt",
+      "aggregate": "8a578a9ee91a8bc541bf4bebef46dda8cdee53afa48738600d67542c47e7034c"
+    },
+    {
+      "step": "clippy",
+      "aggregate": "8a578a9ee91a8bc541bf4bebef46dda8cdee53afa48738600d67542c47e7034c"
+    },
+    {
+      "step": "voice-default-parallel",
+      "aggregate": "8a578a9ee91a8bc541bf4bebef46dda8cdee53afa48738600d67542c47e7034c"
+    },
+    {
+      "step": "readers-default-parallel",
+      "aggregate": "8a578a9ee91a8bc541bf4bebef46dda8cdee53afa48738600d67542c47e7034c"
+    },
+    {
+      "step": "workspace-build",
+      "aggregate": "8a578a9ee91a8bc541bf4bebef46dda8cdee53afa48738600d67542c47e7034c"
+    },
+    {
+      "step": "diff-check",
+      "aggregate": "8a578a9ee91a8bc541bf4bebef46dda8cdee53afa48738600d67542c47e7034c"
+    }
+  ],
+  "final_source_aggregate_sha256": "8a578a9ee91a8bc541bf4bebef46dda8cdee53afa48738600d67542c47e7034c",
+  "source_bytes_unchanged": true,
+  "restoration_status": "This gate used unmodified committed source and made no mutation overlays; no restoration operation was needed. Final content/mode aggregate equals initial and every after-step aggregate. Baseline phone-worktree overlay/restoration proof remains in baseline-e5.",
+  "source_proof_method": "Read captured source map and immutable Git blobs only; no MAIN artifact or live source reads."
+}

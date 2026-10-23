@@ -1,0 +1,11 @@
+---- relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers stdout ----
+
+thread 'relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers' (706219117) panicked at crates/voice-eval/tests/it/relay_hardening.rs:126:54:
+called `Result::unwrap()` on an `Err` value: ParseIntError { kind: Empty }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers
+
+test result: FAILED. 237 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 44.53s

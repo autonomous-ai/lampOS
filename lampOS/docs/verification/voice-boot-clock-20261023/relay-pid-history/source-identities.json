@@ -1,0 +1,40 @@
+{
+  "scope": "Git blob equality for fixture, relay product implementation and private-directory helper; not historical compiled artifact identity",
+  "heads": {
+    "historical_recorded_HEAD": "a503d70f034990c72abe10ed55239372b7de8f23",
+    "historical_published_receipt": "fdf8914f338dd0c1888be2581d90275e106a0cbe",
+    "current_base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+    "current_boot_head": "0f2e6439e018680af247080983c9ec0c258c3229"
+  },
+  "sha256": {
+    "lampOS/crates/voice-eval/tests/it/relay_hardening.rs": {
+      "a503d70f034990c72abe10ed55239372b7de8f23": "94cb3ff48b5973b1e9ba05dd144f452288a6b3d652980df10e0e76f8419d8e4a",
+      "fdf8914f338dd0c1888be2581d90275e106a0cbe": "94cb3ff48b5973b1e9ba05dd144f452288a6b3d652980df10e0e76f8419d8e4a",
+      "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc": "94cb3ff48b5973b1e9ba05dd144f452288a6b3d652980df10e0e76f8419d8e4a",
+      "0f2e6439e018680af247080983c9ec0c258c3229": "94cb3ff48b5973b1e9ba05dd144f452288a6b3d652980df10e0e76f8419d8e4a"
+    },
+    "lampOS/crates/voice-eval/src/physical/session.rs": {
+      "a503d70f034990c72abe10ed55239372b7de8f23": "c5baf822c82a0824ca655a11ad73a36d266fe121ce8853961732925da6f67212",
+      "fdf8914f338dd0c1888be2581d90275e106a0cbe": "c5baf822c82a0824ca655a11ad73a36d266fe121ce8853961732925da6f67212",
+      "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc": "c5baf822c82a0824ca655a11ad73a36d266fe121ce8853961732925da6f67212",
+      "0f2e6439e018680af247080983c9ec0c258c3229": "c5baf822c82a0824ca655a11ad73a36d266fe121ce8853961732925da6f67212"
+    },
+    "lampOS/crates/voice-eval/tests/it/common/mod.rs": {
+      "a503d70f034990c72abe10ed55239372b7de8f23": "39d30134e50f4f0b291c1bc78f36a9b87a11f9ae8f65872a43eb3dc94e7a102d",
+      "fdf8914f338dd0c1888be2581d90275e106a0cbe": "39d30134e50f4f0b291c1bc78f36a9b87a11f9ae8f65872a43eb3dc94e7a102d",
+      "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc": "39d30134e50f4f0b291c1bc78f36a9b87a11f9ae8f65872a43eb3dc94e7a102d",
+      "0f2e6439e018680af247080983c9ec0c258c3229": "39d30134e50f4f0b291c1bc78f36a9b87a11f9ae8f65872a43eb3dc94e7a102d"
+    }
+  },
+  "boot_authored_paths": [
+    "lampOS/crates/voice/src/coordinator/second.rs",
+    "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+    "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+    "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+    "lampOS/crates/voice/src/scenario_clock.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs",
+    "lampOS/crates/voice/src/stop_words.rs",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "voice_eval_tree_changes_in_boot": []
+}

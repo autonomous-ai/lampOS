@@ -1,0 +1,78 @@
+{
+  "head": "0f2e6439e018680af247080983c9ec0c258c3229",
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "whole_voice_eval_crate_tree_equal": "d4f3d6aa348aa982929936cde81105e0bfc08baa",
+  "checked_paths": [
+    {
+      "path": "lampOS/crates/voice-eval/tests/it/relay_hardening.rs",
+      "bytes": 10853,
+      "sha256": "94cb3ff48b5973b1e9ba05dd144f452288a6b3d652980df10e0e76f8419d8e4a",
+      "base_blob": "ac23d016d12d73cd7741d40bfc59a114bb313921",
+      "head_blob": "ac23d016d12d73cd7741d40bfc59a114bb313921",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice-eval/tests/it/common/mod.rs",
+      "bytes": 3237,
+      "sha256": "39d30134e50f4f0b291c1bc78f36a9b87a11f9ae8f65872a43eb3dc94e7a102d",
+      "base_blob": "94a8bc6083bc805ec4eea2f1b2d2e7a903cf8ffd",
+      "head_blob": "94a8bc6083bc805ec4eea2f1b2d2e7a903cf8ffd",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice-eval/tests/it/main.rs",
+      "bytes": 807,
+      "sha256": "e6b90fc49f9a73ed9d62fd9e4a80d8a815874da8af5d20364949e44fe4decd95",
+      "base_blob": "36b4f9cf811b39f558f2428f7b88dab03c9092b4",
+      "head_blob": "36b4f9cf811b39f558f2428f7b88dab03c9092b4",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice-eval/src/physical/session.rs",
+      "bytes": 79408,
+      "sha256": "c5baf822c82a0824ca655a11ad73a36d266fe121ce8853961732925da6f67212",
+      "base_blob": "ea644da757b097cba5491e1078ad7c943555f4fc",
+      "head_blob": "ea644da757b097cba5491e1078ad7c943555f4fc",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice-eval/Cargo.toml",
+      "bytes": 1850,
+      "sha256": "eeb211074c1d8a2813ebb0c73422f20385fc56922480163d0303df43e3e59cb7",
+      "base_blob": "493e1589b6fa2fd8a0430b80f3be0017d81f593b",
+      "head_blob": "493e1589b6fa2fd8a0430b80f3be0017d81f593b",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/options.rs",
+      "bytes": 82952,
+      "sha256": "58c43a3a577571b9123cd86696de64b6fcd428711fa22f8acfcfd13d1052fee3",
+      "base_blob": "3308d031467de93f411fc1cbf5e742cfff9266ec",
+      "head_blob": "3308d031467de93f411fc1cbf5e742cfff9266ec",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker.rs",
+      "bytes": 689387,
+      "sha256": "81d7368deb6f1bea8aa5eae3037d9a4b3ce1cf25502e81e8e9bc93a6f1932aaa",
+      "base_blob": "57503ac800e55056afd038130428d68e9a89b59a",
+      "head_blob": "57503ac800e55056afd038130428d68e9a89b59a",
+      "equal": true
+    }
+  ],
+  "eight_authored_changed_paths": [
+    "lampOS/crates/voice/src/coordinator/second.rs",
+    "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+    "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+    "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+    "lampOS/crates/voice/src/scenario_clock.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs",
+    "lampOS/crates/voice/src/stop_words.rs",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "failure_boundary": "read_pid successfully reads worker.pid, trims it, then parse::<i32>() fails with Empty at relay_hardening.rs:126:54. The preceding runtime timing, exit-code, killed/error and two-trace assertions had been reached without panic. The final process_gone check is not evaluated because its argument parse panics.",
+  "ordering_permitted_by_fixture": "The closer thread waits only for path.exists(), then drops runner transport. The shell redirection for echo $! creates/truncates worker.pid before echo writes its PID. Session run kills the shell process group on transport closure. This permits closure after file creation but before PID content is written. The observed empty parse is consistent with that race; no controlled reproduction or PID-file content capture was run here.",
+  "relevant_code_path": "This test explicitly starts /bin/sh with the scripted fake runtime. It calls the unchanged VoiceEval physical/session relay. That module imports unchanged Voice option/Continuation types; it does not start the Voice runtime in this test. Private::new/join constructs temporary paths. Trace and PID data come from this shell fixture.",
+  "authored_scope": "Seven Rust changes affect cfg(test) clocks/helpers and test modules; normal Live::hand retains lamp_ipc::monotonic_us. The eighth path is docs/voice-test-fixtures.md. The audited failing fixture/relay path does not read that doc or the authored test-source files. This is a narrow path audit, not a claim about every other reader test.",
+  "causal_limit": "No e5 baseline reader suite was run in this fixed comparison: baseline covered Voice only. Unchanged code/source reachability is not a before/after reproduction, and does not prove an inherited failure, host-load cause or waiver. The failed reader gate remains failed."
+}

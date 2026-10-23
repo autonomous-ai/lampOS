@@ -1,0 +1,35 @@
+{
+  "head": "0f2e6439e018680af247080983c9ec0c258c3229",
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "started_at": "2026-10-23T03:48:35.690888+00:00",
+  "finished_at": "2026-10-23T04:18:33.949532+00:00",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_BUILD_TARGET": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTFLAGS": null,
+    "RUST_BACKTRACE": "0",
+    "RUST_TEST_THREADS": null
+  },
+  "omitted_local_path_value_sha256": "2db016c7667ac4d5a4a753bf030da00184e7a76845c12f56803253e8ceca34a9",
+  "os": {
+    "sysname": "Darwin",
+    "release": "25.6.0",
+    "machine": "x86_64"
+  },
+  "host_node_and_kernel_build_metadata_omitted": true,
+  "toolchain_raw_command": "rustc",
+  "baseline_toolchain_and_prescribed_environment_equal": true,
+  "comparison_scope": "All declared environment/cleared keys plus CARGO_TARGET_DIR; exact rustc -vV stdout equal. This does not claim the entire inherited environment or host load is equal.",
+  "compilation_jobs": 4,
+  "test_scheduling": "Both full Voice and 11-package readers use default libtest parallelism, with RUST_TEST_THREADS unset and no test-thread argv override.",
+  "architecture": "Captured Rust host x86_64-apple-darwin and Mach-O x86_64 test executables; physical hardware/translation not established.",
+  "socket_bind": "passed",
+  "no_new_runs": "Packaging executed no Cargo/test/binary and accessed no MAIN artifact."
+}

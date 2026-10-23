@@ -1,5 +1,27 @@
 # Tests work log
 
+## 2026-10-23 11:36 +0700 — boot-clock complete gates retain two failures
+
+Ready for lamp-voice: no (#3190, review disposition remains pending).
+
+The [terminal Mac gate](verification/voice-boot-clock-20261023/final-gates-e5/)
+completed every command on `0f2e6439e`. Formatting, strict 12-package Clippy,
+workspace build and diff check passed. Full Voice was **3,869 / 1 / 15**;
+the eleven readers were **3,203 / 1 / 17**. All 74 targets and 7,106 case
+identities are bound, with none unrun or incomplete. The selected total is
+**7,072 / 2 / 32**; this is not full-workspace runtime coverage. All 9,992
+tracked source paths retained their exact bytes and modes.
+
+The light-call failure remains as before. The only reader failure is
+`relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers`:
+its final worker-PID read parses an empty file. The entire VoiceEval crate
+is unchanged, and this case runs `/bin/sh`. A [historical receipt](verification/voice-boot-clock-20261023/relay-pid-history/)
+shows the identical boundary before this patch, with its dirty historical
+source and incomplete provenance made explicit. Existence-before-PID-write
+is a source-supported possible ordering, not a recorded cause. Both failed
+commands remain failed; the reviewer owns the disposition. Complete human
+streams, census, artifact/source identity and all prior failures are retained.
+
 ## 2026-10-23 11:26 +0700 — #3204 Linux formatting receipt delivered
 
 The [requested Linux check](verification/touch-wire-linux-fmt-20261023/)

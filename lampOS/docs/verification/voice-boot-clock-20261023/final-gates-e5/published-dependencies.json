@@ -1,0 +1,21 @@
+{
+  "full_voice_pair": {
+    "relative": "../full-comparison-e5/README.md",
+    "publication_commit": "498bd334817ef1f9f080fdfe65d84eee127f4506",
+    "manifest_sha256": "a60f12097ee1354ceac8d25ea44adea6493de744772ac9dcf88c6332d52c3f14",
+    "local_verified_source": "/private/tmp/tests-boot-clock-base-e5-counterfactual-20261023/prepared-pair-public"
+  },
+  "baseline": {
+    "relative": "../baseline-e5/README.md",
+    "publication_commit": "699591f0cb8ec5839f6e9c1e953ebb1ae89d4733",
+    "manifest_sha256": "7810f3343053d2b7997ba96e7a15d1b0f12087cc8c3b3c4457eb3198e72c0e08",
+    "local_verified_source": "/private/tmp/tests-boot-clock-base-e5-counterfactual-20261023/prepared-public"
+  },
+  "earlier_reader_occurrence": {
+    "relative": "../relay-pid-history/README.md",
+    "manifest_sha256": "60f103e0e8d32a4e84e834d76d70718a051261520a0665df64ec68c47a17072d",
+    "local_verified_source": "/private/tmp/tests-relay-pid-audit-20261023",
+    "scope": "Earlier exact empty-PID parse boundary, with dirty historical source and incomplete artifact/full-tree provenance; prior occurrence only, not proof of cause or a waiver."
+  },
+  "dependency_limit": "This final receipt reuses the unchanged published Voice command/census/raw evidence. It adds terminal environment, reader, lint/build and source-final records. Earlier failures remain in those receipts."
+}
