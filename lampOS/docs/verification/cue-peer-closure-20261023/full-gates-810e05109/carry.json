@@ -1,0 +1,27 @@
+{
+  "old_base": "3e75cc3cbe4c544dee433fb8a81dc3b06daf688d",
+  "base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+  "base_tree": "6e25adfa7d21377d28f31b2fcaac6f9497de26d5",
+  "branch": "tests/1569-cue-peer-closed",
+  "worktree": "/private/tmp/tests-codex-cue-peer-closed-20261023",
+  "authored_patch_byte_identical": true,
+  "authored_files_byte_identical": true,
+  "upstream_owned_files_byte_identical": true,
+  "patch_sha256": "0688625440c18c28d53aef11b8f2794aca1dacbf908e0e061a2eca20a423666f",
+  "source": {
+    "lampOS/crates/voice/tests/it/fixture_provider.rs": {
+      "candidate_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+      "base_sha256": "b50767957067efee6a502e372605a7bcc2b16e23097da1ddca85153cf966993a",
+      "bytes": 45782
+    },
+    "lampOS/docs/voice-test-fixtures.md": {
+      "candidate_sha256": "f28c90d1963e99f731c2457783d298750b10ee434b1163efbb719f6e0c65b0ee",
+      "base_sha256": "6f96999c5c3dd5182c7c7c958b47f831c25cadd6bb1697a255cc9ea376cbfe14",
+      "bytes": 30804
+    }
+  },
+  "status": " M lampOS/crates/voice/tests/it/fixture_provider.rs\n M lampOS/docs/voice-test-fixtures.md\n",
+  "Cargo_executed": false,
+  "committed": false,
+  "pushed": false
+}

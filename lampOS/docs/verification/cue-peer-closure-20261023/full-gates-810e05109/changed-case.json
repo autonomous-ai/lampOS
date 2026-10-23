@@ -1,0 +1,14 @@
+{
+  "source_path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+  "source_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+  "case": "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+  "actual": {
+    "phase": "voice-default-parallel",
+    "target": "lamp-voice:test:it",
+    "name": "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+    "status": "ok"
+  },
+  "compiled_census_is_execution": false,
+  "original_five_assertions_preserved": true,
+  "control_receipt": "https://github.com/autonomous-ai/lampOS/blob/163051a0e7/lampOS/docs/verification/cue-peer-closure-20261023/README.md"
+}

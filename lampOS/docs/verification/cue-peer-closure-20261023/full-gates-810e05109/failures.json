@@ -1,0 +1,25 @@
+{
+  "base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+  "count": 1,
+  "failures": [
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:test:it",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "actual_status": "FAILED",
+      "binary_sha256": "98a85d95d7828f528c41dc07cbd848170092cae0c9b81c7e8becd285e6121c7f",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-cue-peer-closed-810e-gates-20261023/run-2026-10-23T131501.473477Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 650124,
+        "original_stream_sha256": "380b433876e9ed3e7dd5a9bb318eada5a14369b3dfc027f7f6268eafe0f043f7",
+        "byte_offset": 647719,
+        "bytes": 1219,
+        "sha256": "b49191abc3632eeba906ff93808538c1fc5c6089c5309a02ff4e550475abeafd",
+        "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [2.749114ms, 2.944789ms, 3.397986ms, 3.469837ms, 3.563087ms, 19.37379ms, 36.709238ms, 54.170359ms, 57.905189ms, 58.860269ms, 59.537973ms, 59.854166ms, 62.111635ms, 75.817067ms, 79.726095ms, 82.283648ms, 92.242952ms, 93.653736ms, 135.727138ms, 153.206493ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (710997214) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[2.749114ms, 2.944789ms, 3.397986ms, 3.469837ms, 3.563087ms, 19.37379ms, 36.709238ms, 54.170359ms, 57.905189ms, 58.860269ms, 59.537973ms, 59.854166ms, 62.111635ms, 75.817067ms, 79.726095ms, 82.283648ms, 92.242952ms, 93.653736ms, 135.727138ms, 153.206493ms]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\n   3: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    }
+  ],
+  "paired_baseline_run_in_this_plan": false,
+  "failed_candidate_runs_repeated": false
+}

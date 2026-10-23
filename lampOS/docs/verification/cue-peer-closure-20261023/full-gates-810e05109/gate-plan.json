@@ -1,0 +1,238 @@
+{
+  "status": "Prepared, unexecuted after exact-patch carry to 810e; separate MAIN execution grant required.",
+  "source_identity": {
+    "worktree": "/private/tmp/tests-codex-cue-peer-closed-20261023",
+    "head": "810e05109bced3beca88a5b602930cfed5fba4e5",
+    "base_tree": "6e25adfa7d21377d28f31b2fcaac6f9497de26d5",
+    "branch": "tests/1569-cue-peer-closed",
+    "tracked_paths": 10033,
+    "lampos_paths": 6687,
+    "source_aggregate_sha256": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f",
+    "owned_paths": [
+      "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "source_map_sha256": "836d211a6c3068397feb1ea93a35676b5690dee2e1e396908ce095a628ba9286",
+    "only_owned_files_differ_from_base": true
+  },
+  "environment": {
+    "PATH": "/Users/autonomous/.cargo/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/usr/local/go/bin:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/Users/autonomous/.codex/tmp/arg0-macos/codex-arg0TYuE1D:/Users/autonomous/.harness/runtime/grid-0.3.59-darwin-x64/bin:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.96.0",
+    "RUST_BACKTRACE": "1",
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null
+  },
+  "dependency_proof": "gate-dependencies.json",
+  "joining_scope": "Every touched crate and reverse dependent is represented; integration-only changes do not enter the production library, but no gate waiver or shared qualification is inferred.",
+  "packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "readers": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice-eval"
+  ],
+  "steps": [
+    {
+      "id": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-expression",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-lean",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-peek",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "voice-default-parallel",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--no-fail-fast",
+        "--message-format=json-render-diagnostics"
+      ],
+      "timeout_seconds": 5400
+    },
+    {
+      "id": "readers-default-parallel",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-expression",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-lean",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-peek",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice-eval",
+        "--no-fail-fast",
+        "--message-format=json-render-diagnostics"
+      ],
+      "timeout_seconds": 5400
+    },
+    {
+      "id": "workspace-build",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--message-format=json-render-diagnostics"
+      ],
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/private/tmp/tests-codex-cue-peer-closed-20261023",
+      "timeout_seconds": 60
+    }
+  ],
+  "execution_requirements": [
+    "No RUST_TEST_THREADS or --test-threads override.",
+    "Full human stdout/stderr retained; compiler inventories are not executed tests.",
+    "Bind each actual test executable/case census; preserve should-panic display annotation only when uniquely mapped to its compiled identity.",
+    "Well-formed ordinary test failure may permit remaining independent reader/build gates, but final qualification remains FAILED. Stop on timeout, compile/source/infrastructure or census failure; never retry a full gate until green.",
+    "No current-head native Linux/ARM64 claim from local execution; native jobs and exact-source Linux formatting remain separately required."
+  ],
+  "doctest_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "custom_harness_targets": [
+    {
+      "package": "lamp-update",
+      "name": "self-process-cuts",
+      "path": "lampOS/crates/update/tests/self_process_cuts.rs",
+      "sha256": "34e68d2c1964c42b12f9d5c88af041133c891737ff683c1c25118f50deacf8a3"
+    },
+    {
+      "package": "lamp-update",
+      "name": "self-cli-exec",
+      "path": "lampOS/crates/update/tests/self_cli_exec.rs",
+      "sha256": "008d2f7a8533835a75d661967bd7817c27d66897417fea9a4f4dc8b81ef015cd"
+    }
+  ],
+  "selected_case": "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+  "candidate_source_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+  "candidate_doc_sha256": "f28c90d1963e99f731c2457783d298750b10ee434b1163efbb719f6e0c65b0ee",
+  "candidate_commit": null,
+  "input_control_gate_plan_sha256": "a7a4ff70f08e0ad36c3b4ab5932ea780a4dbf7fe17a4928efae786e37d4e89f8",
+  "fixed_target": "/private/tmp/tests-codex-1569-target",
+  "clear_environment_prefixes": [
+    "CARGO_TARGET_AARCH64_",
+    "CARGO_TARGET_ARM_"
+  ],
+  "gate_attempt_sentinel": "execution-start.json",
+  "superseded_unexecuted_plan": {
+    "path": "/private/tmp/tests-cue-peer-closed-gates-20261023/gate-plan.json",
+    "sha256": "03541df01b179234044de981b251c328bf17abc123f268828e3772798dd2f755"
+  },
+  "carry_receipt": {
+    "path": "/private/tmp/tests-cue-peer-carry-810e-20261023/carry.json",
+    "sha256": "af3440b36ed0361a6c6ba4a54fa549e12563e47e54248b98f2e57b53ca8b6a56"
+  }
+}

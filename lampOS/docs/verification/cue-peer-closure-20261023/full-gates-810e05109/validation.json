@@ -1,0 +1,47 @@
+{
+  "status": "passed",
+  "checks": {
+    "json": [
+      "artifact-bindings.json",
+      "authored.patch.json",
+      "carry.json",
+      "census-and-outcomes.json",
+      "changed-case.json",
+      "command-results.json",
+      "dependency-closure.json",
+      "external-raw-index.json",
+      "failures.json",
+      "gate-plan.json",
+      "light-call-boundary.json",
+      "native-streams.json",
+      "source-and-environment.json"
+    ],
+    "links": [
+      "census-and-outcomes.json",
+      "changed-case.json",
+      "failures.json",
+      "light-call-boundary.json",
+      "command-results.json",
+      "gate-plan.json",
+      "dependency-closure.json",
+      "source-and-environment.json",
+      "authored.patch.json",
+      "carry.json",
+      "native-streams.json",
+      "artifact-bindings.json",
+      "external-raw-index.json"
+    ],
+    "exact_wrappers": 74,
+    "projections": 6
+  },
+  "combined_actual_counts": {
+    "passed": 7164,
+    "failed": 1,
+    "ignored": 32,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "complete_binding": true,
+  "new_test_execution_during_sealing": false,
+  "source_or_target_reads_during_sealing": "None; captured immutable external evidence only."
+}

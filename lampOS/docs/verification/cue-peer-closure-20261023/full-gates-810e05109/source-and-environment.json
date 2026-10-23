@@ -1,0 +1,90 @@
+{
+  "identity": {
+    "worktree": "/private/tmp/tests-codex-cue-peer-closed-20261023",
+    "head": "810e05109bced3beca88a5b602930cfed5fba4e5",
+    "base_tree": "6e25adfa7d21377d28f31b2fcaac6f9497de26d5",
+    "branch": "tests/1569-cue-peer-closed",
+    "tracked_paths": 10033,
+    "lampos_paths": 6687,
+    "source_aggregate_sha256": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f",
+    "owned_paths": [
+      "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "source_map_sha256": "836d211a6c3068397feb1ea93a35676b5690dee2e1e396908ce095a628ba9286",
+    "only_owned_files_differ_from_base": true
+  },
+  "candidate_commit_at_execution": null,
+  "source_unchanged": true,
+  "source_before_sha256": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f",
+  "source_after_sha256": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f",
+  "freshness": {
+    "mtime_ns": 1792761301577090000,
+    "paths": 10033,
+    "before_sha256": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f",
+    "after_sha256": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f",
+    "bytes_modes_symlinks_identical": true
+  },
+  "per_step_source_aggregates": [
+    {
+      "step": "fmt",
+      "before": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f",
+      "after": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f"
+    },
+    {
+      "step": "clippy",
+      "before": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f",
+      "after": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f"
+    },
+    {
+      "step": "voice-default-parallel",
+      "before": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f",
+      "after": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f"
+    },
+    {
+      "step": "readers-default-parallel",
+      "before": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f",
+      "after": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f"
+    },
+    {
+      "step": "workspace-build",
+      "before": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f",
+      "after": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f"
+    },
+    {
+      "step": "diff-check",
+      "before": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f",
+      "after": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f"
+    }
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.96.0",
+    "RUST_BACKTRACE": "1",
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null
+  },
+  "PATH_prefix": "/Users/autonomous/.cargo/bin:",
+  "socket_preflight": "AF_UNIX datagram and IPv4 loopback succeeded before Cargo",
+  "launch_permissions": "Explicitly authorized require_escalated for local fixture sockets.",
+  "architecture": "Rust host x86_64-apple-darwin and captured Mach-O x86_64 artifacts; physical hardware ISA not independently measured.",
+  "source_map": {
+    "external_file": "/private/tmp/tests-cue-peer-closed-810e-gates-20261023/source-map.json",
+    "bytes": 2752814,
+    "sha256": "836d211a6c3068397feb1ea93a35676b5690dee2e1e396908ce095a628ba9286"
+  },
+  "original_results_json": {
+    "external_file": "/private/tmp/tests-cue-peer-closed-810e-gates-20261023/run-2026-10-23T131501.473477Z/results.json",
+    "bytes": 44247,
+    "sha256": "b96f4fbf583cbd881812e4b8cf6df347323a4a77866e18e8146e4860304b6c76"
+  },
+  "limit": "All tracked repository inputs/modes/symlink values were guarded; bulk map remains external. Two declared dirty files are the exact tested source, with no candidate commit claimed at execution time."
+}

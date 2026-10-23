@@ -1,0 +1,48 @@
+{
+  "actual_failures": [
+    {
+      "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "samples_raw": "2.749114ms, 2.944789ms, 3.397986ms, 3.469837ms, 3.563087ms, 19.37379ms, 36.709238ms, 54.170359ms, 57.905189ms, 58.860269ms, 59.537973ms, 59.854166ms, 62.111635ms, 75.817067ms, 79.726095ms, 82.283648ms, 92.242952ms, 93.653736ms, 135.727138ms, 153.206493ms",
+      "milliseconds": [
+        2.749114,
+        2.944789,
+        3.397986,
+        3.469837,
+        3.563087,
+        19.37379,
+        36.709238,
+        54.170359,
+        57.905189,
+        58.860269,
+        59.537973,
+        59.854166,
+        62.111635,
+        75.817067,
+        79.726095,
+        82.283648,
+        92.242952,
+        93.653736,
+        135.727138,
+        153.206493
+      ],
+      "checked_index": 10,
+      "checked_upper_median_ms": 59.537973,
+      "strict_bound_ms": 25,
+      "maximum_ms_descriptive_only": 153.206493,
+      "all_20_Outcome_Done_assertions_preceded_this_assertion": true,
+      "source_predicate": "middle < Duration::from_millis(25); middle = took[took.len() / 2]",
+      "limit": "This is a retained candidate timing failure, not an inherited-cause classification or waiver."
+    }
+  ],
+  "source": {
+    "base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+    "path": "lampOS/crates/voice/tests/it/light_call.rs",
+    "full_source_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+    "same_as_tested_source_map": true,
+    "line_81_through_91": "    stop.store(true, Ordering::Release);\n    ring.join().unwrap();\n    std::fs::remove_dir_all(&root).unwrap();\n    took.sort();\n    eprintln!(\"light calls, fastest to slowest: {took:?}\");\n    // A few of the ring's passes, not a 50 ms look and a 15 ms read: the\n    // middle call took about 55 ms before #1806 on the Intel Mac, and 3 ms\n    // after.\n    let middle = took[took.len() / 2];\n    assert!(middle < Duration::from_millis(25), \"{took:?}\");\n}\n",
+    "predicate": "middle < Duration::from_millis(25)",
+    "definition": "let middle = took[took.len() / 2];",
+    "all_20_done_assertions_and_cleanup_precede_this_assertion": true,
+    "causality_limit": "Source and assertion boundary only; no historical-cause classification."
+  }
+}

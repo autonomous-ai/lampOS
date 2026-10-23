@@ -1,5 +1,24 @@
 # Tests work log
 
+## 2026-10-23 20:48 +0700 — peer fixture full local gate complete
+
+Ready for lamp-voice: no; native PR checks and review remain required.
+
+The [peer fixture gate](verification/cue-peer-closure-20261023/full-gates-810e05109/)
+on 810e05109 plus its two frozen files completed 7,164 / 1 / 32 across all
+74 targets. Full Voice: 3,933 / 1 / 15; all eleven readers: 3,231 / 0 / 17.
+The changed peer-loss case passed. Formatting, strict 12-package Clippy,
+workspace build and diff check passed; exact-source Linux formatting is
+already published. The sole failure is light-call's unchanged 25 ms bound,
+with upper-middle 59.537973 ms. Its complete diagnostic remains unwaived.
+No failed case or full gate was repeated. All source bytes remained unchanged.
+
+Root verified all 16 declared stream projections and the sole failure block
+against their captured originals. The single pre-commit fetch still found
+810e05109; the exact two-file candidate is proceeding to its own draft PR.
+Expression has taken the shared target for its separate full gate. The
+approved Update diagnostic remains prepared only, behind these gates.
+
 ## 2026-10-23 20:29 +0700 — native binary-count precision
 
 Ready for lamp-voice: no; both current execution HOLDs remain.
