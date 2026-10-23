@@ -19,7 +19,7 @@ pub const MODEL_SHA256: &str = "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f428
 /// arm's length scored 0.92 and nothing in two rooms without one reached 0.6.
 pub const LEAST_SCORE: f32 = 0.6;
 /// Two boxes that overlap more than this are one face.
-pub const SAME_FACE: f32 = 0.3;
+const SAME_FACE: f32 = 0.3;
 const STRIDES: [usize; 3] = [8, 16, 32];
 
 /// A face, in the picture's pixels: its box, and the eye on the left of the
@@ -34,8 +34,7 @@ pub struct Face {
     pub marks: [(f32, f32); 5],
 }
 
-/// How much two boxes overlap: their shared area over their union's.
-pub fn overlap(a: &Face, b: &Face) -> f32 {
+fn overlap(a: &Face, b: &Face) -> f32 {
     let across = (a.x + a.width).min(b.x + b.width) - a.x.max(b.x);
     let down = (a.y + a.height).min(b.y + b.height) - a.y.max(b.y);
     let shared = across.max(0.0) * down.max(0.0);
