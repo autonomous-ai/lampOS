@@ -7600,3 +7600,54 @@ is clean on fetched train22 `f477d6c49`; the current collaboration rules
 route status to Queue #3126. The train22 recognition-loop overlap is being
 checked for the eventual combined train. No lamp, provider call, acoustic
 measurement, activation or memory-row score increase is claimed.
+
+## 2026-10-23 08:15 +07: Common host gate finished; current-main carry and Peek underway
+
+Ready for lamp-voice: no. Common #3064 still needs its formal re-read and
+the rebased source's native gate. The published `6225c78ef` completed its
+Mac gate: 7,368 passed, zero failed, 36 ignored across the full affected
+and reverse-consumer suites. One Linux-only Eyes `/dev/full` test was
+filtered on the Mac and passed in native run 39877345073. The separate
+five returning-candidate and 14 look-away controls passed. Formatting,
+strict workspace all-target Clippy and workspace build passed; final source
+hashes matched. The existing name-lookup timing control measured 11.954 ms
+first and 0.179 ms repeat on this Mac, not acoustic or lamp latency.
+The complete terminal receipt, including ignored doctests, is retained in
+`/private/tmp/fourth-returning-speaker-checks-20261023/final/terminal-summary.json`.
+
+The actual one-commit carry onto `b7700b7c2` is staged on Fourth's own
+branch, tree `35d2e39f6`. Both Eyes conflicts retain source invalidation
+alongside successful-remember cadence reset and immediate returning-candidate
+recognition. The moved two-second constant is qualified from its new module.
+The later train's files were disjoint, so advancing to it changed no byte
+of Fourth's patch. Mac formatting, strict workspace Clippy and explicit
+Linux formatting pass on the candidate. Full Eyes, Voice and Memory suites
+and the final build continue. An initial preflight saw stale index stat
+entries after the one source-mtime refresh, despite exact source bytes;
+refreshing index metadata corrected it before any Cargo run. Nextest was
+unavailable, so the suite uses ordinary Cargo test without repeating the
+already passed checks. These preparation failures remain in
+`/private/tmp/fourth-common-train23-checks-20261023/`.
+
+Name #3014 and Photo #2988 have actual staged carries from the published
+Common, with their old branches preserved. Under the first builder's new
+no-stack rule, their final publication waits for Common to merge; each
+then needs its own current-main gate, native run and activation acceptance.
+No old result qualifies a new candidate.
+
+#2789's per-root session-reader group contract is now approved and underway
+on `fourth/peek-session-reader-20261023`. The first Records JSON regressions
+ran against unchanged production: one passed and four failed as intended,
+because the policy was ignored and malformed values accepted. The dedicated
+scratch target avoids the active Common target. Implementation preserves
+private historical sessions, health and quarantine, narrows shared events
+to the pinned group, and keeps identity and ACL checks at deletion. The
+separate subscriber-only bus access decision and actual account/lamp test
+are still owed; no broad `lampos` membership is substituted for them.
+
+#2949 is claimed for the photo consent skill extraction after #2856. Its
+source audit is underway; the current updater restores deleted product
+skills, so removal across updates needs an explicit retained disabled state.
+#2800 still depends on the tone person session. The lead coordinates the
+remaining #1809 and #2824 person checks. No lamp, install, provider call,
+product-default activation or quality-row increase occurred.
