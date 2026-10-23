@@ -7897,3 +7897,41 @@ Queue and own PR comments were read through 11:59:42. Train 34 landed after
 the 511 source was pinned; the final receipts will name the actual tested
 base and native merge tree. Name and Photo still follow merged Common.
 No lamp was accessed and no row score was raised.
+
+
+## 2026-10-23 12:26 +07: private event expiry caught; Peek correction on current main
+
+Ready for lamp-voice: no
+
+Common's train-33 revision-3 Mac and Linux gates both passed formatting
+and strict workspace/all-target Clippy. Each then passed callbacks 27/0
+and scope 34/0, before private-context finished 25/1. The unchanged
+`event_note_private_provenance_survives_neutral_told_and_async_expiry`
+assertion caught one forbidden Services chat after a private callback
+expired. A temporary guard dropped its private return before the persistent
+answer guard was armed. The production handoff is being corrected;
+this is a real regression, and neither failed gate is called green.
+The earlier fixture type and two mem::take lint failures remain retained.
+Receipts: `/private/tmp/fourth-common-train33-gates-20261023/`.
+
+Peek's corrected 15-path source is now carried onto current main
+`be698e83a`, staged tree `d5ed6edc8`. All 14 non-switches feature blobs
+are identical to the independently reviewed correction; switches.md is
+main plus its existing Peek row, with no outside-path drift. The actual
+worktree has 10,004 tracked entries and 6,658 lampOS files. Source bytes
+and modes were checked before and after the one Rust/manifest timestamp
+refresh. Mac and isolated non-root Linux gates are now running, with
+exclusive targets and frozen source. Receipt directories:
+`/private/tmp/fourth-peek-train35-{mac,linux}-checks-20261023/attempt1/`.
+The two disclosure REDs and historical full Mac failures remain recorded;
+new native ARM64, Clippy, review and device proof remain outstanding.
+
+The material proposed Eyes revert #3220 composes cleanly with Common in
+an object-only preview and preserves its Checking/Seen/private protocol.
+It is not merged into either candidate and gives no look-rate or device
+claim. Compatible pins, installation and current known-person checks
+remain First's. The coordination branch and local builder instructions
+now match `be698e83a`; Queue and PR comments were read through 12:21:36.
+Mood work is parked under First's 12:13 instruction. Common and Peek are
+the active non-mood pieces; Name and Photo follow merged Common.
+No lamp was accessed and no row score was raised.
