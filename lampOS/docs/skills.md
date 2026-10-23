@@ -1738,7 +1738,7 @@ Removing a made skill by voice is still to come.
 
 Tests:
 - `made_skill::tests`:
-  - the brief within the hand-over's 1,000 bytes;
+  - the brief within 1,000 bytes, half the hand-over's 2,000;
   - exactly two files;
   - the cap, each wider use refused;
   - the card marked;
