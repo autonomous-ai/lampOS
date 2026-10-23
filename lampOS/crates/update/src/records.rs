@@ -18,7 +18,7 @@
 //! V1's updater did.
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs::{self, File, OpenOptions},
     io::{self, Write},
     os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt},
@@ -134,6 +134,11 @@ pub const LINK_SUFFIX: &str = ".link";
 pub struct Journal {
     pub build: Build,
     pub units: Vec<Switching>,
+    /// The validated old startup order, projected onto every changed unit,
+    /// including inactive ones. Absent in older journals; an empty list is
+    /// present only when no units change. Saved before any switching write.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rollback_order: Option<Vec<String>>,
     /// Each model path the switch moves, as it was (#1680): put back in
     /// the reverse order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -147,6 +152,31 @@ pub struct Journal {
     /// before.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skills: Vec<SkillBack>,
+}
+
+impl Journal {
+    /// A saved order must cover the full journal exactly once, before
+    /// recovery excludes units already restored. It is never guessed from
+    /// a malformed list, nor replaced with the current installed graph.
+    fn validate_rollback_order(&self) -> io::Result<()> {
+        let Some(order) = &self.rollback_order else {
+            return Ok(());
+        };
+        let units: BTreeSet<&str> = self.units.iter().map(|unit| unit.unit.as_str()).collect();
+        let saved: BTreeSet<&str> = order.iter().map(String::as_str).collect();
+        if units.len() != self.units.len()
+            || saved.len() != order.len()
+            || saved != units
+            || units
+                .iter()
+                .any(|name| !crate::manifest::is_unit_name(name) || *name == crate::round::OWN_UNIT)
+        {
+            return Err(io::Error::other(
+                "the saved rollback order must name every changed managed unit exactly once",
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// A product skill's file as it was before a round wrote it.
@@ -325,19 +355,37 @@ impl Records {
         Ok(aside)
     }
 
-    /// A switch under way, if any. One that cannot be read is
-    /// `InvalidData`: the round sets it aside.
+    /// A switch under way, if any. Unreadable legacy JSON is `InvalidData`
+    /// and set aside. A present but invalid saved order is a recovery
+    /// failure instead: the journal and restoration prefix must stay put.
     pub fn journal(&self) -> io::Result<Option<Journal>> {
         match fs::read(self.folder.join("journal.json")) {
-            Ok(bytes) => serde_json::from_slice(&bytes)
-                .map(Some)
-                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error)),
+            Ok(bytes) => {
+                let value: serde_json::Value = serde_json::from_slice(&bytes)
+                    .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+                let has_order = value.get("rollback_order").is_some();
+                if has_order && !value["rollback_order"].is_array() {
+                    return Err(io::Error::other("the saved rollback order is not an array"));
+                }
+                // Decode the original bytes, not Value: duplicate order
+                // properties must be refused rather than keeping the last.
+                let journal: Journal = serde_json::from_slice(&bytes).map_err(|error| {
+                    if has_order {
+                        io::Error::other(error)
+                    } else {
+                        io::Error::new(io::ErrorKind::InvalidData, error)
+                    }
+                })?;
+                journal.validate_rollback_order()?;
+                Ok(Some(journal))
+            }
             Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
             Err(error) => Err(error),
         }
     }
 
     pub fn save_journal(&self, journal: &Journal) -> io::Result<()> {
+        journal.validate_rollback_order()?;
         self.make()?;
         let bytes = serde_json::to_vec_pretty(journal).map_err(io::Error::other)?;
         write_whole(&self.folder.join("journal.json"), &bytes, 0o600)
@@ -528,6 +576,10 @@ mod tests {
 
         let journal = Journal {
             build,
+            rollback_order: Some(vec![
+                "lamp-body.service".into(),
+                "lamp-voice.service".into(),
+            ]),
             units: vec![
                 Switching {
                     unit: "lamp-voice.service".into(),
@@ -681,6 +733,7 @@ mod tests {
                 sequence: 4576,
                 commit: "4f5e62507".into(),
             },
+            rollback_order: Some(vec!["lamp-voice.service".into()]),
             units: vec![Switching {
                 unit: "lamp-voice.service".into(),
                 was_active: true,
@@ -751,11 +804,18 @@ mod tests {
     /// back (the build row "Updates cover the whole lamp, V3 to V5").
     #[test]
     fn each_kept_state_and_journal_reads_as_saved() {
-        let kept: [(&str, &[u8], &[u8]); 1] = [(
-            "2026-10-21",
-            include_bytes!("../tests/fixtures/stores/state-2026-10-21.json"),
-            include_bytes!("../tests/fixtures/stores/journal-2026-10-21.json"),
-        )];
+        let kept: [(&str, &[u8], &[u8]); 2] = [
+            (
+                "2026-10-21",
+                include_bytes!("../tests/fixtures/stores/state-2026-10-21.json"),
+                include_bytes!("../tests/fixtures/stores/journal-2026-10-21.json"),
+            ),
+            (
+                "2026-10-23",
+                include_bytes!("../tests/fixtures/stores/state-2026-10-23.json"),
+                include_bytes!("../tests/fixtures/stores/journal-2026-10-23.json"),
+            ),
+        ];
         for (day, state_bytes, journal_bytes) in kept {
             let folder = tempfile::tempdir().unwrap();
             std::fs::write(folder.path().join("state.json"), state_bytes).unwrap();
