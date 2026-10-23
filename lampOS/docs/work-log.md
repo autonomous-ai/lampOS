@@ -1,3 +1,24 @@
+## Current checkpoint: 2026-10-23 07:09 +07, another conversation writer overlap reproduced
+
+Ready for lamp-voice: no (changed Voice crate gate and native checks remain)
+
+An ordered control of the two actual CountOnly and own-answers fixtures
+fails the original own-answers assertion **0 / 1** without the competing
+fixture's guard and passes **1 / 0** with it. Every original assertion and
+bound remains. [Complete controls, initial control error and restoration](verification/shared-thread-fixtures-20261023/README.md).
+This is a separate demonstrated writer from Tests' Music-stop correction;
+Tests confirmed the five additional guard sites remain Second's slice.
+The historical row 79 panic remains unexplained.
+
+The candidate is exactly five guard additions in Voice tests, before
+fixture work, with production bytes unchanged. Independent source read
+found no P1/P2; fmt and strict Voice Clippy pass, and the full changed
+Voice crate tests are running. #3150's template P3 is fixed at `7600fdb1b`;
+its native runs are still active. #3130's requested read follows its
+dependency and rebase.
+
+---
+
 ## Current checkpoint: 2026-10-23 07:01 +07, resumed on the current Queue
 
 Ready for lamp-voice: no (#3150 native checks pending; row 79 investigation)

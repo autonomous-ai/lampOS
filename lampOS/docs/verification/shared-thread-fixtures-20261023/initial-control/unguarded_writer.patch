@@ -1,0 +1,114 @@
+diff --git a/lampOS/crates/voice/src/provider_worker.rs b/lampOS/crates/voice/src/provider_worker.rs
+index a7dbb56b9..93eb0c5d1 100644
+--- a/lampOS/crates/voice/src/provider_worker.rs
++++ b/lampOS/crates/voice/src/provider_worker.rs
+@@ -7310,8 +7310,13 @@ pub(crate) mod tests {
+     /// marker is in the thread's file text or the exchange the next answer
+     /// opens. The next line's Start ends it, and that line is kept.
+     #[test]
+-    fn the_sentence_after_count_only_never_reaches_the_live_thread() {
++    pub(crate) fn the_sentence_after_count_only_never_reaches_the_live_thread() {
+         let kept = std::mem::take(&mut *crate::thread::THREAD.lock().unwrap());
++        if std::thread::current().name() == Some("second-row79-writer") {
++            let (events, resume) = ROW79_CONTROL.get().unwrap();
++            events.send(Row79Event::Reset).unwrap();
++            resume.lock().unwrap().recv_timeout(Duration::from_secs(30)).unwrap();
++        }
+         let mut owner = controller();
+         let mut handoff = InputHandoff::default();
+         let sink = RecordingSink::default();
+@@ -9605,6 +9610,13 @@ pub(crate) mod tests {
+ 
+     static ONE_THREAD: std::sync::Mutex<()> = std::sync::Mutex::new(());
+ 
++    #[derive(Debug)]
++    pub(crate) enum Row79Event { Guard, Reset }
++    pub(crate) static ROW79_CONTROL: std::sync::OnceLock<(
++        std::sync::mpsc::Sender<Row79Event>,
++        std::sync::Mutex<std::sync::mpsc::Receiver<()>>,
++    )> = std::sync::OnceLock::new();
++
+     thread_local! {
+         /// How many of this thread's tests' holds are open.
+         static HELD: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+@@ -9612,6 +9624,9 @@ pub(crate) mod tests {
+ 
+     /// The lock, or another hold on it if this thread has it already.
+     pub(crate) fn one_thread() -> OneThread {
++        if std::thread::current().name() == Some("second-row79-writer") {
++            ROW79_CONTROL.get().unwrap().0.send(Row79Event::Guard).unwrap();
++        }
+         let held = HELD.with(|held| held.replace(held.get() + 1));
+         OneThread {
+             _lock: (held == 0).then(|| {
+diff --git a/lampOS/crates/voice/src/second_provider/worker.rs b/lampOS/crates/voice/src/second_provider/worker.rs
+index 8e0ab06c7..6ea9dbdc7 100644
+--- a/lampOS/crates/voice/src/second_provider/worker.rs
++++ b/lampOS/crates/voice/src/second_provider/worker.rs
+@@ -9539,6 +9539,19 @@ mod tests {
+     /// follow-ups all go on (the first builder's 01:02).
+     #[test]
+     fn the_lamps_own_answers_to_talk_keep_no_conversation_going() {
++        use crate::provider_worker::tests::{Row79Event, ROW79_CONTROL};
++        struct JoinedWriter(Option<std::thread::JoinHandle<()>>);
++        impl Drop for JoinedWriter {
++            fn drop(&mut self) {
++                if let Some(writer) = self.0.take() { writer.join().unwrap(); }
++            }
++        }
++        // Declared before the original guard: join after that guard drops.
++        let mut writer = JoinedWriter(None);
++        let mut control_fired = false;
++        let (events, observed) = std::sync::mpsc::channel();
++        let (resume, resumed) = std::sync::mpsc::channel();
++        ROW79_CONTROL.set((events, std::sync::Mutex::new(resumed))).unwrap();
+         // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+         let _one = crate::provider_worker::tests::one_thread();
+         let s = Duration::from_secs;
+@@ -9574,7 +9587,7 @@ mod tests {
+                 self.1.remove(at)
+             }
+         }
+-        let run = |not_own: bool,
++        let mut run = |not_own: bool,
+                    busy: bool,
+                    named: Option<f32>,
+                    faces: Option<&[&str]>,
+@@ -9676,6 +9689,26 @@ mod tests {
+                     thread.lamp(*asked, lamp, then);
+                 }
+                 *crate::thread::THREAD.lock().unwrap() = thread;
++                let mut reset_waiting = false;
++                if !control_fired && !not_own && !busy && named.is_none()
++                    && faces.is_none() && voices.is_none() && request == 3
++                {
++                    control_fired = true;
++                    writer.0 = Some(std::thread::Builder::new()
++                        .name("second-row79-writer".into())
++                        .spawn(crate::provider_worker::tests::the_sentence_after_count_only_never_reaches_the_live_thread)
++                        .unwrap());
++                    match observed.recv_timeout(Duration::from_secs(30)).unwrap() {
++                        Row79Event::Reset => {
++                            eprintln!("SECOND_ROW79_CONTROL: actual competing fixture cleared THREAD before request 3");
++                            reset_waiting = true;
++                        }
++                        Row79Event::Guard => {
++                            eprintln!("SECOND_ROW79_CONTROL: actual competing fixture reached guard held by this fixture");
++                            resume.send(()).unwrap();
++                        }
++                    }
++                }
+                 heeding.called_at = heeding.called_at.map(|at| at - passed);
+                 // Three lines left alone before the question: a busy room.
+                 if busy && request == 1 {
+@@ -9706,6 +9739,10 @@ mod tests {
+                     }
+                     None => heeding.heed(request, said, heard, None),
+                 };
++                if reset_waiting {
++                    resume.send(()).unwrap();
++                    writer.0.take().unwrap().join().unwrap();
++                }
+                 if held.is_none() {
+                     answered.push((request, heard, answer, at + 1));
+                     words_end(&mut heeding, request, at + 2, was);

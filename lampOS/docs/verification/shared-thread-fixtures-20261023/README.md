@@ -1,28 +1,61 @@
-# Guard the additional conversation fixtures
+# Shared conversation fixtures, 23 October 2026
 
-Five Voice fixtures write the process-wide conversation without acquiring
-its existing `one_thread()` guard: Live sign-in, Live CountOnly, the ten
-interrupted questions, photo yes/no answers, and room light-rule forgetting.
-Each now holds that guard from before fixture work until cleanup finishes.
-The sign-in fixture takes it before its existing agent-task lock. Assertions,
-timeouts and production behavior are unchanged.
+Second's additional-writer investigation for #1569 row 79, based on public
+`ae4ab0022a5716b8b393956d5e26fd1480aac350`. This establishes one reproducible
+interference path. It does not identify the cause of the historical failure,
+whose panic was not captured.
 
-An ordered control runs the actual CountOnly fixture between the own-answers
-fixture installing its conversation and judging its third line. The real
-unguarded `mem::take(THREAD)` reproduces its original assertion failure:
-**0 passed / 1 failed**. Adding the guard preserves every original case:
-**1 passed / 0 failed**. Both fixtures retain their assertions and bounds.
-[Complete controls and restored source](https://github.com/autonomous-ai/lampOS/blob/432b46426/lampOS/docs/verification/shared-thread-fixtures-20261023/README.md)
-also retain the initial control-only channel teardown error and correction.
-This proves an additional interference path, not the cause of #1569 row 79's
-historical uncaptured panic. Tests' separate #3023 Music-stop guard remains
-outside this correction.
+## Ordered control
 
-On the Mac, Rust 1.96.0 `cargo fmt --all --check`, strict all-target Voice
-Clippy, and `cargo test -q -p lamp-voice --offline --no-fail-fast --
---test-threads=2` passed: **3,815 passed, 0 failed, 14 ignored**, with no
-filtering. All 6,519 tracked inputs stayed unchanged during the gate on
-`ae4ab0022` plus these five guard additions. The changed test names occur
-only in Voice under `crates/`; no other crate changed. Native PR ARM64 and
-Linux Clippy qualification is recorded on the PR and Second's log. No device
-operation or audio result is claimed.
+The original `the_lamps_own_answers_to_talk_keep_no_conversation_going`
+fixture already holds `one_thread()`. At request 3 of its first quiet/off
+case, after it installs the conversation and before `heed()` reads it, the
+control starts the actual
+`the_sentence_after_count_only_never_reaches_the_live_thread` fixture on
+another thread. Both original fixtures keep every assertion and bound.
+
+Without a guard in the competing fixture, a channel acknowledges its real
+`mem::take(THREAD)` and holds it before restoration. The original row 79
+assertion fails: `[true, true, false, false, false]` instead of `[true; 5]`.
+The writer is released and joined before that assertion. Result: **0 passed,
+1 failed**, exit 101. See `unguarded_writer.patch`, `.txt` and `.json`.
+
+With only the existing guard added at the competing fixture's entry, its
+guard attempt is acknowledged while row 79 still owns the lock. Row 79
+completes all its original cases before the guard drops and the writer
+runs. The writer is joined before the control's channels drop. Result:
+**1 passed, 0 failed**, exit 0. See `guarded_writer.patch`, `.txt` and `.json`.
+No sleeps or increased product/fixture timeouts were used. Channel deadlines
+only bound a broken control. All 6,519 tracked inputs stayed unchanged during
+each command; the exact source commit, deliberate patch and changed source
+hashes are retained. Both instrumented files were restored byte for byte.
+
+The initial control attempt is retained in `initial-control/`. Its unguarded
+run produced the same target failure. Its guarded run completed row 79's
+cases but failed in control teardown: the event receiver dropped before the
+joined writer sent its reset event. Declaring the channels before the joined
+writer corrected that control-only lifetime. Both cases were repeated after
+the correction; that initial failure is not a product gate or waived failure.
+
+## Scope of the correction
+
+Five outer fixtures lacked the existing guard:
+
+| Fixture | Shared mutation |
+| --- | --- |
+| Live sign-in transcript | Clears and writes the conversation; take the conversation guard before its existing agent-task lock. |
+| Live CountOnly transcript | Takes, writes and restores the conversation. |
+| Ten interrupted questions | Clears the conversation before driving the scripted engine. |
+| Photo yes/no answer | Clears the conversation for each scripted scenario. |
+| Room light-rule forget | Successful `rule_for` reaches `forget_light`, which clears the conversation. |
+
+The candidate adds five guard acquisitions before fixture work begins and
+keeps them through cleanup. Assertions, timeouts and production code are
+unchanged. The changed test names occur only in `lamp-voice` under `crates/`.
+This is not a claim that every indirect conversation writer is serialized.
+The separate Music-stop helper guard and its previously published overlap
+control belong to Tests' #3023; this patch leaves that helper unchanged.
+
+The Mac gate and official PR ARM64/Linux checks will be appended with their
+exact source identity and result counts. No lamp operation, acoustic result
+or signed release is established here.

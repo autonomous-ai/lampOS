@@ -1,0 +1,8 @@
+{
+  "head": "ae4ab0022a5716b8b393956d5e26fd1480aac350",
+  "restored": true,
+  "files": {
+    "lampOS/crates/voice/src/second_provider/worker.rs": "e049e0d33f89545f4aeafe75f7ea29c9610cf81e9f4bbe917a120672c5efa2b5",
+    "lampOS/crates/voice/src/provider_worker.rs": "c2a68501b617fd66877edd081a5a5080cc4bf83d990f47848640e86df70578e3"
+  }
+}

@@ -1,0 +1,147 @@
+
+running 1 test
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+SECOND_ROW79_CONTROL: actual competing fixture reached guard held by this fixture
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 4: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 5: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: the lamp's answers to 1 requests (the newest Some(2)), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)
+lamp-voice second: request 3: no conversation going on: it was last heard saying words, to their end, 48 s ago, it was last called 50 s ago, 0 lines left alone since it last spoke
+lamp-voice second: request 4: the lamp's answers to 1 requests (the newest Some(2)), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)
+lamp-voice second: request 4: no conversation going on: it was last heard saying words, to their end, 88 s ago, it was last called 90 s ago, 0 lines left alone since it last spoke
+lamp-voice second: request 5: the lamp's answers to 1 requests (the newest Some(2)), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)
+lamp-voice second: request 5: no conversation going on: it was last heard saying words, to their end, 128 s ago, it was last called 130 s ago, 0 lines left alone since it last spoke
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 4: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 5: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 4: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 4: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice provider: request 2: another voice than the conversation's, known after its answer (cosine 0.00): the conversation is over
+lamp-voice second: request 3: no conversation is going on for it: request 2's voice, known after its answer, was another's
+lamp-voice second: request 4: no conversation going on: it was last heard saying words, to their end, 38 s ago, it was last called 70 s ago, 2 lines left alone since it last spoke
+lamp-voice provider: request 4: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice provider: request 2: another voice than the conversation's, known after its answer (cosine 0.00): the conversation is over
+lamp-voice second: request 3: no conversation is going on for it: request 2's voice, known after its answer, was another's
+lamp-voice second: request 4: no conversation going on: it was last heard saying words, to their end, 38 s ago, it was last called 70 s ago, 2 lines left alone since it last spoke
+lamp-voice provider: request 4: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice provider: request 3: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice provider: request 4: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 4: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice provider: request 3: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice provider: request 4: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 4: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 4: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 4: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: the lamp's answers to 1 requests (the newest Some(2)), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 4: the lamp's answers to 2 requests (the newest Some(3)), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)
+lamp-voice second: request 4: no conversation going on: it was last heard saying words, to their end, 58 s ago, it was last called 60 s ago, 0 lines left alone since it last spoke
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 3 lines left alone since it last spoke, in a busy room, where it goes on 15 s
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 4: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 5: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 3 lines left alone since it last spoke, in a busy room, where it goes on 15 s
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: the lamp's answers to 1 requests (the newest Some(2)), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)
+lamp-voice second: request 3: no conversation going on: it was last heard saying words, to their end, 22 s ago, it was last called 24 s ago, 0 lines left alone since it last spoke, in a busy room, where it goes on 15 s
+lamp-voice second: request 4: the lamp's answers to 1 requests (the newest Some(2)), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)
+lamp-voice second: request 4: no conversation going on: it was last heard saying words, to their end, 36 s ago, it was last called 38 s ago, 0 lines left alone since it last spoke, in a busy room, where it goes on 15 s
+lamp-voice second: request 5: the lamp's answers to 1 requests (the newest Some(2)), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)
+lamp-voice second: request 5: no conversation going on: it was last heard saying words, to their end, 50 s ago, it was last called 52 s ago, 0 lines left alone since it last spoke, in a busy room, where it goes on 15 s
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on
+lamp-voice second: request 4: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 5: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: the lamp's answers to 1 requests (the newest Some(2)), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)
+lamp-voice second: request 3: no conversation going on: it was last heard saying words, to their end, 48 s ago, it was last called 50 s ago, 0 lines left alone since it last spoke
+lamp-voice second: request 5: the lamp's answers to 1 requests (the newest Some(2)), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)
+lamp-voice second: request 5: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 3 lines left alone since it last spoke, in a busy room, where it goes on 15 s
+lamp-voice second: request 1: its answer is played: its name was heard close to the lamp
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 4: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 5: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 3 lines left alone since it last spoke, in a busy room, where it goes on 15 s
+lamp-voice second: request 1: its answer is played: its name was heard close to the lamp
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: the lamp's answers to 1 requests (the newest Some(2)), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)
+lamp-voice second: request 3: no conversation going on: it was last heard saying words, to their end, 22 s ago, it was last called 24 s ago, 0 lines left alone since it last spoke, in a busy room, where it goes on 15 s
+lamp-voice second: request 4: the lamp's answers to 1 requests (the newest Some(2)), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)
+lamp-voice second: request 4: no conversation going on: it was last heard saying words, to their end, 36 s ago, it was last called 38 s ago, 0 lines left alone since it last spoke, in a busy room, where it goes on 15 s
+lamp-voice second: request 5: the lamp's answers to 1 requests (the newest Some(2)), let out only as the conversation going on, keep no conversation going (LAMP_GOING_ON_NOT_OWN)
+lamp-voice second: request 5: no conversation going on: it was last heard saying words, to their end, 50 s ago, it was last called 52 s ago, 0 lines left alone since it last spoke, in a busy room, where it goes on 15 s
+
+thread 'second-row79-writer' (66927743) panicked at crates/voice/src/provider_worker.rs:7318:44:
+called `Result::unwrap()` on an `Err` value: SendError { .. }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going' (66927742) panicked at crates/voice/src/second_provider/worker.rs:9546:69:
+called `Result::unwrap()` on an `Err` value: Any { .. }
+second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going --- FAILED
+
+failures:
+
+failures:
+    second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3547 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

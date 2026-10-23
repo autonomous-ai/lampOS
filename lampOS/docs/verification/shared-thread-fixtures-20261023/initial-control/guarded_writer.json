@@ -1,0 +1,38 @@
+{
+  "label": "guarded_writer",
+  "head": "ae4ab0022a5716b8b393956d5e26fd1480aac350",
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--offline",
+    "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going",
+    "--",
+    "--exact",
+    "--nocapture"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 46.184,
+  "log_bytes": 19547,
+  "log_sha256": "c962f365e6d4051755d408cccd588540965ab05270eadd7391af20246d03fcba",
+  "bound_files": 6519,
+  "inputs_unchanged": true,
+  "result_lines": [
+    "SECOND_ROW79_CONTROL: actual competing fixture reached guard held by this fixture",
+    "thread 'second-row79-writer' (66927743) panicked at crates/voice/src/provider_worker.rs:7318:44:",
+    "thread 'second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going' (66927742) panicked at crates/voice/src/second_provider/worker.rs:9546:69:",
+    "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3547 filtered out; finished in 0.03s"
+  ],
+  "command_note": "Executable displayed as cargo; the installed Rust 1.96.0 toolchain was invoked by its absolute path.",
+  "host": "Darwin arm64; rustc 1.96.0; aarch64-apple-darwin",
+  "input_manifest_sha256": "f84568bc6713b2376b56d8fa0b925c3f6f5ba14cae980dc5bcaedc9d71481997",
+  "patch_sha256": "680814d4d91d6447fc3afa1782136b80983e6628f416e0c8346f53224f74ee0a",
+  "control_source_sha256": {
+    "lampOS/crates/voice/src/provider_worker.rs": "480a09e2d68cfcd7489b7ae16e203b78c63fbdfb0598aa5cdf1b02e5b199c977",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "d3554e027ec4a0c5779923ac8e68d84d5a270bfb28d4b0e19f78f097d9e4499b"
+  }
+}
