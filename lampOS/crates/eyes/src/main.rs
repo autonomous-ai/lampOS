@@ -695,8 +695,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         /// `LAMP_PHOTO_SPEAKER=on` (#2856): a yes is kept only with that id.
         photo_speaker: bool,
         /// With it on, a yes that passed, waiting for the look forced after
-        /// it (`photo::yes_after_look`): its name, face, caller and when.
-        photo_yes: Option<(String, Option<String>, UnixStream, Instant)>,
+        /// it (`photo::PendingYes`).
+        photo_yes: Option<lamp_eyes::photo::PendingYes<UnixStream>>,
         /// When each unconfirmed face was last seen, monotonic, for the end
         /// of a meeting with no answer.
         photo_seen: Vec<(String, u64)>,
@@ -811,6 +811,27 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             }
             Ok(None) => serde_json::json!({"error": "not_unconfirmed"}),
             Err(_) => serde_json::json!({"error": "storage"}),
+        }
+    }
+    /// A waiting photo yes ended: kept, or answered why not.
+    fn photo_yes_ended(
+        who: &mut Who,
+        ended: lamp_eyes::photo::YesEnded<UnixStream>,
+        known_file: Option<&std::path::Path>,
+    ) {
+        let (mut stream, reply) = match ended {
+            lamp_eyes::photo::YesEnded::Keep(name, stream) => (stream, keep_photo_yes(who, &name)),
+            lamp_eyes::photo::YesEnded::Refuse(stream, why) => {
+                eprintln!("lamp-eyes: a yes to a face from a photo was not kept: {why}");
+                (stream, serde_json::json!({"error": why}))
+            }
+        };
+        answer(&mut stream, reply);
+        if let Some(known) = known_file {
+            lamp_eyes::who::keep_tellable(
+                &lamp_eyes::who::tellable_of(known),
+                &who.people.tellable(),
+            );
         }
     }
     fn answer(stream: &mut UnixStream, value: serde_json::Value) {
@@ -1107,6 +1128,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     let mut frame = vec![0u8; MAX_FRAME_BYTES];
     // Bytes of a frame that has not been looked at yet.
     let mut latest: Option<usize> = None;
+    // When that frame was captured, monotonic µs: a photo yes is looked at
+    // only on a frame from after it (#2856).
+    let mut latest_us = 0u64;
     let mut looked_at = Instant::now();
     let mut face_at: Option<Instant> = None;
     // When any face was last found, even one too small to follow: with
@@ -1478,10 +1502,25 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             Some(_) if who.photo_speaker && who.photo_yes.is_some() => {
                                 serde_json::json!({"error": "busy"})
                             }
-                            Some(_) if who.photo_speaker => {
-                                who.photo_yes = Some((name, face, stream, Instant::now()));
-                                who.looked_for = None;
-                                continue;
+                            // Pinned to this record of the name and this hold
+                            // of the camera's permission (#2856).
+                            Some(unconfirmed) if who.photo_speaker => {
+                                match (unconfirmed.record_of(&name), permit.held()) {
+                                    (None, _) => serde_json::json!({"error": "not_unconfirmed"}),
+                                    (_, None) => serde_json::json!({"error": "eyes_shut"}),
+                                    (Some(record), Some(hold)) => {
+                                        who.photo_yes = Some(lamp_eyes::photo::PendingYes::new(
+                                            name,
+                                            face,
+                                            stream,
+                                            record,
+                                            hold,
+                                            lamp_ipc::monotonic_us(),
+                                        ));
+                                        who.looked_for = None;
+                                        continue;
+                                    }
+                                }
                             }
                             Some(_) => keep_photo_yes(who, &name),
                         }
@@ -1602,15 +1641,14 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     who.taking = Some((taking, stream));
                 }
             }
-            // A photo yes whose forced look did not come in time: not kept.
-            if who
-                .photo_yes
-                .as_ref()
-                .is_some_and(|(.., at)| at.elapsed() >= lamp_eyes::photo::YES_LOOK_WITHIN)
-                && let Some((_, _, mut stream, _)) = who.photo_yes.take()
-            {
-                eprintln!("lamp-eyes: a yes to a face from a photo was not kept: no look in time");
-                answer(&mut stream, serde_json::json!({"error": "not_that_face"}));
+            // A photo yes whose forced look did not come in time, or whose
+            // camera was shut meanwhile, before the closed camera's turn
+            // below: not kept, for good (#2856).
+            if let Some(pending) = who.photo_yes.take() {
+                match pending.checked(lamp_ipc::monotonic_us(), permit.held()) {
+                    Ok(ended) => photo_yes_ended(who, ended, arguments.known_file.as_deref()),
+                    Err(pending) => who.photo_yes = Some(pending),
+                }
             }
         }
         for datagram in permit.heard() {
@@ -1849,6 +1887,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         frames_all += 1;
                         newest = got.bytes_used.min(frame.len());
                         latest = Some(newest);
+                        // The driver's time in the shared monotonic clock,
+                        // or, without it, when it was read.
+                        latest_us = got
+                            .timestamp
+                            .filter(|at| at.domain == lamp_camera::TimestampDomain::HostMonotonic)
+                            .map_or_else(lamp_ipc::monotonic_us, |at| at.micros);
                     }
                     Ok(None) => break,
                     Err(error) => {
@@ -1983,6 +2027,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             && looked_at.elapsed() >= every
         {
             latest = None;
+            let frame_us = latest_us;
             looked_at = Instant::now();
             let mut stage_at = looked_at;
             let stage = |at: &mut Instant, into: &mut Duration| {
@@ -2238,29 +2283,32 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     bus.familiar(None, lamp_ipc::monotonic_us());
                                 }
                             }
-                            // The look forced by a photo yes, from a frame read
-                            // after it reached the eyes: kept only if the face
-                            // that said it prints as the photo's (#2856).
-                            if let Some((name, yes_face, mut stream, _)) = who.photo_yes.take() {
-                                let reply = if lamp_eyes::photo::yes_after_look(
-                                    &name,
-                                    matched.as_deref(),
-                                    near_face.as_deref(),
-                                    yes_face.as_deref(),
-                                ) {
-                                    keep_photo_yes(who, &name)
-                                } else {
-                                    eprintln!(
-                                        "lamp-eyes: a yes to a face from a photo was not kept: the face that said it is not the photo's"
-                                    );
-                                    serde_json::json!({"error": "not_that_face"})
+                            // The look forced by a photo yes, on a frame
+                            // captured after it: its deadline, the camera's
+                            // hold and the name's record checked here, as it
+                            // is kept (`photo::PendingYes::looked`, #2856).
+                            if let Some(pending) = who.photo_yes.take() {
+                                let look = lamp_eyes::photo::YesLook {
+                                    frame_us,
+                                    now_us: lamp_ipc::monotonic_us(),
+                                    hold: permit.held(),
+                                    record: who.unconfirmed.as_ref().and_then(|unconfirmed| {
+                                        unconfirmed.record_of(pending.name())
+                                    }),
+                                    matched: matched.as_deref(),
+                                    face: near_face.as_deref(),
                                 };
-                                answer(&mut stream, reply);
-                                if let Some(known) = &arguments.known_file {
-                                    lamp_eyes::who::keep_tellable(
-                                        &lamp_eyes::who::tellable_of(known),
-                                        &who.people.tellable(),
-                                    );
+                                match pending.looked(&look) {
+                                    Ok(ended) => photo_yes_ended(
+                                        who,
+                                        ended,
+                                        arguments.known_file.as_deref(),
+                                    ),
+                                    // A frame from before it: the next look.
+                                    Err(pending) => {
+                                        who.photo_yes = Some(pending);
+                                        who.looked_for = None;
+                                    }
                                 }
                             }
                         }
