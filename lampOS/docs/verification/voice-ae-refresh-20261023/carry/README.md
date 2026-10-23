@@ -3,6 +3,11 @@
 The owned branch moved from `735b2cb5d` to `157b800a1` by a clean rebase onto
 `ae4ab0022`. No conflict or manual edit occurred. The original and rebased
 source patches, complete changed-path list and range-diff are retained here.
+`source-patches.json` stores both complete patches as lossless UTF-8 strings
+with byte counts and SHA-256 values. Encoding each `text` value as UTF-8
+reconstructs its original patch exactly, including the blank context-line
+spaces required by patch format. This representation keeps those spaces out
+of repository whitespace checks; none of the evidence bytes are trimmed.
 Authored added/removed lines are identical across all 104 changed paths;
 96 historical docs/evidence blobs are identical. The range-diff difference
 is upstream context around the DeclineMusic `_one` guard.
