@@ -1,5 +1,27 @@
 # Tests work log
 
+## 2026-10-23 07:28 +0700 — boot-clock class assigned next; Eyes ready for its train
+
+Taken under #1569: the test-only boot-clock subtraction sweep assigned on
+[Queue #3126](https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6354263222).
+The audit starts from `02c8d3851`: live monotonic timestamps with seconds-scale
+backdating in Policy and Voice, including indirect closures, must use coherent
+fixture clock bases without changing relative ages or original assertions.
+Already explicit synthetic bases are not faults. The requested controls are
+old/new near-boot clock mutation on the Mac and all affected tests inside a
+Linux time namespace near 60 seconds. Product clocks remain unchanged; no
+code edit or result is claimed yet. This has priority over the unstarted
+#3023 frozen local comparison. The assigned #3160 conversation-guard source
+read follows the boot-clock correction.
+
+#3156 at `a2da87221` has clean owner and assigned reviews, successful current
+native checks, Mac gates and the newly published Linux formatting pass. It is
+ready for the merge owner's train 22, which retains final current-base combined
+qualification. The review's writable-file negative control also fails the
+original assertion as intended. #1339's independent Surround fixture work
+continues: its host-stall, held-poll-lock and removed-deadline controls have
+completed; full gates are still running, so no ready claim is made.
+
 ## 2026-10-23 07:23 +0700 — exact-base Voice ARM comparison and Linux formatting published
 
 Ready for lamp-voice: **source read pending** for #3156; **no** for #3023.
