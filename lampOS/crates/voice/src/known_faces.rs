@@ -670,6 +670,70 @@ fn gives_a_name_in(sentence: &str, speaks_of_my_name: bool) -> bool {
     })
 }
 
+/// Where the second route reads whether a line asking the lamp to remember
+/// the person's face, with their name, must call [`REMEMBER`] (`on` only;
+/// [`asks_to_remember`]).
+pub const ASKED_ENVIRONMENT: &str = "LAMP_SECOND_REMEMBER_ASKED";
+
+/// Whether [`ASKED_ENVIRONMENT`] is on.
+pub fn asked_on() -> bool {
+    std::env::var(ASKED_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
+/// What asks the lamp to remember the speaker's own face or who they are.
+/// Only their own: "remember her face" and "remember my friend" are not.
+const ASKS_TO_REMEMBER: &[&[&str]] = &[
+    &["remember", "my", "face"],
+    &["remember", "my", "name"],
+    &["remember", "me"],
+    &["remember", "who", "i", "am"],
+    &["remember", "what", "i", "look", "like"],
+    &["learn", "my", "face"],
+    &["save", "my", "face"],
+    &["keep", "my", "face"],
+];
+
+/// Words just before an ask that take it back: "don't remember me",
+/// "never remember my face", "you don't remember me".
+const NOT_AN_ASK_AFTER: &[&str] = &["don't", "dont", "not", "never"];
+
+/// Whether what the person said asks the lamp to remember their own face or
+/// who they are ([`ASKS_TO_REMEMBER`]): "Lamp, remember my face", "Can you
+/// remember me?". Not taken back ([`NOT_AN_ASK_AFTER`]), and not a question
+/// of whether the lamp knows them already: "Do you remember me?", "Did you
+/// remember my face?". English only: [`gives_a_name`], which a forced call
+/// needs beside it, has no Vietnamese forms.
+pub fn asks_to_remember(said: &str) -> bool {
+    let words = lower_words(said);
+    (0..words.len()).any(|at| {
+        let before = |back: usize| at.checked_sub(back).map(|i| words[i].as_str());
+        ASKS_TO_REMEMBER.iter().any(|phrase| {
+            words.len() >= at + phrase.len()
+                && words[at..at + phrase.len()]
+                    .iter()
+                    .zip(phrase.iter())
+                    .all(|(word, asked)| word == asked)
+        }) && !before(1).is_some_and(|word| NOT_AN_ASK_AFTER.contains(&word))
+            && !(before(1) == Some("you") && matches!(before(2), Some("do" | "did")))
+    })
+}
+
+/// Whether what the person said is mostly a name spelled letter by letter:
+/// "K, E, S, S.", "It's K E S S." A run of two or more letters, and more
+/// than two in three of the line's words single letters, so that "I a
+/// little" in passing is not.
+pub fn spells_a_name(said: &str) -> bool {
+    let words = folded_words(said);
+    let letters = words
+        .iter()
+        .filter(|word| word.chars().count() == 1)
+        .count();
+    3 * letters > 2 * words.len()
+        && spelled_runs(&words)
+            .iter()
+            .any(|run| run.chars().count() >= 2)
+}
+
 /// What the model is told beside a request in which the person gave their
 /// name, with names checked: a name told is a name kept (the first builder,
 /// #705, 13:43: on 15 October the lamp only said it would remember).
@@ -1939,6 +2003,45 @@ mod tests {
                 .description
                 .contains("tells you their name")
         );
+    }
+
+    /// `LAMP_SECOND_REMEMBER_ASKED`'s two halves: an ask to remember the
+    /// speaker's own face or who they are, and a name spelled after one.
+    #[test]
+    fn an_ask_to_remember_is_their_own_face_and_never_a_question_or_a_no() {
+        for asked in [
+            "Lamp, remember my face, I'm Kess.",
+            "Can you remember my face?",
+            "Please remember me.",
+            "Remember who I am.",
+            "Hey Lamp, remember what I look like.",
+            "Learn my face.",
+            "Could you save my face?",
+            "Please remember my name is Jim.",
+        ] {
+            assert!(asks_to_remember(asked), "{asked}");
+        }
+        for not in [
+            "Do you remember me?",
+            "Did you remember my face?",
+            "Don't remember my face.",
+            "Never remember me.",
+            "You don't remember me.",
+            "Remember her face.",
+            "Remember my friend.",
+            "Remember to turn the light off.",
+            "I remembered my keys.",
+            // English only, as `gives_a_name` is.
+            "Nhớ mặt tôi nhé.",
+        ] {
+            assert!(!asks_to_remember(not), "{not}");
+        }
+        for spelled in ["K, E, S, S.", "It's K E S S.", "k e s s"] {
+            assert!(spells_a_name(spelled), "{spelled}");
+        }
+        for not in ["Kess.", "I a little", "It's Q. Q. Q.", "Okay.", "I'm Kess."] {
+            assert!(!spells_a_name(not), "{not}");
+        }
     }
 
     #[test]

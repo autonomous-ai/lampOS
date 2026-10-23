@@ -1422,6 +1422,26 @@ With the switch:
   condition, so that a match that is no name ("I'm Irish.") costs
   nothing. The journal says "they gave their
   name, and the model is told to keep it".
+- **On the second route, an ask with a name calls it**
+  (`LAMP_SECOND_REMEMBER_ASKED=on`, off by default; the owner's try on
+  lamp-4ace, 23 Oct 18:30). There "Lamp, remember my face, I'm …" was
+  given every function and its first round called `take_a_look`. The
+  spelled name after it called nothing, and the lamp said it knew the
+  face while the eyes held no one. With the switch, names checked and the
+  eyes' who socket, a line whose own words ask the lamp to remember the
+  speaker's face or who they are ("remember my face", "remember me",
+  "remember who I am", "remember what I look like", "learn my face",
+  "save my face", "remember my name"; `known_faces::asks_to_remember`)
+  and give their name (`known_faces::gives_a_name`) has its first round
+  sent with `tool_choice` naming `remember_my_face`. So does a line that
+  gives or spells the name (`known_faces::spells_a_name`, "K, E, S, S.")
+  right after a line of theirs that asked. The name is still checked, so
+  one not in their words is refused, and the model asks them to spell it.
+  Not forced: an ask with no name, a question whether the lamp knows them
+  ("Do you remember me?"), a taken-back ask ("Don't remember my face"),
+  someone else's face, a round after a call, and Vietnamese, which
+  `gives_a_name` doesn't read. The line that names one of the staff
+  (`LAMP_TASKS_NAMED_ASK`) is forced first.
 - The eyes take the plain `{"remember":"A"}` as before, so an older
   voice is unchanged. The other way round, a voice with the switch talking
   to older eyes gets `not_understood` for every remember (they take no
