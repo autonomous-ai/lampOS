@@ -195,6 +195,9 @@ pub struct RoomTold {
     /// ([`Self::seen_talking`]).
     held_talk: bool,
     talking_seen: Option<u64>,
+    /// The request let out only as the same speaker's conversation carried
+    /// on ([`Self::carried`]), until it is closed.
+    carried: Option<u64>,
     room: Room,
     /// The session last told, and what it was told.
     told: Option<(u64, Room)>,
@@ -228,6 +231,7 @@ impl RoomTold {
             ends_sooner: false,
             held_talk: false,
             talking_seen: None,
+            carried: None,
             room: Room::Unknown,
             told: None,
         }
@@ -414,6 +418,15 @@ impl RoomTold {
         }
     }
 
+    /// `request` was let out only as the same speaker's conversation carried
+    /// on (`LAMP_SAME_SPEAKER_CARRIES`, `second_provider::worker::Heeding`):
+    /// the one the lamp answered, by their voice or face. Left unanswered by
+    /// the model it is no talk, so it neither ends the conversation nor keeps
+    /// the room busy: on lamp-4ace on 23 Oct at 18:5x the owner's own lines
+    /// the model chose not to answer were counted as people talking.
+    pub fn carried(&mut self, request: u64) {
+        self.carried = Some(request);
+    }
     /// What the rule's verdict on `request` tells the room, as the worker
     /// gives it: a request whose answer is held is not talk between people
     /// ([`Self::held`]); one held as another voice is, and ends the
@@ -616,6 +629,10 @@ impl RoomTold {
         }
         if self.held == Some(request) {
             self.held = None;
+            return Left::Held;
+        }
+        if self.carried == Some(request) {
+            self.carried = None;
             return Left::Held;
         }
         if self.held_by_policy == Some(request) {
@@ -2122,5 +2139,29 @@ mod tests {
         off.ended(1, 31 * S);
         off.judged(1, Some(crate::attention::Verdict::Play("a face")), true);
         assert_eq!(off.at(32 * S), Room::Unknown);
+    }
+
+    /// `LAMP_SAME_SPEAKER_CARRIES`: lines let out only as the same speaker's
+    /// conversation carried on, then left unanswered by the model, are held,
+    /// not talk: three in a minute neither end the conversation nor make the
+    /// room busy. The same lines not carried are talk, and do both.
+    #[test]
+    fn a_carried_line_left_unanswered_is_not_talk() {
+        let room_after = |carried: bool| {
+            let mut room = RoomTold::new();
+            room.count_only_talk(true);
+            room.end_busy_sooner(true);
+            for (request, at) in [(1, 0), (2, 15), (3, 30)] {
+                said(&mut room, request, at);
+                if carried {
+                    room.carried(request);
+                }
+                let left = room.left_unanswered(request, (at + 6) * S);
+                assert_eq!(left == Left::Held, carried, "request {request}");
+            }
+            (room.at(40 * S), room.talked_past_the_lamp())
+        };
+        assert_eq!(room_after(true), (Room::Unknown, false), "carried");
+        assert_eq!(room_after(false), (Room::Busy, true), "not carried");
     }
 }

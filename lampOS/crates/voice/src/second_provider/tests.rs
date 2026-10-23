@@ -5332,7 +5332,7 @@ async fn the_lamps_work_and_its_own_turns_are_told_to_the_rule() {
             Did::Worked(_) => "worked",
             Did::Spoke(_) => "spoke",
             // The words' end, told with each packet: tested on its own.
-            Did::Said(..) => return,
+            Did::Said(..) | Did::Stopped => return,
         })
     }));
     for request in 1..=2 {
@@ -5349,6 +5349,55 @@ async fn the_lamps_work_and_its_own_turns_are_told_to_the_rule() {
     engine.submit(written(3, "Tell the person their task is done."));
     assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
     assert_eq!(*did.lock().unwrap(), ["worked", "spoke"]);
+}
+
+/// `LAMP_SAME_SPEAKER_CARRIES`: the first line after a stop tells the rule
+/// of the stop before it is judged, so a carried conversation ends there;
+/// a line not after a stop tells none.
+#[tokio::test]
+async fn the_first_line_after_a_stop_tells_the_rule_of_it() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Sure.".to_owned()), Ok("And then?".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![text("Okay."), Ok(ChatEvent::Done)],
+                vec![text("Then this."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let stops: Arc<Mutex<Vec<usize>>> = Arc::default();
+    let seen = stops.clone();
+    let lines = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let begun = lines.clone();
+    let mut engine = engine.telling_what_it_did(Arc::new(move |did| {
+        if did == Did::Stopped {
+            seen.lock()
+                .unwrap()
+                .push(begun.load(std::sync::atomic::Ordering::Relaxed));
+        }
+    }));
+    for (request, after_stop) in [(1, true), (2, false)] {
+        lines.store(request as usize, std::sync::atomic::Ordering::Relaxed);
+        engine.submit(ProviderInput::Start {
+            request,
+            session: 1,
+            privacy_generation: 1,
+            continues: false,
+            continues_cut_off: false,
+            over_the_lamp: false,
+            after_stop,
+            follows_on: false,
+            over_the_lamps_voice: false,
+            heard_of_cut: None,
+        });
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        turn(&mut engine).await;
+    }
+    assert_eq!(*stops.lock().unwrap(), [1]);
 }
 
 /// #1712, the first builder at 19:21: the engine tells when the lamp's
