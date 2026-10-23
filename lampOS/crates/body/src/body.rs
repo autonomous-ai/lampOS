@@ -4443,10 +4443,14 @@ fn run_on<P: PortIo, R: Runtime>(
     let mut easing = [0u16; 3];
     let mut eased_at = [0u64; EASES_ALLOWED];
     // Under `--give-way`: where each joint last gave way, steps in a row a
-    // hand has pushed it since, the offset from home a hand left each where
-    // it put it, and each of the five joints' pushing without moving; each
-    // commanded joint's contact floor (V1's) and steps in a row over it.
+    // hand has pushed it since, where it last stood on its track and where
+    // its hold began (or a hand last left it), the offset from home a hand
+    // left each where it put it, and each of the five joints' pushing
+    // without moving; each commanded joint's contact floor (V1's) and steps
+    // in a row over it.
     let mut gave_at = [0u16; 3];
+    let mut on_track_at = [0u16; 3];
+    let mut held_from = [0u16; 3];
     let mut in_hand = [0u16; 3];
     let mut kept = [0.0f32; 3];
     let mut stalls = [Stall::default(); 5];
@@ -6074,6 +6078,7 @@ fn run_on<P: PortIo, R: Runtime>(
             off_track[index] = if written[index].abs_diff(is.position) > astray {
                 off_track[index].saturating_add(1)
             } else {
+                on_track_at[index] = is.position;
                 0
             };
             // V1's contact floor, for three steps: a hand, whatever the
@@ -6157,8 +6162,16 @@ fn run_on<P: PortIo, R: Runtime>(
                 // Judged against the lower of its load bound and what a joint
                 // that gives way to a hand under that bound reads: on
                 // lamp-52e6 a hand lifting the head read 100 to 130, under
-                // the head's 240, and a head told to stay came back.
-                let bound = strained.min(STALL_LOAD);
+                // the head's 240, and a head told to stay came back. Still
+                // where its hold began, only its full bound: lamp-06c1's
+                // head pitch reads 124 to 136 at its own rest (23 Oct), and
+                // judged by 100 it was held for good.
+                let still = is.position.abs_diff(held_from[index]) <= HAND_MOVED;
+                let bound = if still {
+                    strained
+                } else {
+                    strained.min(STALL_LOAD)
+                };
                 // A hand read on this step keeps it held a second more: one
                 // quiet read among them (a servo whose goal is where it is
                 // reads little) is not the hand gone, and a joint sent home
@@ -6187,6 +6200,7 @@ fn run_on<P: PortIo, R: Runtime>(
                         // window as every goal, and later moods are laid
                         // from there.
                         kept[index] = commanded[index] - home_now[index] - offsets[index];
+                        held_from[index] = is.position;
                         report.kept_where_put[index] =
                             report.kept_where_put[index].saturating_add(1);
                     }
@@ -6232,6 +6246,16 @@ fn run_on<P: PortIo, R: Runtime>(
                     // it off its goal was moved from there, not from where it
                     // gave: a light head lifted 40 counts gives at 30.
                     gave_at[index] = if pushed { written[index] } else { is.position };
+                    // Where it stood: one that has not moved since it last
+                    // tracked was left there by its goal wandering off
+                    // (lamp-06c1's head, 22 Oct, at 1,765 in every sample),
+                    // not moved by a hand, which moved it from its goal.
+                    let left_by_goal = is.position.abs_diff(on_track_at[index]) <= STALL_SLACK;
+                    held_from[index] = if pushed && !left_by_goal {
+                        written[index]
+                    } else {
+                        is.position
+                    };
                     in_hand[index] = 0;
                     over_load[index] = 0;
                     contact[index] = 0;
