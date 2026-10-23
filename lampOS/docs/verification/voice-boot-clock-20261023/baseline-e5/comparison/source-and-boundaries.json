@@ -1,0 +1,146 @@
+{
+  "refs": [
+    "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+    "da595851f239cd6456cc1fb4565d3fc272675702",
+    "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc"
+  ],
+  "whole_files": {
+    "lampOS/crates/voice/src/privacy_bus.rs": [
+      {
+        "ref": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+        "bytes": 63219,
+        "sha256": "0c5187d595c326fda96aed34ca1c8faeb387bc946c34a23900c95480973c0674",
+        "git_blob": "8b608ea882644fb1673c7aebb9c24c7f33ecf481"
+      },
+      {
+        "ref": "da595851f239cd6456cc1fb4565d3fc272675702",
+        "bytes": 63219,
+        "sha256": "0c5187d595c326fda96aed34ca1c8faeb387bc946c34a23900c95480973c0674",
+        "git_blob": "8b608ea882644fb1673c7aebb9c24c7f33ecf481"
+      },
+      {
+        "ref": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+        "bytes": 63219,
+        "sha256": "0c5187d595c326fda96aed34ca1c8faeb387bc946c34a23900c95480973c0674",
+        "git_blob": "8b608ea882644fb1673c7aebb9c24c7f33ecf481"
+      }
+    ],
+    "lampOS/crates/voice/tests/it/light_call.rs": [
+      {
+        "ref": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+        "bytes": 3214,
+        "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+        "git_blob": "2827452b9b6336d505c82219f036424858626ee5"
+      },
+      {
+        "ref": "da595851f239cd6456cc1fb4565d3fc272675702",
+        "bytes": 3214,
+        "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+        "git_blob": "2827452b9b6336d505c82219f036424858626ee5"
+      },
+      {
+        "ref": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+        "bytes": 3214,
+        "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+        "git_blob": "2827452b9b6336d505c82219f036424858626ee5"
+      }
+    ]
+  },
+  "privacy": {
+    "name": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+    "source_location": "crates/voice/src/privacy_bus.rs:1313:25",
+    "f477_before": "passed",
+    "da595_after": "failed: the host stalled in 10 of 10 attempts: privacy publisher unavailable",
+    "e5_base": "failed: the host stalled in 10 of 10 attempts: privacy publisher unavailable",
+    "interpretation": "Same exact failure boundary recurs on the later unchanged base. The diagnostic label does not establish host-load causation, nor the cause of the earlier unscheduled failure."
+  },
+  "light_call": {
+    "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+    "source_location": "crates/voice/tests/it/light_call.rs:90:5",
+    "timings": {
+      "f477-before": {
+        "sorted_20_ms": [
+          2.842447,
+          3.052378,
+          3.519385,
+          3.68881,
+          3.834385,
+          5.128642,
+          19.778226,
+          22.242647,
+          40.041049,
+          40.270465,
+          48.529192,
+          57.540391,
+          64.197904,
+          72.613586,
+          76.822128,
+          77.451068,
+          78.16051,
+          80.471075,
+          83.670355,
+          129.587621
+        ],
+        "asserted_upper_middle_ms": 48.529192,
+        "limit_ms": 25,
+        "source_location": "crates/voice/tests/it/light_call.rs:90:5"
+      },
+      "da595-after": {
+        "sorted_20_ms": [
+          20.836465,
+          39.342211,
+          39.704743,
+          42.21619,
+          56.415061,
+          74.961282,
+          91.593312,
+          91.935108,
+          94.532104,
+          97.038352,
+          98.36635,
+          109.957341,
+          114.902074,
+          116.457938,
+          116.92064,
+          130.097997,
+          132.799183,
+          147.96126,
+          151.951952,
+          155.017645
+        ],
+        "asserted_upper_middle_ms": 98.36635,
+        "limit_ms": 25,
+        "source_location": "crates/voice/tests/it/light_call.rs:90:5"
+      },
+      "e5-base": {
+        "sorted_20_ms": [
+          1.584601,
+          2.698703,
+          2.780818,
+          2.863021,
+          2.9464,
+          3.385706,
+          3.584646,
+          3.642713,
+          3.889109,
+          21.742583,
+          38.435873,
+          38.809789,
+          40.367092,
+          61.29568,
+          74.022042,
+          76.886083,
+          78.563864,
+          88.406653,
+          109.957328,
+          114.315265
+        ],
+        "asserted_upper_middle_ms": 38.435873,
+        "limit_ms": 25,
+        "source_location": "crates/voice/tests/it/light_call.rs:90:5"
+      }
+    },
+    "interpretation": "All three fail the same unchanged upper-middle <25 ms assertion; the captured arrays differ. This is not a matched-host comparison or waiver."
+  },
+  "limits": "Whole repository snapshots, compiled binaries and full inventories differ. No conclusion that all five earlier candidate-only failures are inherited; the other four remain outside this boundary comparison. No active AFTER output was read."
+}

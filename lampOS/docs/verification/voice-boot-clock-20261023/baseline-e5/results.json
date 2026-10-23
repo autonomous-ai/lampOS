@@ -1,0 +1,44 @@
+{
+  "status": "completed FAILED baseline, unwaived",
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "runner_exit_code": 101,
+  "command_wall_seconds": 618.682987,
+  "compile_and_execution_in_one_command": true,
+  "compilation_successful": true,
+  "totals": {
+    "passed": 3860,
+    "failed": 10,
+    "ignored": 15,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "affected_86": {
+    "passed": 86,
+    "failed": 0,
+    "ignored": 0
+  },
+  "target_statuses": {
+    "completed_targets": [
+      "lamp-voice:lib:lamp_voice",
+      "lamp-voice:bin:lamp-voice",
+      "lamp-voice:test:it",
+      "lamp-voice:example:render_line_second",
+      "lamp-voice:example:stop_words_stt_replay",
+      "lamp-voice:doctests"
+    ],
+    "passed_targets": [
+      "lamp-voice:bin:lamp-voice",
+      "lamp-voice:example:render_line_second",
+      "lamp-voice:example:stop_words_stt_replay",
+      "lamp-voice:doctests"
+    ],
+    "failed_targets": [
+      "lamp-voice:lib:lamp_voice",
+      "lamp-voice:test:it"
+    ],
+    "unrun_targets": [],
+    "incomplete_targets": []
+  },
+  "restoration_complete": true,
+  "ready": false
+}

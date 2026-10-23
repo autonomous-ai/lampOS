@@ -1,0 +1,85 @@
+{
+  "actual_normalizations": [
+    {
+      "raw_name": "coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup - should panic",
+      "compiled_identity": "coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup",
+      "display_annotation": " - should panic"
+    },
+    {
+      "raw_name": "coordinator::tests::early_end::fixture_policy_tests::unrequested_task_cancellation_is_rejected - should panic",
+      "compiled_identity": "coordinator::tests::early_end::fixture_policy_tests::unrequested_task_cancellation_is_rejected",
+      "display_annotation": " - should panic"
+    },
+    {
+      "raw_name": "coordinator::tests::endpoint_session::fixture_policy_tests::a_logical_clock_is_rejected_before_the_process_constructor - should panic",
+      "compiled_identity": "coordinator::tests::endpoint_session::fixture_policy_tests::a_logical_clock_is_rejected_before_the_process_constructor",
+      "display_annotation": " - should panic"
+    }
+  ],
+  "normalization_rule": "Only a raw name absent from the compiled inventory may lose one terminal \" - should panic\", and only when the resulting compiled name occurs exactly once. All raw displays remain in full stdout.",
+  "actual_targets_bound": 6,
+  "actual_case_identities_bound": 3885,
+  "ignored_identities_bound": 15,
+  "filtered_cases": 0,
+  "missing_annotated_identity_control": "Independent in-memory omission check rejected the raw annotated case after its compiled identity was removed. No binary was executed.",
+  "historical_pre_execution_replay": {
+    "scope": "Read-only replay of retained output and compiled names; no Cargo/test/artifact execution",
+    "historical_ignored_expected_names": "Derived from retained actual ignored rows for this parser replay only. New execution requires independently listed --ignored census.",
+    "source": "/private/tmp/tests-codex-boot-clock-mac-continuation-20261023/complete-receipt/voice-comparison",
+    "arms": [
+      {
+        "arm": "before",
+        "complete_binding": true,
+        "target_count": 6,
+        "real_annotation_mapping": [
+          {
+            "raw_name": "coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup - should panic",
+            "compiled_identity": "coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup",
+            "display_annotation": " - should panic"
+          },
+          {
+            "raw_name": "coordinator::tests::early_end::fixture_policy_tests::unrequested_task_cancellation_is_rejected - should panic",
+            "compiled_identity": "coordinator::tests::early_end::fixture_policy_tests::unrequested_task_cancellation_is_rejected",
+            "display_annotation": " - should panic"
+          },
+          {
+            "raw_name": "coordinator::tests::endpoint_session::fixture_policy_tests::a_logical_clock_is_rejected_before_the_process_constructor - should panic",
+            "compiled_identity": "coordinator::tests::endpoint_session::fixture_policy_tests::a_logical_clock_is_rejected_before_the_process_constructor",
+            "display_annotation": " - should panic"
+          }
+        ],
+        "preserved_failed_count": 1,
+        "missing_identity_control_rejected": true,
+        "stdout_sha256": "07ae6a05ceb8ce102b7d28efc3e32250f76ad7771a84c9cdd1823cdd2bd4ac8f",
+        "stderr_sha256": "aac29ff345adb948f678af7fa774fc9c74b822694b544e12010782c8334daed0"
+      },
+      {
+        "arm": "after",
+        "complete_binding": true,
+        "target_count": 6,
+        "real_annotation_mapping": [
+          {
+            "raw_name": "coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup - should panic",
+            "compiled_identity": "coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup",
+            "display_annotation": " - should panic"
+          },
+          {
+            "raw_name": "coordinator::tests::early_end::fixture_policy_tests::unrequested_task_cancellation_is_rejected - should panic",
+            "compiled_identity": "coordinator::tests::early_end::fixture_policy_tests::unrequested_task_cancellation_is_rejected",
+            "display_annotation": " - should panic"
+          },
+          {
+            "raw_name": "coordinator::tests::endpoint_session::fixture_policy_tests::a_logical_clock_is_rejected_before_the_process_constructor - should panic",
+            "compiled_identity": "coordinator::tests::endpoint_session::fixture_policy_tests::a_logical_clock_is_rejected_before_the_process_constructor",
+            "display_annotation": " - should panic"
+          }
+        ],
+        "preserved_failed_count": 6,
+        "missing_identity_control_rejected": true,
+        "stdout_sha256": "29cf3f71c21e8ab1acdde5e60826c0c3a727e18b7d0124f9ce0128c42bea013b",
+        "stderr_sha256": "bec8a9803f4979205606f61b83cc5c3da89536ee9eb1b48297c448a7ece9f352"
+      }
+    ]
+  },
+  "status": "All actual rows, summaries, exact case names and ignored inventories independently matched the frozen target proof."
+}

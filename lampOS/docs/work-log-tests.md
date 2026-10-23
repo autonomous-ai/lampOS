@@ -1,5 +1,26 @@
 # Tests work log
 
+## 2026-10-23 10:59 +0700 — complete current-base failure retained; candidate library passed
+
+Ready for lamp-voice: no (#3190, complete reader gate and review pending).
+
+The [fixed complete-tree baseline](verification/voice-boot-clock-20261023/baseline-e5/)
+on `e5cd73aca` finished **3,860 passed / 10 failed / 15 ignored**; the library
+was **3,580 / 9 / 15**. Eight motor fixtures, privacy-bus resync and light-call
+latency failed before the boot-clock patch. All 86 selected clock cases passed.
+All six targets and 3,885 case identities are bound to their compiled census,
+and the two borrowed phone files were restored exactly. Full failure text,
+source/restoration proof and human output are published.
+
+Privacy-bus and light-call repeat the original assertion boundaries in byte-
+identical files on the unchanged current base. That observation does not
+explain the other four earlier library failures or prove their original cause.
+The single current-head parallel Voice step has now finished **3,869 / 1 / 15**,
+with library **3,589 / 0 / 15** and the same light-call failure. Its complete
+census equals the baseline and all 86 selected cases pass. Candidate formatting
+and strict 12-package Clippy passed; the reader gate continues. No later pass
+replaces a failed observation.
+
 ## 2026-10-23 10:47 +0700 — rebased boot-clock ARM64 and Clippy passed
 
 Ready for lamp-voice: no (#3190, Mac comparison and review remain).

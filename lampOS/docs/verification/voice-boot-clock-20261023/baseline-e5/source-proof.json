@@ -1,0 +1,68 @@
+{
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "base_git_tree": "753d9453602d19ec91543762119a422b1e0ce89c",
+  "source_map": {
+    "path": "/private/tmp/tests-boot-clock-base-e5-counterfactual-20261023/base-source-map.json",
+    "bytes": 2131971,
+    "sha256": "e399639d3b45f840ccfe321d31c09512626f88d55f215f5cfb4057078bb3067f",
+    "reason": "Full 9,992-entry map remains external; exact base Git tree independently reconstructed and every path/mode/content hash checked."
+  },
+  "candidate_map": {
+    "path": "/private/tmp/tests-boot-clock-base-e5-counterfactual-20261023/candidate-source-map.json",
+    "bytes": 2131971,
+    "sha256": "ecc2fbfa7db723cc481cf62576bf5eb0962fad2a42b352028af3191d38255d9d",
+    "reason": "Saved phone-fixture restoration map, not the boot AFTER source map; only two owned files differ from base."
+  },
+  "tracked_paths": 9992,
+  "lampOS_paths": 6649,
+  "tracked_symlinks": 1,
+  "base_tracked_bytes": 265352625,
+  "base_aggregate_sha256": "60c8a01944775148f7c790efee71bfe03c9d996756adcfa186525f3db190ded1",
+  "saved_phone_candidate_aggregate_sha256": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97",
+  "aggregate_algorithm": "Sorted path UTF-8 + NUL + Git mode + NUL + u64 big-endian byte length + content; symlinks use literal target bytes.",
+  "independent_git_object_reconstruction_passed": true,
+  "freshness": {
+    "tracked_files": 9992,
+    "mtime_ns": 1792726607293728000,
+    "before_sha256": "60c8a01944775148f7c790efee71bfe03c9d996756adcfa186525f3db190ded1",
+    "after_sha256": "60c8a01944775148f7c790efee71bfe03c9d996756adcfa186525f3db190ded1",
+    "identical_bytes": true
+  },
+  "base_before_after_census_unchanged": true,
+  "restoration": {
+    "complete": true,
+    "errors": [],
+    "candidate_source_aggregate_sha256": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97",
+    "owned_files": [
+      {
+        "path": "lampOS/crates/voice/src/messages.rs",
+        "sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+        "permissions": "0o644"
+      },
+      {
+        "path": "lampOS/docs/messages.md",
+        "sha256": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3",
+        "permissions": "0o644"
+      }
+    ]
+  },
+  "owned_snapshots": [
+    {
+      "path": "lampOS/crates/voice/src/messages.rs",
+      "git_mode": "100644",
+      "base_snapshot": "snapshots/0-base.txt",
+      "base_sha256": "1bc28d917159472dcd6de1e2436c07b85f1215f9f67d8b39563e0bd339a62fb5",
+      "candidate_snapshot": "snapshots/0-candidate.txt",
+      "candidate_sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de"
+    },
+    {
+      "path": "lampOS/docs/messages.md",
+      "git_mode": "100644",
+      "base_snapshot": "snapshots/1-base.txt",
+      "base_sha256": "60ac65a303056dbf6829e3b3eda24a0d1163ab359cfa18ad92e97c930b632ec9",
+      "candidate_snapshot": "snapshots/1-candidate.txt",
+      "candidate_sha256": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3"
+    }
+  ],
+  "scope_limit": "Restoration is of the borrowed phone worktree two-file candidate. It is not a source proof or qualification for the running boot AFTER head."
+}

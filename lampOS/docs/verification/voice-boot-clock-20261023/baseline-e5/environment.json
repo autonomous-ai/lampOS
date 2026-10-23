@@ -1,0 +1,37 @@
+{
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "observation_path": "/private/tmp/tests-boot-clock-base-e5-counterfactual-20261023/observation-20261023T033643.755885Z",
+  "started_at": "2026-10-23T03:36:43.756810+00:00",
+  "finished_at": "2026-10-23T03:47:16.859369+00:00",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_BUILD_TARGET": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTFLAGS": null,
+    "RUST_BACKTRACE": "0",
+    "RUST_TEST_THREADS": null
+  },
+  "path_value_omitted_sha256": "2db016c7667ac4d5a4a753bf030da00184e7a76845c12f56803253e8ceca34a9",
+  "os": {
+    "sysname": "Darwin",
+    "release": "25.6.0",
+    "machine": "x86_64"
+  },
+  "kernel_version_omitted_sha256": "4bc7275b32363cc7f5b79b59da8445a518fa48fa387a4317588bd90c431abf4f",
+  "host_node_name_omitted": true,
+  "compiler": "rustc 1.96.0 x86_64-apple-darwin; exact raw output retained",
+  "binary_isa": "All five listed test executables recorded as Mach-O 64-bit executable x86_64.",
+  "physical_hardware_or_translation": "Not established; no physical Intel or native-ISA claim.",
+  "test_concurrency": "Default libtest parallelism; RUST_TEST_THREADS unset, no --test-threads override. CARGO_BUILD_JOBS=4 controls compilation only.",
+  "watchdog_seconds": 1800,
+  "no_timeout": true,
+  "socket_bind": "passed",
+  "host_load": "Not isolated or matched. No cause inferred from timing alone.",
+  "scope": "One full Voice package baseline only. No reader, Clippy, fmt, workspace-build, Linux/ARM/device qualification. No retries."
+}

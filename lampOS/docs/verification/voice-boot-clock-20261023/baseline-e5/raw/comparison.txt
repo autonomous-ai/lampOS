@@ -1,0 +1,31 @@
+Raw stream: old-before-light
+Payload bytes: 876
+Payload SHA256: 0560f7b986ba6b4804543c9e22eeb70f2ce8bb31a80010f1c499aa6a0b454eb8
+BEGIN RAW PAYLOAD
+---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----
+light calls, fastest to slowest: [2.842447ms, 3.052378ms, 3.519385ms, 3.68881ms, 3.834385ms, 5.128642ms, 19.778226ms, 22.242647ms, 40.041049ms, 40.270465ms, 48.529192ms, 57.540391ms, 64.197904ms, 72.613586ms, 76.822128ms, 77.451068ms, 78.16051ms, 80.471075ms, 83.670355ms, 129.587621ms]
+
+thread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (704686248) panicked at crates/voice/tests/it/light_call.rs:90:5:
+[2.842447ms, 3.052378ms, 3.519385ms, 3.68881ms, 3.834385ms, 5.128642ms, 19.778226ms, 22.242647ms, 40.041049ms, 40.270465ms, 48.529192ms, 57.540391ms, 64.197904ms, 72.613586ms, 76.822128ms, 77.451068ms, 78.16051ms, 80.471075ms, 83.670355ms, 129.587621ms]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+END RAW PAYLOAD
+Raw stream: old-after-privacy
+Payload bytes: 383
+Payload SHA256: b540cd982e76f48d163f2c42c9d31a0597ab1203dd3a674d058ffd07ae5f2f03
+BEGIN RAW PAYLOAD
+---- privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second stdout ----
+
+thread 'privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second' (705093313) panicked at crates/voice/src/privacy_bus.rs:1313:25:
+the host stalled in 10 of 10 attempts: privacy publisher unavailable
+END RAW PAYLOAD
+Raw stream: old-after-light
+Payload bytes: 900
+Payload SHA256: e383d06bdc5b5e4e6f40eba0da57c4688360b7c0abbb0e2fa23d1dc180e2771c
+BEGIN RAW PAYLOAD
+---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----
+light calls, fastest to slowest: [20.836465ms, 39.342211ms, 39.704743ms, 42.21619ms, 56.415061ms, 74.961282ms, 91.593312ms, 91.935108ms, 94.532104ms, 97.038352ms, 98.36635ms, 109.957341ms, 114.902074ms, 116.457938ms, 116.92064ms, 130.097997ms, 132.799183ms, 147.96126ms, 151.951952ms, 155.017645ms]
+
+thread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (705120245) panicked at crates/voice/tests/it/light_call.rs:90:5:
+[20.836465ms, 39.342211ms, 39.704743ms, 42.21619ms, 56.415061ms, 74.961282ms, 91.593312ms, 91.935108ms, 94.532104ms, 97.038352ms, 98.36635ms, 109.957341ms, 114.902074ms, 116.457938ms, 116.92064ms, 130.097997ms, 132.799183ms, 147.96126ms, 151.951952ms, 155.017645ms]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+END RAW PAYLOAD
