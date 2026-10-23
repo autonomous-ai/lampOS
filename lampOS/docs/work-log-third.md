@@ -5,6 +5,42 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 09:12 — touch wire compatibility audit and next proposal
+
+Ready for lamp-voice: no (third-P4 is proposed; no product change yet).
+
+- Fetched `e6b88eac2`, loaded current AGENTS.md including its one-build-apart
+  rule, and fast-forwarded the clean session checkout. All 72 Queue replies
+  since the last handoff were read, plus subsequent replies through
+  `6355676986`; the open draft had no new issue comments, review comments
+  or reviews. The two labelled issues still await their acceptance owners.
+- The Body Hand wire shape is unchanged since `5564b6914`: `pushed` and
+  `since_us` were always required. Original and extended JSON both parse;
+  malformed input or expired evidence does not keep a push asserted.
+  No compatibility fix or detector change is justified there. Fifth owns
+  the Body deadband work and the attended hand qualification.
+- A separate gap is real: the three touch types reject every added field.
+  Built current Msgs on the Mac with
+  `CARGO_BUILD_JOBS=2 cargo build -q --offline --locked -p lamp-msgs --message-format=json`,
+  then linked a scratch Rust probe against those exact emitted libraries.
+  Original event and state literals passed deserialization and `check()`;
+  an added `future_diagnostic` field was refused in all four placements:
+  event, state, nested source, and retained event. The probe exited zero.
+  Original and extended Hand literals passed; a missing `since_us` failed.
+  No lamp, adjacent released binary, or physical latency was tested.
+- Proposed **third-P4** in Queue comment `6355696995` at 09:09: allow
+  additive fields only on TouchEvent, TouchSourceState and TouchState,
+  preserve required types, action enums and all semantic/owner checks,
+  and retain strict physical privacy evidence. Tests must pin old wire
+  literals, unchanged output, and receiver refusal/deduplication fences.
+  This is preparation before a later publisher adds fields, not a claim
+  that a currently mixed pair has failed. The self-pick window ends at
+  **09:24:40 +07**; no implementation begins before that or an explicit yes.
+- Independent source reads found no authority check depending on unknown
+  touch fields being refused. `docs/msgs.md` needs its strict-fields
+  sentence narrowed with the change. Existing binaries cannot be made
+  tolerant retroactively, and new enum/action meanings remain separate.
+
 ## 2026-10-23 08:18 — Controls follow-up landed; every initiated gate finished
 
 Ready for lamp-voice: yes (#3162 landed through #3164; all initiated checks are complete).
@@ -3936,6 +3972,7 @@ router, hotspot or lamp; step 4 of #806 needs a builder with a lamp.
 | third-P1 | Expression reads the system's time zone (`--zone system`), so a lamp outside Vietnam keeps its days across daylight saving; Memory's owner the same | #820 | Yes (First, 18:20; Second for the policy, 18:34); #844 |
 | third-P2 | Use diagnostic long-gap counter deltas for Controls totals; rate-limited journal warnings can omit the final suppressed gaps | #2602, 22 Oct 23:36 | Claimed after the self-pick window; delivered as #3083 for documentation review |
 | third-P3 | Test the real bus-to-Controls path for a push, its release or expiry, and recovery only after a fresh head contact | #1798; #3126, 23 Oct 07:02 | Delivered as #3162 through train #3164 at `b7700b7c2`; every initiated gate complete at 08:14; Body implementation and hand qualification remain with their owners |
+| third-P4 | Let touch message readers ignore additive fields while preserving known action, identity, freshness and privacy checks | #3126, 23 Oct 09:09, comment `6355696995` | Proposed; current refusal demonstrated on `e6b88eac2`; self-pick window ends 09:24:40 +07 |
 
 ## 2026-10-15 — Setup for a home (#806) ready as #817; #795 and #808 rebased
 
