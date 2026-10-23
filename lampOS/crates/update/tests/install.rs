@@ -907,6 +907,11 @@ fn head_touch_comes_whole_and_never_beside_the_old_engines_head() {
             .1;
         format!(" {} ", section(text, "Service").join(" "))
     };
+    assert!(
+        service("lamp-controls.service")
+            .contains(" --pins /etc/lampOS/controls/controls-pins.json "),
+        "install preflight must check the product Controls reader's active pins"
+    );
     let voice = service("lamp-voice.service");
     let voice_head = voice.contains(" Environment=LAMP_HEAD_TOUCH=on ");
     let sleep_mute = voice.contains(" --controls-mute ");
@@ -4276,4 +4281,211 @@ fn the_product_full_look_is_on_in_both_units_with_one_file() {
             .lines()
             .any(|line| line == "Environment=LAMP_EYES_FULL_LOOK_FILE=/run/lampos-eyes/look.jpg")
     );
+}
+
+// Independent #2948 install admission controls, appended without changing
+// existing test bodies. These inspect installed files, not runtime privacy.
+fn install_review_head_drop_in(disables_head: bool) {
+    const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
+    const DROP_IN: &str = "/etc/systemd/system/lamp-voice.service.d/30-local.conf";
+    const VOICE: &str = "/etc/systemd/system/lamp-voice.service";
+    const EXPRESSION: &str = "/etc/systemd/system/lamp-expression.service";
+    let mut lamp = Lamp::new(188, &[]);
+    let mut pins: serde_json::Value =
+        serde_json::from_str(SETTINGS.iter().find(|(path, _)| *path == PINS).unwrap().1).unwrap();
+    pins["legacy_head"] = true.into();
+    pins["review_owned_marker"] = "keep this local value".into();
+    let before_pins = serde_json::to_string_pretty(&pins).unwrap();
+    let drop_in = if disables_head {
+        "[Service]\nEnvironment=LAMP_HEAD_TOUCH=off\n"
+    } else {
+        "[Service]\nEnvironment=LOCAL_REVIEW_MARKER=kept\n"
+    };
+    for path in [PINS, DROP_IN] {
+        fs::create_dir_all(lamp.on(path).parent().unwrap()).unwrap();
+    }
+    fs::write(lamp.on(PINS), &before_pins).unwrap();
+    fs::write(lamp.on(DROP_IN), drop_in).unwrap();
+    let before_voice = fs::read(lamp.on(VOICE)).ok();
+    let before_expression = fs::read(lamp.on(EXPRESSION)).ok();
+    let result = lamp.install();
+    let after_pins: serde_json::Value =
+        serde_json::from_slice(&fs::read(lamp.on(PINS)).unwrap()).unwrap();
+    let voice = fs::read_to_string(lamp.on(VOICE)).unwrap_or_default();
+    let expression = fs::read_to_string(lamp.on(EXPRESSION)).unwrap_or_default();
+    eprintln!(
+        "disabling_override={disables_head}, install_ok={}, legacy_head={:?}, base_voice_head={}, base_expression_head={}, drop_in_kept={}",
+        result.is_ok(),
+        after_pins.get("legacy_head"),
+        voice.contains("Environment=LAMP_HEAD_TOUCH=on"),
+        expression.contains(" --head-touch"),
+        fs::read_to_string(lamp.on(DROP_IN)).unwrap() == drop_in,
+    );
+    assert_eq!(fs::read_to_string(lamp.on(DROP_IN)).unwrap(), drop_in);
+    if disables_head {
+        assert!(
+            result.is_err(),
+            "install admitted head-enabled Expression beside a preserved Voice head-off override"
+        );
+        assert_eq!(fs::read_to_string(lamp.on(PINS)).unwrap(), before_pins);
+        assert_eq!(fs::read(lamp.on(VOICE)).ok(), before_voice);
+        assert_eq!(fs::read(lamp.on(EXPRESSION)).ok(), before_expression);
+    } else {
+        result.unwrap();
+        assert_eq!(after_pins.get("legacy_head"), None);
+        assert_eq!(after_pins["review_owned_marker"], "keep this local value");
+        for (name, installed) in [
+            ("lamp-voice.service", voice),
+            ("lamp-expression.service", expression),
+        ] {
+            assert_eq!(
+                installed,
+                PRODUCT.iter().find(|(unit, _)| *unit == name).unwrap().1
+            );
+        }
+    }
+}
+
+#[test]
+fn install_review_head_pair_keeps_a_benign_drop_in() {
+    install_review_head_drop_in(false);
+}
+
+#[test]
+fn install_review_head_pair_refuses_a_disabling_drop_in_before_mutation() {
+    install_review_head_drop_in(true);
+}
+
+#[test]
+fn install_review_head_pair_refuses_a_removed_mute_before_mutation() {
+    const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
+    const DROP_IN: &str = "/etc/systemd/system/lamp-voice.service.d/40-local-command.conf";
+    const VOICE: &str = "/etc/systemd/system/lamp-voice.service";
+    const EXPRESSION: &str = "/etc/systemd/system/lamp-expression.service";
+    let mut lamp = Lamp::new(188, &[]);
+    let product_voice = PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let exec = product_voice
+        .lines()
+        .find(|line| line.starts_with("ExecStart="))
+        .unwrap();
+    let mute = " --controls-mute /var/lib/lampOS/voice/mute/record.json";
+    assert!(exec.contains(mute));
+    let command = exec.replace(mute, "");
+    assert!(!command.contains("--controls-mute"));
+    let drop_in = format!("[Service]\nExecStart=\n{command}\n");
+    let mut pins: serde_json::Value =
+        serde_json::from_str(SETTINGS.iter().find(|(path, _)| *path == PINS).unwrap().1).unwrap();
+    pins["legacy_head"] = true.into();
+    pins["review_owned_marker"] = "keep this local value".into();
+    let before_pins = serde_json::to_string_pretty(&pins).unwrap();
+    for path in [PINS, DROP_IN] {
+        fs::create_dir_all(lamp.on(path).parent().unwrap()).unwrap();
+    }
+    fs::write(lamp.on(PINS), &before_pins).unwrap();
+    fs::write(lamp.on(DROP_IN), &drop_in).unwrap();
+    let before_voice = fs::read(lamp.on(VOICE)).ok();
+    let before_expression = fs::read(lamp.on(EXPRESSION)).ok();
+    let result = lamp.install();
+    let after_pins: serde_json::Value =
+        serde_json::from_slice(&fs::read(lamp.on(PINS)).unwrap()).unwrap();
+    let voice = fs::read_to_string(lamp.on(VOICE)).unwrap_or_default();
+    let expression = fs::read_to_string(lamp.on(EXPRESSION)).unwrap_or_default();
+    eprintln!(
+        "removed_mute_override=true, install_ok={}, legacy_head={:?}, base_voice_head={}, base_expression_head={}, drop_in_kept={}, override_has_mute={}",
+        result.is_ok(),
+        after_pins.get("legacy_head"),
+        voice.contains("Environment=LAMP_HEAD_TOUCH=on"),
+        expression.contains(" --head-touch"),
+        fs::read_to_string(lamp.on(DROP_IN)).unwrap() == drop_in,
+        command.contains("--controls-mute"),
+    );
+    assert_eq!(fs::read_to_string(lamp.on(DROP_IN)).unwrap(), drop_in);
+    assert!(
+        result.is_err(),
+        "install admitted head-enabled Expression beside a preserved Voice command without --controls-mute"
+    );
+    assert_eq!(fs::read_to_string(lamp.on(PINS)).unwrap(), before_pins);
+    assert_eq!(fs::read(lamp.on(VOICE)).ok(), before_voice);
+    assert_eq!(fs::read(lamp.on(EXPRESSION)).ok(), before_expression);
+}
+
+#[test]
+fn install_review_head_pair_refusal_precedes_state_and_host_mutation() {
+    use std::os::unix::fs::symlink;
+    for (path, drop_in) in [
+        (
+            "/etc/systemd/system/lamp-voice.service.d/30-local.conf",
+            "[Service]\nEnvironmentFile=/etc/lampOS/voice/local.env\n",
+        ),
+        (
+            "/etc/systemd/system/lamp-.service.d/30-local.conf",
+            "[Service]\nEnvironment=LAMP_HEAD_TOUCH=off\n",
+        ),
+        (
+            "/run/systemd/system/lamp-expression.service.d/30-local.conf",
+            "[Service]\nEnvironment=LAMP_BUS_ROOT=/run/isolated\n",
+        ),
+    ] {
+        let mut lamp = Lamp::new(188, &[]);
+        fs::create_dir_all(lamp.on(path).parent().unwrap()).unwrap();
+        fs::write(lamp.on(path), drop_in).unwrap();
+        let records = Records::new(lamp.on(&lamp.config.records));
+        drop(records.lock().unwrap());
+        fs::write(lamp.on("/var/lib/lampos-update/state.json"), "{not json").unwrap();
+        let current = lamp.on("/opt/lampOS/body/current");
+        fs::create_dir_all(current.parent().unwrap()).unwrap();
+        symlink("b".repeat(64), &current).unwrap();
+        let before = tree(&lamp.root);
+        let error = lamp.install().unwrap_err();
+        assert!(error.contains("local override"), "{error}");
+        assert_eq!(tree(&lamp.root), before, "{path}");
+        assert!(lamp.host.calls.is_empty(), "{:?}", lamp.host.calls);
+    }
+}
+
+#[test]
+fn install_review_head_pair_retry_keeps_calibration_and_is_idempotent() {
+    const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
+    const DROP_IN: &str = "/etc/systemd/system/lamp-voice.service.d/30-local.conf";
+    let mut lamp = Lamp::new(188, &[]);
+    let mut pins: serde_json::Value =
+        serde_json::from_str(SETTINGS.iter().find(|(path, _)| *path == PINS).unwrap().1).unwrap();
+    pins["legacy_head"] = true.into();
+    pins["every_ms"] = 7.into();
+    pins["head_rest"] = serde_json::Value::Array(
+        pins["head_pads"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|pad| serde_json::json!({"name": pad["name"], "rest": "low", "reads": "level"}))
+            .collect(),
+    );
+    let before = serde_json::to_string_pretty(&pins).unwrap();
+    for path in [PINS, DROP_IN] {
+        fs::create_dir_all(lamp.on(path).parent().unwrap()).unwrap();
+    }
+    fs::write(lamp.on(PINS), &before).unwrap();
+    fs::write(
+        lamp.on(DROP_IN),
+        "[Service]\nEnvironment=LAMP_HEAD_TOUCH=off\n",
+    )
+    .unwrap();
+    assert!(lamp.install().is_err());
+    assert_eq!(fs::read_to_string(lamp.on(PINS)).unwrap(), before);
+    fs::remove_file(lamp.on(DROP_IN)).unwrap();
+    lamp.install().unwrap();
+    pins.as_object_mut().unwrap().remove("legacy_head");
+    let installed_pins: serde_json::Value =
+        serde_json::from_slice(&fs::read(lamp.on(PINS)).unwrap()).unwrap();
+    assert_eq!(installed_pins, pins);
+    let installed = tree(&lamp.root);
+    let calls = lamp.host.calls.len();
+    let again = lamp.install().unwrap();
+    assert!(again.changed.is_empty(), "{:?}", again.changed);
+    assert_eq!(tree(&lamp.root), installed);
+    assert_eq!(lamp.host.calls.len(), calls);
 }

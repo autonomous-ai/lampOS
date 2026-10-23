@@ -252,6 +252,37 @@ fn pins(text: &str) -> Result<Option<serde_json::Map<String, serde_json::Value>>
         .then(|| object.clone()))
 }
 
+/// Installation replaces the base product units but preserves local drop-ins.
+/// Check their resulting reader mode before install changes users, links, units
+/// or pins. The same conservative override rules as an update round apply.
+pub(crate) fn preflight_install(
+    root: &Path,
+    units: &Path,
+    product: &[(&str, &str)],
+    settings: &[(&str, &str)],
+) -> Result<(), String> {
+    let text = settings
+        .iter()
+        .find_map(|(path, text)| (*path == PINS).then_some(*text))
+        .ok_or("install has no product Controls pins")?;
+    let Some(object) = pins(text)? else {
+        return Ok(());
+    };
+    let carried = product
+        .iter()
+        .map(|(name, text)| ((*name).to_owned(), (*text).to_owned()))
+        .collect();
+    let wanted = legacy(root, units, &carried)?;
+    let configured = object
+        .get("legacy_head")
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false);
+    if configured != wanted {
+        return Err("install head pins do not match the resulting product readers".into());
+    }
+    Ok(())
+}
+
 /// Only a build-owned write/record is adapted; custom pins stay custom.
 pub(crate) fn project(
     root: &Path,
