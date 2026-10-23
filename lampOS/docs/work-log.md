@@ -1,4 +1,4 @@
-## Current checkpoint: 2026-10-23 20:40 +07, corrected updater green and old helper exercised
+## Current checkpoint: 2026-10-23 20:52 +07, corrected updater green and old helper exercised
 
 Ready for lamp-voice: #3269 is ready for review; current reviewer dispositions remain required
 
@@ -22,6 +22,11 @@ supported pair, a real process cut or physical durability acceptance.
 also passes the same **6 / 0** cases; only the pinned executable digest changed.
 Its source is the PR head's direct parent, so it is the closer provisional
 old-side recommendation. The prior 6408 results remain separate and intact.
+
+[Two real-envelope wrong-key controls](verification/signed-channel-6439-negative-20261023/README.md)
+pass on the current Mac CLI with an unchanged temporary root: wrong-key ID
+refusal and signature refusal after a forged key label. Neither establishes
+positive signature trust; the actual public-key handoff remains required.
 
 The whole-lamp state inventory is published for #2809. #1812 still requires
 Migrate's trusted public key for fingerprint `54213f8d3aa2f241`. #2810 still

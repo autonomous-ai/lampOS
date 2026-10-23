@@ -1,0 +1,1 @@
+refused, nothing switched: signed with key 54213f8d3aa2f241, and this lamp trusts key 21fe31dfa154a261

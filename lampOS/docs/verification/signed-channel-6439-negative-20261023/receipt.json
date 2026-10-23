@@ -1,0 +1,86 @@
+{
+  "observed_at_utc": "2026-10-23T13:50:03.387570+00:00",
+  "current_head": "46f5f384ad94f9c2dcc5f7050991ef4325621384",
+  "release_tag": "lampos-lamp-voice-6439",
+  "sequence": 6439,
+  "release_source": "810e05109bced3beca88a5b602930cfed5fba4e5",
+  "published_envelope_sha256": "8cbc94f6839747cafff66a7077b30f79e7916914f7f3ae759925065062f8fb02",
+  "checker_binary_sha256": "2bee425a2f4ce3c906fa922a62c2390b6613af02d9ca17a4cf59064f0e9abb78",
+  "host": "Darwin arm64",
+  "rust": "1.96.0",
+  "key_kind": "public RFC 8032 test vector only",
+  "test_key_fingerprint": "21fe31dfa154a261",
+  "actual_release_key_fingerprint": "54213f8d3aa2f241",
+  "cases": {
+    "wrong-key": {
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "elapsed_s": 0.662545,
+      "root_unchanged": true,
+      "expected_message": "signed with key 54213f8d3aa2f241, and this lamp trusts key 21fe31dfa154a261",
+      "envelope_sha256": "8cbc94f6839747cafff66a7077b30f79e7916914f7f3ae759925065062f8fb02",
+      "stdout_sha256": "bff34e0fa0c0079ddd684402f12ac6ac956a9900d62551f604656bc5ae7a6043",
+      "stderr_sha256": "da80ab94d81d0afd323e67e3e90af5e55e28365d3319a70b9ac7876e9be0f5d4"
+    },
+    "forged-key-label": {
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "elapsed_s": 0.010673,
+      "root_unchanged": true,
+      "expected_message": "the signature does not match the manifest",
+      "envelope_sha256": "d08a4b625dc3d25255657ae0f048bf1b3a51541a73cbd3b27704be9235323050",
+      "stdout_sha256": "c43e561941d8de953a44114ce29a3f741c2070a4ff98fde044dfe0a2f20f626c",
+      "stderr_sha256": "325844bdb4ce47299b96ca6832587edcc147dc1ed35c73858f54207a6d4748c0"
+    }
+  },
+  "root_snapshot": {
+    ".": {
+      "mode": 493,
+      "type": "dir"
+    },
+    "var": {
+      "mode": 493,
+      "type": "dir"
+    },
+    "var/lib": {
+      "mode": 493,
+      "type": "dir"
+    },
+    "var/lib/lampos-update": {
+      "mode": 493,
+      "type": "dir"
+    },
+    "var/lib/lampos-update/state.json": {
+      "mode": 420,
+      "type": "file",
+      "sha256": "2497af0ef42ff8ae7a128606d46c32a7838856a959b7cd3abb89ea15172462e2"
+    }
+  },
+  "command_template": "lamp-update check --channel-url file:///SCRATCH/negative-channels/CASE/ --channel lamp-voice --key-file SCRATCH/rfc8032-public-key.pub --root SCRATCH/wrong-key-check-root --lamp release-check --apply off",
+  "limits": "Wrong-key negative controls only; no trusted positive signature verification, asset fetching, installation, publication or device action.",
+  "published_output_redaction": {
+    "from": "temporary scratch-root prefix",
+    "to": "SCRATCH",
+    "raw_hashes": "cases.*.stderr_sha256",
+    "published_hashes": {
+      "wrong-key-stdout.txt": "bff34e0fa0c0079ddd684402f12ac6ac956a9900d62551f604656bc5ae7a6043",
+      "wrong-key-stderr.txt": "73ab55bbae1553e11ed3d4cb4c12508bd3075d41db10612fcd81616f34a22097",
+      "forged-key-label-stdout.txt": "c43e561941d8de953a44114ce29a3f741c2070a4ff98fde044dfe0a2f20f626c",
+      "forged-key-label-stderr.txt": "576bede02a2e162c8e6071e0a582e8f36340aa9fcc386c3aa2630cb63f8899e2"
+    }
+  },
+  "host_build_command": "cargo +1.96.0 build -q --locked --offline -p lamp-update --bin lamp-update",
+  "host_build_exit": 0,
+  "host_build_environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "RUSTC_WRAPPER": ""
+  },
+  "inputs_sha256": {
+    "published-envelope.json": "8cbc94f6839747cafff66a7077b30f79e7916914f7f3ae759925065062f8fb02",
+    "forged-label-envelope.json": "d08a4b625dc3d25255657ae0f048bf1b3a51541a73cbd3b27704be9235323050",
+    "rfc8032-public-key.pub": "27eab1a0792e48b0aaafaadef8e884d95836b758e1f0470054502576bebf724b",
+    "host-checker-build.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
