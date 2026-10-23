@@ -1,6 +1,6 @@
 use lamp_bus::Kind;
 use lamp_msgs::*;
-use serde_json::json;
+use serde_json::{Value, json};
 
 fn event() -> TouchEvent {
     TouchEvent {
@@ -77,6 +77,34 @@ fn strip_event() -> TouchEvent {
     }
 }
 
+// Frozen v1 wire, independent of today's serializer. A future writer may add
+// metadata, but an older reader must retain exactly these request semantics.
+const ORIGINAL_TOUCH_STATE: &str = r#"{
+    "stamp":{"clock_id":"boot","at_us":1100000,"sequence":1},
+    "session_id":"controls","enabled":true,
+    "sources":[{
+        "source":"head","name":"head","reader_session_id":"gpio",
+        "ready":true,"fault":null,"observed_us":1100000,"armed":true,
+        "active":true,"contact_id":1,"began_us":1000000,"held_us":100000,
+        "active_mask":3,"active_names":["pad37","pad96"],
+        "position":null,"toward_pad":null,"distance":0.0,"speed":0.0
+    }],
+    "latest":[{
+        "stamp":{"clock_id":"boot","at_us":1100000,"sequence":1},
+        "session_id":"controls","reader_session_id":"gpio","enabled":true,
+        "source":"head","name":"head","contact_id":1,"gesture":"touch",
+        "when_speaking":"stop","when_quiet":"notice","when_asleep":null,
+        "began_us":1000000,"observed_us":1100000,"released_us":null,
+        "active_mask":3,"active_names":["pad37","pad96"],
+        "position":null,"toward_pad":null,"distance":0.0,"speed":0.0
+    }],
+    "event_sequence":1,"rejected_inputs":0
+}"#;
+
+fn original_touch_wire() -> Value {
+    serde_json::from_str(ORIGINAL_TOUCH_STATE).unwrap()
+}
+
 #[test]
 fn touch_topics_are_explicit_and_leave_v1_inventory_unchanged() {
     assert_eq!(first_topics().len(), 17);
@@ -99,19 +127,106 @@ fn touch_topics_are_explicit_and_leave_v1_inventory_unchanged() {
     assert_eq!(TouchState::declaration().lifespan_ms, Some(300));
 }
 #[test]
-fn roundtrip_new_contract_and_reject_unknown_actions_fields() {
-    let value = state();
-    value.check().unwrap();
-    assert_eq!(
-        serde_json::from_str::<TouchState>(&serde_json::to_string(&value).unwrap()).unwrap(),
-        value
-    );
-    let mut wire = serde_json::to_value(event()).unwrap();
+fn additive_fields_on_events_preserve_requests_without_granting_permission() {
+    let original = original_touch_wire()["latest"][0].clone();
+    let old: TouchEvent = serde_json::from_value(original.clone()).unwrap();
+    old.check().unwrap();
+    assert_eq!(old, event());
+    assert_eq!(serde_json::to_value(&old).unwrap(), original);
+
+    let mut wire = original.clone();
     wire["permit"] = json!(true);
-    assert!(serde_json::from_value::<TouchEvent>(wire).is_err());
-    let mut wire = serde_json::to_value(event()).unwrap();
+    wire["future_metadata"] = json!({"revision":2,"labels":["diagnostic"]});
+    let read: TouchEvent = serde_json::from_value(wire).unwrap();
+    read.check().unwrap();
+    assert_eq!(read, old);
+    assert_eq!(read.intent(true, false), Some(TouchIntent::Stop));
+    assert_eq!(read.intent(false, false), Some(TouchIntent::Notice));
+    assert_eq!(read.intent(false, true), None);
+    assert_eq!(
+        serde_json::to_vec(&read).unwrap(),
+        serde_json::to_vec(&old).unwrap()
+    );
+
+    let mut wire = original;
     wire["when_quiet"] = json!("unmute");
     assert!(serde_json::from_value::<TouchEvent>(wire).is_err());
+}
+
+#[test]
+fn additive_fields_on_states_and_nested_records_preserve_the_old_wire() {
+    let original = original_touch_wire();
+    let old: TouchState = serde_json::from_str(ORIGINAL_TOUCH_STATE).unwrap();
+    old.check().unwrap();
+    assert_eq!(old, state());
+    assert_eq!(serde_json::to_value(&old).unwrap(), original);
+    let old_bytes = serde_json::to_vec(&old).unwrap();
+
+    // Each level is independent: relaxing only the outer state must not hide
+    // a source or retained event that still refuses additive fields.
+    for path in ["", "/sources/0", "/latest/0"] {
+        let mut newer = original.clone();
+        newer.pointer_mut(path).unwrap()["future_metadata"] =
+            json!({"revision":2,"labels":["diagnostic"]});
+        let read: TouchState = serde_json::from_value(newer.clone()).unwrap();
+        read.check().unwrap();
+        assert_eq!(read, old, "at {path}");
+        assert_eq!(serde_json::to_vec(&read).unwrap(), old_bytes, "at {path}");
+        let source: TouchSourceState = serde_json::from_value(newer["sources"][0].clone()).unwrap();
+        source.check(read.stamp.at_us).unwrap();
+        assert_eq!(source, old.sources[0]);
+    }
+}
+
+#[test]
+fn additive_fields_leave_required_fields_types_and_action_checks_intact() {
+    let original = original_touch_wire();
+    // Option fields already accept absence; these known fields are required.
+    for path in [
+        "/session_id",
+        "/event_sequence",
+        "/sources/0/ready",
+        "/latest/0/reader_session_id",
+        "/latest/0/gesture",
+        "/latest/0/when_quiet",
+    ] {
+        let mut wire = original.clone();
+        let (parent, field) = path.rsplit_once('/').unwrap();
+        wire.pointer_mut(parent)
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .remove(field)
+            .unwrap();
+        assert!(
+            serde_json::from_value::<TouchState>(wire).is_err(),
+            "missing {path}"
+        );
+    }
+    for (path, value) in [
+        ("/event_sequence", json!("1")),
+        ("/sources/0/ready", json!("true")),
+        ("/sources/0/observed_us", json!(-1)),
+        ("/sources/0/source", json!("microphone")),
+        ("/latest/0/contact_id", json!(1.5)),
+        ("/latest/0/enabled", json!(1)),
+        ("/latest/0/when_quiet", json!("unmute")),
+        ("/latest/0/gesture", json!("toggle")),
+        ("/latest/0/source", json!("microphone")),
+    ] {
+        let mut wire = original.clone();
+        *wire.pointer_mut(path).unwrap() = value;
+        assert!(
+            serde_json::from_value::<TouchState>(wire).is_err(),
+            "invalid {path}"
+        );
+    }
+    // Wake is a known intent, but cannot replace Notice on a head Touch.
+    let mut wire = original;
+    wire["latest"][0]["when_quiet"] = json!("wake");
+    let invalid: TouchState = serde_json::from_value(wire).unwrap();
+    assert!(invalid.latest[0].check().is_err());
+    assert!(invalid.check().is_err());
 }
 #[test]
 fn contextual_intent_is_chosen_by_owner_and_contains_no_readiness() {
