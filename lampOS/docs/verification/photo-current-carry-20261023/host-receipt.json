@@ -1,0 +1,73 @@
+{
+  "base": "00c79072298c583c88ac92a0cad42d2f9155520c",
+  "both_targets_released": true,
+  "branch": "fourth/photo-common-final-20261023",
+  "final_supplement": {
+    "each_host": "6 passed / 0 failed / 0 ignored",
+    "installed_off_on": "all three executed, Live31/Second34 exact and no cut",
+    "receipt": "fourth-photo-final-carry-gates-20261023/census-supplement/both-host-supplement-receipt.json",
+    "receipt_sha256": "a72c8c60467623c42c6d8635729e8ef959be29e2a92b093b40dc83418183622f",
+    "stages": [
+      "fmt",
+      "strict workspace/all-target Clippy",
+      "full functions6"
+    ]
+  },
+  "final_tree": "c419e6c2647191176e0f4cd7cb84a71316f11d2c",
+  "full_tracked_files": 10051,
+  "hashes": {
+    "census-supplement/code-correction/receipt.json": "41533a9ef17db6f3319f7a696825b2db1a9a9c428341a0894b6936a02efba435",
+    "census-supplement/config.json": "65ccf5a61c3a17a24f57d8824d10e6039fdbe287e30c512f8638c42ebe1202ec",
+    "census-supplement/frozen.json": "86282b5706e50ea02060580747624516bb00e61468f34bc1fa9960dfe54d1c5d",
+    "census-supplement/full-source-receipt.json": "3098e41d66ba7f7b98072b46f10384d6aac290a4820f726394edcfd477dbae22",
+    "census-supplement/gate.py": "ea1ee7c873c4c7ee774524051474e2ce99cb34e5ed32315b21a9b98f597bcc07",
+    "census-supplement/linux/attempt1/evidence.json": "91e792f25c6bbd3ee20dad7244b3b753a4589abf9d4dfa9e06711062712b9791",
+    "census-supplement/mac/attempt1/evidence.json": "39fceb71d7a1051f61341288875cd4f71514fc0e7fc67177b0152e47fb825845",
+    "census-supplement/parity-against-revision2.json": "d0d9e466e49c988198d0b13fe3aaafc35d1b9e456d2216ccd4df8991fd4e457c"
+  },
+  "limits": [
+    "Full ARM64 workspace suite and exact-head Linux CI are still publication gates.",
+    "No actual Eyes or physical capture-origin/Photo whole-interval proof integration claimed; LAMP_PHOTO_SPEAKER remains disabled.",
+    "First origin-channel decision, subsequent route integration and First/Mobile physical/privacy acceptance remain open.",
+    "No acoustic/model/device latency or replay/liveness authentication claim; host timing is controlled-socket only.",
+    "Closing Voice connection cannot retract already-written bytes or establish Eyes did not commit."
+  ],
+  "no_source_or_index_change_during_any_gate": true,
+  "paths": 29,
+  "published_head": "c71274d32b76e8d7587ec6bd0ff5072f78a9c615",
+  "record_kind": "source-specific local gate receipt; not native or device acceptance",
+  "retained_failures": {
+    "first_attempt_b5": "Mac E0061 and Linux E0599 compilation failures; no runtime control executed",
+    "old_wire_and_transport": "all prior RED/fixture/full-Cloud histories retained under their original source receipts",
+    "revision2_bd": "each host285 passed/1 failed/2 ignored; only stale Photo expected Second33 versus actual Common34. Explicit off/on not reached there."
+  },
+  "retained_source_exact_runtime_and_other_controls_per_host": {
+    "Cloud_full_crate": {
+      "failed": 0,
+      "ignored_fixture_writers": 2,
+      "passed": 209
+    },
+    "Voice_focused": 63,
+    "installed_unit_controls": 6,
+    "new_Pending_authored_executed_cases": 7,
+    "new_Pending_tests": 3,
+    "receipt": "fourth-photo-final-carry-gates-20261023/revision2/both-host-result-receipt.json",
+    "receipt_sha256": "161759cd5cbd0e4c58a20e761f9aee4ec60197b242d9de8203632d5ef4c420c4",
+    "scratch_census": 2,
+    "tree": "bd269b7b18027713f2a147ee385deec77e3ea0b0",
+    "workspace_build": "pass"
+  },
+  "scope_total_note": "Retained unchanged-source controls plus corrected census amount to286 passed/0 failed/2 ignored per host for the selected qualification scope; this is NOT one fresh full-suite run on final tree. Old failed observations remain failed.",
+  "source_composition": {
+    "Root_historical_doc_tail_proof": "fourth-photo-current-evidence-preface-20261023/receipt.json",
+    "one_file_test_delta_receipt": "fourth-photo-final-carry-gates-20261023/census-supplement/code-correction/receipt.json",
+    "only_changes_after_runtime_gate": [
+      "one Update integration-test expected vector and dynamic diagnostic",
+      "two verification evidence prefaces"
+    ],
+    "parity_receipt": "fourth-photo-final-carry-gates-20261023/census-supplement/parity-against-revision2.json",
+    "runtime_other_test_sources_exact": true
+  },
+  "source_receipt_location": "builder scratch; relative paths below refer to /private/tmp",
+  "source_receipt_sha256": "481375f67175467fb766bbc2bfbdfafd8e2432c58b965d4682033f70d2c27384"
+}

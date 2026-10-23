@@ -8200,3 +8200,32 @@ and the new HTTP fixture lacked FutureExt. Both attempts are retained.
 Only those two test-only compiler corrections were applied; assertions
 are unchanged. Corrected tree bd269b7b1 is under fresh gates. No Photo
 native qualification, origin approval, lamp result or score is claimed.
+
+## 2026-10-23 21:23 +07: Photo current Common carry pushed
+
+Ready for lamp-voice: no (#2988 original-capture, review and physical holds)
+
+Photo is published as c71274d32, one Photo task commit above Common
+00c790722, with 29 changed paths. Current Eyes runtime and consent guards
+are retained exactly. The route uses Eyes' face wire key and preserves
+Common's Pending/Ready/Lost authority. The speaker switch stays off:
+original-capture classification and strict whole-interval Photo speaker
+proof still require First's contract decision and route integration.
+
+The source-specific local receipt is
+verification/photo-current-carry-20261023/host-receipt.json. Both hosts pass
+final formatting, strict workspace/all-target Clippy and functions 6/0/0;
+installed/off/on each retain Live 31 and Second 34. Retained unchanged-source
+results are Voice 63/0, Cloud 209/0/2 fixture writers ignored, installed units
+6/0, scratch census 2/0 and workspace build. Earlier compiler failures and
+285/1/2 stale-census runs are retained. The final supplement did not repeat
+the unchanged runtime suites. All source guards and cleanup checks pass.
+Clippy 39967057642 passes on the exact author tree; ARM64 39967057269 is
+running. Native results, formal review and First/Mobile physical acceptance
+remain separate gates. No lamp action or row-score change was made.
+
+Name #3014 is now being carried onto the CI-qualified Common dependency
+as five product/test/documentation paths, without a runtime delta. Its own
+both-host gates are next; product activation remains held for review and
+First's person-at-lamp checks. Common's current source/settings dispositions
+remain with First, reviewer-lead and El; its native receipt is already posted.
