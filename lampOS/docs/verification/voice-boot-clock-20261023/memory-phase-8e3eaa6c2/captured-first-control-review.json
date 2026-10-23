@@ -1,0 +1,37 @@
+{
+  "read_only_captured_output_revalidation": true,
+  "new_test_execution": false,
+  "initial_runner_exit": 1,
+  "initial_status": "Stopped on invalid or unexpected outcome; no retry",
+  "initial_failure": "Panic matcher and cleanup-order lookup omitted Rust 1.96 numeric thread ID",
+  "correction_scope": "Optional ASCII numeric thread ID in precisely two panic-location lookups; no other validation or source change",
+  "original_runner_sha256": "ffc31c7f02afcc8cecd45b77499f0a3100383d1998d4f3f873027e3a5a6348db",
+  "corrected_validator_copy_sha256": "8cb8dd5fc898a8161a1ec3a555f00ed0bd7242eecbe1907acb75c7c4a4534063",
+  "patch_sha256": "70d4a949a7a245339faf8f11a86719a38cc0579a0e22a2658018c4bd99cb1a6d",
+  "stdout_sha256": "95931d56b4d10d02820068e1daa4b207f55f706775c4aefb3b80ea98efdb3b99",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "validation": {
+    "expected_negative_observation": true,
+    "actual_test_exit": 101,
+    "original_assertion_failed_after_explicit_release_and_join": true,
+    "caller_returned_before_release": true,
+    "hold_sequence": 4,
+    "caller_elapsed_us": 1501800,
+    "private_budget_or_settlement_observed": false,
+    "historical_same_phase_reproduction": false,
+    "phase_limit": "Holding the compatibility kept reply is earlier than every historical bare-forget log. It demonstrates reachability only, not the same phase or historical cause. Private context locks, settlement and remaining budget remain unobserved.",
+    "unexecuted_later_branches": "unexecuted after the original first-branch assertion fails"
+  },
+  "actual_test_counts": {
+    "passed": 0,
+    "failed": 1,
+    "ignored": 0,
+    "measured": 0,
+    "filtered_out": 158
+  },
+  "still_unrun": [
+    "02-held-journalled",
+    "03-held-retry"
+  ],
+  "original_files_unchanged": true
+}

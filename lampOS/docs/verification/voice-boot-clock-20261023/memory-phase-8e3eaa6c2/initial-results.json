@@ -1,0 +1,225 @@
+{
+  "status": "Stopped on invalid or unexpected outcome; no retry",
+  "source": {
+    "worktree": "/private/tmp/tests-codex-memory-phase-20261023",
+    "head": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+    "base_tree": "bfc542f17318518ef5dea21dd9f196ec47fbf96d",
+    "branch": "tests/1569-memory-phase-diagnostic",
+    "tracked_paths": 10028,
+    "lampos_paths": 6682,
+    "owned_paths": [
+      "lampOS/crates/memory/tests/it/voice.rs"
+    ],
+    "source_aggregate_sha256": "9a032352c48badc66e3052a291e80d921cbb777cab878bc589514fe118d184a5",
+    "source_map_sha256": "01c1d0adbca90f3d5fa9dfc221484b715fdb4828f40bc8105b03b42744d25176",
+    "fixture_sha256": "f9a71c4f63d2e31ca138667fd026f884f5fc9325b3f9eb87f67e1498443c1d95"
+  },
+  "source_before_sha256": "9a032352c48badc66e3052a291e80d921cbb777cab878bc589514fe118d184a5",
+  "environment": {
+    "PATH": "/Users/autonomous/.cargo/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/usr/local/go/bin:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/Users/autonomous/.codex/tmp/arg0-macos/codex-arg0TYuE1D:/Users/autonomous/.harness/runtime/grid-0.3.59-darwin-x64/bin:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.96.0",
+    "RUST_BACKTRACE": "1",
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LAMP_TEST_MEMORY_HOLD_COMPAT_REPLY": null
+  },
+  "removed_environment_keys": [],
+  "normal_target": {
+    "state": "completed",
+    "command": {
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+        "--show-output"
+      ],
+      "cwd": "/private/tmp/tests-codex-memory-phase-20261023/lampOS/crates/memory",
+      "started_at": "2026-10-23T13:06:47.283470+00:00",
+      "timeout_seconds": 1800,
+      "stdout": "normal.stdout.txt",
+      "stderr": "normal.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 64529,
+      "owned_process_group": 64529,
+      "exit_code": 0,
+      "wall_seconds": 153.665551,
+      "finished_at": "2026-10-23T13:09:20.945047+00:00",
+      "stdout_sha256": "1bf054783fa2b350db8f564011f8ea4018b4a57c4fd9b0535010fb1f90c9cacd",
+      "stdout_bytes": 101875,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    },
+    "counts": {
+      "passed": 154,
+      "failed": 0,
+      "ignored": 5,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "failed_cases": []
+  },
+  "controls": [
+    {
+      "id": "01-held-right-after",
+      "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+      "state": "running",
+      "actual_failure_remains_failure": true,
+      "environment_overlay": {
+        "LAMP_TEST_MEMORY_HOLD_COMPAT_REPLY": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about"
+      },
+      "command": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+          "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+          "--exact",
+          "--show-output"
+        ],
+        "cwd": "/private/tmp/tests-codex-memory-phase-20261023/lampOS/crates/memory",
+        "started_at": "2026-10-23T13:09:25.307433+00:00",
+        "timeout_seconds": 120,
+        "stdout": "control.stdout.txt",
+        "stderr": "control.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 71724,
+        "owned_process_group": 71724,
+        "exit_code": 101,
+        "wall_seconds": 3.202136,
+        "finished_at": "2026-10-23T13:09:28.509870+00:00",
+        "stdout_sha256": "95931d56b4d10d02820068e1daa4b207f55f706775c4aefb3b80ea98efdb3b99",
+        "stdout_bytes": 9897,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "counts": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 158
+      }
+    }
+  ],
+  "unrun": [
+    "02-held-journalled",
+    "03-held-retry"
+  ],
+  "phase_limit": "Holding the compatibility kept reply is earlier than every historical bare-forget log. It demonstrates reachability only, not the same phase or historical cause. Private context locks, settlement and remaining budget remain unobserved.",
+  "source_unchanged": true,
+  "whole_reader_or_voice_suite_executed": false,
+  "socket_preflight": "AF_UNIX datagram and IPv4 loopback succeeded before Cargo",
+  "rustc": {
+    "command": [
+      "rustc",
+      "-vV"
+    ],
+    "cwd": "/private/tmp/tests-codex-memory-phase-20261023/lampOS",
+    "started_at": "2026-10-23T13:04:49.869489+00:00",
+    "timeout_seconds": 60,
+    "stdout": "rustc.stdout.txt",
+    "stderr": "rustc.stderr.txt",
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "owned_pid": 57335,
+    "owned_process_group": 57335,
+    "exit_code": 0,
+    "wall_seconds": 0.048716,
+    "finished_at": "2026-10-23T13:04:49.918572+00:00",
+    "stdout_sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+    "stdout_bytes": 191,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0
+  },
+  "cargo": {
+    "command": [
+      "cargo",
+      "-V"
+    ],
+    "cwd": "/private/tmp/tests-codex-memory-phase-20261023/lampOS",
+    "started_at": "2026-10-23T13:04:49.919535+00:00",
+    "timeout_seconds": 60,
+    "stdout": "cargo.stdout.txt",
+    "stderr": "cargo.stderr.txt",
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "owned_pid": 57336,
+    "owned_process_group": 57336,
+    "exit_code": 0,
+    "wall_seconds": 0.051938,
+    "finished_at": "2026-10-23T13:04:49.971881+00:00",
+    "stdout_sha256": "b6ef6807dd96d18b833474ad68e7a23a29e562a29c67afa71a59fb9a73df0068",
+    "stdout_bytes": 36,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0
+  },
+  "freshness": {
+    "mtime_ns": 1792760689972879000,
+    "paths": 10028,
+    "before_sha256": "9a032352c48badc66e3052a291e80d921cbb777cab878bc589514fe118d184a5",
+    "after_sha256": "9a032352c48badc66e3052a291e80d921cbb777cab878bc589514fe118d184a5",
+    "bytes_modes_symlinks_identical": true
+  },
+  "compilation": {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-body",
+      "-p",
+      "lamp-cloud",
+      "-p",
+      "lamp-expression",
+      "-p",
+      "lamp-keeper",
+      "-p",
+      "lamp-lean",
+      "-p",
+      "lamp-memory",
+      "-p",
+      "lamp-peek",
+      "-p",
+      "lamp-setup",
+      "-p",
+      "lamp-skills",
+      "-p",
+      "lamp-update",
+      "-p",
+      "lamp-voice-eval",
+      "--no-fail-fast",
+      "--message-format=json-render-diagnostics",
+      "--no-run"
+    ],
+    "cwd": "/private/tmp/tests-codex-memory-phase-20261023/lampOS",
+    "started_at": "2026-10-23T13:04:54.710845+00:00",
+    "timeout_seconds": 1800,
+    "stdout": "compile.stdout.txt",
+    "stderr": "compile.stderr.txt",
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "owned_pid": 57450,
+    "owned_process_group": 57450,
+    "exit_code": 0,
+    "wall_seconds": 107.495015,
+    "finished_at": "2026-10-23T13:06:42.205347+00:00",
+    "stdout_sha256": "f75ab5c7e6193776b14ee53f9010a54086998486a16fbb95d28be60c0f6db368",
+    "stdout_bytes": 353455,
+    "stderr_sha256": "ca3efe8ac306f4bb3e2fda3d8886da9f86a46bd7c397086573922ae9985a8ab9",
+    "stderr_bytes": 3602
+  },
+  "error": "AssertionError()",
+  "source_after_sha256": "9a032352c48badc66e3052a291e80d921cbb777cab878bc589514fe118d184a5",
+  "instrumentation_left_as_prepared": true,
+  "base_source_restoration_claimed": false,
+  "finished_at": "2026-10-23T13:09:32.821659+00:00",
+  "runner_exit_code": 1
+}

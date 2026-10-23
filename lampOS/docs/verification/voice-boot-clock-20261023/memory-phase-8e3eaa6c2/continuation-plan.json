@@ -1,0 +1,23 @@
+{
+  "status": "Prepared only; parent must review and grant the two previously unrun controls.",
+  "initial_run": "/private/tmp/tests-memory-phase-diagnostic-execution-20261023/run-2026-10-23T130449.867050Z",
+  "initial_runner_exit": 1,
+  "initial_first_control_test_exit": 101,
+  "correction": "Only optional numeric thread-ID syntax in panic-location and corresponding cleanup-order lookup; first captured control revalidated without execution.",
+  "corrected_validator_sha256": "8cb8dd5fc898a8161a1ec3a555f00ed0bd7242eecbe1907acb75c7c4a4534063",
+  "controls": [
+    "02-held-journalled",
+    "03-held-retry"
+  ],
+  "source_aggregate_sha256": "9a032352c48badc66e3052a291e80d921cbb777cab878bc589514fe118d184a5",
+  "executable_sha256": "393da7d9bad9b6bb24f7002e02260781166fc199e28201e2b37d18212e7e7c4c",
+  "binary": "retained-memory-it",
+  "compile": false,
+  "normal_or_first_control_repeat": false,
+  "listing_repeat": false,
+  "source_changes": false,
+  "expectations": "Original fixed expected negative and cleanup/phase invariants remain identical; no assertion or limit changes. Stop on any invalid/unexpected result.",
+  "watchdog_seconds_per_control": 120,
+  "phase_limit": "Earlier compatibility-kept hold is reachability only, not the historical post-probe cause or phase.",
+  "initial_artifact_proof": "Byte-exact retained copy of the single compiled instrumented Mach-O x86_64 binary, bound to its prior complete 159-case inventory and source; copy is not a build or test."
+}

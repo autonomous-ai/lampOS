@@ -1,0 +1,2049 @@
+[
+  {
+    "stage": "normal-target",
+    "counts": {
+      "passed": 154,
+      "failed": 0,
+      "ignored": 5,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "raw_summary": "test result: ok. 154 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 153.61s",
+    "failed_cases": [],
+    "calls": [
+      {
+        "caller_event": {
+          "at_us": 2366006,
+          "branch": {
+            "attempt": "initial refusal then retry"
+          },
+          "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+          "controlled": false,
+          "details": {
+            "attempt": "initial_refusal",
+            "call": {
+              "args": {},
+              "id": "voice-memory-test",
+              "name": "forget"
+            },
+            "deadline_ms": 1500,
+            "elapsed_us": 1032,
+            "person": "p-c60cdee85b94b4a3",
+            "private_remaining_budget": "unobserved",
+            "private_settlement_and_context_lock": "unobserved",
+            "return": [
+              {
+                "error": "My memory is not answering right now, so I could not do that."
+              },
+              false
+            ],
+            "started_us": 2364973
+          },
+          "phase": "caller_returned"
+        },
+        "server_request_entries_during_public_call": [
+          {
+            "entry": {
+              "at_us": 2365086,
+              "branch": {
+                "attempt": "initial refusal then retry"
+              },
+              "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+              "controlled": false,
+              "details": {
+                "request": {
+                  "max_bytes": 16384,
+                  "observations": true,
+                  "op": "kept",
+                  "person": "p-c60cdee85b94b4a3"
+                },
+                "sequence": 4
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 2365718,
+                "branch": {
+                  "attempt": "initial refusal then retry"
+                },
+                "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+                "controlled": false,
+                "details": {
+                  "answer_line": "{\"entries\":[{\"at_unix_ms\":1792674489982,\"id\":2,\"text\":\"The synthetic lantern inventory is complete.\"},{\"at_unix_ms\":1792674489981,\"id\":3,\"text\":\"Synthetic exam on the hill\"}],\"ok\":true}",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-c60cdee85b94b4a3"
+                  },
+                  "sequence": 4,
+                  "storage_fault": false,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 2365745,
+                "branch": {
+                  "attempt": "initial refusal then retry"
+                },
+                "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+                "controlled": false,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-c60cdee85b94b4a3"
+                  },
+                  "sequence": 4
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          },
+          {
+            "entry": {
+              "at_us": 2365932,
+              "branch": {
+                "attempt": "initial refusal then retry"
+              },
+              "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+              "controlled": false,
+              "details": {
+                "request": {
+                  "id": 3,
+                  "op": "forget",
+                  "person": "p-c60cdee85b94b4a3"
+                },
+                "sequence": 5
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 2365956,
+                "branch": {
+                  "attempt": "initial refusal then retry"
+                },
+                "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+                "controlled": false,
+                "details": {
+                  "answer_line": "{\"error\":\"io\",\"ok\":false}",
+                  "request": {
+                    "id": 3,
+                    "op": "forget",
+                    "person": "p-c60cdee85b94b4a3"
+                  },
+                  "sequence": 5,
+                  "storage_fault": true,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 2365970,
+                "branch": {
+                  "attempt": "initial refusal then retry"
+                },
+                "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+                "controlled": false,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "id": 3,
+                    "op": "forget",
+                    "person": "p-c60cdee85b94b4a3"
+                  },
+                  "sequence": 5
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "caller_event": {
+          "at_us": 5462653,
+          "branch": {
+            "attempt": "initial refusal then retry"
+          },
+          "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+          "controlled": false,
+          "details": {
+            "attempt": "retry",
+            "call": {
+              "args": {},
+              "id": "voice-memory-test",
+              "name": "forget"
+            },
+            "deadline_ms": 1500,
+            "elapsed_us": 1246745,
+            "person": "p-c60cdee85b94b4a3",
+            "private_remaining_budget": "unobserved",
+            "private_settlement_and_context_lock": "unobserved",
+            "return": [
+              {
+                "forgotten": true
+              },
+              true
+            ],
+            "started_us": 4215907
+          },
+          "phase": "caller_returned"
+        },
+        "server_request_entries_during_public_call": [
+          {
+            "entry": {
+              "at_us": 4215971,
+              "branch": {
+                "attempt": "initial refusal then retry"
+              },
+              "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+              "controlled": false,
+              "details": {
+                "request": {
+                  "max_bytes": 16384,
+                  "observations": true,
+                  "op": "kept",
+                  "person": "p-c60cdee85b94b4a3"
+                },
+                "sequence": 11
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 4216710,
+                "branch": {
+                  "attempt": "initial refusal then retry"
+                },
+                "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+                "controlled": false,
+                "details": {
+                  "answer_line": "{\"entries\":[{\"at_unix_ms\":1792674489982,\"id\":2,\"text\":\"The synthetic lantern inventory is complete.\"},{\"at_unix_ms\":1792674489981,\"id\":3,\"text\":\"Synthetic exam on the hill\"}],\"ok\":true}",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-c60cdee85b94b4a3"
+                  },
+                  "sequence": 11,
+                  "storage_fault": false,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 4216738,
+                "branch": {
+                  "attempt": "initial refusal then retry"
+                },
+                "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+                "controlled": false,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-c60cdee85b94b4a3"
+                  },
+                  "sequence": 11
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          },
+          {
+            "entry": {
+              "at_us": 4216916,
+              "branch": {
+                "attempt": "initial refusal then retry"
+              },
+              "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+              "controlled": false,
+              "details": {
+                "request": {
+                  "id": 3,
+                  "op": "forget",
+                  "person": "p-c60cdee85b94b4a3"
+                },
+                "sequence": 12
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 5462527,
+                "branch": {
+                  "attempt": "initial refusal then retry"
+                },
+                "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+                "controlled": false,
+                "details": {
+                  "answer_line": "{\"ok\":true,\"removed\":2}",
+                  "request": {
+                    "id": 3,
+                    "op": "forget",
+                    "person": "p-c60cdee85b94b4a3"
+                  },
+                  "sequence": 12,
+                  "storage_fault": false,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 5462566,
+                "branch": {
+                  "attempt": "initial refusal then retry"
+                },
+                "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+                "controlled": false,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "id": 3,
+                    "op": "forget",
+                    "person": "p-c60cdee85b94b4a3"
+                  },
+                  "sequence": 12
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "caller_event": {
+          "at_us": 3331609,
+          "branch": {
+            "asked": true,
+            "events": false,
+            "journalled": false
+          },
+          "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+          "controlled": false,
+          "details": {
+            "attempt": "forget",
+            "call": {
+              "args": {},
+              "id": "voice-memory-test",
+              "name": "forget"
+            },
+            "deadline_ms": 1500,
+            "elapsed_us": 1258234,
+            "person": "p-fe3403cf9781cc04",
+            "private_remaining_budget": "unobserved",
+            "private_settlement_and_context_lock": "unobserved",
+            "return": [
+              {
+                "forgotten": true
+              },
+              true
+            ],
+            "started_us": 2073374
+          },
+          "phase": "caller_returned"
+        },
+        "server_request_entries_during_public_call": [
+          {
+            "entry": {
+              "at_us": 2073434,
+              "branch": {
+                "asked": true,
+                "events": false,
+                "journalled": false
+              },
+              "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+              "controlled": false,
+              "details": {
+                "request": {
+                  "max_bytes": 16384,
+                  "observations": true,
+                  "op": "kept",
+                  "person": "p-fe3403cf9781cc04"
+                },
+                "sequence": 4
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 2073952,
+                "branch": {
+                  "asked": true,
+                  "events": false,
+                  "journalled": false
+                },
+                "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+                "controlled": false,
+                "details": {
+                  "answer_line": "{\"entries\":[{\"at_unix_ms\":1792501697050,\"id\":1,\"text\":\"unrelated synthetic note\"},{\"at_unix_ms\":1792674497050,\"id\":3,\"text\":\"Synthetic exam on the hill\"}],\"ok\":true}",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 4,
+                  "storage_fault": false,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 2073977,
+                "branch": {
+                  "asked": true,
+                  "events": false,
+                  "journalled": false
+                },
+                "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+                "controlled": false,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 4
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          },
+          {
+            "entry": {
+              "at_us": 2074122,
+              "branch": {
+                "asked": true,
+                "events": false,
+                "journalled": false
+              },
+              "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+              "controlled": false,
+              "details": {
+                "request": {
+                  "id": 3,
+                  "op": "forget",
+                  "person": "p-fe3403cf9781cc04"
+                },
+                "sequence": 5
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 3331459,
+                "branch": {
+                  "asked": true,
+                  "events": false,
+                  "journalled": false
+                },
+                "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+                "controlled": false,
+                "details": {
+                  "answer_line": "{\"ok\":true,\"removed\":2}",
+                  "request": {
+                    "id": 3,
+                    "op": "forget",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 5,
+                  "storage_fault": false,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 3331496,
+                "branch": {
+                  "asked": true,
+                  "events": false,
+                  "journalled": false
+                },
+                "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+                "controlled": false,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "id": 3,
+                    "op": "forget",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 5
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "caller_event": {
+          "at_us": 3015359,
+          "branch": {
+            "asked": true,
+            "events": true,
+            "journalled": false
+          },
+          "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+          "controlled": false,
+          "details": {
+            "attempt": "forget",
+            "call": {
+              "args": {},
+              "id": "voice-memory-test",
+              "name": "forget"
+            },
+            "deadline_ms": 1500,
+            "elapsed_us": 1151123,
+            "person": "p-fe3403cf9781cc04",
+            "private_remaining_budget": "unobserved",
+            "private_settlement_and_context_lock": "unobserved",
+            "return": [
+              {
+                "forgotten": true
+              },
+              true
+            ],
+            "started_us": 1864235
+          },
+          "phase": "caller_returned"
+        },
+        "server_request_entries_during_public_call": [
+          {
+            "entry": {
+              "at_us": 1864322,
+              "branch": {
+                "asked": true,
+                "events": true,
+                "journalled": false
+              },
+              "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+              "controlled": false,
+              "details": {
+                "request": {
+                  "max_bytes": 16384,
+                  "observations": true,
+                  "op": "kept",
+                  "person": "p-fe3403cf9781cc04"
+                },
+                "sequence": 4
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 1865088,
+                "branch": {
+                  "asked": true,
+                  "events": true,
+                  "journalled": false
+                },
+                "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+                "controlled": false,
+                "details": {
+                  "answer_line": "{\"entries\":[{\"at_unix_ms\":1792501710909,\"id\":1,\"text\":\"unrelated synthetic note\"},{\"at_unix_ms\":1792588110909,\"id\":2,\"text\":\"Synthetic exam on the hill\"}],\"ok\":true}",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 4,
+                  "storage_fault": false,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 1865127,
+                "branch": {
+                  "asked": true,
+                  "events": true,
+                  "journalled": false
+                },
+                "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+                "controlled": false,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 4
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          },
+          {
+            "entry": {
+              "at_us": 1865333,
+              "branch": {
+                "asked": true,
+                "events": true,
+                "journalled": false
+              },
+              "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+              "controlled": false,
+              "details": {
+                "request": {
+                  "id": 2,
+                  "op": "forget",
+                  "person": "p-fe3403cf9781cc04"
+                },
+                "sequence": 5
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 3015142,
+                "branch": {
+                  "asked": true,
+                  "events": true,
+                  "journalled": false
+                },
+                "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+                "controlled": false,
+                "details": {
+                  "answer_line": "{\"ok\":true,\"removed\":1}",
+                  "request": {
+                    "id": 2,
+                    "op": "forget",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 5,
+                  "storage_fault": false,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 3015191,
+                "branch": {
+                  "asked": true,
+                  "events": true,
+                  "journalled": false
+                },
+                "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+                "controlled": false,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "id": 2,
+                    "op": "forget",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 5
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "caller_event": {
+          "at_us": 5641316,
+          "branch": {
+            "asked": true,
+            "events": false,
+            "journalled": true
+          },
+          "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+          "controlled": false,
+          "details": {
+            "attempt": "forget",
+            "call": {
+              "args": {},
+              "id": "voice-memory-test",
+              "name": "forget"
+            },
+            "deadline_ms": 1500,
+            "elapsed_us": 1317831,
+            "person": "p-fe3403cf9781cc04",
+            "private_remaining_budget": "unobserved",
+            "private_settlement_and_context_lock": "unobserved",
+            "return": [
+              {
+                "forgotten": true
+              },
+              true
+            ],
+            "started_us": 4323484
+          },
+          "phase": "caller_returned"
+        },
+        "server_request_entries_during_public_call": [
+          {
+            "entry": {
+              "at_us": 4323536,
+              "branch": {
+                "asked": true,
+                "events": false,
+                "journalled": true
+              },
+              "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+              "controlled": false,
+              "details": {
+                "request": {
+                  "max_bytes": 16384,
+                  "observations": true,
+                  "op": "kept",
+                  "person": "p-fe3403cf9781cc04"
+                },
+                "sequence": 6
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 4324027,
+                "branch": {
+                  "asked": true,
+                  "events": false,
+                  "journalled": true
+                },
+                "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+                "controlled": false,
+                "details": {
+                  "answer_line": "{\"entries\":[{\"at_unix_ms\":1792501695914,\"id\":1,\"text\":\"unrelated synthetic note\"},{\"at_unix_ms\":1792674495914,\"id\":3,\"text\":\"Synthetic exam on the hill\"}],\"ok\":true}",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 6,
+                  "storage_fault": false,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 4324052,
+                "branch": {
+                  "asked": true,
+                  "events": false,
+                  "journalled": true
+                },
+                "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+                "controlled": false,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 6
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          },
+          {
+            "entry": {
+              "at_us": 4324192,
+              "branch": {
+                "asked": true,
+                "events": false,
+                "journalled": true
+              },
+              "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+              "controlled": false,
+              "details": {
+                "request": {
+                  "id": 3,
+                  "op": "forget",
+                  "person": "p-fe3403cf9781cc04"
+                },
+                "sequence": 7
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 5641196,
+                "branch": {
+                  "asked": true,
+                  "events": false,
+                  "journalled": true
+                },
+                "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+                "controlled": false,
+                "details": {
+                  "answer_line": "{\"ok\":true,\"removed\":4}",
+                  "request": {
+                    "id": 3,
+                    "op": "forget",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 7,
+                  "storage_fault": false,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 5641231,
+                "branch": {
+                  "asked": true,
+                  "events": false,
+                  "journalled": true
+                },
+                "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+                "controlled": false,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "id": 3,
+                    "op": "forget",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 7
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "caller_event": {
+          "at_us": 5464336,
+          "branch": {
+            "asked": true,
+            "events": true,
+            "journalled": true
+          },
+          "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+          "controlled": false,
+          "details": {
+            "attempt": "forget",
+            "call": {
+              "args": {},
+              "id": "voice-memory-test",
+              "name": "forget"
+            },
+            "deadline_ms": 1500,
+            "elapsed_us": 1026769,
+            "person": "p-fe3403cf9781cc04",
+            "private_remaining_budget": "unobserved",
+            "private_settlement_and_context_lock": "unobserved",
+            "return": [
+              {
+                "forgotten": true
+              },
+              true
+            ],
+            "started_us": 4437567
+          },
+          "phase": "caller_returned"
+        },
+        "server_request_entries_during_public_call": [
+          {
+            "entry": {
+              "at_us": 4437621,
+              "branch": {
+                "asked": true,
+                "events": true,
+                "journalled": true
+              },
+              "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+              "controlled": false,
+              "details": {
+                "request": {
+                  "max_bytes": 16384,
+                  "observations": true,
+                  "op": "kept",
+                  "person": "p-fe3403cf9781cc04"
+                },
+                "sequence": 6
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 4438174,
+                "branch": {
+                  "asked": true,
+                  "events": true,
+                  "journalled": true
+                },
+                "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+                "controlled": false,
+                "details": {
+                  "answer_line": "{\"entries\":[{\"at_unix_ms\":1792501711605,\"id\":1,\"text\":\"unrelated synthetic note\"},{\"at_unix_ms\":1792588111605,\"id\":2,\"text\":\"Synthetic exam on the hill\"}],\"ok\":true}",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 6,
+                  "storage_fault": false,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 4438203,
+                "branch": {
+                  "asked": true,
+                  "events": true,
+                  "journalled": true
+                },
+                "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+                "controlled": false,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 6
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          },
+          {
+            "entry": {
+              "at_us": 4438361,
+              "branch": {
+                "asked": true,
+                "events": true,
+                "journalled": true
+              },
+              "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+              "controlled": false,
+              "details": {
+                "request": {
+                  "id": 2,
+                  "op": "forget",
+                  "person": "p-fe3403cf9781cc04"
+                },
+                "sequence": 7
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 5464146,
+                "branch": {
+                  "asked": true,
+                  "events": true,
+                  "journalled": true
+                },
+                "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+                "controlled": false,
+                "details": {
+                  "answer_line": "{\"ok\":true,\"removed\":3}",
+                  "request": {
+                    "id": 2,
+                    "op": "forget",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 7,
+                  "storage_fault": false,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 5464201,
+                "branch": {
+                  "asked": true,
+                  "events": true,
+                  "journalled": true
+                },
+                "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+                "controlled": false,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "id": 2,
+                    "op": "forget",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 7
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "retry_trace_snapshots": [
+      {
+        "at_us": 5462659,
+        "branch": {
+          "attempt": "initial refusal then retry"
+        },
+        "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+        "controlled": false,
+        "details": {
+          "meaning": "original immediate nonblocking snapshot; not a later drain",
+          "trace": [
+            [
+              {
+                "max_bytes": 1200,
+                "op": "session_open",
+                "session": "voice-e554426f0f061c5e5b290e8821b32292-2"
+              },
+              {
+                "ok": true,
+                "snapshot": {
+                  "generation": 0,
+                  "invalidated": false,
+                  "note": "{\"facts\":[],\"scope\":\"said in this room; speaker unknown\",\"untrusted\":true}",
+                  "opened_unix_ms": 1792760889981,
+                  "session": "voice-e554426f0f061c5e5b290e8821b32292-2",
+                  "source_ids": []
+                }
+              }
+            ],
+            [
+              {
+                "op": "session_close",
+                "session": "voice-e554426f0f061c5e5b290e8821b32292-1"
+              },
+              {
+                "ok": true
+              }
+            ],
+            [
+              {
+                "max_bytes": 1200,
+                "op": "session_open",
+                "person": "p-c60cdee85b94b4a3",
+                "session": "voice-e554426f0f061c5e5b290e8821b32292-2"
+              },
+              {
+                "ok": true,
+                "snapshot": {
+                  "generation": 0,
+                  "invalidated": false,
+                  "note": "{\"facts\":[{\"id\":3,\"kind\":\"thread\",\"text\":\"Synthetic exam on the hill\"},{\"id\":2,\"kind\":\"preference\",\"text\":\"The synthetic lantern inventory is complete.\"}],\"scope\":\"caller-supplied person; identity not verified\",\"untrusted\":true}",
+                  "opened_unix_ms": 1792760889981,
+                  "session": "voice-e554426f0f061c5e5b290e8821b32292-2",
+                  "source_ids": [
+                    3,
+                    2
+                  ]
+                }
+              }
+            ],
+            [
+              {
+                "op": "session_close",
+                "person": "p-c60cdee85b94b4a3",
+                "session": "voice-e554426f0f061c5e5b290e8821b32292-1"
+              },
+              {
+                "ok": true
+              }
+            ],
+            [
+              {
+                "op": "follow_up",
+                "person": "p-c60cdee85b94b4a3",
+                "until_asked": true
+              },
+              {
+                "follow_up": null,
+                "ok": true
+              }
+            ],
+            [
+              {
+                "max_bytes": 16384,
+                "observations": true,
+                "op": "kept",
+                "person": "p-c60cdee85b94b4a3"
+              },
+              {
+                "entries": [
+                  {
+                    "at_unix_ms": 1792674489982,
+                    "id": 2,
+                    "text": "The synthetic lantern inventory is complete."
+                  },
+                  {
+                    "at_unix_ms": 1792674489981,
+                    "id": 3,
+                    "text": "Synthetic exam on the hill"
+                  }
+                ],
+                "ok": true
+              }
+            ],
+            [
+              {
+                "id": 3,
+                "op": "forget",
+                "person": "p-c60cdee85b94b4a3"
+              },
+              {
+                "ok": true,
+                "removed": 2
+              }
+            ]
+          ]
+        },
+        "phase": "retry_trace_snapshot"
+      }
+    ],
+    "hold_and_cleanup_events": [
+      {
+        "at_us": 5594772,
+        "branch": {
+          "attempt": "initial refusal then retry"
+        },
+        "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+        "controlled": false,
+        "details": {
+          "explicit_release_sent": true,
+          "hold_entered": false,
+          "hold_invalid": false,
+          "joined": true
+        },
+        "phase": "fixture_stopped_and_joined"
+      },
+      {
+        "at_us": 3549516,
+        "branch": {
+          "asked": true,
+          "events": false,
+          "journalled": false
+        },
+        "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+        "controlled": false,
+        "details": {
+          "explicit_release_sent": true,
+          "hold_entered": false,
+          "hold_invalid": false,
+          "joined": true
+        },
+        "phase": "fixture_stopped_and_joined"
+      },
+      {
+        "at_us": 3218465,
+        "branch": {
+          "asked": true,
+          "events": true,
+          "journalled": false
+        },
+        "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+        "controlled": false,
+        "details": {
+          "explicit_release_sent": true,
+          "hold_entered": false,
+          "hold_invalid": false,
+          "joined": true
+        },
+        "phase": "fixture_stopped_and_joined"
+      },
+      {
+        "at_us": 5716924,
+        "branch": {
+          "asked": true,
+          "events": false,
+          "journalled": true
+        },
+        "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+        "controlled": false,
+        "details": {
+          "explicit_release_sent": true,
+          "hold_entered": false,
+          "hold_invalid": false,
+          "joined": true
+        },
+        "phase": "fixture_stopped_and_joined"
+      },
+      {
+        "at_us": 5555954,
+        "branch": {
+          "asked": true,
+          "events": true,
+          "journalled": true
+        },
+        "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+        "controlled": false,
+        "details": {
+          "explicit_release_sent": true,
+          "hold_entered": false,
+          "hold_invalid": false,
+          "joined": true
+        },
+        "phase": "fixture_stopped_and_joined"
+      }
+    ],
+    "projection_rule": "All caller returns, original retry snapshots and hold/cleanup events, plus callback records whose entry timestamp lies within a recorded public call. All remaining raw events are retained verbatim in raw-output.json; no private state inferred."
+  },
+  {
+    "stage": "01-held-right-after",
+    "counts": {
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 158
+    },
+    "raw_summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 158 filtered out; finished in 3.16s",
+    "failed_cases": [
+      "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about"
+    ],
+    "calls": [
+      {
+        "caller_event": {
+          "at_us": 1822533,
+          "branch": {
+            "asked": true,
+            "events": false,
+            "journalled": false
+          },
+          "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+          "controlled": true,
+          "details": {
+            "attempt": "forget",
+            "call": {
+              "args": {},
+              "id": "voice-memory-test",
+              "name": "forget"
+            },
+            "deadline_ms": 1500,
+            "elapsed_us": 1501800,
+            "person": "p-fe3403cf9781cc04",
+            "private_remaining_budget": "unobserved",
+            "private_settlement_and_context_lock": "unobserved",
+            "return": [
+              {
+                "error": "My memory is not answering right now, so I could not do that."
+              },
+              false
+            ],
+            "started_us": 320732
+          },
+          "phase": "caller_returned"
+        },
+        "server_request_entries_during_public_call": [
+          {
+            "entry": {
+              "at_us": 320797,
+              "branch": {
+                "asked": true,
+                "events": false,
+                "journalled": false
+              },
+              "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+              "controlled": true,
+              "details": {
+                "request": {
+                  "max_bytes": 16384,
+                  "observations": true,
+                  "op": "kept",
+                  "person": "p-fe3403cf9781cc04"
+                },
+                "sequence": 4
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 321366,
+                "branch": {
+                  "asked": true,
+                  "events": false,
+                  "journalled": false
+                },
+                "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+                "controlled": true,
+                "details": {
+                  "answer_line": "{\"entries\":[{\"at_unix_ms\":1792501765331,\"id\":1,\"text\":\"unrelated synthetic note\"},{\"at_unix_ms\":1792674565331,\"id\":3,\"text\":\"Synthetic exam on the hill\"}],\"ok\":true}",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 4,
+                  "storage_fault": false,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 1822592,
+                "branch": {
+                  "asked": true,
+                  "events": false,
+                  "journalled": false
+                },
+                "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+                "controlled": true,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 4
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "retry_trace_snapshots": [],
+    "hold_and_cleanup_events": [
+      {
+        "at_us": 320724,
+        "branch": {
+          "asked": true,
+          "events": false,
+          "journalled": false
+        },
+        "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+        "controlled": true,
+        "details": {
+          "person": "p-fe3403cf9781cc04"
+        },
+        "phase": "compatibility_hold_armed"
+      },
+      {
+        "at_us": 321395,
+        "branch": {
+          "asked": true,
+          "events": false,
+          "journalled": false
+        },
+        "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+        "controlled": true,
+        "details": {
+          "limit": "reachability only; earlier than the historical bare-forget log",
+          "request": {
+            "max_bytes": 16384,
+            "observations": true,
+            "op": "kept",
+            "person": "p-fe3403cf9781cc04"
+          },
+          "sequence": 4
+        },
+        "phase": "compatibility_reply_hold_entered"
+      },
+      {
+        "at_us": 1822580,
+        "branch": {
+          "asked": true,
+          "events": false,
+          "journalled": false
+        },
+        "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+        "controlled": true,
+        "details": {
+          "sequence": 4
+        },
+        "phase": "compatibility_reply_explicitly_released"
+      },
+      {
+        "at_us": 1822987,
+        "branch": {
+          "asked": true,
+          "events": false,
+          "journalled": false
+        },
+        "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+        "controlled": true,
+        "details": {
+          "explicit_release_sent": true,
+          "hold_entered": true,
+          "hold_invalid": false,
+          "joined": true
+        },
+        "phase": "fixture_stopped_and_joined"
+      }
+    ],
+    "projection_rule": "All caller returns, original retry snapshots and hold/cleanup events, plus callback records whose entry timestamp lies within a recorded public call. All remaining raw events are retained verbatim in raw-output.json; no private state inferred."
+  },
+  {
+    "stage": "02-held-journalled",
+    "counts": {
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 158
+    },
+    "raw_summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 158 filtered out; finished in 3.16s",
+    "failed_cases": [
+      "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation"
+    ],
+    "calls": [
+      {
+        "caller_event": {
+          "at_us": 1924107,
+          "branch": {
+            "asked": true,
+            "events": false,
+            "journalled": true
+          },
+          "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+          "controlled": true,
+          "details": {
+            "attempt": "forget",
+            "call": {
+              "args": {},
+              "id": "voice-memory-test",
+              "name": "forget"
+            },
+            "deadline_ms": 1500,
+            "elapsed_us": 1501663,
+            "person": "p-fe3403cf9781cc04",
+            "private_remaining_budget": "unobserved",
+            "private_settlement_and_context_lock": "unobserved",
+            "return": [
+              {
+                "error": "My memory is not answering right now, so I could not do that."
+              },
+              false
+            ],
+            "started_us": 422444
+          },
+          "phase": "caller_returned"
+        },
+        "server_request_entries_during_public_call": [
+          {
+            "entry": {
+              "at_us": 422559,
+              "branch": {
+                "asked": true,
+                "events": false,
+                "journalled": true
+              },
+              "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+              "controlled": true,
+              "details": {
+                "request": {
+                  "max_bytes": 16384,
+                  "observations": true,
+                  "op": "kept",
+                  "person": "p-fe3403cf9781cc04"
+                },
+                "sequence": 6
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 423366,
+                "branch": {
+                  "asked": true,
+                  "events": false,
+                  "journalled": true
+                },
+                "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+                "controlled": true,
+                "details": {
+                  "answer_line": "{\"entries\":[{\"at_unix_ms\":1792502027401,\"id\":1,\"text\":\"unrelated synthetic note\"},{\"at_unix_ms\":1792674827401,\"id\":3,\"text\":\"Synthetic exam on the hill\"}],\"ok\":true}",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 6,
+                  "storage_fault": false,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 1924259,
+                "branch": {
+                  "asked": true,
+                  "events": false,
+                  "journalled": true
+                },
+                "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+                "controlled": true,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-fe3403cf9781cc04"
+                  },
+                  "sequence": 6
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "retry_trace_snapshots": [],
+    "hold_and_cleanup_events": [
+      {
+        "at_us": 422427,
+        "branch": {
+          "asked": true,
+          "events": false,
+          "journalled": true
+        },
+        "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+        "controlled": true,
+        "details": {
+          "person": "p-fe3403cf9781cc04"
+        },
+        "phase": "compatibility_hold_armed"
+      },
+      {
+        "at_us": 423407,
+        "branch": {
+          "asked": true,
+          "events": false,
+          "journalled": true
+        },
+        "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+        "controlled": true,
+        "details": {
+          "limit": "reachability only; earlier than the historical bare-forget log",
+          "request": {
+            "max_bytes": 16384,
+            "observations": true,
+            "op": "kept",
+            "person": "p-fe3403cf9781cc04"
+          },
+          "sequence": 6
+        },
+        "phase": "compatibility_reply_hold_entered"
+      },
+      {
+        "at_us": 1924225,
+        "branch": {
+          "asked": true,
+          "events": false,
+          "journalled": true
+        },
+        "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+        "controlled": true,
+        "details": {
+          "sequence": 6
+        },
+        "phase": "compatibility_reply_explicitly_released"
+      },
+      {
+        "at_us": 1924991,
+        "branch": {
+          "asked": true,
+          "events": false,
+          "journalled": true
+        },
+        "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+        "controlled": true,
+        "details": {
+          "explicit_release_sent": true,
+          "hold_entered": true,
+          "hold_invalid": false,
+          "joined": true
+        },
+        "phase": "fixture_stopped_and_joined"
+      }
+    ],
+    "projection_rule": "All caller returns, original retry snapshots and hold/cleanup events, plus callback records whose entry timestamp lies within a recorded public call. All remaining raw events are retained verbatim in raw-output.json; no private state inferred."
+  },
+  {
+    "stage": "03-held-retry",
+    "counts": {
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 158
+    },
+    "raw_summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 158 filtered out; finished in 3.22s",
+    "failed_cases": [
+      "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+    ],
+    "calls": [
+      {
+        "caller_event": {
+          "at_us": 289592,
+          "branch": {
+            "attempt": "initial refusal then retry"
+          },
+          "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+          "controlled": true,
+          "details": {
+            "attempt": "initial_refusal",
+            "call": {
+              "args": {},
+              "id": "voice-memory-test",
+              "name": "forget"
+            },
+            "deadline_ms": 1500,
+            "elapsed_us": 1010,
+            "person": "p-c60cdee85b94b4a3",
+            "private_remaining_budget": "unobserved",
+            "private_settlement_and_context_lock": "unobserved",
+            "return": [
+              {
+                "error": "My memory is not answering right now, so I could not do that."
+              },
+              false
+            ],
+            "started_us": 288582
+          },
+          "phase": "caller_returned"
+        },
+        "server_request_entries_during_public_call": [
+          {
+            "entry": {
+              "at_us": 288654,
+              "branch": {
+                "attempt": "initial refusal then retry"
+              },
+              "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+              "controlled": true,
+              "details": {
+                "request": {
+                  "max_bytes": 16384,
+                  "observations": true,
+                  "op": "kept",
+                  "person": "p-c60cdee85b94b4a3"
+                },
+                "sequence": 4
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 289279,
+                "branch": {
+                  "attempt": "initial refusal then retry"
+                },
+                "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+                "controlled": true,
+                "details": {
+                  "answer_line": "{\"entries\":[{\"at_unix_ms\":1792674834880,\"id\":2,\"text\":\"The synthetic lantern inventory is complete.\"},{\"at_unix_ms\":1792674834879,\"id\":3,\"text\":\"Synthetic exam on the hill\"}],\"ok\":true}",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-c60cdee85b94b4a3"
+                  },
+                  "sequence": 4,
+                  "storage_fault": false,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 289306,
+                "branch": {
+                  "attempt": "initial refusal then retry"
+                },
+                "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+                "controlled": true,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-c60cdee85b94b4a3"
+                  },
+                  "sequence": 4
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          },
+          {
+            "entry": {
+              "at_us": 289503,
+              "branch": {
+                "attempt": "initial refusal then retry"
+              },
+              "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+              "controlled": true,
+              "details": {
+                "request": {
+                  "id": 3,
+                  "op": "forget",
+                  "person": "p-c60cdee85b94b4a3"
+                },
+                "sequence": 5
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 289528,
+                "branch": {
+                  "attempt": "initial refusal then retry"
+                },
+                "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+                "controlled": true,
+                "details": {
+                  "answer_line": "{\"error\":\"io\",\"ok\":false}",
+                  "request": {
+                    "id": 3,
+                    "op": "forget",
+                    "person": "p-c60cdee85b94b4a3"
+                  },
+                  "sequence": 5,
+                  "storage_fault": true,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 289543,
+                "branch": {
+                  "attempt": "initial refusal then retry"
+                },
+                "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+                "controlled": true,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "id": 3,
+                    "op": "forget",
+                    "person": "p-c60cdee85b94b4a3"
+                  },
+                  "sequence": 5
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "caller_event": {
+          "at_us": 2020711,
+          "branch": {
+            "attempt": "initial refusal then retry"
+          },
+          "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+          "controlled": true,
+          "details": {
+            "attempt": "retry",
+            "call": {
+              "args": {},
+              "id": "voice-memory-test",
+              "name": "forget"
+            },
+            "deadline_ms": 1500,
+            "elapsed_us": 1501703,
+            "person": "p-c60cdee85b94b4a3",
+            "private_remaining_budget": "unobserved",
+            "private_settlement_and_context_lock": "unobserved",
+            "return": [
+              {
+                "error": "My memory is not answering right now, so I could not do that."
+              },
+              false
+            ],
+            "started_us": 519007
+          },
+          "phase": "caller_returned"
+        },
+        "server_request_entries_during_public_call": [
+          {
+            "entry": {
+              "at_us": 519092,
+              "branch": {
+                "attempt": "initial refusal then retry"
+              },
+              "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+              "controlled": true,
+              "details": {
+                "request": {
+                  "max_bytes": 16384,
+                  "observations": true,
+                  "op": "kept",
+                  "person": "p-c60cdee85b94b4a3"
+                },
+                "sequence": 11
+              },
+              "phase": "request_entered"
+            },
+            "answer_ready": [
+              {
+                "at_us": 519775,
+                "branch": {
+                  "attempt": "initial refusal then retry"
+                },
+                "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+                "controlled": true,
+                "details": {
+                  "answer_line": "{\"entries\":[{\"at_unix_ms\":1792674834880,\"id\":2,\"text\":\"The synthetic lantern inventory is complete.\"},{\"at_unix_ms\":1792674834879,\"id\":3,\"text\":\"Synthetic exam on the hill\"}],\"ok\":true}",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-c60cdee85b94b4a3"
+                  },
+                  "sequence": 11,
+                  "storage_fault": false,
+                  "wrote": false
+                },
+                "phase": "answer_ready"
+              }
+            ],
+            "answer_returning": [
+              {
+                "at_us": 2021829,
+                "branch": {
+                  "attempt": "initial refusal then retry"
+                },
+                "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+                "controlled": true,
+                "details": {
+                  "meaning": "immediately before callback return; no socket/client acknowledgement",
+                  "request": {
+                    "max_bytes": 16384,
+                    "observations": true,
+                    "op": "kept",
+                    "person": "p-c60cdee85b94b4a3"
+                  },
+                  "sequence": 11
+                },
+                "phase": "answer_returning"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "retry_trace_snapshots": [
+      {
+        "at_us": 2020731,
+        "branch": {
+          "attempt": "initial refusal then retry"
+        },
+        "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+        "controlled": true,
+        "details": {
+          "meaning": "original immediate nonblocking snapshot; not a later drain",
+          "trace": [
+            [
+              {
+                "max_bytes": 1200,
+                "op": "session_open",
+                "session": "voice-dc24eb7b82c96b639d079f9f42c30320-2"
+              },
+              {
+                "ok": true,
+                "snapshot": {
+                  "generation": 0,
+                  "invalidated": false,
+                  "note": "{\"facts\":[],\"scope\":\"said in this room; speaker unknown\",\"untrusted\":true}",
+                  "opened_unix_ms": 1792761234879,
+                  "session": "voice-dc24eb7b82c96b639d079f9f42c30320-2",
+                  "source_ids": []
+                }
+              }
+            ],
+            [
+              {
+                "op": "session_close",
+                "session": "voice-dc24eb7b82c96b639d079f9f42c30320-1"
+              },
+              {
+                "ok": true
+              }
+            ],
+            [
+              {
+                "max_bytes": 1200,
+                "op": "session_open",
+                "person": "p-c60cdee85b94b4a3",
+                "session": "voice-dc24eb7b82c96b639d079f9f42c30320-2"
+              },
+              {
+                "ok": true,
+                "snapshot": {
+                  "generation": 0,
+                  "invalidated": false,
+                  "note": "{\"facts\":[{\"id\":3,\"kind\":\"thread\",\"text\":\"Synthetic exam on the hill\"},{\"id\":2,\"kind\":\"preference\",\"text\":\"The synthetic lantern inventory is complete.\"}],\"scope\":\"caller-supplied person; identity not verified\",\"untrusted\":true}",
+                  "opened_unix_ms": 1792761234879,
+                  "session": "voice-dc24eb7b82c96b639d079f9f42c30320-2",
+                  "source_ids": [
+                    3,
+                    2
+                  ]
+                }
+              }
+            ],
+            [
+              {
+                "op": "session_close",
+                "person": "p-c60cdee85b94b4a3",
+                "session": "voice-dc24eb7b82c96b639d079f9f42c30320-1"
+              },
+              {
+                "ok": true
+              }
+            ],
+            [
+              {
+                "op": "follow_up",
+                "person": "p-c60cdee85b94b4a3",
+                "until_asked": true
+              },
+              {
+                "follow_up": null,
+                "ok": true
+              }
+            ],
+            [
+              {
+                "max_bytes": 16384,
+                "observations": true,
+                "op": "kept",
+                "person": "p-c60cdee85b94b4a3"
+              },
+              {
+                "entries": [
+                  {
+                    "at_unix_ms": 1792674834880,
+                    "id": 2,
+                    "text": "The synthetic lantern inventory is complete."
+                  },
+                  {
+                    "at_unix_ms": 1792674834879,
+                    "id": 3,
+                    "text": "Synthetic exam on the hill"
+                  }
+                ],
+                "ok": true
+              }
+            ]
+          ]
+        },
+        "phase": "retry_trace_snapshot"
+      }
+    ],
+    "hold_and_cleanup_events": [
+      {
+        "at_us": 518999,
+        "branch": {
+          "attempt": "initial refusal then retry"
+        },
+        "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+        "controlled": true,
+        "details": {
+          "person": "p-c60cdee85b94b4a3"
+        },
+        "phase": "compatibility_hold_armed"
+      },
+      {
+        "at_us": 519811,
+        "branch": {
+          "attempt": "initial refusal then retry"
+        },
+        "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+        "controlled": true,
+        "details": {
+          "limit": "reachability only; earlier than the historical bare-forget log",
+          "request": {
+            "max_bytes": 16384,
+            "observations": true,
+            "op": "kept",
+            "person": "p-c60cdee85b94b4a3"
+          },
+          "sequence": 11
+        },
+        "phase": "compatibility_reply_hold_entered"
+      },
+      {
+        "at_us": 2021816,
+        "branch": {
+          "attempt": "initial refusal then retry"
+        },
+        "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+        "controlled": true,
+        "details": {
+          "sequence": 11
+        },
+        "phase": "compatibility_reply_explicitly_released"
+      },
+      {
+        "at_us": 2022271,
+        "branch": {
+          "attempt": "initial refusal then retry"
+        },
+        "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+        "controlled": true,
+        "details": {
+          "explicit_release_sent": true,
+          "hold_entered": true,
+          "hold_invalid": false,
+          "joined": true
+        },
+        "phase": "fixture_stopped_and_joined"
+      }
+    ],
+    "projection_rule": "All caller returns, original retry snapshots and hold/cleanup events, plus callback records whose entry timestamp lies within a recorded public call. All remaining raw events are retained verbatim in raw-output.json; no private state inferred."
+  }
+]

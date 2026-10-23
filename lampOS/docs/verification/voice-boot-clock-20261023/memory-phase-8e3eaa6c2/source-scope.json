@@ -1,0 +1,107 @@
+{
+  "source": {
+    "worktree": "/private/tmp/tests-codex-memory-phase-20261023",
+    "head": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+    "base_tree": "bfc542f17318518ef5dea21dd9f196ec47fbf96d",
+    "branch": "tests/1569-memory-phase-diagnostic",
+    "tracked_paths": 10028,
+    "lampos_paths": 6682,
+    "owned_paths": [
+      "lampOS/crates/memory/tests/it/voice.rs"
+    ],
+    "source_aggregate_sha256": "9a032352c48badc66e3052a291e80d921cbb777cab878bc589514fe118d184a5",
+    "source_map_sha256": "01c1d0adbca90f3d5fa9dfc221484b715fdb4828f40bc8105b03b42744d25176",
+    "fixture_sha256": "f9a71c4f63d2e31ca138667fd026f884f5fc9325b3f9eb87f67e1498443c1d95"
+  },
+  "preservation": {
+    "base": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+    "path": "lampOS/crates/memory/tests/it/voice.rs",
+    "base_sha256": "ab0f14dd70f9b25ed71f4aeb23811b61f46dc78f06cc52bb1106d2cf375635a9",
+    "instrumented_sha256": "f9a71c4f63d2e31ca138667fd026f884f5fc9325b3f9eb87f67e1498443c1d95",
+    "patch_sha256": "7265a1deb2c6f5f9f0173bc848bf9c56089bb9fd4df618e44461b9777b540685",
+    "original_assertion_macros_preserved_byte_for_byte_in_order": 114,
+    "added_diagnostic_assertions": 4,
+    "original_1500ms_literals_count": 14,
+    "retry_snapshot_directly_after_return_instant": true,
+    "no_cargo_or_tests_run": true,
+    "source_test_function_names_unchanged": [
+      "ranked_voice_recall_finds_an_earlier_day_and_respects_a_named_day",
+      "a_voice_session_receives_a_frozen_note_with_provenance_then_a_new_snapshot",
+      "a_remembered_fact_links_later_journal_echoes_and_forgetting_removes_them",
+      "repeated_real_conversation_ends_reach_memory_without_retaining_model_jobs",
+      "a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+      "a_missing_store_never_becomes_an_empty_or_successful_memory_answer",
+      "a_timed_out_mutation_may_commit_but_cannot_seed_unlinked_journal_history",
+      "deletion_invalidates_a_frozen_note_and_linked_writes_never_fall_back_to_plain_append",
+      "forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+      "a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+      "forget_that_with_no_follow_up_asked_still_forgets_the_newest_kept_line",
+      "forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+      "a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+    ]
+  },
+  "relevant_inputs": [
+    {
+      "path": "lampOS/crates/memory/tests/it/voice.rs",
+      "git_mode": "100644",
+      "base_blob": "a3ca35f2b896a8182410df298ed29ecb3b7b11fa",
+      "bytes": 45419,
+      "sha256": "f9a71c4f63d2e31ca138667fd026f884f5fc9325b3f9eb87f67e1498443c1d95"
+    },
+    {
+      "path": "lampOS/crates/memory/src/server.rs",
+      "git_mode": "100644",
+      "base_blob": "c994fddecf150c1156300269d30319b3d40ca2f6",
+      "bytes": 21028,
+      "sha256": "73039982f1814258d3c37ce342c251b3b4ff73bc7db99b30be4b8b0f8db95f87"
+    },
+    {
+      "path": "lampOS/crates/voice/src/remember.rs",
+      "git_mode": "100644",
+      "base_blob": "0f867c0b4d0e1448a1a1d06a3991218919a8d007",
+      "bytes": 744033,
+      "sha256": "3ac1aba38a8097167ca3973b3f4e072b83104d1a222da50446fc4cb0ce387277"
+    },
+    {
+      "path": "lampOS/crates/memory/Cargo.toml",
+      "git_mode": "100644",
+      "base_blob": "f489eeb99b93a9be05e1f81a81a150b89368df45",
+      "bytes": 1405,
+      "sha256": "aef3519411f1e2fed21a93d645fc26a617a66ccda5733a10d8d2a69f683b3553"
+    },
+    {
+      "path": "lampOS/crates/voice/Cargo.toml",
+      "git_mode": "100644",
+      "base_blob": "8b4383b2bbfad0baf0d9993ce84f08b6994d63b2",
+      "bytes": 4468,
+      "sha256": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776"
+    },
+    {
+      "path": "lampOS/Cargo.toml",
+      "git_mode": "100644",
+      "base_blob": "7416fa9986f29ce44496e9e74b550780b7780b24",
+      "bytes": 1424,
+      "sha256": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7"
+    },
+    {
+      "path": "lampOS/Cargo.lock",
+      "git_mode": "100644",
+      "base_blob": "0c5fb9f3e386b0666966ca09d850186037741d8f",
+      "bytes": 118267,
+      "sha256": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c"
+    },
+    {
+      "path": "lampOS/rust-toolchain.toml",
+      "git_mode": "100644",
+      "base_blob": "e3b40113e65befef4d5d198284b99c78c27136f0",
+      "bytes": 86,
+      "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+    }
+  ],
+  "scope": "All tracked repository paths, modes and symlink values were guarded. The full source map remains external with a digest; only the Memory integration fixture was instrumented.",
+  "source_before_sha256": "9a032352c48badc66e3052a291e80d921cbb777cab878bc589514fe118d184a5",
+  "source_after_sha256": "9a032352c48badc66e3052a291e80d921cbb777cab878bc589514fe118d184a5",
+  "source_unchanged": true,
+  "base_source_restoration_claimed": false,
+  "instrumentation_left_as_prepared": true
+}

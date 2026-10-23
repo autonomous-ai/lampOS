@@ -1,5 +1,31 @@
 # Tests work log
 
+## 2026-10-23 20:19 +0700 — bounded Memory phase observations complete
+
+Ready for lamp-voice: no; historical reader failures remain unwaived.
+
+The [fixture-only Memory diagnostic](verification/voice-boot-clock-20261023/memory-phase-8e3eaa6c2/)
+on recorded parent 8e3eaa6c2 passed the normal integration target 154 / 0 / 5.
+Three fixed held-compatibility controls each failed their original assertion
+once, with the unchanged 1,500 ms caller limit and explicit release/join before
+assertion. They demonstrate an earlier reachable boundary, not the old failures'
+post-compatibility phase or cause. The client's private lock, settlement and
+remaining budget are unobserved. Normal forgetting calls took 1.027–1.318 s;
+these are instrumented observations, not a product latency qualification.
+
+The first runner exited 1 because its panic parser omitted Rust's numeric
+thread ID. That original failure is retained. A two-lookup parser correction
+validated captured output; a separate continuation ran only the two then-unrun
+controls on the retained identical executable. No compile, normal target or
+first control was repeated. All 114 original assertions and original retry
+trace-drain ordering remain. Complete human streams, phase projections, source
+proof and 418 matching compiler feature/profile records are published. Root
+verified all 26 output wrappers, both exact patches and external hashes.
+
+The peer fixture full gate now owns the shared target; formatting and strict
+12-package Clippy passed, and full parallel Voice is running. Expression's
+full gate follows its terminal release. No product or device changes.
+
 ## 2026-10-23 20:14 +0700 — both current native gates green
 
 Ready for lamp-voice: no; the local execution HOLDs remain with the reviewer.

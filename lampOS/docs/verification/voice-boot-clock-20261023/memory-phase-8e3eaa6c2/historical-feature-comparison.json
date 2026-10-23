@@ -1,0 +1,9 @@
+{
+  "historical_records": 418,
+  "actual_records": 418,
+  "equal": true,
+  "only_historical": [],
+  "only_actual": [],
+  "normalization": "Workspace package-ID prefix only; target name/kind/crate_types, full profile and sorted features retained. Absolute source/output paths and fresh are excluded.",
+  "limit": "Observed compiler-artifact metadata is not a complete resolver graph or proof of executable byte identity. Scratch instrumentation changes the binary."
+}

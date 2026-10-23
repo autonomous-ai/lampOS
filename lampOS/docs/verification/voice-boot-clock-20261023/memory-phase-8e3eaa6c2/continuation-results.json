@@ -1,0 +1,173 @@
+{
+  "status": "Both previously unrun controls produced their fixed expected negatives once",
+  "initial_runner_exit_preserved": 1,
+  "compile_executed": false,
+  "normal_or_first_control_repeated": false,
+  "artifact": {
+    "executable": "/private/tmp/tests-memory-phase-continuation-20261023/retained-memory-it",
+    "sha256": "393da7d9bad9b6bb24f7002e02260781166fc199e28201e2b37d18212e7e7c4c",
+    "bytes": 14528044,
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-codex-memory-phase-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "manifest_path": "/private/tmp/tests-codex-memory-phase-20261023/lampOS/crates/memory/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-memory-phase-20261023/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257"
+      ],
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+      "fresh": false
+    },
+    "source_aggregate_sha256": "9a032352c48badc66e3052a291e80d921cbb777cab878bc589514fe118d184a5",
+    "build_finished": [
+      {
+        "reason": "build-finished",
+        "success": true
+      }
+    ],
+    "compiler_errors": []
+  },
+  "source_aggregate_sha256": "9a032352c48badc66e3052a291e80d921cbb777cab878bc589514fe118d184a5",
+  "controls": [
+    {
+      "id": "02-held-journalled",
+      "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+      "state": "expected negative observed once; first execution of this control",
+      "command": {
+        "command": [
+          "/private/tmp/tests-memory-phase-continuation-20261023/retained-memory-it",
+          "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+          "--exact",
+          "--show-output"
+        ],
+        "cwd": "/private/tmp/tests-codex-memory-phase-20261023/lampOS/crates/memory",
+        "started_at": "2026-10-23T13:13:46.553313+00:00",
+        "timeout_seconds": 120,
+        "stdout": "control.stdout.txt",
+        "stderr": "control.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 87629,
+        "owned_process_group": 87629,
+        "exit_code": 101,
+        "wall_seconds": 4.023572,
+        "finished_at": "2026-10-23T13:13:50.577169+00:00",
+        "stdout_sha256": "7e01fcee89b119b3913146322002901e2c5d7b2f5bcc955d13cdfb47495bb6bc",
+        "stdout_bytes": 12782,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "counts": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 158
+      },
+      "validation": {
+        "expected_negative_observation": true,
+        "actual_test_exit": 101,
+        "original_assertion_failed_after_explicit_release_and_join": true,
+        "caller_returned_before_release": true,
+        "hold_sequence": 6,
+        "caller_elapsed_us": 1501663,
+        "private_budget_or_settlement_observed": false,
+        "historical_same_phase_reproduction": false,
+        "phase_limit": "Holding the compatibility kept reply is earlier than every historical bare-forget log. It demonstrates reachability only, not the same phase or historical cause. Private context locks, settlement and remaining budget remain unobserved.",
+        "unexecuted_later_branches": "unexecuted after the original first-branch assertion fails"
+      }
+    },
+    {
+      "id": "03-held-retry",
+      "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "state": "expected negative observed once; first execution of this control",
+      "command": {
+        "command": [
+          "/private/tmp/tests-memory-phase-continuation-20261023/retained-memory-it",
+          "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+          "--exact",
+          "--show-output"
+        ],
+        "cwd": "/private/tmp/tests-codex-memory-phase-20261023/lampOS/crates/memory",
+        "started_at": "2026-10-23T13:13:54.863914+00:00",
+        "timeout_seconds": 120,
+        "stdout": "control.stdout.txt",
+        "stderr": "control.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 87816,
+        "owned_process_group": 87816,
+        "exit_code": 101,
+        "wall_seconds": 3.267868,
+        "finished_at": "2026-10-23T13:13:58.132053+00:00",
+        "stdout_sha256": "317a14b578207f526b92a1f0e38df38045aed8a2e463cee7fe7f57d1a4726de4",
+        "stdout_bytes": 20977,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "counts": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 158
+      },
+      "validation": {
+        "expected_negative_observation": true,
+        "actual_test_exit": 101,
+        "original_assertion_failed_after_explicit_release_and_join": true,
+        "caller_returned_before_release": true,
+        "hold_sequence": 11,
+        "caller_elapsed_us": 1501703,
+        "private_budget_or_settlement_observed": false,
+        "historical_same_phase_reproduction": false,
+        "phase_limit": "Holding the compatibility kept reply is earlier than every historical bare-forget log. It demonstrates reachability only, not the same phase or historical cause. Private context locks, settlement and remaining budget remain unobserved.",
+        "unexecuted_later_branches": null
+      }
+    }
+  ],
+  "unrun": [],
+  "environment": {
+    "PATH": "/Users/autonomous/.cargo/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/usr/local/go/bin:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/Users/autonomous/.codex/tmp/arg0-macos/codex-arg0TYuE1D:/Users/autonomous/.harness/runtime/grid-0.3.59-darwin-x64/bin:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.96.0",
+    "RUST_BACKTRACE": "1",
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LAMP_TEST_MEMORY_HOLD_COMPAT_REPLY": null
+  },
+  "removed_environment_keys": [],
+  "source_unchanged": true,
+  "source_after_sha256": "9a032352c48badc66e3052a291e80d921cbb777cab878bc589514fe118d184a5",
+  "finished_at": "2026-10-23T13:14:02.511753+00:00",
+  "runner_exit_code": 0
+}

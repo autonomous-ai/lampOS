@@ -1,0 +1,45 @@
+{
+  "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+  "sha256": "393da7d9bad9b6bb24f7002e02260781166fc199e28201e2b37d18212e7e7c4c",
+  "bytes": 14528044,
+  "compiler_artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/tests-codex-memory-phase-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/private/tmp/tests-codex-memory-phase-20261023/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/private/tmp/tests-codex-memory-phase-20261023/lampOS/crates/memory/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257"
+    ],
+    "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+    "fresh": false
+  },
+  "source_aggregate_sha256": "9a032352c48badc66e3052a291e80d921cbb777cab878bc589514fe118d184a5",
+  "build_finished": [
+    {
+      "reason": "build-finished",
+      "success": true
+    }
+  ],
+  "compiler_errors": []
+}

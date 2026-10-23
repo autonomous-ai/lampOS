@@ -1,0 +1,81 @@
+[
+  {
+    "external_path": "/private/tmp/tests-memory-phase-diagnostic-execution-20261023/run-2026-10-23T130449.867050Z/compilation/compile.stdout.txt",
+    "path": "compilation/compile.stdout.txt",
+    "bytes": 353455,
+    "sha256": "f75ab5c7e6193776b14ee53f9010a54086998486a16fbb95d28be60c0f6db368",
+    "reason": "Full Cargo message JSON stays external; actual executable, census and compiler feature/profile projections retained separately."
+  },
+  {
+    "external_path": "/private/tmp/tests-memory-phase-diagnostic-execution-20261023/run.py",
+    "bytes": 25165,
+    "sha256": "ffc31c7f02afcc8cecd45b77499f0a3100383d1998d4f3f873027e3a5a6348db",
+    "reason": "Preparation or bulk source/compiler record retained externally; no Python/full source snapshot copied into repository."
+  },
+  {
+    "external_path": "/private/tmp/tests-memory-phase-diagnostic-execution-20261023/support.py",
+    "bytes": 3285,
+    "sha256": "6ec612d0d37f6d92ea4ba0ed80d45160565164c2f627a1052a823f728bead964",
+    "reason": "Preparation or bulk source/compiler record retained externally; no Python/full source snapshot copied into repository."
+  },
+  {
+    "external_path": "/private/tmp/tests-memory-phase-diagnostic-execution-20261023/source-map.json",
+    "bytes": 2751555,
+    "sha256": "01c1d0adbca90f3d5fa9dfc221484b715fdb4828f40bc8105b03b42744d25176",
+    "reason": "Preparation or bulk source/compiler record retained externally; no Python/full source snapshot copied into repository."
+  },
+  {
+    "external_path": "/private/tmp/tests-memory-phase-diagnostic-execution-20261023/instrumented-voice.rs",
+    "bytes": 45419,
+    "sha256": "f9a71c4f63d2e31ca138667fd026f884f5fc9325b3f9eb87f67e1498443c1d95",
+    "reason": "Preparation or bulk source/compiler record retained externally; no Python/full source snapshot copied into repository."
+  },
+  {
+    "external_path": "/private/tmp/tests-memory-phase-diagnostic-execution-20261023/before-voice.rs",
+    "bytes": 34811,
+    "sha256": "ab0f14dd70f9b25ed71f4aeb23811b61f46dc78f06cc52bb1106d2cf375635a9",
+    "reason": "Preparation or bulk source/compiler record retained externally; no Python/full source snapshot copied into repository."
+  },
+  {
+    "external_path": "/private/tmp/tests-memory-phase-diagnostic-execution-20261023/execution-plan.json",
+    "bytes": 20633,
+    "sha256": "ba9d928d5debb9a56d446cfd26ead85f373ae7bd018c63f7f20d4cdd1c6961f3",
+    "reason": "Preparation or bulk source/compiler record retained externally; no Python/full source snapshot copied into repository."
+  },
+  {
+    "external_path": "/private/tmp/tests-memory-phase-diagnostic-execution-20261023/historical-compiler-feature-profile-records.json",
+    "bytes": 183998,
+    "sha256": "5637261c9357cfce6f03fd293f42c1a7dfe95642b4ae71fe53637693d80d3efe",
+    "reason": "Preparation or bulk source/compiler record retained externally; no Python/full source snapshot copied into repository."
+  },
+  {
+    "external_path": "/private/tmp/tests-memory-phase-diagnostic-execution-20261023/SHA256SUMS",
+    "bytes": 1993,
+    "sha256": "a8f1880f12f5440ebe7f668dcbdf95544bee7adb6f9a238930da4593f644ac8c",
+    "reason": "Preparation or bulk source/compiler record retained externally; no Python/full source snapshot copied into repository."
+  },
+  {
+    "external_path": "/private/tmp/tests-memory-phase-continuation-20261023/continue.py",
+    "bytes": 6425,
+    "sha256": "fc0a979a9100319b23bc9d0f732bcf5bcf775b652285f94bfa13fbb7693b640a",
+    "reason": "Retained native executable or external continuation implementation; never copied into repository."
+  },
+  {
+    "external_path": "/private/tmp/tests-memory-phase-continuation-20261023/parser-corrected.py",
+    "bytes": 25223,
+    "sha256": "8cb8dd5fc898a8161a1ec3a555f00ed0bd7242eecbe1907acb75c7c4a4534063",
+    "reason": "Retained native executable or external continuation implementation; never copied into repository."
+  },
+  {
+    "external_path": "/private/tmp/tests-memory-phase-continuation-20261023/retained-memory-it",
+    "bytes": 14528044,
+    "sha256": "393da7d9bad9b6bb24f7002e02260781166fc199e28201e2b37d18212e7e7c4c",
+    "reason": "Retained native executable or external continuation implementation; never copied into repository."
+  },
+  {
+    "external_path": "/private/tmp/tests-memory-phase-continuation-20261023/SHA256SUMS",
+    "bytes": 623,
+    "sha256": "60c8039dda9fb0583536467e141d755c54157b5aebc53fe53daba4e7e07e0d16",
+    "reason": "Retained native executable or external continuation implementation; never copied into repository."
+  }
+]
