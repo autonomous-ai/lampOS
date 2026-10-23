@@ -2375,28 +2375,24 @@ pub fn serve(
                     .map_or(0, |since| since.as_millis() as u64);
                 // The lamp's own zone, as memory's other notes read the day
                 // (#820): each moment at its own offset.
-                let note = crate::remember::hits_note(
+                let note = crate::remember::hits_note_counted(
                     &socket,
                     person.as_deref(),
                     heard,
                     now_unix_ms,
                     crate::local_time::system(),
                 );
+                // What was told, counted, never said (#2510 take 1 c).
                 eprintln!(
-                    "lamp-voice second: request {request}: memory {} in {} ms ({})",
-                    if note.is_some() {
-                        "told"
-                    } else {
-                        "had nothing told"
-                    },
-                    started.elapsed().as_millis(),
-                    if person.is_some() {
-                        "theirs"
-                    } else {
-                        "the room's"
-                    }
+                    "lamp-voice second: {}",
+                    crate::remember::hits_journal_line(
+                        request,
+                        note.as_ref().map(|(_, count)| *count),
+                        started.elapsed().as_millis(),
+                        person.is_some(),
+                    )
                 );
-                note
+                note.map(|(note, _)| note)
             }));
         }
         (true, _) => eprintln!(
