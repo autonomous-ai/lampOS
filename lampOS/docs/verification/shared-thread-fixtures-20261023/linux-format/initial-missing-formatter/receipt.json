@@ -1,0 +1,38 @@
+{
+  "head": "28cc2539ace71321dddfe89e37af3809a960bff1",
+  "source_tree": "e619281497b780f35e9c01c977beaa3a326a5c10",
+  "source_command": [
+    "git",
+    "archive",
+    "28cc2539ace71321dddfe89e37af3809a960bff1:lampOS"
+  ],
+  "image_id": "sha256:e1c74d1ab074f9e6696ae7b759e9c522b1517b32c5a30cc567b3f11f8c3e1be0",
+  "image_os": "linux",
+  "image_architecture": "arm64",
+  "image_repo_digests": [
+    "rust@sha256:5e2214abe154fe26e39f64488952e5c991eeed1d6d6da7cc8381ae83927f0cfc"
+  ],
+  "command": [
+    "docker",
+    "--context",
+    "colima-lampos",
+    "run",
+    "--rm",
+    "--pull",
+    "never",
+    "--network",
+    "none",
+    "-i",
+    "sha256:e1c74d1ab074f9e6696ae7b759e9c522b1517b32c5a30cc567b3f11f8c3e1be0",
+    "/bin/sh",
+    "-eu",
+    "-c",
+    "mkdir /src\ntar -xf - -C /src\ncd /src\nuname -s -m\nrustc --version\ncargo fmt --all --check\n"
+  ],
+  "archive_exit_code": 0,
+  "format_exit_code": 1,
+  "elapsed_seconds": 1.804,
+  "log_bytes": 468,
+  "log_sha256": "83f0d15e6468f4ab784c8104ee8193219ddb75d8903d60982c673753e2ce41a9",
+  "limit": "Formatting only in the existing Linux container; no local ARM64 build or tests. Official PR native CI remains the ARM64 gate."
+}

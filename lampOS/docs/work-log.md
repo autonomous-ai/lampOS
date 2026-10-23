@@ -1,3 +1,29 @@
+## Current checkpoint: 2026-10-23 07:51 +07, updater restart-order tests first
+
+Ready for lamp-voice: #3160 native checks pending; updater piece in progress
+
+First assigned dependency-derived updater restart order at 07:36 on Queue
+#3126. Second took `second/update-restart-order` from `f477d6c49`: forward,
+rollback and interrupted recovery must start prerequisites before callers,
+using the candidate or saved old unit declarations as appropriate. Tests
+are being written before production changes. Cycle refusal, inactive and
+unchanged parts, and quietness at the actual Voice restart are in scope.
+Eyes and Skills currently declare themselves after Voice; this work follows
+the units and does not silently reverse those declarations.
+
+Friday's independent update audit confirms new Voice can meet old Memory;
+the second #3130 counter is therefore a reachable compatibility fault.
+Seventh acknowledged both P2s and is fixing them in one push; Second will
+re-read the corrected head. The previous public counter remains exact.
+
+#3160 `28cc2539a` passed explicit Linux formatting from its exact Git source
+tree in the cached Rust 1.96.0 development image, networking disabled.
+[Full receipt and retained setup failures](verification/shared-thread-fixtures-20261023/README.md).
+No local ARM64 build or tests ran. Current native checks continue; First
+asked that it be marked ready when gated, with Tests still its external reader.
+
+---
+
 ## Current checkpoint: 2026-10-23 07:37 +07, mixed-version forget counter reproduced
 
 Ready for lamp-voice: #3150 merged; #3160 current-head gates/read pending

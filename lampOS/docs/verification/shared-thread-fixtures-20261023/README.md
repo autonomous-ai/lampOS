@@ -88,6 +88,21 @@ files only. `rebase-current.json` proves the equal range-diff and unchanged
 hashes for every task file. Current-head Mac formatting and strict Voice
 Clippy passed (`mac-latest/`). The exact full changed-crate test result above
 remains applicable to the unchanged executable inputs. New-head official
-checks and explicit Linux formatting remain required before ready.
+checks remain required before ready; Linux formatting is recorded below.
 
 No lamp operation, acoustic result or signed release is established here.
+
+## Explicit Linux formatting
+
+`cargo fmt --all --check` passed on an exact Git archive of `28cc2539a`
+in the existing cached Linux aarch64 development image, Rust **1.96.0
+(ac68faa20 2026-05-25)**, with network disabled. `linux-format/receipt.json`
+binds the full source tree, immutable image ID, command and raw output hash;
+`format.txt` is the complete output. This ran formatting only, no local
+ARM64 build or tests. The PR workflow remains the ARM64 gate.
+
+Two container setup attempts are retained separately: the minimal Rust image
+lacked rustfmt and tried an unavailable offline download; the development
+image already had `/src`. Neither reached formatting. The successful
+command selects the cached toolchain and extracts into a new empty directory.
+No source was changed between these setup attempts.
