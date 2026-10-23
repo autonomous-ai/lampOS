@@ -48,10 +48,12 @@ against lamp-06c1.
   them (Backend3 on #3035). What it
   means in practice (the Reviewer on #2636, MQTT v5 3.1.2.5, 3.1.2.10,
   3.1.3.2.2):
-  - **A reconnect sends it at once.** Every connection asks for a clean
-    start (`online.rs`), which ends the old session, and an ended session's
-    will goes without waiting out its delay. The new connection's `info`
-    follows, so the backend sees offline and then online at once.
+  - **A reconnect inside the delay sends nothing.** The spec lets an ended
+    session's will go at once, but the lamps' broker doesn't: on lamp-06c1
+    (23 Oct 09:11:11), lamp-cloud restarted with the will on and the backend
+    got only the new connection's `info`, one second later, with no
+    `offline` before it. So a restart that comes back within 30 s leaves the
+    record online, with no flicker.
   - **A process killed or stopped** closes its connection, and the will goes
     30 s later. lamp-cloud never sends a DISCONNECT, so a `systemctl stop`
     is an offline too, half a minute on.
