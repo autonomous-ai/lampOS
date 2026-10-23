@@ -35,11 +35,11 @@ const CHAT: &str = "chat: ";
 /// left out past the bound, if anything.
 const PRODUCT_FUNCTIONS: usize = 31;
 
-/// Every `Environment=` of the product voice unit's `[Service]`.
-fn voice_environment() -> Vec<(String, String)> {
+/// Every `Environment=` of a voice unit's `[Service]`.
+fn voice_environment(unit: &str) -> Vec<(String, String)> {
     let mut inside = false;
     let mut set = Vec::new();
-    for line in VOICE.lines().map(str::trim) {
+    for line in unit.lines().map(str::trim) {
         if line.starts_with('[') {
             inside = line == "[Service]";
         } else if inside && let Some(pair) = line.strip_prefix("Environment=") {
@@ -150,7 +150,7 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
             command.env_remove(name);
         }
     }
-    for (name, value) in voice_environment() {
+    for (name, value) in voice_environment(VOICE) {
         if name == "LAMP_ACTIONS_DIR" {
             command.env(name, folder.path());
         } else {
@@ -332,4 +332,58 @@ fn with_reports_on_dance_stays_at_the_bound() {
         );
     }
     assert!(!errors.contains("alone are past the bound"), "{errors}");
+}
+
+/// Read the actual generic unit through the voice's flag parser and
+/// declaration path, in a child so no test shares its environment.
+#[test]
+fn the_generic_voice_declares_the_clock_and_receives_time_and_session_context() {
+    const CHILD: &str = "LAMP_TEST_GENERIC_CLOCK";
+    const TEST: &str = "the_generic_voice_declares_the_clock_and_receives_time_and_session_context";
+    if std::env::var_os(CHILD).is_some() {
+        let flags = lamp_voice::tools::arguments_from_environment();
+        let (settings, rest) = lamp_voice::tools::take(&flags).unwrap();
+        assert!(rest.is_empty(), "{rest:?}");
+        assert!(settings.decline && settings.clock && settings.places);
+        let declared = lamp_voice::tools::declared(&settings);
+        let clock = declared
+            .iter()
+            .find(|tool| tool.name == lamp_voice::tools::THE_TIME)
+            .expect("the generic voice offers no clock function");
+        assert!(clock.parameters.as_ref().unwrap()["properties"]["place"].is_object());
+        assert_eq!(
+            lamp_voice::tools::route(&settings, lamp_voice::tools::THE_TIME),
+            lamp_voice::tools::Route::Clock
+        );
+        // The real opening-note path either names the local time or says
+        // the kernel clock is unset; neither needs a product-only file.
+        let note = lamp_voice::local_time::told_here(settings.clock, settings.places)
+            .expect("the generic voice has no time context");
+        assert!(note.contains("The time"), "{note}");
+        let kernel = std::env::var(lamp_voice::local_time::KERNEL_CLOCK_ENVIRONMENT).unwrap();
+        assert!(lamp_voice::local_time::unset(Some(&kernel), Some(false)));
+        let session = lamp_voice::session_fact::arguments_from_environment();
+        let (enabled, rest) = lamp_voice::session_fact::take(&session);
+        assert!(enabled && rest.is_empty());
+        assert!(lamp_gemini::wire::encode_context(lamp_voice::session_fact::FACT).is_ok());
+        return;
+    }
+    let mut command = Command::new(std::env::current_exe().unwrap());
+    command.args([TEST, "--exact", "--nocapture", "--test-threads=1"]);
+    for (name, _) in std::env::vars_os() {
+        if name.to_string_lossy().starts_with("LAMP_") {
+            command.env_remove(name);
+        }
+    }
+    for (name, value) in voice_environment(include_str!("../../../deploy/units/lamp-voice.service"))
+    {
+        command.env(name, value);
+    }
+    let output = command.env(CHILD, "1").output().unwrap();
+    assert!(
+        output.status.success(),
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
