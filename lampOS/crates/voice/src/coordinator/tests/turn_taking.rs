@@ -2,6 +2,28 @@
 use super::*;
 use crate::{activity::START_BLOCKS, turn_taking::TAIL_US};
 use lamp_audio::ownership::PlaybackCursor;
+use std::{cell::RefCell, rc::Rc};
+
+thread_local! {
+    static CLOCK: RefCell<std::rc::Weak<crate::scenario_clock::Scope>> =
+        const { RefCell::new(std::rc::Weak::new()) };
+}
+
+/// All live harnesses on this test thread share their dated history. The last
+/// one releases the scope, including when a test shadows an earlier harness.
+fn fixture_clock() -> Rc<crate::scenario_clock::Scope> {
+    CLOCK.with(|clock| {
+        let mut clock = clock.borrow_mut();
+        if let Some(scope) = clock.upgrade() {
+            return scope;
+        }
+        let scope = Rc::new(
+            crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap(),
+        );
+        *clock = Rc::downgrade(&scope);
+        scope
+    })
+}
 
 struct Harness {
     owner: Controller,
@@ -40,6 +62,7 @@ struct Harness {
     told: Vec<WordsTold>,
     /// The answer was asked to stop by a waited sound's words.
     stopped: bool,
+    _clock: Rc<crate::scenario_clock::Scope>,
 }
 impl Harness {
     /// The product's turn-taking and mask with `LAMP_WAIT_KEEPS_ANSWER=on`:
@@ -75,6 +98,7 @@ impl Harness {
         Self::with_lag(policy, 500_000)
     }
     fn with_lag(policy: TurnTaking, lag: u64) -> Self {
+        let clock = fixture_clock();
         let base = monotonic_us() - lag;
         let time = MonoTime::from_micros(base);
         let mut owner = Controller::new(new_boot().unwrap(), time);
@@ -149,6 +173,7 @@ impl Harness {
             words: None,
             told: Vec::new(),
             stopped: false,
+            _clock: clock,
         }
     }
     fn old(&self) -> TurnOwner {
