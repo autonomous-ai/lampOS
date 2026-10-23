@@ -10,6 +10,11 @@ At 10:29 the implementation was assigned to #3196 and this work became a
 review. The proposed production patch is `171c6a996`; the following
 regression evidence is against that patch, not an alternative product fix.
 
+A [second contact-reporting regression](contact-reporting.md) also passes
+on the baseline and fails with that production patch. It covers pressure
+above the independent contact floor while a glance permits a higher motion
+load, before the existing protection makes the lamp slump.
+
 ## Retained observations
 
 [The excerpt](lamp-06c1-20261022-excerpt.log) preserves all 23 numeric lines

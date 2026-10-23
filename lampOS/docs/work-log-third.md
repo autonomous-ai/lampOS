@@ -5,6 +5,32 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 10:58 — compatibility PR pushed; second Body review failure
+
+Ready for lamp-voice: no (#3204 Linux gates/read remain; #3196 needs correction).
+
+- #3204 is pushed at `418f618e8`, directly on `498aca8a2`. The range-diff
+  from `7406f1a61` is identical and all five authored file blobs match.
+  On the carried head, Mac fmt, strict workspace Clippy, complete
+  Msgs/Controls tests (681 passed, zero failed, one ignored) and workspace
+  build all passed. The full earlier workspace run remains separately
+  attributed to the authored diff over `b3a1ece0b`.
+- Queue `6356959647` requests the external read and explicit Linux fmt
+  receipt. Fourteen took the read. Native ARM64 run `39897297680` and
+  Linux Clippy `39897297556` are being followed to completion; no green
+  result is claimed yet. The local AGENTS.md matches the integration copy.
+- First selected El's #3196 implementation and required the sustained
+  gentle-hand correction before merge. A second control now establishes
+  that a contact-floor hold during glance cooling is also lost from the
+  proposed hand reporting: baseline 1/0, proposed production patch 0/1,
+  exit 101. Pitch load 675 still triggers physical protection, but the
+  proposed reporting threshold is the glance's 700. The [complete test
+  and receipt](verification/body-resting-push-20261023/contact-reporting.md)
+  distinguish this reporting fault from the protection that still works.
+- #1798 and #2136 have no comments after Third's 08:00 checkpoints. Their
+  remaining physical acceptance and complete Live comparison owners are
+  unchanged. #2948 remains a draft; Third accessed no lamp.
+
 ## 2026-10-23 10:40 — sustained-push review failure reproduced
 
 Ready for lamp-voice: no (#3196 held; third-P4 build and current-base carry remain).
