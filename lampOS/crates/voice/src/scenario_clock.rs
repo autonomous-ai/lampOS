@@ -52,6 +52,12 @@ pub(crate) struct Scope {
 
 impl Scope {
     pub(crate) fn enter(watchdog: Duration) -> io::Result<Self> {
+        Self::enter_at(watchdog, lamp_ipc::monotonic_us())
+    }
+
+    /// A fixture with backdated events supplies enough history explicitly.
+    /// Its readers and publishers must all use this thread's clock.
+    pub(crate) fn enter_at(watchdog: Duration, epoch_us: u64) -> io::Result<Self> {
         let epoch = Instant::now();
         let host_deadline = epoch
             .checked_add(watchdog)
@@ -72,7 +78,7 @@ impl Scope {
             })?;
             *active = Some(State {
                 id,
-                epoch_us: lamp_ipc::monotonic_us(),
+                epoch_us,
                 epoch,
                 elapsed: Duration::ZERO,
                 host_deadline,
