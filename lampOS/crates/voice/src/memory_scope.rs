@@ -762,6 +762,13 @@ mod tests {
         }
     }
     fn cached(cache: &FaceCache, name: &str, until: Instant) {
+        cached_named(cache, name, until, Instant::now());
+    }
+    /// [`cached`], first named at `named_at`: a line's keeper without the
+    /// eyes' view must be named within [`REFRESH_EVERY`] of the line's start,
+    /// so a test naming one "at the start" takes that start from the line
+    /// ([`line_start`]), not the real clock a loaded runner may stall past.
+    fn cached_named(cache: &FaceCache, name: &str, until: Instant, named_at: Instant) {
         *cache.face.lock().unwrap() = Some(CachedFace {
             generation: cache.generation.load(Ordering::Acquire),
             scope: ScopeSnapshot {
@@ -770,8 +777,30 @@ mod tests {
             },
             valid_until: until,
             seen_until: until,
-            named_at: Instant::now(),
+            named_at,
         });
+    }
+    /// When `lease`'s line began, as the line itself took it
+    /// ([`RequestScope::looking_later`]).
+    fn line_start(lease: &ScopeLease) -> Instant {
+        lease
+            .context
+            .late
+            .as_ref()
+            .expect("a line looking later")
+            .started
+    }
+    /// The face a refresh just named was first named at `at`, the line's
+    /// start ([`line_start`]): the same naming however long the runner
+    /// stalled before the refresh ran.
+    fn first_named_at(cache: &FaceCache, at: Instant) {
+        cache
+            .face
+            .lock()
+            .unwrap()
+            .as_mut()
+            .expect("a face cached")
+            .named_at = at;
     }
     #[test]
     fn cache_uses_latest_face_never_sticky_session_owner_and_expires() {
@@ -1126,7 +1155,12 @@ mod tests {
             RequestScope::looking_later(key(1), cache.snapshot(Instant::now()), cache.clone());
         let lease = owner.lease();
         assert_eq!(lease.scope(), Some(&ScopeSnapshot::room()));
-        cached(&cache, "Ann", Instant::now() + Duration::from_secs(3));
+        cached_named(
+            &cache,
+            "Ann",
+            Instant::now() + Duration::from_secs(3),
+            line_start(&lease),
+        );
         ended(&lease);
         let ann = crate::remember::person_id("Ann");
         assert_eq!(lease.keeper_within(Duration::ZERO), Some(ann.clone()));
@@ -1142,9 +1176,17 @@ mod tests {
         let lease = owner.lease();
         let later = {
             let cache = cache.clone();
+            let start = line_start(&lease);
             std::thread::spawn(move || {
                 std::thread::sleep(Duration::from_millis(60));
-                cached(&cache, "Ann", Instant::now() + Duration::from_secs(3));
+                // Named 60 ms in, within one refresh of the start, however
+                // late a loaded runner gets here.
+                cached_named(
+                    &cache,
+                    "Ann",
+                    Instant::now() + Duration::from_secs(3),
+                    start + Duration::from_millis(60),
+                );
             })
         };
         ended(&lease);
@@ -1222,7 +1264,12 @@ mod tests {
         );
         let theirs = RequestScope::looking_later(key(6), ScopeSnapshot::of("Bob"), cache.clone());
         let plain = RequestScope::new(key(7), ScopeSnapshot::room());
-        cached(&cache, "Ann", Instant::now() + Duration::from_secs(3));
+        cached_named(
+            &cache,
+            "Ann",
+            Instant::now() + Duration::from_secs(3),
+            line_start(&changed.lease()),
+        );
         for (what, owner) in [
             ("narrowed", &narrowed),
             ("revoked", &revoked),
@@ -1450,6 +1497,8 @@ mod tests {
                 RequestScope::looking_later(key(8 + index), ScopeSnapshot::room(), cache.clone());
             let begun = Instant::now();
             assert!(cache.replace(cache.begin_refresh(), Some(observation("Ann"))));
+            // Named at the start, as the line took it.
+            first_named_at(&cache, line_start(&line.lease()));
             let view = eyes.map(|in_view| view(in_view, begun));
             seen_end(
                 &line.lease(),
@@ -1521,6 +1570,8 @@ mod tests {
         cache.invalidate();
         let line = RequestScope::looking_later(key(2), ScopeSnapshot::room(), cache.clone());
         assert!(cache.replace(cache.begin_refresh(), Some(observation("Ann"))));
+        // Named at the start, as the line took it.
+        first_named_at(&cache, line_start(&line.lease()));
         past_one_refresh();
         // Named on by later refreshes: still first named at the start.
         assert!(cache.replace(cache.begin_refresh(), Some(observation("Ann"))));
