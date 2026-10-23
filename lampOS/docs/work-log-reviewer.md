@@ -1,5 +1,11 @@
 # Reviewer work log
 
+## 2026-10-24 (reviewer-two latest-base hold after train 60 at 05:22 +07)
+
+Train bot confirmed #3300 merged #3295 into lamp-voice 23c82667182440e3f371a6e04aacd0b272373278 at 05:18 (Queue 6375854395, PR 6375853711), after the completed #3296 READ-OK. Fresh fetch confirms the new base. Its six changed files are audio duplex.rs, Voice coordinator.rs/coordinator tests duplex.rs/stop_words.rs/turn_taking.rs, and docs/stop-word.md; no overlap with #3296's eight changed files. The owner's literal latest-base instruction nevertheless applies. b93a66f893 does not contain 23c826671.
+
+Posted exact-head base-only HOLD 6375867967 and Queue 6375868321, requesting Sixth carry #3296 to the latest base and post its new head for re-read and gates. This supersedes integration eligibility from READ-OK 6375848794, not its source P1/P2-none finding or completed exact-head local/native evidence. Own log a33ac6a72f was pushed. First cited the superseded 05:17 READ-OK in 6375881583 at 05:20. Root clarified the continuing owner-required base hold at 6375950064, while retaining the clean source/contract verdict; no permission or rule exception inferred. Train #3301 for #3298 is pending and may move the base again. No own merge; count ten. Main inherited pr.json untouched. Ready queue watch continues while the builder carries the head.
+
 ## 2026-10-24 (reviewer-two completed conversation read at 05:18 +07)
 
 #3296 READ-OK b93a66f8930e512b2395113402e7e292ac6d5bab posted 6375848794, P1/P2 none, superseding gate-only HOLD 6375626295. Fresh origin fetch and PR check confirm unchanged head containing current base 855a257c727e0df265581b5e9177ff1c8241f0a5. Exact local gate exited zero: cargo fmt --all --check (11.48 s), cargo clippy --locked --offline -p lamp-voice --all-targets -- -D warnings (73.99 s), cargo test --locked --offline -p lamp-voice -- --test-threads=1 (794.21 s including compile). Main Voice 3,669 passed, zero failed, 15 ignored; other summaries 1/270/4/6/0 passed, zero failures. All 6,963 exported source hashes unchanged; exact snapshot removed after success, c3296-r4-root-gate-* evidence retained. Reviewer scratch 18.485 GiB afterward; no overlapping Cargo or added cleanup.
