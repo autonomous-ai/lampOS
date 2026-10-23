@@ -25,6 +25,10 @@ and nothing else: no process, no socket, no clock.
   definition; one team on one machine can do with less.
 - A field that may be absent is an `Option`, left out when there is nothing
   to say. Every other field has to be there.
+- Keep existing wire field names and meanings, including `Option` fields.
+  Renaming or repurposing one is not an additive change: a missing `Option`
+  can decode as `None` and silently lose its old meaning. Add independently
+  ignorable metadata without replacing existing fields.
 - A value of an enumerated field that this version does not know is an error
   for that message: a state is not guessed.
 - Reading the JSON checks a message's shape. Its sense, a light's colour and
