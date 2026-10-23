@@ -5,6 +5,30 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 07:18 — Controls consumer regression claimed
+
+Ready for lamp-voice: no (test-only third-P3 is taken under #1798).
+
+- The proposal's 15-minute window ended at 07:17:16 with no competing
+  claim or redirect. The Queue and issue claims are comments `6354269779`
+  and `6354270580`. Work starts from `9b6960e61` on
+  `third/body-hand-controls-tests`, with the real bus and Controls service.
+  It covers push suppression, explicit release and expiry, contact
+  recovery, primary Stop, and reading the push before qualification.
+  Fifth retains the Body correction and device trial. There is no product
+  change, lamp access or claim of acoustic or physical latency.
+- The unchanged Controls baseline at `4fca958ad` passed on the Mac with
+  local socket access: 500 passed, zero failed, one ignored, using
+  `CARGO_BUILD_JOBS=2 cargo test -q --offline --locked -p lamp-controls -- --test-threads=2`.
+  The initial sandbox run failed 15 integration cases because Unix socket
+  binds were denied; 441 integration cases passed and one was ignored.
+  Both logs are retained in the session scratch directory. The rerun
+  used identical source, with no test omitted or modified.
+- #3153's train-21 carry `37a1b5d4e` compares equal to `4fca958ad`.
+  Linux Clippy passed, but ARM64 attempt 1 of run `39876440732` failed
+  the existing fresh-boot worker fixture. First assigned its clock fix
+  to Tests and reran the train; no ARM64 success is claimed here.
+
 ## 2026-10-23 07:04 — journal follow-up pushed; Controls consumer read
 
 Ready for lamp-voice: yes (#3153, documentation only; First read it clean).
@@ -30,7 +54,7 @@ Ready for lamp-voice: yes (#3153, documentation only; First read it clean).
   results, not a diagnosis or measurement of Fifth's actual Body fault.
 - Proposed **third-P3** at 07:02: the missing deterministic bus-to-Controls
   test for suppression, explicit release/expiry, and fresh-contact
-  recovery. The self-pick window ends at 07:17:15. Before then only the
+  recovery. The self-pick window ends at 07:17:16. Before then only the
   fixture and clock boundary are read; there is no implementation yet.
   Fifth retains the Body deadband correction and the hand trial.
 
@@ -3815,6 +3839,7 @@ router, hotspot or lamp; step 4 of #806 needs a builder with a lamp.
 |---|---|---|---|
 | third-P1 | Expression reads the system's time zone (`--zone system`), so a lamp outside Vietnam keeps its days across daylight saving; Memory's owner the same | #820 | Yes (First, 18:20; Second for the policy, 18:34); #844 |
 | third-P2 | Use diagnostic long-gap counter deltas for Controls totals; rate-limited journal warnings can omit the final suppressed gaps | #2602, 22 Oct 23:36 | Claimed after the self-pick window; delivered as #3083 for documentation review |
+| third-P3 | Test the real bus-to-Controls path for a push, its release or expiry, and recovery only after a fresh head contact | #1798; #3126, 23 Oct 07:02 | Claimed at 07:18 after the self-pick window; test-only, Body implementation remains with its owner |
 
 ## 2026-10-15 — Setup for a home (#806) ready as #817; #795 and #808 rebased
 
