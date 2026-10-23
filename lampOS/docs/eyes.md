@@ -762,7 +762,16 @@ this room" until someone asks to be recognised.
   later (#3108; `who::recognise_due`). A face from a photo is not: it is
   named only on its person's yes. The camera gives 320 by 240, so a face at the desk is 35 to
   65 pixels tall. Whether that is enough is to be measured with people
-  (the camera can give 640 by 480 if not).
+  (the camera can give 640 by 480 if not). With `LAMP_FACE_FULL_CROP=on`
+  the face is cut from the frame at its own size instead
+  ([below](#held-through-a-miss-lamp_face_full_cropon-3126)).
+- **The score, in the journal.** Each check with a face in view, outside a
+  remembering, says one line, at most every two seconds:
+  `recognition best 0.341 height 0.152 (near at 0.1, same at 0.363)`, the
+  best cosine against anyone's kept prints (`none` with nobody remembered
+  or no face near enough), the largest face's height as a share of the
+  picture's, the near gate and the threshold. No name, no id: only numbers,
+  always on (#3126).
 - **Kept.** `--people FILE` (on lamp-4ace `/var/lib/lampos-eyes/people.json`,
   in a directory of mode 0700 and a file of mode 0600). Per person: the
   name, up to five prints and when they were added; with
@@ -907,7 +916,8 @@ this room" until someone asks to be recognised.
 - **Said.** With `--known-file` (on lamp-4ace `/run/lampos-eyes/known`,
   beside the socket), the name of the known person at the lamp is kept
   there and renewed every two seconds while they are there. The file is
-  removed when nobody is near. With `LAMP_MEMORY_STABLE_ID=on` the
+  removed when nobody is near (with `LAMP_FACE_FULL_CROP=on`, once the hold
+  is over, [below](#held-through-a-miss-lamp_face_full_cropon-3126)). With `LAMP_MEMORY_STABLE_ID=on` the
   person's memory id is on the line after the name (`NAME\nID\n`,
   `lamp_msgs::known`); off, the name alone, as before. Every reader (the
   voice's `known_faces`, the skills' `known::name_in`) reads the first
@@ -1002,6 +1012,37 @@ can you remember my face? I'm Sam." (played, nobody in view) was answered
 "I couldn't quite see you. Would you mind looking right at me and asking
 again?", the eyes having looked for 4.2 s. Since 08:39 the eyes say no face
 after 1.5 s: the same request was answered 3.5 s after the end of speech.
+
+### Held through a miss (`LAMP_FACE_FULL_CROP=on`, #3126)
+
+Off unless set. On lamp-4ace on 23 Oct a face just remembered was not kept
+known: with `--full-look 1280x960` the picture is the frame shrunk four
+times by taking every fourth pixel, so a face at the desk is 29 to 65
+pixels stretched to 112, the same person scored either side of 0.363 look
+to look, and each miss took their name and the known file away (Sixth's
+analysis on #3126). With the switch on:
+
+- **The face from the full frame.** The look keeps its decoded frame (the
+  decode's own buffer, for that look only; nothing written) and the near
+  face's five marks, found in the shrunk picture, are carried back to it;
+  only the 112 by 112 face is read from it (`who::align_full`). Both
+  remembering and recognising cut it this way, so prints and the faces
+  matched against them come the same way: faces remembered before the
+  switch are best remembered again. The sitter's prints
+  (`LAMP_ACTIVITY=on`), the expression read and photos are cut as before.
+- **Held through a miss.** A check that finds nobody (no match, no face
+  from a photo, or no face near enough) keeps the one known, their name in
+  `who` and the known file, if they matched within the last 4 s
+  (`who::KNOWN_HOLD`, `who::Held`): one missed check, two seconds on, keeps
+  them, and the next lets them go, so someone who leaves is let go within
+  4 s of their last match. A held check does not count a visit. Someone
+  else matched, or a face from a photo, replaces them at once.
+- **The camera closed lets them go at once**: the name and the known file
+  go as it closes, held or not.
+
+Off, nothing changes: each miss lets go, as before. The lamp check: on
+lamp-52e6, the lead's face from a seat with the switch on and off, the
+score in the journal, the known file held and `who` naming them.
 
 ### Atomic face repair store (inactive)
 
