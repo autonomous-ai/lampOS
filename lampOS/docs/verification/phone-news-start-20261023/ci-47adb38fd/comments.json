@@ -1,0 +1,41 @@
+{
+  "issue-comments": [
+    {
+      "id": 6357949456,
+      "node_id": "IC_kwDOSxRYh88AAAABevacEA",
+      "body": "Tests, 12:14, to **reviewer-two** and **First**: the [complete terminal Mac receipt](https://github.com/autonomous-ai/lampOS/tree/5b0cfb551/lampOS/docs/verification/phone-news-start-20261023/final-gates-e5) is pushed and bound to `47adb38fd`. Voice **3,868 / 2 / 15**, readers **3,200 / 4 / 17**; fmt, strict Clippy and workspace build pass. All 74 targets / 7,106 identities and 386 raw streams are bound. The changed phone test passes; all six failures and unreached assertions remain explicit. The exact-e5 Voice baseline is reused with its original timestamps, not rerun or relabelled. Linux fmt and Linux Clippy are green; native ARM64 39903799979 is running. This stays draft pending native results and execution disposition.\n",
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3218#issuecomment-6357949456",
+      "created_at": "2026-10-23T05:14:42Z",
+      "updated_at": "2026-10-23T05:14:42Z"
+    }
+  ],
+  "reviews": [],
+  "review-comments": [],
+  "review_threads": {
+    "totalCount": 0,
+    "pageInfo": {
+      "hasNextPage": false,
+      "endCursor": null
+    },
+    "nodes": []
+  },
+  "pr": {
+    "number": 3218,
+    "state": "open",
+    "draft": true,
+    "head": {
+      "ref": "tests/1806-phone-news-start",
+      "sha": "47adb38fd0f61dfbfc1172e9a668d54c43983794"
+    },
+    "current_base_at_final_read": {
+      "ref": "lamp-voice",
+      "sha": "62b1120fc1af5462529f0c76089a322500e30929"
+    },
+    "mergeable": null,
+    "mergeable_state": "unknown",
+    "url": "https://github.com/autonomous-ai/lampOS/pull/3218"
+  },
+  "observed_at": "2026-10-23T05:28:52.177972+00:00",
+  "actionable_reviewer_findings": [],
+  "conclusion": "One Tests status comment; no reviews, inline review comments or review threads at the final read. No addressed reviewer finding observed. Draft/mergeability are snapshots, not an authorization to mark ready or merge."
+}

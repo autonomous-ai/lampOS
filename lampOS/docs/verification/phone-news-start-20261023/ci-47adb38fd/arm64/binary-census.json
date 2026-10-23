@@ -1,0 +1,428 @@
+{
+  "binaries": [
+    {
+      "binary": "lamp-body",
+      "observed_unique_cases": 432,
+      "statuses": {
+        "PASS": 432
+      }
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body",
+      "observed_unique_cases": 32,
+      "statuses": {
+        "PASS": 32
+      }
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-inspect",
+      "observed_unique_cases": 2,
+      "statuses": {
+        "PASS": 2
+      }
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-measure",
+      "observed_unique_cases": 5,
+      "statuses": {
+        "PASS": 5
+      }
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-mood",
+      "observed_unique_cases": 3,
+      "statuses": {
+        "PASS": 3
+      }
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-worker",
+      "observed_unique_cases": 1,
+      "statuses": {
+        "PASS": 1
+      }
+    },
+    {
+      "binary": "lamp-body::it",
+      "observed_unique_cases": 125,
+      "statuses": {
+        "PASS": 125
+      }
+    },
+    {
+      "binary": "lamp-cloud",
+      "observed_unique_cases": 166,
+      "statuses": {
+        "PASS": 166
+      }
+    },
+    {
+      "binary": "lamp-cloud::it",
+      "observed_unique_cases": 30,
+      "statuses": {
+        "PASS": 30
+      }
+    },
+    {
+      "binary": "lamp-expression",
+      "observed_unique_cases": 27,
+      "statuses": {
+        "PASS": 27
+      }
+    },
+    {
+      "binary": "lamp-expression::bin/lamp-expression",
+      "observed_unique_cases": 4,
+      "statuses": {
+        "PASS": 4
+      }
+    },
+    {
+      "binary": "lamp-expression::it",
+      "observed_unique_cases": 280,
+      "statuses": {
+        "PASS": 280
+      }
+    },
+    {
+      "binary": "lamp-expression::runtime",
+      "observed_unique_cases": 27,
+      "statuses": {
+        "PASS": 27
+      }
+    },
+    {
+      "binary": "lamp-keeper",
+      "observed_unique_cases": 40,
+      "statuses": {
+        "PASS": 40
+      }
+    },
+    {
+      "binary": "lamp-keeper::bin/lamp-keeper",
+      "observed_unique_cases": 2,
+      "statuses": {
+        "PASS": 2
+      }
+    },
+    {
+      "binary": "lamp-lean",
+      "observed_unique_cases": 10,
+      "statuses": {
+        "PASS": 10
+      }
+    },
+    {
+      "binary": "lamp-lean::it",
+      "observed_unique_cases": 51,
+      "statuses": {
+        "PASS": 51
+      }
+    },
+    {
+      "binary": "lamp-memory",
+      "observed_unique_cases": 96,
+      "statuses": {
+        "PASS": 96
+      }
+    },
+    {
+      "binary": "lamp-memory::bin/lamp-memory",
+      "observed_unique_cases": 8,
+      "statuses": {
+        "PASS": 8
+      }
+    },
+    {
+      "binary": "lamp-memory::bin/lamp-memory-eval",
+      "observed_unique_cases": 8,
+      "statuses": {
+        "PASS": 8
+      }
+    },
+    {
+      "binary": "lamp-memory::forget_person",
+      "observed_unique_cases": 3,
+      "statuses": {
+        "PASS": 3
+      }
+    },
+    {
+      "binary": "lamp-memory::forget_shared_exchange",
+      "observed_unique_cases": 4,
+      "statuses": {
+        "PASS": 4
+      }
+    },
+    {
+      "binary": "lamp-memory::forgot",
+      "observed_unique_cases": 1,
+      "statuses": {
+        "PASS": 1
+      }
+    },
+    {
+      "binary": "lamp-memory::health_control",
+      "observed_unique_cases": 23,
+      "statuses": {
+        "PASS": 23
+      }
+    },
+    {
+      "binary": "lamp-memory::it",
+      "observed_unique_cases": 154,
+      "statuses": {
+        "PASS": 154
+      }
+    },
+    {
+      "binary": "lamp-memory::paraphrase_fixture",
+      "observed_unique_cases": 1,
+      "statuses": {
+        "PASS": 1
+      }
+    },
+    {
+      "binary": "lamp-memory::voice_early_words",
+      "observed_unique_cases": 1,
+      "statuses": {
+        "PASS": 1
+      }
+    },
+    {
+      "binary": "lamp-memory::voice_follows_face",
+      "observed_unique_cases": 1,
+      "statuses": {
+        "PASS": 1
+      }
+    },
+    {
+      "binary": "lamp-memory::voice_forget",
+      "observed_unique_cases": 5,
+      "statuses": {
+        "PASS": 5
+      }
+    },
+    {
+      "binary": "lamp-memory::voice_forget_about",
+      "observed_unique_cases": 2,
+      "statuses": {
+        "PASS": 2
+      }
+    },
+    {
+      "binary": "lamp-memory::voice_forget_named",
+      "observed_unique_cases": 2,
+      "statuses": {
+        "PASS": 2
+      }
+    },
+    {
+      "binary": "lamp-memory::voice_link_used",
+      "observed_unique_cases": 2,
+      "statuses": {
+        "PASS": 2
+      }
+    },
+    {
+      "binary": "lamp-memory::voice_observe",
+      "observed_unique_cases": 1,
+      "statuses": {
+        "PASS": 1
+      }
+    },
+    {
+      "binary": "lamp-memory::voice_since_until",
+      "observed_unique_cases": 2,
+      "statuses": {
+        "PASS": 2
+      }
+    },
+    {
+      "binary": "lamp-peek",
+      "observed_unique_cases": 15,
+      "statuses": {
+        "PASS": 15
+      }
+    },
+    {
+      "binary": "lamp-peek::peek",
+      "observed_unique_cases": 11,
+      "statuses": {
+        "PASS": 11
+      }
+    },
+    {
+      "binary": "lamp-setup",
+      "observed_unique_cases": 16,
+      "statuses": {
+        "PASS": 16
+      }
+    },
+    {
+      "binary": "lamp-setup::it",
+      "observed_unique_cases": 156,
+      "statuses": {
+        "PASS": 156
+      }
+    },
+    {
+      "binary": "lamp-setup::wake",
+      "observed_unique_cases": 6,
+      "statuses": {
+        "PASS": 6
+      }
+    },
+    {
+      "binary": "lamp-skills",
+      "observed_unique_cases": 157,
+      "statuses": {
+        "PASS": 157
+      }
+    },
+    {
+      "binary": "lamp-skills::bin/lamp-skills",
+      "observed_unique_cases": 23,
+      "statuses": {
+        "PASS": 23
+      }
+    },
+    {
+      "binary": "lamp-skills::it",
+      "observed_unique_cases": 304,
+      "statuses": {
+        "PASS": 304
+      }
+    },
+    {
+      "binary": "lamp-skills::requested_audio",
+      "observed_unique_cases": 31,
+      "statuses": {
+        "PASS": 31
+      }
+    },
+    {
+      "binary": "lamp-update",
+      "observed_unique_cases": 119,
+      "statuses": {
+        "PASS": 119
+      }
+    },
+    {
+      "binary": "lamp-update::functions",
+      "observed_unique_cases": 4,
+      "statuses": {
+        "PASS": 4
+      }
+    },
+    {
+      "binary": "lamp-update::install",
+      "observed_unique_cases": 80,
+      "statuses": {
+        "PASS": 80
+      }
+    },
+    {
+      "binary": "lamp-update::it",
+      "observed_unique_cases": 12,
+      "statuses": {
+        "PASS": 12
+      }
+    },
+    {
+      "binary": "lamp-update::round",
+      "observed_unique_cases": 123,
+      "statuses": {
+        "PASS": 123
+      }
+    },
+    {
+      "binary": "lamp-update::self-cli-exec",
+      "observed_unique_cases": 1,
+      "statuses": {
+        "PASS": 1
+      }
+    },
+    {
+      "binary": "lamp-update::self-process-cuts",
+      "observed_unique_cases": 1,
+      "statuses": {
+        "PASS": 1
+      }
+    },
+    {
+      "binary": "lamp-voice",
+      "observed_unique_cases": 3626,
+      "statuses": {
+        "PASS": 3625,
+        "LEAK": 1
+      }
+    },
+    {
+      "binary": "lamp-voice-eval",
+      "observed_unique_cases": 378,
+      "statuses": {
+        "PASS": 378
+      }
+    },
+    {
+      "binary": "lamp-voice-eval::bin/lamp-voice-eval",
+      "observed_unique_cases": 7,
+      "statuses": {
+        "PASS": 7
+      }
+    },
+    {
+      "binary": "lamp-voice-eval::it",
+      "observed_unique_cases": 238,
+      "statuses": {
+        "PASS": 238
+      }
+    },
+    {
+      "binary": "lamp-voice::bin/lamp-voice",
+      "observed_unique_cases": 1,
+      "statuses": {
+        "PASS": 1
+      }
+    },
+    {
+      "binary": "lamp-voice::example/render_line_second",
+      "observed_unique_cases": 4,
+      "statuses": {
+        "PASS": 4
+      }
+    },
+    {
+      "binary": "lamp-voice::example/stop_words_stt_replay",
+      "observed_unique_cases": 6,
+      "statuses": {
+        "PASS": 6
+      }
+    },
+    {
+      "binary": "lamp-voice::it",
+      "observed_unique_cases": 301,
+      "statuses": {
+        "PASS": 301
+      }
+    }
+  ],
+  "observed_terminal_binaries": 58,
+  "startup_binaries": 62,
+  "skipped_binaries": 106,
+  "counts_explanation": "The log does not enumerate the four starting binaries with no terminal row or skipped identities/reasons; no identities are guessed.",
+  "raw_log_sha256": "b9ea379a1272a80e9773240b4012d2b2759408e046a5ca5001c0c3b4fd89ee6b",
+  "unique_terminal_cases_external": {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/unique-terminal-cases.json",
+    "bytes": 1721774,
+    "sha256": "8184f858d90a3b7fe56af2dbd7e519ca67504fb66cf17e7cb7fe8522ded41582",
+    "reason": "Every case is also visible in the complete portable raw log; duplicate machine census remains external."
+  },
+  "all_raw_terminal_rows_external": {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/terminal-cases.json",
+    "bytes": 1730056,
+    "sha256": "3e411c29e4580a2cfe1fb9c5c6a8807a3d7bea1c546ed8324d693154a322bbb5",
+    "reason": "Raw parsed rows include 34 identical output repetitions, counted once by (binary,name) with matching status/duration/ordinal/total."
+  }
+}

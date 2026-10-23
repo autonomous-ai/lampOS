@@ -1,0 +1,127 @@
+{
+  "scope": "One old missing-start observation, one corrected missing-start observation, one restored-normal observation, formatter and strict Voice all-target Clippy. Full qualification remains pending.",
+  "observations": [
+    {
+      "id": "before-missing-start",
+      "expected": "pass",
+      "source_aggregate_sha256": "91a6e7e0788e924648fa9dc0b5eb728bba594705af7a48645c318568b23d6efc",
+      "binary_sha256": "cb775a48ce81255e08bcf551f82cdc4d38b9487d138723fc04c029a30f6e75b0",
+      "summary": [
+        [
+          "ok",
+          "1",
+          "0",
+          "0",
+          "0",
+          "3620",
+          "0.30"
+        ]
+      ],
+      "rows": [
+        [
+          "provider_worker::tests::spoken_to::a_child_still_loading_its_model_takes_nothing_from_the_worker",
+          "ok"
+        ]
+      ],
+      "source_unchanged_after": true,
+      "command_id": "initial/before-missing-start-exact",
+      "wall_seconds": 0.386608,
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "id": "after-missing-start",
+      "expected": "startup_failure",
+      "source_aggregate_sha256": "5b63df8a1c8a4d0f0c204e29d049894d5057c90ad3bcd7d7e14e1b7a065ad6a9",
+      "binary_sha256": "e0d17e67fcfdbf0cb13266f3df77dca1b35ec6c4511dc09e7e6dffdf2e60f690",
+      "summary": [
+        [
+          "FAILED",
+          "0",
+          "1",
+          "0",
+          "0",
+          "3620",
+          "5.01"
+        ]
+      ],
+      "rows": [
+        [
+          "provider_worker::tests::spoken_to::a_child_still_loading_its_model_takes_nothing_from_the_worker",
+          "FAILED"
+        ]
+      ],
+      "source_unchanged_after": true,
+      "command_id": "corrected/after-missing-start-exact",
+      "wall_seconds": 5.054915,
+      "exit_code": 101,
+      "timed_out": false
+    },
+    {
+      "id": "restored-normal",
+      "expected": "pass",
+      "source_aggregate_sha256": "a08436d49b6e16f08ea994b2e1033a8bdd0dfa3ee8e9de9157c7eafc63921179",
+      "binary_sha256": "f019092d3e6f80dc97f989f47abefc3ec18471cf7fa11dfc1388a7d6e1ba941f",
+      "summary": [
+        [
+          "ok",
+          "1",
+          "0",
+          "0",
+          "0",
+          "3620",
+          "0.85"
+        ]
+      ],
+      "rows": [
+        [
+          "provider_worker::tests::spoken_to::a_child_still_loading_its_model_takes_nothing_from_the_worker",
+          "ok"
+        ]
+      ],
+      "source_unchanged_after": true,
+      "command_id": "corrected/restored-normal-exact",
+      "wall_seconds": 0.933891,
+      "exit_code": 0,
+      "timed_out": false
+    }
+  ],
+  "earlier_failures": [
+    {
+      "command_id": "initial/fmt-initial",
+      "kind": "pre-Cargo launch/setup failure; missing Cargo in PATH"
+    },
+    {
+      "command_id": "initial/fmt-check-before-controls",
+      "kind": "actual formatter exit 1; five helper-only style differences"
+    },
+    {
+      "command_id": "initial/after-missing-start-compile",
+      "kind": "compile exit 101; three missing Arc qualifications, no runtime executed"
+    }
+  ],
+  "final_formatter_exit": 0,
+  "final_clippy_exit": 0,
+  "final_clippy_wall_seconds": 86.291849,
+  "source_restored": true,
+  "diff_check_exit": 0,
+  "not_run": [
+    "full Voice suite",
+    "dependent package suites",
+    "workspace build for this P3",
+    "Linux formatter for this P3",
+    "ARM64 qualification for this P3"
+  ],
+  "root_records": [
+    {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/results.json",
+      "bytes": 3347,
+      "sha256": "6dc53a6808526c3cd1f023295bb5bcfd0d89416e27c20be218a032a0e8c1abf9"
+    },
+    {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/results.json",
+      "bytes": 9413,
+      "sha256": "396a4117cece1bebc766b485b803aba1a466069b2f0f6d4fabd1e5526f9564c0"
+    }
+  ]
+}

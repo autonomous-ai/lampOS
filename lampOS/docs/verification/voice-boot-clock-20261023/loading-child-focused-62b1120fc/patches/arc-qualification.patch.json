@@ -1,0 +1,8 @@
+{
+  "format": "utf8-string-envelope-v1",
+  "original_relative_path": "patches/arc-qualification.patch",
+  "encoding": "utf-8",
+  "decoded_bytes": 1295,
+  "decoded_sha256": "9e3a8c768beb9747a7ca5d539de7d39deff4dd8e1807817e9417b510f546ac43",
+  "data": "--- a/lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs\n+++ b/lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs\n@@ -1770,7 +1770,7 @@\n /// probes acknowledge the same live child throughout the conversation.\n struct LoadingChild {\n     dir: std::path::PathBuf,\n-    prints: Arc<std::sync::Mutex<Option<crate::same_voice::Prints>>>,\n+    prints: std::sync::Arc<std::sync::Mutex<Option<crate::same_voice::Prints>>>,\n     control: Option<std::fs::File>,\n     pid: Option<rustix::process::Pid>,\n     probe: u64,\n@@ -1780,7 +1780,7 @@\n \n /// Let cleanup close Prints even if a panicking paused test has not yet\n /// dropped the worker task. The real Printer still handles every call.\n-struct LoadingPrints(Arc<std::sync::Mutex<Option<crate::same_voice::Prints>>>);\n+struct LoadingPrints(std::sync::Arc<std::sync::Mutex<Option<crate::same_voice::Prints>>>);\n \n impl crate::same_voice::Printer for LoadingPrints {\n     fn ask(&mut self, request: u64, samples: &[i16]) -> bool {\n@@ -1832,7 +1832,7 @@\n         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();\n         Self {\n             dir,\n-            prints: Arc::default(),\n+            prints: std::sync::Arc::default(),\n             control: None,\n             pid: None,\n             probe: 0,\n"
+}

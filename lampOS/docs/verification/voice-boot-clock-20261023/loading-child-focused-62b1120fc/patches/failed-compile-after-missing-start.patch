@@ -1,0 +1,11 @@
+--- a/lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs
++++ b/lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs
+@@ -2000,7 +2000,7 @@
+     let _clock = logical_clock();
+     let mut child = LoadingChild::new();
+     let mut options = options(true, quiet_going_on, crate::tools::Settings::default());
+-    options.voices = Some(child.printer());
++    options.voices = None;
+     let mut rig = LiveRig::start_with(quick_policy(), options);
+     let mut dial = rig.ready().await;
+     child.held().unwrap();

@@ -1,5 +1,32 @@
 # Tests work log
 
+## 2026-10-23 12:42 +0700 — phone native CI and controlled loading-child startup
+
+Ready for lamp-voice: no (#3218 local failures and #3190 execution HOLD remain).
+
+The [phone native receipt](verification/phone-news-start-20261023/ci-47adb38fd/)
+records ARM64 **7,171 passed, including one leaky pass; 0 failed; 32 skipped**,
+across the selected 12 of 46 packages. The changed phone case passed in 3.066 s.
+Linux strict workspace Clippy passed. Both checks used merge `0faa46c6d`,
+with base `62b1120fc` and authored head `47adb38fd`. The separate 4 doctests,
+12 process cases, relay result and offline publication suites are not added
+to that total. All six Mac failures passed on ARM; changed platform and tree
+mean those observations do not waive or classify the failed Mac gate.
+
+The [loading-child controls](verification/voice-boot-clock-20261023/loading-child-focused-62b1120fc/)
+show the missing-start old fixture falsely passing once, the corrected fixture
+failing at startup once, and the normal corrected child passing once. The
+child is acknowledged before and after all three original checks, then
+released and reaped. All 79 old assertion bodies are unchanged. Mac formatting
+and strict Voice Clippy pass; earlier setup, formatting and compilation
+failures remain recorded. Root verified all 53 output stream bindings.
+
+The [commit binding and range-diff](verification/voice-boot-clock-20261023/loading-child-commit-77792f275/)
+connect that exact 10,002-path source to pushed #3190 head `77792f275` without
+rewriting original observation metadata. New full Voice, Linux formatting and
+native checks remain pending. The independent relay PID-ready controls and
+full VoiceEval gate are running next; no product behavior or assertion changed.
+
 ## 2026-10-23 12:13 +0700 — phone-news complete gate published with six failures
 
 Ready for lamp-voice: no (#3218 draft, native checks and review pending).

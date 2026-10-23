@@ -1,0 +1,566 @@
+[
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/final-jobs.json",
+    "bytes": 7015,
+    "sha256": "9f46ad73857a26469586aef1d98a0cecbb731923b2017777f04329320885f931",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/final-jobs.json.command.json",
+    "bytes": 490,
+    "sha256": "4662bc3ee30c3544701355662598c7752d11d1cfe00a8dc3afe875cc6bc5d04b",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/final-jobs.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/final-run.json",
+    "bytes": 12735,
+    "sha256": "af3b0610240b6c886be7d704d92c3475a0d4137a8e7d06ca5438a1a92d016d4d",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/final-run.json.command.json",
+    "bytes": 473,
+    "sha256": "efabaf6222efad11c74ca0daaa24f2d14ad3546a8ee1a4b2feb941ab1a38e07d",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/final-run.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/initial-jobs.json",
+    "bytes": 4735,
+    "sha256": "e59e2f61dc7bcf9633735cf4330e90cb89c7229d5f9649529bafdac748e0d457",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/initial-jobs.json.command.json",
+    "bytes": 490,
+    "sha256": "7b9e0f859289b392d6e677162e161047bfce4712bc1a3c88ef365a50375b8d52",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/initial-jobs.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/initial-run.json",
+    "bytes": 12732,
+    "sha256": "c8e242e04d71872c5205f5319352e19481b746912d381d45c19601d1d31518bd",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/initial-run.json.command.json",
+    "bytes": 472,
+    "sha256": "56c03bbeb6b0a926582497d96f98aa089a6ee0d3cc2bc922fe92df0f12e7cca2",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/initial-run.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/job.log",
+    "bytes": 1265621,
+    "sha256": "b9ea379a1272a80e9773240b4012d2b2759408e046a5ca5001c0c3b4fd89ee6b",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/job.log.command.json",
+    "bytes": 481,
+    "sha256": "a1d41dd72bb7fcd1ea5a766696bfe0ed956ccb8f2a3604ccf769e5f5e070821d",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/job.log.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/receipt.json",
+    "bytes": 40226,
+    "sha256": "c6ba51869c5f1e4e4042782fb95ea28503bc91d8839adb746d13904ece49c36c",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/terminal-cases.json",
+    "bytes": 1730056,
+    "sha256": "3e411c29e4580a2cfe1fb9c5c6a8807a3d7bea1c546ed8324d693154a322bbb5",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64/unique-terminal-cases.json",
+    "bytes": 1721774,
+    "sha256": "8184f858d90a3b7fe56af2dbd7e519ca67504fb66cf17e7cb7fe8522ded41582",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64-watch.result.json",
+    "bytes": 754,
+    "sha256": "512a92c70fdf6503a252d40e6ce7a85fcbc5742d58e6f2db021aa30507e7b2b9",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64-watch.started.json",
+    "bytes": 416,
+    "sha256": "cc83bf11f8896b1449710a090cdbc8c378c109c4268494c9c847927b91da0e42",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64-watch.stderr.txt",
+    "bytes": 94,
+    "sha256": "eed65211f0fcee1b82c2661764250c1adaebcb36f0cb78a702d59632f056c439",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/arm64-watch.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/clippy/final-jobs.json",
+    "bytes": 2633,
+    "sha256": "8687fd10f846c9cb332b507730fe4002ea533cc54896836112d2861d0b2808df",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/clippy/final-jobs.json.command.json",
+    "bytes": 490,
+    "sha256": "667a7ee254c8e776cf46d74d82813d2d15f650641e7de36fcf98dbfcd733297a",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/clippy/final-jobs.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/clippy/final-run.json",
+    "bytes": 12734,
+    "sha256": "ac79448fd256b9d216c2cafdfa5752a5dcf1d4c6e974ab1f49955ba17d0bdbb2",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/clippy/final-run.json.command.json",
+    "bytes": 473,
+    "sha256": "a2ef6cfd9398de94c5fd7c7a2c0afd84b502b56ef54b962cb92d9180e6c10ce1",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/clippy/final-run.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/clippy/job.log",
+    "bytes": 39503,
+    "sha256": "042e90e04bd9465165e86af648803d8ab3cdf3ec9a2748561ca15bd86a69b26f",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/clippy/job.log.command.json",
+    "bytes": 479,
+    "sha256": "e92ebc6682297fcc9d34f846d821f80fd7c3ae2dcde1093789d018b8045014d2",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/clippy/job.log.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/clippy/receipt.json",
+    "bytes": 4034,
+    "sha256": "974b6433153d8684f3d761e4970fc12edc449f811326729754679edf0ed20a67",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/issue-comments-final.json",
+    "bytes": 2303,
+    "sha256": "805ea4fe44e0d0d4433961cc9c0c79b0b2f8bc9a8bec7235964e25c4f15b2bee",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/issue-comments-final.json.command.json",
+    "bytes": 514,
+    "sha256": "c561e46217639dcdd6ea1b8ff0ad6345492c063717f5814caa39e42ff9288f21",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/issue-comments-final.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/issue-comments-initial.json",
+    "bytes": 2303,
+    "sha256": "805ea4fe44e0d0d4433961cc9c0c79b0b2f8bc9a8bec7235964e25c4f15b2bee",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/issue-comments-initial.json.command.json",
+    "bytes": 514,
+    "sha256": "0a31f2666f990e659866fdcbf70b197cd99de5358e301aec7631faaf0790cde4",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/issue-comments-initial.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/pr-final.json",
+    "bytes": 20998,
+    "sha256": "74731b20f9a5f7044b87aded9d8d34812eaaf7e004099d1525fae29eb4ad6569",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/pr-final.json.command.json",
+    "bytes": 459,
+    "sha256": "ad6aef3b75aadab806279d86c0f0ceed4a48f2c2f17f99dbb395a09d27db979e",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/pr-final.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/pr-initial.json",
+    "bytes": 20999,
+    "sha256": "f24f0b1ca5b658bf54bb33f2f66ab40dab8753ecb1ffd206b03e0671b3d112aa",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/pr-initial.json.command.json",
+    "bytes": 459,
+    "sha256": "06de024355d48919fe3cc6efddd18721d5957ecb6f796507476c6a4722ad84ea",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/pr-initial.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/review-comments-final.json",
+    "bytes": 4,
+    "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/review-comments-final.json.command.json",
+    "bytes": 510,
+    "sha256": "b75cc82d36db422506ab54b77f87ce43dd7c8a846ee4e5eca5cb4c7b26686d02",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/review-comments-final.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/review-comments-initial.json",
+    "bytes": 4,
+    "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/review-comments-initial.json.command.json",
+    "bytes": 510,
+    "sha256": "8ffeec63132f4870768963bd634f5b5ba384c42ebd2702f5665033ffa07f65dd",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/review-comments-initial.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/reviews-final.json",
+    "bytes": 4,
+    "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/reviews-final.json.command.json",
+    "bytes": 509,
+    "sha256": "4ede5af67274e370e9eec83560a5c9a5d4a4eb081110a88f29174307cb044aa1",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/reviews-final.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/reviews-initial.json",
+    "bytes": 4,
+    "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/reviews-initial.json.command.json",
+    "bytes": 509,
+    "sha256": "07690a78168f76fab87ca6b596d3db1a786286a9e25d5f42a5e0680d59bf7d01",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/reviews-initial.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/threads-final.json",
+    "bytes": 135,
+    "sha256": "b7d2accee34d7a7fd9354c630e40ba3b856015467aaf9791631673527fac0e4c",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/threads-final.json.command.json",
+    "bytes": 751,
+    "sha256": "b5880bcc033fd611d9b9921dd65c969cbfa3c5988114eff3311ca48584367d70",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/threads-final.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/threads-initial.json",
+    "bytes": 135,
+    "sha256": "b7d2accee34d7a7fd9354c630e40ba3b856015467aaf9791631673527fac0e4c",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/threads-initial.json.command.json",
+    "bytes": 751,
+    "sha256": "63dcfdffccb07dbc610e641e941ec730204b02e994cc5e56a5145802689ddbb2",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/comments/threads-initial.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-0.json",
+    "bytes": 26380,
+    "sha256": "9a085eadf9bf8fc55d251f5b0b63389476603c7bba4f6795e1c3f9e26fe7902f",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-0.json.command.json",
+    "bytes": 537,
+    "sha256": "5b165364b9d788533127b89f35e4e94444babbd1c0692de9d1b5ef33041a8153",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-0.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-1.json",
+    "bytes": 6902,
+    "sha256": "8f9e2bcb994aa71b7553b5def900d090a8f49526277ca5f5960ae744268f77fe",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-1.json.command.json",
+    "bytes": 537,
+    "sha256": "75606a50056ca753be6becb7424fd63925c5ba79a4e6283a89c2f1053afceba6",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-1.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-2.json",
+    "bytes": 8698,
+    "sha256": "7e186b2ce711b0fc4e997d2d2ffdde442c5c81ae1945810d1e08a9e4b4e04dde",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-2.json.command.json",
+    "bytes": 537,
+    "sha256": "6b7854ca64026eadc63b32efbf4d7c327f1ee0ce0b29028d46b47cdcf3342f32",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-2.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-3.json",
+    "bytes": 8179,
+    "sha256": "03b5431cfbb14003b8dac398b3df50641533760dfcb9ec10ad77fe90743bf842",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-3.json.command.json",
+    "bytes": 529,
+    "sha256": "9f8386e2490f1f7dcdf01603d2607cb3834ba0905aee64047e87fa545eb92de2",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-3.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-4.json",
+    "bytes": 72397,
+    "sha256": "a4eda3e05e384f02df8d631a00e796c0c0d82e6169aedd4b549961ecf4a70565",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-4.json.command.json",
+    "bytes": 538,
+    "sha256": "d47e0c0948d093bd0d6119ea6e4dfa17943821ec94db18502c1c3c2d361aee48",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-4.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-5.json",
+    "bytes": 33505,
+    "sha256": "a1fce42fb70a6e02eed5d47d3080c23c272b7010c96282085f37e8b73982f519",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-5.json.command.json",
+    "bytes": 525,
+    "sha256": "9c46caf6cc696c7099ceb6a2741d893987df1f693b41fa7710b324682d0bf0ec",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/content-5.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/merge-commit.json",
+    "bytes": 2603,
+    "sha256": "6b39ac966c6ed38324356ea170755edfb4771ed29091b0fd69719a93ffbbfa49",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/merge-commit.json.command.json",
+    "bytes": 500,
+    "sha256": "c17b9e2fc0729d6421ac7ce7305aab619104f060977486b8fa8d8b4035821c56",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/merge-commit.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/merge-root-tree.json",
+    "bytes": 5120,
+    "sha256": "64c551d0fdc1f3728c5c0b360a5780a09c1debe05d7c871db4fcab400c008a26",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/merge-root-tree.json.command.json",
+    "bytes": 498,
+    "sha256": "a7975d3fa641d7aec88ac87df30ef61f39c74ea408f666ddb0f37aa5be97d180",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/merge-root-tree.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/source-binding.initial.json",
+    "bytes": 79494,
+    "sha256": "32ec926e54e94492deaaf5d23945bdebba46122e0743ccd8b94aa15c70b99141",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/identity/source-snapshots.json",
+    "bytes": 113063,
+    "sha256": "6d6e9f7749b6356aadf0a4c1f49ae8c0d402d88e7837a341dbfcdf587718e4a9",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/network-watch/arm64-watch.result.json",
+    "bytes": 758,
+    "sha256": "01937d356ee1a6ae792a7a14fec03f9f2719638fcd5d7b68b047f4a4bf1e529b",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/network-watch/arm64-watch.started.json",
+    "bytes": 416,
+    "sha256": "88b9133835d451a5d3b19981498acafb4a9e4932478c72483f39b26082f505c9",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/network-watch/arm64-watch.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/network-watch/arm64-watch.stdout.txt",
+    "bytes": 22027,
+    "sha256": "6cb27ae952adf3797992a47f77c54c50e9d87b89d1f90ae5bc15dccd1ab80f7b",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/pr-initial.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  },
+  {
+    "path": "/private/tmp/tests-3218-ci-20261023/terminal-collector-correction.json",
+    "bytes": 643,
+    "sha256": "1b1b0309a5cc46cd94bbe0ad3fdec583f782de54cd512ff6174002f36966c6d9",
+    "reason": "Original external collection/log/source/parse receipt; no executable or target artifact."
+  }
+]

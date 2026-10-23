@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "both_workflow_and_required_job_terminal": true,
+  "required_heads_match": "47adb38fd0f61dfbfc1172e9a668d54c43983794",
+  "checkouts_match": "0faa46c6d1bc8d3d8e7545afb2a90a74c8374abf",
+  "authored_file_hashes_match": 2,
+  "configuration_hashes_match": 4,
+  "full_raw_logs_lossless": 2,
+  "nextest_unique_ordinals": 7171,
+  "summary_and_status_rows_equal": true,
+  "phone_literal_case_matched": true,
+  "leaky_case_disclosed": true,
+  "separate_harnesses_not_added_to_nextest": true,
+  "review_reads_complete_through_recorded_time": true,
+  "JSON_links_hashes_whitespace": "passed",
+  "attribution_objects_omitted": true,
+  "log_redactions": 0,
+  "local_build_test_rerun_branch_write_or_post": false,
+  "source_readiness_not_changed": true
+}

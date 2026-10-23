@@ -1,0 +1,68 @@
+{
+  "policy": "Portable API metadata uses explicit identity/status/step projections. Full original responses remain externally hash-bound. Person/account attribution is omitted; raw log bytes are retained without redaction.",
+  "records": {
+    "arm64/final-run.json": {
+      "path": "/private/tmp/tests-3218-ci-20261023/arm64/final-run.json",
+      "bytes": 12735,
+      "sha256": "af3b0610240b6c886be7d704d92c3475a0d4137a8e7d06ca5438a1a92d016d4d",
+      "reason": "Original API response retained externally; explicit projection omits actor/account/runner attribution.",
+      "projection": "Workflow or job identity, head, result, times, URLs, runner architecture labels and step outcomes only."
+    },
+    "arm64/final-jobs.json": {
+      "path": "/private/tmp/tests-3218-ci-20261023/arm64/final-jobs.json",
+      "bytes": 7015,
+      "sha256": "9f46ad73857a26469586aef1d98a0cecbb731923b2017777f04329320885f931",
+      "reason": "Original API response retained externally; explicit projection omits actor/account/runner attribution.",
+      "projection": "Workflow or job identity, head, result, times, URLs, runner architecture labels and step outcomes only."
+    },
+    "clippy/final-run.json": {
+      "path": "/private/tmp/tests-3218-ci-20261023/clippy/final-run.json",
+      "bytes": 12734,
+      "sha256": "ac79448fd256b9d216c2cafdfa5752a5dcf1d4c6e974ab1f49955ba17d0bdbb2",
+      "reason": "Original API response retained externally; explicit projection omits actor/account/runner attribution.",
+      "projection": "Workflow or job identity, head, result, times, URLs, runner architecture labels and step outcomes only."
+    },
+    "clippy/final-jobs.json": {
+      "path": "/private/tmp/tests-3218-ci-20261023/clippy/final-jobs.json",
+      "bytes": 2633,
+      "sha256": "8687fd10f846c9cb332b507730fe4002ea533cc54896836112d2861d0b2808df",
+      "reason": "Original API response retained externally; explicit projection omits actor/account/runner attribution.",
+      "projection": "Workflow or job identity, head, result, times, URLs, runner architecture labels and step outcomes only."
+    },
+    "identity/merge.json": {
+      "path": "/private/tmp/tests-3218-ci-20261023/identity/merge-commit.json",
+      "bytes": 2603,
+      "sha256": "6b39ac966c6ed38324356ea170755edfb4771ed29091b0fd69719a93ffbbfa49",
+      "reason": "Original commit API response remains external.",
+      "projection": "Commit/tree/parent identities and dates only; author/committer names/emails and message omitted."
+    },
+    "comments/issue-comments": {
+      "path": "/private/tmp/tests-3218-ci-20261023/comments/issue-comments-final.json",
+      "bytes": 2303,
+      "sha256": "805ea4fe44e0d0d4433961cc9c0c79b0b2f8bc9a8bec7235964e25c4f15b2bee",
+      "reason": "Complete API pages retained externally.",
+      "projection": "Content, timestamps, source position, review state and links only; user/account attribution omitted."
+    },
+    "comments/reviews": {
+      "path": "/private/tmp/tests-3218-ci-20261023/comments/reviews-final.json",
+      "bytes": 4,
+      "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+      "reason": "Complete API pages retained externally.",
+      "projection": "Content, timestamps, source position, review state and links only; user/account attribution omitted."
+    },
+    "comments/review-comments": {
+      "path": "/private/tmp/tests-3218-ci-20261023/comments/review-comments-final.json",
+      "bytes": 4,
+      "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+      "reason": "Complete API pages retained externally.",
+      "projection": "Content, timestamps, source position, review state and links only; user/account attribution omitted."
+    },
+    "comments/pr": {
+      "path": "/private/tmp/tests-3218-ci-20261023/comments/pr-final.json",
+      "bytes": 20998,
+      "sha256": "74731b20f9a5f7044b87aded9d8d34812eaaf7e004099d1525fae29eb4ad6569",
+      "reason": "Complete PR response stays external.",
+      "projection": "PR state/draft/head/base/mergeability/URL only; author/account/body attribution omitted from this projection."
+    }
+  }
+}

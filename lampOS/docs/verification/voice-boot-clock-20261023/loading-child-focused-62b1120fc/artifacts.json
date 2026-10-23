@@ -1,0 +1,155 @@
+{
+  "compiled_inventory_equal": true,
+  "count": 3621,
+  "selected_case": "provider_worker::tests::spoken_to::a_child_still_loading_its_model_takes_nothing_from_the_worker",
+  "bindings": [
+    {
+      "source_aggregate_sha256": "91a6e7e0788e924648fa9dc0b5eb728bba594705af7a48645c318568b23d6efc",
+      "artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_voice",
+          "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+        ],
+        "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "fresh": false
+      },
+      "executable_sha256": "cb775a48ce81255e08bcf551f82cdc4d38b9487d138723fc04c029a30f6e75b0",
+      "executable_bytes": 112606640,
+      "case_occurrences": 1,
+      "first_source_map_sha256": "1fd5438e9c59171e8ea4b0051fac87c98a54a010ba5d447f7e0bfc88916ecf0f",
+      "observation": "before-missing-start",
+      "inventory_count": 3621,
+      "ignored_count": 15,
+      "inventory_stream": "initial/before-missing-start-inventory/stdout",
+      "ignored_stream": "initial/before-missing-start-ignored/stdout",
+      "external_binding": {
+        "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start.artifact-binding.json",
+        "bytes": 342481,
+        "sha256": "cf836ea5d3a2149cabae2bfdf2b04382e6f469e83f8993da9019379935f127e1"
+      }
+    },
+    {
+      "source_aggregate_sha256": "5b63df8a1c8a4d0f0c204e29d049894d5057c90ad3bcd7d7e14e1b7a065ad6a9",
+      "artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_voice",
+          "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+        ],
+        "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "fresh": false
+      },
+      "executable_sha256": "e0d17e67fcfdbf0cb13266f3df77dca1b35ec6c4511dc09e7e6dffdf2e60f690",
+      "executable_bytes": 112621992,
+      "case_occurrences": 1,
+      "first_source_map_sha256": "a80f4b68d34555e45f0ed04408e19cb6e3021a42108a3fb3bd412d28e310e6d0",
+      "observation": "after-missing-start",
+      "inventory_count": 3621,
+      "ignored_count": 15,
+      "inventory_stream": "corrected/after-missing-start-inventory/stdout",
+      "ignored_stream": "corrected/after-missing-start-ignored/stdout",
+      "external_binding": {
+        "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start.artifact-binding.json",
+        "bytes": 342481,
+        "sha256": "707fc171ef7522ba506489d8858ecc89ac76bfab3e00ca8c546f076969bac3c7"
+      }
+    },
+    {
+      "source_aggregate_sha256": "a08436d49b6e16f08ea994b2e1033a8bdd0dfa3ee8e9de9157c7eafc63921179",
+      "artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_voice",
+          "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+        ],
+        "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "fresh": false
+      },
+      "executable_sha256": "f019092d3e6f80dc97f989f47abefc3ec18471cf7fa11dfc1388a7d6e1ba941f",
+      "executable_bytes": 112629000,
+      "case_occurrences": 1,
+      "first_source_map_sha256": "f43abfd33b0521e2a9c6d95ff56fa4184cfe8f03760f19a67a523d86da65701b",
+      "observation": "restored-normal",
+      "inventory_count": 3621,
+      "ignored_count": 15,
+      "inventory_stream": "corrected/restored-normal-inventory/stdout",
+      "ignored_stream": "corrected/restored-normal-ignored/stdout",
+      "external_binding": {
+        "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal.artifact-binding.json",
+        "bytes": 342481,
+        "sha256": "3bf01e4dae52d55e756c715d65288be34306e860d46d43ef6e78326dda8a81c0"
+      }
+    }
+  ],
+  "hardware_limit": "Captured compiler host and file output establish x86_64-apple-darwin / Mach-O x86_64. Physical hardware and translation mode were not established."
+}

@@ -1,0 +1,830 @@
+[
+  {
+    "id": "initial/after-missing-start-compile/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/after-missing-start-compile.stdout.txt",
+    "bytes": 248527,
+    "sha256": "7ea60c32d8971abfc0984b720f26de70c3509b6a508c74a0d9e57d1bab1feb0e",
+    "retained": [],
+    "omitted_complete_cargo_records": {
+      "compiler-artifact": 294,
+      "build-script-executed": 32,
+      "build-finished": 1
+    },
+    "omitted_ranges": [
+      {
+        "source_start": 0,
+        "source_end": 248527,
+        "bytes": 248527,
+        "sha256": "7ea60c32d8971abfc0984b720f26de70c3509b6a508c74a0d9e57d1bab1feb0e"
+      }
+    ]
+  },
+  {
+    "id": "initial/after-missing-start-compile/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/after-missing-start-compile.stderr.txt",
+    "bytes": 1552,
+    "sha256": "dbb77040f2a65622eb95a3adea24a45513f20a717b89b0812adb5536b08f1eb6",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 1552,
+        "file": "raw/initial.txt.json",
+        "offset": 134,
+        "bytes": 1552,
+        "sha256": "dbb77040f2a65622eb95a3adea24a45513f20a717b89b0812adb5536b08f1eb6",
+        "decoding": {
+          "format": "utf8-string-envelope-v1",
+          "data_field": "data",
+          "encoding": "utf-8",
+          "offsets": "decoded UTF-8 bytes",
+          "decoded_container_sha256": "8d5b228ba34e6ca5f654fe53b5b403193f9e756c5e17398fcd29c41ae5200ce2"
+        }
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "initial/before-missing-start-binary-file/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start-binary-file.stdout.txt",
+    "bytes": 109,
+    "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 109,
+        "file": "raw/initial.txt.json",
+        "offset": 1876,
+        "bytes": 109,
+        "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4",
+        "decoding": {
+          "format": "utf8-string-envelope-v1",
+          "data_field": "data",
+          "encoding": "utf-8",
+          "offsets": "decoded UTF-8 bytes",
+          "decoded_container_sha256": "8d5b228ba34e6ca5f654fe53b5b403193f9e756c5e17398fcd29c41ae5200ce2"
+        }
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "initial/before-missing-start-binary-file/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start-binary-file.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 0,
+        "file": "raw/initial.txt.json",
+        "offset": 2178,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "decoding": {
+          "format": "utf8-string-envelope-v1",
+          "data_field": "data",
+          "encoding": "utf-8",
+          "offsets": "decoded UTF-8 bytes",
+          "decoded_container_sha256": "8d5b228ba34e6ca5f654fe53b5b403193f9e756c5e17398fcd29c41ae5200ce2"
+        }
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "initial/before-missing-start-compile/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start-compile.stdout.txt",
+    "bytes": 249333,
+    "sha256": "a4afe2456ff1ec6d61386a09a2e7319fb41b1178dd094d2f9476a5df62bc4168",
+    "retained": [],
+    "omitted_complete_cargo_records": {
+      "compiler-artifact": 295,
+      "build-script-executed": 32,
+      "build-finished": 1
+    },
+    "omitted_ranges": [
+      {
+        "source_start": 0,
+        "source_end": 249333,
+        "bytes": 249333,
+        "sha256": "a4afe2456ff1ec6d61386a09a2e7319fb41b1178dd094d2f9476a5df62bc4168"
+      }
+    ]
+  },
+  {
+    "id": "initial/before-missing-start-compile/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start-compile.stderr.txt",
+    "bytes": 3610,
+    "sha256": "3eafb47aacffd84883bf4ba39bc61fab15c915e75b84bbd38bf162d233732045",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 3610,
+        "file": "raw/initial.txt.json",
+        "offset": 2370,
+        "bytes": 3610,
+        "sha256": "3eafb47aacffd84883bf4ba39bc61fab15c915e75b84bbd38bf162d233732045",
+        "decoding": {
+          "format": "utf8-string-envelope-v1",
+          "data_field": "data",
+          "encoding": "utf-8",
+          "offsets": "decoded UTF-8 bytes",
+          "decoded_container_sha256": "8d5b228ba34e6ca5f654fe53b5b403193f9e756c5e17398fcd29c41ae5200ce2"
+        }
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "initial/before-missing-start-exact/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start-exact.stdout.txt",
+    "bytes": 224,
+    "sha256": "02096c0118b7d4eb143b1f7eae6e5043bd1ca892c61dd833a8659ed6bc51bb1b",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 224,
+        "file": "raw/initial.txt.json",
+        "offset": 6165,
+        "bytes": 224,
+        "sha256": "02096c0118b7d4eb143b1f7eae6e5043bd1ca892c61dd833a8659ed6bc51bb1b",
+        "decoding": {
+          "format": "utf8-string-envelope-v1",
+          "data_field": "data",
+          "encoding": "utf-8",
+          "offsets": "decoded UTF-8 bytes",
+          "decoded_container_sha256": "8d5b228ba34e6ca5f654fe53b5b403193f9e756c5e17398fcd29c41ae5200ce2"
+        }
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "initial/before-missing-start-exact/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start-exact.stderr.txt",
+    "bytes": 271,
+    "sha256": "3158ef45845571e624dfc5ae67d0fee75a78fb5227209d769566f692064aea8d",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 271,
+        "file": "raw/initial.txt.json",
+        "offset": 6572,
+        "bytes": 271,
+        "sha256": "3158ef45845571e624dfc5ae67d0fee75a78fb5227209d769566f692064aea8d",
+        "decoding": {
+          "format": "utf8-string-envelope-v1",
+          "data_field": "data",
+          "encoding": "utf-8",
+          "offsets": "decoded UTF-8 bytes",
+          "decoded_container_sha256": "8d5b228ba34e6ca5f654fe53b5b403193f9e756c5e17398fcd29c41ae5200ce2"
+        }
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "initial/before-missing-start-ignored/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start-ignored.stdout.txt",
+    "bytes": 1015,
+    "sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 1015,
+        "file": "raw/inventory.txt",
+        "offset": 135,
+        "bytes": 1015,
+        "sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf"
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "initial/before-missing-start-ignored/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start-ignored.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "initial/before-missing-start-inventory/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start-inventory.stdout.txt",
+    "bytes": 336412,
+    "sha256": "d8f98165dc079ae0ab2c4827466594f0528777bd53ef0d1b59969b57db80c053",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 336412,
+        "file": "raw/inventory.txt",
+        "offset": 1342,
+        "bytes": 336412,
+        "sha256": "d8f98165dc079ae0ab2c4827466594f0528777bd53ef0d1b59969b57db80c053"
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "initial/before-missing-start-inventory/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start-inventory.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "initial/fmt-check-before-controls/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/fmt-check-before-controls.stdout.txt",
+    "bytes": 2583,
+    "sha256": "d8a0a44e47241987e9e6723e9793efb2fdb998a4b41065c28254d3944c001840",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 2583,
+        "file": "raw/initial.txt.json",
+        "offset": 7026,
+        "bytes": 2583,
+        "sha256": "d8a0a44e47241987e9e6723e9793efb2fdb998a4b41065c28254d3944c001840",
+        "decoding": {
+          "format": "utf8-string-envelope-v1",
+          "data_field": "data",
+          "encoding": "utf-8",
+          "offsets": "decoded UTF-8 bytes",
+          "decoded_container_sha256": "8d5b228ba34e6ca5f654fe53b5b403193f9e756c5e17398fcd29c41ae5200ce2"
+        }
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "initial/fmt-check-before-controls/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/fmt-check-before-controls.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "initial/fmt-formatted/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/fmt-formatted.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "initial/fmt-formatted/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/fmt-formatted.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "initial/fmt-initial/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/fmt-initial.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "initial/fmt-initial/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/fmt-initial.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "initial/format-owned/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/format-owned.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "initial/format-owned/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/format-owned.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "initial/rustc/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/rustc.stdout.txt",
+    "bytes": 191,
+    "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 191,
+        "file": "raw/initial.txt.json",
+        "offset": 9770,
+        "bytes": 191,
+        "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+        "decoding": {
+          "format": "utf8-string-envelope-v1",
+          "data_field": "data",
+          "encoding": "utf-8",
+          "offsets": "decoded UTF-8 bytes",
+          "decoded_container_sha256": "8d5b228ba34e6ca5f654fe53b5b403193f9e756c5e17398fcd29c41ae5200ce2"
+        }
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "initial/rustc/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/rustc.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "corrected/after-missing-start-binary-file/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start-binary-file.stdout.txt",
+    "bytes": 109,
+    "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stdout"
+  },
+  {
+    "id": "corrected/after-missing-start-binary-file/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start-binary-file.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "corrected/after-missing-start-compile/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start-compile.stdout.txt",
+    "bytes": 249308,
+    "sha256": "06582c4b251b65c14e1dc39ec66105eb7da64bff1c8ca9cb5bfd2207ee955107",
+    "retained": [],
+    "omitted_complete_cargo_records": {
+      "compiler-artifact": 295,
+      "build-script-executed": 32,
+      "build-finished": 1
+    },
+    "omitted_ranges": [
+      {
+        "source_start": 0,
+        "source_end": 249308,
+        "bytes": 249308,
+        "sha256": "06582c4b251b65c14e1dc39ec66105eb7da64bff1c8ca9cb5bfd2207ee955107"
+      }
+    ]
+  },
+  {
+    "id": "corrected/after-missing-start-compile/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start-compile.stderr.txt",
+    "bytes": 856,
+    "sha256": "7421f0ec1e657035e0b58f5cafe98704e346606fa302d0595b8f741d62fe0077",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 856,
+        "file": "raw/corrected.txt",
+        "offset": 135,
+        "bytes": 856,
+        "sha256": "7421f0ec1e657035e0b58f5cafe98704e346606fa302d0595b8f741d62fe0077"
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "corrected/after-missing-start-exact/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start-exact.stdout.txt",
+    "bytes": 355,
+    "sha256": "d4a993d8bf5003ef99c87cf1d6b6ba71a7c3fda821735c32a6b94bf8a42be662",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 355,
+        "file": "raw/corrected.txt",
+        "offset": 1178,
+        "bytes": 355,
+        "sha256": "d4a993d8bf5003ef99c87cf1d6b6ba71a7c3fda821735c32a6b94bf8a42be662"
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "corrected/after-missing-start-exact/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start-exact.stderr.txt",
+    "bytes": 398,
+    "sha256": "e7abb922b8350c5857e7e1118a7e92bf1bad89f5b7c75d3d3a827241704db476",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 398,
+        "file": "raw/corrected.txt",
+        "offset": 1718,
+        "bytes": 398,
+        "sha256": "e7abb922b8350c5857e7e1118a7e92bf1bad89f5b7c75d3d3a827241704db476"
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "corrected/after-missing-start-ignored/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start-ignored.stdout.txt",
+    "bytes": 1015,
+    "sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-ignored/stdout"
+  },
+  {
+    "id": "corrected/after-missing-start-ignored/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start-ignored.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "corrected/after-missing-start-inventory/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start-inventory.stdout.txt",
+    "bytes": 336412,
+    "sha256": "d8f98165dc079ae0ab2c4827466594f0528777bd53ef0d1b59969b57db80c053",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-inventory/stdout"
+  },
+  {
+    "id": "corrected/after-missing-start-inventory/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start-inventory.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "corrected/clippy/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/clippy.stdout.txt",
+    "bytes": 248031,
+    "sha256": "12bd085623b7c65803308ba6a9cbe65a4e4ff98177898f1c0ab8fbd64136dcf2",
+    "retained": [],
+    "omitted_complete_cargo_records": {
+      "compiler-artifact": 318,
+      "build-script-executed": 32,
+      "build-finished": 1
+    },
+    "omitted_ranges": [
+      {
+        "source_start": 0,
+        "source_end": 248031,
+        "bytes": 248031,
+        "sha256": "12bd085623b7c65803308ba6a9cbe65a4e4ff98177898f1c0ab8fbd64136dcf2"
+      }
+    ]
+  },
+  {
+    "id": "corrected/clippy/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/clippy.stderr.txt",
+    "bytes": 2795,
+    "sha256": "291ad875578c3da68a8add7c9cd9c8279b4bc8b8f4e24d4c9d612bd5b6d746dc",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 2795,
+        "file": "raw/corrected.txt",
+        "offset": 2283,
+        "bytes": 2795,
+        "sha256": "291ad875578c3da68a8add7c9cd9c8279b4bc8b8f4e24d4c9d612bd5b6d746dc"
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "corrected/fmt-corrected/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/fmt-corrected.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "corrected/fmt-corrected/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/fmt-corrected.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "corrected/restored-normal-binary-file/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal-binary-file.stdout.txt",
+    "bytes": 109,
+    "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stdout"
+  },
+  {
+    "id": "corrected/restored-normal-binary-file/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal-binary-file.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "corrected/restored-normal-compile/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal-compile.stdout.txt",
+    "bytes": 249308,
+    "sha256": "165bb801af2cb737187286f7d61043bcc4a45bf7409c9c67dbe76539f16d1ed2",
+    "retained": [],
+    "omitted_complete_cargo_records": {
+      "compiler-artifact": 295,
+      "build-script-executed": 32,
+      "build-finished": 1
+    },
+    "omitted_ranges": [
+      {
+        "source_start": 0,
+        "source_end": 249308,
+        "bytes": 249308,
+        "sha256": "165bb801af2cb737187286f7d61043bcc4a45bf7409c9c67dbe76539f16d1ed2"
+      }
+    ]
+  },
+  {
+    "id": "corrected/restored-normal-compile/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal-compile.stderr.txt",
+    "bytes": 168,
+    "sha256": "f546539ae7ad79c0221b6d57c91f38d39c0f3eb5580bcec1a413e3f506bc02ac",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 168,
+        "file": "raw/corrected.txt",
+        "offset": 5242,
+        "bytes": 168,
+        "sha256": "f546539ae7ad79c0221b6d57c91f38d39c0f3eb5580bcec1a413e3f506bc02ac"
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "corrected/restored-normal-exact/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal-exact.stdout.txt",
+    "bytes": 224,
+    "sha256": "825c8ff74aad4e1691d9cc29a1e17ace480b6dfe54ae1bc41bd84ef580aea34e",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 224,
+        "file": "raw/corrected.txt",
+        "offset": 5589,
+        "bytes": 224,
+        "sha256": "825c8ff74aad4e1691d9cc29a1e17ace480b6dfe54ae1bc41bd84ef580aea34e"
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "corrected/restored-normal-exact/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal-exact.stderr.txt",
+    "bytes": 759,
+    "sha256": "4504a75390549400002ee200c5bd7816e95a22caec7bf9ed6130419f584866b6",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 759,
+        "file": "raw/corrected.txt",
+        "offset": 5990,
+        "bytes": 759,
+        "sha256": "4504a75390549400002ee200c5bd7816e95a22caec7bf9ed6130419f584866b6"
+      }
+    ],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": []
+  },
+  {
+    "id": "corrected/restored-normal-ignored/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal-ignored.stdout.txt",
+    "bytes": 1015,
+    "sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-ignored/stdout"
+  },
+  {
+    "id": "corrected/restored-normal-ignored/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal-ignored.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "corrected/restored-normal-inventory/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal-inventory.stdout.txt",
+    "bytes": 336412,
+    "sha256": "d8f98165dc079ae0ab2c4827466594f0528777bd53ef0d1b59969b57db80c053",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-inventory/stdout"
+  },
+  {
+    "id": "corrected/restored-normal-inventory/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal-inventory.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "corrected/rustc/stdout",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/rustc.stdout.txt",
+    "bytes": 191,
+    "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/rustc/stdout"
+  },
+  {
+    "id": "corrected/rustc/stderr",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/rustc.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [],
+    "omitted_complete_cargo_records": {},
+    "omitted_ranges": [],
+    "identical_to": "initial/before-missing-start-binary-file/stderr"
+  },
+  {
+    "id": "initial/runner-error.txt",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/runner-error.txt",
+    "bytes": 677,
+    "sha256": "5e4fc9edc6d83c703e32d347bbcf942644cc7863e67a3b2a14b07cc305a7f4ad",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 677,
+        "file": "raw/initial.txt.json",
+        "offset": 10026,
+        "bytes": 677,
+        "sha256": "5e4fc9edc6d83c703e32d347bbcf942644cc7863e67a3b2a14b07cc305a7f4ad",
+        "decoding": {
+          "format": "utf8-string-envelope-v1",
+          "data_field": "data",
+          "encoding": "utf-8",
+          "offsets": "decoded UTF-8 bytes",
+          "decoded_container_sha256": "8d5b228ba34e6ca5f654fe53b5b403193f9e756c5e17398fcd29c41ae5200ce2"
+        }
+      }
+    ],
+    "omitted_ranges": []
+  },
+  {
+    "id": "initial/final-diff-check.stdout.txt",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/final-diff-check.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 0,
+        "file": "raw/initial.txt.json",
+        "offset": 10783,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "decoding": {
+          "format": "utf8-string-envelope-v1",
+          "data_field": "data",
+          "encoding": "utf-8",
+          "offsets": "decoded UTF-8 bytes",
+          "decoded_container_sha256": "8d5b228ba34e6ca5f654fe53b5b403193f9e756c5e17398fcd29c41ae5200ce2"
+        }
+      }
+    ],
+    "omitted_ranges": []
+  },
+  {
+    "id": "initial/final-diff-check.stderr.txt",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/final-diff-check.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 0,
+        "file": "raw/initial.txt.json",
+        "offset": 10874,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "decoding": {
+          "format": "utf8-string-envelope-v1",
+          "data_field": "data",
+          "encoding": "utf-8",
+          "offsets": "decoded UTF-8 bytes",
+          "decoded_container_sha256": "8d5b228ba34e6ca5f654fe53b5b403193f9e756c5e17398fcd29c41ae5200ce2"
+        }
+      }
+    ],
+    "omitted_ranges": []
+  },
+  {
+    "id": "corrected/final-diff-check.stdout.txt",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/final-diff-check.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 0,
+        "file": "raw/corrected.txt",
+        "offset": 6845,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "omitted_ranges": []
+  },
+  {
+    "id": "corrected/final-diff-check.stderr.txt",
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/final-diff-check.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "retained": [
+      {
+        "source_start": 0,
+        "source_end": 0,
+        "file": "raw/corrected.txt",
+        "offset": 6940,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "omitted_ranges": []
+  }
+]

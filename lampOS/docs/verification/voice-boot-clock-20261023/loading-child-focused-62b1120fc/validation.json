@@ -1,0 +1,34 @@
+{
+  "all_command_raw_stream_hashes_verified": true,
+  "all_retained_byte_offsets_verified": true,
+  "all_omitted_ranges_are_complete_recognized_Cargo_JSON_records": true,
+  "duplicate_streams_byte_equal": true,
+  "all_three_inventories_equal": true,
+  "all_patches_reconstruct_recorded_Rust_hashes": true,
+  "all_79_original_assertions_equal": true,
+  "all_source_maps_equal_outside_two_owned_files": true,
+  "all_earlier_failures_preserved": true,
+  "repo_or_target_access_during_packaging": false,
+  "note": "Receipt only; full qualification remains pending. SHA256SUMS seals all public files other than itself.",
+  "receipt_ready_for_parent_review": true,
+  "json_and_markdown_whitespace_checked": true,
+  "relative_readme_links_checked": true,
+  "raw_and_patch_bytes_preserved_without_whitespace_edits": true,
+  "lossless_json_envelopes_verified": true,
+  "decoded_raw_offsets_verified": true,
+  "original_sealed_bundle_unchanged": true,
+  "default_staged_git_diff_check": {
+    "command": [
+      "git",
+      "diff",
+      "--cached",
+      "--check"
+    ],
+    "exit_code": 0,
+    "whitespace_override": null,
+    "scope": "Every file staged as a new file in an external scratch Git repository; final sealed bundle rechecked after validation metadata and manifest updates.",
+    "external_evidence": "/private/tmp/tests-loading-child-review-20261023/json-envelope-validation",
+    "stdout_bytes": 0,
+    "stderr_bytes": 0
+  }
+}

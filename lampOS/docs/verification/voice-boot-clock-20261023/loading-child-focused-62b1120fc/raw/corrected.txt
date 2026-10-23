@@ -1,0 +1,103 @@
+BEGIN RAW corrected/after-missing-start-compile/stderr [0,856) SHA256 7421f0ec1e657035e0b58f5cafe98704e346606fa302d0595b8f741d62fe0077
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice)
+warning: struct `LoadingPrints` is never constructed
+    --> crates/voice/src/provider_worker/tests/spoken_to.rs:1783:8
+     |
+1783 | struct LoadingPrints(std::sync::Arc<std::sync::Mutex<Option<crate::same_voice::Prints>>>);
+     |        ^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `printer` is never used
+    --> crates/voice/src/provider_worker/tests/spoken_to.rs:1844:8
+     |
+1803 | impl LoadingChild {
+     | ----------------- method in this implementation
+...
+1844 |     fn printer(&mut self) -> Box<dyn crate::same_voice::Printer> {
+     |        ^^^^^^^
+
+warning: `lamp-voice` (lib test) generated 2 warnings
+    Finished `test` profile [unoptimized] target(s) in 1m 24s
+
+END RAW corrected/after-missing-start-compile/stderr
+BEGIN RAW corrected/after-missing-start-exact/stdout [0,355) SHA256 d4a993d8bf5003ef99c87cf1d6b6ba71a7c3fda821735c32a6b94bf8a42be662
+
+running 1 test
+test provider_worker::tests::spoken_to::a_child_still_loading_its_model_takes_nothing_from_the_worker ... FAILED
+
+failures:
+
+failures:
+    provider_worker::tests::spoken_to::a_child_still_loading_its_model_takes_nothing_from_the_worker
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3620 filtered out; finished in 5.01s
+
+
+END RAW corrected/after-missing-start-exact/stdout
+BEGIN RAW corrected/after-missing-start-exact/stderr [0,398) SHA256 e7abb922b8350c5857e7e1118a7e92bf1bad89f5b7c75d3d3a827241704db476
+
+thread 'provider_worker::tests::spoken_to::a_child_still_loading_its_model_takes_nothing_from_the_worker' (706856739) panicked at crates/voice/src/provider_worker/tests/spoken_to.rs:2006:18:
+called `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: "loading child did not publish its complete PID" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+END RAW corrected/after-missing-start-exact/stderr
+BEGIN RAW corrected/clippy/stderr [0,2795) SHA256 291ad875578c3da68a8add7c9cd9c8279b4bc8b8f4e24d4c9d612bd5b6d746dc
+    Checking lamp-ipc v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/ipc)
+    Checking lamp-bus v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/bus)
+    Checking lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/turn-owner)
+    Checking lamp-local-time v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/local-time)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/camera)
+    Checking sonora v0.2.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/third_party/sonora)
+    Checking lamp-gemini v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/gemini)
+    Checking lamp-msgs v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/msgs)
+    Checking lamp-audio v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/audio)
+    Checking lamp-ring v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/ring)
+    Checking lamp-turn-end-wire v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/turn-end-wire)
+    Checking lamp-near-call v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/near-call)
+    Checking lamp-voice-processes v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice-processes)
+    Checking lamp-lean v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/lean)
+    Checking lamp-keeper v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/keeper)
+    Checking lamp-schedule v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/schedule)
+    Checking lamp-health v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/health)
+    Checking lamp-controls v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/controls)
+    Checking lamp-body v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body)
+    Checking lamp-ears v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/ears)
+    Checking lamp-tasks v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/tasks)
+    Checking lamp-actions v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/actions)
+    Checking lamp-policy v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/policy)
+    Checking lamp-expression v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression)
+    Checking lamp-voice v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice)
+    Finished `dev` profile [unoptimized] target(s) in 1m 26s
+
+END RAW corrected/clippy/stderr
+BEGIN RAW corrected/restored-normal-compile/stderr [0,168) SHA256 f546539ae7ad79c0221b6d57c91f38d39c0f3eb5580bcec1a413e3f506bc02ac
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 1m 29s
+
+END RAW corrected/restored-normal-compile/stderr
+BEGIN RAW corrected/restored-normal-exact/stdout [0,224) SHA256 825c8ff74aad4e1691d9cc29a1e17ace480b6dfe54ae1bc41bd84ef580aea34e
+
+running 1 test
+test provider_worker::tests::spoken_to::a_child_still_loading_its_model_takes_nothing_from_the_worker ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3620 filtered out; finished in 0.85s
+
+
+END RAW corrected/restored-normal-exact/stdout
+BEGIN RAW corrected/restored-normal-exact/stderr [0,759) SHA256 4504a75390549400002ee200c5bd7816e95a22caec7bf9ed6130419f584866b6
+lamp-voice provider: request 1: no voice print: the same-voice child was busy (loading its model or printing another line)
+lamp-voice provider: request 1: its answer is played: the room is not known to be busy
+lamp-voice provider: request 2: no voice print: the same-voice child was busy (loading its model or printing another line)
+lamp-voice provider: request 2: its answer is played: the room is not known to be busy
+lamp-voice provider: request 3: no voice print: the same-voice child was busy (loading its model or printing another line)
+lamp-voice provider: request 3: its answer is played: the session has heard enough to be trusted
+lamp-voice provider: the same-voice child ended: before its model was loaded: it ended; it is started again in 5000 ms
+
+END RAW corrected/restored-normal-exact/stderr
+BEGIN RAW corrected/final-diff-check.stdout.txt
+
+END RAW corrected/final-diff-check.stdout.txt
+BEGIN RAW corrected/final-diff-check.stderr.txt
+
+END RAW corrected/final-diff-check.stderr.txt

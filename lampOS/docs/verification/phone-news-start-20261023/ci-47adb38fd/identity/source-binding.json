@@ -1,0 +1,34 @@
+{
+  "pr": 3218,
+  "authored_head": "47adb38fd0f61dfbfc1172e9a668d54c43983794",
+  "authored_head_parent": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "authored_head_tree": "237a63ab66f38bcd2e1d9910ab7a4d7a31171640",
+  "checked_merge": "0faa46c6d1bc8d3d8e7545afb2a90a74c8374abf",
+  "checked_merge_parents": [
+    "62b1120fc1af5462529f0c76089a322500e30929",
+    "47adb38fd0f61dfbfc1172e9a668d54c43983794"
+  ],
+  "checked_merge_tree": "6574a2cba5f6050670451818f5350222ed74b9be",
+  "whole_merge_tree_equals_authored_head": false,
+  "whole_tree_scope": "CI checked the synthetic merge on newer base62b1120fc, not the Mac gate whole tree on e5. Both authored phone blobs and all four captured CI configuration files are byte-identical to the authored head. Other upstream bytes are not asserted equal.",
+  "changed_authored_files": [
+    {
+      "path": "lampOS/crates/voice/src/messages.rs",
+      "bytes": 51731,
+      "sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "git_blob": "7ede2e9b0b14c32c36aa1bca279dbcf65f6a7608"
+    },
+    {
+      "path": "lampOS/docs/messages.md",
+      "bytes": 23556,
+      "sha256": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3",
+      "git_blob": "3c8f3b35827cd753501db2fb07eff88a763c6f18"
+    }
+  ],
+  "configuration_matches_authored_head": true,
+  "arm64_checkout_equal_clippy_checkout": true,
+  "root_subtrees": {
+    ".github": "d6cdf1fbf133c642ef9aeadd0cd40bdae4b03acf",
+    "lampOS": "f8565b15629d3d5b0487352df8d2002dd15945cc"
+  }
+}

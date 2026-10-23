@@ -1,0 +1,34 @@
+{
+  "operation": "Packaging only; no observation or source-result change",
+  "original_bundle_path": "/private/tmp/tests-loading-child-review-20261023/prepared-public",
+  "original_manifest_sha256": "0785da9a8057d8aeada48c2121da9a804161ab45e3ca6755cb2ee39895b6cdee",
+  "converted_files": {
+    "patches/arc-qualification.patch": {
+      "file": "patches/arc-qualification.patch.json",
+      "decoded_bytes": 1295,
+      "decoded_sha256": "9e3a8c768beb9747a7ca5d539de7d39deff4dd8e1807817e9417b510f546ac43",
+      "envelope_sha256": "9ca196d8340b2368a2fdac1046b4ae6bad7b51b41067411385216b8510271bc1"
+    },
+    "patches/candidate.patch": {
+      "file": "patches/candidate.patch.json",
+      "decoded_bytes": 12909,
+      "decoded_sha256": "26c317de424fb27ad7096f653eb1fe43b5fe6ba5031f664bae8b3c7ebb6a2084",
+      "envelope_sha256": "66c03ab001823ed05ccf1c9a3ae038a20a321452eba25dd6d8d3c4f4ed023a48"
+    },
+    "patches/formatting-only.patch": {
+      "file": "patches/formatting-only.patch.json",
+      "decoded_bytes": 2333,
+      "decoded_sha256": "84fd6b1b685fe6307cd810667feeb25e4c930f01dc87a2ac4fc04b37002b5ff1",
+      "envelope_sha256": "a51827a1684bc0144894bde72a75bc00e20aa2d07a90a392b88811e04779a236"
+    },
+    "raw/initial.txt": {
+      "file": "raw/initial.txt.json",
+      "decoded_bytes": 10919,
+      "decoded_sha256": "8d5b228ba34e6ca5f654fe53b5b403193f9e756c5e17398fcd29c41ae5200ce2",
+      "envelope_sha256": "3b858f61eb1d8a493ab62767f39cb595012a1f5aaf86d9456c1df905dc968636"
+    }
+  },
+  "decode": "Parse JSON; encode data as UTF-8 without adding a newline; verify decoded_bytes and decoded_sha256. Raw-index offsets apply to decoded bytes.",
+  "external_stream_provenance_unchanged": true,
+  "old_sealed_bundle_modified": false
+}

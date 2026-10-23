@@ -1,0 +1,13 @@
+{
+  "original_external_path": "/private/tmp/tests-loading-child-root-publication-20261023/range-diff.txt",
+  "original_bytes": 14863,
+  "original_sha256": "c0832695d3e6b8b52964d3c86dbee55c1575dfc10bc2a8222fcba47576029c45",
+  "published_bytes": 14824,
+  "published_sha256": "24544c20d3dc2212b99e8c65a9665c8e0c0941b7958efacae48c78d1dfba065d",
+  "omitted_lines_1_based": [
+    3
+  ],
+  "reason": "Author metadata omitted under the builder no-person-attribution rule; every patch and commit-message line retained.",
+  "public_envelope": "range-diff.json",
+  "decoding": "Read the text field as UTF-8 bytes to reconstruct the author-free range-diff exactly."
+}

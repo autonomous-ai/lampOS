@@ -1,0 +1,81 @@
+{
+  "changed_phone_case": [
+    {
+      "status": "PASS",
+      "seconds": 3.066,
+      "ordinal": 4033,
+      "total": 7171,
+      "binary": "lamp-voice",
+      "name": "messages::tests::a_text_never_waits_on_the_news_for_the_phone",
+      "raw_line": 4744
+    }
+  ],
+  "leaky_passes": [
+    {
+      "status": "LEAK",
+      "seconds": 0.223,
+      "ordinal": 5052,
+      "total": 7171,
+      "binary": "lamp-voice",
+      "name": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+      "raw_line": 5763
+    }
+  ],
+  "six_disclosed_mac_failure_names_observed_here": [
+    {
+      "status": "PASS",
+      "seconds": 0.14,
+      "ordinal": 2206,
+      "total": 7171,
+      "binary": "lamp-skills::it",
+      "name": "skills::unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt",
+      "raw_line": 2917
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.612,
+      "ordinal": 2211,
+      "total": 7171,
+      "binary": "lamp-skills::it",
+      "name": "skills::thinking_after_a_moment_of_speaking_is_still_the_line",
+      "raw_line": 2922
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.04,
+      "ordinal": 2250,
+      "total": 7171,
+      "binary": "lamp-skills::requested_audio",
+      "name": "refused_cap_reload_keeps_audio_generation_but_asset_scan_still_revokes_it",
+      "raw_line": 2961
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.006,
+      "ordinal": 6118,
+      "total": 7171,
+      "binary": "lamp-voice",
+      "name": "tools::tests::scoped_audio_rejects_revocation_and_mixed_request_keys_before_dispatch",
+      "raw_line": 6829
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.062,
+      "ordinal": 6399,
+      "total": 7171,
+      "binary": "lamp-voice::it",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "raw_line": 7110
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.012,
+      "ordinal": 7099,
+      "total": 7171,
+      "binary": "lamp-voice-eval::it",
+      "name": "relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers",
+      "raw_line": 7810
+    }
+  ],
+  "causal_limit": "All six Mac failure names passed in this ARM selected-package run, but platform, release profile, scheduler and whole checked source differ. These are later observations, not causal controls or waivers of the retained Mac failures. The changed case duration includes the original quiet window; it is not a response-latency number."
+}

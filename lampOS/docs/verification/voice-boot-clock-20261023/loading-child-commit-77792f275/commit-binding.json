@@ -1,0 +1,15 @@
+{
+  "commit": "77792f2753b4fb97f4a078897cdf52e1bbd24362",
+  "base": "62b1120fc1af5462529f0c76089a322500e30929",
+  "tree": "24f40f1f8f9c36a935922b5caab5f965e14ff49e",
+  "prior_remote_head": "0f2e6439e018680af247080983c9ec0c258c3229",
+  "unchanged_carry": "8ae8651871ed6b6a888157836575b4d994d6722c",
+  "carry_branch": "tests/1569-boot-clock-train34-control",
+  "source_aggregate_sha256": "a08436d49b6e16f08ea994b2e1033a8bdd0dfa3ee8e9de9157c7eafc63921179",
+  "p3_files_sha256": {
+    "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+    "lampOS/docs/voice-test-fixtures.md": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c"
+  },
+  "p3_patch_sha256": "26c317de424fb27ad7096f653eb1fe43b5fe6ba5031f664bae8b3c7ebb6a2084",
+  "qualification": "Focused controls, fmt and Voice strict Clippy only; full current-head qualification remains pending. All previous failed evidence is retained."
+}

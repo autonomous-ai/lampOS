@@ -1,0 +1,207 @@
+{
+  "carry": {
+    "old_head": "0f2e6439e018680af247080983c9ec0c258c3229",
+    "new_carry_head": "8ae8651871ed6b6a888157836575b4d994d6722c",
+    "new_base": "62b1120fc1af5462529f0c76089a322500e30929",
+    "range_diff": "1:  0f2e6439e0 = 1:  8ae8651871 lampOS: give backdated voice fixtures a shared clock history",
+    "p3_source_files_byte_identical": true
+  },
+  "final_source_hashes": {
+    "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+    "lampOS/docs/voice-test-fixtures.md": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c"
+  },
+  "source_map_scope": "All 10,002 tracked worktree files, including modes and literal symlink targets; not just lampOS. Full maps remain external at the recorded paths and hashes.",
+  "source_maps": [
+    {
+      "id": "initial/after-missing-start.source-map.json",
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/after-missing-start.source-map.json",
+      "bytes": 2134034,
+      "sha256": "95b4f584d2520f99f795ec55593a20fb61f0be814f0c3f97a0a57f92d686ecfa",
+      "tracked_paths": 10002,
+      "owned_files": [
+        {
+          "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+          "git_mode": "100644",
+          "bytes": 80720,
+          "sha256": "b4e211b5d4e011308d0cc7acbe3541e842dcb9bc07c59066cc98b44a84078bba"
+        },
+        {
+          "path": "lampOS/docs/voice-test-fixtures.md",
+          "git_mode": "100644",
+          "bytes": 32508,
+          "sha256": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c"
+        }
+      ]
+    },
+    {
+      "id": "initial/before-missing-start.source-map.json",
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start.source-map.json",
+      "bytes": 2134034,
+      "sha256": "1fd5438e9c59171e8ea4b0051fac87c98a54a010ba5d447f7e0bfc88916ecf0f",
+      "tracked_paths": 10002,
+      "owned_files": [
+        {
+          "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+          "git_mode": "100644",
+          "bytes": 73889,
+          "sha256": "78135035c9c47116bafd97c06931559032222c75d518e0b970409383d40eb273"
+        },
+        {
+          "path": "lampOS/docs/voice-test-fixtures.md",
+          "git_mode": "100644",
+          "bytes": 31717,
+          "sha256": "7a3164aec84b4fb303944d8e97056e21e8c3563acc469779b376ae0b06510194"
+        }
+      ]
+    },
+    {
+      "id": "initial/candidate-source-map.json",
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/candidate-source-map.json",
+      "bytes": 2134034,
+      "sha256": "d955ea998e00128f4ef651adff8b377b01891c5c0b5b99722b82c3e740043032",
+      "tracked_paths": 10002,
+      "owned_files": [
+        {
+          "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+          "git_mode": "100644",
+          "bytes": 80737,
+          "sha256": "70363328a3cfba6aaf697d02e8424bc83cc552ede3447a493e2f585be54f4290"
+        },
+        {
+          "path": "lampOS/docs/voice-test-fixtures.md",
+          "git_mode": "100644",
+          "bytes": 32508,
+          "sha256": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c"
+        }
+      ]
+    },
+    {
+      "id": "corrected/after-missing-start.source-map.json",
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start.source-map.json",
+      "bytes": 2134034,
+      "sha256": "a80f4b68d34555e45f0ed04408e19cb6e3021a42108a3fb3bd412d28e310e6d0",
+      "tracked_paths": 10002,
+      "owned_files": [
+        {
+          "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+          "git_mode": "100644",
+          "bytes": 80753,
+          "sha256": "55733bf6e60099f7f6a9ea3be0df34c718e4f13233c15e0f08311226bc020c41"
+        },
+        {
+          "path": "lampOS/docs/voice-test-fixtures.md",
+          "git_mode": "100644",
+          "bytes": 32508,
+          "sha256": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c"
+        }
+      ]
+    },
+    {
+      "id": "corrected/candidate-source-map.json",
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/candidate-source-map.json",
+      "bytes": 2134034,
+      "sha256": "f43abfd33b0521e2a9c6d95ff56fa4184cfe8f03760f19a67a523d86da65701b",
+      "tracked_paths": 10002,
+      "owned_files": [
+        {
+          "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+          "git_mode": "100644",
+          "bytes": 80770,
+          "sha256": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f"
+        },
+        {
+          "path": "lampOS/docs/voice-test-fixtures.md",
+          "git_mode": "100644",
+          "bytes": 32508,
+          "sha256": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c"
+        }
+      ]
+    },
+    {
+      "id": "corrected/restored-normal.source-map.json",
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal.source-map.json",
+      "bytes": 2134034,
+      "sha256": "f43abfd33b0521e2a9c6d95ff56fa4184cfe8f03760f19a67a523d86da65701b",
+      "tracked_paths": 10002,
+      "owned_files": [
+        {
+          "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+          "git_mode": "100644",
+          "bytes": 80770,
+          "sha256": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f"
+        },
+        {
+          "path": "lampOS/docs/voice-test-fixtures.md",
+          "git_mode": "100644",
+          "bytes": 32508,
+          "sha256": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c"
+        }
+      ]
+    }
+  ],
+  "all_non_owned_paths_equal_across_every_overlay": true,
+  "assertion_audit": {
+    "all_original_macro_bodies_equal": true,
+    "count": 79,
+    "original_selected_case_macros": 1,
+    "selected_loop_iterations": 3,
+    "loop_bytes_sha256": "0a90bf584731ead68f648000a36c166a88eee2e82447730962f0598201dfc6b6",
+    "outside_helper_and_selected_case_byte_identical": true,
+    "method": "Balanced assertion macro bodies after masking strings and comments; all 79 original bodies compare byte-for-byte. This static check does not replace the recorded compiled executions."
+  },
+  "aggregate_before_first_run": "5717ac97df4f8b56427fcf34021816acac112105e0919d55585af176d1c18790",
+  "aggregate_after_first_run": "5717ac97df4f8b56427fcf34021816acac112105e0919d55585af176d1c18790",
+  "aggregate_before_continuation": "a08436d49b6e16f08ea994b2e1033a8bdd0dfa3ee8e9de9157c7eafc63921179",
+  "aggregate_after_continuation": "a08436d49b6e16f08ea994b2e1033a8bdd0dfa3ee8e9de9157c7eafc63921179",
+  "both_runs_exact_source_restoration": true,
+  "initial_source_freshness": {
+    "files": 10001,
+    "before_sha256": "91a6e7e0788e924648fa9dc0b5eb728bba594705af7a48645c318568b23d6efc",
+    "after_sha256": "91a6e7e0788e924648fa9dc0b5eb728bba594705af7a48645c318568b23d6efc",
+    "content_and_modes_unchanged": true,
+    "scope": "Only this owned worktree tracked regular files; no other worktree or target modified."
+  },
+  "continuation_freshness": {
+    "prior_refresh": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/freshness.json",
+    "reason": "Same worktree/target, no intervening Cargo; only owned source overlay and Arc qualification changed, each written with fresh mtime. Compiled Voice artifact must report fresh=false.",
+    "source_mtime_ns": 1792733014892405173
+  },
+  "initial_preparation": {
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/prepared.json",
+    "bytes": 3498,
+    "sha256": "78cfc6e15670914bed7b19d26a30cb67c761fb0991825a0824b816ce2af39c92"
+  },
+  "initial_plan": {
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/PLAN.md",
+    "bytes": 6238,
+    "sha256": "ab6fdebdbf1dcb09a9201cc16e75d984a80d1c9e70749da4d76b271922555072"
+  },
+  "initial_runner": {
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/run_controls.py",
+    "bytes": 10976,
+    "sha256": "b0305c15c83a18e5a23189672b73c274e2284cd57213be2984bdd0437a777b7d"
+  },
+  "continuation_runner": {
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/continue_arc.py",
+    "bytes": 12226,
+    "sha256": "12ab647340b6580f072da16fa5b8bc33e595803c0da786a501aedc099fa70c51"
+  },
+  "command_runner": {
+    "external_path": "/private/tmp/tests-loading-child-review-20261023/run_command.py",
+    "bytes": 3071,
+    "sha256": "fb7c4b538719b1129b81be9f7952d22824b891e16016d3f8fbdaf15c08624abc"
+  },
+  "execution_markers": [
+    {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/controls-execution-start.json",
+      "bytes": 291,
+      "sha256": "1db3e4e5f8313db5964fb4b5e6728a24adc2812cd6dc56df1435313a8ebade20"
+    },
+    {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/controls-execution-start.json",
+      "bytes": 291,
+      "sha256": "055677d2c6e97cd6a72c19429a4bb4ee253889a8fb0c7a22d153de8e169d858f"
+    }
+  ],
+  "patch_application": "Each shipped Rust/control patch and the Arc-only correction was reconstructed from frozen external bytes and checked against the recorded source hashes; no current worktree or target was read during packaging."
+}

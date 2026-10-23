@@ -1,0 +1,1181 @@
+[
+  {
+    "id": "after-missing-start-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--offline",
+      "--locked",
+      "--no-run",
+      "--message-format=json-render-diagnostics"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 1200,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:17:03.439276+00:00",
+    "path_sha256": "2db016c7667ac4d5a4a753bf030da00184e7a76845c12f56803253e8ceca34a9",
+    "owned_process_group": 18107,
+    "finished_at": "2026-10-23T05:17:56.143916+00:00",
+    "wall_seconds": 52.705587,
+    "exit_code": 101,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "after-missing-start-compile.stdout.txt",
+    "stdout_bytes": 248527,
+    "stdout_sha256": "7ea60c32d8971abfc0984b720f26de70c3509b6a508c74a0d9e57d1bab1feb0e",
+    "stderr": "after-missing-start-compile.stderr.txt",
+    "stderr_bytes": 1552,
+    "stderr_sha256": "dbb77040f2a65622eb95a3adea24a45513f20a717b89b0812adb5536b08f1eb6",
+    "record_id": "initial/after-missing-start-compile",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/after-missing-start-compile.json",
+      "bytes": 1408,
+      "sha256": "7c4c175197e21090989d01eb563a9f7a3b2a69065b1c2c6a748620cafc37ad21"
+    },
+    "streams": [
+      "initial/after-missing-start-compile/stdout",
+      "initial/after-missing-start-compile/stderr"
+    ]
+  },
+  {
+    "id": "before-missing-start-binary-file",
+    "command": [
+      "file",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 30,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:16:52.660924+00:00",
+    "path_sha256": "2db016c7667ac4d5a4a753bf030da00184e7a76845c12f56803253e8ceca34a9",
+    "owned_process_group": 17865,
+    "finished_at": "2026-10-23T05:16:52.683002+00:00",
+    "wall_seconds": 0.0217,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "before-missing-start-binary-file.stdout.txt",
+    "stdout_bytes": 109,
+    "stdout_sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4",
+    "stderr": "before-missing-start-binary-file.stderr.txt",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "record_id": "initial/before-missing-start-binary-file",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start-binary-file.json",
+      "bytes": 1342,
+      "sha256": "69ee518bd399a77b48c0038c8515a9799ae27b489dfd3aed86ca35bf2ba7d810"
+    },
+    "streams": [
+      "initial/before-missing-start-binary-file/stdout",
+      "initial/before-missing-start-binary-file/stderr"
+    ]
+  },
+  {
+    "id": "before-missing-start-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--offline",
+      "--locked",
+      "--no-run",
+      "--message-format=json-render-diagnostics"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 1200,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:15:05.161450+00:00",
+    "path_sha256": "2db016c7667ac4d5a4a753bf030da00184e7a76845c12f56803253e8ceca34a9",
+    "owned_process_group": 11801,
+    "finished_at": "2026-10-23T05:16:52.410943+00:00",
+    "wall_seconds": 107.251242,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "before-missing-start-compile.stdout.txt",
+    "stdout_bytes": 249333,
+    "stdout_sha256": "a4afe2456ff1ec6d61386a09a2e7319fb41b1178dd094d2f9476a5df62bc4168",
+    "stderr": "before-missing-start-compile.stderr.txt",
+    "stderr_bytes": 3610,
+    "stderr_sha256": "3eafb47aacffd84883bf4ba39bc61fab15c915e75b84bbd38bf162d233732045",
+    "record_id": "initial/before-missing-start-compile",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start-compile.json",
+      "bytes": 1410,
+      "sha256": "4bca16328570501c57fe60f0b3570c560ae9460d9f0706edeeb1fa6609f93076"
+    },
+    "streams": [
+      "initial/before-missing-start-compile/stdout",
+      "initial/before-missing-start-compile/stderr"
+    ]
+  },
+  {
+    "id": "before-missing-start-exact",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "provider_worker::tests::spoken_to::a_child_still_loading_its_model_takes_nothing_from_the_worker",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 30,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:16:59.024845+00:00",
+    "path_sha256": "2db016c7667ac4d5a4a753bf030da00184e7a76845c12f56803253e8ceca34a9",
+    "owned_process_group": 17978,
+    "finished_at": "2026-10-23T05:16:59.411796+00:00",
+    "wall_seconds": 0.386608,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "before-missing-start-exact.stdout.txt",
+    "stdout_bytes": 224,
+    "stdout_sha256": "02096c0118b7d4eb143b1f7eae6e5043bd1ca892c61dd833a8659ed6bc51bb1b",
+    "stderr": "before-missing-start-exact.stderr.txt",
+    "stderr_bytes": 271,
+    "stderr_sha256": "3158ef45845571e624dfc5ae67d0fee75a78fb5227209d769566f692064aea8d",
+    "record_id": "initial/before-missing-start-exact",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start-exact.json",
+      "bytes": 1454,
+      "sha256": "a4c076f9200a4808be1e5a393a1a6f223344cb206862cd4b72fca4830fca6f12"
+    },
+    "streams": [
+      "initial/before-missing-start-exact/stdout",
+      "initial/before-missing-start-exact/stderr"
+    ]
+  },
+  {
+    "id": "before-missing-start-ignored",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list",
+      "--ignored",
+      "--format",
+      "terse"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 60,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:16:54.795284+00:00",
+    "path_sha256": "2db016c7667ac4d5a4a753bf030da00184e7a76845c12f56803253e8ceca34a9",
+    "owned_process_group": 17915,
+    "finished_at": "2026-10-23T05:16:54.827773+00:00",
+    "wall_seconds": 0.032273,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "before-missing-start-ignored.stdout.txt",
+    "stdout_bytes": 1015,
+    "stdout_sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+    "stderr": "before-missing-start-ignored.stderr.txt",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "record_id": "initial/before-missing-start-ignored",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start-ignored.json",
+      "bytes": 1381,
+      "sha256": "ad021d1adcaf0473c03552d348ebb6125dd65498849511fa3f6c3a40dff54ebf"
+    },
+    "streams": [
+      "initial/before-missing-start-ignored/stdout",
+      "initial/before-missing-start-ignored/stderr"
+    ]
+  },
+  {
+    "id": "before-missing-start-inventory",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list",
+      "--format",
+      "terse"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 60,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:16:52.683837+00:00",
+    "path_sha256": "2db016c7667ac4d5a4a753bf030da00184e7a76845c12f56803253e8ceca34a9",
+    "owned_process_group": 17866,
+    "finished_at": "2026-10-23T05:16:54.793482+00:00",
+    "wall_seconds": 2.10943,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "before-missing-start-inventory.stdout.txt",
+    "stdout_bytes": 336412,
+    "stdout_sha256": "d8f98165dc079ae0ab2c4827466594f0528777bd53ef0d1b59969b57db80c053",
+    "stderr": "before-missing-start-inventory.stderr.txt",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "record_id": "initial/before-missing-start-inventory",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/before-missing-start-inventory.json",
+      "bytes": 1371,
+      "sha256": "55e0ea3864b847887daee86b0a8f24d7db64c2467f3318e5cb1be68b768b4f8a"
+    },
+    "streams": [
+      "initial/before-missing-start-inventory/stdout",
+      "initial/before-missing-start-inventory/stderr"
+    ]
+  },
+  {
+    "id": "fmt-check-before-controls",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 300,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:10:32.963689+00:00",
+    "path_sha256": "2db016c7667ac4d5a4a753bf030da00184e7a76845c12f56803253e8ceca34a9",
+    "owned_process_group": 96316,
+    "finished_at": "2026-10-23T05:10:45.281337+00:00",
+    "wall_seconds": 12.317426,
+    "exit_code": 1,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "fmt-check-before-controls.stdout.txt",
+    "stdout_bytes": 2583,
+    "stdout_sha256": "d8a0a44e47241987e9e6723e9793efb2fdb998a4b41065c28254d3944c001840",
+    "stderr": "fmt-check-before-controls.stderr.txt",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "record_id": "initial/fmt-check-before-controls",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/fmt-check-before-controls.json",
+      "bytes": 1283,
+      "sha256": "359ec0544f9c205a4f268844aa83df98a346b166748ab8adedff91aaf36b4fc0"
+    },
+    "streams": [
+      "initial/fmt-check-before-controls/stdout",
+      "initial/fmt-check-before-controls/stderr"
+    ]
+  },
+  {
+    "id": "fmt-formatted",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 300,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:14:43.780207+00:00",
+    "path_sha256": "2db016c7667ac4d5a4a753bf030da00184e7a76845c12f56803253e8ceca34a9",
+    "owned_process_group": 10545,
+    "finished_at": "2026-10-23T05:14:56.990523+00:00",
+    "wall_seconds": 13.209893,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "fmt-formatted.stdout.txt",
+    "stdout_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr": "fmt-formatted.stderr.txt",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "record_id": "initial/fmt-formatted",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/fmt-formatted.json",
+      "bytes": 1244,
+      "sha256": "19eb37174618d03be261809321add926061254ad10bc58b9b5b2eae9137f6ea0"
+    },
+    "streams": [
+      "initial/fmt-formatted/stdout",
+      "initial/fmt-formatted/stderr"
+    ]
+  },
+  {
+    "id": "fmt-initial",
+    "status": "launch_failed_before_Cargo",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "error_type": "FileNotFoundError",
+    "error_text": "[Errno 2] No such file or directory: 'cargo'",
+    "runner_exit_observed": 1,
+    "child_exit_code": null,
+    "child_started": false,
+    "timed_out": false,
+    "source_changes": false,
+    "tool_return_chunk": "0a5500",
+    "runner_before_path_fix_sha256": "f626e4ef0d5faa590c2a73910efd687ca76bbe1af2028b3a86abc7e1997a325c",
+    "stdout_bytes": 0,
+    "stderr_bytes": 0,
+    "diagnostic_note": "Python traceback was returned by exec_command before subprocess creation; the two reserved child-stream files are empty. This is a launch/setup failure, not a Cargo/fixture outcome.",
+    "record_id": "initial/fmt-initial",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/fmt-initial.json",
+      "bytes": 755,
+      "sha256": "9544a3d664293d4ead54ddc71c4ed19f2852503466c0b39f14b62a68e58734b9"
+    },
+    "streams": [
+      "initial/fmt-initial/stdout",
+      "initial/fmt-initial/stderr"
+    ]
+  },
+  {
+    "id": "format-owned",
+    "command": [
+      "rustfmt",
+      "--edition",
+      "2024",
+      "crates/voice/src/provider_worker/tests/spoken_to.rs"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 60,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:12:17.086993+00:00",
+    "path_sha256": "2db016c7667ac4d5a4a753bf030da00184e7a76845c12f56803253e8ceca34a9",
+    "owned_process_group": 2034,
+    "finished_at": "2026-10-23T05:12:17.274861+00:00",
+    "wall_seconds": 0.187244,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "format-owned.stdout.txt",
+    "stdout_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr": "format-owned.stderr.txt",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "record_id": "initial/format-owned",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/format-owned.json",
+      "bytes": 1289,
+      "sha256": "406fe49f37cd8e476aa33a78877ed578ca550b0acf8e1b952f2ac3b3a88f8da8"
+    },
+    "streams": [
+      "initial/format-owned/stdout",
+      "initial/format-owned/stderr"
+    ]
+  },
+  {
+    "id": "rustc",
+    "command": [
+      "rustc",
+      "-vV"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 30,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:14:56.991834+00:00",
+    "path_sha256": "2db016c7667ac4d5a4a753bf030da00184e7a76845c12f56803253e8ceca34a9",
+    "owned_process_group": 11028,
+    "finished_at": "2026-10-23T05:14:57.080786+00:00",
+    "wall_seconds": 0.088708,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "rustc.stdout.txt",
+    "stdout_bytes": 191,
+    "stdout_sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+    "stderr": "rustc.stderr.txt",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "record_id": "initial/rustc",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc/rustc.json",
+      "bytes": 1192,
+      "sha256": "dde70c6a80c7e7519773e1b47dfd73dd3a9c7478b1eafe1d571893181ebea78d"
+    },
+    "streams": [
+      "initial/rustc/stdout",
+      "initial/rustc/stderr"
+    ]
+  },
+  {
+    "id": "after-missing-start-binary-file",
+    "command": [
+      "file",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 30,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:25:01.897488+00:00",
+    "path_sha256": "306444f65cffbf2be272ab5fef5f6c161c42a88dbe9ce6c5b2c08c0999c987ad",
+    "owned_process_group": 44914,
+    "finished_at": "2026-10-23T05:25:01.916832+00:00",
+    "wall_seconds": 0.018598,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "after-missing-start-binary-file.stdout.txt",
+    "stdout_bytes": 109,
+    "stdout_sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4",
+    "stderr": "after-missing-start-binary-file.stderr.txt",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "record_id": "corrected/after-missing-start-binary-file",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start-binary-file.json",
+      "bytes": 1341,
+      "sha256": "c1c21110c6e9e77efdae0962f2ecdf22f4eba7f0c3c68478c41156f4af1dec40"
+    },
+    "streams": [
+      "corrected/after-missing-start-binary-file/stdout",
+      "corrected/after-missing-start-binary-file/stderr"
+    ]
+  },
+  {
+    "id": "after-missing-start-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--offline",
+      "--locked",
+      "--no-run",
+      "--message-format=json-render-diagnostics"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 1200,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:23:36.839657+00:00",
+    "path_sha256": "306444f65cffbf2be272ab5fef5f6c161c42a88dbe9ce6c5b2c08c0999c987ad",
+    "owned_process_group": 40994,
+    "finished_at": "2026-10-23T05:25:01.650088+00:00",
+    "wall_seconds": 84.812091,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "after-missing-start-compile.stdout.txt",
+    "stdout_bytes": 249308,
+    "stdout_sha256": "06582c4b251b65c14e1dc39ec66105eb7da64bff1c8ca9cb5bfd2207ee955107",
+    "stderr": "after-missing-start-compile.stderr.txt",
+    "stderr_bytes": 856,
+    "stderr_sha256": "7421f0ec1e657035e0b58f5cafe98704e346606fa302d0595b8f741d62fe0077",
+    "record_id": "corrected/after-missing-start-compile",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start-compile.json",
+      "bytes": 1405,
+      "sha256": "f2a37840ed089d8a4a0591f0996646fab683bfd53413fdb9ef76a5075c023c5c"
+    },
+    "streams": [
+      "corrected/after-missing-start-compile/stdout",
+      "corrected/after-missing-start-compile/stderr"
+    ]
+  },
+  {
+    "id": "after-missing-start-exact",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "provider_worker::tests::spoken_to::a_child_still_loading_its_model_takes_nothing_from_the_worker",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 30,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:25:06.145122+00:00",
+    "path_sha256": "306444f65cffbf2be272ab5fef5f6c161c42a88dbe9ce6c5b2c08c0999c987ad",
+    "owned_process_group": 44996,
+    "finished_at": "2026-10-23T05:25:11.200153+00:00",
+    "wall_seconds": 5.054915,
+    "exit_code": 101,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "after-missing-start-exact.stdout.txt",
+    "stdout_bytes": 355,
+    "stdout_sha256": "d4a993d8bf5003ef99c87cf1d6b6ba71a7c3fda821735c32a6b94bf8a42be662",
+    "stderr": "after-missing-start-exact.stderr.txt",
+    "stderr_bytes": 398,
+    "stderr_sha256": "e7abb922b8350c5857e7e1118a7e92bf1bad89f5b7c75d3d3a827241704db476",
+    "record_id": "corrected/after-missing-start-exact",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start-exact.json",
+      "bytes": 1453,
+      "sha256": "d271b42910b2a97cff066c11ea43ba291dbfa276b1289b058b181cc66e223f2a"
+    },
+    "streams": [
+      "corrected/after-missing-start-exact/stdout",
+      "corrected/after-missing-start-exact/stderr"
+    ]
+  },
+  {
+    "id": "after-missing-start-ignored",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list",
+      "--ignored",
+      "--format",
+      "terse"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 60,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:25:04.025244+00:00",
+    "path_sha256": "306444f65cffbf2be272ab5fef5f6c161c42a88dbe9ce6c5b2c08c0999c987ad",
+    "owned_process_group": 44952,
+    "finished_at": "2026-10-23T05:25:04.056176+00:00",
+    "wall_seconds": 0.030619,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "after-missing-start-ignored.stdout.txt",
+    "stdout_bytes": 1015,
+    "stdout_sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+    "stderr": "after-missing-start-ignored.stderr.txt",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "record_id": "corrected/after-missing-start-ignored",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start-ignored.json",
+      "bytes": 1378,
+      "sha256": "617ddffcbe63371b362100dcb1c53608b8ecd917ae95570e4685f85811e27762"
+    },
+    "streams": [
+      "corrected/after-missing-start-ignored/stdout",
+      "corrected/after-missing-start-ignored/stderr"
+    ]
+  },
+  {
+    "id": "after-missing-start-inventory",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list",
+      "--format",
+      "terse"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 60,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:25:01.917588+00:00",
+    "path_sha256": "306444f65cffbf2be272ab5fef5f6c161c42a88dbe9ce6c5b2c08c0999c987ad",
+    "owned_process_group": 44915,
+    "finished_at": "2026-10-23T05:25:04.023131+00:00",
+    "wall_seconds": 2.105318,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "after-missing-start-inventory.stdout.txt",
+    "stdout_bytes": 336412,
+    "stdout_sha256": "d8f98165dc079ae0ab2c4827466594f0528777bd53ef0d1b59969b57db80c053",
+    "stderr": "after-missing-start-inventory.stderr.txt",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "record_id": "corrected/after-missing-start-inventory",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/after-missing-start-inventory.json",
+      "bytes": 1369,
+      "sha256": "71cf70144b87b7b6382be37b2739c40eb1b9b945ccce7f503dd80cb1ed429356"
+    },
+    "streams": [
+      "corrected/after-missing-start-inventory/stdout",
+      "corrected/after-missing-start-inventory/stderr"
+    ]
+  },
+  {
+    "id": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-p",
+      "lamp-voice",
+      "--all-targets",
+      "--offline",
+      "--locked",
+      "--message-format=json-render-diagnostics",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 1200,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:26:54.225703+00:00",
+    "path_sha256": "306444f65cffbf2be272ab5fef5f6c161c42a88dbe9ce6c5b2c08c0999c987ad",
+    "owned_process_group": 50748,
+    "finished_at": "2026-10-23T05:28:20.516334+00:00",
+    "wall_seconds": 86.291849,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "clippy.stdout.txt",
+    "stdout_bytes": 248031,
+    "stdout_sha256": "12bd085623b7c65803308ba6a9cbe65a4e4ff98177898f1c0ab8fbd64136dcf2",
+    "stderr": "clippy.stderr.txt",
+    "stderr_bytes": 2795,
+    "stderr_sha256": "291ad875578c3da68a8add7c9cd9c8279b4bc8b8f4e24d4c9d612bd5b6d746dc",
+    "record_id": "corrected/clippy",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/clippy.json",
+      "bytes": 1373,
+      "sha256": "d4e4685e5d7b9f251d7362bed40639f24a7017fb9b7fe7d9b08982b50e835a66"
+    },
+    "streams": [
+      "corrected/clippy/stdout",
+      "corrected/clippy/stderr"
+    ]
+  },
+  {
+    "id": "fmt-corrected",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 300,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:23:22.775735+00:00",
+    "path_sha256": "306444f65cffbf2be272ab5fef5f6c161c42a88dbe9ce6c5b2c08c0999c987ad",
+    "owned_process_group": 40026,
+    "finished_at": "2026-10-23T05:23:34.811254+00:00",
+    "wall_seconds": 12.035213,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "fmt-corrected.stdout.txt",
+    "stdout_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr": "fmt-corrected.stderr.txt",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "record_id": "corrected/fmt-corrected",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/fmt-corrected.json",
+      "bytes": 1244,
+      "sha256": "ea74da20eb604a385dabe2a63204ce983261f8bfcc19a709fa404c45f749e494"
+    },
+    "streams": [
+      "corrected/fmt-corrected/stdout",
+      "corrected/fmt-corrected/stderr"
+    ]
+  },
+  {
+    "id": "restored-normal-binary-file",
+    "command": [
+      "file",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 30,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:26:44.642188+00:00",
+    "path_sha256": "306444f65cffbf2be272ab5fef5f6c161c42a88dbe9ce6c5b2c08c0999c987ad",
+    "owned_process_group": 49963,
+    "finished_at": "2026-10-23T05:26:44.666731+00:00",
+    "wall_seconds": 0.024072,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "restored-normal-binary-file.stdout.txt",
+    "stdout_bytes": 109,
+    "stdout_sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4",
+    "stderr": "restored-normal-binary-file.stderr.txt",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "record_id": "corrected/restored-normal-binary-file",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal-binary-file.json",
+      "bytes": 1329,
+      "sha256": "4d4dc3d934d13fd46e105215fddc51dc24135c62dffc478a4a9c7b728492d8d6"
+    },
+    "streams": [
+      "corrected/restored-normal-binary-file/stdout",
+      "corrected/restored-normal-binary-file/stderr"
+    ]
+  },
+  {
+    "id": "restored-normal-compile",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--offline",
+      "--locked",
+      "--no-run",
+      "--message-format=json-render-diagnostics"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 1200,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:25:14.916312+00:00",
+    "path_sha256": "306444f65cffbf2be272ab5fef5f6c161c42a88dbe9ce6c5b2c08c0999c987ad",
+    "owned_process_group": 45174,
+    "finished_at": "2026-10-23T05:26:44.353595+00:00",
+    "wall_seconds": 89.439075,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "restored-normal-compile.stdout.txt",
+    "stdout_bytes": 249308,
+    "stdout_sha256": "165bb801af2cb737187286f7d61043bcc4a45bf7409c9c67dbe76539f16d1ed2",
+    "stderr": "restored-normal-compile.stderr.txt",
+    "stderr_bytes": 168,
+    "stderr_sha256": "f546539ae7ad79c0221b6d57c91f38d39c0f3eb5580bcec1a413e3f506bc02ac",
+    "record_id": "corrected/restored-normal-compile",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal-compile.json",
+      "bytes": 1393,
+      "sha256": "99dfbb12739fc4044f0645c35ad84e734a478a09ae01b077f8ae064a9c00dd75"
+    },
+    "streams": [
+      "corrected/restored-normal-compile/stdout",
+      "corrected/restored-normal-compile/stderr"
+    ]
+  },
+  {
+    "id": "restored-normal-exact",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "provider_worker::tests::spoken_to::a_child_still_loading_its_model_takes_nothing_from_the_worker",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 30,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:26:51.259923+00:00",
+    "path_sha256": "306444f65cffbf2be272ab5fef5f6c161c42a88dbe9ce6c5b2c08c0999c987ad",
+    "owned_process_group": 50682,
+    "finished_at": "2026-10-23T05:26:52.194084+00:00",
+    "wall_seconds": 0.933891,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "restored-normal-exact.stdout.txt",
+    "stdout_bytes": 224,
+    "stdout_sha256": "825c8ff74aad4e1691d9cc29a1e17ace480b6dfe54ae1bc41bd84ef580aea34e",
+    "stderr": "restored-normal-exact.stderr.txt",
+    "stderr_bytes": 759,
+    "stderr_sha256": "4504a75390549400002ee200c5bd7816e95a22caec7bf9ed6130419f584866b6",
+    "record_id": "corrected/restored-normal-exact",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal-exact.json",
+      "bytes": 1439,
+      "sha256": "dcb5341e244c874761f4a385184fd8f0c55eeac37e4949645f7f94df468ee6ad"
+    },
+    "streams": [
+      "corrected/restored-normal-exact/stdout",
+      "corrected/restored-normal-exact/stderr"
+    ]
+  },
+  {
+    "id": "restored-normal-ignored",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list",
+      "--ignored",
+      "--format",
+      "terse"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 60,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:26:46.789752+00:00",
+    "path_sha256": "306444f65cffbf2be272ab5fef5f6c161c42a88dbe9ce6c5b2c08c0999c987ad",
+    "owned_process_group": 50401,
+    "finished_at": "2026-10-23T05:26:46.834907+00:00",
+    "wall_seconds": 0.044943,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "restored-normal-ignored.stdout.txt",
+    "stdout_bytes": 1015,
+    "stdout_sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+    "stderr": "restored-normal-ignored.stderr.txt",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "record_id": "corrected/restored-normal-ignored",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal-ignored.json",
+      "bytes": 1366,
+      "sha256": "bf5dde22470fad2184ff40592be7c33e7582c4ac5c3c1f22b5155bd753dc868c"
+    },
+    "streams": [
+      "corrected/restored-normal-ignored/stdout",
+      "corrected/restored-normal-ignored/stderr"
+    ]
+  },
+  {
+    "id": "restored-normal-inventory",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list",
+      "--format",
+      "terse"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 60,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:26:44.668078+00:00",
+    "path_sha256": "306444f65cffbf2be272ab5fef5f6c161c42a88dbe9ce6c5b2c08c0999c987ad",
+    "owned_process_group": 50089,
+    "finished_at": "2026-10-23T05:26:46.788243+00:00",
+    "wall_seconds": 2.119787,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "restored-normal-inventory.stdout.txt",
+    "stdout_bytes": 336412,
+    "stdout_sha256": "d8f98165dc079ae0ab2c4827466594f0528777bd53ef0d1b59969b57db80c053",
+    "stderr": "restored-normal-inventory.stderr.txt",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "record_id": "corrected/restored-normal-inventory",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/restored-normal-inventory.json",
+      "bytes": 1357,
+      "sha256": "50db0f720aa19b1bc96d1d1c4d17dd2482800adae0e5e181852af422526374a9"
+    },
+    "streams": [
+      "corrected/restored-normal-inventory/stdout",
+      "corrected/restored-normal-inventory/stderr"
+    ]
+  },
+  {
+    "id": "rustc",
+    "command": [
+      "rustc",
+      "-vV"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "timeout_seconds": 30,
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_BACKTRACE": "0",
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUST_TEST_THREADS": null
+    },
+    "started_at": "2026-10-23T05:23:34.812055+00:00",
+    "path_sha256": "306444f65cffbf2be272ab5fef5f6c161c42a88dbe9ce6c5b2c08c0999c987ad",
+    "owned_process_group": 40840,
+    "finished_at": "2026-10-23T05:23:34.891298+00:00",
+    "wall_seconds": 0.078985,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "stdout": "rustc.stdout.txt",
+    "stdout_bytes": 191,
+    "stdout_sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+    "stderr": "rustc.stderr.txt",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "record_id": "corrected/rustc",
+    "external_record": {
+      "external_path": "/private/tmp/tests-loading-child-review-20261023/execution-current-62b1120fc-arc-fix/rustc.json",
+      "bytes": 1192,
+      "sha256": "6015e7fc36230d5c9f197d12081557e23efeda7579610353466b6af9ebc5fe13"
+    },
+    "streams": [
+      "corrected/rustc/stdout",
+      "corrected/rustc/stderr"
+    ]
+  }
+]

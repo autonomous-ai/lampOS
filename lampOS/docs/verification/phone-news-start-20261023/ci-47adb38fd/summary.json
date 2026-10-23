@@ -1,0 +1,149 @@
+{
+  "pr": 3218,
+  "authored_head": "47adb38fd0f61dfbfc1172e9a668d54c43983794",
+  "checked_merge": "0faa46c6d1bc8d3d8e7545afb2a90a74c8374abf",
+  "base_parent": "62b1120fc1af5462529f0c76089a322500e30929",
+  "merge_tree": "6574a2cba5f6050670451818f5350222ed74b9be",
+  "required_workflows_and_jobs_success": true,
+  "ARM_job_seconds": 1222.0,
+  "nextest": {
+    "passed": 7171,
+    "leaky_passes_included": 1,
+    "failed": 0,
+    "skipped_tests": 32,
+    "skipped_binaries": 106,
+    "startup_binaries": 62,
+    "observed_terminal_binaries": 58,
+    "duration_seconds": 142.62,
+    "profile": "pr",
+    "profile_default_filter": "all()",
+    "package_selection": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "selected_packages": 12,
+    "workspace_packages": 46,
+    "parallelism": "-j num-cpus; observed cores:4",
+    "partition": "hash:1/1",
+    "excluded_own_harnesses": [
+      "lamp-ipc::relay_signals",
+      "lamp-turn-end-wire::process"
+    ],
+    "unique_ordinal_coverage": "1..7171 complete",
+    "identical_final_output_repetitions": 34,
+    "raw_terminal_rows": 7205
+  },
+  "separate_commands": {
+    "doctests": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "targets": 46
+    },
+    "turn_end_process_harness": {
+      "passed": 12,
+      "failed": 0
+    },
+    "relay_signals": "ok; numeric count not emitted",
+    "offline_publication_checks": [
+      {
+        "script": "lampos-publish-test.py",
+        "passed": 35,
+        "failed": 0
+      },
+      {
+        "script": "lampos-publish-artifact-test.py",
+        "passed": 12,
+        "failed": 0
+      },
+      {
+        "script": "lampos-publish-cli-test.py",
+        "passed": 7,
+        "failed": 0
+      }
+    ]
+  },
+  "changed_phone_case": [
+    {
+      "status": "PASS",
+      "seconds": 3.066,
+      "ordinal": 4033,
+      "total": 7171,
+      "binary": "lamp-voice",
+      "name": "messages::tests::a_text_never_waits_on_the_news_for_the_phone",
+      "raw_line": 4744
+    }
+  ],
+  "leaky_passes": [
+    {
+      "status": "LEAK",
+      "seconds": 0.223,
+      "ordinal": 5052,
+      "total": 7171,
+      "binary": "lamp-voice",
+      "name": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+      "raw_line": 5763
+    }
+  ],
+  "compiler_warning_lines": [
+    {
+      "raw_line": 135,
+      "text": "2026-10-23T05:05:43.4207546Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+    },
+    {
+      "raw_line": 519,
+      "text": "2026-10-23T05:06:47.6855344Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost"
+    },
+    {
+      "raw_line": 524,
+      "text": "2026-10-23T05:06:47.6859551Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+    },
+    {
+      "raw_line": 529,
+      "text": "2026-10-23T05:06:47.6863522Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost"
+    },
+    {
+      "raw_line": 534,
+      "text": "2026-10-23T05:06:47.6867403Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp"
+    },
+    {
+      "raw_line": 676,
+      "text": "2026-10-23T05:11:02.1857942Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost"
+    },
+    {
+      "raw_line": 681,
+      "text": "2026-10-23T05:11:02.1861941Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+    },
+    {
+      "raw_line": 686,
+      "text": "2026-10-23T05:11:02.1865765Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost"
+    },
+    {
+      "raw_line": 691,
+      "text": "2026-10-23T05:11:02.1870240Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp"
+    }
+  ],
+  "artifact_upload": {
+    "workspace_binaries": 47,
+    "selected_examples": 2,
+    "files": 50,
+    "zip_bytes": 115831222,
+    "zip_sha256": "fce7b759fed42c39c0e83352ea2b1849ed08cea7932fd0f146c0337aa1978a44",
+    "artifact_id": 12480592809,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39903799979/artifacts/12480592809",
+    "independently_downloaded_or_hashed": false
+  },
+  "readiness": "Not advanced; six Mac failures remain disclosed and unwaived, and reviewer/current-base disposition is separate.",
+  "formatting": "These CI jobs did not run a Linux fmt gate; root has separate formatting receipts.",
+  "cached_build": "Both required jobs restored caches/source times; this is not a cold-build claim."
+}
