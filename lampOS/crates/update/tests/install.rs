@@ -841,6 +841,26 @@ fn time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set() {
     assert!(voice.contains(&"Environment=LAMP_KERNEL_CLOCK=on"));
 }
 
+/// The lead's decision 1 (23 Oct): a product lamp keeps nothing about a
+/// person while nobody is known, so an unknown speaker's "my favourite
+/// colour is blue" is not kept to the room. The switch acts on the
+/// `remember` the memory socket gives the voice.
+#[test]
+fn the_product_keeps_nothing_personal_while_nobody_is_known() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock",
+        "Environment=LAMP_MEMORY_PERSONAL_NEEDS_FACE=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
 /// and the voice reading it, so a full update gives one lamp what the
 /// real-face run had.

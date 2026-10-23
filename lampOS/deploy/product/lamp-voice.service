@@ -191,6 +191,10 @@ Environment=LAMP_SCHEDULE_SOCKET=/run/lampos-schedule/call.sock
 Environment=LAMP_SCHEDULE_DELIVERY_DIR=/var/lib/lampOS/voice/schedule-delivery
 Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock
 Environment=LAMP_MEMORY_DAYS=on
+# Nothing about a person kept while nobody is known (the lead's decision 1, 23 Oct; docs/memory.md): a
+# `remember` about a person with no face known, a text from the app included, is not kept, and the model says
+# it will remember once it knows who they are; a room fact is kept as before.
+Environment=LAMP_MEMORY_PERSONAL_NEEDS_FACE=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
