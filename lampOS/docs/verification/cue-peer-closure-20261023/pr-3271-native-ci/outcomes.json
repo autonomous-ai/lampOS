@@ -1,0 +1,413 @@
+{
+  "source_head": "55f671b12ef08c93f11ae235980f69cf7059b7a8",
+  "checked_merge": "a6a267bf26c1187170876292bd49c36a870ba0a3",
+  "native_runner": "Linux ARM64",
+  "rust_toolchain": "1.96.0-aarch64-unknown-linux-gnu",
+  "nextest": "0.9.148",
+  "cargo_profile": "release",
+  "nextest_profile": "pr",
+  "partition": "hash:1/1",
+  "parallelism": "num-cpus; raw log reports four cores",
+  "selected_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "selected_tests": 7237,
+  "selected_binaries": 62,
+  "skipped_tests": 33,
+  "skipped_binaries": 106,
+  "executed": 5896,
+  "passed_total_including_leak": 5895,
+  "passing_LEAK": 1,
+  "failed": 1,
+  "selected_unrun": 1341,
+  "nextest_exit": 100,
+  "seconds": 125.132,
+  "changed_case": {
+    "name": "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+    "observed_execution_row": false,
+    "result": "not observed; no ARM pass claimed"
+  },
+  "primary_row_count_rule": "Only unique indexed result rows before the first nextest Summary; later repeated reporting is not added again.",
+  "observed_primary_rows": {
+    "PASS": 5894,
+    "LEAK": 1,
+    "FAIL": 1
+  },
+  "observed_binary_count": 52,
+  "observed_by_binary": {
+    "lamp-body": {
+      "PASS": 436,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 436
+    },
+    "lamp-body::it": {
+      "PASS": 125,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 125
+    },
+    "lamp-body::bin/lamp-body": {
+      "PASS": 32,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 32
+    },
+    "lamp-body::bin/lamp-body-inspect": {
+      "PASS": 2,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 2
+    },
+    "lamp-body::bin/lamp-body-measure": {
+      "PASS": 5,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 5
+    },
+    "lamp-body::bin/lamp-body-mood": {
+      "PASS": 3,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 3
+    },
+    "lamp-body::bin/lamp-body-worker": {
+      "PASS": 1,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 1
+    },
+    "lamp-cloud": {
+      "PASS": 166,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 166
+    },
+    "lamp-skills::it": {
+      "PASS": 304,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 304
+    },
+    "lamp-cloud::it": {
+      "PASS": 30,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 30
+    },
+    "lamp-expression": {
+      "PASS": 27,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 27
+    },
+    "lamp-expression::it": {
+      "PASS": 280,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 280
+    },
+    "lamp-voice": {
+      "PASS": 3261,
+      "LEAK": 1,
+      "FAIL": 1,
+      "observed_rows": 3263
+    },
+    "lamp-expression::runtime": {
+      "PASS": 27,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 27
+    },
+    "lamp-expression::bin/lamp-expression": {
+      "PASS": 4,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 4
+    },
+    "lamp-keeper": {
+      "PASS": 40,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 40
+    },
+    "lamp-keeper::bin/lamp-keeper": {
+      "PASS": 2,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 2
+    },
+    "lamp-lean": {
+      "PASS": 10,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 10
+    },
+    "lamp-lean::it": {
+      "PASS": 51,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 51
+    },
+    "lamp-memory": {
+      "PASS": 96,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 96
+    },
+    "lamp-voice::it": {
+      "PASS": 14,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 14
+    },
+    "lamp-memory::forget_person": {
+      "PASS": 3,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 3
+    },
+    "lamp-memory::forget_shared_exchange": {
+      "PASS": 4,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 4
+    },
+    "lamp-memory::health_control": {
+      "PASS": 23,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 23
+    },
+    "lamp-memory::it": {
+      "PASS": 154,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 154
+    },
+    "lamp-memory::forgot": {
+      "PASS": 1,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 1
+    },
+    "lamp-memory::paraphrase_fixture": {
+      "PASS": 1,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 1
+    },
+    "lamp-memory::voice_early_words": {
+      "PASS": 1,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 1
+    },
+    "lamp-memory::voice_follows_face": {
+      "PASS": 1,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 1
+    },
+    "lamp-memory::voice_forget": {
+      "PASS": 5,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 5
+    },
+    "lamp-memory::voice_forget_about": {
+      "PASS": 2,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 2
+    },
+    "lamp-memory::voice_forget_named": {
+      "PASS": 2,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 2
+    },
+    "lamp-memory::voice_link_used": {
+      "PASS": 2,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 2
+    },
+    "lamp-memory::voice_observe": {
+      "PASS": 1,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 1
+    },
+    "lamp-memory::voice_since_until": {
+      "PASS": 2,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 2
+    },
+    "lamp-memory::bin/lamp-memory": {
+      "PASS": 8,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 8
+    },
+    "lamp-memory::bin/lamp-memory-eval": {
+      "PASS": 8,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 8
+    },
+    "lamp-peek": {
+      "PASS": 15,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 15
+    },
+    "lamp-peek::peek": {
+      "PASS": 11,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 11
+    },
+    "lamp-setup": {
+      "PASS": 16,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 16
+    },
+    "lamp-setup::it": {
+      "PASS": 156,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 156
+    },
+    "lamp-setup::wake": {
+      "PASS": 6,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 6
+    },
+    "lamp-skills": {
+      "PASS": 157,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 157
+    },
+    "lamp-skills::requested_audio": {
+      "PASS": 31,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 31
+    },
+    "lamp-skills::bin/lamp-skills": {
+      "PASS": 23,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 23
+    },
+    "lamp-update": {
+      "PASS": 120,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 120
+    },
+    "lamp-update::functions": {
+      "PASS": 5,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 5
+    },
+    "lamp-update::install": {
+      "PASS": 82,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 82
+    },
+    "lamp-update::it": {
+      "PASS": 13,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 13
+    },
+    "lamp-update::round": {
+      "PASS": 123,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 123
+    },
+    "lamp-update::self-cli-exec": {
+      "PASS": 1,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 1
+    },
+    "lamp-update::self-process-cuts": {
+      "PASS": 1,
+      "LEAK": 0,
+      "FAIL": 0,
+      "observed_rows": 1
+    }
+  },
+  "failure_rows": [
+    {
+      "line": 6566,
+      "outcome": "FAIL",
+      "seconds": 0.005,
+      "index": 5893,
+      "selected_total": 7237,
+      "binary_id": "lamp-voice",
+      "name": "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy"
+    }
+  ],
+  "passing_leak_rows": [
+    {
+      "line": 5765,
+      "outcome": "LEAK",
+      "seconds": 0.227,
+      "index": 5092,
+      "selected_total": 7237,
+      "binary_id": "lamp-voice",
+      "name": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+    }
+  ],
+  "skipped_scope_limit": "Skipped and selected-unrun counts are aggregate nextest data; a complete selected-case inventory was not exported before fail-fast, so no exact list of all unrun names is claimed.",
+  "separate_checks": {
+    "publication_failure_tests": {
+      "passed": 35,
+      "failed": 0
+    },
+    "artifact_provenance_regression": {
+      "passed": 12,
+      "failed": 0
+    },
+    "publication_CLI_rehearsal": {
+      "passed": 7,
+      "failed": 0
+    },
+    "workspace_release_build": "success",
+    "binary_classification": "success",
+    "selected_example_builds": "success",
+    "doctests": "skipped",
+    "own_harness_relay_and_process_tests": "skipped",
+    "artifact_export_upload": "skipped"
+  },
+  "clippy": {
+    "workflow": "success",
+    "required_job": "success",
+    "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+    "toolchain": "1.96.0-x86_64-unknown-linux-gnu",
+    "linux_fmt": "not run in this workflow; separately published exact-source fmt receipt is linked in README"
+  },
+  "qualification": "FAILED; draft/HOLD unchanged; local failure remains independently disclosed."
+}

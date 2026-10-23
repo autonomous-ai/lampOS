@@ -1,0 +1,72 @@
+{
+  "merge": {
+    "merge": "a6a267bf26c1187170876292bd49c36a870ba0a3",
+    "tree": "c4f5ef905e6b1059badd4450c243a19b7d0165b4",
+    "parents": [
+      "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "55f671b12ef08c93f11ae235980f69cf7059b7a8"
+    ],
+    "checkout_raw_lines": [
+      "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T13:50:14.2201209Z [command]/usr/bin/git log -1 --format=%H",
+      "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T13:50:14.2222779Z a6a267bf26c1187170876292bd49c36a870ba0a3"
+    ],
+    "head": "55f671b12ef08c93f11ae235980f69cf7059b7a8",
+    "head_tree": "c4f5ef905e6b1059badd4450c243a19b7d0165b4",
+    "tree_equals_authored_head": true,
+    "git_commit_API_raw_sha256": "cf326e39c2e05c69e192fc1b084a4392bd7edae0a43329cbad1068d161066316",
+    "attribution_fields_omitted": true,
+    "clippy_checkout_raw_lines": [
+      "lampOS — clippy, every crate and target (x86 Linux)\tRun actions/checkout@v4\t2026-10-23T13:58:49.5771310Z [command]/usr/bin/git log -1 --format=%H",
+      "lampOS — clippy, every crate and target (x86 Linux)\tRun actions/checkout@v4\t2026-10-23T13:58:49.5802903Z a6a267bf26c1187170876292bd49c36a870ba0a3"
+    ]
+  },
+  "source_config": {
+    "head": "55f671b12ef08c93f11ae235980f69cf7059b7a8",
+    "records": [
+      {
+        "path": ".github/workflows/lampos-arm64.yml",
+        "git_blob": "1c0ac73ea8f7c0970ebaec380bb057a0d17e3dd9",
+        "sha256": "ad1a4cd650db5f2a721b510263ff5c1697b09f872646395fb4cab6173f8757f9",
+        "bytes": 18332
+      },
+      {
+        "path": ".github/workflows/lampos-clippy.yml",
+        "git_blob": "8e6dc386c08ece68de2c9a42446d2c9de080eb95",
+        "sha256": "2b41648cade7109e94995fd076f638166345867600e38e5e9aa9438a9b18c9ac",
+        "bytes": 4189
+      },
+      {
+        "path": ".github/scripts/lampos-pr-crates.py",
+        "git_blob": "2213782569c8e9130dc40d6d632ffc04a78e0081",
+        "sha256": "c89f3cc802c1f385793f7a800142ae235ef7b09c00e38f1661427eecffcf2671",
+        "bytes": 5493
+      },
+      {
+        "path": "lampOS/.config/nextest.toml",
+        "git_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+        "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+        "bytes": 5157
+      },
+      {
+        "path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+        "git_blob": "a4cf438913af21134238b9cce07efe99381e4199",
+        "sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+        "bytes": 45782
+      },
+      {
+        "path": "lampOS/docs/voice-test-fixtures.md",
+        "git_blob": "a9003b72960d3c147b862ba6949e2962c244f4cf",
+        "sha256": "f28c90d1963e99f731c2457783d298750b10ee434b1163efbb719f6e0c65b0ee",
+        "bytes": 30804
+      }
+    ],
+    "limit": "Authored source/config identity only; final actual checked merge and runtime profile/selection are taken from terminal logs separately."
+  },
+  "current_PR": {
+    "number": 3271,
+    "draft": true,
+    "head": "55f671b12ef08c93f11ae235980f69cf7059b7a8",
+    "base": "810e05109bced3beca88a5b602930cfed5fba4e5"
+  },
+  "artifact_limit": "The export/upload steps were skipped; no downloadable test ELF identity/hash is asserted. Nextest binary identifiers below are runner identities, not executable SHA256."
+}

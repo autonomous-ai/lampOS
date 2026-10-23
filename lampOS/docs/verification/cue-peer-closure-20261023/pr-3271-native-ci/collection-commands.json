@@ -1,0 +1,224 @@
+{
+  "arm64": {
+    "native_wait": {
+      "command": [
+        "gh",
+        "run",
+        "watch",
+        "39964412356",
+        "--repo",
+        "autonomous-ai/lampOS",
+        "--interval",
+        "45",
+        "--exit-status"
+      ],
+      "started_at": "2026-10-23T13:52:09.101671+00:00",
+      "timeout_seconds": 5400,
+      "timed_out": false,
+      "owned_pid": 29525,
+      "exit_code": 1,
+      "finished_at": "2026-10-23T13:54:34.280955+00:00",
+      "wall_seconds": 145.1836427547969,
+      "stdout": {
+        "path": "native-watch.stdout",
+        "bytes": 5921,
+        "sha256": "15f4ac75f25cb3908ea355d7e71c24f3a4ed0be0fa231bc306b4213a8790e4b1"
+      },
+      "stderr": {
+        "path": "native-watch.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "final_run_GET": {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/actions/runs/39964412356"
+      ],
+      "started_at": "2026-10-23T13:54:34.411497+00:00",
+      "timeout_seconds": 120,
+      "timed_out": false,
+      "owned_pid": 37266,
+      "exit_code": 0,
+      "finished_at": "2026-10-23T13:54:35.372371+00:00",
+      "wall_seconds": 0.9609580370597541,
+      "stdout": {
+        "path": "final-run.stdout",
+        "bytes": 12705,
+        "sha256": "cc7ec05ae0e20e3ec02aac47dc403f7a40e6954f009fe7ec97d7df9d7fe1c5b0"
+      },
+      "stderr": {
+        "path": "final-run.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "final_jobs_GET": {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/actions/runs/39964412356/jobs?per_page=100"
+      ],
+      "started_at": "2026-10-23T13:54:35.578773+00:00",
+      "timeout_seconds": 120,
+      "timed_out": false,
+      "owned_pid": 37305,
+      "exit_code": 0,
+      "finished_at": "2026-10-23T13:54:36.494309+00:00",
+      "wall_seconds": 0.9156036619096994,
+      "stdout": {
+        "path": "final-jobs.stdout",
+        "bytes": 7012,
+        "sha256": "a93318c3ed711ee17a289ef370026f4345b278deff824988116ded8b0aceadad"
+      },
+      "stderr": {
+        "path": "final-jobs.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "one_job_log_download": {
+      "command": [
+        "gh",
+        "run",
+        "view",
+        "39964412356",
+        "--repo",
+        "autonomous-ai/lampOS",
+        "--job",
+        "120450417213",
+        "--log"
+      ],
+      "started_at": "2026-10-23T13:54:36.719511+00:00",
+      "timeout_seconds": 300,
+      "timed_out": false,
+      "owned_pid": 37325,
+      "exit_code": 0,
+      "finished_at": "2026-10-23T13:55:20.367958+00:00",
+      "wall_seconds": 43.64977564010769,
+      "stdout": {
+        "path": "job-log.stdout",
+        "bytes": 1439335,
+        "sha256": "97965aa1a035ae51023aee5e0e9b42ebe47fd316df7dc7b77021e579352349f3"
+      },
+      "stderr": {
+        "path": "job-log.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "collection_finished_at": "2026-10-23T13:55:20.462812+00:00"
+  },
+  "clippy": {
+    "native_wait": {
+      "command": [
+        "gh",
+        "run",
+        "watch",
+        "39964412421",
+        "--repo",
+        "autonomous-ai/lampOS",
+        "--interval",
+        "45",
+        "--exit-status"
+      ],
+      "started_at": "2026-10-23T13:52:09.101722+00:00",
+      "timeout_seconds": 5400,
+      "timed_out": false,
+      "owned_pid": 29526,
+      "exit_code": 0,
+      "finished_at": "2026-10-23T14:01:37.615193+00:00",
+      "wall_seconds": 568.5303239147179,
+      "stdout": {
+        "path": "native-watch.stdout",
+        "bytes": 7168,
+        "sha256": "56281caf35a62090edbabc339c110dd03c677e30fc38a89aaf98907bdf0ccbb8"
+      },
+      "stderr": {
+        "path": "native-watch.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "final_run_GET": {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/actions/runs/39964412421"
+      ],
+      "started_at": "2026-10-23T14:01:37.706217+00:00",
+      "timeout_seconds": 120,
+      "timed_out": false,
+      "owned_pid": 59492,
+      "exit_code": 0,
+      "finished_at": "2026-10-23T14:01:38.620360+00:00",
+      "wall_seconds": 0.914210902992636,
+      "stdout": {
+        "path": "final-run.stdout",
+        "bytes": 12704,
+        "sha256": "2892f2fe4261861df04db7a0ec3d18796dc5609bfc2b7681db7c137d05e09d70"
+      },
+      "stderr": {
+        "path": "final-run.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "final_jobs_GET": {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/actions/runs/39964412421/jobs?per_page=100"
+      ],
+      "started_at": "2026-10-23T14:01:38.788884+00:00",
+      "timeout_seconds": 120,
+      "timed_out": false,
+      "owned_pid": 59506,
+      "exit_code": 0,
+      "finished_at": "2026-10-23T14:01:39.563994+00:00",
+      "wall_seconds": 0.7752037532627583,
+      "stdout": {
+        "path": "final-jobs.stdout",
+        "bytes": 2632,
+        "sha256": "0baaa0a22e0ae7b39cde8c07b857f8e53d9de7c0ac8c1de04ebbe9ad57cfaf22"
+      },
+      "stderr": {
+        "path": "final-jobs.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "one_job_log_download": {
+      "command": [
+        "gh",
+        "run",
+        "view",
+        "39964412421",
+        "--repo",
+        "autonomous-ai/lampOS",
+        "--job",
+        "120450417359",
+        "--log"
+      ],
+      "started_at": "2026-10-23T14:01:39.714592+00:00",
+      "timeout_seconds": 300,
+      "timed_out": false,
+      "owned_pid": 59512,
+      "exit_code": 0,
+      "finished_at": "2026-10-23T14:01:51.530559+00:00",
+      "wall_seconds": 11.816372686997056,
+      "stdout": {
+        "path": "job-log.stdout",
+        "bytes": 78176,
+        "sha256": "b9d6dda08a6175e42eba6e34feeff047e264b08abd1d962b28bf1b2aeebf9b8c"
+      },
+      "stderr": {
+        "path": "job-log.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "collection_finished_at": "2026-10-23T14:01:51.607383+00:00"
+  }
+}

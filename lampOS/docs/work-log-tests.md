@@ -1,5 +1,33 @@
 # Tests work log
 
+## 2026-10-23 21:13 +0700 — peer ARM failure and clock comparison
+
+Ready for lamp-voice: no; #3271 remains draft/HOLD.
+
+The [terminal native receipt](verification/cue-peer-closure-20261023/pr-3271-native-ci/)
+records ARM64 39964412356 failed and Linux Clippy 39964412421 passed.
+ARM: 5,895 total passes including one LEAK, one failure, 33 skipped and
+1,341 selected tests unrun after fail-fast. The failed held-lines test stops
+at room setup (Unknown versus Quiet), before its scenario. No changed peer
+case result was observed; doctests, own-harness tests and artifact export
+were skipped. The checked merge tree equals 55f671b12. No rerun.
+
+The [source comparison](verification/cue-peer-closure-20261023/pr-3271-room-clock-comparison/)
+shows the exact test is unchanged from base and its earlier control baseline.
+Under wrapping arithmetic, a sampled clock in [90 s, 400 s) can leave that
+setup Unknown. The failed run did not record its clock sample or overflow
+profile, so this remains conditional reasoning. The older 60-second control
+failed by checked subtraction overflow; the existing #3190 clock correction
+passed. It is not a reproduction of this release symptom or failed-run uptime.
+Recommend reusing #3190's reviewed correction subject to its existing HOLD
+rather than duplicating it here; prerequisite/readiness disposition stays
+with the first builder and reviewer. No source stack or waiver is applied.
+
+Root verified 15 current CI slices, four historical streams, the full
+failure block and every published source slice against original bytes/Git
+objects. Expression's full gate and the queued bounded Update diagnostic
+continue separately; no further historical-cause experiment is claimed.
+
 ## 2026-10-23 20:52 +0700 — peer fixture PR opened
 
 Ready for lamp-voice: no.

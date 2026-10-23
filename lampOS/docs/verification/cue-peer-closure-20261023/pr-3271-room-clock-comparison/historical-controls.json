@@ -1,0 +1,453 @@
+{
+  "before": {
+    "source_commit": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+    "original_results": {
+      "external_path": "/private/tmp/tests-boot-clock-linux-20261023/runs/baseline-20261023t010211777596z/results.json",
+      "bytes": 54514,
+      "sha256": "0487cdc3c30988f768979a7edeb72be763cd2d85271351ec427399af5530dd36"
+    },
+    "frozen_plan": {
+      "external_path": "/private/tmp/tests-boot-clock-linux-20261023/runs/baseline-20261023t010211777596z/plan.json",
+      "bytes": 25892,
+      "sha256": "95a548d0d0a0d20d3f8f6a36eb1f2615c6652fa2150de674c84ebd1e40233a69"
+    },
+    "binary": {
+      "cargo_path": "/target/build/x86_64-unknown-linux-gnu/debug/deps/lamp_voice-a9031edb52550e8e",
+      "retained_path": "/target/retained/baseline-b9a6066717c5ff7d",
+      "sha256": "442130b0537e141fd32cda7da604b0a5fc39777fed0458569f4190fb774176d3",
+      "target": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///target/snapshots/baseline-b9a6066717c5ff7d/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/target/snapshots/baseline-b9a6066717c5ff7d/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_voice",
+          "src_path": "/target/snapshots/baseline-b9a6066717c5ff7d/lampOS/crates/voice/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/target/build/x86_64-unknown-linux-gnu/debug/deps/lamp_voice-a9031edb52550e8e"
+        ],
+        "executable": "/target/build/x86_64-unknown-linux-gnu/debug/deps/lamp_voice-a9031edb52550e8e",
+        "fresh": false
+      }
+    },
+    "compiled_inventory_count": 3583,
+    "test": {
+      "case": {
+        "name": "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+        "clock_seconds": 60,
+        "expected_exit": 101,
+        "watchdog_seconds": 120,
+        "required_patterns": [
+          "attempt to subtract with overflow",
+          "src/second_provider/worker\\.rs"
+        ]
+      },
+      "command_label": "case-001",
+      "clocks": [
+        {
+          "boottime": 1032490.07156255,
+          "realtime": 1792717646.52301,
+          "time_namespace": "time:[4026531834]",
+          "offsets": "monotonic           0         0\nboottime            0         0\n",
+          "uid": 1000,
+          "phase": "outer_before",
+          "monotonic": 1032490.07155459,
+          "pid": 1
+        },
+        {
+          "offsets": "monotonic    -1032430         0\nboottime     -1032430         0\n",
+          "uid": 1000,
+          "pid": 3,
+          "monotonic": 60.08975986,
+          "boottime": 60.089767613,
+          "phase": "namespace_before",
+          "realtime": 1792717646.54121,
+          "time_namespace": "time:[4026532607]"
+        },
+        {
+          "time_namespace": "time:[4026532607]",
+          "realtime": 1792717646.54196,
+          "phase": "test_child_before_exec",
+          "boottime": 60.090514735,
+          "monotonic": 60.090506284,
+          "offsets": "monotonic    -1032430         0\nboottime     -1032430         0\n",
+          "uid": 1000,
+          "pid": 4
+        },
+        {
+          "time_namespace": "time:[4026532607]",
+          "realtime": 1792717646.5474,
+          "phase": "namespace_after",
+          "boottime": 60.095954049,
+          "monotonic": 60.095947484,
+          "test_wait_status": 25856,
+          "offsets": "monotonic    -1032430         0\nboottime     -1032430         0\n",
+          "uid": 1000,
+          "pid": 3
+        },
+        {
+          "boottime": 1032490.09703118,
+          "namespace_wait_status": 25856,
+          "offsets": "monotonic           0         0\nboottime            0         0\n",
+          "time_namespace": "time:[4026531834]",
+          "realtime": 1792717646.54848,
+          "uid": 1000,
+          "pid": 1,
+          "monotonic": 1032490.09702455,
+          "phase": "outer_after"
+        }
+      ],
+      "test_summaries": [
+        [
+          "FAILED",
+          "0",
+          "1",
+          "0",
+          "0",
+          "3582"
+        ]
+      ],
+      "expected_outcome_matched": true
+    },
+    "command": {
+      "label": "case-001",
+      "argv": [
+        "podman",
+        "run",
+        "--rm",
+        "--name",
+        "tests-boot-clock-baseline-20261023t010211777596z-case-001",
+        "--label",
+        "owner=tests",
+        "--label",
+        "task=boot-clock-20261023",
+        "--pull=never",
+        "--network=none",
+        "--read-only",
+        "--tmpfs",
+        "/tmp:rw,size=256m,mode=1777",
+        "--volume",
+        "tests-boot-clock-cargo-20261023:/cargo:ro",
+        "--volume",
+        "tests-boot-clock-target-20261023:/target:ro",
+        "--workdir",
+        "/target/snapshots/baseline-b9a6066717c5ff7d/lampOS",
+        "--env",
+        "CARGO_HOME=/cargo",
+        "--env",
+        "CARGO_TARGET_DIR=/target/build",
+        "--env",
+        "CARGO_BUILD_JOBS=2",
+        "--env",
+        "CARGO_PROFILE_DEV_DEBUG=0",
+        "--env",
+        "CARGO_PROFILE_TEST_DEBUG=0",
+        "--env",
+        "CARGO_INCREMENTAL=0",
+        "--env",
+        "CARGO_NET_OFFLINE=true",
+        "--entrypoint",
+        "/usr/bin/env",
+        "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+        "-u",
+        "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER",
+        "-u",
+        "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER",
+        "-u",
+        "CC_aarch64_unknown_linux_gnu",
+        "-u",
+        "CXX_aarch64_unknown_linux_gnu",
+        "-u",
+        "AR_aarch64_unknown_linux_gnu",
+        "-u",
+        "PKG_CONFIG_ALLOW_CROSS",
+        "-u",
+        "PKG_CONFIG_PATH_aarch64_unknown_linux_gnu",
+        "-u",
+        "BINDGEN_EXTRA_CLANG_ARGS_aarch64_unknown_linux_gnu",
+        "-u",
+        "CARGO_BUILD_TARGET",
+        "-u",
+        "RUST_TEST_THREADS",
+        "-u",
+        "RUSTFLAGS",
+        "-u",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "-u",
+        "RUSTC_WRAPPER",
+        "-u",
+        "RUSTC_WORKSPACE_WRAPPER",
+        "perl",
+        "-e",
+        "\nuse strict; use warnings; use Time::HiRes qw(clock_gettime); use JSON::PP qw(encode_json);\n$|=1;\nmy $wanted=shift @ARGV; my $inner=shift @ARGV;\nsub snap { my($phase)=@_; my $ns=readlink('/proc/self/ns/time');\n  open(my $fh,'<','/proc/self/timens_offsets') or die $!; local $/; my $off=<$fh>;\n  return {phase=>$phase,pid=>$$,uid=>$<,monotonic=>clock_gettime(1),boottime=>clock_gettime(7),\n          realtime=>clock_gettime(0),time_namespace=>$ns,offsets=>$off}; }\nmy $before=snap('outer_before'); print 'BOOT_CLOCK_RECEIPT '.encode_json($before).\"\\n\";\nmy $om=$wanted-int($before->{monotonic}); my $ob=$wanted-int($before->{boottime});\nmy $pid=fork(); defined($pid) or die $!;\nif(!$pid) { exec 'unshare','--user','--map-current-user','--time','--fork',\n  '--monotonic='.$om,'--boottime='.$ob,'perl','-e',$inner,'--',$wanted,@ARGV; die $!; }\nwaitpid($pid,0); my $status=$?;\nmy $after=snap('outer_after'); $after->{namespace_wait_status}=$status;\nprint 'BOOT_CLOCK_RECEIPT '.encode_json($after).\"\\n\";\nexit(($status & 127) ? 128+($status & 127) : ($status >> 8));\n",
+        "--",
+        "60",
+        "\nuse strict; use warnings; use Time::HiRes qw(clock_gettime); use JSON::PP qw(encode_json);\n$|=1;\nmy $wanted=shift @ARGV;\nsub snap { my($phase)=@_; my $ns=readlink('/proc/self/ns/time');\n  open(my $fh,'<','/proc/self/timens_offsets') or die $!; local $/; my $off=<$fh>;\n  return {phase=>$phase,pid=>$$,uid=>$<,monotonic=>clock_gettime(1),boottime=>clock_gettime(7),\n          realtime=>clock_gettime(0),time_namespace=>$ns,offsets=>$off}; }\nmy $before=snap('namespace_before'); print 'BOOT_CLOCK_RECEIPT '.encode_json($before).\"\\n\";\ndie 'namespace clock not at requested boundary' unless $before->{monotonic}>=$wanted &&\n $before->{monotonic}<$wanted+2 && $before->{boottime}>=$wanted && $before->{boottime}<$wanted+2;\nmy $pid=fork(); defined($pid) or die $!;\nif(!$pid) { print 'BOOT_CLOCK_RECEIPT '.encode_json(snap('test_child_before_exec')).\"\\n\";\n  exec {$ARGV[0]} @ARGV; die 'exec failed: '.$!; }\nwaitpid($pid,0); my $status=$?;\nmy $after=snap('namespace_after'); $after->{test_wait_status}=$status;\nprint 'BOOT_CLOCK_RECEIPT '.encode_json($after).\"\\n\";\nexit(($status & 127) ? 128+($status & 127) : ($status >> 8));\n",
+        "/target/retained/baseline-b9a6066717c5ff7d",
+        "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "watchdog_seconds": 120,
+      "started_utc": "2026-10-23T01:07:26.198169+00:00",
+      "exit": 101,
+      "wall_seconds": 0.3788163657300174,
+      "stop_reason": null,
+      "feeder_errors": [],
+      "storage_observations": [],
+      "stdout": {
+        "path": "/private/tmp/tests-boot-clock-linux-20261023/runs/baseline-20261023t010211777596z/case-001.stdout",
+        "bytes": 1728,
+        "sha256": "d2d33d7b9455bcaee84bc535d92d1757945c1f6da37b64a36b03a64a22f493e1"
+      },
+      "stderr": {
+        "path": "/private/tmp/tests-boot-clock-linux-20261023/runs/baseline-20261023t010211777596z/case-001.stderr",
+        "bytes": 291,
+        "sha256": "f7373ade834d516d462a65d9507dab0d5dc4291783094aabd60083fc3ad3d557"
+      }
+    }
+  },
+  "corrected": {
+    "source_commit": "da595851f239cd6456cc1fb4565d3fc272675702",
+    "original_results": {
+      "external_path": "/private/tmp/tests-boot-clock-linux-corrected-20261023/runs/candidate-20261023t012553024008z/results.json",
+      "bytes": 704378,
+      "sha256": "0acd729b63845df462a218f6b482152fc9263caf23bf53ab5820a68674bedb0d"
+    },
+    "frozen_plan": {
+      "external_path": "/private/tmp/tests-boot-clock-linux-corrected-20261023/runs/candidate-20261023t012553024008z/plan.json",
+      "bytes": 26503,
+      "sha256": "0f35612336a89835248eda95d145cfcb81468202be88a712533beeffe51edf49"
+    },
+    "binary": {
+      "cargo_path": "/target/build/x86_64-unknown-linux-gnu/debug/deps/lamp_voice-a9031edb52550e8e",
+      "retained_path": "/target/retained/candidate-f6f7ecd767bcd573",
+      "sha256": "ff294bfec0144abeecc6b7bebee1d0d1037ffac976786706c3fe4f590a3f4297",
+      "target": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///target/snapshots/candidate-f6f7ecd767bcd573/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/target/snapshots/candidate-f6f7ecd767bcd573/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_voice",
+          "src_path": "/target/snapshots/candidate-f6f7ecd767bcd573/lampOS/crates/voice/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/target/build/x86_64-unknown-linux-gnu/debug/deps/lamp_voice-a9031edb52550e8e"
+        ],
+        "executable": "/target/build/x86_64-unknown-linux-gnu/debug/deps/lamp_voice-a9031edb52550e8e",
+        "fresh": false
+      }
+    },
+    "compiled_inventory_count": 3583,
+    "test": {
+      "case": {
+        "name": "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+        "clock_seconds": 60,
+        "expected_exit": 0,
+        "watchdog_seconds": 120,
+        "required_patterns": []
+      },
+      "command_label": "case-001",
+      "clocks": [
+        {
+          "pid": 1,
+          "boottime": 1033756.80676445,
+          "uid": 1000,
+          "time_namespace": "time:[4026531834]",
+          "phase": "outer_before",
+          "realtime": 1792718913.25821,
+          "monotonic": 1033756.80675613,
+          "offsets": "monotonic           0         0\nboottime            0         0\n"
+        },
+        {
+          "uid": 1000,
+          "monotonic": 60.824790633,
+          "offsets": "monotonic    -1033696         0\nboottime     -1033696         0\n",
+          "realtime": 1792718913.27624,
+          "phase": "namespace_before",
+          "boottime": 60.824798316,
+          "pid": 3,
+          "time_namespace": "time:[4026532607]"
+        },
+        {
+          "uid": 1000,
+          "offsets": "monotonic    -1033696         0\nboottime     -1033696         0\n",
+          "monotonic": 60.82556646,
+          "boottime": 60.825573235,
+          "phase": "test_child_before_exec",
+          "realtime": 1792718913.27702,
+          "pid": 4,
+          "time_namespace": "time:[4026532607]"
+        },
+        {
+          "time_namespace": "time:[4026532607]",
+          "test_wait_status": 0,
+          "pid": 3,
+          "boottime": 60.835164008,
+          "phase": "namespace_after",
+          "realtime": 1792718913.28661,
+          "offsets": "monotonic    -1033696         0\nboottime     -1033696         0\n",
+          "monotonic": 60.835157234,
+          "uid": 1000
+        },
+        {
+          "pid": 1,
+          "namespace_wait_status": 0,
+          "uid": 1000,
+          "boottime": 1033756.83627537,
+          "phase": "outer_after",
+          "realtime": 1792718913.28772,
+          "time_namespace": "time:[4026531834]",
+          "offsets": "monotonic           0         0\nboottime            0         0\n",
+          "monotonic": 1033756.8362688
+        }
+      ],
+      "test_summaries": [
+        [
+          "ok",
+          "1",
+          "0",
+          "0",
+          "0",
+          "3582"
+        ]
+      ],
+      "expected_outcome_matched": true
+    },
+    "command": {
+      "label": "case-001",
+      "argv": [
+        "podman",
+        "run",
+        "--rm",
+        "--name",
+        "tests-boot-clock-candidate-20261023t012553024008z-case-001",
+        "--label",
+        "owner=tests",
+        "--label",
+        "task=boot-clock-20261023",
+        "--pull=never",
+        "--network=none",
+        "--read-only",
+        "--tmpfs",
+        "/tmp:rw,size=256m,mode=1777",
+        "--volume",
+        "tests-boot-clock-cargo-20261023:/cargo:ro",
+        "--volume",
+        "tests-boot-clock-target-20261023:/target:ro",
+        "--workdir",
+        "/target/snapshots/candidate-f6f7ecd767bcd573/lampOS",
+        "--env",
+        "CARGO_HOME=/cargo",
+        "--env",
+        "CARGO_TARGET_DIR=/target/build",
+        "--env",
+        "CARGO_BUILD_JOBS=2",
+        "--env",
+        "CARGO_PROFILE_DEV_DEBUG=0",
+        "--env",
+        "CARGO_PROFILE_TEST_DEBUG=0",
+        "--env",
+        "CARGO_INCREMENTAL=0",
+        "--env",
+        "CARGO_NET_OFFLINE=true",
+        "--entrypoint",
+        "/usr/bin/env",
+        "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+        "-u",
+        "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER",
+        "-u",
+        "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER",
+        "-u",
+        "CC_aarch64_unknown_linux_gnu",
+        "-u",
+        "CXX_aarch64_unknown_linux_gnu",
+        "-u",
+        "AR_aarch64_unknown_linux_gnu",
+        "-u",
+        "PKG_CONFIG_ALLOW_CROSS",
+        "-u",
+        "PKG_CONFIG_PATH_aarch64_unknown_linux_gnu",
+        "-u",
+        "BINDGEN_EXTRA_CLANG_ARGS_aarch64_unknown_linux_gnu",
+        "-u",
+        "CARGO_BUILD_TARGET",
+        "-u",
+        "RUST_TEST_THREADS",
+        "-u",
+        "RUSTFLAGS",
+        "-u",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "-u",
+        "RUSTC_WRAPPER",
+        "-u",
+        "RUSTC_WORKSPACE_WRAPPER",
+        "perl",
+        "-e",
+        "\nuse strict; use warnings; use Time::HiRes qw(clock_gettime); use JSON::PP qw(encode_json);\n$|=1;\nmy $wanted=shift @ARGV; my $inner=shift @ARGV;\nsub snap { my($phase)=@_; my $ns=readlink('/proc/self/ns/time');\n  open(my $fh,'<','/proc/self/timens_offsets') or die $!; local $/; my $off=<$fh>;\n  return {phase=>$phase,pid=>$$,uid=>$<,monotonic=>clock_gettime(1),boottime=>clock_gettime(7),\n          realtime=>clock_gettime(0),time_namespace=>$ns,offsets=>$off}; }\nmy $before=snap('outer_before'); print 'BOOT_CLOCK_RECEIPT '.encode_json($before).\"\\n\";\nmy $om=$wanted-int($before->{monotonic}); my $ob=$wanted-int($before->{boottime});\nmy $pid=fork(); defined($pid) or die $!;\nif(!$pid) { exec 'unshare','--user','--map-current-user','--time','--fork',\n  '--monotonic='.$om,'--boottime='.$ob,'perl','-e',$inner,'--',$wanted,@ARGV; die $!; }\nwaitpid($pid,0); my $status=$?;\nmy $after=snap('outer_after'); $after->{namespace_wait_status}=$status;\nprint 'BOOT_CLOCK_RECEIPT '.encode_json($after).\"\\n\";\nexit(($status & 127) ? 128+($status & 127) : ($status >> 8));\n",
+        "--",
+        "60",
+        "\nuse strict; use warnings; use Time::HiRes qw(clock_gettime); use JSON::PP qw(encode_json);\n$|=1;\nmy $wanted=shift @ARGV;\nsub snap { my($phase)=@_; my $ns=readlink('/proc/self/ns/time');\n  open(my $fh,'<','/proc/self/timens_offsets') or die $!; local $/; my $off=<$fh>;\n  return {phase=>$phase,pid=>$$,uid=>$<,monotonic=>clock_gettime(1),boottime=>clock_gettime(7),\n          realtime=>clock_gettime(0),time_namespace=>$ns,offsets=>$off}; }\nmy $before=snap('namespace_before'); print 'BOOT_CLOCK_RECEIPT '.encode_json($before).\"\\n\";\ndie 'namespace clock not at requested boundary' unless $before->{monotonic}>=$wanted &&\n $before->{monotonic}<$wanted+2 && $before->{boottime}>=$wanted && $before->{boottime}<$wanted+2;\nmy $pid=fork(); defined($pid) or die $!;\nif(!$pid) { print 'BOOT_CLOCK_RECEIPT '.encode_json(snap('test_child_before_exec')).\"\\n\";\n  exec {$ARGV[0]} @ARGV; die 'exec failed: '.$!; }\nwaitpid($pid,0); my $status=$?;\nmy $after=snap('namespace_after'); $after->{test_wait_status}=$status;\nprint 'BOOT_CLOCK_RECEIPT '.encode_json($after).\"\\n\";\nexit(($status & 127) ? 128+($status & 127) : ($status >> 8));\n",
+        "/target/retained/candidate-f6f7ecd767bcd573",
+        "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "watchdog_seconds": 120,
+      "started_utc": "2026-10-23T01:28:32.915718+00:00",
+      "exit": 0,
+      "wall_seconds": 0.4311227002181113,
+      "stop_reason": null,
+      "feeder_errors": [],
+      "storage_observations": [],
+      "stdout": {
+        "path": "/private/tmp/tests-boot-clock-linux-corrected-20261023/runs/candidate-20261023t012553024008z/case-001.stdout",
+        "bytes": 1585,
+        "sha256": "c1a0e9bb72ef8718a4af013c4fbdb4a770169771d6bc44b9e6b0942f8130c7cc"
+      },
+      "stderr": {
+        "path": "/private/tmp/tests-boot-clock-linux-corrected-20261023/runs/candidate-20261023t012553024008z/case-001.stderr",
+        "bytes": 1514,
+        "sha256": "662b672cc1acf072ba1d5bf5d84f4397ff3e869d75290373b19f8dd90eec478f"
+      }
+    }
+  }
+}

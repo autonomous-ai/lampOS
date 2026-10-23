@@ -1,0 +1,227 @@
+{
+  "recorded_at": "2026-10-23T14:08:06.797085+00:00",
+  "refs": {
+    "base": {
+      "commit": "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "tree": "6e25adfa7d21377d28f31b2fcaac6f9497de26d5",
+      "parents": [
+        "2615c87b636d8e39d8df9548b00af7ed4e164f70"
+      ],
+      "sources": {
+        "lampOS/crates/voice/src/second_provider/worker.rs": {
+          "git_blob": "b4a80268976424bb08aa85065b61be164abe6c44",
+          "bytes": 770784,
+          "sha256": "4e3b891fd552bd5af867f32bed015fc2a89f0b352cf69e14d76ca80da1a4f89b"
+        },
+        "lampOS/crates/voice/src/room_told.rs": {
+          "git_blob": "06d7707ebeffa20d03b8838c76ed3d6ca5081cfa",
+          "bytes": 95641,
+          "sha256": "6a3e4b07fc69e8ed9f5da3ab56e778221f97f018b4d996b2eeb9784b409e6cfb"
+        },
+        "lampOS/crates/ipc/src/lib.rs": {
+          "git_blob": "7b8f04f5ab480c998c4f932fd3d2a7571a2e26ab",
+          "bytes": 11409,
+          "sha256": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f"
+        },
+        "lampOS/crates/voice/src/scenario_clock.rs": {
+          "git_blob": "46def4e92fa76d4abcccca90d87a8ab427e22e97",
+          "bytes": 19292,
+          "sha256": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80"
+        },
+        "lampOS/Cargo.toml": {
+          "git_blob": "7416fa9986f29ce44496e9e74b550780b7780b24",
+          "bytes": 1424,
+          "sha256": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7"
+        }
+      },
+      "exact_test_function": {
+        "name": "with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+        "first_line": 8588,
+        "last_line": 8677,
+        "bytes": 3916,
+        "sha256": "3a88449d12e0ed750750632890c4ebea6f04f678c64323606150c7e460b1dc35"
+      }
+    },
+    "peer": {
+      "commit": "55f671b12ef08c93f11ae235980f69cf7059b7a8",
+      "tree": "c4f5ef905e6b1059badd4450c243a19b7d0165b4",
+      "parents": [
+        "810e05109bced3beca88a5b602930cfed5fba4e5"
+      ],
+      "sources": {
+        "lampOS/crates/voice/src/second_provider/worker.rs": {
+          "git_blob": "b4a80268976424bb08aa85065b61be164abe6c44",
+          "bytes": 770784,
+          "sha256": "4e3b891fd552bd5af867f32bed015fc2a89f0b352cf69e14d76ca80da1a4f89b"
+        },
+        "lampOS/crates/voice/src/room_told.rs": {
+          "git_blob": "06d7707ebeffa20d03b8838c76ed3d6ca5081cfa",
+          "bytes": 95641,
+          "sha256": "6a3e4b07fc69e8ed9f5da3ab56e778221f97f018b4d996b2eeb9784b409e6cfb"
+        },
+        "lampOS/crates/ipc/src/lib.rs": {
+          "git_blob": "7b8f04f5ab480c998c4f932fd3d2a7571a2e26ab",
+          "bytes": 11409,
+          "sha256": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f"
+        },
+        "lampOS/crates/voice/src/scenario_clock.rs": {
+          "git_blob": "46def4e92fa76d4abcccca90d87a8ab427e22e97",
+          "bytes": 19292,
+          "sha256": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80"
+        },
+        "lampOS/Cargo.toml": {
+          "git_blob": "7416fa9986f29ce44496e9e74b550780b7780b24",
+          "bytes": 1424,
+          "sha256": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7"
+        }
+      },
+      "exact_test_function": {
+        "name": "with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+        "first_line": 8588,
+        "last_line": 8677,
+        "bytes": 3916,
+        "sha256": "3a88449d12e0ed750750632890c4ebea6f04f678c64323606150c7e460b1dc35"
+      }
+    },
+    "boot": {
+      "commit": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+      "tree": "6d032f9cda19dbce74a73c05a134c3878cbd8783",
+      "parents": [
+        "810e05109bced3beca88a5b602930cfed5fba4e5"
+      ],
+      "sources": {
+        "lampOS/crates/voice/src/second_provider/worker.rs": {
+          "git_blob": "1303280b36b313938057fc4e791f525567de0538",
+          "bytes": 771430,
+          "sha256": "c8fd3cf2298b965b1652bcfb8357ea0038fb88d33a2f9a97647b15ba4af2f645"
+        },
+        "lampOS/crates/voice/src/room_told.rs": {
+          "git_blob": "06d7707ebeffa20d03b8838c76ed3d6ca5081cfa",
+          "bytes": 95641,
+          "sha256": "6a3e4b07fc69e8ed9f5da3ab56e778221f97f018b4d996b2eeb9784b409e6cfb"
+        },
+        "lampOS/crates/ipc/src/lib.rs": {
+          "git_blob": "7b8f04f5ab480c998c4f932fd3d2a7571a2e26ab",
+          "bytes": 11409,
+          "sha256": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f"
+        },
+        "lampOS/crates/voice/src/scenario_clock.rs": {
+          "git_blob": "9d3491a63326a3113a418d0f2fe99aecabec1689",
+          "bytes": 19561,
+          "sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2"
+        },
+        "lampOS/Cargo.toml": {
+          "git_blob": "7416fa9986f29ce44496e9e74b550780b7780b24",
+          "bytes": 1424,
+          "sha256": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7"
+        }
+      },
+      "exact_test_function": {
+        "name": "with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+        "first_line": 8597,
+        "last_line": 8687,
+        "bytes": 3949,
+        "sha256": "a25d8deaee76be6e2afab7240eb4af860a8c8aa27821de9475e43240ce737b5e"
+      }
+    },
+    "control_base": {
+      "commit": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+      "tree": "47d9ad1060a6602f8924372eface1b1afda548a3",
+      "parents": [
+        "eadbef438fcc49e7098f31aec208427e40a39084"
+      ],
+      "sources": {
+        "lampOS/crates/voice/src/second_provider/worker.rs": {
+          "git_blob": "8e0ab06c7444a9e8f9f87d2d83829e7640401104",
+          "bytes": 758117,
+          "sha256": "e049e0d33f89545f4aeafe75f7ea29c9610cf81e9f4bbe917a120672c5efa2b5"
+        },
+        "lampOS/crates/voice/src/room_told.rs": {
+          "git_blob": "06d7707ebeffa20d03b8838c76ed3d6ca5081cfa",
+          "bytes": 95641,
+          "sha256": "6a3e4b07fc69e8ed9f5da3ab56e778221f97f018b4d996b2eeb9784b409e6cfb"
+        },
+        "lampOS/crates/ipc/src/lib.rs": {
+          "git_blob": "7b8f04f5ab480c998c4f932fd3d2a7571a2e26ab",
+          "bytes": 11409,
+          "sha256": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f"
+        },
+        "lampOS/crates/voice/src/scenario_clock.rs": {
+          "git_blob": "46def4e92fa76d4abcccca90d87a8ab427e22e97",
+          "bytes": 19292,
+          "sha256": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80"
+        },
+        "lampOS/Cargo.toml": {
+          "git_blob": "7416fa9986f29ce44496e9e74b550780b7780b24",
+          "bytes": 1424,
+          "sha256": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7"
+        }
+      },
+      "exact_test_function": {
+        "name": "with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+        "first_line": 8298,
+        "last_line": 8387,
+        "bytes": 3916,
+        "sha256": "3a88449d12e0ed750750632890c4ebea6f04f678c64323606150c7e460b1dc35"
+      }
+    },
+    "control_corrected": {
+      "commit": "da595851f239cd6456cc1fb4565d3fc272675702",
+      "tree": "6b1273ace2cddd5d39d84672ef572fc4664c9e08",
+      "parents": [
+        "f477d6c49732dbd5cba84cbe18ea568692c056e6"
+      ],
+      "sources": {
+        "lampOS/crates/voice/src/second_provider/worker.rs": {
+          "git_blob": "a620f977ed540edb2123df4f05086209c610bb80",
+          "bytes": 758763,
+          "sha256": "983d30959d6322c97be81be053f00596796d15e52eb8eb8d35ffaad8d276b9c7"
+        },
+        "lampOS/crates/voice/src/room_told.rs": {
+          "git_blob": "06d7707ebeffa20d03b8838c76ed3d6ca5081cfa",
+          "bytes": 95641,
+          "sha256": "6a3e4b07fc69e8ed9f5da3ab56e778221f97f018b4d996b2eeb9784b409e6cfb"
+        },
+        "lampOS/crates/ipc/src/lib.rs": {
+          "git_blob": "7b8f04f5ab480c998c4f932fd3d2a7571a2e26ab",
+          "bytes": 11409,
+          "sha256": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f"
+        },
+        "lampOS/crates/voice/src/scenario_clock.rs": {
+          "git_blob": "9d3491a63326a3113a418d0f2fe99aecabec1689",
+          "bytes": 19561,
+          "sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2"
+        },
+        "lampOS/Cargo.toml": {
+          "git_blob": "7416fa9986f29ce44496e9e74b550780b7780b24",
+          "bytes": 1424,
+          "sha256": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7"
+        }
+      },
+      "exact_test_function": {
+        "name": "with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+        "first_line": 8307,
+        "last_line": 8397,
+        "bytes": 3949,
+        "sha256": "a25d8deaee76be6e2afab7240eb4af860a8c8aa27821de9475e43240ce737b5e"
+      }
+    }
+  },
+  "peer_changed_paths": [
+    "lampOS/crates/voice/tests/it/fixture_provider.rs",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "verified_equalities": {
+    "base_peer_worker_full_file": true,
+    "base_peer_control_base_exact_function": true,
+    "boot_control_corrected_exact_function": true,
+    "boot_control_corrected_scenario_clock_full_file": true,
+    "all_five_refs_room_told_and_ipc_full_files": true,
+    "exact_test_edits_only_add_scope_and_same_clock_face_publish": true
+  },
+  "limitations": [
+    "No current CI binary hash or host monotonic sample is present in the captured failure log.",
+    "Whole worker files differ between old and current bases; the exact failing function is byte-identical.",
+    "Historical controls are Linux x86 default-test builds with overflow checks, not a release ARM counterfactual."
+  ]
+}

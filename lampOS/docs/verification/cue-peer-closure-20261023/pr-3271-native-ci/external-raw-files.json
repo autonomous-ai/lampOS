@@ -1,0 +1,76 @@
+{
+  "arm64": {
+    "final-run-data.json": {
+      "external_path": "/private/tmp/tests-peer-pr3271-ci-20261023/arm64/final-run-data.json",
+      "bytes": 14251,
+      "sha256": "fc02339c595914afdfd2d447fa011cd88db16967392d822730b1b485b63392ce"
+    },
+    "final-jobs-data.json": {
+      "external_path": "/private/tmp/tests-peer-pr3271-ci-20261023/arm64/final-jobs-data.json",
+      "bytes": 9738,
+      "sha256": "88092937ef8ba5f0ad12fd90372dd00243e283576eb99f03f1e0f26577b2dfb1"
+    },
+    "job-log.stdout": {
+      "external_path": "/private/tmp/tests-peer-pr3271-ci-20261023/arm64/job-log.stdout",
+      "bytes": 1439335,
+      "sha256": "97965aa1a035ae51023aee5e0e9b42ebe47fd316df7dc7b77021e579352349f3"
+    },
+    "job-log.stderr": {
+      "external_path": "/private/tmp/tests-peer-pr3271-ci-20261023/arm64/job-log.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-watch.stdout": {
+      "external_path": "/private/tmp/tests-peer-pr3271-ci-20261023/arm64/native-watch.stdout",
+      "bytes": 5921,
+      "sha256": "15f4ac75f25cb3908ea355d7e71c24f3a4ed0be0fa231bc306b4213a8790e4b1"
+    },
+    "native-watch.stderr": {
+      "external_path": "/private/tmp/tests-peer-pr3271-ci-20261023/arm64/native-watch.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "result.json": {
+      "external_path": "/private/tmp/tests-peer-pr3271-ci-20261023/arm64/result.json",
+      "bytes": 2027,
+      "sha256": "085b7d21de0a144745bebd034e82d8730064059de302f916c95c4ddbbb9034e5"
+    }
+  },
+  "clippy": {
+    "final-run-data.json": {
+      "external_path": "/private/tmp/tests-peer-pr3271-ci-20261023/clippy/final-run-data.json",
+      "bytes": 14250,
+      "sha256": "4e8af9b0b56a407e5fbacc157d66186e2a416fb3359ee5271b327211835da245"
+    },
+    "final-jobs-data.json": {
+      "external_path": "/private/tmp/tests-peer-pr3271-ci-20261023/clippy/final-jobs-data.json",
+      "bytes": 3765,
+      "sha256": "c8624d8b93ea3ce4529fe32980ad54a8a87d261ed385dcd161b838791bc5b681"
+    },
+    "job-log.stdout": {
+      "external_path": "/private/tmp/tests-peer-pr3271-ci-20261023/clippy/job-log.stdout",
+      "bytes": 78176,
+      "sha256": "b9d6dda08a6175e42eba6e34feeff047e264b08abd1d962b28bf1b2aeebf9b8c"
+    },
+    "job-log.stderr": {
+      "external_path": "/private/tmp/tests-peer-pr3271-ci-20261023/clippy/job-log.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-watch.stdout": {
+      "external_path": "/private/tmp/tests-peer-pr3271-ci-20261023/clippy/native-watch.stdout",
+      "bytes": 7168,
+      "sha256": "56281caf35a62090edbabc339c110dd03c677e30fc38a89aaf98907bdf0ccbb8"
+    },
+    "native-watch.stderr": {
+      "external_path": "/private/tmp/tests-peer-pr3271-ci-20261023/clippy/native-watch.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "result.json": {
+      "external_path": "/private/tmp/tests-peer-pr3271-ci-20261023/clippy/result.json",
+      "bytes": 2027,
+      "sha256": "17145c4ca96cfe7b8f070790fbd6652628c1dc6b24b8037faa2a997d8b0c8d1e"
+    }
+  }
+}
