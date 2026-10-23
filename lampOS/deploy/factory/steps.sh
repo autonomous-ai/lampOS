@@ -174,12 +174,15 @@ expression_back() {
 }
 # lamp-voice reads the privacy switch from lamp-controls, and lamp-ears may
 # listen only on the voice's lease (privacy-switch.md): with Controls stopped
-# for the touch step the microphones close and the ring stops saying what it
-# shows, and on lamp-52e6 they did not come back once Controls did (#2818:
-# ears/level and light/state as old as the touch step's stop at the
-# self-test). So those of the two that ran when Controls was first stopped
-# are restarted after the step, however it or the script ends; the self-test
-# still needs a fresh read of each, so a dead microphone or ring still fails.
+# under a listening voice, the conversation ends on an unreadable switch and
+# keeps the restart guard's mute (controls.md), so the voice, and the ears
+# with it, stay closed and the ring stops saying what it shows, even after a
+# restart (#2818 on lamp-52e6: ears/level and light/state as old as the touch
+# step's stop, and record.json.restart-guard left). So those of the two that
+# run are stopped before Controls is, a stop that releases the guard and
+# keeps a person's own mute, and started again once Controls is back, after
+# the step, however it or the script ends; the self-test still needs a fresh
+# read of each, so a dead microphone or ring still fails.
 LISTENERS='' LISTENERS_READ=0
 listeners_down() {
   [[ $LISTENERS_READ == 1 ]] && return 0
@@ -188,6 +191,10 @@ listeners_down() {
   for unit in lamp-voice lamp-ears; do
     [[ $("$SYSTEMCTL" is-active "$unit" 2>/dev/null) == active ]] && LISTENERS+=" $unit"
   done
+  [[ -n $LISTENERS ]] || return 0
+  # shellcheck disable=SC2086 # the unit names, one word each
+  "$SYSTEMCTL" stop $LISTENERS || { fail "could not stop$LISTENERS before lamp-controls"; return 1; }
+  say "stopped$LISTENERS while lamp-controls is stopped, so the voice ends cleanly, not on a lost privacy switch"
 }
 listeners_back() {
   LISTENERS_READ=0
@@ -195,8 +202,8 @@ listeners_back() {
   local units=$LISTENERS
   LISTENERS=''
   # shellcheck disable=SC2086 # the unit names, one word each
-  "$SYSTEMCTL" restart $units || { fail "could not restart$units after lamp-controls was stopped"; return 1; }
-  say "restarted$units, which lose the privacy switch while lamp-controls is stopped"
+  "$SYSTEMCTL" start $units || { fail "could not start$units again after lamp-controls"; return 1; }
+  say "started$units again, lamp-controls back"
 }
 trap 'ease_back; controls_back; expression_back; listeners_back' EXIT
 # A wait the traps can cut short: bash runs a trap only once a foreground
@@ -362,7 +369,7 @@ step_head_pads() {
   ask "the head pads: for 40 s, hands away from the lamp for the first 11 s (count them), then hold head pad 1 about 2 s and let go, then head pad 2 the same, and any other head pad the same; a hand on two at once is fine (the button is off meanwhile)." || return 1
   local report=$ROOT/var/tmp/factory-head-pads-$STAMP.json out=$PINS.factory-$STAMP pads
   mkdir -p "$(dirname "$report")"
-  listeners_down
+  listeners_down || return 1
   "$SYSTEMCTL" stop lamp-controls || { fail "could not stop lamp-controls"; return 1; }
   CONTROLS_STOPPED=1
   "$CONTROLS_BIN" discover-head --seconds 40 --rest-seconds 10 ${HEAD_LINES_FROM:+--lines-from "$HEAD_LINES_FROM"} >"$report"
@@ -445,7 +452,7 @@ step_touch() {
   mkdir -p "$(dirname "$report")"
   # Calibration takes the chip's lock, which lamp-controls holds: it is
   # stopped for it and started again however the step ends.
-  listeners_down
+  listeners_down || return 1
   "$SYSTEMCTL" stop lamp-controls || { fail "could not stop lamp-controls"; return 1; }
   CONTROLS_STOPPED=1
   "$CONTROLS_BIN" calibrate-touch --pins "$PINS" --output "$out" >"$report"
