@@ -11489,11 +11489,17 @@ fn hear_capture_block(
         // #2939: how long the commit was held for the yield's words, and
         // whether they were a backchannel (null: none came).
         let (held_ms, backchannel) = mask.yield_words();
-        if listened.step == DuplexStep::Commit && held_ms > 0 && backchannel.is_none() {
+        if held_ms > 0 && backchannel.is_none() {
             // Words that come after this are dropped with the yield: say
-            // that the hold ran out before them.
+            // that the hold ran out before them. With no words the answer
+            // goes on; only a sentence commits without them.
             eprintln!(
-                "lamp-voice: a yield's words had not come after its commit was held {held_ms} ms: committed"
+                "lamp-voice: a yield's words had not come after its commit was held {held_ms} ms: {}",
+                if listened.step == DuplexStep::Commit {
+                    "committed"
+                } else {
+                    "the answer goes on"
+                }
             );
         }
         event["held_ms"] = json!(held_ms);
@@ -11618,6 +11624,8 @@ fn hear_stop_words(
             )?;
         }
         crate::stop_words::Tell::Unheard => {
+            // With backchannel holds such a yield resumed the answer,
+            // unless it reached a sentence.
             eprintln!("lamp-voice: a yield ended before its words came");
             record(
                 trace,
