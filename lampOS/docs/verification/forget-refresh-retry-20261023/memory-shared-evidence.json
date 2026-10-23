@@ -1,0 +1,29 @@
+{
+  "head": "a1b8034bfed33e723b22e3779f98f81ea59c3511",
+  "host": "Darwin arm64",
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-memory",
+    "--test",
+    "it",
+    "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+    "--",
+    "--exact",
+    "--nocapture"
+  ],
+  "started_at_utc": "2026-10-23T01:50:03.712403+00:00",
+  "elapsed_seconds": 22.848,
+  "exit_code": 0,
+  "bound_files": 6520,
+  "inputs_unchanged": true,
+  "log_sha256": "05d2be0c6c9a1adf44c748333648457df22286d1bedb05eac05f539ad9288eb5",
+  "result_lines": [
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 157 filtered out; finished in 0.40s"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "head": "a1b8034bfed33e723b22e3779f98f81ea59c3511",
+  "host": "Darwin arm64; Rust 1.96.0",
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-memory",
+    "--test",
+    "it",
+    "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+    "--",
+    "--exact",
+    "--nocapture"
+  ],
+  "started_at_utc": "2026-10-23T01:53:00.680472+00:00",
+  "elapsed_seconds": 3.798,
+  "exit_code": 101,
+  "bound_files": 6520,
+  "inputs_unchanged": true,
+  "patch_sha256": "3137133514399ab3b15220a9eafb2bc2286ab27ab836da50f0703b68015f8ae9",
+  "log_sha256": "91a71335a98239762a7bb363a7dd00d6cfd7fbe09be77e68461327c234413b5d",
+  "result_lines": [
+    "first={\"error\":\"My memory is not answering right now, so I could not do that.\"}; retry=(Object {\"forgotten\": Bool(true)}, true); trace=[(Object {\"max_bytes\": Number(1200), \"op\": String(\"session_open\"), \"session\": String(\"voice-e2b6cc4cc1985da69104bdcf436b04fe-2\")}, Object {\"ok\": Bool(true), \"snapshot\": Object {\"generation\": Number(0), \"invalidated\": Bool(false), \"note\": String(\"{\\\"facts\\\":[],\\\"scope\\\":\\\"said in this room; speaker unknown\\\",\\\"untrusted\\\":true}\"), \"opened_unix_ms\": Number(1792720383898), \"session\": String(\"voice-e2b6cc4cc1985da69104bdcf436b04fe-2\"), \"source_ids\": Array []}}), (Object {\"op\": String(\"session_close\"), \"session\": String(\"voice-e2b6cc4cc1985da69104bdcf436b04fe-1\")}, Object {\"ok\": Bool(true)}), (Object {\"max_bytes\": Number(1200), \"op\": String(\"session_open\"), \"person\": String(\"p-c60cdee85b94b4a3\"), \"session\": String(\"voice-e2b6cc4cc1985da69104bdcf436b04fe-2\")}, Object {\"ok\": Bool(true), \"snapshot\": Object {\"generation\": Number(0), \"invalidated\": Bool(false), \"note\": String(\"{\\\"facts\\\":[{\\\"id\\\":3,\\\"kind\\\":\\\"thread\\\",\\\"text\\\":\\\"Synthetic exam on the hill\\\"},{\\\"id\\\":2,\\\"kind\\\":\\\"preference\\\",\\\"text\\\":\\\"The synthetic lantern inventory is complete.\\\"}],\\\"scope\\\":\\\"caller-supplied person; identity not verified\\\",\\\"untrusted\\\":true}\"), \"opened_unix_ms\": Number(1792720383898), \"session\": String(\"voice-e2b6cc4cc1985da69104bdcf436b04fe-2\"), \"source_ids\": Array [Number(3), Number(2)]}}), (Object {\"op\": String(\"session_close\"), \"person\": String(\"p-c60cdee85b94b4a3\"), \"session\": String(\"voice-e2b6cc4cc1985da69104bdcf436b04fe-1\")}, Object {\"ok\": Bool(true)}), (Object {\"op\": String(\"follow_up\"), \"person\": String(\"p-c60cdee85b94b4a3\"), \"until_asked\": Bool(true)}, Object {\"follow_up\": Null, \"ok\": Bool(true)}), (Object {\"kind\": String(\"kept\"), \"op\": String(\"forget_last\"), \"person\": String(\"p-c60cdee85b94b4a3\")}, Object {\"ok\": Bool(true), \"removed\": Object {\"at_unix_ms\": Number(1792633983899), \"id\": Number(2), \"kind\": String(\"kept\")}})]",
+    "thread 'voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh' (67896764) panicked at crates/memory/tests/it/voice.rs:926:5:",
+    "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 158 filtered out; finished in 0.53s",
+    "error: test failed, to rerun pass `-p lamp-memory --test it`"
+  ]
+}

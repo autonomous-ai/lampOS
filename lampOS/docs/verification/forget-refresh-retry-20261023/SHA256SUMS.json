@@ -1,0 +1,13 @@
+{
+  "README.md": "6aaf4433526ad6f92d4ec256fa0580a2196e0b19c32e91fbe471398e3e74d4d6",
+  "current-manifest.json": "8d53fcc93a0f32cf46df21f9baf824ac1137d716833a0d5ce343a939fc7181fe",
+  "memory-shared-evidence.json": "48e7801eae0e6577cd631dc7520f4a3c746ce8499f55374b3b1e362ab005b752",
+  "memory-shared-evidence.txt": "05d2be0c6c9a1adf44c748333648457df22286d1bedb05eac05f539ad9288eb5",
+  "refresh-counter.patch": "3137133514399ab3b15220a9eafb2bc2286ab27ab836da50f0703b68015f8ae9",
+  "refresh-manifest.json": "1c7bdc35468d5808fe3433c0dd40db49ad78ece74e2877c37ca919c7589925fc",
+  "refresh-restoration.json": "e51cb298eddc3f2260c5cc0c62e04d1a44a9ec02a54e4384a2a16ed62eeafdfa",
+  "refresh.json": "23227557300550c52721de364a228828ea1c0de5ed2a876906a7ca3d1c7e8ac8",
+  "refresh.txt": "91a71335a98239762a7bb363a7dd00d6cfd7fbe09be77e68461327c234413b5d",
+  "voice-refusal.json": "8d651de170bbfb17d5fd0891c831780d8f58a492040b195b3e114ee8701f8839",
+  "voice-refusal.txt": "07f00956bd94d78a11d238b9ba5319790807f9e19dfd487abc178d7d4a45e3ca"
+}
