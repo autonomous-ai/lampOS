@@ -379,52 +379,146 @@ Turning add-ons on sets `LAMP_ADDONS=on` in both units.
 **After 1.0, off the lamp, through Harness.** A partner's add-on runs on
 the partner's computer as an agent or service and speaks the same
 proposal contract over Harness, so a partner writes one thing. Here the
-summaries leave the lamp, so every remote add-on needs its person's yes
-for what it subscribes to, seen and revoked per add-on; memory and
-context reads come here too, with the same yes. `AGENTS.md` keeps Harness
-out of this release, and the transport is the Harness team's (below).
+summaries leave the lamp, so they need the person's yes: first one yes for
+the computer as a whole, per add-on once Harness proves which add-on is
+asking; memory and context reads come later, with the same yes.
+`AGENTS.md` keeps Harness out of this release, and the transport is the
+Harness team's (below, "Remote add-ons").
 
-## Harness (after 1.0)
+## Remote add-ons (design; code after the 70 shipping rows)
 
-Harness today lets the lamp ask agents on a paired computer to do work
-(`lamp-tasks`, [tasks.md](tasks.md); the device protocol over the paired,
-end-to-end encrypted channel, `docs/harness.md` in the parent repository).
-No agent can read lamp topics or write to the lamp. The remote half needs
-new capabilities on that same channel, agreed with the Harness team on
-`autonomous-ai/openharness`. The first builder opens that issue once the
-on-lamp half has run on a lamp. Its draft:
+Proposed as `devin-0-P1` on 2026-10-23, at the owner's request
+([#3126](https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6361684886)),
+and shaped by the first builder's answers the same day
+([#3126, 16:30](https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6361854408)).
+**Design only.** The code comes after the 70 shipping rows, off by default,
+unless the owner says it is for this release; `AGENTS.md` keeps Harness out
+of this release. This section replaces the draft for the Harness team that
+stood here, which asked for new capabilities on the paired device channel.
 
-> **Device add-on capabilities on the autonomous-device channel**
->
-> lampOS will let partners' add-ons suggest what the lamp does: an add-on
-> reads summaries of the lamp's state and writes typed proposals, which
-> the lamp judges ([addons.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/addons.md)).
-> On the lamp an add-on is a skill. After 1.0 we want the same contract
-> from an agent on the paired computer. We ask for, negotiated in
-> `hello` and off unless both sides offer it:
->
-> 1. `addon.subscribe`: the device pushes events from its allowlisted
->    topics (the same summaries as on the lamp) to an agent that asked,
->    with the existing event cursor, ring and resync. These summaries
->    leave the lamp: presence, voice state, sounds and the day's phase
->    say a lot about a person's routine. So each remote add-on needs its
->    person's yes for the summaries it subscribes to (not only for
->    memory), and the person can see and revoke that yes per add-on.
-> 2. `addon.propose`: an agent sends one typed `AddonProposal`; the
->    device answers with a receipt (`queued`, `rejected`) and later the
->    judge's decision (kept or dropped). Idempotency keys and the existing
->    token bucket apply.
-> 3. `addon.context`: a bounded, read-only snapshot of the lamp's
->    context (who is present as yes/no, room state, mood, recent topics as
->    labels), with the person's yes, never transcripts or pictures.
-> 4. Per-add-on identity on the computer side: which agent or package
->    the frames come from, so the device can rate-limit and revoke one
->    add-on without unpairing the computer.
->
-> No new pairing, transport or credential: these ride the existing
-> encrypted device channel. Questions for the Harness team: where an
-> add-on's identity comes from (a Store package, an API provider, a
-> pane), and whether `addon.subscribe` fits the event ring's limits.
+A remote add-on is an agent or service on one of the person's computers. It
+reads the same summaries as an add-on on the lamp and writes the same kind
+of proposal, and the lamp's judge decides. Nothing it sends reaches a
+speaker, a light or a motor unjudged.
+
+```text
+agent on the person's computer
+  -> Harness (openharness#1485's add-on contract)
+  -> the lamp's own Harness daemon
+  -> the remote add-on service on the lamp (new, off by default)
+  -> addon/proposal, stamped as remote -> lamp-addons (the judge)
+  -> addon/decision -> the service -> Harness: kept or dropped
+```
+
+### The four answers
+
+1. **Transport: the lamp's own Harness, not V1's channel.** The owner set
+   on 14 and 15 October that the lamp uses Harness through its own CLI and
+   daemon: the V2 lamp is itself a signed-in Harness machine on the
+   person's account ([tasks.md](tasks.md)). So V1's paired device channel
+   (`system/harness/` in the parent repository) is not ported, and lampOS
+   invents no pairing flow, transport or credential. Harness's add-on
+   contract today rides only that device channel, so the route through the
+   lamp's own daemon is a question for the Harness team:
+   [openharness#1654](https://github.com/autonomous-ai/openharness/issues/1654).
+   The service is built once that route exists, in the shape it takes.
+2. **The judge takes a third writer, never as `skills`.** Today
+   `lamp-addons` drops every `addon/proposal` whose source is not `skills`
+   (`crates/addons/src/runtime.rs`). It gains one more accepted source, the
+   remote service, stamped as such: its proposals carry `addon` as
+   `remote:<computer>`, and the judge gives them their own, stricter rates
+   and their own reasons (below). The service never writes as `lamp-skills`
+   and never impersonates an add-on on the lamp.
+3. **Release: after the 70 shipping rows**, off by default. addons.md has
+   always put remote add-ons after 1.0.
+4. **Identity: one yes for the computer, effects only through the judge.**
+   Harness does not yet prove which add-on sent a proposal, so any agent on
+   the computer could claim any name. A per-add-on yes means nothing until
+   it does. So the first version takes one yes for "this computer" as a
+   whole, and only `light` and `say` acts, both through the judge.
+   Per-add-on consent waits for Harness's proof of the sender
+   (openharness#1654, question 3).
+
+### What the lamp publishes
+
+The service publishes only the allowlist's topics (`ADDON_TOPICS`:
+`voice/state`, `room/presence`, `mood/state`, `light/state`,
+`ears/classes`, `clock/local`), as the summaries an add-on on the lamp
+reads, and only while the person's yes for that computer holds. These
+summaries leave the lamp, and every agent on that computer can read them.
+It never publishes a transcript, a picture, a sound, a face, a name or
+memory.
+
+In Harness's terms (`addon.publish`, openharness#1485):
+
+| Field | Rule (Harness's) | The lamp |
+|---|---|---|
+| `values` | 1 to 16 entries a batch, one batch taken or refused | changes coalesced, at most one batch a second (the link's token bucket) |
+| `topic` | two to four lowercase segments, at most 96 characters | the allowlist's names, unchanged |
+| `value` | a JSON object, at most 4096 bytes; `null` withdraws the topic | the summary as the lamp's own topic carries it; `null` for every topic when the yes is withdrawn |
+| `at` | optional, the device's time in Unix ms | the lamp's wall clock when the summary was made |
+
+Harness forgets what was published on every hello and on a restart, and
+the service then publishes its whole set again. With the yes withdrawn it
+publishes nothing.
+
+### What a proposal becomes
+
+A proposal reaches the lamp as Harness's `addon.proposal` event:
+`proposalId`, `addon`, `act`, `why`, `sure`, `holdsMs`, `params`, `note`,
+`expiresAt`. The service checks it and writes one `AddonProposal`, or drops
+it with a reason given back as the decision:
+
+| Harness | `AddonProposal` |
+|---|---|
+| `proposalId` | kept by the service with the lamp's own `proposal` number, to send the decision back |
+| `addon` | not trusted: `remote:<computer>`, from the machine Harness says it came from; the given name is journaled only |
+| `act` | `light` or `say`; anything else is dropped (`not_for_remote`) |
+| `why` | one of the remote reasons (below); anything else is dropped |
+| `sure` | as given, 0 to 1 |
+| `holdsMs` | as given, 1 s to 30 s; the lamp judges with its own clock and drops one received late |
+| `params` | for `light`: colour, level 1 to 5, optional pattern, as `AddonLight` |
+| `note` | for `say` only: the line, at most 300 bytes, quoted and untrusted as every add-on note is |
+
+The kept or dropped answer goes back as `addon.decision` (`decision`, and
+`reason`: the rule that decided, at most 200 characters). A decision that
+cannot be sent is journaled, never retried with a new proposal.
+
+**Rates for a remote writer** (to be measured on a lamp): one proposal kept
+every 5 minutes and 6 an hour for each computer, at most 1 waiting for a
+decision. Its says count within the 4 says an hour for all add-ons. After a
+drop, that computer gets nothing kept for 5 minutes. Every rule of the
+judge as built holds as for an add-on on the lamp, the person's light
+first.
+
+### Off, out and failing
+
+- **Off** (the service's switch not set): it opens nothing, publishes
+  nothing and writes nothing; the judge's accepted sources are what they
+  are today.
+- **The yes withdrawn:** every topic is withdrawn (`null`), and every
+  proposal from that computer is dropped, `by` rule, "no yes for this
+  computer".
+- **Harness not installed, signed out, or its daemon down:** the service
+  publishes nothing, and its health says why, as `lamp-tasks`' does.
+- **The lamp asleep, paused or private:** the judge drops, as for any
+  add-on. The service sends no queue of old proposals afterwards: a
+  proposal holds 30 s at most.
+
+### Open for remote add-ons
+
+- The remote reasons for `why` (for example `messages`, `news`), each with
+  its lamp row.
+- **A remote say's words.** An add-on on the lamp can send only words
+  written in its folder, read when its package is signed and installed. A
+  remote `note` is made at run time on the computer. Quoted, untrusted and
+  without functions, as part 2c is, or a first version with no `note`
+  (the voice says it in its own words from the reason alone): the first
+  builder's call.
+- How the person says the yes for a computer, sees it, and withdraws it
+  (the app, or by voice).
+- The service's name, its switch and its census entries in
+  [switches.md](switches.md), once it is built.
 
 ## Not decided
 
