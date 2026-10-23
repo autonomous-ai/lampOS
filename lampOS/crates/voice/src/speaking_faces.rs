@@ -374,20 +374,32 @@ impl SpeakingFaces {
     /// 21 Oct 14:00, `LAMP_TURNED_SPEAKING`). A mouth the eyes could not read
     /// says nothing, so with `LAMP_EYES_SPEAKING` off this is never true.
     pub fn turned_only_silent(&self, from: Instant, to: Instant) -> bool {
-        let (unread, spoke) = self.looks.lock().map_or((true, true), |looks| {
-            let during = || {
-                looks
-                    .kept
-                    .iter()
-                    .filter(|look| look.at >= from && look.at <= to)
-            };
-            (
-                during().any(|look| look.turned_unread),
-                during().any(|look| !look.turned.is_empty()),
-            )
+        let unread = self.looks.lock().map_or(true, |looks| {
+            looks
+                .kept
+                .iter()
+                .any(|look| look.at >= from && look.at <= to && look.turned_unread)
         });
-        !unread
-            && !spoke
+        !unread && self.turned_not_seen_speaking(from, to)
+    }
+
+    /// Whether the faces turned to the lamp from `from` to `to` were read and
+    /// none was seen speaking: one turned to it read still in at least half
+    /// of the looks, and none turned to it read speaking in any look. As
+    /// [`Self::turned_only_silent`], but a look whose turned mouth went
+    /// unread spoils nothing, so a still face the eyes miss now and then is
+    /// still read (`LAMP_TURNED_FACE_SPEAKS`: on lamp-52e6 on 24 Oct at
+    /// 05:31 a still face turned to the lamp let two other voices' desk
+    /// talk out). Mouths never read, as with `LAMP_EYES_SPEAKING` off, say
+    /// nothing: never true.
+    pub fn turned_not_seen_speaking(&self, from: Instant, to: Instant) -> bool {
+        let spoke = self.looks.lock().map_or(true, |looks| {
+            looks
+                .kept
+                .iter()
+                .any(|look| look.at >= from && look.at <= to && !look.turned.is_empty())
+        });
+        !spoke
             && !self
                 .counted(from, to, |look| look.turned_silent.clone())
                 .is_empty()

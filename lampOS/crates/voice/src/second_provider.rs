@@ -464,6 +464,15 @@ pub const BUSY_CALLED_STRICT_ENVIRONMENT: &str = "LAMP_BUSY_CALLED_STRICT";
 /// talk out; `Heeding::counting_only_turned_speakers`).
 pub const TURNED_SPEAKING_ENVIRONMENT: &str = "LAMP_TURNED_SPEAKING";
 
+/// Where the worker reads whether a face turned to the lamp lets a line out
+/// only when it is seen speaking it, or the line is in the conversation's
+/// voice: `on`, and nothing else. A face read and never seen speaking the
+/// line is nobody turned to the lamp, and the line, held, is talk for the
+/// room (lamp-52e6 on 24 Oct at 05:31: with a still face turned to it, two
+/// other voices' desk talk was answered and the room never read busy;
+/// `worker::Heeding::needing_the_turned_face_to_speak`).
+pub const TURNED_FACE_SPEAKS_ENVIRONMENT: &str = "LAMP_TURNED_FACE_SPEAKS";
+
 /// Where the worker reads whether a line that cut the one before it short
 /// is asked with that one's words when the same person said both: `on`,
 /// and nothing else ([`Engine::joining_cut_words`]). On lamp-4ace on 21 Oct
