@@ -1,0 +1,26 @@
+{
+  "prepared_at": "2026-10-23T11:15:10.960790+00:00",
+  "source": {
+    "commit": "4b92b677d379b6ac1dadbd9e306320a04af48672",
+    "root_tree": "0f2159c3f4c692e0e267221b0ebc071f5b7a6dc2",
+    "parents": [
+      "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850"
+    ],
+    "workspace_tree": "d6590cc76e530c991f213d2eca5078a0ed2c790f"
+  },
+  "remote_PR_head": "4b92b677d379b6ac1dadbd9e306320a04af48672",
+  "remote_PR_base_at_read": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+  "PR_url": "https://github.com/autonomous-ai/lampOS/pull/3190",
+  "tracked_lampOS_entries": 6682,
+  "source_tree_sha256": "d3df9260661a74603190be484df51e4a8398eb48f6e4c3b78ce93ad1f81cc96c",
+  "runner_sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40",
+  "plan_sha256": "f60a8aae3aef067b3f97ab6647cbf5f5c9bb8c10c98186ba26e715c8d987f5c8",
+  "runner_AST": "passed",
+  "prepare_only_exit": 0,
+  "Cargo_calls": 0,
+  "container_calls": 0,
+  "source_edits": false,
+  "target_access": false,
+  "archive_timeout_seconds": 600,
+  "container_timeout_seconds": 300
+}

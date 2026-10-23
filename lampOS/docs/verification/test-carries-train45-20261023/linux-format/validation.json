@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "exact_remote_heads_and_own_parents_verified": 2,
+  "one_format_invocation_per_head": true,
+  "both_format_exit_zero_and_sentinels_observed": true,
+  "source_fingerprints_equal": 2,
+  "raw_stream_hashes_and_lengths_verified": 26,
+  "source_inventory_count_per_head": 6682,
+  "Linux_x86_toolchain_confirmed": true,
+  "no_MAIN_build_tests_or_source_edits": true,
+  "static_source_audit_is_not_compiled_artifact_proof": true,
+  "no_shared_gate_qualification_claim": true
+}

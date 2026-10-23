@@ -1,0 +1,104 @@
+[
+  {
+    "path": "/private/tmp/tests-3190-4b92b677d-linux-fmt-20261023/run-20261023T111535.836037Z/image-inspect.stdout",
+    "bytes": 7701,
+    "sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74",
+    "reason": "Full cached-image configuration stays external; portable projection records identity, platform and default user."
+  },
+  {
+    "path": "/private/tmp/tests-3190-4b92b677d-linux-fmt-20261023/run.py",
+    "bytes": 9359,
+    "sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40",
+    "reason": "Complete external preparation/source inventory/API/runner record retained by digest; scripts and account metadata are not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3190-4b92b677d-linux-fmt-20261023/source-tree.json",
+    "bytes": 1203577,
+    "sha256": "d3df9260661a74603190be484df51e4a8398eb48f6e4c3b78ce93ad1f81cc96c",
+    "reason": "Complete external preparation/source inventory/API/runner record retained by digest; scripts and account metadata are not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3190-4b92b677d-linux-fmt-20261023/SHA256SUMS",
+    "bytes": 477,
+    "sha256": "0ab5d5e2e92cfe6cee0b47332e6b9307c5741d2b36e665b35639b1608a683ee0",
+    "reason": "Complete external preparation/source inventory/API/runner record retained by digest; scripts and account metadata are not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3190-4b92b677d-linux-fmt-20261023/pr.json",
+    "bytes": 22175,
+    "sha256": "fbe17872d84fbe325adfb9aa550ebe09d8349e1125d8575d272dacc2cce2b950",
+    "reason": "Complete external preparation/source inventory/API/runner record retained by digest; scripts and account metadata are not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3190-4b92b677d-linux-fmt-20261023/run-20261023T111535.836037Z/manifest.json",
+    "bytes": 2340,
+    "sha256": "2132c4701b247e98d17d0c5294723c56e00b2d222e5e4c988b20a04175eb7247",
+    "reason": "Complete external preparation/source inventory/API/runner record retained by digest; scripts and account metadata are not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3190-4b92b677d-linux-fmt-20261023/run-20261023T111535.836037Z/source-lampOS.tar",
+    "bytes": 211834880,
+    "sha256": "cf10c74bc9b28bddf358d0e0cbc4d8ec5a2b02deb15e64206375913f23a3c954",
+    "reason": "Complete exact-source archive stays external; executed runner verified its commit, hash and unchanged final identity."
+  },
+  {
+    "path": "/private/tmp/tests-3218-238403b1c-linux-fmt-20261023/run-20261023T111442.782606Z/image-inspect.stdout",
+    "bytes": 7701,
+    "sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74",
+    "reason": "Full cached-image configuration stays external; portable projection records identity, platform and default user."
+  },
+  {
+    "path": "/private/tmp/tests-3218-238403b1c-linux-fmt-20261023/run.py",
+    "bytes": 9359,
+    "sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40",
+    "reason": "Complete external preparation/source inventory/API/runner record retained by digest; scripts and account metadata are not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3218-238403b1c-linux-fmt-20261023/source-tree.json",
+    "bytes": 1203577,
+    "sha256": "77c1d8ee5a96580de012812e1ed09cfedcd04405ac24133273871b3c7878620d",
+    "reason": "Complete external preparation/source inventory/API/runner record retained by digest; scripts and account metadata are not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3218-238403b1c-linux-fmt-20261023/SHA256SUMS",
+    "bytes": 477,
+    "sha256": "57e05c7d8495e06481cbdc6720682d747fbbcd0a128d7e8e49f4e625c5a02fe6",
+    "reason": "Complete external preparation/source inventory/API/runner record retained by digest; scripts and account metadata are not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3218-238403b1c-linux-fmt-20261023/pr.json",
+    "bytes": 22222,
+    "sha256": "1b8b2713ef745639e9c6e5d1f2ada48a0c21340f4aa8bf91b69f10288126b34f",
+    "reason": "Complete external preparation/source inventory/API/runner record retained by digest; scripts and account metadata are not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3218-238403b1c-linux-fmt-20261023/run-20261023T111442.782606Z/manifest.json",
+    "bytes": 2340,
+    "sha256": "8048cba2f32e303459b758144b3b795dd0c961fdb5a655a05e231b76620f9fda",
+    "reason": "Complete external preparation/source inventory/API/runner record retained by digest; scripts and account metadata are not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3218-238403b1c-linux-fmt-20261023/run-20261023T111442.782606Z/source-lampOS.tar",
+    "bytes": 211824640,
+    "sha256": "69b0885812e528fb381db627eb4e5c4fc21f2e3f5bc9038d5dedfef2b88bd937",
+    "reason": "Complete exact-source archive stays external; executed runner verified its commit, hash and unchanged final identity."
+  },
+  {
+    "path": "/private/tmp/tests-carries-8e3-linux-fmt-20261023/method-preparation.json",
+    "bytes": 548,
+    "sha256": "ffa6ade48f2cb2af32c818f005ab2f529d087a72be337544a0778039cf4a0c14",
+    "reason": "Complete external source/method read retained by digest; authored patches remain available from their exact Git heads."
+  },
+  {
+    "path": "/private/tmp/tests-carries-8e3-linux-fmt-20261023/3190-authored.patch",
+    "bytes": 38270,
+    "sha256": "0b805a66723dede340704704882351c1b74c20faf6a278fd4ff941d68425df9c",
+    "reason": "Complete external source/method read retained by digest; authored patches remain available from their exact Git heads."
+  },
+  {
+    "path": "/private/tmp/tests-carries-8e3-linux-fmt-20261023/3218-authored.patch",
+    "bytes": 3836,
+    "sha256": "4c244aeda8e908f6bcffdfe7dd487331ade1de785c0cff5ef139c490f472ca28",
+    "reason": "Complete external source/method read retained by digest; authored patches remain available from their exact Git heads."
+  }
+]

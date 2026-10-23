@@ -1,0 +1,24 @@
+{
+  "label": "3218-238403b1c",
+  "kind": "exact_git_commit",
+  "pr": 3218,
+  "source": {
+    "commit": "238403b1c5959fe8834aba09cfbbf24f03b6d893",
+    "root_tree": "f4017e5b0cfad4c6f4571a5106cb1baf62369faf",
+    "parents": [
+      "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850"
+    ],
+    "workspace_tree": "cf5ccc193f71bded4703d4d9554fa0ef22dc00ed"
+  },
+  "expected_parent": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+  "overlays": [],
+  "image": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "status": "Prepared for one authorized exact-head source-only Linux formatting run; archive600s/container300s.",
+  "base_archive_sha256": "69b0885812e528fb381db627eb4e5c4fc21f2e3f5bc9038d5dedfef2b88bd937",
+  "archive_file": "source-lampOS.tar",
+  "archive_bytes": 211824640,
+  "archive_sha256": "69b0885812e528fb381db627eb4e5c4fc21f2e3f5bc9038d5dedfef2b88bd937",
+  "input_scope": "All tracked lampOS files; exact Git commit or declared frozen two-file overlay only.",
+  "overlay_all_lampOS_bytes_and_modes_verified": false,
+  "runner_sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40"
+}

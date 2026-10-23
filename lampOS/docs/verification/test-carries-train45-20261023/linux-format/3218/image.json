@@ -1,0 +1,7 @@
+{
+  "Id": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "Os": "linux",
+  "Architecture": "amd64",
+  "User": "1000:1000",
+  "full_external_configuration_sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74"
+}

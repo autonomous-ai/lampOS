@@ -1,5 +1,21 @@
 # Tests work log
 
+## 2026-10-23 18:20 +0700 — relay merged and both test branches carried
+
+Ready for lamp-voice: no (#3190 and #3218 execution HOLDs remain).
+
+#3255 merged through train 45 as `8e3eaa6c2`, with its required ARM64 and
+Linux Clippy checks green. Both [remaining test branches](verification/test-carries-train45-20261023/)
+are clean equal carries on that base: boot-clock `4b92b677d`, phone `238403b1c`.
+The eight- and two-path patches are unchanged. Exact-head Linux formatting
+passed for both. New-head ARM64/Clippy watchers are running; full local gates
+are being bound to these heads because upstream product/test inputs changed.
+
+Historical failures and both reviewer execution HOLDs remain. No old result
+was relabelled as current, no product change was added and no ARM build ran
+on the Mac. Root verified both range-diffs, authored file hashes and all 26
+published formatter streams before this publication.
+
 ## 2026-10-23 18:05 +0700 — Expression full-target baseline comparison
 
 Ready for lamp-voice: no (#3218 execution HOLD remains with Reviewer-two).

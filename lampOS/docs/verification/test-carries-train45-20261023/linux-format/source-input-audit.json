@@ -1,0 +1,230 @@
+{
+  "base": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+  "heads": {
+    "3190": "4b92b677d379b6ac1dadbd9e306320a04af48672",
+    "3218": "238403b1c5959fe8834aba09cfbbf24f03b6d893"
+  },
+  "repository_entry_count": 10028,
+  "authored_changes": {
+    "3190": [
+      {
+        "path": "lampOS/crates/voice/src/coordinator/second.rs",
+        "base": [
+          "100644",
+          "blob",
+          "d5a949670c21e9a246990abaa6232d40b9092b67"
+        ],
+        "candidate": [
+          "100644",
+          "blob",
+          "18422cfda93ef559ce7364489a024cb6b4837e38"
+        ]
+      },
+      {
+        "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+        "base": [
+          "100644",
+          "blob",
+          "87b775273be3775b2b9f2ab64f0e0186c455a40b"
+        ],
+        "candidate": [
+          "100644",
+          "blob",
+          "f7a2640063815a8607e9b03d24870f8b9224db5d"
+        ]
+      },
+      {
+        "path": "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+        "base": [
+          "100644",
+          "blob",
+          "93309939096ead4b8fcba90ea5b23703efaa8bb2"
+        ],
+        "candidate": [
+          "100644",
+          "blob",
+          "8ac21f8f4c67e033e7e505c3619d736da8745e88"
+        ]
+      },
+      {
+        "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+        "base": [
+          "100644",
+          "blob",
+          "8fe40927d304c123840bd73221f8b7a72abfbfd3"
+        ],
+        "candidate": [
+          "100644",
+          "blob",
+          "86915a852b297b994b3d1bb6f2524d99f218ebd7"
+        ]
+      },
+      {
+        "path": "lampOS/crates/voice/src/scenario_clock.rs",
+        "base": [
+          "100644",
+          "blob",
+          "46def4e92fa76d4abcccca90d87a8ab427e22e97"
+        ],
+        "candidate": [
+          "100644",
+          "blob",
+          "9d3491a63326a3113a418d0f2fe99aecabec1689"
+        ]
+      },
+      {
+        "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+        "base": [
+          "100644",
+          "blob",
+          "b4a80268976424bb08aa85065b61be164abe6c44"
+        ],
+        "candidate": [
+          "100644",
+          "blob",
+          "1303280b36b313938057fc4e791f525567de0538"
+        ]
+      },
+      {
+        "path": "lampOS/crates/voice/src/stop_words.rs",
+        "base": [
+          "100644",
+          "blob",
+          "8a7449c9b602c4507b0ce59f14d4580fa2e4fccd"
+        ],
+        "candidate": [
+          "100644",
+          "blob",
+          "8f5e1d7db8bd3199af3810d7e973995da31c306f"
+        ]
+      },
+      {
+        "path": "lampOS/docs/voice-test-fixtures.md",
+        "base": [
+          "100644",
+          "blob",
+          "1c14f56a5976219337737834f6278bec8bd6da2e"
+        ],
+        "candidate": [
+          "100644",
+          "blob",
+          "5b55842583f3af68a577332aedc12d37d9bfea7c"
+        ]
+      }
+    ],
+    "3218": [
+      {
+        "path": "lampOS/crates/voice/src/messages.rs",
+        "base": [
+          "100644",
+          "blob",
+          "3bbae6c36cdef540bbf26a523a5525bd6b69d7b4"
+        ],
+        "candidate": [
+          "100644",
+          "blob",
+          "7ede2e9b0b14c32c36aa1bca279dbcf65f6a7608"
+        ]
+      },
+      {
+        "path": "lampOS/docs/messages.md",
+        "base": [
+          "100644",
+          "blob",
+          "69162487753820b1affe7e8f6746b9441bc06799"
+        ],
+        "candidate": [
+          "100644",
+          "blob",
+          "3c8f3b35827cd753501db2fb07eff88a763c6f18"
+        ]
+      }
+    ]
+  },
+  "cfg_contexts": {
+    "lampOS/crates/voice/src/lib.rs": [
+      {
+        "line": 172,
+        "context": "169: mod session_state;\n170: \n171: #[cfg(test)]\n172: mod scenario_clock;\n173: mod service_privacy;\n174: mod service_privacy_controls;"
+      }
+    ],
+    "lampOS/crates/voice/src/coordinator.rs": [
+      {
+        "line": 14119,
+        "context": "14116: }\n14117: \n14118: #[cfg(test)]\n14119: mod tests {\n14120:     /// #2231 (the reviewer-lead on #2459): a refused key waits only the\n14121:     /// second time in a row; a quota or a rate limit at once; any other end"
+      }
+    ],
+    "lampOS/crates/voice/src/coordinator/second.rs": [
+      {
+        "line": 947,
+        "context": "944: }\n945: \n946: #[cfg(test)]\n947: mod tests {\n948:     use super::*;\n949:     use crate::provider_worker::{FailedStage, Fault};"
+      }
+    ],
+    "lampOS/crates/voice/src/provider_worker.rs": [
+      {
+        "line": 6665,
+        "context": "6662: }\n6663: \n6664: #[cfg(test)]\n6665: pub(crate) mod tests {\n6666:     mod holding_answer;\n6667:     mod reminders;"
+      },
+      {
+        "line": 15842,
+        "context": "15839:     /// The Policy holds the lamp's actions (#800): tests only.\n15840:     mod policy_holds;\n15841:     /// The lamp speaks when spoken to (#829, step 2): tests only.\n15842:     mod spoken_to;\n15843: }"
+      }
+    ],
+    "lampOS/crates/voice/src/second_provider/worker.rs": [
+      {
+        "line": 16,
+        "context": "13:     output_request,\n14: };\n15: #[cfg(test)]\n16: use crate::scenario_clock::monotonic_us;\n17: use crate::{\n18:     provider_flow::OutputSender,"
+      },
+      {
+        "line": 24,
+        "context": "21:     wire::{Control, WorkerEvent},\n22: };\n23: #[cfg(not(test))]\n24: use lamp_ipc::monotonic_us;\n25: use lamp_turn_owner::{BootId, BoundaryGuard, MonoTime, Snapshot};\n26: use std::{"
+      },
+      {
+        "line": 8000,
+        "context": "7997: mod route_checks;\n7998: \n7999: #[cfg(test)]\n8000: mod tests {\n8001:     /// These synchronous fixtures backdate events by up to 400 seconds.\n8002:     /// Heeding and its inputs share this epoch, independent of host uptime."
+      }
+    ],
+    "lampOS/crates/voice/src/messages.rs": [
+      {
+        "line": 571,
+        "context": "568: }\n569: \n570: #[cfg(test)]\n571: mod tests {\n572:     use super::*;\n573:     use serde_json::{Value, json};"
+      }
+    ]
+  },
+  "between_head_changed_paths": [
+    "lampOS/crates/voice/src/coordinator/second.rs",
+    "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+    "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+    "lampOS/crates/voice/src/messages.rs",
+    "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+    "lampOS/crates/voice/src/scenario_clock.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs",
+    "lampOS/crates/voice/src/stop_words.rs",
+    "lampOS/docs/messages.md",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "all_other_repository_paths_byte_mode_equal": true,
+  "all_non_Voice_crate_inputs_equal": true,
+  "Cargo_and_toolchain_paths_checked": 58,
+  "Cargo_and_toolchain_equal": true,
+  "repository_root_robot_fixture_tree_equal": true,
+  "literal_doc_filename_references": {
+    "3190": {
+      "exit_code": 0,
+      "matches": "4b92b677d379b6ac1dadbd9e306320a04af48672:lampOS/crates/cloud/src/chat.rs:2://! (#1673, `docs/messages.md`): `chat.send` on `fa_channel` is acked with\n4b92b677d379b6ac1dadbd9e306320a04af48672:lampOS/crates/cloud/src/unasked.rs:2://! (`messages/out`, `docs/messages.md`, \"Unasked texts\"): guard mode's\n4b92b677d379b6ac1dadbd9e306320a04af48672:lampOS/crates/cloud/tests/it/texts.rs:2://! (#1673, `docs/messages.md`): `chat.send` is acked with a run and put on\n4b92b677d379b6ac1dadbd9e306320a04af48672:lampOS/crates/msgs/src/chat.rs:2://! sends back (`chat/in`, `chat/out`, #1673, `docs/messages.md`).\n4b92b677d379b6ac1dadbd9e306320a04af48672:lampOS/crates/msgs/src/chat.rs:35:    /// aloud, whatever the app asks (`docs/messages.md`).\n4b92b677d379b6ac1dadbd9e306320a04af48672:lampOS/crates/msgs/src/chat.rs:64:/// `chat.event` types (`docs/messages.md`).\n4b92b677d379b6ac1dadbd9e306320a04af48672:lampOS/crates/msgs/src/chat.rs:132:/// (`lamp_cloud::unasked`, `docs/messages.md`, \"Unasked texts\").\n4b92b677d379b6ac1dadbd9e306320a04af48672:lampOS/crates/voice/src/messages.rs:2://! `docs/messages.md`): each text on `chat/in` is answered in text on\n",
+      "limit": "Literal filename search only; not a complete generated/build-input proof."
+    },
+    "3218": {
+      "exit_code": 0,
+      "matches": "238403b1c5959fe8834aba09cfbbf24f03b6d893:lampOS/crates/cloud/src/chat.rs:2://! (#1673, `docs/messages.md`): `chat.send` on `fa_channel` is acked with\n238403b1c5959fe8834aba09cfbbf24f03b6d893:lampOS/crates/cloud/src/unasked.rs:2://! (`messages/out`, `docs/messages.md`, \"Unasked texts\"): guard mode's\n238403b1c5959fe8834aba09cfbbf24f03b6d893:lampOS/crates/cloud/tests/it/texts.rs:2://! (#1673, `docs/messages.md`): `chat.send` is acked with a run and put on\n238403b1c5959fe8834aba09cfbbf24f03b6d893:lampOS/crates/msgs/src/chat.rs:2://! sends back (`chat/in`, `chat/out`, #1673, `docs/messages.md`).\n238403b1c5959fe8834aba09cfbbf24f03b6d893:lampOS/crates/msgs/src/chat.rs:35:    /// aloud, whatever the app asks (`docs/messages.md`).\n238403b1c5959fe8834aba09cfbbf24f03b6d893:lampOS/crates/msgs/src/chat.rs:64:/// `chat.event` types (`docs/messages.md`).\n238403b1c5959fe8834aba09cfbbf24f03b6d893:lampOS/crates/msgs/src/chat.rs:132:/// (`lamp_cloud::unasked`, `docs/messages.md`, \"Unasked texts\").\n238403b1c5959fe8834aba09cfbbf24f03b6d893:lampOS/crates/voice/src/messages.rs:2://! `docs/messages.md`): each text on `chat/in` is answered in text on\n",
+      "limit": "Literal filename search only; not a complete generated/build-input proof."
+    }
+  },
+  "release_clock_call_context": {
+    "path": "lampOS/crates/voice/src/stop_words.rs",
+    "line": 1362,
+    "text": "1362:     fn hand(&self, of: u64, captured_at_us: u64, samples: &[i16], stream: &SttStream) -> bool {\n1363:         #[cfg(not(test))]\n1364:         let clock = lamp_ipc::monotonic_us;\n1365:         #[cfg(test)]\n1366:         let clock = || self.fixture_now_us();\n1367:         let number = self.number();\n1368:         *number == of\n1369:             && clock().saturating_sub(captured_at_us) <= MOST_AGE_US\n1370:             && stream.send(samples).is_ok()\n1371:     }\n1372: }\n1373: \n1374: impl RelayEars {",
+    "finding": "Non-test source introduces local clock=lamp_ipc::monotonic_us and uses clock(); same function choice but not literally unchanged release tokens."
+  },
+  "qualification": "Static read only. Full Voice fixtures differ; no cross-head artifact identity or shared gate qualification is established. Reuse would require actual current-head artifact/census/environment bindings and reviewer acceptance; do not skip required gates."
+}

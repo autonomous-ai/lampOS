@@ -1,0 +1,63 @@
+{
+  "old_head": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e",
+  "old_base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+  "new_base": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+  "branch": "tests/1806-phone-news-start",
+  "backup_ref": "tests/archive-phone-news-start-4e1e00e52-20261023",
+  "old_tree": "e7e1a36bd1fdcf7eb7ac0fb47ff2205ace97ef04",
+  "new_base_tree": "bfc542f17318518ef5dea21dd9f196ec47fbf96d",
+  "clean_before": true,
+  "authored_files": [
+    {
+      "path": "lampOS/crates/voice/src/messages.rs",
+      "old_head_sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "old_base_sha256": "1bc28d917159472dcd6de1e2436c07b85f1215f9f67d8b39563e0bd339a62fb5",
+      "new_base_sha256": "1bc28d917159472dcd6de1e2436c07b85f1215f9f67d8b39563e0bd339a62fb5",
+      "base_bytes_equal": true,
+      "new_head_sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "head_bytes_equal": true
+    },
+    {
+      "path": "lampOS/docs/messages.md",
+      "old_head_sha256": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3",
+      "old_base_sha256": "60ac65a303056dbf6829e3b3eda24a0d1163ab359cfa18ad92e97c930b632ec9",
+      "new_base_sha256": "60ac65a303056dbf6829e3b3eda24a0d1163ab359cfa18ad92e97c930b632ec9",
+      "base_bytes_equal": true,
+      "new_head_sha256": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3",
+      "head_bytes_equal": true
+    }
+  ],
+  "expected_remote_lease": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e",
+  "at_utc": "2026-10-23T11:12:18.084711+00:00",
+  "new_head": "238403b1c5959fe8834aba09cfbbf24f03b6d893",
+  "new_tree": "f4017e5b0cfad4c6f4571a5106cb1baf62369faf",
+  "new_parent": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+  "patch_bytes_equal": true,
+  "old_new_patch_sha256": "6a85e3205664487c98f2aced6fb303315cc6af39079f17f91bcdc5ee7d7c0e65",
+  "range_diff_equal": true,
+  "range_diff_sha256": "0bfd6be8f4216dfba2776c42a2de108dbb1cb9aa7e63b5a69bddf10e8d276dea",
+  "diff_check_exit_code": 0,
+  "clean_after": true,
+  "upstream_changed_paths": [
+    "lampOS/builders/devin-0.md",
+    "lampOS/crates/tasks/src/engine.rs",
+    "lampOS/crates/tasks/src/harness.rs",
+    "lampOS/crates/update/src/unit.rs",
+    "lampOS/crates/update/tests/functions.rs",
+    "lampOS/crates/voice-eval/tests/it/relay_hardening.rs",
+    "lampOS/crates/voice/src/agent_tasks.rs",
+    "lampOS/crates/voice/src/coordinator.rs",
+    "lampOS/crates/voice/src/coordinator/tests/duplex.rs",
+    "lampOS/crates/voice/src/stop_words.rs",
+    "lampOS/deploy/units/README.md",
+    "lampOS/deploy/units/lamp-voice.service",
+    "lampOS/docs/addons.md",
+    "lampOS/docs/build-rows.md",
+    "lampOS/docs/stop-word.md",
+    "lampOS/docs/switches.md",
+    "lampOS/docs/voice-eval.md",
+    "lampOS/docs/work-log-devin-0.md"
+  ],
+  "upstream_changed_cargo_manifests_lock_toolchain": [],
+  "qualification": "No Cargo, formatter, Clippy, tests or build performed on this carry. Previous receipts remain bound to their old heads; PR draft and execution HOLD unchanged."
+}

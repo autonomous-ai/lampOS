@@ -1,0 +1,17 @@
+{
+  "label": "3218-238403b1c",
+  "kind": "exact_git_commit",
+  "pr": 3218,
+  "source": {
+    "commit": "238403b1c5959fe8834aba09cfbbf24f03b6d893",
+    "root_tree": "f4017e5b0cfad4c6f4571a5106cb1baf62369faf",
+    "parents": [
+      "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850"
+    ],
+    "workspace_tree": "cf5ccc193f71bded4703d4d9554fa0ef22dc00ed"
+  },
+  "expected_parent": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+  "overlays": [],
+  "image": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "status": "Prepared for one authorized exact-head source-only Linux formatting run; archive600s/container300s."
+}

@@ -1,0 +1,24 @@
+{
+  "PR": 3190,
+  "URL": "https://github.com/autonomous-ai/lampOS/pull/3190",
+  "remote_head_at_read": "4b92b677d379b6ac1dadbd9e306320a04af48672",
+  "remote_base_at_read": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+  "own_parent": [
+    "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850"
+  ],
+  "root_tree": "0f2159c3f4c692e0e267221b0ebc071f5b7a6dc2",
+  "lampOS_tree": "d6590cc76e530c991f213d2eca5078a0ed2c790f",
+  "snapshot_command": {
+    "command": [
+      "gh",
+      "api",
+      "repos/autonomous-ai/lampOS/pulls/3190"
+    ],
+    "started_at": "2026-10-23T11:15:09.875631+00:00",
+    "elapsed_seconds": 0.8859663410112262,
+    "exit_code": 0,
+    "stdout_sha256": "fbe17872d84fbe325adfb9aa550ebe09d8349e1125d8575d272dacc2cce2b950",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "qualification": "Remote source identity verified before this exact-head run; no current-parent, review or CI readiness claim."
+}

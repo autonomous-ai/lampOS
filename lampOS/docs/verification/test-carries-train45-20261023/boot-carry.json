@@ -1,0 +1,66 @@
+{
+  "old_head": "d5d0383accafac8aa54c352eba65b1b0d5a44d9d",
+  "old_base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+  "old_public_archive_branch": "tests/1569-boot-clock-qualified-d5",
+  "new_head": "4b92b677d379b6ac1dadbd9e306320a04af48672",
+  "new_base": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+  "new_tree": "0f2159c3f4c692e0e267221b0ebc071f5b7a6dc2",
+  "branch": "tests/1569-boot-clock-current",
+  "files": [
+    "lampOS/crates/voice/src/coordinator/second.rs",
+    "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+    "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+    "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+    "lampOS/crates/voice/src/scenario_clock.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs",
+    "lampOS/crates/voice/src/stop_words.rs",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "range_diff": "1:  d5d0383acc = 1:  4b92b677d3 lampOS: give voice fixtures a shared clock and observed child startup\n",
+  "added_removed_patch_lines_byte_identical": true,
+  "clean": true,
+  "Cargo_run": false,
+  "push_lease_expected_old_sha": "d5d0383accafac8aa54c352eba65b1b0d5a44d9d",
+  "source": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/second.rs",
+      "git_blob": "18422cfda93ef559ce7364489a024cb6b4837e38",
+      "sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf"
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "git_blob": "f7a2640063815a8607e9b03d24870f8b9224db5d",
+      "sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1"
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "git_blob": "8ac21f8f4c67e033e7e505c3619d736da8745e88",
+      "sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf"
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "git_blob": "86915a852b297b994b3d1bb6f2524d99f218ebd7",
+      "sha256": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f"
+    },
+    {
+      "path": "lampOS/crates/voice/src/scenario_clock.rs",
+      "git_blob": "9d3491a63326a3113a418d0f2fe99aecabec1689",
+      "sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2"
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "git_blob": "1303280b36b313938057fc4e791f525567de0538",
+      "sha256": "c8fd3cf2298b965b1652bcfb8357ea0038fb88d33a2f9a97647b15ba4af2f645"
+    },
+    {
+      "path": "lampOS/crates/voice/src/stop_words.rs",
+      "git_blob": "8f5e1d7db8bd3199af3810d7e973995da31c306f",
+      "sha256": "ca09b676897fc05724646f55de270db866a2131f374fe0ab77fed8c1f510cdda"
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "git_blob": "5b55842583f3af68a577332aedc12d37d9bfea7c",
+      "sha256": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "checks": [
+    {
+      "PR": 3190,
+      "head": "4b92b677d379b6ac1dadbd9e306320a04af48672",
+      "parent": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+      "root_tree": "0f2159c3f4c692e0e267221b0ebc071f5b7a6dc2",
+      "lampOS_tree": "d6590cc76e530c991f213d2eca5078a0ed2c790f",
+      "exit": 0,
+      "format_invocations": 1,
+      "tracked_lampOS_inputs": 6682,
+      "source_fingerprint_before": "0f6e4cb0f87014ddf9b7702bc1f268c763f01dc2b74e3a896827cfa65525f5d3",
+      "source_fingerprint_after": "0f6e4cb0f87014ddf9b7702bc1f268c763f01dc2b74e3a896827cfa65525f5d3",
+      "archive_seconds": 0.8650962626561522,
+      "container_seconds": 15.885160758160055,
+      "timing_boundary": "Entire container command including setup, extraction, rustfmt and source hashing.",
+      "format_started_utc": "2026-10-23T11:15:37.644561+00:00",
+      "format_finished_utc": "2026-10-23T11:15:53.529378+00:00",
+      "source_archive_sha256": "cf10c74bc9b28bddf358d0e0cbc4d8ec5a2b02deb15e64206375913f23a3c954",
+      "source_unchanged": true
+    },
+    {
+      "PR": 3218,
+      "head": "238403b1c5959fe8834aba09cfbbf24f03b6d893",
+      "parent": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+      "root_tree": "f4017e5b0cfad4c6f4571a5106cb1baf62369faf",
+      "lampOS_tree": "cf5ccc193f71bded4703d4d9554fa0ef22dc00ed",
+      "exit": 0,
+      "format_invocations": 1,
+      "tracked_lampOS_inputs": 6682,
+      "source_fingerprint_before": "7271ea5d59dd1fdcf93bc94cb94176c4a0880a6e6851cd59552ff51bd7850f1b",
+      "source_fingerprint_after": "7271ea5d59dd1fdcf93bc94cb94176c4a0880a6e6851cd59552ff51bd7850f1b",
+      "archive_seconds": 0.8096376843750477,
+      "container_seconds": 14.554111971985549,
+      "timing_boundary": "Entire container command including setup, extraction, rustfmt and source hashing.",
+      "format_started_utc": "2026-10-23T11:14:44.537525+00:00",
+      "format_finished_utc": "2026-10-23T11:14:59.091316+00:00",
+      "source_archive_sha256": "69b0885812e528fb381db627eb4e5c4fc21f2e3f5bc9038d5dedfef2b88bd937",
+      "source_unchanged": true
+    }
+  ],
+  "method": {
+    "command": "cargo fmt --all --check",
+    "runner_sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40",
+    "archive_timeout_seconds": 600,
+    "container_timeout_seconds": 300,
+    "toolchain": "Rust/Cargo1.96.0;rustfmt1.9.0-stable;hostx86_64-unknown-linux-gnu",
+    "builds": 0,
+    "tests": 0,
+    "ARM_builds": 0,
+    "MAIN_access": false
+  },
+  "qualification_shared_between_heads": false
+}
