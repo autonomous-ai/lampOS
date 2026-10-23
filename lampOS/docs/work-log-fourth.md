@@ -8179,3 +8179,24 @@ Name's five-path source preparation preserves current Common runtime.
 Review corrected its product-unit table cell and clarified that only terminal
 Lost cannot revive; a previously proved same-epoch Pending request may resume.
 Its own gate, published carry and physical acceptance remain pending.
+
+## 2026-10-23 20:31 +07: Common native gate complete
+
+Ready for lamp-voice: no, current reviewer dispositions and First acceptance pending
+
+Common #3064 at 00c790722 has green ARM64 39957390695 and strict
+workspace/all-target Clippy 39957390652. Native results: 11177 passed,
+0 failed, 69 skipped, one leaky pass, no selected tests unrun. All 63 core
+and 17 integration controls pass; separate docs 4/0 and process harness
+12/0 pass. Both workflows executed e87f358f7, exact authored tree caa0e61cc.
+All 49 artifact checksums and AArch64 ELF headers were verified. The public
+receipt is verification/common-current-native-20261023/receipt.json.
+The author CI hold is resolved; First, reviewer-lead and El still own their
+current-head dispositions, compatible pins and physical acceptance.
+
+Photo's current-Common carry initially stopped at Clippy on both hosts,
+before any test: its carried Update helper call lacked the new unit argument,
+and the new HTTP fixture lacked FutureExt. Both attempts are retained.
+Only those two test-only compiler corrections were applied; assertions
+are unchanged. Corrected tree bd269b7b1 is under fresh gates. No Photo
+native qualification, origin approval, lamp result or score is claimed.
