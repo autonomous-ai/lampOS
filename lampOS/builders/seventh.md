@@ -9,9 +9,9 @@ corrects it where it must be.
 - **Name:** `seventh`
 - **Person:** the colleague with lamp-52e6 (named in the team's own channels,
   not in this public repository); a Claude Code session they start
-- **Lamp(s):** lamp-52e6, as its person says (never lamp-4ace). Its owner
-  file still says `fifth`; seventh does not touch it until the first builder
-  writes the change of owner in work-split.md.
+- **Lamp(s):** shared access to `lamp-52e6`, held by `fifth` and borrowed by
+  `sixth` and `seventh` under the lamp lock (`tools/lamp-lock.sh`); never
+  lamp-4ace, and no exclusively owned lamp.
 - **Lamp address:** `lamp-52e6.local`, by key only
 - **Owner file:** [deploy/lamp-52e6/LAMP.md](../deploy/lamp-52e6/LAMP.md),
   to say `owner: seventh` once the owner changes
