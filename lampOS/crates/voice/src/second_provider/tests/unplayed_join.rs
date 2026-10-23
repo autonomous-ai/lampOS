@@ -601,13 +601,17 @@ async fn a_piece_dropped_by_the_caps_keeps_its_exchange() {
 /// the lamp's words ended". The journal's times showed it did begin 37 s
 /// after 23's words (the kit waited too long, 08:53), so the hold was
 /// right; this pins the let-go path. Here, each line judged by the
-/// worker's own rule (`LAMP_NAME_OR_FOLLOW_UP`): request 1 calls the lamp and its answer is a
-/// search never finished, request 2 is joined to it (1 unsaid) and cut
-/// before its speech played, request 3 is not joined (two voices) and is
-/// answered and played. The call is then 40 s old and the room busy, and
-/// request 4 begins just after 3's words: request 3's played answer is the
-/// lamp's words, in the thread and in their end, so 4 is in the
-/// conversation going on.
+/// worker's own rule (`LAMP_NAME_OR_FOLLOW_UP`): request 1 calls the lamp
+/// and is answered "Eight and two.", its speech held; request 2 is joined
+/// to it (1 unsaid) and its answer is a search never finished; request 3
+/// cuts it, is not joined (two voices), and is answered and played. The
+/// call is then 40 s old and the room busy, and request 4 begins just
+/// after 3's words: request 3's played answer is the lamp's words, in the
+/// thread and in their end, so 4 is in the conversation going on. The
+/// chain (`LAMP_GOING_ON_NOT_OWN`) is empty here: `Heeding` is never told
+/// of a let-go, so it leaves the chain as it was, and the chain's own end
+/// (`said_until_free_us`) is pinned by the worker's
+/// `the_lamps_own_answers_to_talk_keep_no_conversation_going`.
 #[tokio::test]
 async fn a_played_answer_after_words_let_go_keeps_the_conversation_going() {
     use super::worker::Heeding;
@@ -620,10 +624,12 @@ async fn a_played_answer_after_words_let_go_keeps_the_conversation_going() {
     const AFTER: &str = "And the day after?";
     let s = Duration::from_secs;
     *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
-    // The lamp's words before the call: 44 s ago.
+    // The lamp's words before the call: 44 s ago, or now on a clock booted
+    // under 44 s ago, never a panic (#1569).
     {
         let mut thread = Thread::new();
-        let before = std::time::Instant::now() - s(44);
+        let now = std::time::Instant::now();
+        let before = now.checked_sub(s(44)).unwrap_or(now);
         thread.person("Lamp, what's the weather today?", true, before);
         thread.lamp(100, "Sunny and warm today.", before);
         *crate::thread::THREAD.lock().unwrap() = thread;
@@ -691,10 +697,12 @@ async fn a_played_answer_after_words_let_go_keeps_the_conversation_going() {
     // Each line a second long, ended now, as the microphone would read it.
     .heeding(Arc::new(move |request, _, heard, from| {
         let now_us = monotonic_us();
-        let held = judged
-            .lock()
-            .unwrap()
-            .heed(request, (now_us - 1_000_000, now_us), heard, from);
+        let held = judged.lock().unwrap().heed(
+            request,
+            (now_us.saturating_sub(1_000_000), now_us),
+            heard,
+            from,
+        );
         told.lock().unwrap().push((request, held));
         held
     }))
@@ -748,7 +756,12 @@ async fn a_played_answer_after_words_let_go_keeps_the_conversation_going() {
     engine.retire_through(1);
     engine.submit(audio(2, 1));
     engine.submit(end(2));
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
     while searched.try_recv().is_err() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "request 2's search begins within 5 s: {verdicts:?}"
+        );
         if let Ok(event) = tokio::time::timeout(Duration::from_millis(20), engine.next()).await {
             keep(&event);
         }
