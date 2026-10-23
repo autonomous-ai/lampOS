@@ -278,11 +278,28 @@ and every later `new` on that name is refused for it before anything starts:
 that computer reports it: `~/harnesses/NAME` from Harness 0.4.55 (Mobile on
 lamp-0c89, 23 October), or its absolute path (openharness `newCommand.ts`,
 for another machine). On that refusal alone, with a FOLDER that ends in that
-name, `lamp-tasks` asks the same `new` once more in exactly that FOLDER, and
-its journal says so (`tasks: lamp-task-N: Harness
-made the folder … so it starts there`, with no ask's words). A folder target,
+name, `lamp-tasks` asks the same `new` once more in exactly that FOLDER, in what
+is left of `new`'s one 60 s bound, and its journal says so (`tasks:
+lamp-task-N: the name 'NAME' is taken by the folder FOLDER on that computer,
+so it starts there`, with no ask's words). A name Harness turns into a
+folder of another spelling (capitals, spaces) gets no retry, as before:
+give such a target its folder. A folder target,
 any other refusal, a timeout or a second refusal is never asked again,
 so nothing can start twice, and a named target's hand-overs all start.
+
+Every hand-over says how it went in one journal line, whatever the outcome
+(on everywhere, no switch): `tasks: lamp-task-N: dispatch STATE [CODE] (exit
+N, T s, stderr: LAST)`. STATE is `accepted`, `pending`, `not_sent` or
+`uncertain`, with its code (`new_failed`, `folder_missing`, `timeout` …);
+`exit` is the last Harness call's status, `no exit` when none ended (a
+timeout, or refused before any call); LAST is stderr's last line with words,
+at most 160 characters, with only what can't be the person's kept: quoted
+spans go whole, and a word stays only if it is plain lowercase ASCII
+(`error:`, `refused`) or an upper-case code (`SPAWN_FAILED`), is none of the
+ask's words at any length, has no `/` or `@` and doesn't look secret. A name,
+a computer's label, a folder or a word with an accent is `…`, one per run
+(Fourteen's privacy read). The ask is never in it. Before (lamp-0c89, 23 October), an `uncertain` hand-over said
+nothing in the journal, only in the task store.
 
 The executable is resolved once to an absolute canonical regular file, owned
 by the service user or root, executable, without group/other write or set-ID
@@ -501,7 +518,7 @@ started once its answer is told:
 | Local transport | 8 KiB request; 128 KiB response, enough for escaped bounded observation text |
 | Clients | 4 workers, 4 queued sockets, 16 queued owner requests |
 | Client deadlines | 300 ms complete request, 1,100 ms owner receipt, 1,200 ms total server service |
-| CLI | One worker, one job/result slot; preflight/read 10 s each, new 60 s |
+| CLI | One worker, one job/result slot; preflight/read 10 s each, new 60 s (a name-taken retry included) |
 | CLI capture | 64 KiB stdout, 16 KiB stderr; individual poll waits capped at 10 ms |
 | Progress (`--progress`) | One `ps` per machine per watch period, 10 s each; 256 KiB stdout; 256 harnesses a reply; a progress line cut to 2 KiB; memory only, at most 16 tasks |
 | Push (`--push-wait`) | One `wait` held per machine with watched tasks, on at most 64 agents, 600 s each (killed at 630 s), beside the CLI worker; the next on a machine no sooner than 3 s after one came back with an end, 30 s after one failed; a pushed task left out until the watch reads it again; 64 KiB stdout |

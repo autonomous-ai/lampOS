@@ -337,6 +337,9 @@ pub struct CliConfig {
     /// (`serve --folder-missing`, #2840). Off unless set: `uncertain` with
     /// `new_failed`, as any failed `new`.
     pub folder_missing: bool,
+    /// Each dispatch's journal line ([`dispatch_line`]) is also kept here,
+    /// for a test to read; it always goes to stderr, the unit's journal.
+    pub journal: Option<Arc<Mutex<Vec<String>>>>,
 }
 
 impl CliConfig {
@@ -352,6 +355,7 @@ impl CliConfig {
             cancel: None,
             as_person: false,
             folder_missing: false,
+            journal: None,
         }
     }
 }
@@ -473,7 +477,21 @@ impl Cli {
             || also.is_some_and(|cancel| cancel.load(Ordering::Acquire))
     }
 
+    /// Hand `launch` over, and say how it went in one journal line
+    /// ([`dispatch_line`]), whatever the outcome.
     pub fn launch(&self, launch: &Launch) -> LaunchOutcome {
+        let began = Instant::now();
+        let mut seen = Seen::default();
+        let outcome = self.launch_seen(launch, &mut seen);
+        let line = dispatch_line(launch, &outcome, &seen, began.elapsed());
+        eprintln!("{line}");
+        if let Some(journal) = &self.config.journal {
+            journal.lock().unwrap_or_else(|e| e.into_inner()).push(line);
+        }
+        outcome
+    }
+
+    fn launch_seen(&self, launch: &Launch, seen: &mut Seen) -> LaunchOutcome {
         let not_sent = |code: &str| LaunchOutcome::NotSent { code: code.into() };
         let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
         if let Err(code) = launch.validate() {
@@ -482,10 +500,12 @@ impl Cli {
         let Ok(_guard) = self.operation.try_lock() else {
             return not_sent("busy");
         };
-        let preflight = match self.run(
+        let preflight = self.run(
             &["machines".into(), "--json".into()],
             self.config.read_timeout,
-        ) {
+        );
+        seen.took(&preflight);
+        let preflight = match preflight {
             Ok(reply) => reply,
             Err(error) => {
                 return not_sent(&if error.code == "cancelled" {
@@ -532,22 +552,29 @@ impl Cli {
             "--task".into(),
             launch.prompt.clone().into(),
         ]);
+        // One `launch_timeout` for the whole `new`, a retry included.
+        let until = Instant::now() + self.config.launch_timeout;
         let mut reply = self.run(&args, self.config.launch_timeout);
+        seen.took(&reply);
         // A bare name gets its folder, `~/harnesses/<name>`, from Harness on
         // the first `new`, and every later `new` on that name is refused
         // for it, before anything starts (Harness 0.4.55; Mobile on
         // lamp-0c89, 23 Oct). On that refusal alone, asked once more in
-        // the folder it names; nothing else is ever asked twice.
+        // the folder it names, in what is left of the bound; nothing else
+        // is ever asked twice.
+        let left = until.saturating_duration_since(Instant::now());
         if let (Some(at), Ok(refused)) = (project_at, &reply)
             && !refused.success
+            && !left.is_zero()
             && let Some(folder) = name_taken(&refused.stdout, &launch.target.project)
         {
             eprintln!(
-                "tasks: {}: Harness made the folder {folder} for the name '{}' before, so it starts there",
+                "tasks: {}: the name '{}' is taken by the folder {folder} on that computer, so it starts there",
                 launch.name, launch.target.project
             );
             args[at] = folder.into();
-            reply = self.run(&args, self.config.launch_timeout);
+            reply = self.run(&args, left);
+            seen.took(&reply);
         }
         match reply {
             Ok(reply) if reply.success => parse_launch(&reply.stdout, launch),
@@ -907,6 +934,7 @@ impl Cli {
                         success: code == Some(0),
                         code,
                         stdout: output,
+                        stderr: errors,
                     });
                 }
                 if now.saturating_duration_since(at) >= DRAIN_LIMIT {
@@ -980,6 +1008,9 @@ struct Reply {
     success: bool,
     code: Option<i32>,
     stdout: Vec<u8>,
+    /// At most [`STDERR_LIMIT`]; only its last line is ever said
+    /// ([`dispatch_line`]).
+    stderr: Vec<u8>,
 }
 struct RunError {
     code: &'static str,
@@ -1311,6 +1342,135 @@ fn folder_missing(bytes: &[u8]) -> bool {
                 || reply.error.starts_with("CWD_NOT_FOUND (")
                 || reply.error == "That folder does not exist on the machine.")
     })
+}
+
+/// A dispatch's last CLI call, for its journal line: its exit status and
+/// stderr, or neither when it never exited (a timeout, a pipe cap).
+#[derive(Default)]
+struct Seen {
+    exit: Option<i32>,
+    stderr: Vec<u8>,
+}
+impl Seen {
+    fn took(&mut self, result: &Result<Reply, RunError>) {
+        (self.exit, self.stderr) = match result {
+            Ok(reply) => (reply.code, reply.stderr.clone()),
+            Err(_) => (None, Vec::new()),
+        };
+    }
+}
+
+/// The most of stderr's last line a journal line keeps.
+const STDERR_SAID_CHARS: usize = 160;
+
+/// One dispatch's journal line, whatever its outcome (the first builder on
+/// #3126, 23 Oct 11:42: an `uncertain` dispatch left lamp-0c89's journal
+/// empty). The task's label, its state and code, the CLI's last exit
+/// status, how long it took, and stderr's last line with only what can't be
+/// the person's kept ([`said_of_stderr`]). Never the ask.
+fn dispatch_line(launch: &Launch, outcome: &LaunchOutcome, seen: &Seen, took: Duration) -> String {
+    let state = match outcome {
+        LaunchOutcome::Created { .. } => "accepted".to_owned(),
+        LaunchOutcome::Pending { .. } => "pending".to_owned(),
+        LaunchOutcome::NotSent { code } => format!("not_sent {code}"),
+        LaunchOutcome::Uncertain { code } => format!("uncertain {code}"),
+    };
+    let exit = seen
+        .exit
+        .map_or_else(|| "no exit".to_owned(), |code| format!("exit {code}"));
+    let mut line = format!(
+        "tasks: {}: dispatch {state} ({exit}, {:.1} s",
+        launch.name,
+        took.as_secs_f64()
+    );
+    if let Some(said) = said_of_stderr(&seen.stderr, &launch.prompt) {
+        line.push_str(&format!(", stderr: {said}"));
+    }
+    line.push(')');
+    line
+}
+
+/// Stderr's last line that has words, with only what can't be the person's
+/// kept (Fourteen's privacy P2 on #3234): quoted spans go whole, and a word
+/// stays only if it is plain lowercase ASCII (`error:`, `could`, `start`)
+/// or an upper-case code (`SPAWN_FAILED`), is none of the ask's words at any
+/// length, has no `/` or `@`, and doesn't look secret. Anything else, a
+/// name, a computer's label, a folder, a word with an accent, is "…", one
+/// for each run. At most [`STDERR_SAID_CHARS`]; nothing when no word is left.
+fn said_of_stderr(stderr: &[u8], prompt: &str) -> Option<String> {
+    let text = String::from_utf8_lossy(stderr);
+    let last = text.lines().rev().find(|line| !line.trim().is_empty())?;
+    let bare = |word: &str| {
+        word.trim_matches(|c: char| !c.is_alphanumeric())
+            .to_lowercase()
+    };
+    let asked: BTreeSet<String> = prompt
+        .split_whitespace()
+        .map(bare)
+        .filter(|word| !word.is_empty())
+        .collect();
+    // Each quoted span as one word, so it goes whole.
+    let mut unquoted = String::new();
+    let mut closing: Option<char> = None;
+    for c in last.chars() {
+        match closing {
+            Some(end) if c == end => {
+                closing = None;
+                unquoted.push_str(" \u{1} ");
+            }
+            Some(_) => {}
+            None => match c {
+                '\'' | '"' | '`' => closing = Some(c),
+                '“' => closing = Some('”'),
+                '‘' => closing = Some('’'),
+                _ => unquoted.push(if c.is_control() { ' ' } else { c }),
+            },
+        }
+    }
+    if closing.is_some() {
+        unquoted.push_str(" \u{1} ");
+    }
+    let secret = |word: &str| {
+        [
+            "token",
+            "secret",
+            "password",
+            "passwd",
+            "apikey",
+            "api_key",
+            "api-key",
+            "bearer",
+            "authorization",
+            "cookie",
+            "credential",
+            "session",
+        ]
+        .iter()
+        .any(|name| word.to_lowercase().contains(name))
+    };
+    let kept = |word: &str| {
+        let core = word.trim_end_matches([':', ',', '.', ';', '!', '?', ')']);
+        let plain = !core.is_empty()
+            && core
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "-_()".contains(c));
+        let code = core.len() >= 3
+            && core
+                .chars()
+                .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_');
+        (plain || code) && !asked.contains(&bare(word)) && !secret(word)
+    };
+    let mut words: Vec<&str> = Vec::new();
+    for word in unquoted.split_whitespace() {
+        let word = if kept(word) { word } else { "…" };
+        if !(word == "…" && words.last() == Some(&"…")) {
+            words.push(word);
+        }
+    }
+    if words.iter().all(|word| *word == "…") {
+        return None;
+    }
+    Some(words.join(" ").chars().take(STDERR_SAID_CHARS).collect())
 }
 
 /// The folder Harness made for the bare project name `project`, when the
