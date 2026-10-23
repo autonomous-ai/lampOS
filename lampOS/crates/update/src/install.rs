@@ -287,8 +287,8 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
 /// Every core skill is one (the owner: core skills are always installed;
-/// `tests/install.rs` holds the two lists equal). Twelve keep their folders'
-/// own default: eleven enabled, and Bedtime and Morning disabled by its own
+/// `tests/install.rs` holds the two lists equal). Fourteen keep their folders'
+/// own default: thirteen enabled, and Bedtime and Morning disabled by its own
 /// `enabled = false` until its lamp comparison (#1672); those of
 /// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,
 /// so none of their functions reach a session.
@@ -316,10 +316,13 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // The startle (#2822): Expression's glance at a sudden sound, its move
     // read from this skill's file when Expression starts.
     "startle",
-    // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
-    "light-out",
+    // Music sway and watch you leave (#2834): core skills on in the product,
+    // each reading what the product's units turn on (the ears' sound
+    // classes behind the privacy route, the eyes' activity).
     "watch-you-leave",
     "music-sway",
+    // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
+    "light-out",
     "light-scenes",
     "point-light",
     "light-show",
@@ -338,18 +341,6 @@ pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
         "it reads `room/presence`, which the eyes say only with `LAMP_PRESENCE=on` (#1677), off \
          until the light going out and coming back has been seen on a lamp: someone reading face \
          down at the desk must never lose their light",
-    ),
-    (
-        "watch-you-leave",
-        "not yet tried on a lamp (#1669 (e)): it turns the base when the sitter leaves \
-         (`room/stood_up`, `LAMP_ACTIVITY=on`), so it is tried at the arm hour with someone at the \
-         arm, and whether the small turn reads as watching someone go is for that check",
-    ),
-    (
-        "music-sway",
-        "it reads `ears/classes`, which lamp-ears says only with `LAMP_EARS_CLASSES=on` (#1669), off \
-         until its scores are measured in an empty room and a busy one: a sway at people's talk \
-         would read as a machine",
     ),
     // #1679's three core skills, built and not yet tried on a lamp: each
     // comes with the product once lamp-4ace has played it with a person.
@@ -541,11 +532,11 @@ pub const SETTINGS: &[(&str, &str)] = &[
     // Installed disabled (PRODUCT_SKILLS_OFF).
     skill_file_off!("light-out"),
     skill_file!("light-out", "SKILL.md"),
-    skill_file_off!("watch-you-leave"),
+    skill_file!("watch-you-leave", "skill.toml"),
     skill_file!("watch-you-leave", "SKILL.md"),
     skill_file!("watch-you-leave", "moves/watch-left.json"),
     skill_file!("watch-you-leave", "moves/watch-right.json"),
-    skill_file_off!("music-sway"),
+    skill_file!("music-sway", "skill.toml"),
     skill_file!("music-sway", "SKILL.md"),
     skill_file!("music-sway", "moves/sway.json"),
     skill_file_off!("light-scenes"),
