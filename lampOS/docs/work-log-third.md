@@ -5,6 +5,26 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 17:44 — clock native gates green; remaining work has owners
+
+Ready for lamp-voice: no (exact-head Linux formatting receipt pending).
+
+- #3260 `7c3693e66` remains on current `b5a199368`, clean and pushed,
+  with reviewer-lead READ-OK and no P1/P2. Native ARM64 `39938443228`
+  passed 10,999 nextest cases, zero failed, 68 skipped, one leaky journal
+  case retained; docs passed and the separate harness passed 12/0.
+  Linux workspace/all-target Clippy `39938443224` passed.
+- The [receipt](verification/generic-voice-clock-20261023/README.md)
+  includes native result links, prior local gates and the invalid sandbox
+  observation. Tests owns the remaining exact-head Linux format receipt;
+  First owns the latest-base carry and merge. No lamp or acoustic claim.
+- #2948's mute/privacy path has reviewer-three READ-OK; the separate
+  settings-only OTA HOLD stays for Second's fix, then the combined carry
+  read. #3248 stays held for El's stationary-hand renewal correction.
+  #1798 and #2136 have no new replies and still require their assigned
+  physical/product and Live-comparison operators. No other executable
+  Third item is currently assigned.
+
 ## 2026-10-23 17:21 — generic voice clock pushed as #3260
 
 Ready for lamp-voice: no (native gates and review pending).

@@ -55,5 +55,16 @@ worker flag forwarding, local clock function and new-session context paths.
 No additional product-only configuration or service is required. This does
 not set the lamp's zone or prove a moved lamp's spoken time or acoustic
 latency. No device action or ARM64 linking on the Mac was performed.
-Native ARM64 build/test and Linux Clippy runs are pending on the PR;
-explicit Linux formatting was requested separately.
+Native gates for the exact head subsequently passed:
+
+- [ARM64 39938443228](https://github.com/autonomous-ai/lampOS/actions/runs/39938443228):
+  10,999 nextest cases passed, zero failed, 68 skipped. The case
+  `same_voice::tests::each_line_the_check_says_is_said_to_its_journal`
+  was marked leaky; that marker is retained. Doc tests passed and the
+  separate custom harness passed 12/0. The workflow completed successfully.
+- [Linux Clippy 39938443224](https://github.com/autonomous-ai/lampOS/actions/runs/39938443224):
+  every workspace crate and target passed with warnings denied.
+
+The reviewer-lead posted READ-OK on the exact head. Explicit Linux
+formatting remains with Tests; the integration base is still `b5a199368`.
+No CI rerun or test weakening was used.
