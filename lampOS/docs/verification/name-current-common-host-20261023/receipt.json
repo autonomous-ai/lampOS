@@ -1,0 +1,393 @@
+{
+  "base": "00c79072298c583c88ac92a0cad42d2f9155520c",
+  "branch": "fourth/name-common-final-20261023",
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "stage": "fmt"
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "-q",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "stage": "strict-workspace-clippy"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "the_product_sees_who_speaks",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "stage": "install-the_product_sees_who_speaks"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "the_product_keeps_nothing_personal_while_nobody_is_known",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "stage": "install-the_product_keeps_nothing_personal_while_nobody_is_known"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "every_part_of_the_brain_has_a_product_unit",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "stage": "install-every_part_of_the_brain_has_a_product_unit"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "a_blank_lamp_gets_every_part_its_units_and_nothing_started",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "stage": "install-a_blank_lamp_gets_every_part_its_units_and_nothing_started"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "product_units_pass_only_options_an_older_binary_takes",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "stage": "install-product_units_pass_only_options_an_older_binary_takes"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "the_product_full_look_is_on_in_both_units_with_one_file",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "stage": "install-the_product_full_look_is_on_in_both_units_with_one_file"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--test",
+        "functions",
+        "--",
+        "--nocapture"
+      ],
+      "stage": "function-census"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--test",
+        "it",
+        "scratch_paths::",
+        "--",
+        "--nocapture"
+      ],
+      "stage": "scratch-census"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::a_turn_of_the_known_persons_own_is_told_their_name",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "stage": "known-name-entry-return"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::kept_name_callback::",
+        "--",
+        "--nocapture"
+      ],
+      "stage": "name-callback-and-privacy"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::lookaway_authority_tests::",
+        "--",
+        "--nocapture"
+      ],
+      "stage": "lookaway-authority"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::tests::private_context::",
+        "--",
+        "--nocapture"
+      ],
+      "stage": "Engine-private-context"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::pending_context::",
+        "--",
+        "--nocapture"
+      ],
+      "stage": "worker-Pending-context"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "known_faces::tests::",
+        "--",
+        "--nocapture"
+      ],
+      "stage": "ordinary-known-faces"
+    },
+    {
+      "argv": [
+        "cargo",
+        "build",
+        "-q",
+        "--locked",
+        "--workspace"
+      ],
+      "stage": "workspace-build"
+    }
+  ],
+  "current_row": 0.45,
+  "five_path_setting_install_docs_only": true,
+  "gates": "fmt, strict workspace/all-target Clippy, 112 selected existing tests, workspace build on both hosts",
+  "holds": [
+    "newer main09f/train50 not tested by these source-specific results",
+    "First no-stacks: Common-first landing before new Name publication",
+    "source/dependency review, compatible Voice/Eyes pins and First physical known-person/other-person/room/off-camera/privacy acceptance",
+    "actual published-head native workflow still required",
+    "no updated score/model/provider/device or all-v2 latency qualification"
+  ],
+  "legacy_helper_timing_target": "<5ms not met in Linux first sample5547us; no performance rerun or threshold relaxation",
+  "local_receipt_sha256": "3f7c1a34439392d5bce0aecece6218752a537608c2d5fd84d04d19faac1e0af9",
+  "no_commit_push_or_after_gate_source_edits": true,
+  "results": {
+    "linux": {
+      "cleanup_confirmed": true,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 112
+      },
+      "evidence_sha256": "d046cca73bf00db5a14605df5600df4d40b544e5c8df37155ca31d0e3e8d47c5",
+      "helper_timing_us": {
+        "first": 5547,
+        "repeat": 105
+      },
+      "log_hashes": {
+        "Engine-private-context-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Engine-private-context.log": "11aa05289354fb7be5a52a983753da1be05bd122fa92010e5c96d78e83454ca2",
+        "fmt-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "function-census-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "function-census.log": "fa9ce56db24764201335afe6e588d2c965f085a979d462783d1f04fdef220dbe",
+        "install-a_blank_lamp_gets_every_part_its_units_and_nothing_started-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "install-a_blank_lamp_gets_every_part_its_units_and_nothing_started.log": "d54dcb75453e37d48672bf131ac81d443e3d996755ac652ec6606212b945285d",
+        "install-every_part_of_the_brain_has_a_product_unit-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "install-every_part_of_the_brain_has_a_product_unit.log": "b06313f6941115bb30dc45bb06f48e6b0046c5a6a5f80b88e7e2163e68870109",
+        "install-product_units_pass_only_options_an_older_binary_takes-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "install-product_units_pass_only_options_an_older_binary_takes.log": "2d3c27c9ee414d0cd0f24b6c3c792478a791d425f4adfddfc71cac229d66b8f9",
+        "install-the_product_full_look_is_on_in_both_units_with_one_file-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "install-the_product_full_look_is_on_in_both_units_with_one_file.log": "b06313f6941115bb30dc45bb06f48e6b0046c5a6a5f80b88e7e2163e68870109",
+        "install-the_product_keeps_nothing_personal_while_nobody_is_known-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "install-the_product_keeps_nothing_personal_while_nobody_is_known.log": "2d3c27c9ee414d0cd0f24b6c3c792478a791d425f4adfddfc71cac229d66b8f9",
+        "install-the_product_sees_who_speaks-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "install-the_product_sees_who_speaks.log": "b06313f6941115bb30dc45bb06f48e6b0046c5a6a5f80b88e7e2163e68870109",
+        "known-name-entry-return-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "known-name-entry-return.log": "1a0a5628bb23d79d99ab3dd1cf569735639c6b9379744f91b9fc8e9e221bdf6a",
+        "lookaway-authority-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "lookaway-authority.log": "f31a8358d8e69642e25ce89947f2231cef27dcfe1446c2fd754101b5bd06ca70",
+        "name-callback-and-privacy-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "name-callback-and-privacy.log": "0cec3885ed8d2b0fe94f2c28f7cbe1cf823ef4aec0624ff9ac5f732774a3875e",
+        "ordinary-known-faces-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "ordinary-known-faces.log": "fa5a1451a24ab7c6ed0b403b841b9c11eace380ef5bed448c2de1d226a38bd85",
+        "scratch-census-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "scratch-census.log": "20777682ea2bfb0dcfbb7eb7ab6ca9b08133ce6e701a10ef4906ce81d13277da",
+        "strict-workspace-clippy-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "strict-workspace-clippy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "worker-Pending-context-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "worker-Pending-context.log": "d2d07a4bfb5e00d86a260835856f427daa5837b7a48cf691fbff1cac62e0c37f",
+        "workspace-build-container-cleanup.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "workspace-build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source_unchanged": true,
+      "target_release_permitted": true,
+      "terminal": 0
+    },
+    "mac": {
+      "cleanup_confirmed": true,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 112
+      },
+      "evidence_sha256": "e2fda1f8f7931d850ee4a3aa766e319feb8242486b1b2e7c8b41070af8124d36",
+      "helper_timing_us": {
+        "first": 411,
+        "repeat": 90
+      },
+      "log_hashes": {
+        "Engine-private-context.log": "ba99af1b23c0b83ab2d2685f9af9cef003d9ef116bf1948c71a0f36b167fa7d6",
+        "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "function-census.log": "9394b1f6a71b85dfa50194d326ab13df16d509272714222de404fdcc4a7a4f57",
+        "install-a_blank_lamp_gets_every_part_its_units_and_nothing_started.log": "064ff94b5359a94cf12a7a06883439b3512c1f2aed49e4338f4acc0991d0af8e",
+        "install-every_part_of_the_brain_has_a_product_unit.log": "b06313f6941115bb30dc45bb06f48e6b0046c5a6a5f80b88e7e2163e68870109",
+        "install-product_units_pass_only_options_an_older_binary_takes.log": "b06313f6941115bb30dc45bb06f48e6b0046c5a6a5f80b88e7e2163e68870109",
+        "install-the_product_full_look_is_on_in_both_units_with_one_file.log": "b06313f6941115bb30dc45bb06f48e6b0046c5a6a5f80b88e7e2163e68870109",
+        "install-the_product_keeps_nothing_personal_while_nobody_is_known.log": "b06313f6941115bb30dc45bb06f48e6b0046c5a6a5f80b88e7e2163e68870109",
+        "install-the_product_sees_who_speaks.log": "b06313f6941115bb30dc45bb06f48e6b0046c5a6a5f80b88e7e2163e68870109",
+        "known-name-entry-return.log": "3867b7b4bbebb83c31453022c6f1c2dcf43d2fb79878099398f9e9fc7f484648",
+        "lookaway-authority.log": "ce28584c896433049b1691f3e6dd0e168eaaf8f6fbaea5212a2a70907154911e",
+        "name-callback-and-privacy.log": "de2f7398edafbc1b00c6a2c445d86ec0a1a8632ab6d842568db7b145e3f24a95",
+        "ordinary-known-faces.log": "7b295caa7a1384cd0733ab8fb87eb6858bf0f3d897e7b1be194ce55c112d9d84",
+        "scratch-census.log": "b5f1ec04483cfafed8820d432666c28f980b3bd3ce536fbda18164d00723addb",
+        "strict-workspace-clippy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "worker-Pending-context.log": "79872e5e133b2dbc12738f259cb27463e78bf2e1ee154d08c76a03b0f5a0dee6",
+        "workspace-build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source_unchanged": true,
+      "target_release_permitted": true,
+      "terminal": 0
+    }
+  },
+  "runtime_Rust_source_exact_Common": true,
+  "source_paths": [
+    "lampOS/crates/update/tests/install.rs",
+    "lampOS/deploy/product/lamp-voice.service",
+    "lampOS/docs/second-voice.md",
+    "lampOS/docs/switches.md",
+    "lampOS/docs/verification/known-name-product-prep-20261022/README.md"
+  ],
+  "tested_tree": "49a8abb5835432fb18eaa4f5e921d7defc891d3e",
+  "tests_new": 0,
+  "tests_per_host": {
+    "Engine-private-context": 30,
+    "function-census": 5,
+    "install-a_blank_lamp_gets_every_part_its_units_and_nothing_started": 1,
+    "install-every_part_of_the_brain_has_a_product_unit": 1,
+    "install-product_units_pass_only_options_an_older_binary_takes": 1,
+    "install-the_product_full_look_is_on_in_both_units_with_one_file": 1,
+    "install-the_product_keeps_nothing_personal_while_nobody_is_known": 1,
+    "install-the_product_sees_who_speaks": 1,
+    "known-name-entry-return": 1,
+    "lookaway-authority": 19,
+    "name-callback-and-privacy": 27,
+    "ordinary-known-faces": 20,
+    "scratch-census": 2,
+    "worker-Pending-context": 2
+  },
+  "timing_scope": "Existing synthetic legacy-format known-speaker fixture; known_name_told entry through source validation and note formatting to return. Not all-v2 Checking, cold-storage, provider, acoustic or device qualification.",
+  "tracked_file_count": 10044
+}

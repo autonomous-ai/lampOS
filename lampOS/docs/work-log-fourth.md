@@ -8249,3 +8249,22 @@ Photo and Name follow its qualified dependency. Old-source observations
 stay retained. Name Mac has passed all 112 selected controls, with helper
 first/repeated entry-to-return 411/90 microseconds; workspace build and
 Linux checks remain active. No device, replay-proof or row-score claim.
+
+## 2026-10-23 21:43 +07: Name host gates complete; independent Common next
+
+Ready for lamp-voice: no (#3014 dependency, latency and physical holds)
+
+Name's five-path source tree 49a8abb58 on Common 00c790722 passes both-host
+formatting, strict workspace/all-target Clippy, 112/0/0 existing controls and
+workspace build. Full source/index/mode/mtime guards and cleanup pass;
+all 17 Linux containers are removed and both targets released. The public
+receipt is verification/name-current-common-host-20261023/receipt.json.
+The legacy-fixture helper's first/repeated samples are Mac 411/90 microseconds
+and Linux 5547/105; Linux first misses the under-5-ms target. Cause remains
+unproven; no threshold relaxation or performance rerun was made.
+
+First's no-stacked-PR direction is now applied: Common's independent clean
+train-50 carry proceeds, while new dependent Photo/Name publication waits
+for Common landing or First's routing. That proposal is Queue 6367461283.
+The completed Name source remains frozen; no source-specific pass is claimed
+on train 50. The memory row stays 0.45 and physical acceptance stays with First.
