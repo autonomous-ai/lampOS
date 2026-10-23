@@ -6,6 +6,45 @@ fixture helpers are compiled only under `cfg(test)`. There is no runtime
 flag, environment setting or wider production deadline. Ordinary builds
 continue to use the existing monotonic clock.
 
+## Histories on a freshly booted host
+
+The #1569 Voice fixtures that place events before the present choose a
+600-second epoch with `Scope::enter_at`. Their timestamp producers and age
+readers share that scope, preserving the original 400-second room history,
+follow-up windows and every assertion. `Scope::enter` continues to choose
+its epoch from host uptime; unscoped tests continue to read the host clock.
+
+The hand-control scope starts after real child readiness, before the first
+queued fault and the camera observer's timestamp, and lasts through rig
+teardown. Multiple turn-taking harnesses on one thread share the same
+scope lifetime. The explicitly real-time hand-latency fixture stays on the
+host clock. Only the paused spoken-to follow-up fixture selects this epoch;
+its existing logical-time pump is unchanged.
+
+The stale-audio fixture uses a separate `cfg(test)` clock stored in its
+`Live` instance: 600 seconds plus real elapsed time. Both its sender and
+actual worker use that clock. The production three-second age bound and
+revocation lock remain unchanged, and unconfigured instances use the same
+raw clock as before. A control that admits four-second-old audio still
+fails the original audio-count assertion.
+
+The [verification record](https://github.com/autonomous-ai/lampOS/tree/lamp-tests/lampOS/docs/verification/voice-boot-clock-20261023)
+keeps original failures, exact case lists and Linux x86/Mac clock controls.
+These fixture results do not establish lamp latency or qualify the separate
+Policy service clock, privacy-lease history or ignored host-latency probe.
+
+The separate same-voice loading-child fixture is outside that 86-case clock
+inventory. It observes a complete PID and distinct acknowledgements from a
+child held on a private FIFO before and after the three original line checks;
+the child never sends Ready. Startup, probes and cleanup use five-second real
+host watchdogs, independent of paused Tokio time. Cleanup closes the real
+`Prints` request sender before releasing the hold, checks the child's release
+acknowledgement and observes supervisor reaping without consuming its status
+or sending a PID-based signal. A failed startup or cleanup fails the fixture;
+an unproved cleanup retains its directory for diagnosis rather than removing
+a script that may still be starting. Production readiness and response
+deadlines remain unchanged.
+
 ## Stepped scenarios
 
 The six endpoint cases with an in-process classifier explicitly select
@@ -241,6 +280,17 @@ A test-only release guard also unblocks that writer during assertion unwind.
 A deterministic regression unwinds an entered real stalled writer with a
 typed panic, preserves that panic and requires its eventual finish receipt.
 It does not suppress writer failure or turn the stalled report into success.
+
+The cue peer-loss fixture establishes actual socket closure after dropping
+its receiver: a copied receiver can outlive that local handle. Fresh
+nonblocking, connect-only probes must return `ConnectionRefused` within a
+five-second host setup watchdog. Each live probe is dropped before a 1 ms
+poll; any other error fails immediately. The probes send no cues. Once
+closure is observed, the original single `CueSink::scan` must still latch the
+send failure. The stale-cue checks, trace, timestamps and all original
+assertions remain unchanged. This setup observation does not retry a product
+send or change its deadline, and does not identify the cause of a particular
+failed run.
 
 ## Motor setup
 
