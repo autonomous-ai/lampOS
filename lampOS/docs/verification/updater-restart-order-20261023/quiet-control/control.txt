@@ -1,0 +1,21 @@
+
+running 2 tests
+
+thread 'restart_quiet::queued_speech_during_a_prerequisite_is_heard_before_restarting_voice' (67542375) panicked at crates/update/tests/round/restart_quiet.rs:141:9:
+Voice restarted at [1045000]; speech began at 1045000
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'restart_quiet::continuous_speech_puts_prerequisites_back_without_restarting_voice' (67542374) panicked at crates/update/tests/round/restart_quiet.rs:131:9:
+Switched(2)
+restart_quiet::queued_speech_during_a_prerequisite_is_heard_before_restarting_voice --- FAILED
+restart_quiet::continuous_speech_puts_prerequisites_back_without_restarting_voice --- FAILED
+
+failures:
+
+failures:
+    restart_quiet::continuous_speech_puts_prerequisites_back_without_restarting_voice
+    restart_quiet::queued_speech_during_a_prerequisite_is_heard_before_restarting_voice
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 114 filtered out; finished in 0.22s
+
+error: test failed, to rerun pass `-p lamp-update --test round`

@@ -1,0 +1,54 @@
+
+running 7 tests
+
+thread 'restart_order::a_cycle_in_an_older_recovery_journal_is_retained_without_arbitrary_restarts' (67383745) panicked at crates/update/tests/round/restart_order.rs:392:5:
+an unresolved recovery order must not report success: RolledBack { sequence: 2, why: "the switch was cut short (lamp-update stopped, or the lamp lost power)", after: Ok(()), told: Told { new: "", old: "" } }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+restart_order::a_cycle_in_an_older_recovery_journal_is_retained_without_arbitrary_restarts --- FAILED
+
+thread 'restart_order::a_cycle_in_either_candidate_or_rollback_plan_refuses_before_mutation' (67383746) panicked at crates/update/tests/round/restart_order.rs:363:9:
+old cycle false: Switched(2)
+restart_order::a_cycle_in_either_candidate_or_rollback_plan_refuses_before_mutation --- FAILED
+
+thread 'restart_order::after_and_before_order_the_forward_restarts_instead_of_unit_names' (67383757) panicked at crates/update/tests/round/restart_order.rs:103:5:
+assertion `left == right` failed
+  left: ["lamp-alpha.service", "lamp-middle.service", "lamp-zulu.service"]
+ right: ["lamp-zulu.service", "lamp-middle.service", "lamp-alpha.service"]
+
+thread 'restart_order::interrupted_recovery_orders_saved_units_despite_a_shuffled_partial_journal' (67383762) panicked at crates/update/tests/round/restart_order.rs:298:5:
+assertion `left == right` failed
+  left: ["lamp-zulu.service", "lamp-middle.service", "lamp-alpha.service"]
+ right: ["lamp-alpha.service", "lamp-zulu.service", "lamp-middle.service"]
+restart_order::after_and_before_order_the_forward_restarts_instead_of_unit_names --- FAILED
+restart_order::interrupted_recovery_orders_saved_units_despite_a_shuffled_partial_journal --- FAILED
+
+thread 'restart_order::ordering_does_not_start_inactive_or_restart_unchanged_dependencies' (67383798) panicked at crates/update/tests/round/restart_order.rs:334:5:
+assertion `left == right` failed
+  left: ["lamp-alpha.service", "lamp-omega.service"]
+ right: ["lamp-omega.service", "lamp-alpha.service"]
+restart_order::ordering_does_not_start_inactive_or_restart_unchanged_dependencies --- FAILED
+
+thread 'restart_order::rollback_uses_the_saved_old_dependencies_not_the_new_graph_or_its_reverse' (67383799) panicked at crates/update/tests/round/restart_order.rs:197:5:
+assertion `left == right` failed
+  left: ["lamp-alpha.service", "lamp-middle.service", "lamp-zulu.service", "lamp-zulu.service", "lamp-middle.service", "lamp-alpha.service"]
+ right: ["lamp-middle.service", "lamp-alpha.service", "lamp-zulu.service", "lamp-alpha.service", "lamp-zulu.service", "lamp-middle.service"]
+restart_order::rollback_uses_the_saved_old_dependencies_not_the_new_graph_or_its_reverse --- FAILED
+
+thread 'restart_order::the_product_voices_declared_managed_prerequisites_restart_before_it' (67383810) panicked at crates/update/tests/round/restart_order.rs:164:9:
+lamp-actions.service must precede Voice: ["lamp-voice.service", "lamp-actions.service", "lamp-memory.service", "lamp-schedule.service", "lamp-tasks.service"]
+restart_order::the_product_voices_declared_managed_prerequisites_restart_before_it --- FAILED
+
+failures:
+
+failures:
+    restart_order::a_cycle_in_an_older_recovery_journal_is_retained_without_arbitrary_restarts
+    restart_order::a_cycle_in_either_candidate_or_rollback_plan_refuses_before_mutation
+    restart_order::after_and_before_order_the_forward_restarts_instead_of_unit_names
+    restart_order::interrupted_recovery_orders_saved_units_despite_a_shuffled_partial_journal
+    restart_order::ordering_does_not_start_inactive_or_restart_unchanged_dependencies
+    restart_order::rollback_uses_the_saved_old_dependencies_not_the_new_graph_or_its_reverse
+    restart_order::the_product_voices_declared_managed_prerequisites_restart_before_it
+
+test result: FAILED. 0 passed; 7 failed; 0 ignored; 0 measured; 109 filtered out; finished in 0.90s
+
+error: test failed, to rerun pass `-p lamp-update --test round`

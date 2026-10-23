@@ -1,0 +1,39 @@
+{
+  "host": "Darwin arm64; Rust 1.96.0",
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-update",
+    "--no-fail-fast",
+    "--",
+    "--test-threads=2"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 269.859,
+  "bound_files": 6529,
+  "excluded_prose": "lampOS/docs/updates.md",
+  "inputs_unchanged": true,
+  "log_sha256": "bdab1b4b6388c7daafa6b8e854c93a4c5464c2ece82dc73c58caa3f4695e9839",
+  "result_lines": [
+    "test result: ok. 118 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 2.76s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s",
+    "test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 112.20s",
+    "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s",
+    "a_part_that_dies_is_put_back_and_its_build_refused --- FAILED",
+    "both_kinds_of_part_switch_in_one_round_each_its_own_way --- FAILED",
+    "thread 'a_part_that_dies_is_put_back_and_its_build_refused' (67583470) panicked at crates/update/tests/round.rs:889:5:",
+    "thread 'both_kinds_of_part_switch_in_one_round_each_its_own_way' (67591589) panicked at crates/update/tests/round.rs:1545:5:",
+    "test result: FAILED. 114 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 139.37s",
+    "error: test failed, to rerun pass `-p lamp-update --test round`",
+    "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+    "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "error: 1 target failed:"
+  ]
+}
