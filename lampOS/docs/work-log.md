@@ -1,3 +1,31 @@
+## Current checkpoint: 2026-10-23 19:31 +07, head-touch fix in review and state inventory
+
+Ready for lamp-voice: audit evidence only; #3269 remains draft and held
+
+The [whole-lamp state inventory](verification/whole-lamp-state-20261023/README.md)
+records store paths, schemas, named forward/backward tests, retention/migration
+rules and narrow gaps with proposed owners for #2809. It is a source audit,
+not previous-release executable qualification or physical update acceptance.
+First must name the supported release pair. The fixed-helper release-pair
+check is Second's next suggested slice after the urgent head-touch fix.
+
+#3269 at `c062243b6` addresses the settings-on head-reader loss found in #2948.
+Mac Update passes **357 / 0 / 4 ignored**; formatting and strict Clippy pass.
+Official Linux Clippy is green and ARM64 is still running. Third found two
+P2s: mismatched bus roots and an unused fixed pins path. Both are being fixed
+with failing regression controls before another review. No READ-OK is claimed.
+The dependent Skills run had one journal-ownership failure; a clean base run
+passed **512 / 0 / 1 ignored**, so no pre-existing-cause claim is made.
+
+#1812 still needs Migrate's independently sourced public verification key for
+fingerprint `54213f8d3aa2f241`; the release 6408 asset checks remain complete.
+#2810's real unplug still needs First's candidate/fallback selection and the
+assigned lamp holder with its attending person. No lamp access or physical
+acceptance is claimed. Next: finish #3269's review corrections and exact-head
+gates, then qualify the fixed-helper release boundary once selected.
+
+---
+
 ## Current checkpoint: 2026-10-23 16:53 +07, published release 6408 checked
 
 Ready for lamp-voice: evidence only; no product change or open Second PR
