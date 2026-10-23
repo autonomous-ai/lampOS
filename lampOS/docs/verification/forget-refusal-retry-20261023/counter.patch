@@ -1,0 +1,98 @@
+--- a/lampOS/crates/voice/src/remember.rs
++++ b/lampOS/crates/voice/src/remember.rs
+@@ -9474,6 +9474,95 @@
+         std::fs::remove_file(&socket).unwrap();
+     }
+ 
++    /// Proposed retry safety: a definite refusal of the follow-up's id must
++    /// not make the same person's immediate bare retry delete an unrelated keep.
++    #[test]
++    fn a_refused_follow_up_forget_never_retries_as_an_unrelated_last_keep() {
++        use rustix::event::{PollFd, PollFlags, Timespec, poll};
++        use std::io::Read;
++
++        let socket = std::env::temp_dir().join(format!(
++            "lamp-forget-asked-retry-{}.sock",
++            std::process::id()
++        ));
++        let _ = std::fs::remove_file(&socket);
++        let listener = UnixListener::bind(&socket).unwrap();
++        listener.set_nonblocking(true).unwrap();
++        let served = std::thread::spawn(move || {
++            let until = Instant::now() + Duration::from_secs(5);
++            let mut requests = Vec::new();
++            let mut unrelated_kept = true;
++            while requests.len() < 2 {
++                let Some(left) = until.checked_duration_since(Instant::now()) else {
++                    break;
++                };
++                let timeout = Timespec {
++                    tv_sec: left.as_secs().try_into().unwrap(),
++                    tv_nsec: left.subsec_nanos().into(),
++                };
++                let mut fds = [PollFd::new(&listener, PollFlags::IN)];
++                if poll(&mut fds, Some(&timeout)).unwrap() == 0 {
++                    break;
++                }
++                let (mut stream, _) = match listener.accept() {
++                    Ok(accepted) => accepted,
++                    Err(error) if error.kind() == io::ErrorKind::WouldBlock => continue,
++                    Err(error) => panic!("bounded fixture accept: {error}"),
++                };
++                stream.set_nonblocking(false).unwrap();
++                stream.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
++                stream.set_write_timeout(Some(Duration::from_secs(1))).unwrap();
++                let mut line = String::new();
++                let size = BufReader::new(stream.try_clone().unwrap())
++                    .take(4096)
++                    .read_line(&mut line)
++                    .unwrap();
++                if size == 0 {
++                    break; // The caller's wake connection after a safe refusal.
++                }
++                assert!(line.ends_with('\n'), "complete bounded request");
++                let request: Value = serde_json::from_str(&line).unwrap();
++                let answer = if requests.is_empty() {
++                    json!({"ok":false,"error":"io"})
++                } else if request["op"] == "forget_last" {
++                    unrelated_kept = false;
++                    json!({"ok":true,"removed":{"kind":"kept","id":30}})
++                } else if request["op"] == "forget" && request["id"] == 12 {
++                    json!({"ok":true,"removed":1})
++                } else {
++                    json!({"ok":false,"error":"bad_request"})
++                };
++                requests.push(request);
++                writeln!(stream, "{answer}").unwrap();
++            }
++            (requests, unrelated_kept)
++        });
++        let client = asked_with_memory("forget-asked-refused-retry", &socket);
++        let forget = call(FORGET, json!({}));
++        let first = client.run_for(&forget, Duration::from_secs(1), Some(ASKED_OF));
++        let retry = client.run_for(&forget, Duration::from_secs(1), Some(ASKED_OF));
++        drop(client);
++        // If the retry safely refuses without sending, end the accept loop.
++        drop(UnixStream::connect(&socket));
++        let (requests, unrelated_kept) = served.join().unwrap();
++        std::fs::remove_file(&socket).unwrap();
++
++        assert!(!first.1, "the first store reply was a definite refusal: {first:?}");
++        assert_eq!(
++            requests.first(),
++            Some(&json!({"op":"forget","id":12,"person":ASKED_OF}))
++        );
++        assert!(
++            unrelated_kept,
++            "a refused follow-up forget deleted an unrelated last keep: {requests:?}; retry={retry:?}"
++        );
++        if let Some(sent) = requests.get(1) {
++            assert_eq!(sent, &json!({"op":"forget","id":12,"person":ASKED_OF}));
++        } else {
++            assert_ne!(retry.0["forgotten"], true, "nothing was sent: {retry:?}");
++        }
++    }
++
+     /// Reviewer-two's P2 on #3130: past [`HELD_FORGET_FOR`] of the ask, a
+     /// bare forget in their next line is `forget_last` again.
+     #[test]
