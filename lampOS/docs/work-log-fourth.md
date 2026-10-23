@@ -7840,3 +7840,60 @@ its old cadence argument and executable pins remain unchanged pending the
 exact-pin CLI evidence/decision. The known-person lamp run remains First's.
 Queue and own PR comments were read through 11:25:52; publication/counts
 are posted on #2789 and #3126. Name and Photo wait for merged Common.
+
+
+## 2026-10-23 12:01 +07: Common carried onto train 33; Peek disclosure reproduced and correction prepared
+
+Ready for lamp-voice: no
+
+Common's complete Checking, retained-note adoption and context-composition
+correction is now on a fresh Fourth branch at `51186d5ea`, exact staged
+tree `6a62ca39f`, with 35 paths. The previous paused worktree and every
+failed receipt remain intact. The source-only carry has no conflicts and
+preserves the incoming needs-face write restriction, follow-up forget
+guards, portable write-failure control and cold-clock fixtures. All 6,666
+source files match the carry receipt. Mac formatting has passed; strict
+Clippy and the final Mac/Linux gates are running on frozen source.
+Receipts: `/private/tmp/fourth-common-train33-gates-20261023/`.
+
+The exact old Eyes executable's emulated `--help` now exits 0 in 1.346 s,
+with all 16 unit flags present, including the on/off cadence argument.
+The successful control exercised its existing graceful logger-refusal path
+with six descriptors; the initial timeout and OCI-limit failure remain
+retained. This proves CLI syntax only. The prepared 4ace unit now has
+`--steady-rate off` beside the four coupled settings. The raw help and
+limits are included in the Common verification note. Compatible new pins,
+installation and the current known-person lamp run remain First's.
+
+Peek's published `f1c0eb7dd` finished ARM64 run 39900221416 and Linux
+Clippy run 39900221378 successfully: 10,965/0/69 skipped, one leaky pass
+included, plus four doc and twelve process passes. All 24 compiled own
+controls passed. Both jobs tested merge `4bfd3d388`, tree `f66bc3f1e`,
+with 43 upstream file differences from the author tree. Artifact
+12479511986's archive digest and all 49 ARM64 members were verified.
+These are explicitly pre-fix results: reviewer-three's transcript-sharing
+P2 still holds, and no readiness follows from them. Receipt:
+`/private/tmp/fourth-peek-native-f1c0eb7dd-20261023/`.
+
+Two new Linux tests reproduced that disclosure on unchanged production:
+zero passed, two failed at the intended private-text assertions. One reads
+all rotated shared segments; the other obtains a real coordinator
+Transcript through provider IPC and feeds its records through the granted
+writer. No device or continuous deployed-service result is claimed.
+The frozen RED source and exits are retained under
+`/private/tmp/fourth-peek-shared-metadata-red-20261023/attempt1/`.
+
+The correction projects only fixed kinds/statuses and unsigned timing/count
+fields after a successful reader grant. Arbitrary text and nested values
+never enter the shared queue. Private/unset/verified-rollback traces retain
+their original format. Four new controls and the strengthened separate-user
+DAC check cover that contract. An independent source review found no P1/P2;
+execution remains pending. The complete 15-path Peek carry onto train 33
+merges cleanly to `1cc2edb33`; its fresh final worktree is being prepared.
+Both build targets currently belong to Common, so Peek's final checks
+follow their completion without concurrent target writers.
+
+Queue and own PR comments were read through 11:59:42. Train 34 landed after
+the 511 source was pinned; the final receipts will name the actual tested
+base and native merge tree. Name and Photo still follow merged Common.
+No lamp was accessed and no row score was raised.
