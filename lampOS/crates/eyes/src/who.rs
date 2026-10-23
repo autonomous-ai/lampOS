@@ -1739,6 +1739,19 @@ impl Held {
                 .is_none_or(|matched| id == Some(matched))
     }
 
+    /// Whether a check with no print keeps the one known: within the hold,
+    /// only if no near face was seen (`near`), or the near face seen but not
+    /// printed (turned, too small) has the passing id the match had. Another
+    /// face, or one with no id to tell it by, lets them go at once.
+    pub fn keeps_unprinted(&self, now: Instant, near: bool, id: Option<&str>) -> bool {
+        self.keeps(now)
+            && (!near
+                || self
+                    .matched_id
+                    .as_deref()
+                    .is_some_and(|matched| id == Some(matched)))
+    }
+
     /// Let go at once: the camera closed, or the check let them go.
     pub fn let_go(&mut self) {
         self.matched_at = None;
@@ -2481,6 +2494,27 @@ mod tests {
         held.matched(start, None);
         assert!(held.keeps_print(then, Some(0.35), Some("f9")));
         assert!(!held.keeps_print(then, Some(0.12), None));
+    }
+
+    #[test]
+    fn an_unprinted_near_face_keeps_the_held_name_only_with_the_same_id() {
+        let start = Instant::now();
+        let then = start + RECOGNISE_EVERY;
+        let mut held = Held::new(true);
+        held.matched(start, Some("f3".to_owned()));
+        // A near face seen but not printed, another passing id: no name.
+        assert!(!held.keeps_unprinted(then, true, Some("f4")));
+        assert!(!held.keeps_unprinted(then, true, None));
+        // The same passing id: held.
+        assert!(held.keeps_unprinted(then, true, Some("f3")));
+        // No near face: held until the bound.
+        assert!(held.keeps_unprinted(then, false, None));
+        assert!(!held.keeps_unprinted(start + KNOWN_HOLD, false, None));
+        assert!(!held.keeps_unprinted(start + KNOWN_HOLD, true, Some("f3")));
+        // A match with no passing id: an unprinted near face lets go.
+        held.matched(start, None);
+        assert!(!held.keeps_unprinted(then, true, None));
+        assert!(held.keeps_unprinted(then, false, None));
     }
 
     #[test]
