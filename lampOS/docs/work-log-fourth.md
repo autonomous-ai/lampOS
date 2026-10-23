@@ -8075,23 +8075,67 @@ unrun. No product activation, lamp access or row-score increase is claimed.
 
 Ready for lamp-voice: no
 
-Common's tested tree2e7a1f08b is committed at78a04cc70. Linux completed
-32 stages: changed privacy controls, full Eyes312/0/5 ignored, strict
-Clippy and workspace build pass; Skills514/1/1 remains failed. The exact
+Common's tested tree 2e7a1f08b is committed at 78a04cc70. Linux completed
+32 stages: changed privacy controls, full Eyes 312/0/5 ignored, strict
+Clippy and workspace build pass; Skills 514/1/1 remains failed. The exact
 observer receipt is in verification/common-skills-observer-20261023/.
-Update first failed117/3/2 because the container omitted robots/lamp;
-with the unchanged249 tracked fixtures mounted, it passed120/0/2.
-Common is rebased onto3e75cc3cb at71275b221, preserving both Photo consent
+Update first failed 117/3/2 because the container omitted robots/lamp;
+with the unchanged 249 tracked fixtures mounted, it passed 120/0/2.
+Common is rebased onto 3e75cc3cb at 71275b221, preserving both Photo consent
 and private-source production; its current-head carry gates are running.
 
-Peek3b1d83545 native39944780877 failed9795/1/69, with one leaky pass and
+Peek 3b1d83545 native 39944780877 failed 9795/1/69, with one leaky pass and
 1234 selected tests not run after fail-fast. The metadata basis list named
 an obsolete greeting, which the unchanged source census correctly rejects.
 A one-entry removal is under host gates on the current base; both privacy
-reads on3b remain recorded, but no native acceptance or ready claim stands.
+reads on 3b remain recorded, but no native acceptance or ready claim stands.
 
-Photo's actual pre-fix helpers reproduced5/7/0 on Mac. The corrected
-Linux helpers pass25/0, original scope34/0 and speaking14/0, with formatting
+Photo's actual pre-fix helpers reproduced 5/7/0 on Mac. The corrected
+Linux helpers pass 25/0, original scope 34/0 and speaking 14/0, with formatting
 and unchanged source. Two unused-method warnings remain because runtime
 route integration awaits the original-capture contract; no strict Clippy,
 route, physical consent or product activation claim is made.
+
+## 2026-10-23 19:40 +07: Peek merged and Common census correction
+
+Ready for lamp-voice: yes (#3211, merged); no (#3064 and Photo)
+
+Peek #3211 at b50ddea0f passed native ARM64 39950548255: 11039 passed,
+0 failed, 69 skipped, with one leaky pass; no selected test was left unrun.
+Documentation tests passed 4/0 and process controls 12/0. Clippy
+39950548355 passed. All 30 required controls passed. The run executed merge
+2219821ca on base 0f6f728b2, preserving every owned source blob. Artifact
+12500638045 contains 49 verified AArch64 ELF binaries; its SHA-256 is
+5e9f75b2814e0705e425f8717eca9909dba09850316df7a5b065d9ba31ad1c72.
+The current-head review is recorded on the PR. It was marked ready after
+both gates passed and merged in train #3270. Producer-side bus filtering
+and actual account installation remain separate decisions and acceptance.
+Evidence: /private/tmp/fourth-peek-native-b50ddea0f-20261023/.
+
+Common #3064 at 71275b221 passed both host carry gates, including strict
+workspace Clippy, complete Eyes (Mac 319/0/5 ignored; Linux 321/0/5), and
+Update library 121/0/2 on each host. Mac socket permission failures are
+retained separately from the permitted, unchanged-source reruns. Its native
+ARM64 39950272887 then failed the unchanged scratch-directory census:
+6322 passed, 1 failed, 68 skipped, and 4826 selected tests left unrun.
+None of the 63 required private/Checking/deadline controls completed;
+docs, process and artifact steps were skipped. Clippy 39950271748 passed.
+The new kept-name fixture duplicated person.rs's directory prefix. The
+one-prefix correction is being checked on rebased 0ede356f1, parent
+2615c87b6, before amendment and publication. No privacy assertion or
+runtime behavior is changed. The earlier Skills observer failure remains
+retained and is not declared flaky or cleared by another suite.
+
+Photo transport and neutral Cloud receipt controls passed on both hosts:
+formatting, 8 transport tests and all 15 Cloud photo tests, no ignored tests
+or warning headers. All source/index/mode/mtime guards held, and both
+containers/targets were released. Mac cancellation/drip bounds were
+20600/100735 microseconds; Linux 20862/100583, measured only around the
+synthetic helper call. These are not lamp or acoustic measurements.
+Earlier transport RED 4/4 and Cloud fixture failure 14/1 remain recorded.
+The corrected accepted socket is explicitly blocking; assertions and
+timeouts were preserved. Evidence:
+/private/tmp/fourth-photo-oracle-transport-green-checks-20261023/.
+The wire-contract tests are now staged before the production correction;
+that correction has not run. The original-capture contract remains with
+the first builder. No physical consent, activation or score increase is claimed.
