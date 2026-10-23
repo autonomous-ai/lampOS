@@ -745,10 +745,12 @@ fn run() -> Result<()> {
             let (runs, look, wire) = probe_options(rest)?;
             let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
             if let Some(mode) = wire {
+                // The relay's near addresses, read as the voice reads them.
+                let routes = runtime.block_on(lamp_voice::second_provider::probe::relay_routes_at(Path::new(second_config)))?;
                 // Its requests are made by hand, one at a time, blocking;
                 // the chats that build them are made in the runtime.
                 let _entered = runtime.enter();
-                lamp_voice::second_provider::probe::wire::run(Path::new(provider_config), Path::new(second_config), runs, mode)?;
+                lamp_voice::second_provider::probe::wire::run(Path::new(provider_config), Path::new(second_config), runs, mode, &routes)?;
             } else {
                 runtime.block_on(
                     lamp_voice::second_provider::probe::run(Path::new(provider_config), Path::new(second_config), runs, look.as_deref()),

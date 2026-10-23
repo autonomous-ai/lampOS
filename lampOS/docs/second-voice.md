@@ -3663,7 +3663,32 @@ heard or said, a key or a URL):
 - speech: `first_audio_ms`, `done_ms`, `audio_ms` (the audio's length);
 
 then each candidate's median and 90th percentile. A candidate without its
-key is left out, saying why. Each time runs from its request's start; it is
+key is left out, saying why.
+
+**The relay a run used (#2882, the first builder on #3126).** The probe
+reaches the addresses the voice would. With `LAMP_RELAY_ROUTES=on` in its
+environment (give it with `-E`, as `systemd-run` does not carry the voice
+unit's), it asks the relay for its near addresses once as it starts, where
+and with the key the voice asks, and says which services are near (never
+where); without it, it asks nothing. Each candidate that goes through the
+relay then takes the address the voice's own rule gives it
+(`worker::relay_routable`):
+
+- `chat=deepseek-relay(…)`: the routes' `chat` when the route's DeepSeek
+  goes through the relay with the relay's key;
+- the configured voice: the routes' `speech` when it speaks with the
+  relay's key;
+- `chat=gemini(…)` and `speech=gemini(…)`: the routes' `gemini` when that
+  Gemini already goes through the relay with the relay's key;
+- `chat=configured`: never routed.
+
+An address the unit's environment gives (`LAMP_SECOND_DEEPSEEK_BASE_URL`,
+`LAMP_SECOND_SPEECH_BASE_URL`, `LAMP_SECOND_GEMINI_BASE_URL`) is pinned and
+never routed, as in the voice. Each such candidate's run line, failed or
+not, ends `relay=near`, `relay=normal` or `relay=pinned` and the host it
+reached (`host=…`, never a path or a key). A near address that fails is
+counted as failed, not retried at the normal one: the probe times the near
+address alone. Each time runs from its request's start; it is
 not the lamp's end-of-speech-to-sound time, which also has speech to text's
 last words and the playout hold. Any other OpenAI-compatible endpoint is
 timed by giving it a configuration of its own as `SECOND_CONFIG`. It reads
@@ -3684,7 +3709,10 @@ systemd-run --pty --wait \
 `lamp-voice probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] --wire`
 (`second_provider/probe/wire.rs`) times a chat request step by step, from
 the lamp's side, for DeepSeek through the relay and on its own API (#1934;
-the first builder on #1722, 00:56). On lamp-4ace the relay's answers began
+the first builder on #1722, 00:56). Its relay target, for the
+chat, `--speech` and `--socket`, takes the relay's near address as the
+candidates above do with `LAMP_RELAY_ROUTES=on`, and says which in one line
+as it starts (`wire target=relay: relay=near host=…`). On lamp-4ace the relay's answers began
 about 0.6 s later than DeepSeek's own. Each request is the route's own as
 `Chat` builds it (`hosted.deepseek_model`, thinking off), made by hand on a
 connection of its own:
