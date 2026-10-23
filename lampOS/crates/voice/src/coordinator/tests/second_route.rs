@@ -5570,3 +5570,97 @@ fn the_sentences_words_and_its_answer_are_counted_only_on_either_route() {
         );
     }
 }
+
+/// The production coordinator generated these records from actual provider
+/// IPC. Storage is exercised separately through the shared service writer;
+/// this is a metadata-disclosure control, not a hardware/acoustic claim.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_real_coordinator_transcript_is_projected_before_shared_storage() {
+    use std::os::unix::fs::PermissionsExt;
+    let _one = super::pilot_faults::one_session();
+    const SECRET: &str = "COORDINATOR_PRIVATE_CANARY";
+    let run = run(Script {
+        second: false,
+        only: true,
+        second_hears: Some(SECRET),
+        ..Script::question(Live::Answer(12))
+    });
+    run.assert_clean();
+    let heard = run.events("transcript");
+    assert!(heard.iter().any(|event| event["text"] == SECRET));
+    assert!(!run.events("input_admitted").is_empty());
+    assert!(!run.events("turn_finished").is_empty());
+    let directory = SessionDirectory::create().unwrap();
+    let voice = directory.path.join("voice");
+    let sessions = voice.join("sessions");
+    let output = sessions.join("0123456789abcdef0123456789abcdef");
+    std::fs::create_dir(&voice).unwrap();
+    std::fs::create_dir(&sessions).unwrap();
+    std::fs::set_permissions(&voice, std::fs::Permissions::from_mode(0o710)).unwrap();
+    std::fs::set_permissions(&sessions, std::fs::Permissions::from_mode(0o750)).unwrap();
+    let reader =
+        crate::session_reader::Reader::prepare(&output, rustix::process::getegid().as_raw())
+            .unwrap();
+    std::fs::create_dir(&output).unwrap();
+    std::fs::set_permissions(&output, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let mut trace = SessionState::service_with_reader(&output, Ok(reader));
+    let generated: Vec<_> = run
+        .trace
+        .iter()
+        .filter(|row| {
+            matches!(
+                row["kind"].as_str(),
+                Some(
+                    "transcript"
+                        | "input_admitted"
+                        | "turn_finished"
+                        | "answer_stages"
+                        | "answer_first_audio"
+                )
+            )
+        })
+        .cloned()
+        .collect();
+    assert!(!generated.is_empty() && generated.len() < 64);
+    for event in &generated {
+        record(&mut trace, event.clone()).unwrap();
+    }
+    trace.flush(&mut None, 1);
+    let bounded = trace.finish_logging().unwrap();
+    assert!(!bounded.writer_failed, "bounded finish: {bounded:?}");
+    assert!(bounded.finish_attempted);
+    assert_eq!(bounded.degraded, !bounded.acknowledged);
+    let report = trace
+        .writer_for_test()
+        .observe_completion_for_test(&bounded, std::time::Duration::from_secs(5));
+    assert!(report.acknowledged && !report.degraded);
+    assert_eq!(report.written_events, generated.len() as u64);
+    let mut saved = Vec::new();
+    for n in 0..4 {
+        let bytes = std::fs::read(output.join(format!("metadata/events-{n}.jsonl"))).unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains(SECRET));
+        for line in bytes
+            .split(|byte| *byte == b'\n')
+            .filter(|line| !line.is_empty())
+        {
+            let row: Value = serde_json::from_slice(line).unwrap();
+            assert!(
+                row.get("text").is_none()
+                    && row.get("owner").is_none()
+                    && row.get("provider_session").is_none()
+            );
+            if row["kind"] != "service_segment" {
+                saved.push(row);
+            }
+        }
+    }
+    assert_eq!(saved.len(), generated.len());
+    assert!(saved.iter().any(|row| row["kind"] == "service_event"));
+    for kind in ["input_admitted", "turn_finished"] {
+        let original = generated.iter().find(|row| row["kind"] == kind).unwrap();
+        let shared = saved.iter().find(|row| row["kind"] == kind).unwrap();
+        assert_eq!(shared["turn"], original["turn"]);
+        assert_eq!(shared["at_us"], original["at_us"]);
+    }
+}

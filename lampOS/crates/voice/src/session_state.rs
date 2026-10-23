@@ -102,7 +102,15 @@ impl SessionState {
         }
     }
     pub(crate) fn service(output: &Path) -> Self {
-        let writer = ServiceTrace::start(output);
+        Self::service_writer(ServiceTrace::start(output))
+    }
+    pub(crate) fn service_with_reader(
+        output: &Path,
+        reader: io::Result<crate::session_reader::Reader>,
+    ) -> Self {
+        Self::service_writer(ServiceTrace::start_with_reader(output, reader))
+    }
+    fn service_writer(writer: io::Result<ServiceTrace>) -> Self {
         if writer.is_err() {
             eprintln!(
                 "lamp-voice serve: metadata unavailable at startup; recording health degraded"
@@ -243,6 +251,12 @@ impl SessionState {
             }
             self.events.clear();
         }
+    }
+    #[cfg(test)]
+    pub(crate) fn writer_for_test(&self) -> &ServiceTrace {
+        self.writer
+            .as_ref()
+            .expect("test service writer initialized")
     }
     pub(crate) fn finish_logging(&mut self) -> Option<service_trace::Report> {
         if let Some(writer) = self.writer.as_mut() {

@@ -663,6 +663,19 @@ fn passed(name: &str) -> bool {
 }
 
 #[test]
+fn session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker() {
+    let setting = crate::session_reader::ENVIRONMENT;
+    assert!(
+        !census().read.contains_key(setting),
+        "a worker must not resolve or grant session-reader access"
+    );
+    assert!(
+        !passed(setting),
+        "the reader group belongs only to continuous coordinator startup"
+    );
+}
+
+#[test]
 fn every_switch_the_workers_read_reaches_a_worker_or_says_why_not() {
     let Census { read, .. } = census();
     // The scan sees the switches it must: one by its const, one by a path

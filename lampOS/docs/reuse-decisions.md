@@ -1518,3 +1518,58 @@ ember, never dark. Drop: the announcement. The signal is one topic,
 `room/presence`, said by the eyes for every reader (the light and #1673's
 Messages), never "nobody" while the eyes are not looking. Off unless
 `LAMP_PRESENCE=on`; not run on a lamp. See [presence.md](presence.md).
+
+## A dedicated reader of service events (#2789, 2026-10-23)
+
+V1's `system/lib/voicefile/voicefile.go` provides retained-root confinement
+and regular, bounded file reads. Keep those protections and the V2 service
+writer's exclusive files and retained descriptors. V1's profile/sample
+access and flow-log permissions do not define who may read this service's
+private sessions, so they are not copied as a sharing policy.
+
+Reuse the workspace's rustix descriptor operations and existing Unix group
+mechanism, with a bounded local group-file lookup. Do not introduce NSS or
+network lookup on startup, global umask changes, a privileged reader daemon,
+recursive historical widening or per-turn permission work. A named explicit
+group applies only to new service event files, and Records retains its
+role-specific ownership, layout, ACL and deletion checks. Private defaults,
+health and quarantine remain private. See [Records](records.md#optional-session-reader-group-2789)
+and [Peek](peek.md#session-reader-access) for the rollout contract.
+
+The group lookup and fixed permission setup run once before service workers;
+the host target is under 50 ms from preparation entry to grant or private
+failure. Those permission operations add no per-turn or rotation work.
+Timing and a dedicated account's actual access must be measured separately
+from metadata-stat assertions. A bus view that excludes raw speech before
+delivery, its subscriber permissions and the authorized lamp install/restart
+remain separate acceptance work. Filtering inside Peek cannot protect data
+already received; no device result is claimed by this source change.
+
+
+### Share a producer projection, not the private trace (#3211)
+
+V1's `system/lib/flow/flow.go::Event` carries an arbitrary `Data` map, and
+`system/server/agent/delivery/http/handler_api_flow.go::FlowLogs` downloads
+those JSONL bytes behind the existing authenticated route. That is not a
+field-level privacy contract for a dedicated Unix reader. V2's original
+`ServiceTrace::submit` likewise serialized arbitrary Values, including the
+coordinator's transcript text; Peek's field filtering did not prevent another
+program under the reader account from reading those words.
+
+Keep private/finite traces, bounded packets/queue/rotation, exclusive retained
+descriptors, health reporting, and verified private rollback unchanged. After
+a successful sharing grant only, serialize a typed flat projection of the
+fields actually consumed by Peek's Turns reader: fixed kind/status vocabularies
+and unsigned timing/count fields. An unknown record becomes a fixed generic
+row; no original unknown kind, nested object, words, path or identity survives.
+This changes only stored observations, not the coordinator's in-memory events,
+cue interpretation, capture, privacy or output authority. No new dependency,
+account, bus capability, filesystem permission or default is introduced.
+
+Controls inspect every shared segment's bytes for planted private values,
+verify retained structural timings and counts, exercise the actual coordinator's
+Transcript through the shared writer, and inspect all files from the dedicated
+GID. Private, finite, lookup-failure and verified-rollback traces retain their
+original contents. The serialization/enqueue host target is under 1 ms per
+record; asynchronous filesystem stalls remain outside that target. The authored
+controls still require their Mac/Linux gates; no lamp result is claimed here.

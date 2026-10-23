@@ -2623,6 +2623,7 @@ fn run_source(
         controls_options.mute_record.is_some(),
     )?;
     lifetime.validate()?;
+    let session_reader = crate::session_reader::startup(lifetime.continuous(), output);
     // Restore the software latch before any worker, including metadata/GPIO.
     let controls = RefCell::new(HandControls::restore(controls_options)?);
     // One optional storage/IPC process across every privacy cycle. Its failure
@@ -2648,7 +2649,10 @@ fn run_source(
         crate::marked::session_opened(output);
     }
     let mut trace = if lifetime.continuous() {
-        SessionState::service(output)
+        match session_reader {
+            Some(reader) => SessionState::service_with_reader(output, reader),
+            None => SessionState::service(output),
+        }
     } else {
         SessionState::finite()
     };
