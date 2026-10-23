@@ -78,8 +78,8 @@ pub const FOLLOW_UP_FOR: Duration = Duration::from_secs(8);
 /// whole number of ms from [`FOR_LEAST`] to [`FOR_MOST`]: the lead's
 /// decision 4 (#1711, 23 Oct 08:2x), a second person's follow-up without the
 /// name answered within the window, so the window is a setting. Read only
-/// with the switch on; anything else is said once a coordinator, and
-/// ignored.
+/// with the switch on; anything else is said once by the coordinator,
+/// and ignored.
 pub const FOR_ENVIRONMENT: &str = "LAMP_FOLLOW_UP_FOR_MS";
 /// The worker's flag for it, with its value, right after [`FLAG`].
 pub const FOR_FLAG: &str = "--follow-up-for-ms";
@@ -100,19 +100,19 @@ static FOR_MS: AtomicU64 = AtomicU64::new(FOLLOW_UP_FOR.as_millis() as u64);
 pub fn arguments_from_environment() -> Vec<String> {
     let value = std::env::var(ENVIRONMENT).ok();
     let window = std::env::var(FOR_ENVIRONMENT).ok();
-    // Said once a coordinator, not at each worker start.
+    // Said once by the coordinator, not at each worker start.
     static SAID: std::sync::Once = std::sync::Once::new();
     if value.as_deref() == Some("on")
         && let Some(window) = window.as_deref()
         && within(window).is_none()
     {
         SAID.call_once(|| {
-        eprintln!(
-            "lamp-voice: {FOR_ENVIRONMENT}={window:?} is not a whole number of ms from {} to {}; a follow-up has {} s",
-            FOR_LEAST.as_millis(),
-            FOR_MOST.as_millis(),
-            seconds(FOLLOW_UP_FOR)
-        );
+            eprintln!(
+                "lamp-voice: {FOR_ENVIRONMENT}={window:?} is not a whole number of ms from {} to {}; a follow-up has {} s",
+                FOR_LEAST.as_millis(),
+                FOR_MOST.as_millis(),
+                seconds(FOLLOW_UP_FOR)
+            );
         });
     }
     arguments_with(value.as_deref(), window.as_deref())
