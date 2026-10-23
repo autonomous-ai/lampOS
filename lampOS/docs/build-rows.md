@@ -1,6 +1,6 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-24 03:24 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-24 06:18 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
 **Build 92.6% over 70 rows. Quality 63.8% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
@@ -43,7 +43,7 @@ Written by the first builder from the team's review page at 2026-10-24 03:24 (+0
 | A voice cheaper than Gemini Live, as fast and as good | 1.00 | #754 #1686 #1712 #1973 #2135 #2136 | sixth, first, fourth, ten, backend, third, eighth, twelve | 20 Oct 10:1x, built, by the lead’s rule (it works and it is fast enough are separate): on the main line since #1973, on lamp-4ace, and 32 of 32 answered for the lead on lamp-52e6. |
 | A person brings their own DeepSeek and Deepgram keys, in setup or the app | 0.90 | #2094 #2845 #2846 | el, fourteen | 22 Oct 18:0x, up from 0.8: setup’s own-keys step passed on a freshly reset lamp-06c1 (El, #2845 closed). |
 | Lamp 2 in the Autonomous app | 1.00 | #1396 | ten, mobile, backend | 20 Oct 11:4x, built: the app's Skills page and name and time zone (ecm-sds-mobile#8, #9) merged into the app's v3 after their tries on lamp-0c89. |
-| Talks with you naturally: turns, answers, web answers, the time | 0.90 | #694 | second, nine | 23 Oct 18:5x, down from 1.0: with the owner in a quiet office after colleagues left, each conversation ended after two turns: the room stayed “busy” and held follow-ups and a face turned to the lamp (Thirteen’s P1). |
+| Talks with you naturally: turns, answers, web answers, the time | 0.92 | #694 | second, nine | 24 Oct 06:1x, up from 0.9: the two-turn fault’s fix is merged behind LAMP_SAME_SPEAKER_CARRIES, off (#3296, Sixth, train 62, df6830381). |
 | Hears its name, a bare “Lamp” too | 1.00 | #694 #725 | second, nine | Built; |
 | Eye contact: turns to you and to its name, looks away to think, nods | 1.00 | #715 | fifth | Built |
 | Always alive: breathing, small drift, a glance at a bang | 1.00 | #710 #714 #715 | fifth, second | Built |
