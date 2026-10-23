@@ -48,6 +48,7 @@ fn no_mode_overrides(root: &Path, name: &str) -> Result<(), String> {
     for base in [
         "etc/systemd/system",
         "run/systemd/system",
+        "usr/local/lib/systemd/system",
         "usr/lib/systemd/system",
         "lib/systemd/system",
     ] {
