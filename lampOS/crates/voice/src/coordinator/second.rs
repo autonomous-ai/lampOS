@@ -1866,6 +1866,8 @@ mod tests {
     /// audio age bound when it is sent (lampOS#892).
     #[test]
     fn a_line_given_to_gemini_at_the_end_of_the_hold_is_never_too_old() {
+        let _clock =
+            crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
         let mut bench = Bench::standing_in();
         let (_owner, current) = unsent_reply();
         let turn = current.owner.turn();
@@ -1914,6 +1916,8 @@ mod tests {
     /// Ready is there in the same tick.
     #[test]
     fn a_ready_after_the_hold_leaves_the_line_to_the_second_route() {
+        let _clock =
+            crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
         let mut bench = Bench::standing_in();
         let (_owner, current) = unsent_reply();
         let turn = current.owner.turn();
@@ -1975,6 +1979,8 @@ mod tests {
     /// hold, rather than given to a slower route.
     #[test]
     fn a_ready_lost_in_the_same_drain_holds_the_next_request_for_the_reconnect() {
+        let _clock =
+            crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
         let mut bench = Bench::standing_in();
         bench.gemini_link(1, true);
         bench.gemini_link(2, false);

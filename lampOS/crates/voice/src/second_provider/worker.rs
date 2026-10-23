@@ -12,12 +12,15 @@ use super::{
     net::{Message, search::Search},
     output_request,
 };
+#[cfg(test)]
+use crate::scenario_clock::monotonic_us;
 use crate::{
     provider_flow::OutputSender,
     provider_worker::{ProviderInput, ProviderOutput},
     transport::{Channel, WorkerChannels},
     wire::{Control, WorkerEvent},
 };
+#[cfg(not(test))]
 use lamp_ipc::monotonic_us;
 use lamp_turn_owner::{BootId, BoundaryGuard, MonoTime, Snapshot};
 use std::{
@@ -8445,6 +8448,12 @@ mod route_checks;
 
 #[cfg(test)]
 mod tests {
+    /// These synchronous fixtures backdate events by up to 400 seconds.
+    /// Heeding and its inputs share this epoch, independent of host uptime.
+    fn clock_with_history() -> crate::scenario_clock::Scope {
+        crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap()
+    }
+
     /// The reviewer's P2 on #3050: with scoped context off, the owner's
     /// turn, then the known file gone and one unknown face in view. The
     /// session is still counted for the owner (their sticky presence, 30 s),
@@ -9038,6 +9047,7 @@ mod tests {
     fn with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy() {
         // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
         let _one = crate::provider_worker::tests::one_thread();
+        let _clock = clock_with_history();
         use crate::room_told::Room;
         // A short root: a Unix socket's address holds 103 bytes.
         let root = std::path::PathBuf::from(format!("/tmp/lnh-{}", std::process::id()));
@@ -9070,7 +9080,7 @@ mod tests {
                     Vec::new()
                 },
             };
-            eyes.publish_json(lamp_ipc::monotonic_us(), &faces).unwrap();
+            eyes.publish_json(monotonic_us(), &faces).unwrap();
             let now_us = monotonic_us();
             {
                 let mut room = crate::room_told::room().lock().unwrap();
@@ -9137,6 +9147,7 @@ mod tests {
     fn with_name_or_follow_up_a_follow_up_begun_while_the_answer_plays_goes_on() {
         // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
         let _one = crate::provider_worker::tests::one_thread();
+        let _clock = clock_with_history();
         use crate::room_told::Room;
         let s = Duration::from_secs;
         // The ask's answer began `began_s` s ago and its words play until
@@ -9463,6 +9474,7 @@ mod tests {
     fn with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds() {
         // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
         let _one = crate::provider_worker::tests::one_thread();
+        let _clock = clock_with_history();
         let s = Duration::from_secs;
         let judged = |on: bool, busy: bool, ago: u64, long: u64, heard: &str| {
             *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
@@ -9622,6 +9634,7 @@ mod tests {
     fn a_line_4_s_after_an_answer_is_held_by_another_voice_or_goes_on_judged_without_it() {
         // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
         let _one = crate::provider_worker::tests::one_thread();
+        let _clock = clock_with_history();
         use crate::second_provider::{Did, Heard};
         use std::sync::{Arc, Mutex};
         /// Prints by a line's first sample: 1 is the asker's voice, -1
@@ -10935,6 +10948,7 @@ mod tests {
     fn the_lamps_own_answers_to_talk_keep_no_conversation_going() {
         // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
         let _one = crate::provider_worker::tests::one_thread();
+        let _clock = clock_with_history();
         let s = Duration::from_secs;
         // Lines at a virtual second, each answered a second later if let
         // out: `answer` says what the lamp answers it. A line with nothing
@@ -16331,6 +16345,7 @@ mod tests {
     /// the best of them; none outside that, or without the reader.
     #[test]
     fn a_near_hearing_counts_only_around_the_lines_start() {
+        let _clock = clock_with_history();
         let root = std::path::PathBuf::from(format!("/tmp/lnn-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
@@ -16788,6 +16803,7 @@ mod tests {
     /// it. Each of the turn judged last only.
     #[test]
     fn the_policy_is_told_the_name_a_line_left_unanswered_and_the_lamp_speaking_lately() {
+        let _clock = clock_with_history();
         use crate::second_provider::policy::Turn;
         let signs = |room, names: Vec<(u64, f32)>| super::Signs {
             room,
@@ -16799,7 +16815,7 @@ mod tests {
             continues_from: None,
         };
         const S: u64 = 1_000_000;
-        let now = lamp_ipc::monotonic_us();
+        let now = monotonic_us();
         let mut heeding = super::Heeding::new(false, true, None, None);
         heeding.judge(
             1,
@@ -16847,7 +16863,7 @@ mod tests {
         // The lamp's words heard to their end 19 s ago, then 21 s ago.
         heeding.lamp_did(crate::second_provider::Did::Said(
             1,
-            lamp_ipc::monotonic_us() - 19 * S,
+            monotonic_us() - 19 * S,
         ));
         heeding.judge(
             5,
@@ -16859,7 +16875,7 @@ mod tests {
         let mut quiet = super::Heeding::new(false, true, None, None);
         quiet.lamp_did(crate::second_provider::Did::Said(
             1,
-            lamp_ipc::monotonic_us() - 21 * S,
+            monotonic_us() - 21 * S,
         ));
         quiet.judge(
             6,
