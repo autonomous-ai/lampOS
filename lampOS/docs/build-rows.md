@@ -1,6 +1,6 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-23 12:21 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-23 13:24 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
 **Build 92.3% over 70 rows. Quality 65.0% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
@@ -27,7 +27,7 @@ Written by the first builder from the team's review page at 2026-10-23 12:21 (+0
 | Sleep, and waking on its name | 1.00 | #749 #714 | fourth, second |  |
 | Reminders, timers, memory across days | 1.00 | #748 #743 | — |  |
 | Setup for a home, 5 s reset | 0.90 | #806 #1209 #2861 | first | 20 Oct 13:3x, up from 0.65: lamp-06c1 done end to end with its person (El, #806): the 5 s reset wiped it and rebooted, it was set up again from the app (connected, the link and keys kept 600), “Hey Lamp” heard and answer… |
-| Touch strip and head pads | 0.95 | #711 #1362 #2445 #2460 #2857 | first | 23 Oct 11:2x, up from 0.9: every issue in the row is closed, with head touch passed by a real hand on lamp-52e6 (#2857). |
+| Touch strip and head pads | 0.90 | #711 #1362 #2445 #2460 #2857 | first | 23 Oct 13:2x, back to 0.9, a correction: my 11:2x note counted the row’s issues closed, but the product units don’t turn head touch on yet. |
 | Two people at the lamp | 1.00 | #829 #1158 #1278 | fourth | All merged: day and night bars (#1158, 11:49) and a follow-up within 20 s told it may follow on (#1278, 13:57). |
 | “Stop” over its own voice | 1.00 | #828 #1047 #1264 | fourth | Built: stop words heard over its voice (#1047, 09:11) and listening gaps in its pauses (#1264, 11:52), both off until measured. |
 | Skills: say service, Reminders, Task news | 1.00 | #939 #1042 #1237 #1253 | second | All merged: the say service and the Policy gate, Reminders (with #1253’s fix), Task news as a skill (#1042, 11:44) |
