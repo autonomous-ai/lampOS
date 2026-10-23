@@ -459,6 +459,36 @@ pub fn is_that_face(here: Option<&str>, face: Option<&str>) -> bool {
     here.is_some() && here == face
 }
 
+/// With [`SPEAKER_ENVIRONMENT`] on, a yes that passes is not kept at once:
+/// the eyes force one look after it reached them and keep it only on that
+/// look (#2856, reviewer-three's P2: a newcomer within 1.5 s of the photo
+/// face takes its passing id, `bus_out::Ids::of`). No such look within this
+/// long, the yes is `not_that_face`: it bounds the yes's answer at about a
+/// second, inside the voice's 6 s (`known_faces::DEADLINE`).
+pub const YES_LOOK_WITHIN: std::time::Duration = std::time::Duration::from_millis(1000);
+
+/// Whether a look's near face is the photo's `name` by its print: `matched`
+/// is the unconfirmed face its print matched (`Unconfirmeds::here`), `None`
+/// for no match or someone who asked. With [`SPEAKER_ENVIRONMENT`] on, a
+/// print that isn't the photo's drops `photo_here`, so a passing id taken
+/// over by another face is not left naming the photo's.
+pub fn print_is_photos(name: &str, matched: Option<&str>) -> bool {
+    matched.is_some_and(|matched| crate::who::same_name(matched, name))
+}
+
+/// The yes's answer from the look forced after it: kept only if that look's
+/// near face printed as the photo's `name` and has the yes's passing id
+/// (`face_now`, `yes_face`, both `boot/f3`). Anything else, no face or no
+/// print among them, is `not_that_face`, and nothing is kept.
+pub fn yes_after_look(
+    name: &str,
+    matched: Option<&str>,
+    face_now: Option<&str>,
+    yes_face: Option<&str>,
+) -> bool {
+    print_is_photos(name, matched) && is_that_face(face_now, yes_face)
+}
+
 /// The eyes' answer to `{"photo_here":true}`: the face from a photo seen at
 /// the lamp within `fresh` (`here`: its name and how long ago), and whether
 /// that face was asked about, its own mark. A face let go and added again
@@ -844,6 +874,47 @@ mod tests {
         assert!(!is_that_face(Some("b1/f3"), None));
         assert!(!is_that_face(None, None));
         assert!(!is_that_face(None, Some("b1/f3")));
+    }
+
+    /// Reviewer-three's P2 on #2856: another face leaning into the photo
+    /// face's place within 1.5 s takes its passing id, so the yes passes
+    /// `is_that_face`; the look forced after it is kept only on the
+    /// photo's print.
+    #[test]
+    fn a_yes_from_a_face_that_took_the_photo_faces_id_is_not_kept() {
+        // The same id, a print that isn't the photo's: not kept.
+        assert!(!yes_after_look("Lan", None, Some("b1/f1"), Some("b1/f1")));
+        assert!(!yes_after_look(
+            "Lan",
+            Some("Hoa"),
+            Some("b1/f1"),
+            Some("b1/f1")
+        ));
+        // Nobody near, or no id judged, at that look: not kept.
+        assert!(!yes_after_look("Lan", None, None, Some("b1/f1")));
+        assert!(!yes_after_look("Lan", Some("Lan"), None, Some("b1/f1")));
+        // The photo's print, but another face's id: not kept.
+        assert!(!yes_after_look(
+            "Lan",
+            Some("Lan"),
+            Some("b1/f2"),
+            Some("b1/f1")
+        ));
+        // The photo's print on the face that said yes: kept.
+        assert!(yes_after_look(
+            "Lan",
+            Some("lan"),
+            Some("b1/f1"),
+            Some("b1/f1")
+        ));
+    }
+
+    /// A look whose near print isn't the photo's drops `photo_here`.
+    #[test]
+    fn a_print_that_is_not_the_photos_drops_it_from_here() {
+        assert!(print_is_photos("Lan", Some("Lan")));
+        assert!(!print_is_photos("Lan", None));
+        assert!(!print_is_photos("Lan", Some("Hoa")));
     }
 
     /// `photo_here` names that face with the switch on, and is today's

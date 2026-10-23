@@ -694,6 +694,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         photo_here: Option<(String, Option<String>, Instant)>,
         /// `LAMP_PHOTO_SPEAKER=on` (#2856): a yes is kept only with that id.
         photo_speaker: bool,
+        /// With it on, a yes that passed, waiting for the look forced after
+        /// it (`photo::yes_after_look`): its name, face, caller and when.
+        photo_yes: Option<(String, Option<String>, UnixStream, Instant)>,
         /// When each unconfirmed face was last seen, monotonic, for the end
         /// of a meeting with no answer.
         photo_seen: Vec<(String, u64)>,
@@ -778,6 +781,36 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 eprintln!("lamp-eyes: could not remember a face: {error}");
                 serde_json::json!({"error": "full"})
             }
+        }
+    }
+    /// A face from a photo, confirmed by its person: kept as an ordinary
+    /// print, or why not.
+    fn keep_photo_yes(who: &mut Who, name: &str) -> serde_json::Value {
+        let Some(unconfirmed) = who.unconfirmed.as_mut() else {
+            return serde_json::json!({"error": "photos_off"});
+        };
+        match unconfirmed.confirmed(name) {
+            Ok(Some(taken)) => {
+                let now_unix_s = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |since| since.as_secs());
+                // A face its person confirmed by name: no
+                // near-name question (`apart`).
+                let kept =
+                    who.people
+                        .remember_one(taken.name(), taken.prints(), now_unix_s, false, true);
+                if let Err(who::Refused::Store(_)) = &kept {
+                    // Refused by the store: unconfirmed again.
+                    let _ = unconfirmed.put_back(taken);
+                } else {
+                    eprintln!("lamp-eyes: a face from a photo was confirmed by its person");
+                    who.photo_here = None;
+                    who.photo_seen.retain(|(seen, _)| seen != name);
+                }
+                kept_reply(kept, who.visits, who.people.names().len())
+            }
+            Ok(None) => serde_json::json!({"error": "not_unconfirmed"}),
+            Err(_) => serde_json::json!({"error": "storage"}),
         }
     }
     fn answer(stream: &mut UnixStream, value: serde_json::Value) {
@@ -953,6 +986,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 }),
                 photo_here: None,
                 photo_speaker: lamp_eyes::photo::speaker_from_environment(),
+                photo_yes: None,
                 photo_seen: Vec::new(),
                 photos_looked: None,
             })
@@ -1437,35 +1471,19 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             Some(unconfirmed) if !unconfirmed.was_asked(&name) => {
                                 serde_json::json!({"error": "not_asked"})
                             }
-                            Some(unconfirmed) => match unconfirmed.confirmed(&name) {
-                                Ok(Some(taken)) => {
-                                    let now_unix_s = std::time::SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .map_or(0, |since| since.as_secs());
-                                    // A face its person confirmed by name: no
-                                    // near-name question (`apart`).
-                                    let kept = who.people.remember_one(
-                                        taken.name(),
-                                        taken.prints(),
-                                        now_unix_s,
-                                        false,
-                                        true,
-                                    );
-                                    if let Err(who::Refused::Store(_)) = &kept {
-                                        // Refused by the store: unconfirmed again.
-                                        let _ = unconfirmed.put_back(taken);
-                                    } else {
-                                        eprintln!(
-                                            "lamp-eyes: a face from a photo was confirmed by its person"
-                                        );
-                                        who.photo_here = None;
-                                        who.photo_seen.retain(|(seen, _)| seen != &name);
-                                    }
-                                    kept_reply(kept, who.visits, who.people.names().len())
-                                }
-                                Ok(None) => serde_json::json!({"error": "not_unconfirmed"}),
-                                Err(_) => serde_json::json!({"error": "storage"}),
-                            },
+                            // With `LAMP_PHOTO_SPEAKER=on`, kept only on a look
+                            // forced after it (`photo::yes_after_look`), so a
+                            // face that took the photo face's passing id can't
+                            // keep it (reviewer-three's P2 on #2856).
+                            Some(_) if who.photo_speaker && who.photo_yes.is_some() => {
+                                serde_json::json!({"error": "busy"})
+                            }
+                            Some(_) if who.photo_speaker => {
+                                who.photo_yes = Some((name, face, stream, Instant::now()));
+                                who.looked_for = None;
+                                continue;
+                            }
+                            Some(_) => keep_photo_yes(who, &name),
                         }
                     }
                     Some(Ask::PhotoNo(name)) => match who.unconfirmed.as_mut() {
@@ -1583,6 +1601,16 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 } else {
                     who.taking = Some((taking, stream));
                 }
+            }
+            // A photo yes whose forced look did not come in time: not kept.
+            if who
+                .photo_yes
+                .as_ref()
+                .is_some_and(|(.., at)| at.elapsed() >= lamp_eyes::photo::YES_LOOK_WITHIN)
+                && let Some((_, _, mut stream, _)) = who.photo_yes.take()
+            {
+                eprintln!("lamp-eyes: a yes to a face from a photo was not kept: no look in time");
+                answer(&mut stream, serde_json::json!({"error": "not_that_face"}));
             }
         }
         for datagram in permit.heard() {
@@ -1980,7 +2008,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             stage(&mut stage_at, &mut stages[0]);
             let busy = lamp_eyes::change::busy(
                 wanted.is_some(),
-                who.as_ref().is_some_and(|who| who.taking.is_some()),
+                who.as_ref()
+                    .is_some_and(|who| who.taking.is_some() || who.photo_yes.is_some()),
                 any_face_at.map(|at| at.elapsed().as_micros() as u64),
             );
             if let Some(change) = change.as_mut() {
@@ -2142,6 +2171,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             let print = near
                                 .and_then(|(_, (face, _))| align(&picture, &face.marks))
                                 .and_then(|aligned| who.recogniser.print(&aligned).ok());
+                            let near_face = near_id
+                                .as_ref()
+                                .zip(bus_out.as_ref())
+                                .map(|(id, bus)| format!("{}/{id}", bus.faces_boot()));
+                            // The face from a photo the near print matched.
+                            let mut matched = None;
                             if let Some((taking, _)) = who.taking.as_mut() {
                                 taking.look(&heights, print);
                             } else if let Some(print) = print {
@@ -2151,19 +2186,30 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     .map(|(name, likeness)| (name, likeness, Instant::now()));
                                 // Nobody who asked: a face from a photo, maybe,
                                 // never named, only noted so the voice can ask.
-                                if who.known.is_none()
+                                if who.known.is_none() {
+                                    matched = who
+                                        .unconfirmed
+                                        .as_ref()
+                                        .and_then(|unconfirmed| unconfirmed.here(&print));
+                                }
+                                // A print not the photo's: no longer here
+                                // (`photo::print_is_photos`, #2856).
+                                if who.photo_speaker
+                                    && who.photo_here.as_ref().is_some_and(|(here, ..)| {
+                                        !lamp_eyes::photo::print_is_photos(here, matched.as_deref())
+                                    })
+                                {
+                                    who.photo_here = None;
+                                }
+                                if let Some(name) = matched.clone()
                                     && let Some(unconfirmed) = who.unconfirmed.as_mut()
-                                    && let Some(name) = unconfirmed.here(&print)
                                 {
                                     // As the lamp sees them, kept beside the
                                     // photo's on their yes (#2854).
                                     unconfirmed.saw(&name, print.clone());
                                     who.photo_seen.retain(|(seen, _)| seen != &name);
                                     who.photo_seen.push((name.clone(), lamp_ipc::monotonic_us()));
-                                    let face = near_id.as_ref().zip(bus_out.as_ref()).map(
-                                        |(id, bus)| format!("{}/{id}", bus.faces_boot()),
-                                    );
-                                    who.photo_here = Some((name, face, Instant::now()));
+                                    who.photo_here = Some((name, near_face.clone(), Instant::now()));
                                 }
                                 if who.visits {
                                     let level = familiar(&mut who.people, who.known.as_ref());
@@ -2190,6 +2236,31 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     && let Some(bus) = bus_out.as_mut()
                                 {
                                     bus.familiar(None, lamp_ipc::monotonic_us());
+                                }
+                            }
+                            // The look forced by a photo yes, from a frame read
+                            // after it reached the eyes: kept only if the face
+                            // that said it prints as the photo's (#2856).
+                            if let Some((name, yes_face, mut stream, _)) = who.photo_yes.take() {
+                                let reply = if lamp_eyes::photo::yes_after_look(
+                                    &name,
+                                    matched.as_deref(),
+                                    near_face.as_deref(),
+                                    yes_face.as_deref(),
+                                ) {
+                                    keep_photo_yes(who, &name)
+                                } else {
+                                    eprintln!(
+                                        "lamp-eyes: a yes to a face from a photo was not kept: the face that said it is not the photo's"
+                                    );
+                                    serde_json::json!({"error": "not_that_face"})
+                                };
+                                answer(&mut stream, reply);
+                                if let Some(known) = &arguments.known_file {
+                                    lamp_eyes::who::keep_tellable(
+                                        &lamp_eyes::who::tellable_of(known),
+                                        &who.people.tellable(),
+                                    );
                                 }
                             }
                         }
