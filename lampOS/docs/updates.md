@@ -1463,12 +1463,43 @@ part of the one before. The rule (the first builder on #3126, 23 Oct):
 build on the other side, both ways.** That covers the bus, the sockets,
 memory's protocol and the tool calls between crates.
 
-- **An old reader ignores new fields.** A field or a value the next build
+- **To a lenient reader, a new field is ignored.** A field the next build
   adds is skipped by the build before, and it goes on as it did.
+- **To a strict reader, a new field is refused.** A message read with
+  `#[serde(deny_unknown_fields)]` fails whole on a field it doesn't know.
+  There a new field needs a new op or version, or the sender handles the
+  refusal safely (the next point).
 - **A new reader refused by an old server acts safely and says so.** It
   does not guess and does not act on half an answer. #3127 is the example:
   an older lamp-memory refuses `observations`, so the voice removes nothing
   and tells the person it couldn't forget.
+
+The strict readers of a message from another part (`git grep -n
+deny_unknown_fields -- crates`, read at `02c8d3851`; files, configs and
+messages inside one part are left out):
+
+- **Memory:** every op, `crates/memory/src/protocol.rs:74`; the days ops,
+  `crates/memory/src/days_protocol.rs:13`.
+- **Schedule, Settings, Tasks:** the request and its guard,
+  `crates/schedule/src/protocol.rs:17,25`, `crates/settings/src/protocol.rs:10`,
+  `crates/tasks/src/protocol.rs:10,18`.
+- **Actions' caps socket:** `crates/actions/src/caps_service.rs:95`, and the
+  put inside it, `crates/actions/src/caps.rs:26`.
+- **Controls on the bus:** the privacy switch, the touch event, the touch
+  source state and the touch state, `crates/msgs/src/controls.rs:187,408,594,690`.
+- **Other bus and socket messages in msgs:** the camera's close receipt,
+  `crates/msgs/src/privacy.rs:141`; requested audio between Skills and the
+  voice, `crates/msgs/src/requested_audio.rs:19,57,119,143`; room-sound
+  scores from Ears, `crates/msgs/src/sound_classes.rs:35,51,60`.
+- **The body's datagrams:** a mood, `crates/body/src/bin/lamp-body.rs:619`; a
+  gesture, `lamp-body.rs:688`; a skill's move, `crates/body/src/moves.rs:72,173`;
+  where the eyes see a face, `crates/body/src/gaze.rs:17,27`; the unplug
+  request, `crates/body/src/unplug.rs:40`.
+- **The eyes' sockets, from the voice:** the camera permit and the close
+  receipt's ask, `crates/eyes/src/permit.rs:18,31`; a full look,
+  `crates/eyes/src/full_look.rs:123`; remembering a face,
+  `crates/eyes/src/who.rs:1422,1485,1498`.
+- **The voice's say service, from Skills:** `crates/voice/src/say.rs:301`.
 
 Why the window can't be zero (read at `02c8d3851`):
 
