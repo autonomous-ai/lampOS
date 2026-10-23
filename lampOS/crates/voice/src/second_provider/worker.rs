@@ -5471,10 +5471,10 @@ impl Heeding {
     /// - Else, a print not back, under 0.70 from too little speech
     ///   (lamp-4ace on 23 Oct: 1.6–1.8 s prints at 0.25 and 0.27, possibly
     ///   the owner's own), or no face seen speaking: no sign either way
-    ///   (`None`), and the carry stands. Past the 8 s the line is held;
-    ///   within them the voice check decides as for any follow-up, except
-    ///   that a print under 0.30 from too little speech is neither another
-    ///   voice nor a sign that lets the line go on: it is held ([`Self::heed`]).
+    ///   (`None`), and the carry stands. The line is then judged as if no
+    ///   print had come, whether it came at once, late or never: past the
+    ///   8 s it is held; within them the ordinary follow-up rule lets it go
+    ///   on, the legacy exception ([`Self::heed`]).
     ///
     /// Carried, the line is let out as the conversation going on, before
     /// `busy_bar`, which then still holds a short line that is no question
@@ -6170,8 +6170,9 @@ impl Heeding {
                 crate::same_voice::DIFFERENT_BELOW,
             );
         }
+        let going_on_unheard = signs.going_on;
         let (mut going_on, mut other_voice, same_voice, likeness) =
-            self.voice_going_on_in(request, signs.going_on, busy);
+            self.voice_going_on_in(request, going_on_unheard, busy);
         let (speakers, turned_speakers) = speakers_between(self.eyes.as_ref(), began_us, ended_us);
         // Whether a carry still stands for the caller after this line.
         let mut carry_stands = false;
@@ -6182,13 +6183,15 @@ impl Heeding {
             let carried =
                 self.carried_by_the_same_speaker(request, likeness, &speakers, &turned_speakers);
             // An unsure print is no sign either way: the voice check's own
-            // "another voice" neither makes the room busy nor, with no sure
-            // sign, lets the line go on (`going_on` is already false then).
+            // "another voice" from it is undone, so the line is judged as if
+            // no print had come, as when it comes late or never (reviewer-two
+            // at 04:11 on #3296).
             if other_voice && carried.voice.is_none() {
                 other_voice = false;
+                going_on = going_on_unheard;
             }
-            // No sure sign: past the 8 s held; within them as the voice
-            // check found, as for any follow-up.
+            // No sure sign: past the 8 s held; within them the ordinary
+            // follow-up rule, the legacy exception, whenever the print comes.
             going_on = carried.goes_on.unwrap_or(follow_up && going_on);
             signs.going_on = going_on;
             carry_stands = self.carrying;
@@ -9558,7 +9561,7 @@ mod tests {
 
     /// Prints for the carry tests by a line's first sample: 1 is the
     /// owner's voice; 2 the owner's too, a short print reading 0.27 against
-    /// it, as on lamp-4ace on 23 Oct; -1 a colleague's; for 0 none ever
+    /// it, as on lamp-4ace on 23 Oct; 3 a short print reading 0.50; -1 a colleague's; for 0 none ever
     /// comes back. While `late` is set, prints wait until it is cleared.
     #[derive(Default)]
     struct CarryVoice {
@@ -9571,6 +9574,7 @@ mod tests {
             let print = match samples[0] {
                 1 => vec![1.0, 0.0],
                 2 => vec![0.27, 0.962_8],
+                3 => vec![0.5, 0.866],
                 -1 => vec![0.0, 1.0],
                 _ => return true,
             };
@@ -10054,10 +10058,10 @@ mod tests {
     /// colleague at 3 s, their own face seen speaking, held, ends the carry,
     /// whatever their print: the owner back at 12 s by face and voice, with
     /// no new answer, is held, until a fresh call. The controls at 3 s: a
-    /// colleague's short print with no face is held as no sign either way
-    /// (an unknown print lets no line out) and ends nothing, so the owner at
-    /// 12 s goes on; the owner's own voice with no face goes on as a
-    /// follow-up.
+    /// colleague's short print with no face is no sign either way, so the
+    /// ordinary follow-up rule lets it go on (the legacy exception) and it
+    /// ends nothing, so the owner at 12 s goes on; the owner's own voice
+    /// with no face goes on as a follow-up.
     #[test]
     fn a_colleague_within_the_eight_seconds_ends_the_carry_until_a_fresh_call() {
         let _one = crate::provider_worker::tests::one_thread();
@@ -10083,18 +10087,56 @@ mod tests {
         }
         let mut desk = CarryDesk::new(true);
         desk.answered(3);
-        // A statement: a question held would make the owner's next line a
-        // reply to it (`attention::AFTER_QUESTION`).
-        assert!(
-            desk.line(-1, "", "I sent the slides to the client this morning.")
-                .is_some(),
-            "a short print, no face, at 3 s: held"
+        assert_eq!(
+            desk.line(-1, "", "I sent the slides to the client this morning."),
+            None,
+            "a short print, no face, at 3 s: the ordinary follow-up"
         );
         desk.later(12);
         assert_eq!(desk.line(1, "f1", owner), None, "the carry stands");
         let mut desk = CarryDesk::new(true);
         desk.answered(3);
         assert_eq!(desk.line(1, "", owner), None, "the owner's voice at 3 s");
+    }
+
+    /// Reviewer-two at 04:11 on #3296: under a carry, a line with no face
+    /// and no sure sign of who said it, its print short and under 0.30
+    /// (0.27 or 0.0), short and between 0.30 and 0.70, or never back, is
+    /// judged as if no print had come, at once or late alike: within the
+    /// 8 s the ordinary follow-up rule lets it go on (the legacy
+    /// exception); past them it is held. Either way the carry stands, so
+    /// the owner's next line, by face and voice, goes on.
+    #[test]
+    fn an_unsure_print_with_no_face_decides_nothing_whenever_it_comes() {
+        let _one = crate::provider_worker::tests::one_thread();
+        // A statement: a question held would make the owner's next line a
+        // reply to it (`attention::AFTER_QUESTION`).
+        let words = "I think it will rain in the afternoon.";
+        for (gap, admitted) in [(3, true), (12, false)] {
+            for voice in [2, -1, 3, 0] {
+                for late in [false, true] {
+                    let mut desk = CarryDesk::new(true);
+                    desk.answered(gap);
+                    desk.late.store(late, std::sync::atomic::Ordering::Relaxed);
+                    let held = desk.line(voice, "", words);
+                    desk.late.store(false, std::sync::atomic::Ordering::Relaxed);
+                    assert_eq!(
+                        held.is_none(),
+                        admitted,
+                        "voice {voice} late {late} at {gap} s: {held:?}"
+                    );
+                    assert_eq!(
+                        desk.line(1, "f1", "Should I take an umbrella then?"),
+                        None,
+                        "voice {voice} late {late} at {gap} s: the carry stands"
+                    );
+                }
+            }
+        }
+        // Without the switch the immediate short print is held, as today.
+        let mut off = CarryDesk::new(false);
+        off.answered(3);
+        assert!(off.line(2, "", words).is_some(), "without the switch");
     }
 
     /// The reviewer's P3 on #2428: with `LAMP_QUIET_GOING_ON_SAME_ONE` and no
