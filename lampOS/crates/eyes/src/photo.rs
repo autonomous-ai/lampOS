@@ -576,6 +576,17 @@ impl<C: Caller> YesEnded<C> {
     }
 }
 
+/// A frame's capture time for a waiting yes ([`YesLook::frame_us`]): the
+/// driver's time in the shared monotonic clock, or, without it, 0, before
+/// any yes, so such a frame never answers one, which then runs out (not
+/// dated by its read, which a frame buffered before the yes would pass,
+/// #3257).
+pub fn frame_us(timestamp: Option<lamp_camera::DriverTimestamp>) -> u64 {
+    timestamp
+        .filter(|at| at.domain == lamp_camera::TimestampDomain::HostMonotonic)
+        .map_or(0, |at| at.micros)
+}
+
 /// A look's part in a waiting yes: when its frame was captured, the
 /// permission's hold and the record of the yes's name now, and the near
 /// face's match and passing id ([`yes_after_look`]).
@@ -629,8 +640,9 @@ impl<C: Caller> PendingYes<C> {
     }
 
     /// At a look, as it ends, so nothing between the frame and the keep is
-    /// unchecked: first [`Self::checked`]; a frame captured before the yes
-    /// leaves it waiting; another record under its name (added again, let
+    /// unchecked: first [`Self::checked`]; a frame not captured strictly
+    /// after the yes reached the eyes, the same microsecond included, leaves
+    /// it waiting; another record under its name (added again, let
     /// go, forgotten or a no) is `not_unconfirmed`; and it is kept only if
     /// the near face is the photo's and the one that said it
     /// ([`yes_after_look`]).
@@ -639,7 +651,7 @@ impl<C: Caller> PendingYes<C> {
             Ok(ended) => return Ok(ended),
             Err(pending) => pending,
         };
-        if look.frame_us < pending.arrived_us {
+        if look.frame_us <= pending.arrived_us {
             Err(pending)
         } else if look.record != Some(pending.record) {
             Ok(YesEnded::Refuse(pending.caller, "not_unconfirmed"))
@@ -1203,11 +1215,59 @@ mod tests {
             waiting.looked(&other).ok(),
             Some(YesEnded::Refuse(7, "not_that_face"))
         );
-        // A frame captured after it, the photo's face that said it: kept.
+        // Strictly after it (Fourth's P3 on #3257): a frame of the yes's
+        // own microsecond leaves it waiting; one a microsecond later, the
+        // photo's face that said it, is kept.
+        let Err(waiting) = pending(1).looked(&look(ARRIVED_US, ARRIVED_US + 120_000)) else {
+            panic!("a frame of the yes's own microsecond was looked at");
+        };
         assert_eq!(
-            pending(1)
-                .looked(&look(ARRIVED_US, ARRIVED_US + 120_000))
+            waiting
+                .looked(&look(ARRIVED_US + 1, ARRIVED_US + 120_000))
                 .ok(),
+            Some(YesEnded::Keep("Mirel".into(), 7))
+        );
+    }
+
+    /// Fourth's P3 on #3257: the conversion the loop uses. A frame without a
+    /// timestamp, or with one in another clock, is dated 0 and never
+    /// answers a yes; a known monotonic time is kept as it is, so an old
+    /// one leaves the yes waiting and a new one answers it.
+    #[test]
+    fn a_frame_is_dated_only_by_the_drivers_monotonic_time() {
+        use lamp_camera::{DriverTimestamp, TimestampDomain, TimestampPoint};
+        let at = |micros, domain| {
+            Some(DriverTimestamp {
+                micros,
+                domain,
+                point: TimestampPoint::EndOfFrame,
+            })
+        };
+        assert_eq!(frame_us(None), 0);
+        assert_eq!(
+            frame_us(at(ARRIVED_US + 60_000, TimestampDomain::Unknown)),
+            0
+        );
+        assert_eq!(
+            frame_us(at(ARRIVED_US + 60_000, TimestampDomain::Realtime)),
+            0
+        );
+        let old = frame_us(at(ARRIVED_US - 40_000, TimestampDomain::HostMonotonic));
+        let new = frame_us(at(ARRIVED_US + 60_000, TimestampDomain::HostMonotonic));
+        assert_eq!((old, new), (ARRIVED_US - 40_000, ARRIVED_US + 60_000));
+        for undated in [
+            frame_us(None),
+            frame_us(at(ARRIVED_US + 60_000, TimestampDomain::Unknown)),
+            old,
+        ] {
+            assert!(
+                pending(1)
+                    .looked(&look(undated, ARRIVED_US + 120_000))
+                    .is_err()
+            );
+        }
+        assert_eq!(
+            pending(1).looked(&look(new, ARRIVED_US + 120_000)).ok(),
             Some(YesEnded::Keep("Mirel".into(), 7))
         );
     }

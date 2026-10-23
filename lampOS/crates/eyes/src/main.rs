@@ -1467,8 +1467,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             }
                         }
                     }
-                    // With the switch off, a yes naming a face is not
-                    // understood, as before it (#2856).
+                    // With the switch off, a yes naming a face, even as
+                    // `null`, is not understood, as before it (#2856).
                     Some(Ask::PhotoYes { face: Some(_), .. }) if !who.photo_speaker => {
                         serde_json::json!({"error": "not_understood"})
                     }
@@ -1492,7 +1492,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                         who.photo_here
                                             .as_ref()
                                             .and_then(|(_, here, _)| here.as_deref()),
-                                        face.as_deref(),
+                                        face.as_ref().and_then(Option::as_deref),
                                     ) =>
                             {
                                 serde_json::json!({"error": "not_that_face"})
@@ -1516,7 +1516,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     (Some(record), Some(hold)) => {
                                         who.photo_yes = Some(lamp_eyes::photo::PendingYes::new(
                                             name,
-                                            face,
+                                            face.flatten(),
                                             stream,
                                             record,
                                             hold,
@@ -1892,15 +1892,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         frames_all += 1;
                         newest = got.bytes_used.min(frame.len());
                         latest = Some(newest);
-                        // The driver's time in the shared monotonic clock,
-                        // or, without it, 0: before any photo yes, so such a
-                        // frame never answers one, which then runs out
-                        // (not dated by its read, which a frame buffered
-                        // before the yes would pass, #3257).
-                        latest_us = got
-                            .timestamp
-                            .filter(|at| at.domain == lamp_camera::TimestampDomain::HostMonotonic)
-                            .map_or(0, |at| at.micros);
+                        latest_us = lamp_eyes::photo::frame_us(got.timestamp);
                     }
                     Ok(None) => break,
                     Err(error) => {

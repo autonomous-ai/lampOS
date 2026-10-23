@@ -47,13 +47,15 @@ zune-jpeg = "=0.4.21"
 # Pure Rust JPEG encoding, no dependencies: a full look is made to fit the
 # provider's image bound (`--full-look`).
 jpeg-encoder = "=0.7.1"
+# Its pure frame types on every target: a photo yes dates a frame by the
+# driver's timestamp (`photo::frame_us`); the Linux backend is used on Linux.
+lamp-camera = { path = "../camera" }
 
 [dev-dependencies]
 # Decodes the recorded bus messages a replay test reads.
 base64 = "0.22"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-lamp-camera = { path = "../camera" }
 lamp-turn-owner = { path = "../turn-owner" }
 
 [lints]
