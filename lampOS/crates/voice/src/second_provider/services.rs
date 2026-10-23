@@ -1027,7 +1027,7 @@ impl Services for Net {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::second_config::TtsProvider;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -1188,7 +1188,7 @@ mod tests {
         format!("data: {event}\n\n").into_bytes()
     }
 
-    const SSE: &str =
+    pub(crate) const SSE: &str =
         "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n";
 
     /// #1712, one voice per lamp: a sentence Gemini refuses is asked of
@@ -1328,17 +1328,17 @@ mod tests {
     /// carrying `key`, each on its own connection, by the first of `answers`
     /// whose text is in its request line: that head and body, or, for
     /// `None`, nothing ever. Every request line of the test's own is kept.
-    struct Stub {
-        url: String,
+    pub(crate) struct Stub {
+        pub(crate) url: String,
         seen: Arc<Mutex<Vec<String>>>,
         task: tokio::task::JoinHandle<()>,
     }
 
     impl Stub {
-        fn seen(&self) -> Vec<String> {
+        pub(crate) fn seen(&self) -> Vec<String> {
             self.seen.lock().unwrap().clone()
         }
-        fn asked(&self, path: &str) -> usize {
+        pub(crate) fn asked(&self, path: &str) -> usize {
             self.seen()
                 .iter()
                 .filter(|line| line.contains(path))
@@ -1352,9 +1352,9 @@ mod tests {
         }
     }
 
-    type Answers = Vec<(&'static str, Option<(&'static str, Vec<u8>)>)>;
+    pub(crate) type Answers = Vec<(&'static str, Option<(&'static str, Vec<u8>)>)>;
 
-    async fn stub(key: &'static str, answers: Answers) -> Stub {
+    pub(crate) async fn stub(key: &'static str, answers: Answers) -> Stub {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let seen: Arc<Mutex<Vec<String>>> = Arc::default();
@@ -1421,14 +1421,14 @@ mod tests {
         }
     }
 
-    const CHAT: &str = "/chat/completions";
+    pub(crate) const CHAT: &str = "/chat/completions";
     const SPEECH: &str = "/text-to-speech/";
     /// A near route on another host is a whole API base, as the unit's own
     /// addresses are (`net::openai_base` adds `/v1` to the company's alone).
-    const BASE: &str = "/api/v1/ai/v1";
-    const ROUTES: &str = "/relay/routes";
+    pub(crate) const BASE: &str = "/api/v1/ai/v1";
+    pub(crate) const ROUTES: &str = "/relay/routes";
 
-    fn answered(words: &str) -> Option<(&'static str, Vec<u8>)> {
+    pub(crate) fn answered(words: &str) -> Option<(&'static str, Vec<u8>)> {
         Some((
             SSE,
             format!(
@@ -1438,7 +1438,7 @@ mod tests {
         ))
     }
 
-    fn json_answer(body: serde_json::Value) -> Option<(&'static str, Vec<u8>)> {
+    pub(crate) fn json_answer(body: serde_json::Value) -> Option<(&'static str, Vec<u8>)> {
         Some((
             "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\nconnection: close\r\n\r\n",
             body.to_string().into_bytes(),
@@ -1454,7 +1454,7 @@ mod tests {
 
     /// The route at `relay` (its chat, speech and the routes asked of it),
     /// ElevenLabs through the relay, the relay's key `key`, and listening at `listening`.
-    fn config_at(name: &str, key: &str, relay: &str, listening: &str) -> SecondConfig {
+    pub(crate) fn config_at(name: &str, key: &str, relay: &str, listening: &str) -> SecondConfig {
         use std::os::unix::fs::PermissionsExt;
         let directory =
             std::env::temp_dir().join(format!("lamp-voice-routes-{name}-{}", std::process::id()));

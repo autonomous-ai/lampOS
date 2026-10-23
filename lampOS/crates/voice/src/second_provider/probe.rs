@@ -32,10 +32,25 @@
 //! would say, and to the end; for speech, to the first audio and to the end,
 //! with the audio's length. Then the median and the 90th percentile of each.
 //!
+//! With `LAMP_RELAY_ROUTES=on` in its environment, as in the voice unit's,
+//! the probe asks the relay for its near addresses once as it starts, with
+//! the route's key, and each arm that goes through the relay reaches the
+//! address the voice would: near where the routes name one and the voice
+//! may route that service (`worker::relay_routable`), else its normal
+//! address; an address the unit's environment gives
+//! (`LAMP_SECOND_*_BASE_URL`) is pinned and never routed. Each such arm's
+//! run line ends `relay=near`, `relay=normal` or `relay=pinned` and the
+//! host it reached, never a path or a key ([`Relay`]).
+//!
 //! With `--wire`, only where a chat request's time goes between the lamp
 //! and DeepSeek, through the relay and on its own API, and with `--speech`
 //! a piece of speech's between the lamp and ElevenLabs ([`wire`]).
-use super::net::{self, Chat, ChatEvent, GeminiTts, Message, Sentences, Tts, search::Search};
+use super::net::{
+    self, Chat, ChatEvent, GeminiTts, Message, Sentences, Tts,
+    routes::{self, Routes},
+    search::Search,
+};
+use super::worker::{ChatRoute, RouteFlags, relay_routable};
 
 pub mod cache;
 pub mod handover;
@@ -45,8 +60,8 @@ pub mod says_kept;
 pub mod tools;
 pub mod wire;
 use crate::second_config::{
-    CREDENTIALS_ENV, DEEPSEEK_CREDENTIAL, DEEPSEEK_TEXT_ONLY, OPENROUTER_CREDENTIAL,
-    OPENROUTER_MODEL, OPENROUTER_SECOND_MODEL, least_effort, unit_credential,
+    CREDENTIALS_ENV, DEEPSEEK_CREDENTIAL, DEEPSEEK_TEXT_ONLY, Key, OPENROUTER_CREDENTIAL,
+    OPENROUTER_MODEL, OPENROUTER_SECOND_MODEL, SecondConfig, least_effort, unit_credential,
 };
 use futures_util::{
     StreamExt,
@@ -268,8 +283,178 @@ fn shown(value: Option<u64>) -> String {
     value.map_or_else(|| "none".to_owned(), |v| v.to_string())
 }
 
-/// A chat candidate: its name, the chat, and whether it takes a picture.
-type Candidate = (String, Arc<Chat>, bool);
+/// A chat candidate: its name, the chat, whether it takes a picture, and
+/// the relay it reaches if it goes through one.
+type Candidate = (String, Arc<Chat>, bool, Option<Relay>);
+
+/// One request a run makes of a chat: its name, the chat, the messages,
+/// and the relay it reaches if it goes through one.
+type Ask = (String, Arc<Chat>, Vec<Message>, Option<Relay>);
+
+/// The address an arm through the relay reaches, as the voice would.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Relay {
+    /// The relay's near address for the service (`LAMP_RELAY_ROUTES=on`).
+    Near(String),
+    /// The service's normal address: `second.json`'s.
+    Normal(String),
+    /// The address the unit's environment gave (`LAMP_SECOND_*_BASE_URL`):
+    /// never routed.
+    Pinned(String),
+}
+
+impl Relay {
+    /// Where the arm's requests go.
+    pub fn url(&self) -> &str {
+        match self {
+            Self::Near(url) | Self::Normal(url) | Self::Pinned(url) => url,
+        }
+    }
+
+    /// The end of a run's line: which relay and its host, never a path or
+    /// a key ([`crate::second_config::host`]).
+    pub fn told(&self) -> String {
+        let which = match self {
+            Self::Near(_) => "near",
+            Self::Normal(_) => "normal",
+            Self::Pinned(_) => "pinned",
+        };
+        format!(
+            " relay={which} host={}",
+            crate::second_config::host(self.url())
+        )
+    }
+
+    /// The run line's ending for an arm that may have a relay.
+    fn shown(relay: Option<&Self>) -> String {
+        relay.map(Self::told).unwrap_or_default()
+    }
+}
+
+/// Whether the unit's environment asks for the relay's near addresses, as
+/// the second worker reads it: `on`, and nothing else.
+pub fn routes_on() -> bool {
+    std::env::var(super::services::RELAY_ROUTES_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+}
+
+/// The relay's near addresses, when `on`: asked once where the voice asks
+/// them ([`routes::url`]), with the route's key, and read as it reads them
+/// ([`routes::read`]); off, or not read, none. Says which services are
+/// near, never where.
+pub async fn relay_routes(config: &SecondConfig, on: bool) -> Routes {
+    if !on {
+        println!("relay routes: off (LAMP_RELAY_ROUTES)");
+        return Routes::default();
+    }
+    let url = routes::url(&config.llm_base_url);
+    let authorization = format!("Bearer {}", config.llm_key.expose());
+    match routes::read(net::get_json(&url, &authorization).await) {
+        routes::Read::Routes {
+            routes, refused, ..
+        } => {
+            for service in refused {
+                println!(
+                    "relay routes: the {service} route is not an address to use; {service} stays at its normal one"
+                );
+            }
+            println!("relay {} (LAMP_RELAY_ROUTES)", routes.told());
+            routes
+        }
+        routes::Read::Keep(why) => {
+            println!("relay routes: not read ({why}); every arm at its normal address");
+            Routes::default()
+        }
+    }
+}
+
+/// [`relay_routes`] for the route at `second_config`, with the unit's
+/// environment over the file, for `--wire`, whose requests are made by hand.
+pub async fn relay_routes_at(second_config: &Path) -> io::Result<Routes> {
+    let config = crate::second_config::load_from_path(second_config)?
+        .with_environment(|name| std::env::var_os(name))?;
+    Ok(relay_routes(&config, routes_on()).await)
+}
+
+/// A service's relay: the near address `near` when the voice may route it
+/// (`routable`, never a pinned one), else the address the unit pinned, else
+/// its normal one.
+fn relay_for(normal: &str, pinned: bool, routable: bool, near: Option<&String>) -> Relay {
+    match near.filter(|_| routable) {
+        Some(url) => Relay::Near(url.clone()),
+        None if pinned => Relay::Pinned(normal.to_owned()),
+        None => Relay::Normal(normal.to_owned()),
+    }
+}
+
+/// DeepSeek through the relay (`deepseek_base_url`), as the route's
+/// `LAMP_SECOND_CHAT=deepseek` reaches it; `None` without one.
+pub fn deepseek_relay(config: &SecondConfig, routes: &Routes) -> Option<Relay> {
+    let base = config.hosted.deepseek_base_url.as_deref()?;
+    let route = RouteFlags {
+        chat: Some(ChatRoute::DeepSeek),
+        ..RouteFlags::default()
+    };
+    let routable = relay_routable(config, route, None).chat;
+    Some(relay_for(
+        base,
+        config.pinned.chat,
+        routable,
+        routes.chat.as_ref(),
+    ))
+}
+
+/// The configured voice's relay (`tts_base_url`), as the route reaches it
+/// when it is the lamp's one voice.
+pub fn speech_relay(config: &SecondConfig, routes: &Routes) -> Relay {
+    let routable = relay_routable(config, RouteFlags::default(), None).speech;
+    relay_for(
+        &config.tts_base_url,
+        config.pinned.speech,
+        routable,
+        routes.speech.as_ref(),
+    )
+}
+
+/// The route's own Gemini's relay (`gemini_base_url`) with `key`, as
+/// `LAMP_SECOND_CHAT=gemini` or `LAMP_SECOND_SPEECH=gemini` reaches it.
+pub fn gemini_relay(config: &SecondConfig, routes: &Routes, key: &Key) -> Relay {
+    let route = RouteFlags {
+        chat: Some(ChatRoute::Gemini),
+        ..RouteFlags::default()
+    };
+    let routable = relay_routable(config, route, Some(key)).gemini;
+    relay_for(
+        &config.gemini.base_url,
+        config.pinned.gemini,
+        routable,
+        routes.gemini.as_ref(),
+    )
+}
+
+/// DeepSeek through the relay, with the relay's credential, thinking off,
+/// at the address the voice would reach (#1934, #2882); `None` without a
+/// `deepseek_base_url`.
+fn deepseek_relay_arm(
+    config: &SecondConfig,
+    routes: &Routes,
+    none: net::Declare,
+) -> io::Result<Option<Candidate>> {
+    let Some(relay) = deepseek_relay(config, routes) else {
+        return Ok(None);
+    };
+    let model = &config.hosted.deepseek_model;
+    let chat = Chat::deepseek_at(relay.url(), model, config.llm_key.expose(), none, false)
+        .map_err(io::Error::other)?;
+    Ok(Some((
+        format!("chat=deepseek-relay({model},thinking-off)"),
+        Arc::new(chat),
+        !DEEPSEEK_TEXT_ONLY.contains(&model.as_str()),
+        Some(relay),
+    )))
+}
 
 /// The probe, as `lamp-voice probe-cascade` runs it.
 pub async fn run(
@@ -284,6 +469,8 @@ pub async fn run(
     // drop-in's LAMP_SECOND_DEEPSEEK_BASE_URL is then probed too (#1934).
     let config = crate::second_config::load_from_path(second_config)?
         .with_environment(|name| std::env::var_os(name))?;
+    // The relay's near addresses, as the voice unit's environment asks.
+    let routes = relay_routes(&config, routes_on()).await;
     let picture = look
         .map(|path| {
             let picture = std::fs::read(path)?;
@@ -300,24 +487,29 @@ pub async fn run(
     let left_out = |what: &str, error: &io::Error| {
         println!("{what}: left out: {error}");
     };
+    // The configured chat: never routed.
     let mut chats: Vec<Candidate> = vec![(
         "chat=configured".into(),
         Arc::new(Chat::new(&config, none.clone()).map_err(io::Error::other)?),
         true,
+        Some(Relay::Normal(config.llm_base_url.clone())),
     )];
-    let mut voices: Vec<(String, Arc<Voice>)> = vec![(
+    let speech = speech_relay(&config, &routes);
+    let mut at = config.clone();
+    at.tts_base_url = speech.url().to_owned();
+    let mut voices: Vec<(String, Arc<Voice>, Option<Relay>)> = vec![(
         format!("speech={}", config.tts_provider.name().replace(' ', "_")),
-        Arc::new(Voice::Configured(
-            Tts::new(&config).map_err(io::Error::other)?,
-        )),
+        Arc::new(Voice::Configured(Tts::new(&at).map_err(io::Error::other)?)),
+        Some(speech),
     )];
     match super::worker::gemini_key(&provider, credentials.as_deref()) {
         Ok(key) => {
+            let gemini = gemini_relay(&config, &routes, &key);
             chats.push((
                 format!("chat=gemini({})", config.gemini.chat_model),
                 Arc::new(
                     Chat::gemini(
-                        &config.gemini.base_url,
+                        gemini.url(),
                         &config.gemini.chat_model,
                         key.expose(),
                         none.clone(),
@@ -325,6 +517,7 @@ pub async fn run(
                     .map_err(io::Error::other)?,
                 ),
                 true,
+                Some(gemini.clone()),
             ));
             voices.push((
                 format!(
@@ -334,13 +527,14 @@ pub async fn run(
                 ),
                 Arc::new(Voice::Gemini(
                     GeminiTts::new(
-                        &config.gemini.base_url,
+                        gemini.url(),
                         &config.gemini.speech_model,
                         key.expose(),
                         provider.voice(),
                     )
                     .map_err(io::Error::other)?,
                 )),
+                Some(gemini),
             ));
         }
         Err(error) => left_out("gemini", &error),
@@ -371,9 +565,15 @@ pub async fn run(
                     format!("chat=openrouter({model},{effort})"),
                     chat(false)?,
                     true,
+                    None,
                 ));
                 if searching.is_empty() {
-                    searching.push((format!("search=openrouter({model})"), chat(true)?, true));
+                    searching.push((
+                        format!("search=openrouter({model})"),
+                        chat(true)?,
+                        true,
+                        None,
+                    ));
                 }
             }
         }
@@ -416,6 +616,7 @@ pub async fn run(
                                 .map_err(io::Error::other)?,
                         ),
                         *images,
+                        None,
                     ));
                 }
             }
@@ -424,25 +625,17 @@ pub async fn run(
         Err(error) => left_out("deepseek", &error),
     }
     // DeepSeek through the relay, with the relay's credential, as the
-    // route asks it with `deepseek_base_url` (#1934): its first token beside
-    // the direct one's, in the same runs.
-    if let Some(base) = &config.hosted.deepseek_base_url {
-        let model = &config.hosted.deepseek_model;
-        chats.push((
-            format!("chat=deepseek-relay({model},thinking-off)"),
-            Arc::new(
-                Chat::deepseek_at(base, model, config.llm_key.expose(), none.clone(), false)
-                    .map_err(io::Error::other)?,
-            ),
-            !DEEPSEEK_TEXT_ONLY.contains(&model.as_str()),
-        ));
-    }
-    let mut asks: Vec<(String, Arc<Chat>, Vec<Message>)> = Vec::new();
-    for (name, chat, sees) in &chats {
+    // route asks it with `deepseek_base_url` (#1934), at the address the
+    // voice would reach (#2882): its first token beside the direct one's,
+    // in the same runs.
+    chats.extend(deepseek_relay_arm(&config, &routes, none.clone())?);
+    let mut asks: Vec<Ask> = Vec::new();
+    for (name, chat, sees, relay) in &chats {
         asks.push((
             name.clone(),
             chat.clone(),
             vec![Message::system(character.clone()), Message::user(QUESTION)],
+            relay.clone(),
         ));
         if let Some(jpeg) = picture.as_ref().filter(|_| *sees) {
             asks.push((
@@ -452,10 +645,11 @@ pub async fn run(
                     Message::system(character.clone()),
                     Message::user_seeing(LOOK_QUESTION, jpeg),
                 ],
+                relay.clone(),
             ));
         }
     }
-    for (name, chat, _) in &searching {
+    for (name, chat, _, relay) in &searching {
         asks.push((
             name.clone(),
             chat.clone(),
@@ -463,13 +657,15 @@ pub async fn run(
                 Message::system(character.clone()),
                 Message::user(SEARCH_QUESTION),
             ],
+            relay.clone(),
         ));
     }
     let mut chat_kept: Vec<Kept> = asks.iter().map(|_| Kept::default()).collect();
     let mut voice_kept: Vec<Kept> = voices.iter().map(|_| Kept::default()).collect();
     let mut search_kept = Kept::default();
     for run in 1..=runs {
-        for ((name, chat, messages), kept) in asks.iter().zip(&mut chat_kept) {
+        for ((name, chat, messages, relay), kept) in asks.iter().zip(&mut chat_kept) {
+            let relay = Relay::shown(relay.as_ref());
             let from = Instant::now();
             match time_chat(chat_stream(chat.clone(), messages.clone()), from).await {
                 Ok(times) => {
@@ -478,7 +674,7 @@ pub async fn run(
                         .map(|at| format!(" searched_ms={at}"))
                         .unwrap_or_default();
                     println!(
-                        "{name} run={run} first_ms={} clause_ms={} done_ms={}{searched}",
+                        "{name} run={run} first_ms={} clause_ms={} done_ms={}{searched}{relay}",
                         shown(times.first),
                         shown(times.clause),
                         times.done
@@ -489,7 +685,10 @@ pub async fn run(
                     kept.done.push(times.done);
                 }
                 Err(error) => {
-                    println!("{name} run={run} failed after {} ms: {error}", ms(from));
+                    println!(
+                        "{name} run={run} failed after {} ms: {error}{relay}",
+                        ms(from)
+                    );
                     kept.failed += 1;
                 }
             }
@@ -516,12 +715,13 @@ pub async fn run(
                 }
             }
         }
-        for ((name, voice), kept) in voices.iter().zip(&mut voice_kept) {
+        for ((name, voice, relay), kept) in voices.iter().zip(&mut voice_kept) {
+            let relay = Relay::shown(relay.as_ref());
             let from = Instant::now();
             match time_speech(voice.clone().speak(SENTENCE), from).await {
                 Ok(times) => {
                     println!(
-                        "{name} run={run} first_audio_ms={} done_ms={} audio_ms={}",
+                        "{name} run={run} first_audio_ms={} done_ms={} audio_ms={}{relay}",
                         shown(times.first),
                         times.done,
                         times.audio
@@ -530,7 +730,10 @@ pub async fn run(
                     kept.done.push(times.done);
                 }
                 Err(error) => {
-                    println!("{name} run={run} failed after {} ms: {error}", ms(from));
+                    println!(
+                        "{name} run={run} failed after {} ms: {error}{relay}",
+                        ms(from)
+                    );
                     kept.failed += 1;
                 }
             }
@@ -542,7 +745,7 @@ pub async fn run(
     if deepseek_search.is_some() {
         println!("{}", search_kept.summary("search=deepseek"));
     }
-    for ((name, _), kept) in voices.iter().zip(&voice_kept) {
+    for ((name, ..), kept) in voices.iter().zip(&voice_kept) {
         println!("{}", kept.summary(name));
     }
     Ok(())
@@ -635,6 +838,115 @@ mod tests {
         assert_eq!(percentile(&values, 90), Some(900));
         assert_eq!(percentile(&[42], 90), Some(42));
         assert_eq!(percentile(&[], 50), None);
+    }
+
+    use crate::second_provider::services::tests::{
+        BASE, CHAT, ROUTES, answered, config_at, json_answer, stub,
+    };
+
+    /// The route at `relay`, DeepSeek through it at its normal address.
+    fn through(name: &str, key: &str, relay: &str) -> crate::second_config::SecondConfig {
+        let mut config = config_at(name, key, relay, relay);
+        config.hosted.deepseek_base_url = Some(format!("{relay}{BASE}/deepseek"));
+        config
+    }
+
+    /// The relay's DeepSeek arm asked once, as a run asks it.
+    async fn asked(arm: &Candidate) -> ChatTimes {
+        let messages = vec![Message::system("character"), Message::user(QUESTION)];
+        time_chat(chat_stream(arm.1.clone(), messages), Instant::now())
+            .await
+            .unwrap()
+    }
+
+    /// The first builder on the Queue (#3126): with `LAMP_RELAY_ROUTES=on`
+    /// the probe reads the relay's routes as the voice does, and its DeepSeek
+    /// arm reaches the near address they name, saying so on each run's line;
+    /// so does the configured voice.
+    #[tokio::test]
+    async fn a_probe_with_routes_on_reaches_the_near_address() {
+        let near = stub("k-probe-near", vec![(CHAT, answered("near"))]).await;
+        let routes = json!({"status": 1, "data": {
+            "chat": format!("{}{BASE}/deepseek", near.url),
+            "speech": format!("{}{BASE}", near.url),
+            "listening": null, "gemini": null, "ttl_seconds": 600}});
+        let relay = stub(
+            "k-probe-near",
+            vec![(ROUTES, json_answer(routes)), (CHAT, answered("relay"))],
+        )
+        .await;
+        let config = through("probe-near", "k-probe-near", &relay.url);
+        let routes = relay_routes(&config, true).await;
+        assert_eq!(relay.seen(), ["GET /relay/routes HTTP/1.1"]);
+        let arm = deepseek_relay_arm(&config, &routes, Arc::new(Vec::new))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            arm.3,
+            Some(Relay::Near(format!("{}{BASE}/deepseek", near.url)))
+        );
+        assert!(asked(&arm).await.first.is_some());
+        assert_eq!(
+            near.seen(),
+            ["POST /api/v1/ai/v1/deepseek/chat/completions HTTP/1.1"]
+        );
+        assert_eq!(relay.asked(CHAT), 0);
+        let told = arm.3.as_ref().unwrap().told();
+        assert_eq!(told, format!(" relay=near host={}", &near.url[7..]));
+        assert_eq!(
+            speech_relay(&config, &routes),
+            Relay::Near(format!("{}{BASE}", near.url))
+        );
+    }
+
+    /// With the routes off the probe never asks for them, and its arms
+    /// reach the normal address; an address the unit's environment gave is
+    /// never routed, whatever the routes say.
+    #[tokio::test]
+    async fn a_probe_with_routes_off_reaches_the_normal_address() {
+        let near = stub("k-probe-normal", vec![(CHAT, answered("near"))]).await;
+        let routes = json!({"status": 1, "data": {
+            "chat": format!("{}{BASE}/deepseek", near.url),
+            "speech": format!("{}{BASE}", near.url), "ttl_seconds": 600}});
+        let relay = stub(
+            "k-probe-normal",
+            vec![(ROUTES, json_answer(routes)), (CHAT, answered("relay"))],
+        )
+        .await;
+        let config = through("probe-normal", "k-probe-normal", &relay.url);
+        let off = relay_routes(&config, false).await;
+        assert_eq!(off, Routes::default());
+        assert_eq!(relay.asked(ROUTES), 0);
+        let arm = deepseek_relay_arm(&config, &off, Arc::new(Vec::new))
+            .unwrap()
+            .unwrap();
+        let normal = format!("{}{BASE}/deepseek", relay.url);
+        assert_eq!(arm.3, Some(Relay::Normal(normal.clone())));
+        assert!(asked(&arm).await.first.is_some());
+        assert_eq!(relay.asked(CHAT), 1);
+        assert_eq!(
+            arm.3.as_ref().unwrap().told(),
+            format!(" relay=normal host={}", &relay.url[7..])
+        );
+        assert_eq!(
+            speech_relay(&config, &off),
+            Relay::Normal(relay.url.clone())
+        );
+        // Pinned by the unit: the routes on, its own address all the same.
+        let mut pinned = config.clone();
+        pinned.pinned.chat = true;
+        pinned.pinned.speech = true;
+        let on = relay_routes(&pinned, true).await;
+        assert!(on.chat.is_some());
+        let arm = deepseek_relay_arm(&pinned, &on, Arc::new(Vec::new))
+            .unwrap()
+            .unwrap();
+        assert_eq!(arm.3, Some(Relay::Pinned(normal)));
+        assert!(asked(&arm).await.first.is_some());
+        assert_eq!(relay.asked(CHAT), 2);
+        assert!(near.seen().is_empty(), "{:?}", near.seen());
+        assert_eq!(speech_relay(&pinned, &on), Relay::Pinned(relay.url.clone()));
+        assert!(arm.3.unwrap().told().starts_with(" relay=pinned host="));
     }
 
     /// DeepSeek's list as its docs show it: each model, and whether it
