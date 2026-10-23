@@ -1,5 +1,34 @@
 # Tests work log
 
+## 2026-10-23 07:50 +0700 — Surround pushed; Eyes merged; boot-clock controls prepared
+
+[#3165](https://github.com/autonomous-ai/lampOS/pull/3165) carries the
+Surround pending-network lock fixture at `7a36051bd`. The original fixture
+fails with a 400 ms host pause; the corrected fixture passes with that same
+pause and rejects both a held status lock and a removed join deadline. Mac
+full Surround is **265/0/0**, formatting, strict Clippy and workspace build
+pass; separate Linux x86 formatting passes. The PR contains the complete
+control and gate receipt. The equal carry from `9b6960e61` to `02c8d3851`
+retains every authored blob. Native Linux Clippy passes; ARM64 and source
+review remain pending, so the PR is draft. Current lamp-voice advanced to
+`f477d6c49`; final carry qualification remains with the merge owner.
+
+#3156 merged in train #3161 as `f477d6c49`. The train's actual ARM64 and
+Linux Clippy jobs both succeeded. The independent composed Mac Eyes gate
+was **288/0/5**. #2587 was closed as superseded by its already merged #3062;
+this does not claim broker-side acceptance for #2094.
+
+The #1569 boot-clock correction is being implemented in coherent test-only
+Voice clock domains. An isolated Linux x86 time-namespace probe puts parent
+and child clocks at **60.52 s** without changing the outer clock or requiring
+extra container privileges. Public locked Cargo sources are now cached for
+an offline native x86 build; no boot-fixture test has run yet. Policy's real
+service needs a narrow stamp-clock seam to preserve the replay test's age
+branch; the scope question is on the Queue and no product edit has been made.
+Third's requested exact-head #3162 Linux formatting check is also in progress.
+The #3023 frozen shared-process comparison remains unstarted pending its
+freeze decision; the #3160 assigned read follows the boot-clock correction.
+
 ## 2026-10-23 07:28 +0700 — boot-clock class assigned next; Eyes ready for its train
 
 Taken under #1569: the test-only boot-clock subtraction sweep assigned on
