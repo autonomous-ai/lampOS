@@ -1,0 +1,1041 @@
+diff --git a/lampOS/crates/update/src/records.rs b/lampOS/crates/update/src/records.rs
+index dd2f7d6b1..4edb3438e 100644
+--- a/lampOS/crates/update/src/records.rs
++++ b/lampOS/crates/update/src/records.rs
+@@ -18,7 +18,7 @@
+ //! V1's updater did.
+ use serde::{Deserialize, Serialize};
+ use std::{
+-    collections::BTreeMap,
++    collections::{BTreeMap, BTreeSet},
+     fs::{self, File, OpenOptions},
+     io::{self, Write},
+     os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt},
+@@ -134,6 +134,11 @@ pub const LINK_SUFFIX: &str = ".link";
+ pub struct Journal {
+     pub build: Build,
+     pub units: Vec<Switching>,
++    /// The validated old startup order, projected onto every changed unit,
++    /// including inactive ones. Absent in older journals; an empty list is
++    /// present only when no units change. Saved before any switching write.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub rollback_order: Option<Vec<String>>,
+     /// Each model path the switch moves, as it was (#1680): put back in
+     /// the reverse order.
+     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+@@ -149,6 +154,31 @@ pub struct Journal {
+     pub skills: Vec<SkillBack>,
+ }
+ 
++impl Journal {
++    /// A saved order must cover the full journal exactly once, before
++    /// recovery excludes units already restored. It is never guessed from
++    /// a malformed list, nor replaced with the current installed graph.
++    fn validate_rollback_order(&self) -> io::Result<()> {
++        let Some(order) = &self.rollback_order else {
++            return Ok(());
++        };
++        let units: BTreeSet<&str> = self.units.iter().map(|unit| unit.unit.as_str()).collect();
++        let saved: BTreeSet<&str> = order.iter().map(String::as_str).collect();
++        if units.len() != self.units.len()
++            || saved.len() != order.len()
++            || saved != units
++            || units
++                .iter()
++                .any(|name| !crate::manifest::is_unit_name(name) || *name == crate::round::OWN_UNIT)
++        {
++            return Err(io::Error::other(
++                "the saved rollback order must name every changed managed unit exactly once",
++            ));
++        }
++        Ok(())
++    }
++}
++
+ /// A product skill's file as it was before a round wrote it.
+ #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+ pub struct SkillBack {
+@@ -325,19 +355,37 @@ impl Records {
+         Ok(aside)
+     }
+ 
+-    /// A switch under way, if any. One that cannot be read is
+-    /// `InvalidData`: the round sets it aside.
++    /// A switch under way, if any. Unreadable legacy JSON is `InvalidData`
++    /// and set aside. A present but invalid saved order is a recovery
++    /// failure instead: the journal and restoration prefix must stay put.
+     pub fn journal(&self) -> io::Result<Option<Journal>> {
+         match fs::read(self.folder.join("journal.json")) {
+-            Ok(bytes) => serde_json::from_slice(&bytes)
+-                .map(Some)
+-                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error)),
++            Ok(bytes) => {
++                let value: serde_json::Value = serde_json::from_slice(&bytes)
++                    .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
++                let has_order = value.get("rollback_order").is_some();
++                if has_order && !value["rollback_order"].is_array() {
++                    return Err(io::Error::other("the saved rollback order is not an array"));
++                }
++                // Decode the original bytes, not Value: duplicate order
++                // properties must be refused rather than keeping the last.
++                let journal: Journal = serde_json::from_slice(&bytes).map_err(|error| {
++                    if has_order {
++                        io::Error::other(error)
++                    } else {
++                        io::Error::new(io::ErrorKind::InvalidData, error)
++                    }
++                })?;
++                journal.validate_rollback_order()?;
++                Ok(Some(journal))
++            }
+             Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+             Err(error) => Err(error),
+         }
+     }
+ 
+     pub fn save_journal(&self, journal: &Journal) -> io::Result<()> {
++        journal.validate_rollback_order()?;
+         self.make()?;
+         let bytes = serde_json::to_vec_pretty(journal).map_err(io::Error::other)?;
+         write_whole(&self.folder.join("journal.json"), &bytes, 0o600)
+@@ -528,6 +576,10 @@ mod tests {
+ 
+         let journal = Journal {
+             build,
++            rollback_order: Some(vec![
++                "lamp-body.service".into(),
++                "lamp-voice.service".into(),
++            ]),
+             units: vec![
+                 Switching {
+                     unit: "lamp-voice.service".into(),
+@@ -681,6 +733,7 @@ mod tests {
+                 sequence: 4576,
+                 commit: "4f5e62507".into(),
+             },
++            rollback_order: Some(vec!["lamp-voice.service".into()]),
+             units: vec![Switching {
+                 unit: "lamp-voice.service".into(),
+                 was_active: true,
+@@ -751,11 +804,18 @@ mod tests {
+     /// back (the build row "Updates cover the whole lamp, V3 to V5").
+     #[test]
+     fn each_kept_state_and_journal_reads_as_saved() {
+-        let kept: [(&str, &[u8], &[u8]); 1] = [(
+-            "2026-10-21",
+-            include_bytes!("../tests/fixtures/stores/state-2026-10-21.json"),
+-            include_bytes!("../tests/fixtures/stores/journal-2026-10-21.json"),
+-        )];
++        let kept: [(&str, &[u8], &[u8]); 2] = [
++            (
++                "2026-10-21",
++                include_bytes!("../tests/fixtures/stores/state-2026-10-21.json"),
++                include_bytes!("../tests/fixtures/stores/journal-2026-10-21.json"),
++            ),
++            (
++                "2026-10-23",
++                include_bytes!("../tests/fixtures/stores/state-2026-10-23.json"),
++                include_bytes!("../tests/fixtures/stores/journal-2026-10-23.json"),
++            ),
++        ];
+         for (day, state_bytes, journal_bytes) in kept {
+             let folder = tempfile::tempdir().unwrap();
+             std::fs::write(folder.path().join("state.json"), state_bytes).unwrap();
+diff --git a/lampOS/crates/update/src/round.rs b/lampOS/crates/update/src/round.rs
+index 07ad22db7..0bb4b64ea 100644
+--- a/lampOS/crates/update/src/round.rs
++++ b/lampOS/crates/update/src/round.rs
+@@ -20,10 +20,10 @@
+ //!    the build's lamp-skills must still load every skill that loads now.
+ //! 7. At a quiet moment (nobody heard or answered for 45 s, the voice
+ //!    resting) the units are written, the product skills' files placed,
+-//!    and the parts restarted, the voice first.
++//!    and the parts restarted in the candidate units' startup order.
+ //! 8. For a minute each restarted part must stay up with one process and
+-//!    not say it is worse; otherwise every part is put back, in the reverse
+-//!    order, and the build is refused from then on.
++//!    not say it is worse; otherwise every part is put back in the saved
++//!    old startup order, and the build is refused from then on.
+ //!
+ //! Without `apply` it stops after step 5 and says what it would do, having
+ //! written nothing.
+@@ -390,6 +390,7 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
+         setting_writes: Vec::new(),
+         image_writes: Vec::new(),
+         applying: None,
++        rollback_order: None,
+     };
+     if !config.apply {
+         let state = run.records.peek_state();
+@@ -500,6 +501,9 @@ struct Run<'r, 'w> {
+     /// Those of them that are the image's own files (crate::image).
+     image_writes: Vec<String>,
+     applying: Option<u64>,
++    /// Old startup order fixed before switching, including inactive changed
++    /// units. None means an older journal must reconstruct its old graph.
++    rollback_order: Option<Vec<String>>,
+ }
+ 
+ /// A unit as it is to be put back.
+@@ -756,7 +760,7 @@ impl Run<'_, '_> {
+             .filter_map(|path| image::restarts(path))
+             .map(str::to_owned)
+             .collect();
+-        let changes = plan(
++        let (changes, rollback_order) = plan(
+             self.config,
+             &manifest,
+             &installed,
+@@ -766,6 +770,7 @@ impl Run<'_, '_> {
+             &forced,
+         )
+         .map_err(Outcome::Refused)?;
++        self.rollback_order = Some(rollback_order);
+         self.fetching = to_fetch(self.config, &changes, &self.placings);
+         self.room(&changes)?;
+         let placing = self.product_skills(state, &manifest, &installed, &carried)?;
+@@ -1765,6 +1770,7 @@ impl Run<'_, '_> {
+             .collect();
+         let journal = Journal {
+             build: build.clone(),
++            rollback_order: self.rollback_order.clone(),
+             units: backs
+                 .iter()
+                 .map(|back| Switching {
+@@ -2097,11 +2103,24 @@ impl Run<'_, '_> {
+         }
+     }
+ 
+-    /// Reconstruct the old startup graph without depending on journal order
+-    /// or the channel. Unchanged installed units retain transitive edges;
+-    /// exact saved text replaces every changed unit. Already-restored and
+-    /// inactive members do not gain a restart merely by being in the graph.
++    /// Use the order validated and saved before switching. Only older
++    /// journals reconstruct the old graph from saved and installed units.
++    /// Already-restored and inactive members do not gain a restart merely
++    /// by being named in the full saved order.
+     fn restore_order<'a>(&self, backs: &'a [Back]) -> Result<Vec<&'a Back>, String> {
++        if let Some(order) = &self.rollback_order {
++            if backs.iter().any(|back| !order.contains(&back.unit)) {
++                return Err("the saved rollback order omits a unit to restore".into());
++            }
++            return Ok(order
++                .iter()
++                .filter_map(|name| {
++                    backs
++                        .iter()
++                        .find(|back| back.restarted && back.unit == *name)
++                })
++                .collect());
++        }
+         let mut texts: BTreeMap<String, String> = installed_units(self.config)
+             .map_err(|error| format!("the restoration's unit order cannot be read: {error}"))?
+             .into_iter()
+@@ -2128,6 +2147,10 @@ impl Run<'_, '_> {
+ 
+     /// Step 1: a switch the last run did not finish is put back.
+     fn recover(&mut self, journal: Journal) -> Outcome {
++        // Records validates this against all journal members before any
++        // already-restored prefix is excluded below. Legacy journals stay
++        // byte-for-byte intact while their graph is reconstructed.
++        self.rollback_order = journal.rollback_order.clone();
+         let why =
+             "the switch was cut short (lamp-update stopped, or the lamp lost power)".to_owned();
+         self.say(&format!(
+@@ -2367,8 +2390,16 @@ impl Run<'_, '_> {
+     /// stays too. A folder it did not make is never removed.
+     fn prune(&mut self, state: &mut State) {
+         // Named now: by a unit, or by a part's current link.
+-        let mut named: BTreeSet<String> = installed_units(self.config)
+-            .unwrap_or_default()
++        let installed = match installed_units(self.config) {
++            Ok(installed) => installed,
++            Err(error) => {
++                self.say(&format!(
++                    "build folders are kept because the installed units cannot be read: {error}"
++                ));
++                return;
++            }
++        };
++        let mut named: BTreeSet<String> = installed
+             .into_iter()
+             .map(|part| part.program.folder())
+             .collect();
+@@ -2682,7 +2713,7 @@ fn plan(
+     models: &[Model],
+     touched: &[String],
+     forced: &[String],
+-) -> Result<Vec<Change>, String> {
++) -> Result<(Vec<Change>, Vec<String>), String> {
+     let files: BTreeMap<&str, &manifest::File> = manifest
+         .files
+         .iter()
+@@ -2788,8 +2819,14 @@ fn plan(
+         .iter()
+         .map(|part| (part.unit.as_str(), part.text.as_str()))
+         .collect();
+-    unit::start_order(texts.iter().map(|(name, text)| (*name, *text)))
++    let rollback_order = unit::start_order(texts.iter().map(|(name, text)| (*name, *text)))
+         .map_err(|why| format!("the rollback unit order is refused: {why}"))?;
++    // Project only after ordering the full old graph: unchanged nodes can
++    // connect two changed units. Inactive members stay for crash recovery.
++    let rollback_order = rollback_order
++        .into_iter()
++        .filter(|name| changes.iter().any(|change| change.unit == *name))
++        .collect();
+     for change in &changes {
+         texts.insert(&change.unit, &change.after);
+     }
+@@ -2800,7 +2837,7 @@ fn plan(
+         .map(|(position, name)| (name.as_str(), position))
+         .collect();
+     changes.sort_by_key(|change| positions[change.unit.as_str()]);
+-    Ok(changes)
++    Ok((changes, rollback_order))
+ }
+ 
+ /// The skills part, and its binary.
+diff --git a/lampOS/crates/update/tests/fixtures/stores/README.md b/lampOS/crates/update/tests/fixtures/stores/README.md
+index 4ca31dd0e..e29d394ab 100644
+--- a/lampOS/crates/update/tests/fixtures/stores/README.md
++++ b/lampOS/crates/update/tests/fixtures/stores/README.md
+@@ -14,3 +14,18 @@ made up.
+   pair with the ignored `write_records_fixtures`
+   (`LAMP_UPDATE_RECORDS_FIXTURE`, a folder), add it to the test's list, and
+   keep the old ones.
++
++The 23 October pair adds the journal's `rollback_order`, written by the
++actual serializer before any unit is replaced. The 21 October pair remains
++unchanged and checks recovery records without this optional field. Both
++pairs are read by `each_kept_state_and_journal_reads_as_saved`.
++
++To write a new pair, choose an empty temporary folder and run:
++
++```sh
++LAMP_UPDATE_RECORDS_FIXTURE=/tmp/update-records-fixture \
++  cargo test -p lamp-update --lib records::tests::write_records_fixtures \
++  -- --ignored --exact
++```
++
++Copy its two JSON files here with the new date; do not replace an older pair.
+diff --git a/lampOS/crates/update/tests/fixtures/stores/journal-2026-10-23.json b/lampOS/crates/update/tests/fixtures/stores/journal-2026-10-23.json
+new file mode 100644
+index 000000000..21a6d9e30
+--- /dev/null
++++ b/lampOS/crates/update/tests/fixtures/stores/journal-2026-10-23.json
+@@ -0,0 +1,33 @@
++{
++  "build": {
++    "sequence": 4576,
++    "commit": "4f5e62507"
++  },
++  "units": [
++    {
++      "unit": "lamp-voice.service",
++      "was_active": true,
++      "link": {
++        "path": "/opt/lampOS/voice/current",
++        "build": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
++      }
++    }
++  ],
++  "rollback_order": [
++    "lamp-voice.service"
++  ],
++  "models": [
++    {
++      "path": "/opt/lampOS/eyes/models/face.onnx",
++      "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
++    }
++  ],
++  "settings": true,
++  "skills": [
++    {
++      "path": "/var/lib/lampOS/skills/dance/skill.toml",
++      "before": "name = \"dance\"\n",
++      "wrote": "9999999999999999999999999999999999999999999999999999999999999999"
++    }
++  ]
++}
+\ No newline at end of file
+diff --git a/lampOS/crates/update/tests/fixtures/stores/state-2026-10-23.json b/lampOS/crates/update/tests/fixtures/stores/state-2026-10-23.json
+new file mode 100644
+index 000000000..faefd1de1
+--- /dev/null
++++ b/lampOS/crates/update/tests/fixtures/stores/state-2026-10-23.json
+@@ -0,0 +1,34 @@
++{
++  "installed": {
++    "sequence": 4576,
++    "commit": "4f5e62507"
++  },
++  "previous": {
++    "sequence": 4570,
++    "commit": "d90cc8b8e"
++  },
++  "refused": [
++    {
++      "sequence": 4573,
++      "commit": "c902a95cf",
++      "why": "lamp-voice.service was not well within a minute",
++      "at_unix_ms": 1760000000000
++    }
++  ],
++  "made": [
++    "/opt/lampOS/voice/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
++  ],
++  "settings": {
++    "/etc/lampOS/voice/second.json": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
++  },
++  "settings_writing": {
++    "/etc/lampOS/records.json": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
++  },
++  "systemd_owed": true,
++  "models": {
++    "/opt/lampOS/eyes/models/face.onnx": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
++  },
++  "models_before": {
++    "/opt/lampOS/eyes/models/face.onnx": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
++  }
++}
+\ No newline at end of file
+diff --git a/lampOS/crates/update/tests/round/restart_order.rs b/lampOS/crates/update/tests/round/restart_order.rs
+index 208d06394..ad97da1bb 100644
+--- a/lampOS/crates/update/tests/round/restart_order.rs
++++ b/lampOS/crates/update/tests/round/restart_order.rs
+@@ -404,3 +404,468 @@ fn a_cycle_in_an_older_recovery_journal_is_retained_without_arbitrary_restarts()
+     assert!(restarts(&lamp).is_empty(), "{:?}", lamp.calls());
+     assert!(lamp.channel.fetched.is_empty());
+ }
++
++/// Add the proposed wire field to a reconstructed recovery prefix, without
++/// requiring the current production Journal type to know it yet.
++fn record_rollback_order(lamp: &Lamp, parts: &[&str]) {
++    let path = lamp.root.join("var/lib/lampos-update/journal.json");
++    let mut journal: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
++    journal["rollback_order"] =
++        serde_json::json!(parts.iter().map(|part| name(part)).collect::<Vec<_>>());
++    fs::write(path, serde_json::to_vec(&journal).unwrap()).unwrap();
++}
++
++#[test]
++fn saved_rollback_order_survives_a_newly_unreadable_installed_unit() {
++    let mut lamp = Lamp::new();
++    install_part(
++        &mut lamp,
++        "alpha",
++        "alpha 1",
++        "After=lamp-zulu.service",
++        true,
++    );
++    install_part(&mut lamp, "zulu", "zulu 1", "", true);
++    install_part(&mut lamp, "middle", "middle 1", "", true);
++    let before = lamp.lamp_files();
++    let units = lamp.root.join("etc/systemd/system");
++    let middle = units.join(name("middle"));
++    let middle_before = fs::read(&middle).unwrap();
++    let old_alpha = fs::read(units.join(name("alpha"))).unwrap();
++    let old_zulu = fs::read(units.join(name("zulu"))).unwrap();
++    publish_parts(
++        &mut lamp,
++        &[("alpha", "alpha 2", ""), ("zulu", "zulu 2, unwell", "")],
++    );
++
++    let unreadable = Rc::new(Cell::new(false));
++    let repair = Rc::clone(&unreadable);
++    let repair_path = middle.clone();
++    // FakeEars reads every unit as UTF-8 to make health. Keep the read error
++    // through restoration, then repair only after the original changed files
++    // are back, on the existing stepped clock before its final health sample.
++    lamp.talking = Some(Box::new(move |_| {
++        if repair.replace(false) {
++            assert_eq!(fs::read(&repair_path).unwrap(), [0xff]);
++            assert_eq!(fs::read(units.join(name("alpha"))).unwrap(), old_alpha);
++            assert_eq!(fs::read(units.join(name("zulu"))).unwrap(), old_zulu);
++            fs::write(&repair_path, &middle_before).unwrap();
++        }
++        false
++    }));
++    let mut injected = false;
++    let outcome = lamp.round_observing(&mut |line| {
++        if line.starts_with("putting build 2 back:") {
++            assert!(!injected);
++            injected = true;
++            fs::write(&middle, [0xff]).unwrap();
++            assert!(fs::read_to_string(&middle).is_err());
++            unreadable.set(true);
++        }
++    });
++    assert!(injected, "the new build must reach rollback: {outcome:?}");
++    assert!(
++        matches!(&outcome, Outcome::RolledBack { after: Ok(()), .. }),
++        "{outcome:?}"
++    );
++    assert!(
++        !unreadable.get(),
++        "the old files must precede fixture repair"
++    );
++    assert_eq!(
++        restarts(&lamp),
++        [name("alpha"), name("zulu"), name("zulu"), name("alpha")]
++    );
++    assert_eq!(lamp.lamp_files(), before);
++    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
++}
++
++#[test]
++fn saved_rollback_order_keeps_transitive_edges_after_an_unchanged_unit_drifts() {
++    let mut lamp = Lamp::new();
++    install_part(
++        &mut lamp,
++        "alpha",
++        "alpha 1",
++        "After=lamp-middle.service",
++        true,
++    );
++    install_part(
++        &mut lamp,
++        "middle",
++        "middle 1",
++        "After=lamp-zulu.service",
++        true,
++    );
++    install_part(&mut lamp, "zulu", "zulu 1", "", true);
++    let middle_pid = lamp.systemd.units[&name("middle")].pid;
++    let units = lamp.root.join("etc/systemd/system");
++    let old_alpha = fs::read(units.join(name("alpha"))).unwrap();
++    let old_zulu = fs::read(units.join(name("zulu"))).unwrap();
++    publish_parts(
++        &mut lamp,
++        &[("alpha", "alpha 2", ""), ("zulu", "zulu 2, unwell", "")],
++    );
++    // The old graph is Zulu -> unchanged Middle -> Alpha. This later edit
++    // would make Alpha and Middle cyclic if rollback reread the live graph.
++    let drift = text("middle", "middle 1", "After=lamp-alpha.service");
++    let mut changed = false;
++    let outcome = lamp.round_observing(&mut |line| {
++        if line.starts_with("putting build 2 back:") {
++            assert!(!changed);
++            changed = true;
++            fs::write(units.join(name("middle")), &drift).unwrap();
++        }
++    });
++    assert!(changed, "{outcome:?}");
++    assert!(
++        matches!(&outcome, Outcome::RolledBack { after: Ok(()), .. }),
++        "{outcome:?}"
++    );
++    assert_eq!(
++        restarts(&lamp),
++        [name("alpha"), name("zulu"), name("zulu"), name("alpha")]
++    );
++    assert_eq!(fs::read(units.join(name("alpha"))).unwrap(), old_alpha);
++    assert_eq!(fs::read(units.join(name("zulu"))).unwrap(), old_zulu);
++    assert_eq!(
++        fs::read_to_string(units.join(name("middle"))).unwrap(),
++        drift
++    );
++    assert_eq!(lamp.systemd.units[&name("middle")].pid, middle_pid);
++    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
++}
++
++#[test]
++fn a_cut_at_reload_saves_the_full_old_projection_before_recovery() {
++    let mut lamp = Lamp::new();
++    install_part(
++        &mut lamp,
++        "alpha",
++        "alpha 1",
++        "After=lamp-middle.service",
++        true,
++    );
++    install_part(
++        &mut lamp,
++        "middle",
++        "middle 1",
++        "After=lamp-zulu.service",
++        true,
++    );
++    install_part(&mut lamp, "zulu", "zulu 1", "", true);
++    install_part(
++        &mut lamp,
++        "sleeping",
++        "sleeping 1",
++        "Before=lamp-zulu.service",
++        false,
++    );
++    let middle_pid = lamp.systemd.units[&name("middle")].pid;
++    let units = lamp.root.join("etc/systemd/system");
++    let saved: Vec<_> = ["alpha", "sleeping", "zulu"]
++        .into_iter()
++        .map(|part| (name(part), fs::read(units.join(name(part))).unwrap()))
++        .collect();
++    publish_parts(
++        &mut lamp,
++        &[
++            ("alpha", "alpha 2", ""),
++            ("sleeping", "sleeping 2", ""),
++            ("zulu", "zulu 2", ""),
++        ],
++    );
++    lamp.systemd.cut_at_reload = true;
++    let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| lamp.round()));
++    assert!(
++        cut.is_err(),
++        "the real write/reload boundary must be reached"
++    );
++    assert!(restarts(&lamp).is_empty());
++    let path = lamp.root.join("var/lib/lampos-update/journal.json");
++    let mut journal: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
++    assert_eq!(
++        journal["rollback_order"],
++        serde_json::json!([name("sleeping"), name("zulu"), name("alpha")])
++    );
++    let switching = journal["units"].as_array_mut().unwrap();
++    let mut listed: Vec<_> = switching
++        .iter()
++        .map(|unit| unit["unit"].as_str().unwrap().to_owned())
++        .collect();
++    listed.sort();
++    assert_eq!(listed, [name("alpha"), name("sleeping"), name("zulu")]);
++    assert_eq!(
++        switching
++            .iter()
++            .find(|unit| unit["unit"] == name("sleeping"))
++            .unwrap()["was_active"],
++        false
++    );
++    // Journal enumeration is not restart order, and already-written old
++    // files remain the recovery source after the unchanged graph drifts.
++    switching.reverse();
++    fs::write(&path, serde_json::to_vec(&journal).unwrap()).unwrap();
++    for (unit, bytes) in &saved {
++        assert_eq!(
++            fs::read(lamp.root.join("var/lib/lampos-update/previous").join(unit)).unwrap(),
++            *bytes
++        );
++        assert_ne!(fs::read(units.join(unit)).unwrap(), *bytes);
++    }
++    fs::write(
++        units.join(name("middle")),
++        text("middle", "middle 1", "After=lamp-alpha.service"),
++    )
++    .unwrap();
++    lamp.channel.fetched.clear();
++    lamp.channel.offline = true;
++    let outcome = lamp.round();
++    assert!(
++        matches!(&outcome, Outcome::RolledBack { after: Ok(()), .. }),
++        "{outcome:?}"
++    );
++    assert_eq!(restarts(&lamp), [name("zulu"), name("alpha")]);
++    for (unit, bytes) in saved {
++        assert_eq!(fs::read(units.join(unit)).unwrap(), bytes);
++    }
++    assert_eq!(lamp.systemd.units[&name("middle")].pid, middle_pid);
++    assert!(!lamp.systemd.units.contains_key(&name("sleeping")));
++    assert!(lamp.channel.fetched.is_empty());
++    assert!(!path.exists());
++}
++
++#[test]
++fn saved_rollback_order_survives_an_interrupted_put_back_and_keeps_inactive_units_off() {
++    let mut lamp = Lamp::new();
++    let saved = interrupted(
++        &mut lamp,
++        &[
++            ("alpha", "After=lamp-zulu.service"),
++            ("zulu", ""),
++            ("sleeping", "Before=lamp-zulu.service"),
++            ("steady", "Before=lamp-alpha.service"),
++        ],
++        &[("alpha", ""), ("zulu", ""), ("sleeping", "")],
++        &["sleeping"],
++        &["zulu", "sleeping", "alpha", "steady"],
++    );
++    record_rollback_order(&lamp, &["sleeping", "steady", "zulu", "alpha"]);
++    let journal = lamp.read("/var/lib/lampos-update/journal.json");
++    let units = lamp.root.join("etc/systemd/system");
++    let alpha_before = fs::read(units.join(name("alpha"))).unwrap();
++    let steady_pid = lamp.systemd.units[&name("steady")].pid;
++    // A directory blocks only Alpha's beside-file creation. The earlier
++    // old unit writes really complete; this is a logical persisted prefix.
++    let blocker = units.join(".lamp-alpha.service.lamp-update");
++    fs::create_dir(&blocker).unwrap();
++    let first = lamp.round();
++    assert!(
++        matches!(&first, Outcome::RolledBack { after: Err(_), .. }),
++        "{first:?}"
++    );
++    assert_eq!(lamp.read("/var/lib/lampos-update/journal.json"), journal);
++    assert_eq!(fs::read(units.join(name("alpha"))).unwrap(), alpha_before);
++    for part in ["zulu", "sleeping", "steady"] {
++        assert_eq!(
++            fs::read_to_string(units.join(name(part))).unwrap(),
++            saved[&name(part)]
++        );
++    }
++    assert_eq!(restarts(&lamp), [name("zulu"), name("alpha")]);
++    assert_eq!(lamp.systemd.units[&name("steady")].pid, steady_pid);
++    assert!(!lamp.systemd.units.contains_key(&name("sleeping")));
++
++    fs::remove_dir(&blocker).unwrap();
++    install_part(
++        &mut lamp,
++        "middle",
++        "middle 1",
++        "After=lamp-middle.service",
++        true,
++    );
++    lamp.calls.borrow_mut().clear();
++    let outcome = lamp.round();
++    assert!(
++        matches!(&outcome, Outcome::RolledBack { after: Ok(()), .. }),
++        "{outcome:?}"
++    );
++    assert_eq!(restarts(&lamp), [name("alpha")]);
++    for (unit, text) in saved {
++        assert_eq!(fs::read_to_string(units.join(unit)).unwrap(), text);
++    }
++    assert_eq!(lamp.systemd.units[&name("steady")].pid, steady_pid);
++    assert!(!lamp.systemd.units.contains_key(&name("sleeping")));
++    assert!(lamp.channel.fetched.is_empty());
++    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
++}
++
++#[test]
++fn malformed_present_rollback_orders_retain_the_prefix_and_do_not_fetch() {
++    let cases = [
++        ("null", r#""rollback_order":null"#),
++        ("boolean", r#""rollback_order":false"#),
++        ("string", r#""rollback_order":"lamp-zulu.service""#),
++        ("object", r#""rollback_order":{}"#),
++        (
++            "non-string entry",
++            r#""rollback_order":["lamp-zulu.service",42]"#,
++        ),
++        (
++            "duplicate entry",
++            r#""rollback_order":["lamp-zulu.service","lamp-zulu.service"]"#,
++        ),
++        ("omission", r#""rollback_order":["lamp-zulu.service"]"#),
++        (
++            "extra unit",
++            r#""rollback_order":["lamp-zulu.service","lamp-alpha.service","lamp-middle.service"]"#,
++        ),
++        (
++            "unsafe name",
++            r#""rollback_order":["lamp-zulu.service","../lamp-alpha.service"]"#,
++        ),
++        ("empty", r#""rollback_order":[]"#),
++        (
++            "duplicate property",
++            r#""rollback_order":["lamp-zulu.service","lamp-alpha.service"],"rollback_order":["lamp-zulu.service","lamp-alpha.service"]"#,
++        ),
++    ];
++    let mut failures = Vec::new();
++    for (case, fields) in cases {
++        let mut lamp = Lamp::new();
++        let saved = interrupted(
++            &mut lamp,
++            &[("alpha", "After=lamp-zulu.service"), ("zulu", "")],
++            &[("alpha", ""), ("zulu", "")],
++            &[],
++            &["alpha", "zulu"],
++        );
++        // A reachable valid channel makes a mistaken set-aside-and-proceed
++        // visible, as well as a mistaken legacy recovery of this new field.
++        publish_parts(
++            &mut lamp,
++            &[("alpha", "alpha 2", ""), ("zulu", "zulu 2", "")],
++        );
++        lamp.channel.offline = false;
++        let path = lamp.root.join("var/lib/lampos-update/journal.json");
++        let old = fs::read_to_string(&path).unwrap();
++        let raw = format!("{}, {fields}}}", old.trim_end().strip_suffix('}').unwrap());
++        assert!(
++            serde_json::from_str::<serde_json::Value>(&raw).is_ok(),
++            "{case}"
++        );
++        fs::write(&path, &raw).unwrap();
++        let before = lamp.lamp_files();
++        let state_path = lamp.root.join("var/lib/lampos-update/state.json");
++        let state_before = fs::read(&state_path).ok();
++        let outcome = lamp.round();
++        let unchanged = fs::read(&path).ok().as_deref() == Some(raw.as_bytes())
++            && lamp.lamp_files() == before
++            && fs::read(&state_path).ok() == state_before
++            && saved.iter().all(|(unit, text)| {
++                fs::read_to_string(lamp.root.join("var/lib/lampos-update/previous").join(unit))
++                    .ok()
++                    .as_ref()
++                    == Some(text)
++            });
++        if !matches!(
++            &outcome,
++            Outcome::Failed(_) | Outcome::RolledBack { after: Err(_), .. }
++        ) || !unchanged
++            || !lamp.calls().is_empty()
++            || !lamp.channel.fetched.is_empty()
++        {
++            failures.push(format!(
++                "{case}: {outcome:?}; prefix unchanged={unchanged}; calls={:?}; fetched={:?}",
++                lamp.calls(),
++                lamp.channel.fetched
++            ));
++        }
++    }
++    assert!(failures.is_empty(), "{}", failures.join("\n"));
++}
++
++#[test]
++fn a_legacy_journal_uses_saved_declarations_and_unchanged_transitive_dependencies() {
++    let mut lamp = Lamp::new();
++    let saved = interrupted(
++        &mut lamp,
++        &[("alpha", "After=lamp-middle.service"), ("zulu", "")],
++        &[("alpha", ""), ("zulu", "After=lamp-alpha.service")],
++        &[],
++        &["alpha", "zulu"],
++    );
++    install_part(
++        &mut lamp,
++        "middle",
++        "middle 1",
++        "After=lamp-zulu.service",
++        true,
++    );
++    let middle_pid = lamp.systemd.units[&name("middle")].pid;
++    let journal: serde_json::Value =
++        serde_json::from_str(&lamp.read("/var/lib/lampos-update/journal.json")).unwrap();
++    assert!(journal.get("rollback_order").is_none());
++    let outcome = lamp.round();
++    assert!(
++        matches!(&outcome, Outcome::RolledBack { after: Ok(()), .. }),
++        "{outcome:?}"
++    );
++    assert_eq!(restarts(&lamp), [name("zulu"), name("alpha")]);
++    for (unit, text) in saved {
++        assert_eq!(lamp.read(&format!("/etc/systemd/system/{unit}")), text);
++    }
++    assert_eq!(lamp.systemd.units[&name("middle")].pid, middle_pid);
++    assert!(lamp.channel.fetched.is_empty());
++    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
++}
++
++#[test]
++fn empty_saved_order_recovers_files_and_keeps_live_builds_when_inventory_is_unreadable() {
++    let mut lamp = Lamp::new();
++    let records = lamp.root.join("var/lib/lampos-update");
++    fs::create_dir_all(&records).unwrap();
++    // This live build is not one of the switch's saved units. A failed
++    // inventory read must not turn pruning's keep-set into an empty one.
++    let live = format!("/opt/lampOS/body/{}", sha("body 1"));
++    fs::write(
++        records.join("state.json"),
++        serde_json::to_vec(&serde_json::json!({
++            "installed":{"sequence":1,"commit":"1".repeat(40)},
++            "previous":null,"refused":[],"made":[live]
++        }))
++        .unwrap(),
++    )
++    .unwrap();
++    let skill = "/var/lib/lampOS/skills/dance/skill.toml";
++    let path = lamp.root.join(skill.trim_start_matches('/'));
++    fs::create_dir_all(path.parent().unwrap()).unwrap();
++    fs::write(&path, "new skill").unwrap();
++    fs::write(
++        records.join("journal.json"),
++        serde_json::to_vec(&serde_json::json!({
++            "build":{"sequence":2,"commit":"2".repeat(40)},
++            "units":[], "rollback_order":[],
++            "skills":[{"path":skill,"before":"old skill","wrote":sha("new skill")}]
++        }))
++        .unwrap(),
++    )
++    .unwrap();
++    let unreadable = lamp
++        .root
++        .join("etc/systemd/system/lamp-cmedia-speaker.service");
++    fs::write(&unreadable, [0xff]).unwrap();
++    lamp.channel.offline = true;
++    let outcome = lamp.round();
++    assert!(
++        matches!(&outcome, Outcome::RolledBack { after: Ok(()), .. }),
++        "{outcome:?}"
++    );
++    assert_eq!(fs::read_to_string(&path).unwrap(), "old skill");
++    assert_eq!(fs::read(&unreadable).unwrap(), [0xff]);
++    assert_eq!(lamp.read(&format!("{live}/lamp-body")), "body 1");
++    assert_eq!(lamp.state()["made"], serde_json::json!([live]));
++    assert!(restarts(&lamp).is_empty());
++    assert!(lamp.channel.fetched.is_empty());
++    assert!(!records.join("journal.json").exists());
++}
+diff --git a/lampOS/docs/updates.md b/lampOS/docs/updates.md
+index 1f8332128..588b7a07d 100644
+--- a/lampOS/docs/updates.md
++++ b/lampOS/docs/updates.md
+@@ -473,7 +473,9 @@ workflow change.
+    installed beside, nothing is switched, status 4, and the next round tries
+    again.
+ 8. **Switch.** The units as they are, each moved link with the build it
+-   names, and the journal are written; then the new units (a product part's
++   names, and the journal are written. The journal includes the validated
++   old startup order of every changed unit, including inactive units,
++   preserving dependency paths through unchanged units. Then the new units (a product part's
+    only if the build changed it), `systemctl daemon-reload`, and each
+    product part's `current` replaced whole: a new link made beside as
+    `.current.lamp-update`, renamed over it, the folder synced. Quiet is asked once more: if
+@@ -487,27 +489,40 @@ workflow change.
+    checked again: a prerequisite's restart may have taken time. If no quiet
+    moment arrives within `--quiet-wait-s`, the changes are put back,
+    including parts already restarted; the voice has not been restarted.
++   During this wait, old Voice can talk to already-restarted new servers
++   for up to the configured bound (3600 s by default). Compatibility is
++   required in both directions; restart order does not make the round atomic.
+ 9. **Watch.** Every second for `--watch-s` (60): each restarted unit must
+    not fail, stop, be in `auto-restart`, be started again by systemd
+    (`NRestarts`) or change process (`MainPID`). At the end it must be
+    running, and if it was in `lamp/health` before the switch it must be
+    there again, not stale, and not in error unless it was before. A part
+    that never reported is judged by systemd alone.
+-10. **Back.** A part not well: the old startup graph is reconstructed from
+-    the saved unit declarations and unchanged installed units. It must be
+-    valid before any restoration write; otherwise the journal and recovery
+-    prefix are kept. Every changed unit is then written back as it was,
+-    reloaded, every moved link named its old build again (replaced
+-    whole, as at the switch), each product skill's file the switch wrote put
+-    back as it was (or removed, with any folder made for it if still empty;
+-    a file the lamp changed since it was written is left, and said), and
+-    those restarted are restarted again in the old graph's startup order.
++10. **Back.** A part not well: the journal's validated old startup order is
++    used without rereading the installed dependency graph. Later changes or
++    read failures in that graph cannot veto the saved restart order. Every
++    changed unit is then written back as it was, reloaded, every moved link named
++    its old build again (replaced whole, as at the switch), each product
++    skill's file the switch wrote put back as it was (or removed, with any
++    folder made for it if still empty; a file the lamp changed since it was
++    written is left, and said), and those restarted are restarted again in
++    that saved order. Already-restored and inactive members gain no restart.
++    The saved order must name all journal units exactly once, before any
++    already-restored prefix is excluded. A present malformed order keeps
++    the journal and every restoration prefix intact and starts no new round.
++    Older journals without the field reconstruct the old graph from saved
++    declarations and unchanged installed units; an unreadable or cyclic
++    graph retains the journal before any restoration write. Their journal
++    is not rewritten to add an order, preserving later fields it may hold.
+     Unless the voice is what failed, queued speech is read at its own
+     restart boundary and the between-turn wait runs there (resting, nothing
+     heard or said for 5 s; at once if its state cannot be seen). If that
+     bounded wait expires, the voice is put back anyway and this is said.
+     They are watched again, the outcome says how the previous build is,
+     and the build is refused from then on.
++    If installed units cannot be read during cleanup, all build folders
++    and their `made` records are kept, with one journal line; unreadable
++    inventory is never treated as proof that a live build is unused.
+     **What a part not well said of itself goes into the outcome** (#1505):
+     the unit that failed on the new build (read before it is put back), and
+     the first unit found not well on the old one (the watch stops there),
+@@ -1497,30 +1512,33 @@ memory's protocol and the tool calls between crates.
+   an older lamp-memory refuses `observations`, so the voice removes nothing
+   and tells the person it couldn't forget.
+ 
+-Why the window can't be zero (read at `02c8d3851`):
++Why the window can't be zero:
+ 
+ - **Signed together.** lamp-voice and lamp-memory are both `core`
+   (`deploy/package-binaries.json:4-5`), and one envelope covers the whole
+   manifest (`.github/scripts/lampos-publish.py:196-231`). Publishing is
+   still off (`.github/workflows/lampos-arm64.yml:279`).
+-- **Not switched as one step.** Each `current` link is renamed in turn
+-  (`crates/update/src/round.rs:1632-1641`), and each unit is restarted
+-  separately, the voice first (`round.rs:1868-1883`, step 8 above). The new
+-  voice runs against the old memory until memory's restart comes round.
+-- **Failures leave it longer.** If a later unit fails to restart, the round
+-  puts the build back with the new voice running. The put-back restarts the
+-  voice last and waits up to `--quiet-wait-s` (3600 s) for a gap between
+-  turns (`round.rs:2066-2075`), all that time on the old memory. A power
+-  cut between two renames, or a part that wasn't running (switched, not
+-  started), leaves the same mix.
++- **Not switched as one step.** Each `current` link is renamed in turn,
++  and each active changed unit is restarted separately, in the candidate
++  unit graph's startup order (step 8 above). Voice's declared prerequisites
++  restart before it; old Voice can talk to new Memory while Voice waits
++  for its own quiet boundary, up to `--quiet-wait-s` (3600 s by default).
++  Dependents that declare themselves after Voice still restart after it.
++- **Failures leave a mixed build.** Put-back uses the saved old startup
++  graph and waits for a gap between turns at Voice's own restart boundary.
++  New Voice can therefore talk to restored old servers during that wait.
++  A failed restart, a power cut between renames, or a part that was not
++  running (switched, not started) can also leave two versions in use.
+ - **Test lamps skew on purpose.** lamp-4ace's units pin each part's build,
+   and `deploy.sh` swaps the voice alone (`deploy/lamp-4ace/RUNBOOK.md:51`).
+   lamp-06c1 runs a hand-swapped voice on an older build
+   (`deploy/lamp-06c1/LAMP.md:2`).
+ 
+-Restarting in dependency order, the voice last, shortens the window. It is
+-a separate change (#3126, item 1). It does not remove the rule: a failed
+-restart, a put-back or a power cut still leaves two builds talking.
++Dependency order changes which side moves first; it does not remove the
++compatibility rule. The updater reads the managed base service files:
++drop-ins, aliases, symlinked units and dependency paths through external,
++socket or target units are not resolved. Restart order is not a readiness
++handshake or an atomic protocol cutover.
+ 
+ ## Every part's saved data, one version ahead
+ 
+diff --git a/lampOS/docs/verification/updater-saved-order-20261023/README.md b/lampOS/docs/verification/updater-saved-order-20261023/README.md
+new file mode 100644
+index 000000000..bbb5be178
+--- /dev/null
++++ b/lampOS/docs/verification/updater-saved-order-20261023/README.md
+@@ -0,0 +1,48 @@
++# Saved rollback order, 23 October 2026
++
++Follow-up to #3173: save the validated old startup order before a switch,
++including inactive changed units and paths through unchanged dependencies.
++Restoration uses that saved order even when later installed unit text is
++unreadable or has changed. It validates all journal members before excluding
++an already-restored prefix. Cleanup keeps live build folders and their
++records if it cannot read the installed inventory.
++
++The test-first patch on unchanged production reports **8 passed / 6 failed**;
++the identical patch on the fix passes **14 / 0**. Ignoring the saved order
++alone restores the unreadable-inventory failure, **0 / 1**, and the source
++was restored exactly before the full gate. Cases also cover interrupted
++put-back, inactive units, 11 malformed-order forms, a field-absent legacy
++journal and an empty unit order with live build folders to preserve.
++
++Mac gate, Rust 1.96.0, on integration base `b3a1ece0b` plus this change:
++
++```
++cargo +1.96.0 fmt --all --check
++cargo +1.96.0 clippy -q --locked --offline -p lamp-update --all-targets --message-format=short -- -D warnings
++cargo +1.96.0 test -q --locked --offline -p lamp-update
++```
++
++All commands pass: **332 tests passed / 0 failed / 4 ignored**. The manual
++fixture writer was also run separately, **1 / 0**, to keep a new dated
++23 October state/journal pair beside the unchanged 21 October pair.
++[Full commands, raw output, negative controls and source bindings](https://github.com/autonomous-ai/lampOS/blob/2a289f992/lampOS/docs/verification/updater-saved-order-20261023/README.md).
++All 6,654 bound regular files stayed unchanged during the full gate.
++
++The optional field is ignored by the previous reader. Legacy journals
++retain graph reconstruction without rewriting their unknown fields.
++Malformed present orders retain the journal and recovery prefix; malformed
++JSON syntax keeps the existing set-aside behavior. Old journals can still
++be blocked by unreadable or cyclic installed graphs. Saved-file reads,
++restoration writes, systemd calls and health checks can still fail.
++
++Source self-review found no P1/P2. Cross-crate searches find no outside
++consumer of the changed journal or private ordering helpers. No new switch,
++message, topic or unit line is added; person, privacy, forget and Voice
++quiet handling are unchanged. The mixed-build documentation states both
++directions, the default 3600-second quiet bound, and unresolved external,
++socket, target, alias and drop-in dependency paths.
++
++These are file/fake-systemd fixtures and existing process tests on a Mac.
++They do not establish real systemd behavior, physical power-cut durability,
++acoustic latency or signed-release acceptance. Official native ARM64 and
++Linux Clippy are required separately on the PR head.
