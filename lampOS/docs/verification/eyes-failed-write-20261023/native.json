@@ -1,0 +1,406 @@
+{
+  "records": [
+    {
+      "name": "before",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-eyes",
+        "--lib",
+        "seems_log::tests::a_failed_write_is_said_once",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/private/tmp/tests-codex-eyes-failed-write-20261023/lampOS",
+      "head": "ae4ab0022a5716b8b393956d5e26fd1480aac350",
+      "status_before": "",
+      "status_after": "",
+      "started_utc": "2026-10-22T23:52:31.524857+00:00",
+      "elapsed_seconds": 74.84589004516602,
+      "exit_code": 101,
+      "environment": {
+        "CARGO_TARGET_DIR": "/private/tmp/tests-codex-small-native-20261022",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0"
+      },
+      "source_count": 6515,
+      "streams": {
+        "stdout": {
+          "file": "before.stdout",
+          "bytes": 252,
+          "sha256": "01ed7fedc0b40dc0a2572aff84948e13389ba68a81402b0ba7706d8c1ce80a79"
+        },
+        "stderr": {
+          "file": "before.stderr",
+          "bytes": 2254,
+          "sha256": "ca56cdd49c26085f85c9b2ce593e6fe4156c26dd0df4736cc9bd7b903f7cfdea"
+        }
+      },
+      "artifacts": [
+        {
+          "path": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_eyes-358be3a36c939fca",
+          "bytes": 82567456,
+          "sha256": "b71576dced6987afb232880d7aa072f1dc07b1a5655b8e76b0eb546a84da1f62",
+          "file": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_eyes-358be3a36c939fca: Mach-O 64-bit executable x86_64"
+        }
+      ],
+      "summaries": [
+        "test seems_log::tests::a_failed_write_is_said_once ... FAILED",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s",
+        "thread 'seems_log::tests::a_failed_write_is_said_once' (703592097) panicked at crates/eyes/src/seems_log.rs:312:69:"
+      ],
+      "source_map": "base",
+      "all_tracked_source_hashes_stable": true,
+      "execution_context": "sandbox-restricted"
+    },
+    {
+      "name": "after",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-eyes",
+        "--lib",
+        "seems_log::tests::a_failed_write_is_said_once",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/private/tmp/tests-codex-eyes-failed-write-20261023/lampOS",
+      "head": "ae4ab0022a5716b8b393956d5e26fd1480aac350",
+      "status_before": " M lampOS/crates/eyes/src/seems_log.rs\n M lampOS/docs/eyes.md\n",
+      "status_after": " M lampOS/crates/eyes/src/seems_log.rs\n M lampOS/docs/eyes.md\n",
+      "started_utc": "2026-10-22T23:54:22.378002+00:00",
+      "elapsed_seconds": 8.945958137512207,
+      "exit_code": 0,
+      "environment": {
+        "CARGO_TARGET_DIR": "/private/tmp/tests-codex-small-native-20261022",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0"
+      },
+      "source_count": 6515,
+      "streams": {
+        "stdout": {
+          "file": "after.stdout",
+          "bytes": 172,
+          "sha256": "34841515343f2dacfc4bdc5f227ce4fa8e893d10292d296c3acf19fcdbf205e4"
+        },
+        "stderr": {
+          "file": "after.stderr",
+          "bytes": 285,
+          "sha256": "9bc96b5b4671e782eb3fee95ccdcf5c2835afec5101cc5af8d62c41be02c9cff"
+        }
+      },
+      "artifacts": [
+        {
+          "path": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_eyes-358be3a36c939fca",
+          "bytes": 82567584,
+          "sha256": "7f7ec6bcc00d5b58035a0bbff933c00f04afdb5967a4d48f112317605e6130d1",
+          "file": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_eyes-358be3a36c939fca: Mach-O 64-bit executable x86_64"
+        }
+      ],
+      "summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 280 filtered out; finished in 0.00s"
+      ],
+      "source_map": "candidate",
+      "all_tracked_source_hashes_stable": true,
+      "execution_context": "sandbox-restricted"
+    },
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "cwd": "/private/tmp/tests-codex-eyes-failed-write-20261023/lampOS",
+      "head": "ae4ab0022a5716b8b393956d5e26fd1480aac350",
+      "status_before": " M lampOS/crates/eyes/src/seems_log.rs\n M lampOS/docs/eyes.md\n",
+      "status_after": " M lampOS/crates/eyes/src/seems_log.rs\n M lampOS/docs/eyes.md\n",
+      "started_utc": "2026-10-22T23:54:56.311119+00:00",
+      "elapsed_seconds": 11.76577115058899,
+      "exit_code": 0,
+      "environment": {
+        "CARGO_TARGET_DIR": "/private/tmp/tests-codex-small-native-20261022",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0"
+      },
+      "source_count": 6515,
+      "streams": {
+        "stdout": {
+          "file": "fmt.stdout",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "file": "fmt.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "artifacts": [],
+      "summaries": [],
+      "source_map": "candidate",
+      "all_tracked_source_hashes_stable": true,
+      "execution_context": "sandbox-restricted"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-eyes",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/private/tmp/tests-codex-eyes-failed-write-20261023/lampOS",
+      "head": "ae4ab0022a5716b8b393956d5e26fd1480aac350",
+      "status_before": " M lampOS/crates/eyes/src/seems_log.rs\n M lampOS/docs/eyes.md\n",
+      "status_after": " M lampOS/crates/eyes/src/seems_log.rs\n M lampOS/docs/eyes.md\n",
+      "started_utc": "2026-10-22T23:55:12.581700+00:00",
+      "elapsed_seconds": 32.96672487258911,
+      "exit_code": 0,
+      "environment": {
+        "CARGO_TARGET_DIR": "/private/tmp/tests-codex-small-native-20261022",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0"
+      },
+      "source_count": 6515,
+      "streams": {
+        "stdout": {
+          "file": "clippy.stdout",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "file": "clippy.stderr",
+          "bytes": 1832,
+          "sha256": "3b4cfa1456507fe35bd1210c7bdca75ed610942bfaebd93e2b230f9dd891cec3"
+        }
+      },
+      "artifacts": [],
+      "summaries": [],
+      "source_map": "candidate",
+      "all_tracked_source_hashes_stable": true,
+      "execution_context": "sandbox-restricted"
+    },
+    {
+      "name": "full-eyes",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-eyes"
+      ],
+      "cwd": "/private/tmp/tests-codex-eyes-failed-write-20261023/lampOS",
+      "head": "ae4ab0022a5716b8b393956d5e26fd1480aac350",
+      "status_before": " M lampOS/crates/eyes/src/seems_log.rs\n M lampOS/docs/eyes.md\n",
+      "status_after": " M lampOS/crates/eyes/src/seems_log.rs\n M lampOS/docs/eyes.md\n",
+      "started_utc": "2026-10-22T23:55:49.985724+00:00",
+      "elapsed_seconds": 26.63433599472046,
+      "exit_code": 101,
+      "environment": {
+        "CARGO_TARGET_DIR": "/private/tmp/tests-codex-small-native-20261022",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0"
+      },
+      "source_count": 6515,
+      "streams": {
+        "stdout": {
+          "file": "full-eyes.stdout",
+          "bytes": 28559,
+          "sha256": "d4a4b7d2da652da0fef59684cf7cce629731f5865a13cecb877d958abc08a6bd"
+        },
+        "stderr": {
+          "file": "full-eyes.stderr",
+          "bytes": 340,
+          "sha256": "32fda7538f37b2c66b0de444fc3b97634515946b5eca07cf28feb36ef802dd48"
+        }
+      },
+      "artifacts": [
+        {
+          "path": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_eyes-358be3a36c939fca",
+          "bytes": 82567584,
+          "sha256": "7f7ec6bcc00d5b58035a0bbff933c00f04afdb5967a4d48f112317605e6130d1",
+          "file": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_eyes-358be3a36c939fca: Mach-O 64-bit executable x86_64"
+        }
+      ],
+      "summaries": [
+        "test bus_out::tests::how_the_person_at_the_lamp_seems_is_said_only_when_switched_on ... FAILED",
+        "test bus_out::tests::how_the_eyes_are_is_said_about_once_a_second_whatever_the_camera_does ... FAILED",
+        "test bus_out::tests::how_familiar_the_person_at_the_lamp_is_is_said_only_when_switched_on ... FAILED",
+        "test bus_out::tests::what_the_person_at_the_desk_does_is_said_from_the_looks ... FAILED",
+        "test bus_out::tests::with_far_faces_judged_a_small_steady_face_is_nobody ... FAILED",
+        "test bus_out::tests::whether_anyone_is_at_the_lamp_is_said_from_the_looks_and_the_voices_lines ... FAILED",
+        "test bus_out::tests::with_addressed_only_an_answered_turn_is_someone ... FAILED",
+        "test camera_helper::tests::the_eyes_read_the_helpers_one_line ... FAILED",
+        "test bus_out::tests::the_journals_height_is_the_published_faces ... FAILED",
+        "thread 'bus_out::tests::how_the_person_at_the_lamp_seems_is_said_only_when_switched_on' (703616501) panicked at crates/eyes/src/bus_out.rs:1502:14:",
+        "thread 'bus_out::tests::how_the_eyes_are_is_said_about_once_a_second_whatever_the_camera_does' (703616500) panicked at crates/eyes/src/bus_out.rs:954:14:",
+        "thread 'bus_out::tests::how_familiar_the_person_at_the_lamp_is_is_said_only_when_switched_on' (703616499) panicked at crates/eyes/src/bus_out.rs:1472:14:",
+        "thread 'bus_out::tests::what_the_person_at_the_desk_does_is_said_from_the_looks' (703616508) panicked at crates/eyes/src/bus_out.rs:1220:14:",
+        "thread 'bus_out::tests::with_far_faces_judged_a_small_steady_face_is_nobody' (703616511) panicked at crates/eyes/src/bus_out.rs:1146:14:",
+        "thread 'bus_out::tests::whether_anyone_is_at_the_lamp_is_said_from_the_looks_and_the_voices_lines' (703616509) panicked at crates/eyes/src/bus_out.rs:987:14:",
+        "thread 'bus_out::tests::with_addressed_only_an_answered_turn_is_someone' (703616510) panicked at crates/eyes/src/bus_out.rs:1083:14:",
+        "thread 'camera_helper::tests::the_eyes_read_the_helpers_one_line' (703616513) panicked at crates/eyes/src/camera_helper.rs:229:72:",
+        "thread 'bus_out::tests::the_journals_height_is_the_published_faces' (703616505) panicked at crates/eyes/src/bus_out.rs:1183:32:",
+        "test result: FAILED. 267 passed; 9 failed; 5 ignored; 0 measured; 0 filtered out; finished in 18.61s"
+      ],
+      "source_map": "candidate",
+      "all_tracked_source_hashes_stable": true,
+      "execution_context": "sandbox-restricted"
+    },
+    {
+      "name": "full-eyes-local",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-eyes"
+      ],
+      "cwd": "/private/tmp/tests-codex-eyes-failed-write-20261023/lampOS",
+      "head": "ae4ab0022a5716b8b393956d5e26fd1480aac350",
+      "status_before": " M lampOS/crates/eyes/src/seems_log.rs\n M lampOS/docs/eyes.md\n",
+      "status_after": " M lampOS/crates/eyes/src/seems_log.rs\n M lampOS/docs/eyes.md\n",
+      "started_utc": "2026-10-22T23:57:07.290757+00:00",
+      "elapsed_seconds": 30.064385652542114,
+      "exit_code": 0,
+      "environment": {
+        "CARGO_TARGET_DIR": "/private/tmp/tests-codex-small-native-20261022",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0"
+      },
+      "source_count": 6515,
+      "streams": {
+        "stdout": {
+          "file": "full-eyes-local.stdout",
+          "bytes": 25366,
+          "sha256": "01363a81c3fbfa93afb15e0e9c049be9f14ff24c94be5afd526f1b494fe482bf"
+        },
+        "stderr": {
+          "file": "full-eyes-local.stderr",
+          "bytes": 748,
+          "sha256": "5e9047864bfe398cbdac7f595d4d1802fc31e8b5441bd0c1689bc68bddece71f"
+        }
+      },
+      "artifacts": [
+        {
+          "path": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_eyes-358be3a36c939fca",
+          "bytes": 82567584,
+          "sha256": "7f7ec6bcc00d5b58035a0bbff933c00f04afdb5967a4d48f112317605e6130d1",
+          "file": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_eyes-358be3a36c939fca: Mach-O 64-bit executable x86_64"
+        },
+        {
+          "path": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_eyes-1c7c89d901d6c90b",
+          "bytes": 62711152,
+          "sha256": "b5b8b1448264872780ba49056851125f3e487d27e21fc50a950c405a47f22ac5",
+          "file": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_eyes-1c7c89d901d6c90b: Mach-O 64-bit executable x86_64"
+        },
+        {
+          "path": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_seems_measure-f958815cda3e3766",
+          "bytes": 62239504,
+          "sha256": "1f2e75440b5e6d677b09c71f0e800ad5cadc7edc2fa3439fe23b2cddcd9d8aae",
+          "file": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_seems_measure-f958815cda3e3766: Mach-O 64-bit executable x86_64"
+        },
+        {
+          "path": "/private/tmp/tests-codex-small-native-20261022/debug/deps/full_look_replay-2e2432cbba632ac8",
+          "bytes": 62648248,
+          "sha256": "3e2b3ea14f540d84f315ddc928387b8b131ab28303f16c5c95ed6723b27076e9",
+          "file": "/private/tmp/tests-codex-small-native-20261022/debug/deps/full_look_replay-2e2432cbba632ac8: Mach-O 64-bit executable x86_64"
+        },
+        {
+          "path": "/private/tmp/tests-codex-small-native-20261022/debug/examples/glance_replay-74b6ee6a3688da96",
+          "bytes": 1409208,
+          "sha256": "a9e25870a09c4f5ce21491a90de571c33297a87a59421a96f602eee70c1388eb",
+          "file": "/private/tmp/tests-codex-small-native-20261022/debug/examples/glance_replay-74b6ee6a3688da96: Mach-O 64-bit executable x86_64"
+        }
+      ],
+      "summaries": [
+        "test result: ok. 276 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 21.80s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "source_map": "candidate",
+      "all_tracked_source_hashes_stable": true,
+      "execution_context": "local-process-permissions"
+    },
+    {
+      "name": "workspace-build",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "--offline",
+        "--workspace"
+      ],
+      "cwd": "/private/tmp/tests-codex-eyes-failed-write-20261023/lampOS",
+      "head": "ae4ab0022a5716b8b393956d5e26fd1480aac350",
+      "status_before": " M lampOS/crates/eyes/src/seems_log.rs\n M lampOS/docs/eyes.md\n",
+      "status_after": " M lampOS/crates/eyes/src/seems_log.rs\n M lampOS/docs/eyes.md\n",
+      "started_utc": "2026-10-22T23:57:43.399774+00:00",
+      "elapsed_seconds": 114.06514525413513,
+      "exit_code": 0,
+      "environment": {
+        "CARGO_TARGET_DIR": "/private/tmp/tests-codex-small-native-20261022",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0"
+      },
+      "source_count": 6515,
+      "streams": {
+        "stdout": {
+          "file": "workspace-build.stdout",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "file": "workspace-build.stderr",
+          "bytes": 5265,
+          "sha256": "24aee93f48dffaf878b5d51b417fb8b3e03fc079271e5140492f714eba27b705"
+        }
+      },
+      "artifacts": [],
+      "summaries": [],
+      "source_map": "candidate",
+      "all_tracked_source_hashes_stable": true,
+      "execution_context": "local-process-permissions"
+    }
+  ],
+  "limits": [
+    "Initial wrapper launch could not find cargo on PATH and started no Cargo process; PATH was corrected before the recorded before command.",
+    "The first full-package command failed on nine sandbox PermissionDenied operations. It is retained; the same command ran once with local process permissions and passed.",
+    "No ARM64 compilation was performed on the Mac. Native Linux qualification is pending."
+  ]
+}
