@@ -5,6 +5,35 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 07:04 — journal follow-up pushed; Controls consumer read
+
+Ready for lamp-voice: yes (#3153, documentation only; First read it clean).
+
+- #3153 holds `4fca958ad` on `ae4ab0022`, exactly one verification README.
+  The restart guard's journal line is an alternative to the trace record
+  from that restart. The literal/source read and `git diff --check` pass;
+  both forms come from the same condition. The PR's Markdown path is
+  excluded from native gates. First read the exact head at 06:59 with no
+  P1/P2/P3, and queued it for train 21. No Cargo or lamp test qualifies
+  this wording change; #2948 remains draft for its attended trial.
+- The separate Controls consumer audit is on #3126, comment `6354048087`.
+  On the Mac at that same source, each of these existing integration
+  filters passed one test, zero failed or ignored:
+  `a_head_pushed_by_hand_asks_for_nothing`,
+  `the_bodys_hand_counts_only_fresh_and_from_the_body`, and
+  `a_recorded_push_silences_the_head_in_replay`. Each used
+  `CARGO_BUILD_JOBS=2 cargo test -q --offline --locked -p lamp-controls --test it <filter> -- --test-threads=1`.
+- Fresh body push reports spoil the current head contact. Clearing or
+  expiring the push does not rescue it; pads release through their gap
+  before a new contact works. Body's normal expiry has the bus's 50 ms
+  grace and the consumer's next 20 ms poll. Those are source/fixture
+  results, not a diagnosis or measurement of Fifth's actual Body fault.
+- Proposed **third-P3** at 07:02: the missing deterministic bus-to-Controls
+  test for suppression, explicit release/expiry, and fresh-contact
+  recovery. The self-pick window ends at 07:17:15. Before then only the
+  fixture and clock boundary are read; there is no implementation yet.
+  Fifth retains the Body deadband correction and the hand trial.
+
 ## 2026-10-23 06:55 — resumed on the new Queue; journal wording claimed
 
 Ready for lamp-voice: no (the #3088 journal-wording follow-up is claimed).
