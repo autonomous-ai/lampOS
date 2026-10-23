@@ -87,10 +87,13 @@ impl Scene {
                 ..Default::default()
             }),
         );
-        // Leases a second long, as the burst test's (#1569): a line's waits for Started,
-        // the drained messages and activityEnd send no heartbeat, and a stall
-        // past the rig's 100 ms on a loaded serial run revoked the line's owner
-        // (None at `end_line`, #3180's gate). These tests are about the name.
+        // Leases a second long, as the burst test's (#1569): `drain()` and the
+        // waits for the service's messages up to activityEnd send no heartbeat
+        // (`rig.wire()` does), and a stall past the rig's 100 ms there on a
+        // loaded serial run revoked the line's owner (None at `end_line`,
+        // #3180's gate; pinned by
+        // `a_stall_before_a_lines_end_loses_its_owner_only_past_the_lease`).
+        // These tests are about the name.
         rig.lease_us = 1_000_000;
         rig.owner
             .set_camera_permission(real_time(), Permission::Allowed)
@@ -267,6 +270,32 @@ async fn line(scene: &mut Scene, rig: &mut LiveRig, dial: &mut Dial) -> Vec<Stri
     scene.pump(rig, Duration::from_millis(700)).await;
     let seen = drain(dial).await;
     end_line(rig, dial, request, seen).await
+}
+
+/// #3198's control, pinned (reviewer-two's P3): a stall of 150 ms with no
+/// heartbeat between a line's drain and its end, then one heartbeat, loses
+/// the line's owner under the rig's old 100 ms lease, as #3180's full run
+/// did (None at `end_line`), and keeps it under the scene's 1 s lease.
+#[tokio::test]
+async fn a_stall_before_a_lines_end_loses_its_owner_only_past_the_lease() {
+    for (lease_us, kept) in [(100_000, false), (1_000_000, true)] {
+        let mut scene = Scene::new("stall");
+        let mut rig = scene.rig(true);
+        rig.lease_us = lease_us;
+        let mut dial = rig.ready().await;
+        scene.see(1, Some(NAME));
+        scene.pump(&mut rig, Duration::from_millis(300)).await;
+        let request = begin(&mut rig, &dial).await;
+        scene.pump(&mut rig, Duration::from_millis(300)).await;
+        let seen = drain(&mut dial).await;
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        rig.publish();
+        assert_eq!(rig.snapshot.owner().is_some(), kept, "lease {lease_us} us");
+        if kept {
+            end_line(&mut rig, &mut dial, request, seen).await;
+        }
+        rig.stop().await;
+    }
 }
 
 fn told(seen: &[String]) -> bool {
