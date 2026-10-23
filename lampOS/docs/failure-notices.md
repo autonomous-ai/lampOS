@@ -242,10 +242,14 @@ the install change merges.
 They and `manifest.json` are in the release `notices-2026-10-20`, pinned by
 size and SHA-256 in `deploy/product/models.json`. `lamp-update install`
 places them in `/opt/lampOS/voice/notices`, the folder the product unit's
-`--failure-notice-dir` names. The generic voice unit (`deploy/units`, a lamp
-moved from V1) names the same folder and language since #2943, held to the
-product unit's by `lamp-update`'s unit test; the generic package carrying the
-files is #2943's part 2. The manifest lists every kind, so it goes only
+`--failure-notice-dir` names. A lamp moved from V1 gets no install, and its
+package carries no notices, so `lamp-keeper prepare` places the same five
+files, by install's own fetch and check, in `/var/lib/lampOS/voice/notices`
+(#2943, [keeper.md](keeper.md)): only a missing one, and a failed fetch is
+said, never a refusal. The generic voice unit (`deploy/units`) names that
+folder, in the product unit's language, held to both by `lamp-update`'s
+unit test. Not the product's folder: the package's packager takes every
+`/opt/lampOS` path in a unit for one it carries. The manifest lists every kind, so it goes only
 onto a voice that knows them all: `wifi_lost` is known from `a441fea06`,
 build 4142 on.
 
@@ -266,7 +270,7 @@ reason>"`, and `failure_notice_capability` carries `"fallback":"sigh"`. With
 no `--failure-notice-dir` nothing stands in, and the lamp stays silent as
 before. The sigh says only that something is wrong, not what. The recorded
 lines, which say why, are still the answer: the product's come from
-`notices-2026-10-20`, and the generic package's are #2943 part 2.
+`notices-2026-10-20` by install, and a moved lamp's by `lamp-keeper prepare`.
 
 ## Optional same-owner live integration
 

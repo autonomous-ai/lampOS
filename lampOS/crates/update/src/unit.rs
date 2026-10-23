@@ -228,9 +228,12 @@ mod tests {
         assert_eq!(ceiling(&generic), ceiling(&product), "{generic}");
     }
 
-    /// #2943: the generic voice unit names the recorded failure lines where
-    /// the product unit does, in the same language, so a lamp moved from V1
-    /// says why it can't answer rather than nothing.
+    /// #2943: the generic voice unit names the recorded failure lines in the
+    /// product's language, from the folder `lamp-keeper prepare` fills
+    /// (`install::NOTICES_MOVED`), so a lamp moved from V1 says why it can't
+    /// answer rather than nothing. Not the product's folder under
+    /// `/opt/lampOS`: the generic package's packager takes every path there
+    /// for one it carries, and it carries no notices.
     #[test]
     fn the_generic_voice_says_its_failures_as_the_product_does() {
         let exec = |unit: &str| {
@@ -241,16 +244,25 @@ mod tests {
         };
         let product = exec(include_str!("../../../deploy/product/lamp-voice.service"));
         let generic = exec(include_str!("../../../deploy/units/lamp-voice.service"));
-        for flag in ["--failure-notice-dir", "--failure-notice-language"] {
-            let value = |exec: &str| {
-                exec.split_whitespace()
-                    .skip_while(|word| *word != flag)
-                    .nth(1)
-                    .map(str::to_owned)
-            };
-            assert!(value(&product).is_some(), "{flag}: {product}");
-            assert_eq!(value(&generic), value(&product), "{flag}: {generic}");
-        }
+        let value = |exec: &str, flag: &str| {
+            exec.split_whitespace()
+                .skip_while(|word| *word != flag)
+                .nth(1)
+                .map(str::to_owned)
+        };
+        let language = "--failure-notice-language";
+        assert!(value(&product, language).is_some(), "{product}");
+        assert_eq!(value(&generic, language), value(&product, language));
+        let folder = "--failure-notice-dir";
+        assert_eq!(
+            value(&product, folder).as_deref(),
+            Some(crate::install::NOTICES_PRODUCT)
+        );
+        assert_eq!(
+            value(&generic, folder).as_deref(),
+            Some(crate::install::NOTICES_MOVED),
+            "{generic}"
+        );
     }
 
     /// The product's "who it answers" switches, and the bus they read the

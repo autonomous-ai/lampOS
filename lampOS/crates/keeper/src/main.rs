@@ -53,6 +53,9 @@ provision/ settings, setup's page and reset plan, and the runtime directories;
 with the reset plan, setup's marker, since a moved lamp is already on its
 Wi-Fi (#2937). A device it cannot find, or one
 found twice, stops it with exit 1 before any of these is written.
+Last, it fetches the voice's recorded failure lines that are missing from
+/var/lib/lampOS/voice/notices, checked against the product's pins; one it
+cannot fetch is said, never a refusal (#2943).
 status prints every lampOS unit: its state, its build and its health.
 start, stop and restart act on lamp-PART.service, or lampos.target for lamp.
 pause says on lamp/pause that the lamp is paused: each part that honours it
@@ -106,7 +109,8 @@ fn main() -> ExitCode {
 /// `lamp-keeper prepare`: V1's key where missing and never written before,
 /// by lamp-update install's own code and records; then what a V1 lamp lacks
 /// for the generic package (the profile, the settings and the directories),
-/// where missing (#2163). Nothing it prints carries the key: the paths only.
+/// where missing (#2163). Last, the voice's recorded failure lines, where
+/// missing, by install's own fetch and check (#2943). Nothing it prints carries the key: the paths only.
 fn prepare() -> ExitCode {
     use lamp_update::install;
     let mut say = |line: &str| eprintln!("lamp-keeper: prepare: {line}");
@@ -143,6 +147,19 @@ fn prepare() -> ExitCode {
             eprintln!("lamp-keeper: prepare: {why}");
             return ExitCode::FAILURE;
         }
+    }
+    // The voice's recorded failure lines, which the package does not carry,
+    // from the product's pins (#2943). Never a refusal: a line missing is a
+    // sigh until the next prepare places it.
+    match lamp_update::fetch::Web::new() {
+        Ok(mut channel) => wrote.extend(install::place_moved_notices(
+            Path::new("/"),
+            &mut channel,
+            &mut say,
+        )),
+        Err(error) => say(&format!(
+            "the recorded lines cannot be fetched (TLS cannot be set up: {error})"
+        )),
     }
     if wrote.is_empty() {
         eprintln!("lamp-keeper: prepare: nothing written");
