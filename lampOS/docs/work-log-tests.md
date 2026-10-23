@@ -1,5 +1,30 @@
 # Tests work log
 
+## 2026-10-23 08:05 +0700 — Surround native gate and conversation-guard review complete
+
+#3165's authored `7a36051bd` passed both actual native jobs, checked as
+`d03a53dc4` on `f477d6c49`. ARM64 whole-workspace PR-profile parallel is
+**10,823/0/67**, including one passing LEAK; Surround **265/0**, changed case
+**0.035 s**. Separate doctests **4/0**, process **12/0**, relay ok. Linux
+Clippy passes. [Complete CI receipt](verification/surround-status-lock-20261023/ci/)
+retains exact checkout/tree, full logs, commands, counts and metadata. The
+source read is in progress; final newer-base carry remains with the merge owner.
+
+Posted `READ-OK` on #3160 at `28cc2539a`: all five guards precede shared
+mutation and span cleanup, original assertions and production bytes remain,
+and the ordered controls acknowledge the actual reset/guard attempt. This
+was a source read; its **3,815/0/14** Mac result is the author's, not a new
+execution. Its current ARM64 and Linux Clippy jobs succeed; separate Linux
+formatting and latest-base carry remain with their owners.
+
+The #1569 boot fixture source is frozen at `b5f2e39d2` on `f477d6c49`.
+Seven files preserve **1,821 original assertion macro bodies** and all original
+relative ages and bounds. Linux x86 baseline compilation is running offline
+with two jobs; its planned old/new 60-second controls are not results yet.
+The Mac full before/after and near-boot controls wait for that runner's CPU
+release. Read-only audits of #2839/#2848/#2862 continue; no product edit or
+lamp operation has been made.
+
 ## 2026-10-23 07:54 +0700 — requested Linux formatting receipt delivered
 
 Third's exact #3162 head `22634785d` passed `cargo fmt --all --check` once

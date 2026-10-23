@@ -1,0 +1,3982 @@
+{
+  "pr": 3165,
+  "authored_head": "7a36051bd80d643d502c069cfeb77fa0604e6bd9",
+  "checked_merge": "d03a53dc464696823b46019084de8d6cf809480f",
+  "checked_parents": [
+    "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+    "7a36051bd80d643d502c069cfeb77fa0604e6bd9"
+  ],
+  "checked_tree": "c7a854b66d8950852e6253634b38d9f338ef7da9",
+  "local_merge_tree_matches": true,
+  "ci": {
+    "arm64": {
+      "watch_identity": {
+        "head": "7a36051bd80d643d502c069cfeb77fa0604e6bd9",
+        "run_number": 6268,
+        "run_attempt": 1,
+        "workflow": {
+          "status": "completed",
+          "conclusion": "success"
+        },
+        "job": {
+          "status": "completed",
+          "conclusion": "success"
+        },
+        "active_step": null,
+        "log": {
+          "path": "raw-output.json:arm64",
+          "bytes": 1850568,
+          "sha256": "c149c7e50339561c958a2b33572f61b381ac8e6b9a64b9a8ee6e2e387943c8e5"
+        },
+        "completed_utc": "2026-10-23T00:58:05.213325+00:00"
+      },
+      "raw_log": {
+        "path": "raw-output.json:arm64",
+        "bytes": 1850568,
+        "sha256": "c149c7e50339561c958a2b33572f61b381ac8e6b9a64b9a8ee6e2e387943c8e5"
+      },
+      "checkouts": [
+        {
+          "line": 289,
+          "text": "2026-10-23T00:44:01.9513391Z HEAD is now at d03a53d Merge 7a36051bd80d643d502c069cfeb77fa0604e6bd9 into f477d6c49732dbd5cba84cbe18ea568692c056e6"
+        },
+        {
+          "line": 291,
+          "text": "2026-10-23T00:44:02.0114672Z [command]/usr/bin/git log -1 --format=%H"
+        },
+        {
+          "line": 292,
+          "text": "2026-10-23T00:44:02.0141123Z d03a53dc464696823b46019084de8d6cf809480f"
+        }
+      ],
+      "architecture": [
+        {
+          "line": 346,
+          "text": "2026-10-23T00:44:02.9439132Z info: default host tuple is aarch64-unknown-linux-gnu"
+        },
+        {
+          "line": 350,
+          "text": "2026-10-23T00:44:08.3302220Z info: default toolchain set to 1.96.0-aarch64-unknown-linux-gnu"
+        },
+        {
+          "line": 352,
+          "text": "2026-10-23T00:44:08.3377686Z   1.96.0-aarch64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)"
+        }
+      ],
+      "commands_scope": [
+        {
+          "line": 337,
+          "text": "2026-10-23T00:44:02.3508372Z ##[group]Run curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt"
+        },
+        {
+          "line": 338,
+          "text": "2026-10-23T00:44:02.3509750Z \u001b[36;1mcurl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt\u001b[0m"
+        },
+        {
+          "line": 653,
+          "text": "2026-10-23T00:48:48.4522607Z The whole workspace: `lampOS/docs/verification/surround-status-lock-20261023/artifacts.json` (lampOS/docs, read by tests this can't see)."
+        },
+        {
+          "line": 659,
+          "text": "2026-10-23T00:48:48.4611691Z \u001b[36;1mcargo nextest run --locked --release --workspace \\\u001b[0m"
+        },
+        {
+          "line": 660,
+          "text": "2026-10-23T00:48:48.4611998Z \u001b[36;1m  --profile pr \\\u001b[0m"
+        },
+        {
+          "line": 661,
+          "text": "2026-10-23T00:48:48.4612228Z \u001b[36;1m  --no-tests=pass -j num-cpus \\\u001b[0m"
+        },
+        {
+          "line": 662,
+          "text": "2026-10-23T00:48:48.4612494Z \u001b[36;1m  --partition hash:1/1 \\\u001b[0m"
+        },
+        {
+          "line": 666,
+          "text": "2026-10-23T00:48:48.4632234Z   PICKED: "
+        },
+        {
+          "line": 668,
+          "text": "2026-10-23T00:48:48.4785968Z cores: 4"
+        }
+      ],
+      "limits": [
+        "No new workflow, rerun, local Cargo, source edit, device action or independent Linux fmt run.",
+        "Test binary IDs identify nextest executable targets; no compiled test-binary byte identity is claimed."
+      ],
+      "nextest": {
+        "starting": {
+          "line": 700,
+          "text": "2026-10-23T00:54:15.5340034Z     Starting 10823 tests across 166 binaries (67 tests and 2 binaries skipped)"
+        },
+        "summary": {
+          "line": 11525,
+          "text": "2026-10-23T00:57:24.1225040Z      Summary [ 188.589s] 10823 tests run: 10823 passed (1 leaky), 67 skipped"
+        },
+        "expected_primary_rows": 10823,
+        "primary_rows": 10823,
+        "unique_primary_tests": 10823,
+        "primary_rows_match_starting": true,
+        "status_counts": {
+          "PASS": 10822,
+          "LEAK": 1
+        },
+        "listed_binary_count": 166,
+        "skipped_tests": 67,
+        "skipped_binaries": 2,
+        "binaries_with_primary_rows": 146,
+        "binary_identity_counts": {
+          "lamp-actions": {
+            "PASS": 65
+          },
+          "lamp-actions::it": {
+            "PASS": 29
+          },
+          "lamp-actions::speaker_state": {
+            "PASS": 23
+          },
+          "lamp-actions::bin/lamp-actions": {
+            "PASS": 3
+          },
+          "lamp-addons": {
+            "PASS": 38
+          },
+          "lamp-addons::judge": {
+            "PASS": 12
+          },
+          "lamp-air": {
+            "PASS": 26
+          },
+          "lamp-air::bin/lamp-air": {
+            "PASS": 1
+          },
+          "lamp-audio": {
+            "PASS": 81
+          },
+          "lamp-health::it": {
+            "PASS": 45
+          },
+          "lamp-audio::it": {
+            "PASS": 112
+          },
+          "lamp-skills::it": {
+            "PASS": 303
+          },
+          "lamp-body": {
+            "PASS": 420
+          },
+          "lamp-body::it": {
+            "PASS": 125
+          },
+          "lamp-body::bin/lamp-body": {
+            "PASS": 31
+          },
+          "lamp-body::bin/lamp-body-inspect": {
+            "PASS": 2
+          },
+          "lamp-body::bin/lamp-body-measure": {
+            "PASS": 5
+          },
+          "lamp-body::bin/lamp-body-mood": {
+            "PASS": 3
+          },
+          "lamp-body::bin/lamp-body-worker": {
+            "PASS": 1
+          },
+          "lamp-bus": {
+            "PASS": 55
+          },
+          "lamp-bus::it": {
+            "PASS": 50
+          },
+          "lamp-bus::bin/lamp-bus": {
+            "PASS": 2
+          },
+          "lamp-camera": {
+            "PASS": 31
+          },
+          "lamp-camera::it": {
+            "PASS": 58
+          },
+          "lamp-cloud": {
+            "PASS": 166
+          },
+          "lamp-voice": {
+            "PASS": 3567,
+            "LEAK": 1
+          },
+          "lamp-voice::it": {
+            "PASS": 301
+          },
+          "lamp-cloud::it": {
+            "PASS": 30
+          },
+          "lamp-controls": {
+            "PASS": 33
+          },
+          "lamp-controls::it": {
+            "PASS": 456
+          },
+          "lamp-controls::strip_worker": {
+            "PASS": 9
+          },
+          "lamp-controls::bin/lamp-controls": {
+            "PASS": 2
+          },
+          "lamp-ears": {
+            "PASS": 67
+          },
+          "lamp-ears::pcm_bus": {
+            "PASS": 3
+          },
+          "lamp-ears::bin/lamp-ears": {
+            "PASS": 6
+          },
+          "lamp-environment::snapshots": {
+            "PASS": 12
+          },
+          "lamp-expression": {
+            "PASS": 27
+          },
+          "lamp-expression::it": {
+            "PASS": 280
+          },
+          "lamp-expression::runtime": {
+            "PASS": 27
+          },
+          "lamp-expression::bin/lamp-expression": {
+            "PASS": 4
+          },
+          "lamp-eyes": {
+            "PASS": 279
+          },
+          "lamp-eyes::bin/lamp-eyes": {
+            "PASS": 9
+          },
+          "lamp-eyes::full_look_replay": {
+            "PASS": 1
+          },
+          "lamp-eyes::example/glance_replay": {
+            "PASS": 1
+          },
+          "lamp-gemini": {
+            "PASS": 254
+          },
+          "lamp-gemini::it": {
+            "PASS": 25
+          },
+          "lamp-gemini::example/early_end_probe": {
+            "PASS": 6
+          },
+          "lamp-health": {
+            "PASS": 42
+          },
+          "lamp-health::bin/lamp-health": {
+            "PASS": 3
+          },
+          "lamp-ipc": {
+            "PASS": 9
+          },
+          "lamp-ipc::probe": {
+            "PASS": 3
+          },
+          "lamp-ipc::relay_shared": {
+            "PASS": 1
+          },
+          "lamp-ipc::sockets": {
+            "PASS": 13
+          },
+          "lamp-keeper": {
+            "PASS": 40
+          },
+          "lamp-keeper::bin/lamp-keeper": {
+            "PASS": 2
+          },
+          "lamp-lean": {
+            "PASS": 10
+          },
+          "lamp-lean::it": {
+            "PASS": 51
+          },
+          "lamp-local-time::local_time": {
+            "PASS": 11
+          },
+          "lamp-memory": {
+            "PASS": 96
+          },
+          "lamp-ipc::relay_exit": {
+            "PASS": 1
+          },
+          "lamp-memory::forget_person": {
+            "PASS": 3
+          },
+          "lamp-memory::forget_shared_exchange": {
+            "PASS": 3
+          },
+          "lamp-memory::health_control": {
+            "PASS": 23
+          },
+          "lamp-memory::it": {
+            "PASS": 149
+          },
+          "lamp-memory::forgot": {
+            "PASS": 1
+          },
+          "lamp-memory::paraphrase_fixture": {
+            "PASS": 1
+          },
+          "lamp-memory::voice_early_words": {
+            "PASS": 1
+          },
+          "lamp-memory::voice_forget": {
+            "PASS": 5
+          },
+          "lamp-memory::voice_follows_face": {
+            "PASS": 1
+          },
+          "lamp-memory::voice_forget_about": {
+            "PASS": 2
+          },
+          "lamp-memory::voice_forget_named": {
+            "PASS": 2
+          },
+          "lamp-memory::voice_link_used": {
+            "PASS": 2
+          },
+          "lamp-memory::voice_observe": {
+            "PASS": 1
+          },
+          "lamp-memory::bin/lamp-memory": {
+            "PASS": 8
+          },
+          "lamp-memory::voice_since_until": {
+            "PASS": 2
+          },
+          "lamp-memory::bin/lamp-memory-eval": {
+            "PASS": 8
+          },
+          "lamp-mood::it": {
+            "PASS": 117
+          },
+          "lamp-mood": {
+            "PASS": 1
+          },
+          "lamp-msgs": {
+            "PASS": 92
+          },
+          "lamp-msgs::it": {
+            "PASS": 78
+          },
+          "lamp-name": {
+            "PASS": 25
+          },
+          "lamp-name::it": {
+            "PASS": 2
+          },
+          "lamp-name::bin/lamp-name": {
+            "PASS": 11
+          },
+          "lamp-name::example/stop_words_replay": {
+            "PASS": 6
+          },
+          "lamp-near-call": {
+            "PASS": 8
+          },
+          "lamp-observer": {
+            "PASS": 45
+          },
+          "lamp-observer::bin/lamp-observer": {
+            "PASS": 1
+          },
+          "lamp-peek": {
+            "PASS": 15
+          },
+          "lamp-peek::peek": {
+            "PASS": 11
+          },
+          "lamp-policy": {
+            "PASS": 180
+          },
+          "lamp-policy::it": {
+            "PASS": 94
+          },
+          "lamp-policy::bin/lamp-policy": {
+            "PASS": 5
+          },
+          "lamp-policy::bin/lamp-policy-judges": {
+            "PASS": 3
+          },
+          "lamp-policy::bin/lamp-policy-replay": {
+            "PASS": 2
+          },
+          "lamp-records": {
+            "PASS": 131
+          },
+          "lamp-records::records": {
+            "PASS": 7
+          },
+          "lamp-records::records_control": {
+            "PASS": 14
+          },
+          "lamp-records::bin/lamp-records": {
+            "PASS": 23
+          },
+          "lamp-ring": {
+            "PASS": 53
+          },
+          "lamp-same-voice": {
+            "PASS": 4
+          },
+          "lamp-schedule": {
+            "PASS": 5
+          },
+          "lamp-same-voice::priority": {
+            "PASS": 1
+          },
+          "lamp-schedule::forward": {
+            "PASS": 15
+          },
+          "lamp-schedule::it": {
+            "PASS": 183
+          },
+          "lamp-schedule::storage_children": {
+            "PASS": 2
+          },
+          "lamp-schedule::example/schedule_check": {
+            "PASS": 10
+          },
+          "lamp-selftest": {
+            "PASS": 83
+          },
+          "lamp-selftest::bin/lamp-selftest": {
+            "PASS": 1
+          },
+          "lamp-settings": {
+            "PASS": 32
+          },
+          "lamp-settings::it": {
+            "PASS": 14
+          },
+          "lamp-setup": {
+            "PASS": 16
+          },
+          "lamp-setup::it": {
+            "PASS": 156
+          },
+          "lamp-setup::wake": {
+            "PASS": 6
+          },
+          "lamp-skills": {
+            "PASS": 156
+          },
+          "lamp-skills::requested_audio": {
+            "PASS": 31
+          },
+          "lamp-skills::bin/lamp-skills": {
+            "PASS": 23
+          },
+          "lamp-sound-fixtures::cache_and_mix": {
+            "PASS": 15
+          },
+          "lamp-station": {
+            "PASS": 61
+          },
+          "lamp-station::bin/lamp-station": {
+            "PASS": 7
+          },
+          "lamp-surround": {
+            "PASS": 2
+          },
+          "lamp-surround::it": {
+            "PASS": 263
+          },
+          "lamp-tasks": {
+            "PASS": 108
+          },
+          "lamp-tasks::harness": {
+            "PASS": 43
+          },
+          "lamp-tasks::runtime": {
+            "PASS": 30
+          },
+          "lamp-tasks::runtime_failures": {
+            "PASS": 4
+          },
+          "lamp-tasks::store": {
+            "PASS": 27
+          },
+          "lamp-turn-end": {
+            "PASS": 16
+          },
+          "lamp-turn-end::it": {
+            "PASS": 6
+          },
+          "lamp-turn-end::bin/lamp-turn-end": {
+            "PASS": 9
+          },
+          "lamp-turn-end-wire": {
+            "PASS": 5
+          },
+          "lamp-turn-owner": {
+            "PASS": 1
+          },
+          "lamp-turn-owner::it": {
+            "PASS": 36
+          },
+          "lamp-update": {
+            "PASS": 112
+          },
+          "lamp-update::functions": {
+            "PASS": 4
+          },
+          "lamp-update::install": {
+            "PASS": 78
+          },
+          "lamp-update::it": {
+            "PASS": 8
+          },
+          "lamp-update::round": {
+            "PASS": 107
+          },
+          "lamp-update::self-cli-exec": {
+            "PASS": 1
+          },
+          "lamp-update::self-process-cuts": {
+            "PASS": 1
+          },
+          "lamp-voice::example/render_line_second": {
+            "PASS": 4
+          },
+          "lamp-voice::bin/lamp-voice": {
+            "PASS": 1
+          },
+          "lamp-voice::example/stop_words_stt_replay": {
+            "PASS": 6
+          },
+          "lamp-voice-eval": {
+            "PASS": 378
+          },
+          "lamp-voice-eval::it": {
+            "PASS": 238
+          },
+          "lamp-voice-eval::bin/lamp-voice-eval": {
+            "PASS": 7
+          },
+          "lamp-voice-processes": {
+            "PASS": 2
+          }
+        },
+        "surround_rows": [
+          {
+            "line": 6172,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5472,
+            "total": 10823,
+            "binary": "lamp-surround",
+            "test": "owner::tests::real_peer_credentials_must_match_the_expected_uid"
+          },
+          {
+            "line": 6173,
+            "result": "PASS",
+            "seconds": 0.015,
+            "ordinal": 5473,
+            "total": 10823,
+            "binary": "lamp-surround",
+            "test": "owner::tests::socket_owned_by_a_different_expected_uid_is_refused_before_connecting"
+          },
+          {
+            "line": 6174,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5474,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "atomic::a_partial_uncommitted_temp_does_not_replace_the_journal"
+          },
+          {
+            "line": 6175,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5475,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "atomic::exposed_files_and_directories_are_not_silently_repaired"
+          },
+          {
+            "line": 6176,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5476,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "atomic::failure_before_publication_preserves_the_committed_record"
+          },
+          {
+            "line": 6177,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5477,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "atomic::leaf_and_ancestor_symlinks_are_refused_without_touching_their_targets"
+          },
+          {
+            "line": 6178,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5478,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "atomic::linked_temp_cannot_truncate_any_record"
+          },
+          {
+            "line": 6179,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5479,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "atomic::only_one_writer_holds_the_directory_until_drop"
+          },
+          {
+            "line": 6180,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5480,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "atomic::relative_and_parent_paths_are_refused"
+          },
+          {
+            "line": 6181,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5481,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "atomic::remove_does_not_remove_other_files"
+          },
+          {
+            "line": 6182,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5482,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "atomic::replacement_is_whole_private_and_bounded"
+          },
+          {
+            "line": 6183,
+            "result": "PASS",
+            "seconds": 0.01,
+            "ordinal": 5483,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "cli::doctor_and_plan_are_explicitly_read_only_even_for_an_enabled_configuration"
+          },
+          {
+            "line": 6184,
+            "result": "PASS",
+            "seconds": 0.013,
+            "ordinal": 5484,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "cli::help_bad_flags_and_private_config_errors_have_no_side_effects"
+          },
+          {
+            "line": 6185,
+            "result": "PASS",
+            "seconds": 0.007,
+            "ordinal": 5485,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "cli::invalid_loopback_origin_fails_before_any_adapter_or_operation_is_created"
+          },
+          {
+            "line": 6186,
+            "result": "PASS",
+            "seconds": 0.021,
+            "ordinal": 5486,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "cli::serve_without_both_switches_opens_page_but_does_not_create_maintenance_state"
+          },
+          {
+            "line": 6187,
+            "result": "PASS",
+            "seconds": 0.007,
+            "ordinal": 5487,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "config::a_document_from_a_later_build_is_read"
+          },
+          {
+            "line": 6188,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5488,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "config::endpoint_credentials_and_timeout_errors_are_rejected_before_write"
+          },
+          {
+            "line": 6189,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5489,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "config::malformed_oversized_and_symlink_documents_are_never_accepted"
+          },
+          {
+            "line": 6190,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5490,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "config::private_debug_hides_endpoint_paths_and_model"
+          },
+          {
+            "line": 6191,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5491,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "config::private_paths_and_secret_bounds_are_enforced"
+          },
+          {
+            "line": 6192,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5492,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "config::provider_validation_reuses_known_thinking_and_context_constraints"
+          },
+          {
+            "line": 6193,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5493,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "config::unknown_fields_and_versions_fail_without_echoing_private_input"
+          },
+          {
+            "line": 6194,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5494,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "config::voice_file_has_exact_payload_without_surround_metadata_or_secrets"
+          },
+          {
+            "line": 6195,
+            "result": "PASS",
+            "seconds": 0.013,
+            "ordinal": 5495,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "configuration::a_damaged_current_generation_does_not_block_healthy_rollback"
+          },
+          {
+            "line": 6196,
+            "result": "PASS",
+            "seconds": 0.011,
+            "ordinal": 5496,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "configuration::a_damaged_previous_generation_does_not_hide_healthy_current"
+          },
+          {
+            "line": 6197,
+            "result": "PASS",
+            "seconds": 0.008,
+            "ordinal": 5497,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "configuration::a_generation_is_never_overwritten_and_partial_staging_never_replaces_candidate"
+          },
+          {
+            "line": 6198,
+            "result": "PASS",
+            "seconds": 0.016,
+            "ordinal": 5498,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "configuration::collection_resumes_after_partial_delete_but_never_deletes_links_or_unknown_files"
+          },
+          {
+            "line": 6199,
+            "result": "PASS",
+            "seconds": 0.014,
+            "ordinal": 5499,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "configuration::compare_select_preserves_previous_and_needs_explicit_enablement"
+          },
+          {
+            "line": 6200,
+            "result": "PASS",
+            "seconds": 0.008,
+            "ordinal": 5500,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "configuration::invalid_input_does_not_allocate_a_directory_and_empty_optional_instructions_work"
+          },
+          {
+            "line": 6201,
+            "result": "PASS",
+            "seconds": 0.011,
+            "ordinal": 5501,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "configuration::publication_failure_leaves_old_selection_and_retry_cannot_mutate_the_orphan"
+          },
+          {
+            "line": 6202,
+            "result": "PASS",
+            "seconds": 0.118,
+            "ordinal": 5502,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "configuration::repeated_staging_reclaims_superseded_data_and_keeps_current_previous_and_candidate"
+          },
+          {
+            "line": 6203,
+            "result": "PASS",
+            "seconds": 0.029,
+            "ordinal": 5503,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "configuration::secret_or_payload_tampering_and_link_substitution_fail_before_selection"
+          },
+          {
+            "line": 6204,
+            "result": "PASS",
+            "seconds": 0.01,
+            "ordinal": 5504,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "configuration::stage_publishes_a_whole_private_generation_without_activating_it"
+          },
+          {
+            "line": 6205,
+            "result": "PASS",
+            "seconds": 0.03,
+            "ordinal": 5505,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "http_limit::a_partial_body_hits_total_handling_deadline_and_releases_its_request_slot"
+          },
+          {
+            "line": 6206,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5506,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "http_limit::accepted_stream_count_is_bounded_and_drop_admits_a_replacement"
+          },
+          {
+            "line": 6207,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5507,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "http_limit::bounds_cannot_be_disabled_or_lifted_by_configuration"
+          },
+          {
+            "line": 6208,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5508,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "http_limit::full_write_pool_refuses_before_body_extraction_and_status_keeps_its_own_slots"
+          },
+          {
+            "line": 6209,
+            "result": "PASS",
+            "seconds": 0.105,
+            "ordinal": 5509,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "http_limit::no_header_and_trickled_header_connections_expire_and_new_clients_recover"
+          },
+          {
+            "line": 6210,
+            "result": "PASS",
+            "seconds": 0.031,
+            "ordinal": 5510,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "http_limit::transport_deadline_also_refuses_writes_after_expiry"
+          },
+          {
+            "line": 6211,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5511,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::ap_retry_waits_120_seconds_and_never_disconnects_clients_or_unknown_count"
+          },
+          {
+            "line": 6212,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5512,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::automatic_checkpoint_expiry_does_not_permanently_block_fresh_setup"
+          },
+          {
+            "line": 6213,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5513,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::commit_requires_fresh_candidate_lan_and_never_uses_an_unrelated_fallback"
+          },
+          {
+            "line": 6214,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5514,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::continuous_known_loss_uses_elapsed_90_seconds_not_a_probe_count"
+          },
+          {
+            "line": 6215,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5515,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::failed_activation_restores_checkpoint_and_bad_device_never_means_all_devices"
+          },
+          {
+            "line": 6216,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5516,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::failed_rollback_blocks_replacement_and_is_not_acknowledged"
+          },
+          {
+            "line": 6217,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5517,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::input_bounds_and_explicit_selection_are_required"
+          },
+          {
+            "line": 6218,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5518,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::local_lan_success_cancels_recovery_even_without_cloud"
+          },
+          {
+            "line": 6219,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5519,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::lost_save_reply_is_uncertain_even_before_checkpoint_destroy"
+          },
+          {
+            "line": 6220,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5520,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::newer_probe_is_read_only_and_superseded_commit_cannot_destroy_its_candidate"
+          },
+          {
+            "line": 6221,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5521,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::own_join_restores_ap_at_45_seconds_even_when_every_later_probe_fails"
+          },
+          {
+            "line": 6222,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5522,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::probe_gaps_and_unknown_link_do_not_prove_continuous_loss"
+          },
+          {
+            "line": 6223,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5523,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::recovery_and_retry_preserve_lan_restored_by_rollback_or_refuse_a_failed_probe"
+          },
+          {
+            "line": 6224,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5524,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::recovery_cannot_rollback_a_healthy_uncommitted_candidate"
+          },
+          {
+            "line": 6225,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5525,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::recovery_rejects_stale_reordered_other_boot_and_backwards_time"
+          },
+          {
+            "line": 6226,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5526,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::restoration_or_checkpoint_expiry_cannot_prove_removal_of_uncertain_saved_credentials"
+          },
+          {
+            "line": 6227,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5527,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::runtime_failure_or_recovery_request_cannot_replace_a_healthy_lan_with_ap"
+          },
+          {
+            "line": 6228,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5528,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::saved_profile_followed_by_failed_checkpoint_destroy_is_not_a_commit_or_rollback_ack"
+          },
+          {
+            "line": 6229,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5529,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::saved_retry_has_checkpoint_and_does_not_resave_existing_credentials"
+          },
+          {
+            "line": 6230,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5530,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::supersession_rolls_back_before_a_new_join_and_old_receipts_cannot_mutate"
+          },
+          {
+            "line": 6231,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5531,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::unsupported_and_scripted_adapters_never_fake_activation_and_are_bounded"
+          },
+          {
+            "line": 6232,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5532,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "network::wifi_mutation_checkpoints_only_the_selected_device_and_commits_only_its_profile"
+          },
+          {
+            "line": 6233,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5533,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "operator::disabled_operation_never_reaches_worker"
+          },
+          {
+            "line": 6234,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5534,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "operator::duplicate_or_malformed_cookie_cannot_authenticate"
+          },
+          {
+            "line": 6235,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5535,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "operator::foreign_missing_duplicate_host_and_origins_and_query_secrets_are_refused"
+          },
+          {
+            "line": 6236,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5536,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "operator::login_attempts_are_bounded_and_never_echo_credentials"
+          },
+          {
+            "line": 6237,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5537,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "operator::malformed_oversized_and_unknown_requests_are_redacted"
+          },
+          {
+            "line": 6238,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5538,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "operator::nonlocal_plaintext_origins_and_weak_codes_are_not_allowed"
+          },
+          {
+            "line": 6239,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5539,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "operator::only_four_sessions_are_kept_and_logout_revokes_all"
+          },
+          {
+            "line": 6240,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5540,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "operator::page_is_self_contained_and_status_requires_authentication"
+          },
+          {
+            "line": 6241,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5541,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "operator::sessions_expire_exactly_and_clock_reversal_revokes_them"
+          },
+          {
+            "line": 6242,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5542,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "operator::storage_refusal_is_not_an_accepted_operation"
+          },
+          {
+            "line": 6243,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5543,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "operator::worker_must_admit_before_http_ack_and_status_is_independent"
+          },
+          {
+            "line": 6244,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5544,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::changing_socket_inode_after_connect_refuses_before_any_command_is_sent"
+          },
+          {
+            "line": 6245,
+            "result": "PASS",
+            "seconds": 0.008,
+            "ordinal": 5545,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::configuration_requires_exact_binding_full_quiet_exit_cas_and_fresh_new_owner"
+          },
+          {
+            "line": 6246,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5546,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::configuration_rollback_must_prove_previous_selection_and_its_fresh_owner"
+          },
+          {
+            "line": 6247,
+            "result": "PASS",
+            "seconds": 0.02,
+            "ordinal": 5547,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::disabled_never_connects_and_constructor_only_checks_configuration"
+          },
+          {
+            "line": 6248,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5548,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::durable_configuration_rollback_is_explicit_and_never_reported_as_applied"
+          },
+          {
+            "line": 6249,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5549,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::error_messages_are_fixed_and_contain_no_peer_text"
+          },
+          {
+            "line": 6250,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5550,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::exactly_bounded_single_frame_is_accepted_and_old_periodic_samples_keep_their_own_age"
+          },
+          {
+            "line": 6251,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5551,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::foreign_version_id_clock_session_and_reply_kind_are_rejected"
+          },
+          {
+            "line": 6252,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5552,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::four_typed_roundtrips_preserve_commands_and_required_deadlines"
+          },
+          {
+            "line": 6253,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5553,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::future_pre_request_stale_and_nested_receipts_are_checked_at_arrival"
+          },
+          {
+            "line": 6254,
+            "result": "PASS",
+            "seconds": 0.02,
+            "ordinal": 5554,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::invalid_requests_and_excessive_frames_do_not_connect"
+          },
+          {
+            "line": 6255,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5555,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::malformed_unknown_fields_oversized_missing_newline_and_extra_frames_are_rejected"
+          },
+          {
+            "line": 6256,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5556,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::missing_refused_regular_file_and_insecure_sockets_remain_unavailable_or_unsafe"
+          },
+          {
+            "line": 6257,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5557,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::monotonic_reversal_and_expired_intents_refuse_dispatch_and_late_receipts"
+          },
+          {
+            "line": 6258,
+            "result": "PASS",
+            "seconds": 0.106,
+            "ordinal": 5558,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::newline_without_end_of_response_does_not_escape_the_deadline"
+          },
+          {
+            "line": 6259,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5559,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::probe_needs_fresh_voice_capability_and_preserves_privacy_inhibition"
+          },
+          {
+            "line": 6260,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5560,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::quiet_waits_can_accumulate_45_seconds_after_admission_without_extending_the_120_second_limit"
+          },
+          {
+            "line": 6261,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5561,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::rejected_or_incomplete_configuration_never_promotes_a_generation"
+          },
+          {
+            "line": 6262,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5562,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::reset_receipts_keep_exact_request_and_leave_barrier_validation_to_the_reset_machine"
+          },
+          {
+            "line": 6263,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5563,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::retrying_update_and_reset_actions_keeps_their_original_absolute_deadline"
+          },
+          {
+            "line": 6264,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5564,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::socket_links_parent_links_and_public_parent_directories_are_rejected"
+          },
+          {
+            "line": 6265,
+            "result": "PASS",
+            "seconds": 0.106,
+            "ordinal": 5565,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::timeout_caps_stalled_clock_while_other_async_work_remains_responsive"
+          },
+          {
+            "line": 6266,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5566,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "owner::update_receipts_keep_exact_step_guard_and_owner_failure_is_private"
+          },
+          {
+            "line": 6267,
+            "result": "PASS",
+            "seconds": 0.023,
+            "ordinal": 5567,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::accepted_feed_identity_and_provisioned_anchor_cannot_silently_change"
+          },
+          {
+            "line": 6268,
+            "result": "PASS",
+            "seconds": 0.036,
+            "ordinal": 5568,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::cancellation_during_binary_staging_keeps_the_clock_recovery_journal"
+          },
+          {
+            "line": 6269,
+            "result": "PASS",
+            "seconds": 0.13,
+            "ordinal": 5569,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::compatibility_names_counts_and_lengths_fail_closed"
+          },
+          {
+            "line": 6272,
+            "result": "PASS",
+            "seconds": 0.043,
+            "ordinal": 5572,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::complete_pending_metadata_is_recovered_but_corrupt_partial_metadata_fails_closed"
+          },
+          {
+            "line": 6273,
+            "result": "PASS",
+            "seconds": 0.019,
+            "ordinal": 5573,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::delegated_targets_are_rejected_before_any_delegated_fetch_or_cache_write"
+          },
+          {
+            "line": 6274,
+            "result": "PASS",
+            "seconds": 0.035,
+            "ordinal": 5574,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::hardlinked_repository_target_and_symlink_ancestor_are_rejected"
+          },
+          {
+            "line": 6275,
+            "result": "PASS",
+            "seconds": 0.051,
+            "ordinal": 5575,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::expired_feed_does_not_disable_previously_accepted_offline_recovery"
+          },
+          {
+            "line": 6276,
+            "result": "PASS",
+            "seconds": 0.06,
+            "ordinal": 5576,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::corrupt_trust_or_missing_initialization_marker_never_silently_reset"
+          },
+          {
+            "line": 6277,
+            "result": "PASS",
+            "seconds": 0.018,
+            "ordinal": 5577,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::insecure_urls_credentials_queries_and_manifest_paths_are_rejected"
+          },
+          {
+            "line": 6279,
+            "result": "PASS",
+            "seconds": 0.07,
+            "ordinal": 5579,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::interrupted_root_cache_reconstructs_consecutive_signed_proofs"
+          },
+          {
+            "line": 6280,
+            "result": "PASS",
+            "seconds": 0.066,
+            "ordinal": 5580,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::later_tuf_observed_utc_survives_restart_even_without_an_accepted_update"
+          },
+          {
+            "line": 6281,
+            "result": "PASS",
+            "seconds": 0.084,
+            "ordinal": 5581,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::malformed_rotation_does_not_poison_the_last_trusted_root"
+          },
+          {
+            "line": 6282,
+            "result": "PASS",
+            "seconds": 0.116,
+            "ordinal": 5582,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::incomplete_binary_staging_preserves_old_set_and_retries_without_replacing_it"
+          },
+          {
+            "line": 6283,
+            "result": "PASS",
+            "seconds": 0.013,
+            "ordinal": 5583,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::no_provisioned_anchor_and_untrusted_anchor_both_refuse"
+          },
+          {
+            "line": 6284,
+            "result": "PASS",
+            "seconds": 0.061,
+            "ordinal": 5584,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::manifest_and_binary_tampering_never_produce_a_descriptor"
+          },
+          {
+            "line": 6285,
+            "result": "PASS",
+            "seconds": 0.014,
+            "ordinal": 5585,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::overflowing_root_version_is_rejected_before_library_arithmetic"
+          },
+          {
+            "line": 6286,
+            "result": "PASS",
+            "seconds": 0.051,
+            "ordinal": 5586,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::metadata_and_target_byte_caps_are_independent_of_signed_lengths"
+          },
+          {
+            "line": 6287,
+            "result": "PASS",
+            "seconds": 0.045,
+            "ordinal": 5587,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::persistent_checksum_cannot_replace_signed_manifest_authentication"
+          },
+          {
+            "line": 6288,
+            "result": "PASS",
+            "seconds": 0.051,
+            "ordinal": 5588,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::repository_and_installed_symlinks_are_never_followed"
+          },
+          {
+            "line": 6289,
+            "result": "PASS",
+            "seconds": 0.104,
+            "ordinal": 5589,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::offline_recovery_rehashes_and_rejects_writable_or_missing_binaries"
+          },
+          {
+            "line": 6290,
+            "result": "PASS",
+            "seconds": 0.06,
+            "ordinal": 5590,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::rotation_requires_old_and_new_thresholds_and_consecutive_version"
+          },
+          {
+            "line": 6291,
+            "result": "PASS",
+            "seconds": 0.098,
+            "ordinal": 5591,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::root_rotation_is_retained_when_later_metadata_fails"
+          },
+          {
+            "line": 6292,
+            "result": "PASS",
+            "seconds": 0.147,
+            "ordinal": 5592,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::retained_set_and_binary_directory_bounds_do_not_erase_rollback_releases"
+          },
+          {
+            "line": 6293,
+            "result": "PASS",
+            "seconds": 0.059,
+            "ordinal": 5593,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::stage_disk_obstruction_is_reported_and_never_acknowledged"
+          },
+          {
+            "line": 6294,
+            "result": "PASS",
+            "seconds": 0.12,
+            "ordinal": 5594,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::signatures_and_all_three_tuf_role_expiries_are_enforced"
+          },
+          {
+            "line": 6295,
+            "result": "PASS",
+            "seconds": 0.08,
+            "ordinal": 5595,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::target_count_request_count_and_deadline_are_bounded"
+          },
+          {
+            "line": 6296,
+            "result": "PASS",
+            "seconds": 0.087,
+            "ordinal": 5596,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::timestamp_key_rotation_resets_fast_forward_floors_even_when_an_old_key_remains"
+          },
+          {
+            "line": 6297,
+            "result": "PASS",
+            "seconds": 0.036,
+            "ordinal": 5597,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::unknown_backwards_and_disagreeing_utc_refuse"
+          },
+          {
+            "line": 6298,
+            "result": "PASS",
+            "seconds": 0.061,
+            "ordinal": 5598,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::verified_set_is_complete_immutable_hash_addressed_and_recoverable"
+          },
+          {
+            "line": 6299,
+            "result": "PASS",
+            "seconds": 0.057,
+            "ordinal": 5599,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::a_partial_erase_never_becomes_success_or_undoes_already_confirmed_stores"
+          },
+          {
+            "line": 6300,
+            "result": "PASS",
+            "seconds": 0.138,
+            "ordinal": 5600,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::tuf_versions_release_sequence_and_same_sequence_substitution_are_fenced"
+          },
+          {
+            "line": 6301,
+            "result": "PASS",
+            "seconds": 0.007,
+            "ordinal": 5601,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::clock_regression_disables_dispatch_and_persists_incomplete_when_possible"
+          },
+          {
+            "line": 6302,
+            "result": "PASS",
+            "seconds": 0.11,
+            "ordinal": 5602,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "release::valid_root_rotation_survives_restart_and_old_key_revocation"
+          },
+          {
+            "line": 6303,
+            "result": "PASS",
+            "seconds": 0.037,
+            "ordinal": 5603,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::a_record_from_a_later_build_is_read"
+          },
+          {
+            "line": 6304,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5604,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::corrupt_oversized_or_linked_state_is_refused_without_destroying_evidence"
+          },
+          {
+            "line": 6305,
+            "result": "PASS",
+            "seconds": 0.039,
+            "ordinal": 5605,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::all_owners_prepare_before_any_store_is_emptied_and_every_empty_binds_its_owner"
+          },
+          {
+            "line": 6306,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5606,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::directory_lock_prevents_another_writer_and_time_overflow_creates_no_intent"
+          },
+          {
+            "line": 6307,
+            "result": "PASS",
+            "seconds": 0.007,
+            "ordinal": 5607,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::disabled_open_is_read_only_and_confirmation_is_required_before_any_intent"
+          },
+          {
+            "line": 6308,
+            "result": "PASS",
+            "seconds": 0.034,
+            "ordinal": 5608,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::completed_reset_reopens_without_repeating_erasure_or_rewriting_the_record"
+          },
+          {
+            "line": 6309,
+            "result": "PASS",
+            "seconds": 0.008,
+            "ordinal": 5609,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::failed_intent_write_returns_no_action_and_preserves_the_previous_journal"
+          },
+          {
+            "line": 6310,
+            "result": "PASS",
+            "seconds": 0.008,
+            "ordinal": 5610,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::failed_recovery_write_exposes_no_reusable_old_reset_object"
+          },
+          {
+            "line": 6311,
+            "result": "PASS",
+            "seconds": 0.017,
+            "ordinal": 5611,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::identity_history_prevents_a_b_a_reuse_and_is_bounded_without_eviction"
+          },
+          {
+            "line": 6312,
+            "result": "PASS",
+            "seconds": 0.037,
+            "ordinal": 5612,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::failed_ack_write_retains_the_same_idempotent_empty_request_for_recovery"
+          },
+          {
+            "line": 6313,
+            "result": "PASS",
+            "seconds": 0.026,
+            "ordinal": 5613,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::foreign_future_pre_intent_stale_and_duplicate_receipts_do_not_advance"
+          },
+          {
+            "line": 6314,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5614,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::malformed_store_order_ids_and_arbitrary_paths_are_rejected_without_a_record"
+          },
+          {
+            "line": 6315,
+            "result": "PASS",
+            "seconds": 0.009,
+            "ordinal": 5615,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::receipt_age_and_request_deadline_have_explicit_exclusive_boundaries"
+          },
+          {
+            "line": 6316,
+            "result": "PASS",
+            "seconds": 0.058,
+            "ordinal": 5616,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::empty_requires_readback_and_a_still_frozen_matching_owner"
+          },
+          {
+            "line": 6317,
+            "result": "PASS",
+            "seconds": 0.034,
+            "ordinal": 5617,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::persisted_completion_preparation_phase_and_pending_intent_invariants_are_checked"
+          },
+          {
+            "line": 6318,
+            "result": "PASS",
+            "seconds": 0.017,
+            "ordinal": 5618,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::restarting_requires_a_new_session_even_between_requests_and_a_new_boot_invalidates_barriers"
+          },
+          {
+            "line": 6319,
+            "result": "PASS",
+            "seconds": 0.03,
+            "ordinal": 5619,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::reset_never_walks_or_removes_another_owners_files"
+          },
+          {
+            "line": 6320,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5620,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "runtime::diagnostic_separates_surround_health_from_lamp_readiness_and_contains_no_paths"
+          },
+          {
+            "line": 6321,
+            "result": "PASS",
+            "seconds": 0.013,
+            "ordinal": 5621,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::voice_requires_quiet_closed_and_durable_frozen_barrier_before_any_other_owner"
+          },
+          {
+            "line": 6322,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5622,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "runtime::explicit_network_enable_still_needs_build_and_platform_support"
+          },
+          {
+            "line": 6323,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5623,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "runtime::listener_is_private_single_owner_and_cleans_only_its_own_inode"
+          },
+          {
+            "line": 6324,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5624,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "runtime::readiness_expires_during_slow_work_and_inhibition_never_becomes_listening"
+          },
+          {
+            "line": 6325,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5625,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "runtime::private_config_read_refuses_symlinks_and_public_files"
+          },
+          {
+            "line": 6326,
+            "result": "PASS",
+            "seconds": 0.03,
+            "ordinal": 5626,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::voice_prepare_can_wait_for_quiet_but_retries_keep_the_original_deadline_and_other_actions_stay_short"
+          },
+          {
+            "line": 6327,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5627,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "runtime::roots_cannot_overlap_or_share_listener_writer_lock"
+          },
+          {
+            "line": 6328,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5628,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "runtime::release_urls_are_fixed_https_bases_not_caller_supplied_credentials"
+          },
+          {
+            "line": 6329,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5629,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "runtime::stale_private_socket_recovers_but_files_links_and_live_sockets_are_retained"
+          },
+          {
+            "line": 6330,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5630,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "runtime::wrong_versions_unknown_fields_weak_origins_and_bad_paths_fail_closed"
+          },
+          {
+            "line": 6331,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5631,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "runtime::sample_is_disabled_and_no_board_fact_is_invented"
+          },
+          {
+            "line": 6332,
+            "result": "PASS",
+            "seconds": 0.041,
+            "ordinal": 5632,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::a_pointer_from_a_later_build_is_read"
+          },
+          {
+            "line": 6333,
+            "result": "PASS",
+            "seconds": 0.073,
+            "ordinal": 5633,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::changed_candidate_files_are_rehashed_before_any_pointer_change"
+          },
+          {
+            "line": 6334,
+            "result": "PASS",
+            "seconds": 0.078,
+            "ordinal": 5634,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::collection_refuses_foreign_files_symlinks_and_unknown_protection_before_pruning"
+          },
+          {
+            "line": 6335,
+            "result": "PASS",
+            "seconds": 0.049,
+            "ordinal": 5635,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::collection_removes_interrupted_staging_but_never_rewrites_current_binary"
+          },
+          {
+            "line": 6336,
+            "result": "PASS",
+            "seconds": 0.165,
+            "ordinal": 5636,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::collection_preserves_explicit_candidate_highest_signed_sequence_and_utc_floors"
+          },
+          {
+            "line": 6337,
+            "result": "PASS",
+            "seconds": 0.092,
+            "ordinal": 5637,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::damaged_current_binary_does_not_prevent_selecting_a_healthy_previous_set"
+          },
+          {
+            "line": 6338,
+            "result": "PASS",
+            "seconds": 0.074,
+            "ordinal": 5638,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::disk_error_does_not_acknowledge_or_replace_the_previous_pointer"
+          },
+          {
+            "line": 6339,
+            "result": "PASS",
+            "seconds": 0.042,
+            "ordinal": 5639,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::first_install_is_optional_and_disabled_selection_refuses_changes"
+          },
+          {
+            "line": 6340,
+            "result": "PASS",
+            "seconds": 0.069,
+            "ordinal": 5640,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::forged_mixed_binary_set_is_rejected_even_with_a_recomputed_record_checksum"
+          },
+          {
+            "line": 6341,
+            "result": "PASS",
+            "seconds": 0.082,
+            "ordinal": 5641,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::generation_compare_rejects_stale_and_aba_changes"
+          },
+          {
+            "line": 6342,
+            "result": "PASS",
+            "seconds": 0.074,
+            "ordinal": 5642,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::interrupted_collection_leaves_only_unaccepted_files_and_retry_removes_them"
+          },
+          {
+            "line": 6343,
+            "result": "PASS",
+            "seconds": 0.042,
+            "ordinal": 5643,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::one_atomic_record_selects_exactly_three_hashes_and_resolves_only_verified_paths"
+          },
+          {
+            "line": 6344,
+            "result": "PASS",
+            "seconds": 0.099,
+            "ordinal": 5644,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::missing_corrupt_and_symlinked_selection_records_fail_closed"
+          },
+          {
+            "line": 6345,
+            "result": "PASS",
+            "seconds": 0.032,
+            "ordinal": 5645,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::selection_lock_contention_and_shared_trust_directory_are_rejected"
+          },
+          {
+            "line": 6346,
+            "result": "PASS",
+            "seconds": 0.082,
+            "ordinal": 5646,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::restart_recovers_the_whole_record_and_preserves_the_previous_set"
+          },
+          {
+            "line": 6347,
+            "result": "PASS",
+            "seconds": 0.017,
+            "ordinal": 5647,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::a_new_preparing_or_unknown_receipt_withdraws_ready_without_reopening_setup"
+          },
+          {
+            "line": 6348,
+            "result": "PASS",
+            "seconds": 0.008,
+            "ordinal": 5648,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::address_is_persisted_before_cloud_and_runtime_and_survives_runtime_failure"
+          },
+          {
+            "line": 6349,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5649,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::backwards_future_stale_and_other_boot_receipts_do_not_advance_sequences"
+          },
+          {
+            "line": 6350,
+            "result": "PASS",
+            "seconds": 0.009,
+            "ordinal": 5650,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::corrupt_unknown_and_inconsistent_records_fail_closed"
+          },
+          {
+            "line": 6351,
+            "result": "PASS",
+            "seconds": 0.08,
+            "ordinal": 5651,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::uncommitted_temporary_record_never_becomes_the_current_selection"
+          },
+          {
+            "line": 6352,
+            "result": "PASS",
+            "seconds": 0.011,
+            "ordinal": 5652,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::elapsed_deadline_wins_over_a_late_success_even_without_ticks"
+          },
+          {
+            "line": 6353,
+            "result": "PASS",
+            "seconds": 0.011,
+            "ordinal": 5653,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::failed_probe_withdrawals_are_durable_separate_and_do_not_write_on_every_tick"
+          },
+          {
+            "line": 6354,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5654,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::local_only_and_ap_addresses_cannot_be_readiness"
+          },
+          {
+            "line": 6355,
+            "result": "PASS",
+            "seconds": 0.007,
+            "ordinal": 5655,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::failed_write_does_not_acknowledge_or_change_visible_progress"
+          },
+          {
+            "line": 6356,
+            "result": "PASS",
+            "seconds": 0.014,
+            "ordinal": 5656,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::preparation_heartbeats_cannot_extend_runtime_deadline"
+          },
+          {
+            "line": 6357,
+            "result": "PASS",
+            "seconds": 0.013,
+            "ordinal": 5657,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::progress_from_a_later_build_is_read"
+          },
+          {
+            "line": 6358,
+            "result": "PASS",
+            "seconds": 0.009,
+            "ordinal": 5658,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::runtime_ready_requires_fresh_selected_lan_and_not_cloud_alone"
+          },
+          {
+            "line": 6359,
+            "result": "PASS",
+            "seconds": 0.013,
+            "ordinal": 5659,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::restart_persists_interrupted_and_never_replays_active_or_ready_claims"
+          },
+          {
+            "line": 6360,
+            "result": "PASS",
+            "seconds": 0.007,
+            "ordinal": 5660,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::supersession_and_reused_attempt_id_cannot_adopt_old_result"
+          },
+          {
+            "line": 6361,
+            "result": "PASS",
+            "seconds": 0.011,
+            "ordinal": 5661,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::wired_is_verified_and_empty_address_or_ap_never_means_lan"
+          },
+          {
+            "line": 6362,
+            "result": "PASS",
+            "seconds": 0.014,
+            "ordinal": 5662,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::withdrawal_preserves_preparation_deadlines_and_expired_lan_cannot_revive_runtime"
+          },
+          {
+            "line": 6363,
+            "result": "PASS",
+            "seconds": 0.008,
+            "ordinal": 5663,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "setup::wrong_key_needs_two_distinct_sequenced_observations"
+          },
+          {
+            "line": 6364,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5664,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::body_eyes_voice_start_order_does_not_wait_for_optional_readiness_or_network"
+          },
+          {
+            "line": 6365,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5665,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::confirmed_failed_launches_are_bounded_and_backed_off"
+          },
+          {
+            "line": 6366,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5666,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::healthy_privacy_inhibit_is_never_listening_and_expires"
+          },
+          {
+            "line": 6367,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5667,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::late_actual_readiness_can_recover_a_timeout_without_a_second_writer"
+          },
+          {
+            "line": 6368,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5668,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::missing_binary_configuration_and_calibration_are_precise_and_local"
+          },
+          {
+            "line": 6369,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5669,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::missing_report_cannot_be_called_exit_or_trigger_a_replacement"
+          },
+          {
+            "line": 6370,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5670,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::resumed_readiness_revokes_a_quiet_fence_and_missing_history_is_not_quiet"
+          },
+          {
+            "line": 6371,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5671,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::retired_sessions_and_generations_cannot_revive_on_replacement"
+          },
+          {
+            "line": 6372,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5672,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::runtime_reports_exact_degradation_without_claiming_a_different_capability"
+          },
+          {
+            "line": 6373,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5673,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::stale_future_reordered_and_other_clock_receipts_do_not_poison_sequence"
+          },
+          {
+            "line": 6374,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5674,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::startup_and_binding_have_one_owner_and_reject_unsolicited_receipts"
+          },
+          {
+            "line": 6375,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5675,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::strict_public_wire_types_reject_unknown_fields_duplicates_and_fabricated_health"
+          },
+          {
+            "line": 6376,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5676,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::successful_exec_or_binding_alone_never_proves_readiness"
+          },
+          {
+            "line": 6377,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5677,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::supervisor_is_off_unless_explicitly_enabled"
+          },
+          {
+            "line": 6378,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5678,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::verified_body_exit_without_rest_cannot_restart_but_voice_is_independent"
+          },
+          {
+            "line": 6379,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5679,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::voice_restart_requires_complete_45_seconds_and_closed_admission_before_exit"
+          },
+          {
+            "line": 6380,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5680,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "startup::voice_exit_without_quiet_and_later_retired_owner_quiet_cannot_authorize_restart"
+          },
+          {
+            "line": 6381,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5681,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "tls_provider::adding_surround_preserves_the_existing_voices_implicit_tls_provider"
+          },
+          {
+            "line": 6382,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5682,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::a_wrong_switch_or_reused_start_session_never_advances"
+          },
+          {
+            "line": 6383,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5683,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::absent_body_without_new_qualified_evidence_blocks_recovery_without_forced_stop"
+          },
+          {
+            "line": 6384,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5684,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::absent_workers_and_resting_are_independent_required_first_install_proofs"
+          },
+          {
+            "line": 6385,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5685,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::body_rest_also_requires_new_goals_blocked_and_stop_requires_the_same_token"
+          },
+          {
+            "line": 6386,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5686,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::capability_reports_must_be_fresh_at_receipt_and_for_each_actual_owner"
+          },
+          {
+            "line": 6387,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5687,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::concurrent_requests_never_replace_the_original_previous_release"
+          },
+          {
+            "line": 6388,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5688,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::clock_reset_fails_closed_and_a_new_boot_must_reconcile_with_fresh_receipts"
+          },
+          {
+            "line": 6389,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5689,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::corrupted_persisted_direction_guards_and_outcomes_are_rejected_on_load"
+          },
+          {
+            "line": 6390,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5690,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::disabling_a_loaded_transaction_cannot_dispatch_its_old_side_effect"
+          },
+          {
+            "line": 6391,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5691,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::every_effect_requires_saved_current_intent_and_keeps_a_stable_dedup_key"
+          },
+          {
+            "line": 6392,
+            "result": "PASS",
+            "seconds": 0.007,
+            "ordinal": 5692,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::failing_each_phase_preserves_previous_set_and_blocks_the_failed_candidate"
+          },
+          {
+            "line": 6393,
+            "result": "PASS",
+            "seconds": 0.007,
+            "ordinal": 5693,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::failure_at_every_recovery_phase_stays_incomplete_without_a_second_automatic_attempt"
+          },
+          {
+            "line": 6394,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5694,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::first_install_failure_removes_the_failed_set_and_does_not_claim_rollback_to_a_nonexistent_release"
+          },
+          {
+            "line": 6395,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5695,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::foreign_duplicate_future_stale_and_pre_intent_receipts_do_not_advance"
+          },
+          {
+            "line": 6396,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5696,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::first_install_power_cuts_at_every_phase_recover_to_no_installed_set"
+          },
+          {
+            "line": 6397,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5697,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::healthy_privacy_inhibition_is_explicit_and_never_forces_capture_on"
+          },
+          {
+            "line": 6398,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5698,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::late_timeout_is_one_recovery_attempt_and_failure_stops_automatic_work"
+          },
+          {
+            "line": 6399,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5699,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::manual_rollback_obeys_the_same_quiet_and_rest_boundaries"
+          },
+          {
+            "line": 6400,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5700,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::malformed_state_ids_oversized_ledgers_and_clock_overflow_are_rejected"
+          },
+          {
+            "line": 6401,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5701,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::missing_or_foreign_owner_protocol_never_forges_a_rest_or_worker_exit"
+          },
+          {
+            "line": 6402,
+            "result": "PASS",
+            "seconds": 0.008,
+            "ordinal": 5702,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::power_cut_before_or_after_every_effect_requires_fresh_inspection_and_old_receipts_are_dead"
+          },
+          {
+            "line": 6403,
+            "result": "PASS",
+            "seconds": 0.006,
+            "ordinal": 5703,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::quiet_requires_a_complete_window_for_both_heard_and_said_at_the_exact_boundary"
+          },
+          {
+            "line": 6404,
+            "result": "PASS",
+            "seconds": 0.012,
+            "ordinal": 5704,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::power_cuts_at_each_rollback_phase_keep_the_original_recovery_target"
+          },
+          {
+            "line": 6405,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5705,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::readiness_cannot_be_committed_after_it_ages_while_releasing_ownership"
+          },
+          {
+            "line": 6406,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5706,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::recovery_failure_preserves_an_explicit_incomplete_journal"
+          },
+          {
+            "line": 6407,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5707,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::restarts_and_operator_recovery_retries_have_a_fixed_budget"
+          },
+          {
+            "line": 6408,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5708,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::speech_between_quiet_check_and_exclusive_quiesce_prevents_voice_stop"
+          },
+          {
+            "line": 6409,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5709,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::state_from_a_later_build_is_read"
+          },
+          {
+            "line": 6410,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5710,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::successful_update_stops_in_order_switches_one_set_and_verifies_every_capability"
+          },
+          {
+            "line": 6411,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5711,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::unexpected_current_release_or_mixed_owner_releases_are_not_overwritten"
+          },
+          {
+            "line": 6412,
+            "result": "PASS",
+            "seconds": 0.004,
+            "ordinal": 5712,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "update::updates_are_disabled_without_an_explicit_switch"
+          },
+          {
+            "line": 6413,
+            "result": "PASS",
+            "seconds": 0.007,
+            "ordinal": 5713,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::admission_disk_error_refuses_before_any_adapter_or_configuration_write"
+          },
+          {
+            "line": 6414,
+            "result": "PASS",
+            "seconds": 0.013,
+            "ordinal": 5714,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::active_update_on_restart_reconciles_and_never_reports_unproven_success"
+          },
+          {
+            "line": 6415,
+            "result": "PASS",
+            "seconds": 0.017,
+            "ordinal": 5715,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::admitted_lifecycle_work_immediately_withdraws_listening_at_an_unchanged_clock"
+          },
+          {
+            "line": 6416,
+            "result": "PASS",
+            "seconds": 0.005,
+            "ordinal": 5716,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::disabled_worker_is_read_only_and_never_touches_an_adapter"
+          },
+          {
+            "line": 6417,
+            "result": "PASS",
+            "seconds": 0.019,
+            "ordinal": 5717,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::configuration_applies_only_after_private_owner_selection_and_fresh_capability_proof"
+          },
+          {
+            "line": 6418,
+            "result": "PASS",
+            "seconds": 0.018,
+            "ordinal": 5718,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::duplicate_operation_identity_is_not_reexecuted"
+          },
+          {
+            "line": 6419,
+            "result": "PASS",
+            "seconds": 0.018,
+            "ordinal": 5719,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::durable_admission_precedes_work_and_dropped_http_caller_does_not_cancel_it"
+          },
+          {
+            "line": 6420,
+            "result": "PASS",
+            "seconds": 0.041,
+            "ordinal": 5720,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::ethernet_or_setup_ap_is_not_a_successful_wifi_candidate"
+          },
+          {
+            "line": 6421,
+            "result": "PASS",
+            "seconds": 0.016,
+            "ordinal": 5721,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::idle_read_only_refresh_observes_later_ready_and_withdraws_failed_proof_without_rejoining"
+          },
+          {
+            "line": 6422,
+            "result": "PASS",
+            "seconds": 0.007,
+            "ordinal": 5722,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::one_lifetime_worker_lock_prevents_competing_maintenance_writers"
+          },
+          {
+            "line": 6423,
+            "result": "PASS",
+            "seconds": 0.01,
+            "ordinal": 5723,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::probe_retains_original_voice_observation_age"
+          },
+          {
+            "line": 6424,
+            "result": "PASS",
+            "seconds": 0.015,
+            "ordinal": 5724,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::provider_generation_is_staged_and_status_never_contains_secrets_or_claims_activation"
+          },
+          {
+            "line": 6425,
+            "result": "PASS",
+            "seconds": 0.123,
+            "ordinal": 5725,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::failed_manual_rollback_recovers_original_but_is_not_a_successful_requested_change"
+          },
+          {
+            "line": 6426,
+            "result": "PASS",
+            "seconds": 0.018,
+            "ordinal": 5726,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::reset_actions_have_distinct_stable_rpc_ids_and_durable_intent_before_each_owner_effect"
+          },
+          {
+            "line": 6427,
+            "result": "PASS",
+            "seconds": 0.014,
+            "ordinal": 5727,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::reset_failure_is_durable_and_blocks_unrelated_work_until_explicit_resume"
+          },
+          {
+            "line": 6428,
+            "result": "PASS",
+            "seconds": 0.01,
+            "ordinal": 5728,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::reset_requires_literal_confirmation_and_never_resets_on_a_generic_request"
+          },
+          {
+            "line": 6429,
+            "result": "PASS",
+            "seconds": 0.018,
+            "ordinal": 5729,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::restart_marks_unfinished_admission_interrupted_without_resurrecting_input"
+          },
+          {
+            "line": 6430,
+            "result": "PASS",
+            "seconds": 0.866,
+            "ordinal": 5730,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "selection::collection_supports_more_than_sixteen_updates_and_always_keeps_current_and_previous"
+          },
+          {
+            "line": 6431,
+            "result": "PASS",
+            "seconds": 0.052,
+            "ordinal": 5731,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::signed_release_staging_requires_fresh_owner_utc_and_apply_failure_never_switches_locally"
+          },
+          {
+            "line": 6432,
+            "result": "PASS",
+            "seconds": 0.035,
+            "ordinal": 5732,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline"
+          },
+          {
+            "line": 6433,
+            "result": "PASS",
+            "seconds": 0.019,
+            "ordinal": 5733,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::stalled_idle_read_only_probe_is_preempted_for_durable_admission"
+          },
+          {
+            "line": 6434,
+            "result": "PASS",
+            "seconds": 0.018,
+            "ordinal": 5734,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::transport_success_without_configuration_activation_proof_is_failure"
+          },
+          {
+            "line": 6435,
+            "result": "PASS",
+            "seconds": 0.012,
+            "ordinal": 5735,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::uncertain_wifi_commit_is_check_status_and_only_reprobes_selected_lan"
+          },
+          {
+            "line": 6436,
+            "result": "PASS",
+            "seconds": 0.012,
+            "ordinal": 5736,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::wifi_commit_requires_selected_candidate_lan_and_keeps_runtime_distinct"
+          },
+          {
+            "line": 6438,
+            "result": "PASS",
+            "seconds": 0.007,
+            "ordinal": 5738,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::worker_clock_regression_and_invalid_store_nesting_fail_closed"
+          },
+          {
+            "line": 6467,
+            "result": "PASS",
+            "seconds": 1.187,
+            "ordinal": 5767,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "reset::power_cut_before_or_after_each_prepare_and_empty_reprepares_all_and_deduplicates_erasure"
+          },
+          {
+            "line": 6527,
+            "result": "PASS",
+            "seconds": 0.359,
+            "ordinal": 5827,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::recent_id_retention_never_exhausts_routine_probes_and_generation_survives_restart"
+          }
+        ],
+        "selected_changed_family_rows": [
+          {
+            "line": 6432,
+            "result": "PASS",
+            "seconds": 0.035,
+            "ordinal": 5732,
+            "total": 10823,
+            "binary": "lamp-surround::it",
+            "test": "worker::slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline"
+          }
+        ],
+        "non_pass_rows": [
+          {
+            "line": 9410,
+            "result": "LEAK",
+            "seconds": 0.222,
+            "ordinal": 8710,
+            "total": 10823,
+            "binary": "lamp-voice",
+            "test": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+          }
+        ]
+      },
+      "separate_harnesses": {
+        "docs": [
+          {
+            "package": "lamp_actions",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 11957,
+            "text": "2026-10-23T00:57:24.5062768Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_addons",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 11963,
+            "text": "2026-10-23T00:57:24.5413793Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_air",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 11969,
+            "text": "2026-10-23T00:57:24.5688158Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_audio",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 11975,
+            "text": "2026-10-23T00:57:24.7425493Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_body",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 11981,
+            "text": "2026-10-23T00:57:25.0990075Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_bus",
+            "pass_fail_ignore_measure_filter": [
+              2,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 11989,
+            "text": "2026-10-23T00:57:25.5400638Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_camera",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 11996,
+            "text": "2026-10-23T00:57:25.6558850Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_cloud",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12002,
+            "text": "2026-10-23T00:57:25.8150091Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_controls",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12008,
+            "text": "2026-10-23T00:57:26.0514107Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_ears",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12014,
+            "text": "2026-10-23T00:57:26.0936527Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_environment",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12020,
+            "text": "2026-10-23T00:57:26.1225291Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_expression",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12026,
+            "text": "2026-10-23T00:57:26.2907410Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_eyes",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12032,
+            "text": "2026-10-23T00:57:26.4548979Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_gemini",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12038,
+            "text": "2026-10-23T00:57:26.5732825Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_health",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12044,
+            "text": "2026-10-23T00:57:26.6208799Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_ipc",
+            "pass_fail_ignore_measure_filter": [
+              1,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12051,
+            "text": "2026-10-23T00:57:26.9811629Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_keeper",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12058,
+            "text": "2026-10-23T00:57:27.0267482Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_lean",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12064,
+            "text": "2026-10-23T00:57:27.0741901Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_local_time",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12070,
+            "text": "2026-10-23T00:57:27.0974007Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_memory",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12076,
+            "text": "2026-10-23T00:57:27.2521582Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_mood",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12082,
+            "text": "2026-10-23T00:57:27.3193626Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_msgs",
+            "pass_fail_ignore_measure_filter": [
+              1,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12089,
+            "text": "2026-10-23T00:57:28.2773487Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_name",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12096,
+            "text": "2026-10-23T00:57:28.3168637Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_near_call",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12102,
+            "text": "2026-10-23T00:57:28.3462484Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_observer",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12108,
+            "text": "2026-10-23T00:57:28.3880000Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_peek",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12114,
+            "text": "2026-10-23T00:57:28.4322919Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_policy",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12120,
+            "text": "2026-10-23T00:57:28.6481292Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_records",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12126,
+            "text": "2026-10-23T00:57:28.7417778Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_ring",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12132,
+            "text": "2026-10-23T00:57:28.7753101Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_same_voice",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12138,
+            "text": "2026-10-23T00:57:28.8073517Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_schedule",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12144,
+            "text": "2026-10-23T00:57:29.0456849Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_selftest",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12150,
+            "text": "2026-10-23T00:57:29.0993923Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_settings",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12156,
+            "text": "2026-10-23T00:57:29.1786688Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_setup",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12162,
+            "text": "2026-10-23T00:57:29.2872557Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_skills",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12168,
+            "text": "2026-10-23T00:57:29.5887050Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_sound_fixtures",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12174,
+            "text": "2026-10-23T00:57:29.6453844Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_station",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12180,
+            "text": "2026-10-23T00:57:29.7608672Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_surround",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12186,
+            "text": "2026-10-23T00:57:30.1998485Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_tasks",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12192,
+            "text": "2026-10-23T00:57:30.4286361Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_turn_end",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12198,
+            "text": "2026-10-23T00:57:30.4689005Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_turn_end_wire",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12204,
+            "text": "2026-10-23T00:57:30.4999795Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_turn_owner",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12210,
+            "text": "2026-10-23T00:57:30.5614495Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_update",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12216,
+            "text": "2026-10-23T00:57:30.7776303Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_voice",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12222,
+            "text": "2026-10-23T00:57:32.7132503Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_voice_eval",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12228,
+            "text": "2026-10-23T00:57:33.2890383Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "package": "lamp_voice_processes",
+            "pass_fail_ignore_measure_filter": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "line": 12234,
+            "text": "2026-10-23T00:57:33.3104484Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          }
+        ],
+        "doc_totals_pass_fail_ignore_measure_filter": [
+          4,
+          0,
+          0,
+          0,
+          0
+        ],
+        "result_lines": [
+          {
+            "line": 11532,
+            "text": "2026-10-23T00:57:24.1227512Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 5.01s"
+          },
+          {
+            "line": 11541,
+            "text": "2026-10-23T00:57:24.1230118Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 303 filtered out; finished in 3.62s"
+          },
+          {
+            "line": 11557,
+            "text": "2026-10-23T00:57:24.1235834Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 303 filtered out; finished in 1.10s"
+          },
+          {
+            "line": 11578,
+            "text": "2026-10-23T00:57:24.1244462Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 303 filtered out; finished in 4.52s"
+          },
+          {
+            "line": 11593,
+            "text": "2026-10-23T00:57:24.1249013Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 303 filtered out; finished in 0.92s"
+          },
+          {
+            "line": 11615,
+            "text": "2026-10-23T00:57:24.1257626Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 303 filtered out; finished in 1.74s"
+          },
+          {
+            "line": 11640,
+            "text": "2026-10-23T00:57:24.1267736Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 3.02s"
+          },
+          {
+            "line": 11657,
+            "text": "2026-10-23T00:57:24.1273822Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 2.73s"
+          },
+          {
+            "line": 11666,
+            "text": "2026-10-23T00:57:24.1276601Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 1.30s"
+          },
+          {
+            "line": 11675,
+            "text": "2026-10-23T00:57:24.1279032Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.95s"
+          },
+          {
+            "line": 11688,
+            "text": "2026-10-23T00:57:24.1283425Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 1.55s"
+          },
+          {
+            "line": 11700,
+            "text": "2026-10-23T00:57:24.1286656Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.87s"
+          },
+          {
+            "line": 11712,
+            "text": "2026-10-23T00:57:24.1290573Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 1.01s"
+          },
+          {
+            "line": 11723,
+            "text": "2026-10-23T00:57:24.1294179Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 2.25s"
+          },
+          {
+            "line": 11735,
+            "text": "2026-10-23T00:57:24.1297319Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.80s"
+          },
+          {
+            "line": 11746,
+            "text": "2026-10-23T00:57:24.1300575Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 2.80s"
+          },
+          {
+            "line": 11758,
+            "text": "2026-10-23T00:57:24.1304781Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 2.80s"
+          },
+          {
+            "line": 11770,
+            "text": "2026-10-23T00:57:24.1308661Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 1.31s"
+          },
+          {
+            "line": 11781,
+            "text": "2026-10-23T00:57:24.1312665Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 2.31s"
+          },
+          {
+            "line": 11792,
+            "text": "2026-10-23T00:57:24.1315583Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 3.50s"
+          },
+          {
+            "line": 11803,
+            "text": "2026-10-23T00:57:24.1318227Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 7.91s"
+          },
+          {
+            "line": 11815,
+            "text": "2026-10-23T00:57:24.1321921Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 1.60s"
+          },
+          {
+            "line": 11829,
+            "text": "2026-10-23T00:57:24.1327521Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 2.51s"
+          },
+          {
+            "line": 11842,
+            "text": "2026-10-23T00:57:24.1331954Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 11851,
+            "text": "2026-10-23T00:57:24.1334266Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.07s"
+          },
+          {
+            "line": 11860,
+            "text": "2026-10-23T00:57:24.1336665Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.05s"
+          },
+          {
+            "line": 11869,
+            "text": "2026-10-23T00:57:24.1339057Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.66s"
+          },
+          {
+            "line": 11878,
+            "text": "2026-10-23T00:57:24.1341786Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.40s"
+          },
+          {
+            "line": 11887,
+            "text": "2026-10-23T00:57:24.1344694Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.21s"
+          },
+          {
+            "line": 11896,
+            "text": "2026-10-23T00:57:24.1347220Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.20s"
+          },
+          {
+            "line": 11905,
+            "text": "2026-10-23T00:57:24.1349763Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.12s"
+          },
+          {
+            "line": 11914,
+            "text": "2026-10-23T00:57:24.1352089Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.24s"
+          },
+          {
+            "line": 11923,
+            "text": "2026-10-23T00:57:24.1354374Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.11s"
+          },
+          {
+            "line": 11932,
+            "text": "2026-10-23T00:57:24.1356977Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.33s"
+          },
+          {
+            "line": 11943,
+            "text": "2026-10-23T00:57:24.1360929Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 1.12s"
+          },
+          {
+            "line": 11957,
+            "text": "2026-10-23T00:57:24.5062768Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 11963,
+            "text": "2026-10-23T00:57:24.5413793Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 11969,
+            "text": "2026-10-23T00:57:24.5688158Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 11975,
+            "text": "2026-10-23T00:57:24.7425493Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 11981,
+            "text": "2026-10-23T00:57:25.0990075Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 11989,
+            "text": "2026-10-23T00:57:25.5400638Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 11996,
+            "text": "2026-10-23T00:57:25.6558850Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12002,
+            "text": "2026-10-23T00:57:25.8150091Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12008,
+            "text": "2026-10-23T00:57:26.0514107Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12014,
+            "text": "2026-10-23T00:57:26.0936527Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12020,
+            "text": "2026-10-23T00:57:26.1225291Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12026,
+            "text": "2026-10-23T00:57:26.2907410Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12032,
+            "text": "2026-10-23T00:57:26.4548979Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12038,
+            "text": "2026-10-23T00:57:26.5732825Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12044,
+            "text": "2026-10-23T00:57:26.6208799Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12051,
+            "text": "2026-10-23T00:57:26.9811629Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12058,
+            "text": "2026-10-23T00:57:27.0267482Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12064,
+            "text": "2026-10-23T00:57:27.0741901Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12070,
+            "text": "2026-10-23T00:57:27.0974007Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12076,
+            "text": "2026-10-23T00:57:27.2521582Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12082,
+            "text": "2026-10-23T00:57:27.3193626Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12089,
+            "text": "2026-10-23T00:57:28.2773487Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12096,
+            "text": "2026-10-23T00:57:28.3168637Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12102,
+            "text": "2026-10-23T00:57:28.3462484Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12108,
+            "text": "2026-10-23T00:57:28.3880000Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12114,
+            "text": "2026-10-23T00:57:28.4322919Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12120,
+            "text": "2026-10-23T00:57:28.6481292Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12126,
+            "text": "2026-10-23T00:57:28.7417778Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12132,
+            "text": "2026-10-23T00:57:28.7753101Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12138,
+            "text": "2026-10-23T00:57:28.8073517Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12144,
+            "text": "2026-10-23T00:57:29.0456849Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12150,
+            "text": "2026-10-23T00:57:29.0993923Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12156,
+            "text": "2026-10-23T00:57:29.1786688Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12162,
+            "text": "2026-10-23T00:57:29.2872557Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12168,
+            "text": "2026-10-23T00:57:29.5887050Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12174,
+            "text": "2026-10-23T00:57:29.6453844Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12180,
+            "text": "2026-10-23T00:57:29.7608672Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12186,
+            "text": "2026-10-23T00:57:30.1998485Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12192,
+            "text": "2026-10-23T00:57:30.4286361Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12198,
+            "text": "2026-10-23T00:57:30.4689005Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12204,
+            "text": "2026-10-23T00:57:30.4999795Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12210,
+            "text": "2026-10-23T00:57:30.5614495Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12216,
+            "text": "2026-10-23T00:57:30.7776303Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12222,
+            "text": "2026-10-23T00:57:32.7132503Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12228,
+            "text": "2026-10-23T00:57:33.2890383Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12234,
+            "text": "2026-10-23T00:57:33.3104484Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          },
+          {
+            "line": 12238,
+            "text": "2026-10-23T00:57:33.4543903Z relay_signals: ok"
+          },
+          {
+            "line": 12255,
+            "text": "2026-10-23T00:57:38.0125005Z test result: 12 passed; 0 failed"
+          }
+        ]
+      },
+      "offline_prerequisite_summaries": [
+        {
+          "line": 334,
+          "text": "2026-10-23T00:44:02.3369005Z Ran 35 tests in 0.250s"
+        },
+        {
+          "line": 336,
+          "text": "2026-10-23T00:44:02.3369584Z OK"
+        },
+        {
+          "line": 404,
+          "text": "2026-10-23T00:44:09.6051863Z Ran 12 tests in 0.866s"
+        },
+        {
+          "line": 406,
+          "text": "2026-10-23T00:44:09.6052053Z OK"
+        },
+        {
+          "line": 646,
+          "text": "2026-10-23T00:48:48.4059266Z Ran 7 tests in 0.421s"
+        },
+        {
+          "line": 648,
+          "text": "2026-10-23T00:48:48.4059583Z OK"
+        }
+      ]
+    },
+    "clippy": {
+      "watch_identity": {
+        "head": "7a36051bd80d643d502c069cfeb77fa0604e6bd9",
+        "run_number": 2270,
+        "run_attempt": 1,
+        "workflow": {
+          "status": "completed",
+          "conclusion": "success"
+        },
+        "job": {
+          "status": "completed",
+          "conclusion": "success"
+        },
+        "active_step": null,
+        "log": {
+          "path": "raw-output.json:clippy",
+          "bytes": 36756,
+          "sha256": "93809aefaf643678edba36542e0fcdf98547850247fc0945dc074be143a8c398"
+        },
+        "completed_utc": "2026-10-23T00:52:41.943061+00:00"
+      },
+      "raw_log": {
+        "path": "raw-output.json:clippy",
+        "bytes": 36756,
+        "sha256": "93809aefaf643678edba36542e0fcdf98547850247fc0945dc074be143a8c398"
+      },
+      "checkouts": [
+        {
+          "line": 344,
+          "text": "2026-10-23T00:43:48.2882943Z HEAD is now at d03a53d Merge 7a36051bd80d643d502c069cfeb77fa0604e6bd9 into f477d6c49732dbd5cba84cbe18ea568692c056e6"
+        },
+        {
+          "line": 346,
+          "text": "2026-10-23T00:43:48.4098674Z [command]/usr/bin/git log -1 --format=%H"
+        },
+        {
+          "line": 347,
+          "text": "2026-10-23T00:43:48.4132602Z d03a53dc464696823b46019084de8d6cf809480f"
+        }
+      ],
+      "architecture": [
+        {
+          "line": 357,
+          "text": "2026-10-23T00:43:48.7807216Z info: default host tuple is x86_64-unknown-linux-gnu"
+        },
+        {
+          "line": 361,
+          "text": "2026-10-23T00:43:57.5681280Z info: default toolchain set to 1.96.0-x86_64-unknown-linux-gnu"
+        },
+        {
+          "line": 363,
+          "text": "2026-10-23T00:43:57.5789453Z   1.96.0-x86_64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)"
+        }
+      ],
+      "commands_scope": [
+        {
+          "line": 348,
+          "text": "2026-10-23T00:43:48.4296763Z ##[group]Run curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy"
+        },
+        {
+          "line": 349,
+          "text": "2026-10-23T00:43:48.4297664Z \u001b[36;1mcurl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy\u001b[0m"
+        },
+        {
+          "line": 438,
+          "text": "2026-10-23T00:44:30.5146598Z ##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings"
+        },
+        {
+          "line": 439,
+          "text": "2026-10-23T00:44:30.5147459Z \u001b[36;1mcargo clippy --locked --workspace --all-targets -- -D warnings\u001b[0m"
+        }
+      ],
+      "limits": [
+        "No new workflow, rerun, local Cargo, source edit, device action or independent Linux fmt run.",
+        "Test binary IDs identify nextest executable targets; no compiled test-binary byte identity is claimed."
+      ]
+    }
+  }
+}
