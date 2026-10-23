@@ -869,6 +869,242 @@ fn the_bodys_hand_counts_only_fresh_and_from_the_body() {
     ));
 }
 
+/// #1798: exercise the retained body message through Service, not just its
+/// freshness predicate or the recognizer's direct `set_head_pushed` input.
+mod body_hand {
+    use super::*;
+    use lamp_msgs::{ControlIntent, Hand, TouchEvent};
+    use std::ops::Range;
+
+    fn body(rig: &Rig) -> lamp_bus::Publisher {
+        let mut publisher = rig
+            .bus
+            .publisher_declared(Hand::TOPIC, &Hand::declaration(), "body")
+            .unwrap();
+        // GPIO uses a stepped clock, while bus headers use wall time. Keep
+        // this fixture's fresh value stable under host load; the expiry case
+        // explicitly ages the real retained header below. This does not model
+        // Body's publication cadence or its one-second deadline.
+        publisher.expires_after(None);
+        publisher
+    }
+
+    fn say(body: &mut lamp_bus::Publisher, at: u64, pushed: bool) {
+        body.publish_json(
+            at,
+            &Hand {
+                pushed,
+                // Body's monotonic origin is independent of Controls'.
+                since_us: if pushed { 5_000_000 } else { 0 },
+            },
+        )
+        .unwrap();
+    }
+
+    fn expire_push(rig: &Rig) {
+        let mut message = rig.bus.latest(Hand::TOPIC).unwrap().unwrap();
+        assert!(!message.expired && message.parse::<Hand>().unwrap().pushed);
+        message.header.at_unix_ms = 0;
+        message.header.expires_ms = Some(1_000);
+        let mut bytes = serde_json::to_vec(&message.header).unwrap();
+        bytes.push(b'\n');
+        bytes.extend_from_slice(&message.payload);
+        fs::write(rig.bus.root().join(Hand::TOPIC).join("latest"), bytes).unwrap();
+        assert_expired_push(rig);
+    }
+
+    fn assert_expired_push(rig: &Rig) {
+        let message = rig.bus.latest(Hand::TOPIC).unwrap().unwrap();
+        assert_eq!(message.header.source, "body");
+        assert!(message.expired && message.parse::<Hand>().unwrap().pushed);
+    }
+
+    fn run(rig: &mut Rig, times: Range<u64>, primary: bool, pressed: bool) -> Vec<TouchOutput> {
+        times
+            .step_by(10_000)
+            .map(|at| {
+                rig.gpio(at, primary, false, pressed);
+                let output = rig.step(at);
+                let head = source(&output, TouchSource::Head);
+                assert!(head.ready && head.fault.is_none(), "at {at}: {head:?}");
+                assert_eq!(head.observed_us, Some(at));
+                assert_eq!(head.active, Some(pressed));
+                if at >= 500_000 {
+                    assert!(head.armed, "head was not armed at {at}");
+                }
+                assert_eq!(rig.service.counts.rejected, 0);
+                assert_eq!(rig.service.counts.reader_errors, 0);
+                assert_eq!(rig.service.counts.drain_overflows, 0);
+                output
+            })
+            .collect()
+    }
+
+    fn events(outputs: &[TouchOutput]) -> Vec<&TouchEvent> {
+        outputs.iter().flat_map(|output| &output.events).collect()
+    }
+
+    fn spoiled(outputs: &[TouchOutput], contact: u64) {
+        for output in outputs {
+            let head = source(output, TouchSource::Head);
+            assert_eq!(head.contact_id, Some(contact));
+            assert_eq!(head.held_us, None);
+            assert!(
+                output
+                    .events
+                    .iter()
+                    .all(|event| event.source != TouchSource::Head),
+                "a spoiled head emitted {:?}",
+                output.events
+            );
+        }
+    }
+
+    fn recovery(expired: bool) {
+        let mut rig = Rig::new(true);
+        assert!(events(&run(&mut rig, 0..600_000, false, false)).is_empty());
+        let mut body = body(&rig);
+        say(&mut body, 600_000, true);
+        let held = run(&mut rig, 600_000..1_000_000, false, true);
+        let contact = source(&held[0], TouchSource::Head).contact_id.unwrap();
+        spoiled(&held, contact);
+
+        // A pushed head must not silence the independent primary Stop.
+        let mut button = run(&mut rig, 1_000_000..1_030_000, true, true);
+        button.extend(run(&mut rig, 1_030_000..1_100_000, false, true));
+        spoiled(&button, contact);
+        let stops = events(&button);
+        assert_eq!(stops.len(), 1);
+        assert_eq!(stops[0].source, TouchSource::Primary);
+        assert_eq!(stops[0].intent(true, false), Some(TouchIntent::Stop));
+        assert_eq!(stops[0].intent(false, true), Some(TouchIntent::Stop));
+        let legacy_stop = rig.legacy().latest_stop.unwrap();
+        assert_eq!(legacy_stop.intent, ControlIntent::Stop);
+        assert_eq!(legacy_stop.released_us, stops[0].released_us.unwrap());
+        spoiled(&run(&mut rig, 1_100_000..3_700_000, false, true), contact);
+
+        if expired {
+            expire_push(&rig);
+        } else {
+            say(&mut body, 3_700_000, false);
+        }
+        // Neither clear route rescues the old contact, even after another
+        // complete sleep-hold interval. A short pad gap does not end it.
+        spoiled(&run(&mut rig, 3_700_000..7_000_000, false, true), contact);
+        spoiled(&run(&mut rig, 7_000_000..7_070_000, false, false), contact);
+        spoiled(&run(&mut rig, 7_070_000..7_200_000, false, true), contact);
+
+        // The gap is measured from the last active acquisition (7.19 s).
+        let release = run(&mut rig, 7_200_000..7_400_000, false, false);
+        assert!(events(&release).is_empty());
+        spoiled(&release[..14], contact); // Last sample is 140 ms after active.
+        assert_eq!(source(&release[14], TouchSource::Head).contact_id, None);
+
+        let mut tap = run(&mut rig, 7_400_000..7_600_000, false, true);
+        tap.extend(run(&mut rig, 7_600_000..7_800_000, false, false));
+        let tap = events(&tap);
+        assert_eq!(
+            tap.iter()
+                .map(|event| (event.source, event.gesture))
+                .collect::<Vec<_>>(),
+            [
+                (TouchSource::Head, TouchGesture::Touch),
+                (TouchSource::Head, TouchGesture::Tap)
+            ]
+        );
+        assert_ne!(tap[0].contact_id, contact);
+        assert_eq!(tap[0].contact_id, tap[1].contact_id);
+        assert_eq!(tap[0].observed_us, 7_420_000);
+        assert_eq!(tap[1].released_us, Some(7_600_000));
+        assert_eq!(tap[1].observed_us, 7_740_000);
+        assert_eq!(tap[1].intent(false, true), Some(TouchIntent::Wake));
+
+        let hold = run(&mut rig, 7_800_000..10_830_000, false, true);
+        let held = source(hold.last().unwrap(), TouchSource::Head);
+        assert_eq!(held.held_us, Some(3_020_000));
+        let hold = events(&hold);
+        assert_eq!(
+            hold.iter()
+                .map(|event| (event.source, event.gesture))
+                .collect::<Vec<_>>(),
+            [
+                (TouchSource::Head, TouchGesture::Touch),
+                (TouchSource::Head, TouchGesture::Stroke),
+                (TouchSource::Head, TouchGesture::Hold)
+            ]
+        );
+        assert!(
+            hold.iter()
+                .all(|event| event.contact_id == hold[0].contact_id)
+        );
+        assert_ne!(hold[0].contact_id, tap[0].contact_id);
+        assert_eq!(hold[2].observed_us, 10_800_000);
+        assert_eq!(hold[2].intent(false, false), Some(TouchIntent::Sleep));
+        assert!(events(&run(&mut rig, 10_830_000..11_050_000, false, false)).is_empty());
+        if expired {
+            // A later false publication must not conceal an expiry reader
+            // that failed to clear its push state.
+            assert_expired_push(&rig);
+        }
+    }
+
+    #[test]
+    fn a_body_release_requires_a_new_contact_before_tap_or_hold() {
+        recovery(false);
+    }
+
+    #[test]
+    fn an_expired_body_push_requires_a_new_contact_before_tap_or_hold() {
+        recovery(true);
+    }
+
+    #[test]
+    fn a_body_push_preserves_an_already_qualified_stop() {
+        let mut rig = Rig::new(true);
+        run(&mut rig, 0..600_000, false, false);
+        let touch = run(&mut rig, 600_000..640_000, false, true);
+        let touch = events(&touch);
+        assert_eq!(touch.len(), 1);
+        let stop = touch[0];
+        assert_eq!(stop.source, TouchSource::Head);
+        assert_eq!(stop.gesture, TouchGesture::Touch);
+        assert_eq!(stop.intent(true, false), Some(TouchIntent::Stop));
+
+        let mut body = body(&rig);
+        say(&mut body, 640_000, true);
+        let pushed = run(&mut rig, 640_000..700_000, false, true);
+        spoiled(&pushed, stop.contact_id);
+        for output in &pushed {
+            assert!(output.state.latest.contains(stop));
+        }
+        say(&mut body, 700_000, false);
+        let cleared = run(&mut rig, 700_000..800_000, false, true);
+        spoiled(&cleared, stop.contact_id);
+        for output in &cleared {
+            assert!(output.state.latest.contains(stop));
+        }
+        spoiled(
+            &run(&mut rig, 800_000..3_700_000, false, true),
+            stop.contact_id,
+        );
+        assert!(events(&run(&mut rig, 3_700_000..3_900_000, false, false)).is_empty());
+    }
+
+    #[test]
+    fn a_body_push_is_read_before_the_gpio_that_would_qualify_touch() {
+        let mut rig = Rig::new(true);
+        run(&mut rig, 0..600_000, false, false);
+        let began = run(&mut rig, 600_000..620_000, false, true);
+        assert!(events(&began).is_empty());
+        let contact = source(&began[0], TouchSource::Head).contact_id.unwrap();
+        let mut body = body(&rig);
+        say(&mut body, 620_000, true);
+        // 620 ms is both the 20 ms qualification boundary and a due body
+        // poll. Reading body after GPIO would let one Stop escape here.
+        spoiled(&run(&mut rig, 620_000..700_000, false, true), contact);
+    }
+}
+
 /// What a still pad's and a hand's states are counted with: the two topics,
 /// read after every step (a Mac's socket queue holds only a few of them).
 struct Heard {
