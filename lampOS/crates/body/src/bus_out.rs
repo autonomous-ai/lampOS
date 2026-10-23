@@ -38,6 +38,27 @@ const STEP_S: f64 = 0.02;
 /// The body's report goes with one offered step in this many: every
 /// 0.96 s, inside the second the topic promises.
 const REPORT_EVERY: u32 = 12;
+/// While let go for its pose (#2602) every step is offered, one each
+/// `crate::body::WAIT_READ` (100 ms), and the report goes with one in this
+/// many: every 0.5 s, inside the same second.
+const WAITING_REPORT_EVERY: u32 = 5;
+
+/// Whether `glimpse` is passed on: one step in [`EVERY_STEPS`], and every
+/// step of a body let go for its pose, which steps only ten times a second.
+fn offered(glimpse: &Glimpse) -> bool {
+    glimpse.waiting.is_some() || glimpse.step.is_multiple_of(EVERY_STEPS)
+}
+
+/// Offered steps between the body's reports, for the step `glimpse`.
+fn report_every(glimpse: &Glimpse) -> u32 {
+    match glimpse.waiting {
+        // No longer asking (#2938), it reads every `WAIT_READ_LATE`: a
+        // report with each.
+        Some(crate::body::STOPPED_ASKING) => 1,
+        Some(_) => WAITING_REPORT_EVERY,
+        None => REPORT_EVERY,
+    }
+}
 /// How long a message of where the joints are means anything. A body that
 /// has stopped must not go on being read as where the lamp is.
 pub const LASTS: Duration = Duration::from_secs(1);
@@ -140,6 +161,22 @@ pub fn health(glimpse: &Glimpse, resisted: u32) -> Diagnostic {
         .into_iter()
         .max_by_key(|(_, reading)| *reading)
         .unwrap_or(("head_pitch", 0));
+    // Let go for a pose a hand can set straight (#2602): what it asks is
+    // the whole of its word, and the start checks are not behind it.
+    if let Some(say) = glimpse.waiting {
+        return Diagnostic {
+            level: Level::Error,
+            name: SOURCE.to_owned(),
+            message: say.to_owned(),
+            values: vec![
+                fact("mood", mood_word(glimpse.mood)),
+                fact(
+                    lamp_keeper::STATE,
+                    lamp_keeper::PartState::Starting.as_str(),
+                ),
+            ],
+        };
+    }
     let (level, message) = if reading >= WARM {
         (
             Level::Warn,
@@ -615,9 +652,10 @@ impl Publishing {
         self.resisted_in_all = in_all;
         self.resisted
             .retain(|at| now.saturating_duration_since(*at) < RESISTANCE_SAID_FOR);
-        let since = self.since_report.map_or(REPORT_EVERY, |steps| steps + 1);
+        let every = report_every(glimpse);
+        let since = self.since_report.map_or(every, |steps| steps + 1);
         self.since_report = Some(since);
-        if since >= REPORT_EVERY {
+        if since >= every {
             self.since_report = Some(0);
             let mut report = health(
                 glimpse,
@@ -701,7 +739,7 @@ impl BusOut {
     /// A step of the body. One in [`EVERY_STEPS`] is passed on, and never
     /// waited for.
     pub fn offer(&mut self, glimpse: &Glimpse) {
-        if !glimpse.step.is_multiple_of(EVERY_STEPS) {
+        if !offered(glimpse) {
             return;
         }
         if self
@@ -774,7 +812,64 @@ mod tests {
             toward_refused: None,
             bad_reads: [0; 5],
             retreats: 0,
+            waiting: None,
         }
+    }
+
+    /// #2602: a body let go for its pose says what it asks of a person as
+    /// its whole word, an error, and that it is still starting.
+    #[test]
+    fn a_body_let_go_for_its_pose_says_what_it_asks() {
+        let say = "My head is tipped too far. Please move it gently back toward the middle, and I will start by myself.";
+        let report = health(
+            &Glimpse {
+                waiting: Some(say),
+                ..glimpse(0)
+            },
+            0,
+        );
+        assert_eq!((report.level, report.message.as_str()), (Level::Error, say));
+        assert!(
+            report
+                .values
+                .iter()
+                .any(|value| value.key == lamp_keeper::STATE
+                    && value.value == lamp_keeper::PartState::Starting.as_str())
+        );
+    }
+
+    /// #2602: let go, the body steps every `WAIT_READ`; each step is passed
+    /// on and the report goes often enough that the gap between two never
+    /// exceeds the cadence `diagnostics` is declared at, from the first step.
+    #[test]
+    fn a_body_let_go_reports_within_the_declared_cadence() {
+        let declared = Diagnostic::declaration().period().unwrap();
+        let say = "My base is turned too far.";
+        let mut since: Option<u32> = None;
+        let mut reported_at = Vec::new();
+        for step in 1..=60u32 {
+            let waiting = Glimpse {
+                waiting: Some(say),
+                ..glimpse(u64::from(step))
+            };
+            assert!(offered(&waiting), "step {step}");
+            let every = report_every(&waiting);
+            let now = since.map_or(every, |steps| steps + 1);
+            since = Some(if now >= every { 0 } else { now });
+            if now >= every {
+                reported_at.push(crate::body::WAIT_READ * step);
+            }
+        }
+        assert_eq!(reported_at[0], crate::body::WAIT_READ);
+        assert!(
+            reported_at
+                .windows(2)
+                .all(|two| two[1] - two[0] <= declared),
+            "{reported_at:?}"
+        );
+        // A running body is as before: one step in four, a report in twelve.
+        assert!(!offered(&glimpse(1)) && offered(&glimpse(EVERY_STEPS)));
+        assert_eq!(report_every(&glimpse(0)), REPORT_EVERY);
     }
 
     fn near(a: f64, b: f64) -> bool {
