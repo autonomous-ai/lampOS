@@ -17,7 +17,9 @@ load, before the existing protection makes the lamp slump.
 
 The [hysteresis and release acceptance receipt](hysteresis-acceptance.md)
 keeps the intermediate `c11d067e8` result and the complete two additional
-cases requested by the acceptance decision. Later heads need a fresh read.
+cases requested by the acceptance decision. The newer `8c76a3dab` fixes
+the original two regressions but still fails both acceptance cases and the
+[13-count limp movement control](limp-movement-reporting.md).
 
 ## Retained observations
 

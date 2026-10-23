@@ -20,7 +20,7 @@ a whole-suite result, a Linux run or a device result.
 |---|---:|---:|---|
 | Eight-second displaced gentle hold | 1 / 0 | 0 | Stable initial give-way reference fixes the original sustained-push failure. |
 | Glance-cooling contact floor | 0 / 1 | 101 | Step 535 has load 675, a held pitch and no hand report. |
-| Release after stationary pressure | 0 / 1 | 101 | Step 226, one step after the first quiet read, still reports a hand at load 25 and position equal to goal. |
+| Release after stationary pressure | 0 / 1 | 101 | Step 227, one step after the first quiet read at step 226, still reports a hand at load 25 and position equal to goal. |
 | Lower load after an admitted push | 0 / 1 | 101 | The late hold window at load 130, after entry at 300, reports no hand; pitch's ordinary bound is 240. |
 
 The first two fixtures are in the [main receipt](README.md) and
@@ -48,6 +48,30 @@ the decision, then requires the next and every later observation to clear.
 The retention case enters at 300, falls to 130 for four seconds without
 moving, and checks every sample in a nonempty late window. No new push
 entry at 130 is requested. Both use the existing fixture and `--limp on`.
+
+## Revised head `8c76a3dab`
+
+The same four cases were run again, with only the newer production diff
+applied to the same `e5cd73aca` review baseline. The eight-second displaced
+hold and contact-floor cases now both pass **1 / 0**. The release and
+lower-load retention cases each still fail **0 / 1**, exit 101, at the
+same boundaries. For release, step 226 is the first quiet observation;
+steps 227 and 228 also still report a hand at load 25 and zero goal gap.
+For retention, the checked load-130 window begins at step 250 and reports
+no hand after the established load-300 pressure.
+
+The source still refreshes reporting only above the full bound or contact
+floor, or beyond 15 counts from the initial give-way point. Otherwise it
+decrements a 50-step history. This fixes neither the required lower hold
+level after qualification nor the one-tick release when both inputs clear.
+A pressure that was never admitted is a separate case; both tests here
+first establish a reported push at load 300.
+
+A [third current-head case](limp-movement-reporting.md), for a 13-count
+physical displacement after contact, passes **1 / 0** on the unmodified
+baseline and fails **0 / 1** with the proposed production diff. It checks
+the limp guard's smaller movement threshold before the slump. No review
+clearance is given while these three current-head failures remain.
 
 ## Complete acceptance cases
 

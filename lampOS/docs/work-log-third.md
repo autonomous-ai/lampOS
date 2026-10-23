@@ -5,6 +5,40 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 11:31 — touch carried green; current Body review held
+
+Ready for lamp-voice: no (#3196 held; #3207's unchanged docs carry awaits confirmation).
+
+- #3204 landed through train #3205 in `51186d5ea`. The original
+  `418f618e8` and carried `02ad5267c` have an identical range-diff;
+  all five authored files match, and the integration tree exactly
+  matches tested train `ed317ff1f`. Train ARM64 `39897714720` passed
+  10,941 nextest cases, with zero failed and 68 skipped, plus the
+  separate custom harness's 12/0 and a passing doc-test step. Nextest
+  marked the `same_voice` journal case leaky; that marker is retained.
+  Train Linux Clippy `39897714592` passed. This separate composed
+  result does not erase the source PR's failed run `39897297680`.
+- #3207 is rebased and pushed as `61a195a18` on `51186d5ea`:
+  range-diff `0a1ba6d55 = 61a195a18`, diff check clean. Reviewer-two
+  read the original four-line patch with no P1/P2. Explicit Linux fmt
+  evidence for #3204 remains with Tests. The main checkout is clean,
+  at `51186d5ea`, with AGENTS.md identical to the integration copy.
+- #3196's actual current `8c76a3dab` production diff, applied to the
+  same `e5cd73aca` review base and fixtures, passes the two original
+  focused controls: sustained displaced hold and contact-floor pressure,
+  each 1/0. The [two additional acceptance cases](verification/body-resting-push-20261023/hysteresis-acceptance.md)
+  still each fail 0/1: load 130 after an admitted stationary load 300
+  loses the hand report, and a release to load 25 with zero goal gap
+  remains reported beyond the next tick. First required both behaviors.
+- The [13-count movement control](verification/body-resting-push-20261023/limp-movement-reporting.md)
+  passes 1/0 on the unchanged baseline and fails 0/1 with the proposed
+  production diff. It independently verifies the physical hold and later
+  slump, but reporting goes false beforehand. El retains the product
+  fix; this review changes no product code and accesses no device.
+- All temporary Body production patches are removed from the isolated
+  review worktree; the retained fixtures support the next review. #2948
+  stays draft for First's build and the attended trial with Fifth.
+
 ## 2026-10-23 11:24 — ARM64 failure retained; Body acceptance review
 
 Ready for lamp-voice: no (#3204 native gate failed; #3196 review continues).
