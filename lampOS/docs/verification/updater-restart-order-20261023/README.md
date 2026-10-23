@@ -140,3 +140,19 @@ patch ID as the reviewed commit and all six complete runtime/test files
 match. Train head `02597ec8e` includes `e6b88eac2`. This scoped source
 comparison and isolated crate gate are not a test of the complete train;
 its official ARM64 and Clippy jobs provide that composition gate.
+
+## Train 27 and the landed source
+
+Train #3176 at `02597ec8e` passed official native ARM64 run **39886260122**,
+job **120195022805**, first attempt: **10,873 passed / 0 failed / 67 skipped**,
+one passing leaky case. All 16 restart-order/parser/quiet cases passed.
+Linux Clippy run **39886260205**, job **120195023358**, also passed first
+attempt. Both jobs checked the same train merged into `e6b88eac2`.
+`native-train27/` preserves complete raw logs, their SHA-256 values and the
+exact checkout. These train counts differ from the smaller original PR run;
+neither result is substituted for the other.
+
+The train landed as `b3a1ece0b`, closing #3173. `landed-train27.json` proves
+all eight authored files in that landed source match the checked train.
+This is source comparison after the official run, not a new test execution.
+No lamp, physical unplug or real-key release was exercised.
