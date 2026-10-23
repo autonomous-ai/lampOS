@@ -743,19 +743,55 @@ fn about_someone(text: &str) -> bool {
         })
 }
 
-/// Whether a recall's entry is about a person ([`about_someone`]) in any
-/// of its words: what was heard, said, or kept.
-fn entry_about_someone(entry: &Value) -> bool {
+/// The words of a text for [`names_them`]: NFC, lowercased, split at
+/// anything that is not a letter or a digit.
+fn name_words(text: &str) -> Vec<String> {
+    text.nfc()
+        .collect::<String>()
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Whether a line names `name` (Reviewer-lead's P2 on #3142): its words,
+/// all of them in order, as whole words ([`name_words`]), so "Mai" is in
+/// "Mai likes green tea" and "Mai's bike", never in "Maine". No common
+/// word is passed over: a household line that has the name in it is held
+/// back too, for the day.
+fn names_them(text: &str, name: &str) -> bool {
+    let name = name_words(name);
+    !name.is_empty()
+        && name_words(text)
+            .windows(name.len())
+            .any(|words| words == name.as_slice())
+}
+
+/// Whether a line is about a person for [`ROOM_AFTER_FORGET_ENVIRONMENT`]:
+/// [`about_someone`], or it names the one who forgot ([`names_them`]),
+/// when the eyes gave their name.
+fn about_them(text: &str, name: Option<&str>) -> bool {
+    about_someone(text) || name.is_some_and(|name| names_them(text, name))
+}
+
+/// Whether a recall's entry is about a person ([`about_them`]) in any of
+/// its words: what was heard, said, or kept.
+fn entry_about_them(entry: &Value, name: Option<&str>) -> bool {
     ["heard", "said", "text"]
         .iter()
         .filter_map(|field| entry[*field].as_str())
-        .any(about_someone)
+        .any(|text| about_them(text, name))
 }
 
 /// The room's validated snapshot without its facts about a person
-/// ([`about_someone`]), its ids with them; with how many went. A snapshot
+/// ([`about_them`]), its ids with them; with how many went. A snapshot
 /// whose note is not as validated is left as it is.
-fn room_without_someone(snapshot: Value, ids: Vec<u64>) -> ((Value, Vec<u64>), usize) {
+fn room_without_someone(
+    snapshot: Value,
+    ids: Vec<u64>,
+    name: Option<&str>,
+) -> ((Value, Vec<u64>), usize) {
     let mut snapshot = snapshot;
     let Some(mut quoted) = snapshot["note"]
         .as_str()
@@ -768,7 +804,9 @@ fn room_without_someone(snapshot: Value, ids: Vec<u64>) -> ((Value, Vec<u64>), u
     };
     let mut gone = vec![];
     facts.retain(|fact| {
-        let about = fact["text"].as_str().is_some_and(about_someone);
+        let about = fact["text"]
+            .as_str()
+            .is_some_and(|text| about_them(text, name));
         if about && let Some(id) = fact["id"].as_u64() {
             gone.push(id);
         }
@@ -3335,10 +3373,13 @@ pub struct DaysClient {
     room_not_asker: AtomicBool,
     /// [`ROOM_AFTER_FORGET_ENVIRONMENT`], read when the client is made.
     room_after_forget: AtomicBool,
-    /// Who said "forget everything" and on which local day, with
-    /// [`ROOM_AFTER_FORGET_ENVIRONMENT`]: at most [`FORGOT_MOST`] people, in
-    /// this process only.
-    forgot_everything: Mutex<HashMap<String, i64>>,
+    /// Who said "forget everything", on which local day and by what name
+    /// the eyes knew them then, with [`ROOM_AFTER_FORGET_ENVIRONMENT`]: at
+    /// most [`FORGOT_MOST`] people, in this process only.
+    forgot_everything: Mutex<HashMap<String, (i64, Option<String>)>>,
+    /// The eyes' known file for [`Self::known_name_of`], in place of the
+    /// voice's ([`KNOWN_FILE`]): for tests.
+    known: Mutex<Option<PathBuf>>,
     /// The household's room sounds yes ([`crate::onboarding::ROOM_SOUNDS_PATH`]),
     /// removed by any forget of everything (#2110), and the face expressions
     /// yes beside it.
@@ -4666,6 +4707,7 @@ impl DaysClient {
                 std::env::var(ROOM_AFTER_FORGET_ENVIRONMENT).ok().as_deref() == Some("on"),
             ),
             forgot_everything: Mutex::new(HashMap::new()),
+            known: Mutex::new(None),
             room_sounds: crate::onboarding::ROOM_SOUNDS_PATH.into(),
             resumes: AtomicBool::new(
                 std::env::var(JOURNAL_RESUMES_ENVIRONMENT).ok().as_deref() == Some("on"),
@@ -5004,44 +5046,64 @@ impl DaysClient {
         }
     }
 
+    /// The name the eyes know the face at the lamp by, only when that face
+    /// is `person`'s ([`crate::known_faces::FaceObservation::person`]).
+    fn known_name_of(&self, person: &str) -> Option<String> {
+        let path = self
+            .known
+            .lock()
+            .ok()
+            .and_then(|known| known.clone())
+            .or_else(|| KNOWN_FILE.get().cloned())?;
+        crate::known_faces::FaceObservation::read(&path)
+            .filter(|observation| observation.person() == person)
+            .map(|observation| observation.name().to_owned())
+    }
+
     /// That `person` said "forget everything" on the local day of `now`
-    /// ([`ROOM_AFTER_FORGET_ENVIRONMENT`]), and whether it is now held.
-    /// With [`FORGOT_MOST`] people held, those of an earlier day go first,
-    /// then the earliest.
+    /// ([`ROOM_AFTER_FORGET_ENVIRONMENT`]), with the name the eyes know
+    /// them by when they do ([`Self::known_name_of`]), and whether it is now
+    /// held. With [`FORGOT_MOST`] people held, those of an earlier day go
+    /// first, then the earliest.
     fn forgot_everything_on(&self, person: &str, now: u64, zone: Option<&LocalTime>) -> bool {
         if !self.room_after_forget.load(Ordering::Acquire) {
             return false;
         }
         let today = local_day(now, zone);
+        // Read before the map is held: a small file, never under the lock.
+        let name = self.known_name_of(person);
         let Ok(mut forgot) = self.forgot_everything.lock() else {
             return false;
         };
         if !forgot.contains_key(person) && forgot.len() >= FORGOT_MOST {
-            forgot.retain(|_, day| *day >= today);
+            forgot.retain(|_, (day, _)| *day >= today);
             if forgot.len() >= FORGOT_MOST
                 && let Some(earliest) = forgot
                     .iter()
-                    .min_by_key(|(_, day)| **day)
+                    .min_by_key(|(_, (day, _))| *day)
                     .map(|(person, _)| person.clone())
             {
                 forgot.remove(&earliest);
             }
         }
-        forgot.insert(person.to_owned(), today);
+        forgot.insert(person.to_owned(), (today, name));
         true
     }
 
     /// Whether `person` said "forget everything" on the local day of `now`,
-    /// with [`ROOM_AFTER_FORGET_ENVIRONMENT`]. Nobody known never did.
-    fn forgot_today(&self, person: Option<&str>, now: u64, zone: Option<&LocalTime>) -> bool {
-        let Some(person) = person.filter(|_| self.room_after_forget.load(Ordering::Acquire)) else {
-            return false;
-        };
-        self.forgot_everything
-            .lock()
-            .ok()
-            .and_then(|forgot| forgot.get(person).copied())
-            == Some(local_day(now, zone))
+    /// with [`ROOM_AFTER_FORGET_ENVIRONMENT`]: `Some` with the name the eyes
+    /// knew them by then, if they did. Nobody known never did.
+    #[allow(clippy::option_option)]
+    fn forgot_today(
+        &self,
+        person: Option<&str>,
+        now: u64,
+        zone: Option<&LocalTime>,
+    ) -> Option<Option<String>> {
+        let person = person.filter(|_| self.room_after_forget.load(Ordering::Acquire))?;
+        let forgot = self.forgot_everything.lock().ok()?;
+        let (day, name) = forgot.get(person)?;
+        (*day == local_day(now, zone)).then(|| name.clone())
     }
 
     /// The room's snapshot for this session ([`Self::open_one`]), for
@@ -5054,10 +5116,10 @@ impl DaysClient {
         until: Instant,
     ) -> Result<(Value, Vec<u64>), NoteCause> {
         let (snapshot, ids) = self.open_one(name, None, until)?;
-        if !self.forgot_today(person, unix_ms(), crate::local_time::system()) {
+        let Some(them) = self.forgot_today(person, unix_ms(), crate::local_time::system()) else {
             return Ok((snapshot, ids));
-        }
-        let (room, left_out) = room_without_someone(snapshot, ids);
+        };
+        let (room, left_out) = room_without_someone(snapshot, ids, them.as_deref());
         if left_out > 0 {
             eprintln!("{}", room_after_forget_line(left_out));
         }
@@ -5890,11 +5952,11 @@ impl DaysClient {
         if let Some(mut room) = room {
             // Nothing of the room's about a person for the rest of the day
             // they forgot everything (#2849, `LAMP_MEMORY_ROOM_AFTER_FORGET`).
-            if self.forgot_today(Some(person), now, zone)
+            if let Some(them) = self.forgot_today(Some(person), now, zone)
                 && let Some(entries) = room["entries"].as_array_mut()
             {
                 let before = entries.len();
-                entries.retain(|entry| !entry_about_someone(entry));
+                entries.retain(|entry| !entry_about_them(entry, them.as_deref()));
                 let left_out = before - entries.len();
                 if left_out > 0 {
                     eprintln!("{}", room_after_forget_line(left_out));
@@ -8247,6 +8309,165 @@ mod tests {
         }
     }
 
+    /// The room's lines for Reviewer-lead's P2 on #3142: two that name Mai
+    /// with no pronoun, one about nobody, and one with "Maine" in it.
+    fn room_naming(request: &Value) -> Value {
+        let facts = [
+            (7, "Mai likes green tea"),
+            (8, "Mai is in Hanoi"),
+            (9, "The meeting is at four"),
+            (10, "Maine is far"),
+        ];
+        match (request["op"].as_str(), request["person"].is_string()) {
+            (Some("forget_all"), _) => json!({"ok":true,"removed":0}),
+            (Some("recall" | "search"), true) => json!({"ok":true,"entries":[]}),
+            (Some("recall" | "search"), false) => json!({"ok":true,"entries":facts
+                .map(|(id, text)| json!({"kind":"kept","id":id,"at_unix_ms":NOW,"text":text}))}),
+            (Some("session_open"), person) => {
+                let session = request["session"].as_str().unwrap();
+                let (scope, facts, ids) = if person {
+                    (PERSON_SCOPE, vec![], vec![])
+                } else {
+                    (
+                        ROOM_SCOPE,
+                        facts
+                            .map(|(id, text)| json!({"id":id,"kind":"preference","text":text}))
+                            .to_vec(),
+                        facts.map(|(id, _)| id).to_vec(),
+                    )
+                };
+                json!({"ok":true,"snapshot":{"session":session,"opened_unix_ms":NOW,
+                    "generation":2,"invalidated":false,"source_ids":ids,
+                    "note":json!({"scope":scope,"untrusted":true,"facts":facts}).to_string()}})
+            }
+            _ => json!({"ok":false}),
+        }
+    }
+
+    /// Reviewer-lead's P2 on #3142: after Mai's "forget everything", with
+    /// the eyes knowing the face at the lamp as Mai, the room's lines that
+    /// name her ("Mai likes green tea", "Mai is in Hanoi") reach neither
+    /// her recall nor her note that day; "The meeting is at four" and
+    /// "Maine is far" do, and Lan gets all four. Off, or with the face at
+    /// the lamp another's when she forgot, the lines naming her reach her
+    /// as before.
+    #[test]
+    fn after_forget_everything_the_room_s_lines_naming_them_are_left_out_that_day() {
+        let mai = person_id("Mai");
+        let (now, zone) = (unix_ms(), crate::local_time::system());
+        let deadline = Duration::from_secs(2);
+        // As the eyes write it: the name of the face at the lamp now.
+        let known_as = |label: &str, name: &str| {
+            let known = std::env::temp_dir().join(format!(
+                "lamp-remember-known-{label}-{}",
+                std::process::id()
+            ));
+            std::fs::write(&known, format!("{name}\n")).unwrap();
+            known
+        };
+        let client_for = |label: &str, requests, on: bool, name: &str| {
+            let (socket, served) = memory(label, requests, room_naming);
+            let client = DaysClient::new(socket.clone()).unwrap();
+            client.forget_all.store(true, Ordering::Release);
+            client.room_after_forget.store(on, Ordering::Release);
+            let known = known_as(label, name);
+            *client.known.lock().unwrap() = Some(known.clone());
+            (client, socket, served, known)
+        };
+        let recall = |client: &DaysClient, person: &str| {
+            client
+                .run_at(
+                    &call(RECALL, json!({"about":"tea"})),
+                    FIRST_READ,
+                    now,
+                    zone,
+                    Some(person),
+                )
+                .0
+                .to_string()
+        };
+        let forget = |client: &DaysClient| {
+            let (told, _) = client.run_at(
+                &call(FORGET_EVERYTHING, json!({})),
+                FIRST_READ,
+                now,
+                zone,
+                Some(&mai),
+            );
+            assert_eq!(told["forgotten"], false, "nothing of hers: {told}");
+        };
+        let all_four = |told: &str| {
+            [
+                "Mai likes green tea",
+                "Mai is in Hanoi",
+                "The meeting is at four",
+                "Maine is far",
+            ]
+            .iter()
+            .all(|line| told.contains(line))
+        };
+
+        let (client, socket, served, known) = client_for("raf-name", 7, true, "Mai");
+        forget(&client);
+        for told in [
+            recall(&client, &mai),
+            client.told_for_session_within(1, Some(&mai), false, deadline),
+        ] {
+            assert!(!told.contains("Mai likes"), "{told}");
+            assert!(!told.contains("Hanoi"), "{told}");
+            assert!(told.contains("The meeting is at four"), "{told}");
+            assert!(told.contains("Maine is far"), "{told}");
+        }
+        let told = recall(&client, LAN);
+        assert!(all_four(&told), "Lan: {told}");
+        assert_eq!(served.join().unwrap().len(), 7);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+        std::fs::remove_file(&known).unwrap();
+
+        for (label, on, name) in [
+            ("raf-name-off", false, "Mai"),
+            ("raf-name-lan", true, "Lan"),
+        ] {
+            let (client, socket, served, known) = client_for(label, 3, on, name);
+            forget(&client);
+            let told = recall(&client, &mai);
+            assert!(all_four(&told), "{label}: {told}");
+            assert_eq!(served.join().unwrap().len(), 3, "{label}");
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+            std::fs::remove_file(&known).unwrap();
+        }
+    }
+
+    /// A name is named only whole: every word of it, in order, as whole
+    /// words, NFC and case aside.
+    #[test]
+    fn names_them_is_the_whole_name_as_whole_words() {
+        for (text, name) in [
+            ("Mai likes green tea", "Mai"),
+            ("Mai is in Hanoi", "Mai"),
+            ("ask MAI about it", "Mai"),
+            ("Mai\u{2019}s bike is blue", "Mai"),
+            ("Mai Lan is here", "Mai Lan"),
+            ("Th\u{00f9}y likes tea", "Thu\u{0300}y"),
+        ] {
+            assert!(names_them(text, name), "{text} / {name}");
+        }
+        for (text, name) in [
+            ("Maine is far", "Mai"),
+            ("Mai2 is a robot", "Mai"),
+            ("Mai is here, Lan too", "Mai Lan"),
+            ("The meeting is at four", "Mai"),
+            ("anything", ""),
+        ] {
+            assert!(!names_them(text, name), "{text} / {name}");
+        }
+        assert!(about_them("Mai is in Hanoi", Some("Mai")));
+        assert!(about_them("their bike", None));
+        assert!(!about_them("Mai is in Hanoi", None));
+    }
+
     /// #2849's find, seen again in #1693's c0a4 run: after Mai's "forget
     /// everything", the room's kept lines about a person never reach Mai's
     /// recall that day, the room's fact about nobody does, Lan still gets
@@ -10115,6 +10336,7 @@ mod tests {
             room_not_asker: AtomicBool::new(false),
             room_after_forget: AtomicBool::new(false),
             forgot_everything: Mutex::new(HashMap::new()),
+            known: Mutex::new(None),
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
             remember_once: AtomicBool::new(false),
@@ -14031,6 +14253,7 @@ mod tests {
             room_not_asker: AtomicBool::new(false),
             room_after_forget: AtomicBool::new(false),
             forgot_everything: Mutex::new(HashMap::new()),
+            known: Mutex::new(None),
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
             remember_once: AtomicBool::new(false),
@@ -14197,6 +14420,7 @@ mod tests {
             room_not_asker: AtomicBool::new(false),
             room_after_forget: AtomicBool::new(false),
             forgot_everything: Mutex::new(HashMap::new()),
+            known: Mutex::new(None),
             room_sounds: PathBuf::from("/unused-no-io"),
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
@@ -14672,6 +14896,7 @@ mod tests {
             room_not_asker: AtomicBool::new(false),
             room_after_forget: AtomicBool::new(false),
             forgot_everything: Mutex::new(HashMap::new()),
+            known: Mutex::new(None),
             room_sounds: PathBuf::from("/unused-no-io"),
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
