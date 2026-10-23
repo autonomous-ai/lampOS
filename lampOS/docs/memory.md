@@ -779,7 +779,10 @@ the unchanged legacy client, used unless the new Days client is selected.
       and never picks what is said; only `forget_said` reads it.
     - **Forget everything:** once their `forget_all` answers `ok`, the
       voice sends `forget_said {speaker}`. It removes the room's lines with
-      their id and their versions, and what was made only from those; a
+      their id and their versions, but not a version someone else was seen
+      saying (a correction either way stays its speaker's), and the
+      observations made only from those. A kept thing goes only by its own
+      id: one someone unseen kept in their conversation stays (#3113). A
       thing also made from someone else's words stays, and so do those
       words. The journal gives the count, never a line. What they are told
       is as before.
@@ -788,7 +791,10 @@ the unchanged legacy client, used unless the new Days client is selected.
       is kept as before, the journal says `room line kept without its
       speaker (older memory)`, and no speaker is sent again that run. It
       answers `forget_said` with `unknown_op`: nothing more is removed, the
-      journal says so, and the person is told as today.
+      journal says so, and the person is told as today. So they hear
+      "forgotten" though the room's lines they said are kept; the same when
+      `forget_said` is refused or its answer comes too late: only the
+      journal says it.
     - **Tests:** `remember::tests::room_speaker` (the speaker's source,
       the switch off, both skews) and `crates/memory/tests/it/days_speakers.rs`
       (the table, `forget_said`, the mixed-source rule, schema both ways,
