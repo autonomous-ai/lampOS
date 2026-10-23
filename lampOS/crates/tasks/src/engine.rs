@@ -1,7 +1,7 @@
 //! Durable task policy. A launch intent is committed before it can leave this
 //! module. Transcript observations and qualified speech receipts are separate.
 use crate::{
-    harness::{Closed, EngineKind, Launch, LaunchOutcome, Observation, Target},
+    harness::{Closed, EngineKind, Launch, LaunchOutcome, Observation, Target, prompt_fits},
     protocol::{MAX_PAGE_SIZE, MAX_REPLY_BYTES, Request},
     store::{MAX_STATE_BYTES, Store},
 };
@@ -1580,7 +1580,7 @@ impl<P: Persistence> Engine<P> {
                     prompt: text.clone(),
                     target: target_value.clone(),
                 };
-                if launch.validate().is_err() || text.len() > MAX_PROMPT_BYTES {
+                if launch.validate().is_err() || !prompt_fits(text) {
                     return Err(err(
                         "bad_text",
                         "Task text or provisioned target is not valid.",
@@ -4249,6 +4249,26 @@ mod tests {
     /// A stored state with a field twice is refused, as before #1512, and
     /// not read with the last of the two: it is decoded from its bytes, never
     /// through a JSON value (found reading Second's #1562).
+    /// A task stored by a build that held it to the raw bound only still
+    /// opens, though a new one like it is refused (the reviewer-lead on #3259).
+    #[test]
+    fn a_stored_task_over_the_escaped_bound_still_opens() {
+        let (mut engine, memory) = opened();
+        let id = accepted(&mut engine, 0);
+        let mut state = stored(&memory);
+        let task = state.tasks.iter_mut().find(|task| task.id == id).unwrap();
+        task.launch.prompt = "\u{1}".repeat(1_000);
+        assert!(!prompt_fits(&task.launch.prompt));
+        task.prepared_digest =
+            digest(&(&state.store_id, task.id, &task.target_alias, &task.launch));
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&state).unwrap());
+        let engine = Engine::open(memory, targets(), STORE, RESTART, &clock(1))
+            .expect("the store opens with the task");
+        assert_eq!(engine.state.tasks.len(), 1);
+        assert_eq!(engine.state.tasks[0].launch.prompt, "\u{1}".repeat(1_000));
+    }
+
     #[test]
     fn a_stored_state_with_a_field_twice_is_refused() {
         let (mut engine, memory) = opened();
