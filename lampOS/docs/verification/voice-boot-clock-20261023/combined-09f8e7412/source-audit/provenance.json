@@ -1,0 +1,179 @@
+{
+  "scope": "Source-only audit of two completed Voice-stage failure blocks. No new test execution, source edit, target access or reader-output read. Does not certify the overall combined gate.",
+  "source_identity": {
+    "worktree": "/private/tmp/tests-codex-boot-clock-current-20261023",
+    "head": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+    "base_tree": "1a2db98b23f06944cbe06dd567f3ff3c11c0cae8",
+    "qualification_base": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "branch": "tests/1569-boot-clock-current",
+    "tracked_paths": 10055,
+    "lampos_paths": 6709,
+    "source_aggregate_sha256": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d",
+    "owned_paths": [
+      "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "combined_authored_paths": [
+      "lampOS/crates/voice/src/coordinator/second.rs",
+      "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "lampOS/crates/voice/src/scenario_clock.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/stop_words.rs",
+      "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "source_map_sha256": "b92be8c24a20160abb688b967ac7b38fe75e013c0f605c38e772648c59f8e290",
+    "only_owned_files_differ_from_HEAD": true,
+    "overlay_limit": "HEAD is the equal-rebased boot commit; only reviewed peer source and combined doc are dirty. Execution does not yet bind a final combined commit."
+  },
+  "prior_refs": {
+    "base": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "rebased_boot_head": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+    "prior_boot": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+    "prior_peer": "55f671b12ef08c93f11ae235980f69cf7059b7a8"
+  },
+  "historical_voice_command": {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--no-fail-fast",
+      "--message-format=json-render-diagnostics"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+    "started_at": "2026-10-23T14:58:03.299727+00:00",
+    "timeout_seconds": 5400,
+    "stdout": "voice-default-parallel.stdout.txt",
+    "stderr": "voice-default-parallel.stderr.txt",
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "owned_pid": 84931,
+    "owned_process_group": 84931,
+    "exit_code": 101,
+    "wall_seconds": 492.149965,
+    "finished_at": "2026-10-23T15:06:15.505412+00:00",
+    "stdout_sha256": "7ab748f41ce8328adf33f9ac9a5bad59ecc82d7a3a637e9fb3486d456e9d4b5e",
+    "stdout_bytes": 654821,
+    "stderr_sha256": "c4263701db20759f6e52d9f25e5c365aaaf00a2376d86e7dd28b3d12883bcba6",
+    "stderr_bytes": 3636
+  },
+  "captured_targets": [
+    {
+      "name": "lamp-voice:lib:lamp_voice",
+      "result": "FAILED",
+      "counts": {
+        "passed": 3651,
+        "failed": 2,
+        "ignored": 15,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "sha256": "f83f1926cd903a24a7229972f9db839641d0f66eba7fe6083ebaf3f9cb2731a3"
+    },
+    {
+      "name": "lamp-voice:bin:lamp-voice",
+      "result": "ok",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "sha256": "20ac9faa9eff9b958f190ea33d5be87c888c116cf8a8827248353e7431c85cf0"
+    },
+    {
+      "name": "lamp-voice:test:it",
+      "result": "FAILED",
+      "counts": {
+        "passed": 269,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "sha256": "98a85d95d7828f528c41dc07cbd848170092cae0c9b81c7e8becd285e6121c7f"
+    },
+    {
+      "name": "lamp-voice:example:render_line_second",
+      "result": "ok",
+      "counts": {
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "sha256": "0c6bcc50400f218dd1cce34bf498185a9061b5c365445bc0e411b1cca559ea1d"
+    },
+    {
+      "name": "lamp-voice:example:stop_words_stt_replay",
+      "result": "ok",
+      "counts": {
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "sha256": "c99f3b5ab29b20e362b79c85b8359015d49fab2ab4831efd5f6f131553cc603e"
+    },
+    {
+      "name": "lamp-voice:doctests",
+      "result": "ok",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      }
+    }
+  ],
+  "complete_voice_binding": true,
+  "third_failure_not_audited_here": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+  "external_inputs": [
+    {
+      "path": "/private/tmp/tests-3190-peer-fold-gates-20261023/gate-plan.json",
+      "bytes": 8718,
+      "sha256": "c40efd5977246921325e0a57c61a56b1493659c080f0e2acdd9dbc4df2aa6a4b"
+    },
+    {
+      "path": "/private/tmp/tests-3190-peer-fold-gates-20261023/source-map.json",
+      "bytes": 2759039,
+      "sha256": "b92be8c24a20160abb688b967ac7b38fe75e013c0f605c38e772648c59f8e290"
+    },
+    {
+      "path": "/private/tmp/tests-3190-peer-fold-20261023/fold-proof.json",
+      "bytes": 6149,
+      "sha256": "73589d1ce6547b089ce629f836aa7ae3f92ce4a3cc5938180d757784ecac38cd"
+    },
+    {
+      "path": "/private/tmp/tests-3190-peer-fold-gates-20261023/run-2026-10-23T145546.121457Z/voice-default-parallel/target-outcomes.json",
+      "bytes": 1076483,
+      "sha256": "a374c7bab0597ed89c4e39431538b7c56c35e06dfd8bbdc6f931d30eda954c2f"
+    },
+    {
+      "path": "/private/tmp/tests-3190-peer-fold-gates-20261023/run-2026-10-23T145546.121457Z/voice-default-parallel/compiled-artifacts.json",
+      "bytes": 18274,
+      "sha256": "4899c781ea56f45fd7fef4e02f9f72da09f99965d50d908c0977697c7b884523"
+    },
+    {
+      "path": "/private/tmp/tests-3190-peer-fold-gates-20261023/run-2026-10-23T145546.121457Z/voice-default-parallel/compiled-census.json",
+      "bytes": 380767,
+      "sha256": "531609a054a12f2c2bb569df53bbdbdaca222e22e2a17d2b3ba440591b0da7c7"
+    },
+    {
+      "path": "/private/tmp/tests-3190-peer-fold-gates-20261023/run-2026-10-23T145546.121457Z/voice-default-parallel/voice-default-parallel.stderr.txt",
+      "bytes": 3636,
+      "sha256": "c4263701db20759f6e52d9f25e5c365aaaf00a2376d86e7dd28b3d12883bcba6"
+    }
+  ],
+  "availability_limit": "Only the two complete failure blocks and selected source comparisons are portable in this audit. Full stdout/stderr, source map and compiler/census records remain in the parent gate receipt or at the recorded external paths. No live executable was read. Captured x86_64 toolchain/binary provenance does not establish physical hardware or translation mode.",
+  "controls_status": "Proposed only; neither diagnostic instrumentation nor controlled execution is authorized or performed by this audit."
+}

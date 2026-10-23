@@ -1,0 +1,43 @@
+{
+  "format": 1,
+  "scope": "Read-only source audit; no new verification execution. Manifest excludes itself.",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 6626,
+      "sha256": "d4e476623c571bb4ac21aaadb19de2c1d44adc494b057b0d8ce4a9af20352d91"
+    },
+    {
+      "path": "failure-blocks.json",
+      "bytes": 5525,
+      "sha256": "290dd3d3b8f77df07e984e78c8820abe6716c0d64a2975cd2a1a8c3df220c5c9"
+    },
+    {
+      "path": "provenance.json",
+      "bytes": 7015,
+      "sha256": "2bbb4859e54dd46eef49f07b0c4c636c8a4f27c431bdebbccb4874f4f4fa9fe6"
+    },
+    {
+      "path": "scope-enter-delta.json",
+      "bytes": 2733,
+      "sha256": "4b8cc5e02ea2936415a18d6dddb7854f9b1db9d9d80209f659e17850ac8cd49c"
+    },
+    {
+      "path": "source-comparison.json",
+      "bytes": 21873,
+      "sha256": "9e7762228501a05eec47ab0735aca7c41c02eade8607f1ba86b5baa79bf40225"
+    }
+  ],
+  "validation": {
+    "json_parse": true,
+    "failure_blocks_exact_original_byte_slices": true,
+    "scope_diff_exact_git_bytes": true,
+    "all_24_selected_sources_match_frozen_gate_map": true,
+    "all_four_git_refs_compared": true,
+    "relative_readme_links_resolve": true,
+    "no_trailing_whitespace_or_extra_blank_EOF": true,
+    "no_scripts_binaries_or_Cargo_machine_streams": true,
+    "isolated_default_staged_git_diff_check_exit": 0
+  },
+  "limit": "No conclusion about the cause of either unscheduled failure. Controls are proposals only."
+}

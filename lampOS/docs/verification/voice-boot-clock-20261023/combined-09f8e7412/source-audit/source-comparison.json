@@ -1,0 +1,737 @@
+{
+  "scope": "Selected reachable source paths, not whole-binary equivalence or causal exclusion. Read only from immutable Git objects and the frozen gate source map; no current target or worktree contents used.",
+  "refs": {
+    "base": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "rebased_boot_head": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+    "prior_boot": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+    "prior_peer": "55f671b12ef08c93f11ae235980f69cf7059b7a8"
+  },
+  "captured_source_aggregate_sha256": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d",
+  "full_source_map_external": {
+    "path": "/private/tmp/tests-3190-peer-fold-gates-20261023/source-map.json",
+    "bytes": 2759039,
+    "sha256": "b92be8c24a20160abb688b967ac7b38fe75e013c0f605c38e772648c59f8e290"
+  },
+  "records": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+      "all_four_git_contents_equal": true,
+      "content_groups": [
+        {
+          "sha256": "418607b8c2f0b03895b7f4f083bd0fbe69e17045c07d7de1ff50ad8e0ca2afb4",
+          "bytes": 222082,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot",
+            "prior_peer"
+          ],
+          "git_blob": "837fba9299772d5a49eeb56bfe35e32ad2d2de0c"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "418607b8c2f0b03895b7f4f083bd0fbe69e17045c07d7de1ff50ad8e0ca2afb4",
+        "bytes": 222082,
+        "git_mode": "100644",
+        "matches_refs": [
+          "base",
+          "rebased_boot_head",
+          "prior_boot",
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "all_four_git_contents_equal": true,
+      "content_groups": [
+        {
+          "sha256": "0c5187d595c326fda96aed34ca1c8faeb387bc946c34a23900c95480973c0674",
+          "bytes": 63219,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot",
+            "prior_peer"
+          ],
+          "git_blob": "8b608ea882644fb1673c7aebb9c24c7f33ecf481"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "0c5187d595c326fda96aed34ca1c8faeb387bc946c34a23900c95480973c0674",
+        "bytes": 63219,
+        "git_mode": "100644",
+        "matches_refs": [
+          "base",
+          "rebased_boot_head",
+          "prior_boot",
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/pilot_faults.rs",
+      "all_four_git_contents_equal": true,
+      "content_groups": [
+        {
+          "sha256": "a6531117d5db691221a6f3cfb32c190fb51cb787b8b4ffa0138eb39450d731ab",
+          "bytes": 120473,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot",
+            "prior_peer"
+          ],
+          "git_blob": "16f2b296b8a3dfd76be827f643f0366faee08a7a"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "a6531117d5db691221a6f3cfb32c190fb51cb787b8b4ffa0138eb39450d731ab",
+        "bytes": 120473,
+        "git_mode": "100644",
+        "matches_refs": [
+          "base",
+          "rebased_boot_head",
+          "prior_boot",
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator.rs",
+      "all_four_git_contents_equal": true,
+      "content_groups": [
+        {
+          "sha256": "ee2c8d4ca4ae2100453eace97f377d73c44d47d29fd96277ebb6aec97ff42db8",
+          "bytes": 750394,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot",
+            "prior_peer"
+          ],
+          "git_blob": "6dcc963dffc115cf6ad32c582a0503a41fc5a877"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "ee2c8d4ca4ae2100453eace97f377d73c44d47d29fd96277ebb6aec97ff42db8",
+        "bytes": 750394,
+        "git_mode": "100644",
+        "matches_refs": [
+          "base",
+          "rebased_boot_head",
+          "prior_boot",
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/process.rs",
+      "all_four_git_contents_equal": true,
+      "content_groups": [
+        {
+          "sha256": "21d090b1f6fdfbfc29928da66ac3494062fe51c440cfc5569181a7f6f06c8d7b",
+          "bytes": 104845,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot",
+            "prior_peer"
+          ],
+          "git_blob": "b8cf064c633bdbbda68ef96c37bdb763ad837394"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "21d090b1f6fdfbfc29928da66ac3494062fe51c440cfc5569181a7f6f06c8d7b",
+        "bytes": 104845,
+        "git_mode": "100644",
+        "matches_refs": [
+          "base",
+          "rebased_boot_head",
+          "prior_boot",
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/transport.rs",
+      "all_four_git_contents_equal": true,
+      "content_groups": [
+        {
+          "sha256": "49f8001bb1a8b0b440a4bc49d69ba1195800cf936d7a5130958b9a4c1035246a",
+          "bytes": 45980,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot",
+            "prior_peer"
+          ],
+          "git_blob": "f8f58ccb0b3e926b7604e1d14d59fb7fcd3042aa"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "49f8001bb1a8b0b440a4bc49d69ba1195800cf936d7a5130958b9a4c1035246a",
+        "bytes": 45980,
+        "git_mode": "100644",
+        "matches_refs": [
+          "base",
+          "rebased_boot_head",
+          "prior_boot",
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/cleanup.rs",
+      "all_four_git_contents_equal": true,
+      "content_groups": [
+        {
+          "sha256": "269282253f6d87fe62903b49b1815c125f59cb0eeb6f99eca9f1958fb4472a0b",
+          "bytes": 6989,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot",
+            "prior_peer"
+          ],
+          "git_blob": "b254cd86626498f48c5595f46a618e47a3bc5fed"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "269282253f6d87fe62903b49b1815c125f59cb0eeb6f99eca9f1958fb4472a0b",
+        "bytes": 6989,
+        "git_mode": "100644",
+        "matches_refs": [
+          "base",
+          "rebased_boot_head",
+          "prior_boot",
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/search_pushed.rs",
+      "all_four_git_contents_equal": true,
+      "content_groups": [
+        {
+          "sha256": "11f3d6e0938594e3a418741422c2e833a05ce34fc498698d4320b2300c591f8f",
+          "bytes": 15076,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot",
+            "prior_peer"
+          ],
+          "git_blob": "c263451d897097fe5628fc4b4d9e5a9c8d4178f9"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "11f3d6e0938594e3a418741422c2e833a05ce34fc498698d4320b2300c591f8f",
+        "bytes": 15076,
+        "git_mode": "100644",
+        "matches_refs": [
+          "base",
+          "rebased_boot_head",
+          "prior_boot",
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/bus/src/subscribe.rs",
+      "all_four_git_contents_equal": true,
+      "content_groups": [
+        {
+          "sha256": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+          "bytes": 38012,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot",
+            "prior_peer"
+          ],
+          "git_blob": "cb70bd3b17dce6c6909c3e8e94fb9102d40f54df"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+        "bytes": 38012,
+        "git_mode": "100644",
+        "matches_refs": [
+          "base",
+          "rebased_boot_head",
+          "prior_boot",
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/bus/src/publish.rs",
+      "all_four_git_contents_equal": true,
+      "content_groups": [
+        {
+          "sha256": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+          "bytes": 32256,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot",
+            "prior_peer"
+          ],
+          "git_blob": "e77ff9701bd60af6102913e8acde45ac33582931"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+        "bytes": 32256,
+        "git_mode": "100644",
+        "matches_refs": [
+          "base",
+          "rebased_boot_head",
+          "prior_boot",
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/bus/src/lib.rs",
+      "all_four_git_contents_equal": true,
+      "content_groups": [
+        {
+          "sha256": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+          "bytes": 17782,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot",
+            "prior_peer"
+          ],
+          "git_blob": "481c493ec637b959974d7810299727c321ca408e"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+        "bytes": 17782,
+        "git_mode": "100644",
+        "matches_refs": [
+          "base",
+          "rebased_boot_head",
+          "prior_boot",
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/controls/src/privacy.rs",
+      "all_four_git_contents_equal": true,
+      "content_groups": [
+        {
+          "sha256": "3a22d4b087a9f6cf68b3fbcc753bed367d53354d2660c6c1057b7bdb04a60a2d",
+          "bytes": 19156,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot",
+            "prior_peer"
+          ],
+          "git_blob": "11271c06626b2f6c97d88429b8981b6da80dbf6e"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "3a22d4b087a9f6cf68b3fbcc753bed367d53354d2660c6c1057b7bdb04a60a2d",
+        "bytes": 19156,
+        "git_mode": "100644",
+        "matches_refs": [
+          "base",
+          "rebased_boot_head",
+          "prior_boot",
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/msgs/src/privacy.rs",
+      "all_four_git_contents_equal": true,
+      "content_groups": [
+        {
+          "sha256": "32ec32a89137fc6e39e5fb9b66314f0349069d1321e63d7e0cd5fc2ce0b8e8a1",
+          "bytes": 7079,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot",
+            "prior_peer"
+          ],
+          "git_blob": "8c491f4ed8f71f230a2baed38d8e8bbe2b53333e"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "32ec32a89137fc6e39e5fb9b66314f0349069d1321e63d7e0cd5fc2ce0b8e8a1",
+        "bytes": 7079,
+        "git_mode": "100644",
+        "matches_refs": [
+          "base",
+          "rebased_boot_head",
+          "prior_boot",
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/ipc/src/lib.rs",
+      "all_four_git_contents_equal": true,
+      "content_groups": [
+        {
+          "sha256": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+          "bytes": 11409,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot",
+            "prior_peer"
+          ],
+          "git_blob": "7b8f04f5ab480c998c4f932fd3d2a7571a2e26ab"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+        "bytes": 11409,
+        "git_mode": "100644",
+        "matches_refs": [
+          "base",
+          "rebased_boot_head",
+          "prior_boot",
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker.rs",
+      "all_four_git_contents_equal": true,
+      "content_groups": [
+        {
+          "sha256": "81d7368deb6f1bea8aa5eae3037d9a4b3ce1cf25502e81e8e9bc93a6f1932aaa",
+          "bytes": 689387,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot",
+            "prior_peer"
+          ],
+          "git_blob": "57503ac800e55056afd038130428d68e9a89b59a"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "81d7368deb6f1bea8aa5eae3037d9a4b3ce1cf25502e81e8e9bc93a6f1932aaa",
+        "bytes": 689387,
+        "git_mode": "100644",
+        "matches_refs": [
+          "base",
+          "rebased_boot_head",
+          "prior_boot",
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/second.rs",
+      "all_four_git_contents_equal": false,
+      "content_groups": [
+        {
+          "sha256": "428701e0e25869675634954b80356b9dfb18e4268f14a82683a7a4e1e4c1c984",
+          "bytes": 75893,
+          "refs": [
+            "base",
+            "prior_peer"
+          ],
+          "git_blob": "d5a949670c21e9a246990abaa6232d40b9092b67"
+        },
+        {
+          "sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+          "bytes": 76253,
+          "refs": [
+            "rebased_boot_head",
+            "prior_boot"
+          ],
+          "git_blob": "18422cfda93ef559ce7364489a024cb6b4837e38"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+        "bytes": 76253,
+        "git_mode": "100644",
+        "matches_refs": [
+          "rebased_boot_head",
+          "prior_boot"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "all_four_git_contents_equal": false,
+      "content_groups": [
+        {
+          "sha256": "805d7f55a0351c097d43e1f7c8f03c09bb7f1c116176545783be00a28f963128",
+          "bytes": 132800,
+          "refs": [
+            "base",
+            "prior_peer"
+          ],
+          "git_blob": "87b775273be3775b2b9f2ab64f0e0186c455a40b"
+        },
+        {
+          "sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+          "bytes": 133195,
+          "refs": [
+            "rebased_boot_head",
+            "prior_boot"
+          ],
+          "git_blob": "f7a2640063815a8607e9b03d24870f8b9224db5d"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+        "bytes": 133195,
+        "git_mode": "100644",
+        "matches_refs": [
+          "rebased_boot_head",
+          "prior_boot"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "all_four_git_contents_equal": false,
+      "content_groups": [
+        {
+          "sha256": "47075418dac7fc54591976ca2557e3be698590b94e8cdbd49a8f4f5c379da0c8",
+          "bytes": 108565,
+          "refs": [
+            "base",
+            "prior_peer"
+          ],
+          "git_blob": "93309939096ead4b8fcba90ea5b23703efaa8bb2"
+        },
+        {
+          "sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+          "bytes": 109424,
+          "refs": [
+            "rebased_boot_head",
+            "prior_boot"
+          ],
+          "git_blob": "8ac21f8f4c67e033e7e505c3619d736da8745e88"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+        "bytes": 109424,
+        "git_mode": "100644",
+        "matches_refs": [
+          "rebased_boot_head",
+          "prior_boot"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "all_four_git_contents_equal": false,
+      "content_groups": [
+        {
+          "sha256": "2fb8205fb7ebd46161f13f7403e4de713675b4c64c0438f34c4f01e2b6dfae26",
+          "bytes": 73791,
+          "refs": [
+            "base",
+            "prior_peer"
+          ],
+          "git_blob": "8fe40927d304c123840bd73221f8b7a72abfbfd3"
+        },
+        {
+          "sha256": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+          "bytes": 80770,
+          "refs": [
+            "rebased_boot_head",
+            "prior_boot"
+          ],
+          "git_blob": "86915a852b297b994b3d1bb6f2524d99f218ebd7"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+        "bytes": 80770,
+        "git_mode": "100644",
+        "matches_refs": [
+          "rebased_boot_head",
+          "prior_boot"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/scenario_clock.rs",
+      "all_four_git_contents_equal": false,
+      "content_groups": [
+        {
+          "sha256": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80",
+          "bytes": 19292,
+          "refs": [
+            "base",
+            "prior_peer"
+          ],
+          "git_blob": "46def4e92fa76d4abcccca90d87a8ab427e22e97"
+        },
+        {
+          "sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+          "bytes": 19561,
+          "refs": [
+            "rebased_boot_head",
+            "prior_boot"
+          ],
+          "git_blob": "9d3491a63326a3113a418d0f2fe99aecabec1689"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+        "bytes": 19561,
+        "git_mode": "100644",
+        "matches_refs": [
+          "rebased_boot_head",
+          "prior_boot"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "all_four_git_contents_equal": false,
+      "content_groups": [
+        {
+          "sha256": "4e3b891fd552bd5af867f32bed015fc2a89f0b352cf69e14d76ca80da1a4f89b",
+          "bytes": 770784,
+          "refs": [
+            "base",
+            "prior_peer"
+          ],
+          "git_blob": "b4a80268976424bb08aa85065b61be164abe6c44"
+        },
+        {
+          "sha256": "c8fd3cf2298b965b1652bcfb8357ea0038fb88d33a2f9a97647b15ba4af2f645",
+          "bytes": 771430,
+          "refs": [
+            "rebased_boot_head",
+            "prior_boot"
+          ],
+          "git_blob": "1303280b36b313938057fc4e791f525567de0538"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "c8fd3cf2298b965b1652bcfb8357ea0038fb88d33a2f9a97647b15ba4af2f645",
+        "bytes": 771430,
+        "git_mode": "100644",
+        "matches_refs": [
+          "rebased_boot_head",
+          "prior_boot"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/stop_words.rs",
+      "all_four_git_contents_equal": false,
+      "content_groups": [
+        {
+          "sha256": "b192e72b6822b11f59bbb49dddb69c669427c9f6c9110580ac9ad0203446ab57",
+          "bytes": 145519,
+          "refs": [
+            "base",
+            "prior_peer"
+          ],
+          "git_blob": "8a7449c9b602c4507b0ce59f14d4580fa2e4fccd"
+        },
+        {
+          "sha256": "ca09b676897fc05724646f55de270db866a2131f374fe0ab77fed8c1f510cdda",
+          "bytes": 146296,
+          "refs": [
+            "rebased_boot_head",
+            "prior_boot"
+          ],
+          "git_blob": "8f5e1d7db8bd3199af3810d7e973995da31c306f"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "ca09b676897fc05724646f55de270db866a2131f374fe0ab77fed8c1f510cdda",
+        "bytes": 146296,
+        "git_mode": "100644",
+        "matches_refs": [
+          "rebased_boot_head",
+          "prior_boot"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "all_four_git_contents_equal": false,
+      "content_groups": [
+        {
+          "sha256": "b50767957067efee6a502e372605a7bcc2b16e23097da1ddca85153cf966993a",
+          "bytes": 44428,
+          "refs": [
+            "base",
+            "rebased_boot_head",
+            "prior_boot"
+          ],
+          "git_blob": "bd47b9a138b67d994ba6e61ba2da63b5c5cb9a22"
+        },
+        {
+          "sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+          "bytes": 45782,
+          "refs": [
+            "prior_peer"
+          ],
+          "git_blob": "a4cf438913af21134238b9cce07efe99381e4199"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+        "bytes": 45782,
+        "git_mode": "100644",
+        "matches_refs": [
+          "prior_peer"
+        ]
+      }
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "all_four_git_contents_equal": false,
+      "content_groups": [
+        {
+          "sha256": "6f96999c5c3dd5182c7c7c958b47f831c25cadd6bb1697a255cc9ea376cbfe14",
+          "bytes": 30125,
+          "refs": [
+            "base"
+          ],
+          "git_blob": "1c14f56a5976219337737834f6278bec8bd6da2e"
+        },
+        {
+          "sha256": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c",
+          "bytes": 32508,
+          "refs": [
+            "rebased_boot_head",
+            "prior_boot"
+          ],
+          "git_blob": "5b55842583f3af68a577332aedc12d37d9bfea7c"
+        },
+        {
+          "sha256": "f28c90d1963e99f731c2457783d298750b10ee434b1163efbb719f6e0c65b0ee",
+          "bytes": 30804,
+          "refs": [
+            "prior_peer"
+          ],
+          "git_blob": "a9003b72960d3c147b862ba6949e2962c244f4cf"
+        }
+      ],
+      "captured_gate_source": {
+        "sha256": "77388c4a7523c56e20e5cbe9406f721e52db4463be34482ff831b6a0dd884615",
+        "bytes": 33187,
+        "git_mode": "100644",
+        "matches_refs": []
+      }
+    }
+  ]
+}

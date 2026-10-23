@@ -1,5 +1,26 @@
 # Tests work log
 
+## 2026-10-23 22:28 +0700 — combined Voice failure boundaries audited
+
+Ready for lamp-voice: no; the overall combined gate is still running.
+
+The [source audit](verification/voice-boot-clock-20261023/combined-09f8e7412/source-audit/)
+retains the complete search and privacy failure blocks from the terminal Voice
+stage, which had 3,931 / 3 / 15 and all 88 selected cases passing. Search failed
+its clean-run check after the 24-second host watchdog; cleanup reused that
+already-expired deadline. Its five aggregated occurrences do not establish
+five child waits or an independently hung child. Privacy exhausted ten attempts
+with a message merging Late and SourceGone. The kept-only transport's possible
+20 ms admission boundary is identified, but no failed phase or age was captured.
+
+Root verified both complete blocks, 96 Git file bindings across four refs and
+the exact shared-helper delta. The asserting files are unchanged; default
+Scope::enter now samples raw monotonic time before Instant, so not every
+reachable helper is byte-identical. No sampled skew or causal exclusion is
+claimed. Proposed privacy/search diagnostics remain unexecuted. The separately
+accepted light-call phase trace is being prepared without touching the active
+gate or shared target; no product code or existing assertion is changed.
+
 ## 2026-10-23 22:04 +0700 — light-call blocker source audit
 
 Ready for lamp-voice: no; no new test observation or waiver.
