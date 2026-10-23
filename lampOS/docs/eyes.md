@@ -1531,9 +1531,11 @@ kept **unconfirmed**, until its person says yes at the lamp:
     kept at once: it waits (`photo::PendingYes`), pinned to the name's
     unconfirmed record (`Unconfirmeds::record_of`), the camera permission's
     hold (`permit::Permit::held`) and when it reached the eyes, and the eyes
-    force one look. That look counts only on a frame captured after the yes
-    (the driver's monotonic time; a frame without one never counts, so the
-    yes runs out rather than take a frame dated by its read): a frame
+    force one look. That look counts only on a frame captured strictly after
+    the yes reached the eyes, in a later microsecond, not the same one
+    (the driver's monotonic time, `photo::frame_us`; a frame without one
+    never counts, so the yes runs out rather than take a frame dated by its
+    read): a frame
     buffered before it leaves the yes waiting. It is kept only if that
     look's near face has the yes's id and prints as the photo's face
     (`photo::yes_after_look`). No face, no print, another print or another
@@ -1558,7 +1560,9 @@ kept **unconfirmed**, until its person says yes at the lamp:
     there for `KNOWN_FOR`. The id is held in memory only, beside the
     name, and means nothing after a restart. The voice judges who spoke the
     yes; the eyes only name the face and check it again. Off, both answer
-    as before, without `face`, and a yes with `face` is `not_understood`.
+    as before, without `face`, and a yes with `face`, even `"face":null`,
+    is `not_understood`; a `face` key beside any other ask, `null` too, is
+    not understood either way.
   - `{"photo_yes":NAME}` makes it an ordinary person (`People::remember_one`),
     with the photo's print and those the lamp took of them (`Taken::prints`),
     five at most, as one remembered at the lamp keeps, and the remembering's
