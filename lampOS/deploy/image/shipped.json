@@ -41,7 +41,8 @@
         "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
       ],
       "/usr/local/libexec/lamp-journal-keep": [
-        "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15"
+        "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15",
+        "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce"
       ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
@@ -94,7 +95,8 @@
         "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
       ],
       "/usr/local/libexec/lamp-journal-keep": [
-        "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15"
+        "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15",
+        "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce"
       ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
@@ -149,7 +151,8 @@
         "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
       ],
       "/usr/local/libexec/lamp-journal-keep": [
-        "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15"
+        "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15",
+        "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce"
       ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
@@ -196,7 +199,8 @@
         "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
       ],
       "/usr/local/libexec/lamp-journal-keep": [
-        "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15"
+        "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15",
+        "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce"
       ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"

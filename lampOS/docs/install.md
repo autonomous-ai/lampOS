@@ -1227,9 +1227,11 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   - **Existing lamps:** a build carries it with the image's files
     (`LAMP_UPDATE_IMAGE=on`). It replaces only the base's file as shipped
     (`deploy/image/shipped.json` lists that one's SHA-256 too), so a lamp
-    whose `SIZE` was set by hand (lamp-4ace) keeps its own. By hand: copy
-    it over `/etc/default/orangepi-ramlog`. The next copy to the eMMC uses
-    it, and the boot's copy at the next boot.
+    whose file was edited by hand (lamp-4ace, `SIZE=400M`) keeps its own
+    and never gets this fix from an update. By hand: copy it over
+    `/etc/default/orangepi-ramlog`, and on such a lamp set its own `SIZE`
+    again in the copy. The next copy to the eMMC uses it, and the boot's
+    copy at the next boot.
 - The last two boots' journal, kept on the eMMC at a clean shutdown or
   reboot: `robots/lamp/rootfs/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf`
   and `/usr/local/libexec/lamp-journal-keep` (#2602, the first builder's
@@ -1243,7 +1245,10 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
     first that doesn't fit, so a long boot keeps its end without a gap
     (lamp-06c1's archived files were 1.1 to 1.4 MB an hour on 22 Oct: about
     the last 3 hours). The boot before moves to `previous`, the one before
-    that is removed: 2 boots, 10 MB at most, written once a shutdown. At
+    that is removed: 2 boots, 10 MB at most, written once a shutdown. The
+    boot before is set aside (`.old`) and removed only once this one is in
+    `last`, so a move that fails (the eMMC full or read-only) keeps the
+    kept boots and writes a `lamp-journal-keep:` line to the journal. At
     boot (`ExecStartPost=`, `link`) each kept file is linked into
     `/run/log/journal` as `lamp-kept-<last|previous>-….journal`.
     journalctl (systemd 252) reads journal files at the top of
@@ -1259,8 +1264,8 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
     steps start with "-", so neither may fail ramlog.
   - **Tests:** `tests/it/image_ramlog.rs` pins the drop-in, and runs the
     script: nothing kept unless `stopping`, 5 MB a boot newest first, 2
-    boots and 10 MB at most, a boot with nothing closed keeps the kept, and
-    the links.
+    boots and 10 MB at most, a boot with nothing closed keeps the kept, a
+    failed move keeps them and says so, and the links.
   - **Existing lamps:** a build carries both with the image's files
     (`LAMP_UPDATE_IMAGE=on`), then `systemctl daemon-reload`: the next
     shutdown keeps, and the boot after it links. By hand: copy both, then

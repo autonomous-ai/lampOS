@@ -15,8 +15,8 @@
 #   first, to $keep/last, up to 5 MB, stopping at the first that doesn't fit
 #   so what is kept is the boot's end without a gap. The boot before moves
 #   to $keep/previous, and the one before that is removed: at most 2 boots
-#   and 10 MB, written once per shutdown. A boot with nothing to copy
-#   leaves the kept ones as they are.
+#   and 10 MB, written once per shutdown. A boot with nothing to copy, or
+#   a move that fails, leaves the kept ones as they are.
 # `link`, from ramlog's start at boot: each kept file is linked into
 #   /run/log/journal, a tmpfs journalctl reads besides /var/log/journal.
 #   Journald's own vacuum is of its machine's folder only, and a vacuum
@@ -58,9 +58,26 @@ keep)
         rm -rf "$new"
         exit 0
     fi
-    rm -rf "$keep/previous"
-    [ -d "$keep/last" ] && mv "$keep/last" "$keep/previous"
-    mv "$new" "$keep/last"
+    # The boot before is set aside, not removed, until this one is in its
+    # place: a move that fails (the eMMC full or read-only) leaves the kept
+    # boots as they were and says so in the journal.
+    rm -rf "$keep/.old"
+    if [ -d "$keep/last" ] && ! mv "$keep/last" "$keep/.old"; then
+        echo "lamp-journal-keep: this boot is not kept: $keep/last could not be moved aside" >&2
+        rm -rf "$new"
+        exit 0
+    fi
+    if ! mv "$new" "$keep/last"; then
+        echo "lamp-journal-keep: this boot is not kept: it could not be moved to $keep/last" >&2
+        [ -d "$keep/.old" ] && mv "$keep/.old" "$keep/last"
+        rm -rf "$new"
+        exit 0
+    fi
+    if [ -d "$keep/.old" ]; then
+        rm -rf "$keep/previous"
+        mv "$keep/.old" "$keep/previous" ||
+            echo "lamp-journal-keep: the boot before could not be moved to $keep/previous" >&2
+    fi
     sync
     ;;
 link)
