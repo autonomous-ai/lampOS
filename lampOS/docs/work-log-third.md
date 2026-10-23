@@ -5,6 +5,34 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 09:41 — touch compatibility focused gates pass
+
+Ready for lamp-voice: no (full host gate, native gates and external read remain).
+
+- On the working diff over `b3a1ece0b`, the seven focused touch compatibility
+  cases went from one pass and six expected unknown-field failures to seven
+  passes. Three older tests also match `additive_fields`, giving total
+  command results of 4/6 before and 10/0 after. The command was
+  `CARGO_BUILD_JOBS=2 cargo test -q --offline --locked --no-fail-fast -p lamp-msgs -p lamp-controls additive_fields -- --test-threads=2`.
+- The production diff removes only the three blanket unknown-field
+  refusals. The frozen old wire still serializes identically, while extra
+  fields cannot change a gesture's authority, freshness, owner, reader or
+  delivery count. Physical privacy evidence remains strict. Independent
+  source reads found no issue in either set of tests or the production diff.
+- Mac `cargo fmt --all --check` and
+  `CARGO_BUILD_JOBS=2 cargo clippy -q --offline --locked --workspace --all-targets -- -D warnings`
+  passed. The full workspace tests are running with local socket access,
+  two build jobs and two test threads. No final result is claimed yet.
+- The same 421-byte event's parse plus semantic check, 100 warmups and
+  10,000 samples, had p99 8,331 ns before and 8,485 ns after on the Mac.
+  Both meet the host target of 1 ms; these small differences do not show
+  an improvement. The optimized caller used debug Cargo libraries. No
+  cold-start, ARM64, acoustic or physical latency was measured.
+- Queue progress is comment `6356031959`. First's 09:34 conditional
+  handoff is recorded: if Fifth has not pushed the Body deadband fix by
+  10:00, Third takes it then. Until that condition, Fifth retains it;
+  only a read of the relevant detection and tests is being prepared.
+
 ## 2026-10-23 09:16 — third-P4 approved and claimed; tests first
 
 Ready for lamp-voice: no (implementation and gates in progress).
