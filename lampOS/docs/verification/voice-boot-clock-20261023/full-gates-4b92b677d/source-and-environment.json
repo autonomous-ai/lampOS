@@ -1,0 +1,130 @@
+{
+  "identity": {
+    "head": "4b92b677d379b6ac1dadbd9e306320a04af48672",
+    "base": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+    "candidate_commit": "4b92b677d379b6ac1dadbd9e306320a04af48672",
+    "candidate_kind": "exact clean committed boot-clock fixture head",
+    "tree": "0f2159c3f4c692e0e267221b0ebc071f5b7a6dc2",
+    "parents": [
+      "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850"
+    ],
+    "source_aggregate_sha256": "288a2d090b2690b9b4dd28d96ae16eb3a6202f493b2b72e4ab4df9a9b65fa1d2",
+    "base_source_aggregate_sha256": "c0c566499c2aa0c50f659af10c237c4d982337e0806c89b8a47eeb2d013c7a35",
+    "source_map_sha256": "5407c4cafa142f8e5b3ff7fe0e63b9647ec20903ee803c5402b7250807248298",
+    "base_source_map_sha256": "98b2e21be8885b084c00b293698f52f63bb52f448c51d66da0450ddcc72c1b81",
+    "changed_paths": [
+      "lampOS/crates/voice/src/coordinator/second.rs",
+      "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "lampOS/crates/voice/src/scenario_clock.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/stop_words.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "owned_file_sha256": {
+      "lampOS/crates/voice/src/coordinator/second.rs": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+      "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+      "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+      "lampOS/crates/voice/src/scenario_clock.rs": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "lampOS/crates/voice/src/second_provider/worker.rs": "c8fd3cf2298b965b1652bcfb8357ea0038fb88d33a2f9a97647b15ba4af2f645",
+      "lampOS/crates/voice/src/stop_words.rs": "ca09b676897fc05724646f55de270db866a2131f374fe0ab77fed8c1f510cdda",
+      "lampOS/docs/voice-test-fixtures.md": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c"
+    },
+    "patch_sha256": "3f744f5f2490b3c70e5897545f29e154aa38843917bf7fe82992e6aa388e8778",
+    "repository_paths": 10028,
+    "lampOS_paths": 6682,
+    "source_preparation": "Immutable complete Git objects; initial live metadata proved exact clean HEAD/branch only. No target read or Cargo invocation.",
+    "rules_sha256": {
+      "lampOS/builders/tests.md": "5ce0cdc9d36cc6723655b1f0246751276025c044adfc71a3fdf7c804f18cbcac",
+      "lampOS/AGENTS.md": "0954b38728a27cbe4413e5a2b8898ad8a5b1fad83f594ffabcaa81c18a7f1dad",
+      "lampOS/docs/joining.md": "afe79f105530d5de5384c860840d682936ff8056a75b4f4c0b20ed2d78edbede"
+    }
+  },
+  "freshness": {
+    "tracked_files": 10028,
+    "mtime_ns": 1792754618021418000,
+    "before_sha256": "288a2d090b2690b9b4dd28d96ae16eb3a6202f493b2b72e4ab4df9a9b65fa1d2",
+    "after_sha256": "288a2d090b2690b9b4dd28d96ae16eb3a6202f493b2b72e4ab4df9a9b65fa1d2",
+    "identical_bytes": true,
+    "algorithm": "sorted path + NUL + Git mode + NUL + u64 big-endian length + exact bytes; symlinks use literal target bytes"
+  },
+  "final_source_aggregate_sha256": "288a2d090b2690b9b4dd28d96ae16eb3a6202f493b2b72e4ab4df9a9b65fa1d2",
+  "source_bytes_unchanged": true,
+  "per_step_source_aggregates": [
+    {
+      "step": "fmt",
+      "source_aggregate_sha256_after": "288a2d090b2690b9b4dd28d96ae16eb3a6202f493b2b72e4ab4df9a9b65fa1d2"
+    },
+    {
+      "step": "clippy",
+      "source_aggregate_sha256_after": "288a2d090b2690b9b4dd28d96ae16eb3a6202f493b2b72e4ab4df9a9b65fa1d2"
+    },
+    {
+      "step": "voice-default-parallel",
+      "source_aggregate_sha256_after": "288a2d090b2690b9b4dd28d96ae16eb3a6202f493b2b72e4ab4df9a9b65fa1d2"
+    },
+    {
+      "step": "readers-default-parallel",
+      "source_aggregate_sha256_after": "288a2d090b2690b9b4dd28d96ae16eb3a6202f493b2b72e4ab4df9a9b65fa1d2"
+    },
+    {
+      "step": "workspace-build",
+      "source_aggregate_sha256_after": "288a2d090b2690b9b4dd28d96ae16eb3a6202f493b2b72e4ab4df9a9b65fa1d2"
+    },
+    {
+      "step": "diff-check",
+      "source_aggregate_sha256_after": "288a2d090b2690b9b4dd28d96ae16eb3a6202f493b2b72e4ab4df9a9b65fa1d2"
+    }
+  ],
+  "controlled_environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_BUILD_TARGET": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_TARGET_TMPDIR": null,
+    "CARGO_TERM_COLOR": "never",
+    "LAMP_RELAY_PID_CONTROL_DIR": null,
+    "RUSTFLAGS": null,
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "RUST_BACKTRACE": "0",
+    "RUST_TEST_THREADS": null
+  },
+  "PATH_prefix": "/Users/autonomous/.cargo/bin:",
+  "platform_projection": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "kernel": "Darwin Kernel Version 25.6.0: Fri Jul 31 19:11:49 PDT 2026; root:xnu-12377.161.14~5/RELEASE_X86_64",
+    "reported_machine": "x86_64",
+    "physical_hardware_architecture": "not independently measured"
+  },
+  "projection_note": "Hostname and complete inherited PATH omitted; raw original results JSON remains external and hashed.",
+  "socket_preflight": {
+    "unix_datagram": "bind passed",
+    "unix_path_removed": true,
+    "loopback_tcp": {
+      "status": "bind and listen passed",
+      "address": [
+        "127.0.0.1",
+        58734
+      ]
+    },
+    "completed_before_Cargo": true
+  },
+  "launch_permissions": "require_escalated, as explicitly authorized; both local preflights completed before Cargo",
+  "source_map": {
+    "external_file": "/private/tmp/tests-3190-train45-gates-20261023/source-map.json",
+    "sha256": "5407c4cafa142f8e5b3ff7fe0e63b9647ec20903ee803c5402b7250807248298"
+  },
+  "source_map_availability": "Complete immutable tracked map remains external. This publication includes its hash/count/aggregate and all compiled artifact/case identities, not a bulk whole-repository map.",
+  "original_results_json": {
+    "external_file": "/private/tmp/tests-3190-train45-gates-20261023/gates-20261023T112335.655651Z/results.json",
+    "bytes": 42953,
+    "sha256": "a557317bc3739f5bae0a8d690d1ea9dd5fc27553447ada3a8f3da3c2747f0d1e"
+  }
+}

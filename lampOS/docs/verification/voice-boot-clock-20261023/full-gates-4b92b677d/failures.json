@@ -1,0 +1,119 @@
+{
+  "head": "4b92b677d379b6ac1dadbd9e306320a04af48672",
+  "count": 4,
+  "failures": [
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:test:it",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "actual_status": "FAILED",
+      "binary_sha256": "0eb10bacb1d3c95f97e47ba684b69aaa34b6c6453e5855b4556354e099adea43",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-train45-gates-20261023/gates-20261023T112335.655651Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 649538,
+        "original_stream_sha256": "c8df7176d0fc40ca4e85c3f34eeff323c44c406abbd8cb6694312d0141737a32",
+        "byte_offset": 647470,
+        "bytes": 882,
+        "sha256": "ce4874ecb6ea62714cbe83fbc360bedbd349b40e5573e1aff4fc11b458cf6a30",
+        "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [2.828932ms, 2.937697ms, 3.162442ms, 3.438683ms, 4.424476ms, 20.173125ms, 21.673924ms, 38.172152ms, 38.840518ms, 56.149912ms, 58.486988ms, 60.037696ms, 76.03122ms, 76.238684ms, 76.383886ms, 78.544116ms, 78.694814ms, 94.745074ms, 98.778144ms, 153.744248ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (709910627) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[2.828932ms, 2.937697ms, 3.162442ms, 3.438683ms, 4.424476ms, 20.173125ms, 21.673924ms, 38.172152ms, 38.840518ms, 56.149912ms, 58.486988ms, 60.037696ms, 76.03122ms, 76.238684ms, 76.383886ms, 78.544116ms, 78.694814ms, 94.745074ms, 98.778144ms, 153.744248ms]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-memory:test:it",
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "actual_status": "FAILED",
+      "binary_sha256": "3c4ea363858d950ef3a34e50bf06b4749aacd39fc32a920a172a65208007d19a",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-train45-gates-20261023/gates-20261023T112335.655651Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 655617,
+        "original_stream_sha256": "9d8fce33764d74e1c27ed3f37b82dca393ccfed486b2acd915b092f764057442",
+        "byte_offset": 491783,
+        "bytes": 703,
+        "sha256": "3eb0d33f4bd6d30538b5eda0115f0fd377e944b84eb22448fe74dcbb4b7b7055",
+        "utf8": "---- voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh stdout ----\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\n\nthread 'voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh' (709961114) panicked at crates/memory/tests/it/voice.rs:960:5:\nassertion `left == right` failed: the retry sends one forget: []\n  left: 0\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-memory:test:it",
+      "name": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+      "actual_status": "FAILED",
+      "binary_sha256": "3c4ea363858d950ef3a34e50bf06b4749aacd39fc32a920a172a65208007d19a",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-train45-gates-20261023/gates-20261023T112335.655651Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 655617,
+        "original_stream_sha256": "9d8fce33764d74e1c27ed3f37b82dca393ccfed486b2acd915b092f764057442",
+        "byte_offset": 492486,
+        "bytes": 553,
+        "sha256": "0c32416ff820c0c388c495c035219e7c097323c0c11f52901359d0f1dcca5e76",
+        "utf8": "---- voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about stdout ----\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\n\nthread 'voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about' (709963123) panicked at crates/memory/tests/it/voice.rs:591:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-memory:test:it",
+      "name": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+      "actual_status": "FAILED",
+      "binary_sha256": "3c4ea363858d950ef3a34e50bf06b4749aacd39fc32a920a172a65208007d19a",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-train45-gates-20261023/gates-20261023T112335.655651Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 655617,
+        "original_stream_sha256": "9d8fce33764d74e1c27ed3f37b82dca393ccfed486b2acd915b092f764057442",
+        "byte_offset": 493039,
+        "bytes": 672,
+        "sha256": "35aa74ce6655f13c253820a4d1e08a9a0025e19f91c631be8bb11a4e8cdfc756",
+        "utf8": "---- voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation stdout ----\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: Days memory is answering\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\n\nthread 'voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation' (709962743) panicked at crates/memory/tests/it/voice.rs:591:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\nlamp-voice provider: memory conversation end was not acknowledged; no retry\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    }
+  ],
+  "light_call_checked_statistic": {
+    "head": "4b92b677d379b6ac1dadbd9e306320a04af48672",
+    "base": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+    "test": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+    "source_path": "lampOS/crates/voice/tests/it/light_call.rs",
+    "head_source_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+    "base_source_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+    "source_byte_equal_to_base": true,
+    "assertion": "let middle = took[took.len() / 2]; assert!(middle < Duration::from_millis(25), \"{took:?}\");",
+    "sorted_samples_ms": [
+      2.828932,
+      2.937697,
+      3.162442,
+      3.438683,
+      4.424476,
+      20.173125,
+      21.673924,
+      38.172152,
+      38.840518,
+      56.149912,
+      58.486988,
+      60.037696,
+      76.03122,
+      76.238684,
+      76.383886,
+      78.544116,
+      78.694814,
+      94.745074,
+      98.778144,
+      153.744248
+    ],
+    "checked_index": 10,
+    "checked_value_ms": 58.486988,
+    "strict_bound_ms": 25,
+    "maximum_ms_context_only": 153.744248,
+    "all_20_Outcome_Done_and_cleanup_preceded_assertion": true,
+    "raw_stream": "/private/tmp/tests-3190-train45-gates-20261023/gates-20261023T112335.655651Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+    "raw_stream_bytes": 649538,
+    "raw_stream_sha256": "c8df7176d0fc40ca4e85c3f34eeff323c44c406abbd8cb6694312d0141737a32",
+    "failure_block_sha256": "ce4874ecb6ea62714cbe83fbc360bedbd349b40e5573e1aff4fc11b458cf6a30",
+    "qualification": "One actual failed candidate observation; unchanged source does not establish causality or waive it. No test rerun.",
+    "extraction_note": "The first read-only extraction stopped before writing on an incorrect expected variable spelling (times versus actual took/middle); source was inspected and this exact assertion verified. No test or gate was executed again."
+  },
+  "paired_baseline_run_in_this_plan": false,
+  "failed_candidate_runs_repeated": false
+}

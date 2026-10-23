@@ -1,5 +1,26 @@
 # Tests work log
 
+## 2026-10-23 18:58 +0700 — boot-clock current gate completed
+
+Ready for lamp-voice: no (#3190 execution HOLD remains).
+
+The [single current-head gate](verification/voice-boot-clock-20261023/full-gates-4b92b677d/)
+on `4b92b677d`, parent `8e3eaa6c2`, completed **7,155 / 4 / 32**:
+Voice **3,927 / 1 / 15**, eleven readers **3,228 / 3 / 17**. All 87
+affected clock/child cases passed. Formatting, strict twelve-package Clippy,
+workspace build and diff checks passed. Every one of 74 targets completed;
+no failed command or case was retried.
+
+The failures are light-call's unchanged 25 ms check (checked middle
+58.486988 ms) and three Memory follow-up-forget cases. Their complete original
+diagnostics and the full retained test output are published. Source identity
+is not a causal baseline or a waiver. Root verified all 14 stream projections
+and all four failure blocks against the captured originals before publication.
+
+The bounded Expression admission diagnostic goes next, followed by the
+controlled cue peer-closure fixture. Native ARM64/Clippy success for this head
+is in the previous receipt; the reviewer owns its execution HOLD disposition.
+
 ## 2026-10-23 18:45 +0700 — both carried heads pass native CI
 
 Ready for lamp-voice: no (local qualification and execution HOLDs remain).

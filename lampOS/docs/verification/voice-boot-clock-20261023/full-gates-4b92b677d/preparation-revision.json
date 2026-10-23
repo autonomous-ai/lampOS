@@ -1,0 +1,9 @@
+{
+  "status": "Preparation-only matcher corrected before any gate execution",
+  "first_failure": "The declaration matcher assumed four leading spaces, but hand_controls.rs declares its tests at file level.",
+  "correction": "Accept horizontal whitespace or no indentation before fn; still require one exact function identity in both sources.",
+  "preserved_incomplete_preparation": "/private/tmp/tests-3190-train45-gates-20261023-preparation-incomplete",
+  "Cargo_executed": false,
+  "target_access": false,
+  "source_mutation": false
+}

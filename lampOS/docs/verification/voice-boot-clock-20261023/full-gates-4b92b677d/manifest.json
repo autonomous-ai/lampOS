@@ -1,0 +1,77 @@
+{
+  "format": 1,
+  "scope": "Every payload except manifest itself.",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 6402,
+      "sha256": "a1abe9f8c12cd2cff2412b1c8ffdb24939acf0e98f8d8dd405c98c1b2db2e777"
+    },
+    {
+      "path": "affected-cases.json",
+      "bytes": 65293,
+      "sha256": "d10d002d856c5f71912e8894cd29bd41b026dd11ea2bce6c41b11b51579a0cbd"
+    },
+    {
+      "path": "artifact-bindings.json",
+      "bytes": 64497,
+      "sha256": "0726501633848468cc3b166cc8ece9bbf3a9e786631c6419955ddc7b4264e8ca"
+    },
+    {
+      "path": "authored.patch.json",
+      "bytes": 33170,
+      "sha256": "c5ac02126a12dc2d7dada6d4d3361840c0a7b97a0df7f9f16035c025f77c97fa"
+    },
+    {
+      "path": "census-and-outcomes.json",
+      "bytes": 1240716,
+      "sha256": "cc44193f346961239c98624c2ebb64c5495c8ac0d0904011bb83dbda301a7580"
+    },
+    {
+      "path": "command-results.json",
+      "bytes": 7782,
+      "sha256": "f25b2142db123621bbc3ad35bcb6c27ae5193aad53e0fc216cf9fcb1a4ebfc54"
+    },
+    {
+      "path": "dependency-closure.json",
+      "bytes": 30903,
+      "sha256": "b4a8a18285e3f71c311ab66860d31b522588e9b1e509d3e9cbf3308be18451bd"
+    },
+    {
+      "path": "external-raw-index.json",
+      "bytes": 86518,
+      "sha256": "70ff5eb9e11d9aa013718000f6cc470abdae9597df89d302b6d4d17c5922d1f3"
+    },
+    {
+      "path": "failures.json",
+      "bytes": 8657,
+      "sha256": "6fcd0935ac7c77bc752ecc1f0aa2665d3abff78e7a61534429edec3942886b81"
+    },
+    {
+      "path": "gate-plan.json",
+      "bytes": 7640,
+      "sha256": "26e26e5028cc6722f16fa78400737ff61df070f96705682deb26d73729e062ac"
+    },
+    {
+      "path": "native-streams.json",
+      "bytes": 779924,
+      "sha256": "bdfa5f9e617605c9de56d05b3f468c9c3614c2eccedfb80e6172ae1b4535808f"
+    },
+    {
+      "path": "preparation-revision.json",
+      "bytes": 537,
+      "sha256": "cfe531c46654d5c806e04f99bb2aa4bd1cb6c0a1d9092620d3dcc4ca2e6ffeab"
+    },
+    {
+      "path": "source-and-environment.json",
+      "bytes": 6516,
+      "sha256": "c1d380b3c1c3c85150604e0ebcb8ac957433608cb5c054e146d4ef9481601b89"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 9936,
+      "sha256": "1a7cf572962157ebf3f73c6b976f3be361f17ab0530c99d2107505c061d7fae0"
+    }
+  ],
+  "total_payload_bytes": 2348491
+}
