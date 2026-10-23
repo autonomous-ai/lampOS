@@ -1673,6 +1673,10 @@ the lamp never says how anyone looks (#1671; the first builder's 14:04).
   privacy-switch.md, "Face reads stay off without a yes".
 - **The journal** says only how many reads there were in the last minute,
   how long one took on average and the longest, for the cost on a lamp.
+  With `--seems-blendshapes` it ends `, T of O mouths taken`: of the O
+  crops of the largest face offered for its mouth that minute, how many
+  mouths T a look took (said alone, as `no face reads in the last
+  minute, T of O mouths taken`, in a minute with no face read).
   A read runs in the look loop, so it delays the look it comes with (one in
   about eight), and that is the look the body follows a face by. If a read
   on the lamp takes over about 100 ms, it moves to its own thread before
@@ -1795,11 +1799,21 @@ newest, whichever reader that was.
   open its mouth is (`blendshapes::read_crop`), and runs the blendshapes
   only on a due crop, from the same points: one mesh pass a look, as with
   `--mouth-model` alone, but off the look. A mouth's crop never replaces a
-  seems read's the thread hasn't taken yet (`Latest::waiting`). The next look takes that
-  openness for its own largest face, one look late, and only from the crop
-  the look before offered of its largest face: a read later than that is
-  dropped, and the window it leaves a gap in is judged by the corners
-  (under tract on a small core, 290 ms, every other look). Before this
+  seems read's the thread hasn't taken yet (`Latest::waiting`). Each look
+  takes the newest mouth the thread finished since the last look, for its
+  own largest face, only if that face was seen at most 850 ms before
+  (`mesh::MOUTH_LASTS_US`) and its box overlaps the largest's as the
+  detector's same face does (`mesh::recent_mouth`): the mouth of someone
+  who was the largest a look ago is never given to another. A mouth is
+  taken by one look only, as one given twice would read as a still
+  mouth. Under tract on a small core the mesh (290 ms) is slower than a
+  look (250 ms), so a crop waits in the slot up to one mesh, is read in
+  another, and is taken by the next look: up to 830 ms after its face was
+  seen, and about 250 / 290 of looks find a new mouth
+  (`a_mesh_slower_than_a_look_still_gives_the_largest_its_mouth`). A look
+  without one leaves a gap the window judges by the corners. The minute
+  line says how many mouths were taken against offered (Fourteen's P3s on
+  #3158). Before this
   change the speaking read judged from the corners with the flag on, and
   `mouth_open` was empty in every look (#720, 23 Oct). `--mouth-model`
   alone keeps its pass on the look, as below.
@@ -2081,7 +2095,7 @@ given, #720).** Install places the pinned model at
 `/opt/lampOS/eyes/models/face_mesh_v2.onnx` (`deploy/product/models.json`),
 and the product's unit passes it, for Blendshape V2 (#2799), whose mesh
 runs on its own thread off the look and reads the largest face's mouth
-there each look, for the speaking read one look late (above). With it alone, the largest face in each look is cut out of the
+there each look, for the speaking read a look or two late (above). With it alone, the largest face in each look is cut out of the
 same 320 by 240 look: its box, widened by a quarter on every side and
 turned so the eyes are level, made 256 pixels square (`src/mesh.rs`).
 The mesh reads it under tract, and with `--mouth-diagnostics on` (never in
