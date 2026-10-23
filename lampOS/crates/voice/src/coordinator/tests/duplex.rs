@@ -92,6 +92,10 @@ pub(super) struct Harness {
     reads: Vec<u64>,
     /// A yield's words, with `LAMP_STOP_WORDS=heard` (#828).
     stop_words: Option<crate::stop_words::StopWords>,
+    /// The yield's listener is told each block's score, as the session
+    /// loop tells it, so `heard-always` also asks at the detector's own
+    /// pause. Off, as the tests that predate it were written.
+    scores_speech: bool,
     /// `LAMP_REPLY_END_REACH=on` (#1722), as the session loop reads it.
     pub(super) reach_past_reply: bool,
     /// The test's own scenario clock, unless it waits on the host's.
@@ -193,6 +197,7 @@ impl Harness {
             gap_us: 0,
             reads: vec![0],
             stop_words: None,
+            scores_speech: false,
             reach_past_reply: false,
             _clock: None,
             let_go: false,
@@ -311,6 +316,9 @@ impl Harness {
             .unwrap();
         }
         if let Some(words) = self.stop_words.as_mut() {
+            if self.scores_speech {
+                words.heard_speech(score.is_finite() && score >= 0.5);
+            }
             hear_stop_words(
                 words,
                 &mut self.mask,
@@ -1212,21 +1220,223 @@ fn with_backchannel_holds_the_five_from_lamp_52e6_resume_even_with_a_face_turned
 }
 
 /// #2939: with `heard-always` and the switch on, a call, a question or
-/// more than the backchannel words still cut in once their words come.
+/// more than the backchannel words still cut in once their words come; a
+/// stop, as with `heard`, at its words, the eleventh still block.
 #[test]
 fn with_backchannel_holds_and_heard_always_a_request_still_cuts_in() {
-    for words in [
-        "Lamp, wait.",
-        "What was that?",
-        "Yeah, but why?",
-        "Okay tell me more",
-    ] {
+    let (at, committed, event) = a_short_word_heard_always("Lamp, wait.", Word::Plain, true);
+    assert_eq!((at, committed), (2 + 29 + 11, true));
+    assert_eq!(event["backchannel"], false);
+    for words in ["What was that?", "Yeah, but why?", "Okay tell me more"] {
         let (at, committed, event) = a_short_word_heard_always(words, Word::Plain, true);
         assert_eq!((at, committed), (71, true), "{words} plain");
         assert_eq!(event["backchannel"], false, "{words} plain");
         let (at, committed, event) = a_short_word_heard_always(words, Word::Speech, true);
         assert_eq!((at, committed), (2 + 29 + 25 + 11, true), "{words} speech");
         assert_eq!(event["held_ms"], 300, "{words} speech");
+    }
+}
+
+/// lamp-52e6 on 24 Oct (#2939): with the switch on, a stop said over the
+/// lamp always cuts in, with `heard` and with `heard-always`, however it
+/// ends; "Okay." alone is still held.
+#[test]
+fn with_backchannel_holds_a_stop_always_cuts_in() {
+    for words in ["Stop, stop.", "Stop now.", "Okay, stop.", "Lamp, stop."] {
+        for word in [Word::Over, Word::Plain, Word::Speech] {
+            let (_, _, committed, event) = a_short_word(Some(words), word, true, false);
+            assert!(committed, "{words} {word:?} heard");
+            assert_eq!(event["backchannel"], false, "{words} {word:?} heard");
+            let (_, committed, _) = a_short_word_heard_always(words, word, true);
+            assert!(committed, "{words} {word:?} heard-always");
+        }
+    }
+    let (_, _, committed, event) = a_short_word(Some("Okay."), Word::Plain, true, false);
+    assert!(!committed);
+    assert_eq!(event["backchannel"], true);
+    let (_, committed, _) = a_short_word_heard_always("Okay.", Word::Plain, true);
+    assert!(!committed);
+    // Reviewer-two's P2 on #3295: words the lamp has just said itself are
+    // no stop with `heard-always`, as over the lamp: the yield resumes.
+    let stop_words = crate::stop_words::StopWords::always_counted(
+        Box::new(AlwaysEars {
+            words: Some("the fox had to wait"),
+            flushed: false,
+        }),
+        None,
+    )
+    .with_backchannel_holds(true);
+    let (_, committed, _) =
+        a_short_word_heard_by(stop_words, "And so the fox had to wait.", Word::Over, true);
+    assert!(!committed);
+}
+
+/// Reviewer-two's P2 on #3295: the 03:08 "Stop, stop." with its words
+/// coming 300 ms after they were asked for, as the relay's do, and the
+/// second word, 250 ms in the clear, said in between. The stream stopped
+/// listening at the ask, so those words did not hear it: it commits as any
+/// speech does, the switch on or off.
+#[test]
+fn with_backchannel_holds_speech_after_a_backchannels_words_were_asked_for_commits() {
+    for holds in [true, false] {
+        let mut h = Harness::new(TurnTaking::Duplex, 400);
+        h.stop_words = Some(crate::stop_words::StopWords::new(Box::new(Ears {
+            words: Some("Yeah."),
+            asked: false,
+            heard: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            wait: 30,
+        })));
+        if holds {
+            h.mask.hold_backchannels();
+        }
+        let old = h.old();
+        h.blocks(20, 0.99, Some(evidence(0, OWN)));
+        h.blocks(ONSET + 2, 0.9, Some(evidence(0, OVER)));
+        for quiet in 1..=29 {
+            h.block(0.1, Some(evidence(quiet, None)));
+        }
+        // Still until its words are asked for, at the tenth still block.
+        h.blocks(11, 0.1, Some(evidence(40, None)));
+        assert!(h.events("stop_words").is_empty(), "holds {holds}");
+        // "Stop.", 250 ms in the clear before the words come.
+        h.blocks(25, 0.9, Some(evidence(40, None)));
+        h.blocks(40, 0.1, Some(evidence(40, None)));
+        assert_eq!(h.events("duplex_commit").len(), 1, "holds {holds}");
+        assert!(h.events("duplex_resume").is_empty(), "holds {holds}");
+        assert_eq!(h.events("turn_finished")[0]["outcome"], "user_interrupted");
+        assert_ne!(h.old(), old);
+    }
+}
+
+/// `heard-always` ears whose finals come late: each of `finals` comes its
+/// count of blocks after the first flush since the yield's mark.
+struct LateFinals {
+    finals: Vec<(&'static str, usize)>,
+    heard: usize,
+    marked: bool,
+    flushed_at: Option<usize>,
+}
+
+impl crate::stop_words::Ears for LateFinals {
+    fn ready(&mut self) {}
+    fn hear(&mut self, _: u64, _: &[i16]) {
+        self.heard += 1;
+    }
+    fn finalize(&mut self) {}
+    fn mark(&mut self) {
+        self.marked = true;
+    }
+    fn flush(&mut self) {
+        if self.marked {
+            self.flushed_at.get_or_insert(self.heard);
+        }
+    }
+    fn words(&mut self) -> Option<String> {
+        let at = self.flushed_at?;
+        let (words, wait) = *self.finals.first()?;
+        (self.heard >= at + wait).then(|| {
+            self.finals.remove(0);
+            words.to_owned()
+        })
+    }
+    fn forget(&mut self) {
+        panic!("a stream heard always is never forgotten in a yield");
+    }
+    fn rest(&mut self) {}
+}
+
+/// Reviewer-two's HOLD on #3295 at 04:07: with `heard-always` the first
+/// word's words are asked for at the detector's own pause, the twentieth
+/// quiet block under the lamp's fading sound, before the duplex rule counts
+/// a still block. The second word, 250 ms in the clear, comes after that
+/// ask; the first final, "Yeah.", comes after it, and the second final long
+/// after. The second word is speech those words did not hear: it commits
+/// once they come, the switch on or off, before the second final.
+#[test]
+fn with_backchannel_holds_and_heard_always_speech_after_the_first_flush_commits() {
+    for holds in [true, false] {
+        let mut h = Harness::new(TurnTaking::Duplex, 400);
+        h.stop_words = Some(
+            crate::stop_words::StopWords::always_counted(
+                Box::new(LateFinals {
+                    finals: vec![("Yeah.", 9 + 25 + 10 + 1), ("Stop.", 400)],
+                    heard: 0,
+                    marked: false,
+                    flushed_at: None,
+                }),
+                None,
+            )
+            .with_backchannel_holds(holds),
+        );
+        h.scores_speech = true;
+        if holds {
+            h.mask.hold_backchannels();
+        }
+        let old = h.old();
+        h.blocks(20, 0.99, Some(evidence(0, OWN)));
+        h.blocks(ONSET + 2, 0.9, Some(evidence(0, OVER)));
+        // The lamp's sound dies away; the first word's words are asked for
+        // at the twentieth of these blocks.
+        for quiet in 1..=29 {
+            h.block(0.1, Some(evidence(quiet, None)));
+        }
+        // "Stop.", 250 ms in the clear, then still.
+        h.blocks(25, 0.9, Some(evidence(40, None)));
+        h.blocks(10, 0.1, Some(evidence(40, None)));
+        for _ in 0..150 {
+            if !h.events("duplex_commit").is_empty() || !h.events("duplex_resume").is_empty() {
+                break;
+            }
+            h.block(0.1, Some(evidence(40, None)));
+        }
+        assert_eq!(h.events("duplex_commit").len(), 1, "holds {holds}");
+        assert!(h.events("duplex_resume").is_empty(), "holds {holds}");
+        assert_eq!(h.events("turn_finished")[0]["outcome"], "user_interrupted");
+        assert_ne!(h.old(), old);
+    }
+}
+
+/// lamp-52e6 at 03:08 on 24 Oct (#2939): "Stop, stop." over a story. Its
+/// first word, under the lamp's voice, came as "yeah", asked for at the
+/// pause after it; its second, 300 ms in the clear after those words came,
+/// was held as that backchannel and the story went on. Speech that goes on
+/// after a backchannel's words came is speech they did not hear: it
+/// commits as any speech does, at its sixth block. The switch off, the
+/// same; a backchannel whose words come after its speech is still held
+/// ([`with_backchannel_holds_a_backchannel_resumes_the_reply_on_either_rule`]).
+#[test]
+fn with_backchannel_holds_speech_after_a_backchannels_words_commits() {
+    for holds in [true, false] {
+        let mut h = Harness::new(TurnTaking::Duplex, 400);
+        h.stop_words = Some(crate::stop_words::StopWords::new(Box::new(Ears {
+            words: Some("Yeah."),
+            asked: false,
+            heard: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            wait: 0,
+        })));
+        if holds {
+            h.mask.hold_backchannels();
+        }
+        let old = h.old();
+        h.blocks(20, 0.99, Some(evidence(0, OWN)));
+        h.blocks(ONSET + 2, 0.9, Some(evidence(0, OVER)));
+        for quiet in 1..=29 {
+            h.block(0.1, Some(evidence(quiet, None)));
+        }
+        // Still until its words are asked for and come: a backchannel.
+        h.blocks(12, 0.1, Some(evidence(40, None)));
+        let words = h.events("stop_words");
+        assert_eq!(words.len(), 1, "holds {holds}");
+        assert_eq!(words[0]["backchannel"], true, "holds {holds}");
+        assert!(h.events("duplex_commit").is_empty(), "holds {holds}");
+        assert!(h.events("duplex_resume").is_empty(), "holds {holds}");
+        // "Stop.", 300 ms in the clear.
+        let speech = h.blocks(30, 0.9, Some(evidence(40, None)));
+        let commit = h.events("duplex_commit");
+        assert_eq!(commit.len(), 1, "holds {holds}");
+        assert!(speech[5].accepted.is_some(), "holds {holds}");
+        assert_eq!(h.events("turn_finished")[0]["outcome"], "user_interrupted");
+        assert_ne!(h.old(), old);
     }
 }
 

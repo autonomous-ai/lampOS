@@ -549,6 +549,9 @@ pub struct StopWords {
     rested: bool,
     yielded: bool,
     asked: bool,
+    /// The yield's words were first asked for since last looked at
+    /// ([`Self::take_asked`]).
+    just_asked: bool,
     told: bool,
     /// The microphone was closed ([`Self::close`]): the duplex rule's
     /// yield, which a hand Stop or a head touch leaves in force, is not a
@@ -610,6 +613,10 @@ pub struct StopWords {
     /// and whether they were last told as a backchannel.
     yield_words: String,
     yield_backchannel: bool,
+    /// With `tells_yields` and `hold`: the yield's words held as a stop
+    /// is ([`Self::held_stop`]), from the capture time of the block their
+    /// result arrived in, with their count and whether a backchannel.
+    yield_held: Option<(u64, usize, bool)>,
     /// A yield's words are journaled with its decision
     /// ([`Self::with_backchannel_debug`]).
     debug: bool,
@@ -633,6 +640,7 @@ impl StopWords {
             rested: true,
             yielded: false,
             asked: false,
+            just_asked: false,
             told: false,
             always: false,
             lamp: VecDeque::new(),
@@ -660,6 +668,7 @@ impl StopWords {
             tells_yields: false,
             yield_words: String::new(),
             yield_backchannel: false,
+            yield_held: None,
             debug: false,
         }
     }
@@ -670,8 +679,8 @@ impl StopWords {
     /// later final makes it more), and they are asked for at its
     /// [`FINALIZE_AFTER_STILL_BLOCKS`]th still block if no pause has asked
     /// yet: `LAMP_BACKCHANNEL_HOLDS=on` with `heard-always` (#2939). A stop
-    /// phrase is told as no stop: it stops the lamp as a hand Stop does,
-    /// as without the switch.
+    /// phrase is told as a stop, and commits the yield as with `heard`,
+    /// whether or not it also stops the lamp as a hand Stop does.
     pub fn with_backchannel_holds(mut self, on: bool) -> Self {
         self.tells_yields = on && self.always;
         self
@@ -785,6 +794,13 @@ impl StopWords {
         }
     }
 
+    /// Whether the yield in force had its words first asked for since
+    /// last looked at: they end there, and what is said after is not in
+    /// them (reviewer-two's P2s on #3295).
+    pub fn take_asked(&mut self) -> bool {
+        std::mem::take(&mut self.just_asked)
+    }
+
     /// Whether a stop phrase was heard over the lamp since last asked:
     /// once a reply.
     pub fn spoken_stop(&mut self) -> bool {
@@ -828,6 +844,7 @@ impl StopWords {
                 self.told = false;
                 self.yield_words.clear();
                 self.yield_backchannel = false;
+                self.yield_held = None;
                 self.lamp_asked = self.lamp_asked_by(captured_at_us);
                 self.ears.mark();
                 tell = Tell::Await;
@@ -859,6 +876,7 @@ impl StopWords {
                 && !self.asked
                 && still.is_some_and(|still| still >= FINALIZE_AFTER_STILL_BLOCKS);
             if after_speech || yield_still || self.cadence && self.since_asked >= CADENCE_BLOCKS {
+                self.just_asked |= self.yielded && !self.asked;
                 self.asked |= self.yielded;
                 self.ears.flush();
                 self.flushes += 1;
@@ -898,11 +916,24 @@ impl StopWords {
                     eprintln!("{line}");
                 }
                 if !(self.told && held) {
-                    tell = Tell::Words {
-                        stop: false,
-                        count: word_count(&self.yield_words),
-                        backchannel: held,
-                    };
+                    // The hold reads stop words itself, as a stop over the
+                    // lamp is read: a stop the hand-Stop path leaves unsaid
+                    // still commits the yield (#2939), and the lamp's own
+                    // words, as they are now or within the hold, do not
+                    // (reviewer-two's P2 on #3295).
+                    let count = word_count(&self.yield_words);
+                    let lamp: Vec<&str> = self.lamp.iter().map(|(_, text)| text.as_str()).collect();
+                    let stop = stop_over(&self.yield_words, &lamp.join(" "));
+                    self.yield_held = None;
+                    if stop && self.hold {
+                        self.yield_held = Some((captured_at_us, count, held));
+                    } else {
+                        tell = Tell::Words {
+                            stop,
+                            count,
+                            backchannel: held,
+                        };
+                    }
                 }
                 self.told = true;
                 self.yield_backchannel = held;
@@ -945,6 +976,18 @@ impl StopWords {
             }
         }
         self.decide_held(replying, captured_at_us);
+        if let Some((at_us, count, backchannel)) = self.yield_held
+            && let Some(stop) = self.held_stop(replying, &self.yield_words, at_us, captured_at_us)
+        {
+            self.yield_held = None;
+            if self.yielded {
+                tell = Tell::Words {
+                    stop,
+                    count,
+                    backchannel,
+                };
+            }
+        }
         if !replying && !self.rested {
             self.end_reply();
         }
@@ -974,8 +1017,10 @@ impl StopWords {
             return;
         };
         let waited_ms = now_us.saturating_sub(held.at_us) / 1000;
-        let lamp: Vec<&str> = self.lamp.iter().map(|(_, text)| text.as_str()).collect();
-        if !replying || !stop_over(&held.heard, &lamp.join(" ")) {
+        let Some(acts) = self.held_stop(replying, &held.heard, held.at_us, now_us) else {
+            return;
+        };
+        if !acts {
             if replying {
                 eprintln!(
                     "lamp-voice: stop words: a stop phrase heard was the lamp's own, let go after {waited_ms} ms held"
@@ -986,24 +1031,37 @@ impl StopWords {
             return;
         }
         let covered = self.ahead_at >= held.at_us;
-        if covered || now_us >= held.at_us.saturating_add(HOLD_US) {
-            if let Some(held) = self.held.take() {
-                for kept in &mut self.heard {
-                    if held.results.contains(&kept.n) {
-                        kept.stopped = true;
-                    }
+        if let Some(held) = self.held.take() {
+            for kept in &mut self.heard {
+                if held.results.contains(&kept.n) {
+                    kept.stopped = true;
                 }
             }
-            eprintln!(
-                "lamp-voice: stop words: a held stop phrase acts after {waited_ms} ms held{}",
-                if covered {
-                    ", the lamp's words covering it"
-                } else {
-                    ""
-                }
-            );
-            self.holds.push((waited_ms, true));
-            self.stop();
+        }
+        eprintln!(
+            "lamp-voice: stop words: a held stop phrase acts after {waited_ms} ms held{}",
+            if covered {
+                ", the lamp's words covering it"
+            } else {
+                ""
+            }
+        );
+        self.holds.push((waited_ms, true));
+        self.stop();
+    }
+
+    /// A stop phrase `heard`, held since a block captured at `at_us`, at a
+    /// block captured at `now_us`: `Some(false)` if the lamp's words now
+    /// hold it or the reply is over, `Some(true)` once they cover the
+    /// block it was held at or [`HOLD_US`] after it, `None` while held.
+    fn held_stop(&self, replying: bool, heard: &str, at_us: u64, now_us: u64) -> Option<bool> {
+        let lamp: Vec<&str> = self.lamp.iter().map(|(_, text)| text.as_str()).collect();
+        if !replying || !stop_over(heard, &lamp.join(" ")) {
+            Some(false)
+        } else if self.ahead_at >= at_us || now_us >= at_us.saturating_add(HOLD_US) {
+            Some(true)
+        } else {
+            None
         }
     }
 
@@ -1132,6 +1190,7 @@ impl StopWords {
             if !self.asked && still.is_some_and(|still| still >= FINALIZE_AFTER_STILL_BLOCKS) {
                 self.ears.finalize();
                 self.asked = true;
+                self.just_asked = true;
             }
         } else if self.yielded {
             self.yielded = false;
@@ -3028,6 +3087,57 @@ mod tests {
                 &[("And the owl said:", 20), ("stop, little fox.", 60)]
             ),
             None
+        );
+    }
+
+    /// Reviewer-two's P2 on #3295: with backchannel holds a yield's words
+    /// are a stop only as a stop heard over the lamp is. The lamp's own
+    /// "stop", its text 80 ms late, is held and told as no stop once that
+    /// text comes; words the lamp has just said are no stop at once; a
+    /// person's stop is told as one when its hold ends, at 150 ms. Each
+    /// tell of words, with its delay from the result in ms.
+    #[test]
+    fn with_backchannel_holds_a_yields_words_are_no_stop_if_the_lamp_said_them() {
+        let told = |heard: &str, said: &str, own: Option<(&str, u64)>| {
+            let script = Arc::new(Mutex::new(Script::default()));
+            let mut words =
+                StopWords::always_counted(Box::new(Scripted(Arc::clone(&script))), None)
+                    .with_hold(true)
+                    .with_backchannel_holds(true);
+            let at = |ms: u64| 20_000_000 + ms * 1000;
+            words.lamp_said(said, at(0), false);
+            let mut tells = Vec::new();
+            for ms in (0..=500).step_by(10) {
+                if ms == 100 {
+                    script.lock().unwrap().words = Some(heard.into());
+                }
+                if let Some((text, after_ms)) = own
+                    && ms == 100 + after_ms
+                {
+                    words.lamp_said(text, at(ms), false);
+                }
+                let yielded = ms >= 50;
+                let still = yielded.then_some(0);
+                if let Tell::Words { stop, .. } =
+                    words.block(true, true, yielded, still, None, at(ms), &block(1))
+                {
+                    tells.push((ms - 100, stop));
+                }
+            }
+            tells
+        };
+        let own = Some(("And the owl said: stop, little fox.", 80));
+        assert_eq!(
+            told("the owl said stop", "Once upon a time,", own),
+            [(80, false)]
+        );
+        assert_eq!(
+            told("the fox had to wait", "And so the fox had to wait.", None),
+            [(0, false)]
+        );
+        assert_eq!(
+            told("Lamp, stop.", "Once upon a time,", None),
+            [(150, true)]
         );
     }
 
