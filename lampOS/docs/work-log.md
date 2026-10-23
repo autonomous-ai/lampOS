@@ -8,15 +8,18 @@ passing Voice test marked leaky. Doc tests **4 / 0 / 0**, IPC own harness
 `ok`, and Turn-end-wire **12 / 0**. Linux Clippy **39993981366** and exact-head
 Linux formatting pass. CI merge `663798449` has the same repository tree.
 [Current native/provenance receipt](verification/updater-release-pair-native-20261024/README.md).
-Reviewer-two and Third found no source P1/P2; their final current-head
-qualification remains. The requested public manifest comparison is retained,
+Reviewer-two and Third posted current-head READ-OK, P1/P2 none; both
+qualification holds are cleared. First owns merge. The requested public manifest comparison is retained,
 and the realtime-group wording is corrected without altering raw evidence.
 
 #3275 Body repair READ-OK is posted at `06ae9205f`: original refusal control
 **1 / 0 / 0** at its source-identical predecessor, fresh Linux formatting at
 the current head, original failure retained. Third owns native gates and
 First final disposition. No device or independent signature acceptance.
-Next: complete #3278 ready/review handoff and act on any current-head feedback.
+Next: First merges #3278. Migrate supplies the trusted public key for the
+prepared #1812 verification. First/Fifth and the attending person select the
+#2810 artifact pair, observer configuration and physical window. All local
+code, evidence and assigned reads are complete; no local job remains.
 
 ---
 

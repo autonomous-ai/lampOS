@@ -124,3 +124,14 @@ bound to their original manual execution and unchanged authored source.
 The PR can be marked ready for its assigned readers; First retains merge.
 The original source-after timeline caveat and independent signature/physical
 acceptance limits remain unchanged.
+
+## Existing self-switch controls in the same run
+
+The same exact-head ARM64 run also passed
+`actual_cli_exec_confirms_before_the_next_round` in **0.162 s** and
+`persisted_self_switches_survive_sigkill` in **3.980 s**. Their two original
+result lines are retained in `self-switch-controls.txt`; the parent full-log
+hash is already recorded in `train51-native-summary.json`. This is a selected
+result from the existing gate, not an additional execution or physical-cut
+qualification. #2810's attended worksheet still requires the selected pair,
+observer rehearsal, lamp holder and person window.
