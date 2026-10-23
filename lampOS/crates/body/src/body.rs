@@ -679,6 +679,15 @@ pub struct Limits {
     /// window is let go only when its arm is within `LET_GO_NEAR` of them.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub let_go_folded_arm: Option<[u16; 2]>,
+    /// #2602: a start refused only because a head or base joint is found
+    /// out of where it may start (`pose_wait`), on a lamp found folded,
+    /// lets go of the joints it owns (torque off, so a hand can set the
+    /// lamp straight), says what it asks of a person (`Glimpse::waiting`),
+    /// reads them every `WAIT_READ`, and once they have been in range for
+    /// `IN_RANGE_READS` reads in a row takes hold where they are and starts
+    /// as it would have. Off: refused as before, torque left as it was.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub refused_let_go: bool,
     /// Let a lamp at rest take what Expression asks of the head, within
     /// [`REST_GLANCE_REACH`], and come back to rest once it runs out: a
     /// resting lamp lifts its head at a sudden sound. The arm is not
@@ -830,6 +839,7 @@ impl Limits {
         overload_release: false,
         let_go_at_stop: false,
         let_go_folded_arm: None,
+        refused_let_go: false,
         rest_glance: false,
         look_at_name: false,
         arbitration: false,
@@ -861,7 +871,7 @@ pub struct Sample {
 /// One step as the body saw it, for whoever wants to watch: the mood it
 /// acted on, the goals in force and what the three joints read. Pitch, roll,
 /// yaw.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
 pub struct Glimpse {
     pub step: u64,
     pub mood: Mood,
@@ -928,6 +938,10 @@ pub struct Glimpse {
     /// runs.
     pub bad_reads: [u16; 5],
     pub retreats: u16,
+    /// Under `Limits::refused_let_go`: the lamp is let go because a joint
+    /// is found out of where it may start, and this is what it asks of a
+    /// person, in words the voice can say. `None` on every other step.
+    pub waiting: Option<&'static str>,
 }
 
 /// The gestures asked from outside that were taken or dropped on one step,
@@ -1165,6 +1179,14 @@ pub struct BodyReport {
     /// was let go at once, torque off only, with no goal written.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub let_go_outside_window: Option<String>,
+    /// Under `Limits::refused_let_go`, what it last asked of a person while
+    /// it was let go for a joint out of where it may start.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refused_let_go: Option<&'static str>,
+    /// The start was refused for a pose a hand can set straight: the
+    /// ranges to wait for (`run_until_stopped`).
+    #[serde(skip)]
+    pose_wait: Option<PoseWait>,
     pub arm_peak_load: [u16; 2],
     pub arm_peak_temperature: [u8; 2],
     /// Each time the arm was sent back down, and why.
@@ -2834,6 +2856,202 @@ fn let_go_at_end<P: PortIo, R: Runtime>(bus: &mut Bus<'_, P, R>, report: &mut Bo
     let _ = torque_off(bus, report, &mut Joint::ALL.to_vec());
 }
 
+/// How often the joints are read while the lamp is let go for a pose a
+/// hand can set straight (#2602): ten times a second, a fifth of the run's
+/// own reads, enough to start within a second or so of being set right.
+pub const WAIT_READ: Duration = Duration::from_millis(100);
+/// Reads in a row, `WAIT_READ` apart, every joint in range and still
+/// before the lamp takes hold again: a second, so that a hand passing
+/// through the range on its way is not taken as the lamp set straight.
+const IN_RANGE_READS: u8 = 10;
+/// Still, between two such reads: no joint moved more than this, 30 counts
+/// a second. A hand still setting the head moves it faster than that.
+const WAIT_STILL: u16 = 3;
+/// What the lamp asks of a person while it waits, for the joint found out
+/// of range first: pitch, roll, yaw.
+const SET_STRAIGHT: [&str; 3] = [
+    "My head is tipped too far. Please move it gently back toward the middle, and I will start by myself.",
+    "My head is twisted too far. Please turn it gently back toward the middle, and I will start by myself.",
+    "My base is turned too far. Please turn it gently back toward the middle, and I will start by myself.",
+];
+/// Said instead when the head is found tipped up out of range, against its
+/// weight: its pitch keeps its torque, since let go it would drop onto the
+/// base or a hand (#2938), so no hand can set it straight while it waits.
+const PROPPED: &str = "My head is tipped up too far, and I am holding it so it does not drop. I need someone to help me set it straight.";
+/// How long the lamp asks before it stops (#2938): after this nobody has
+/// set it straight, and it stays let go, reads every `WAIT_READ_LATE` and
+/// says `STOPPED_ASKING` instead. Counted from the first time it let go in
+/// this run, so a take-hold that fails and lets go again does not restart it.
+pub const WAIT_ASKING: Duration = Duration::from_secs(600);
+/// Reads once the lamp has stopped asking: a fifth as often, and still
+/// often enough that the body's diagnostic, one per read then, stays inside
+/// the second `diagnostics` is declared at.
+pub const WAIT_READ_LATE: Duration = Duration::from_millis(500);
+/// What it says, no longer asking, once `WAIT_ASKING` has passed.
+pub const STOPPED_ASKING: &str = "Nobody has set me straight, so I have stopped asking. I am let go, and I will start by myself once I am set straight.";
+
+/// A start refused for a pose a hand can set straight (#2602): where each
+/// of pitch, roll and yaw may be found and start, the joints let go while
+/// it waits, and what it asks.
+#[derive(Clone, Debug)]
+struct PoseWait {
+    ranges: [(u16, u16); 3],
+    joints: Vec<Joint>,
+    say: &'static str,
+}
+
+/// The pose `found` (pitch, roll, yaw) as the start's own checks in
+/// `run_on` judge it: `None` if they let it start, or if no hand can help
+/// (the home given is itself outside the head's start window). The ranges
+/// are those checks' bounds: inside the start window beside the base when
+/// not waking, within `start_reach` (150 off the base) of `home_found`, or
+/// within `WAKE_REACH` of it when waking, and anywhere for a roll or a base
+/// that `--limp` takes as found. Let go are the three this body commands,
+/// and the shoulder and the elbow too for a body that stands (found folded).
+fn pose_wait(
+    limits: &Limits,
+    home: [u16; 3],
+    home_found: [f32; 3],
+    found: [u16; 3],
+    (beside_base, may_wake): (bool, bool),
+    stands: bool,
+) -> Option<PoseWait> {
+    let window = limits.pitch_home.0..=limits.pitch_home.1;
+    if beside_base && !window.contains(&home[0]) {
+        return None;
+    }
+    let allowed = if beside_base {
+        limits.start_reach
+    } else {
+        limits.start_reach.max(150)
+    };
+    let reach = f32::from(if may_wake {
+        allowed.max(WAKE_REACH)
+    } else {
+        allowed
+    });
+    let ranges: [(u16, u16); 3] = std::array::from_fn(|index| {
+        if may_wake && limits.limp && index != 0 {
+            return (0, 4_095);
+        }
+        let low = (home_found[index] - reach).ceil().clamp(0.0, 4_095.0) as u16;
+        let high = (home_found[index] + reach).floor().clamp(0.0, 4_095.0) as u16;
+        if index == 0 && beside_base && !may_wake {
+            (low.max(*window.start()), high.min(*window.end()))
+        } else {
+            (low, high)
+        }
+    });
+    let out = (0..3).find(|index| {
+        let (low, high) = ranges[*index];
+        !(low..=high).contains(&found[*index])
+    })?;
+    let mut joints = if stands {
+        Joint::ALL.to_vec()
+    } else {
+        COMMANDED.to_vec()
+    };
+    // Let go only what gravity already holds (#2938): a head tipped up out
+    // of range (fewer counts, see `lifts`) keeps its torque.
+    let propped = found[0] < ranges[0].0;
+    if propped {
+        joints.retain(|joint| *joint != Joint::WristPitch);
+    }
+    Some(PoseWait {
+        ranges,
+        joints,
+        say: if propped { PROPPED } else { SET_STRAIGHT[out] },
+    })
+}
+
+/// Let go of `wait.joints` (torque off, each acknowledged, a failed one
+/// tried again) and read every `WAIT_READ`, each read a step watched with
+/// what it asks (`Glimpse::waiting`), until pitch, roll and yaw have been in
+/// `wait.ranges`, and all five still (`WAIT_STILL`), for `IN_RANGE_READS`
+/// reads in a row; then take hold of the
+/// joints let go where they are, as `--torque on` does. Only torque off is
+/// written until then, and no goal. One that moves when taken hold of is
+/// let go again and waited for. Asked to stop, it ends let go; a wire that
+/// fails for `WIRE_STEPS` reads ends it as a run's would. From `asked_since`
+/// plus `WAIT_ASKING` on it reads every `WAIT_READ_LATE` and says
+/// `STOPPED_ASKING`, still let go and still starting once set straight.
+fn wait_in_range<P: PortIo, R: Runtime>(
+    bus: &mut Bus<'_, P, R>,
+    report: &mut BodyReport,
+    wait: &PoseWait,
+    asked_since: Duration,
+    (news, asked): (
+        &mut impl FnMut() -> Option<(Mood, u8)>,
+        &mut impl FnMut() -> (Asked, Priority, Option<Source>),
+    ),
+    watch: &mut impl FnMut(&Glimpse),
+) -> Result<(), Stop> {
+    let mut holding = wait.joints.clone();
+    let (mut misses, mut in_range) = (0u8, 0u8);
+    let mut before: Option<[u16; 5]> = None;
+    loop {
+        let late = bus.runtime.now() >= asked_since + WAIT_ASKING;
+        let (every, say) = if late {
+            (WAIT_READ_LATE, STOPPED_ASKING)
+        } else {
+            (WAIT_READ, wait.say)
+        };
+        let due = bus.runtime.now() + every;
+        if !matches!(bus.runtime.cancelled(), Ok(false)) {
+            return Err(Stop::Cancelled);
+        }
+        // Taken and dropped: a lamp let go acts on nothing.
+        let _ = (news(), asked());
+        let failed = torque_off(bus, report, &mut holding);
+        match (failed, bus.samples()) {
+            (None, Ok(now)) => {
+                misses = 0;
+                report.steps += 1;
+                report.last = Some(now);
+                let pose = COMMANDED.map(|joint| now[joint.index()].position);
+                watch(&Glimpse {
+                    waiting: Some(say),
+                    ..glimpse_of(Glimpse::default(), report.steps, &now, pose)
+                });
+                let positions = now.map(|sample| sample.position);
+                let still = before.is_some_and(|before| {
+                    before
+                        .iter()
+                        .zip(positions)
+                        .all(|(was, is)| was.abs_diff(is) <= WAIT_STILL)
+                });
+                before = Some(positions);
+                let inside = still
+                    && pose
+                        .iter()
+                        .zip(wait.ranges)
+                        .all(|(at, (low, high))| (low..=high).contains(at));
+                in_range = if inside { in_range + 1 } else { 0 };
+                if in_range >= IN_RANGE_READS && !bus.runtime.recovery_inhibited() {
+                    match take_hold(bus, report, &wait.joints, &now) {
+                        Ok(_) => return Ok(()),
+                        // Let go again, and waited for again.
+                        Err(_) => {
+                            holding = wait.joints.clone();
+                            in_range = 0;
+                        }
+                    }
+                }
+            }
+            (Some(detail), _) | (None, Err(detail)) => {
+                report.missed_reads += 1;
+                misses += 1;
+                if misses >= WIRE_STEPS || bus.refused.is_some() {
+                    return Err(bus.refused.take().unwrap_or(Stop::Bus {
+                        detail: format!("let go to be set straight: {detail}"),
+                    }));
+                }
+            }
+        }
+        bus.sleep_until(due);
+    }
+}
+
 /// One step of a joint that gave way at `from` and is still held at `goal`,
 /// under `--give-way`: `steps` counts the steps in a row it has been in a
 /// hand, its load over `bound` or it kept more than `HAND_MOVED` counts off
@@ -3131,15 +3349,48 @@ fn run_until_stopped(
     home: Option<[u16; 3]>,
     standing: Option<Standing>,
     looking: Option<Looking>,
-    news: impl FnMut() -> Option<(Mood, u8)>,
-    asked: impl FnMut() -> (Asked, Priority, Option<Source>),
-    watch: impl FnMut(&Glimpse),
+    mut news: impl FnMut() -> Option<(Mood, u8)>,
+    mut asked: impl FnMut() -> (Asked, Priority, Option<Source>),
+    mut watch: impl FnMut(&Glimpse),
 ) -> BodyReport {
     let mut bus = Bus::new(io, runtime, standing);
     bus.settle_steps = limits.temperature_steps.max(1);
     let mut report = run_on(
-        &mut bus, limits, home, standing, looking, news, asked, watch,
+        &mut bus, limits, home, standing, looking, &mut news, &mut asked, &mut watch, 0,
     );
+    // #2602: refused for a pose a hand can set straight, it lets go, says
+    // so and starts again once the pose is in range, until asked to stop.
+    let mut said = None;
+    let mut asked_since = None;
+    while matches!(report.stop, Stop::Refused { .. })
+        && let Some(wait) = report.pose_wait.take()
+    {
+        said = Some(wait.say);
+        let since = *asked_since.get_or_insert_with(|| bus.runtime.now());
+        if let Err(stop) = wait_in_range(
+            &mut bus,
+            &mut report,
+            &wait,
+            since,
+            (&mut news, &mut asked),
+            &mut watch,
+        ) {
+            report.stop = stop;
+            break;
+        }
+        report = run_on(
+            &mut bus,
+            limits,
+            home,
+            standing,
+            looking,
+            &mut news,
+            &mut asked,
+            &mut watch,
+            report.steps,
+        );
+    }
+    report.refused_let_go = said;
     report.bad_reads = bus.bad_reads;
     report.bad_temperatures = bus.bad_temperatures;
     report.temperature_flaps = bus.temperature_flaps;
@@ -3158,7 +3409,11 @@ fn run_on<P: PortIo, R: Runtime>(
     mut news: impl FnMut() -> Option<(Mood, u8)>,
     mut asked: impl FnMut() -> (Asked, Priority, Option<Source>),
     mut watch: impl FnMut(&Glimpse),
+    from_step: u64,
 ) -> BodyReport {
+    // Steps were watched before this run began (#2602): it is a start
+    // again after a wait, and the lamp has said it is ready.
+    let watched = from_step > 0;
     // Runtime home can shift after contact or a short wake. Only the
     // explicitly configured folded target can attest unplug readiness.
     let unplug_home = home;
@@ -3168,7 +3423,7 @@ fn run_on<P: PortIo, R: Runtime>(
         moved: false,
         home: None,
         found: None,
-        steps: 0,
+        steps: from_step,
         goal_writes: 0,
         profile_writes: 0,
         missed_reads: 0,
@@ -3197,6 +3452,8 @@ fn run_on<P: PortIo, R: Runtime>(
         stood: false,
         let_go_at_stop: false,
         let_go_outside_window: None,
+        refused_let_go: None,
+        pose_wait: None,
         arm_peak_load: [0; 2],
         arm_peak_temperature: [0; 2],
         retreats: Vec::new(),
@@ -3589,6 +3846,20 @@ fn run_on<P: PortIo, R: Runtime>(
     let home_of = |standing: Option<Standing>, stand: f32| home_with(home, standing, stand);
     // The window beside the base is for a head that is beside the base.
     let beside_base = head_share(stand) <= 0.0;
+    // #2602: a joint found where a hand can set it straight, on a lamp
+    // found folded and with nothing else against starting, is noted here;
+    // the refusal below is the same, and `run_until_stopped` lets it go
+    // and waits. Never a lamp found up: let go, it would fall.
+    if limits.refused_let_go && refusal.is_none() && stand == 0.0 && !let_go_only {
+        report.pose_wait = pose_wait(
+            &limits,
+            home,
+            home_of(standing, stand),
+            found_pose,
+            (beside_base, may_wake),
+            standing.is_some(),
+        );
+    }
     // Waking: a joint found where it may not start, but within WAKE_REACH
     // of its home, is brought there before anything else (below).
     let mut to_wake = false;
@@ -3888,7 +4159,21 @@ fn run_on<P: PortIo, R: Runtime>(
             (found_pose, to),
             standing.map(|_| arm_written),
             found,
-            None,
+            // After a wait for a hand (#2602) the lamp has said it is ready,
+            // so the watchdog is armed: each step of the wake is watched.
+            if watched {
+                Some((
+                    &mut watch,
+                    Glimpse {
+                        stands: standing.is_some(),
+                        stand,
+                        arm_goals: arm_written,
+                        ..Glimpse::default()
+                    },
+                ))
+            } else {
+                None
+            },
         ) {
             // The run takes over the goals the wake left, home, where the
             // servos have them: a head that still lags its goal by a few
@@ -5544,6 +5829,7 @@ fn run_on<P: PortIo, R: Runtime>(
             toward_refused,
             bad_reads: bus.bad_reads,
             retreats: retreats.into(),
+            waiting: None,
         };
         if !unplug_latched {
             watch(&glimpse);
