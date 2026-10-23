@@ -101,6 +101,28 @@ pkill -P "$foreign" 2>/dev/null; kill "$foreign" 2>/dev/null
 check "which is closed at the end" "grep -q -- '-O exit' '$T/ssh-args'"
 check "and opened before the clock is read" "[[ \$(grep -v -- '-O exit' '$T/ssh-args' | head -1) == *' true' ]]"
 
+# Built here when SAME_VOICE_PAIRS isn't set: found under CARGO_TARGET_DIR when that's set (the first
+# builder's 10:36 run), and a build that leaves nothing stops the run before anything plays.
+mkdir -p "$T/cargo-bin"
+cat >"$T/cargo-bin/cargo" <<EOF
+#!/usr/bin/env bash
+[ -n "\${NO_BUILD:-}" ] && exit 0
+mkdir -p "\$CARGO_TARGET_DIR/release/examples"
+cp "$T/bin/same_voice_pairs" "\$CARGO_TARGET_DIR/release/examples/same_voice_pairs"
+EOF
+chmod +x "$T/cargo-bin/cargo"
+built() {
+  TMPDIR=$T/tmp PATH=$T/cargo-bin:$T/bin:$PATH CARGO_TARGET_DIR=$T/elsewhere \
+    bash "$TABLE" --ssh lamp --model "$T/model.onnx" --plays "$T/round.json" \
+    --stage "$T/stage" --seconds 60 -- "$@"
+}
+rm -f "$T/pairs" "$T/played"
+built bash -c "echo played >>'$T/played'" >/dev/null 2>&1; code=$?
+check "built under CARGO_TARGET_DIR, it is found and scored" "[[ $code -eq 0 && \$(grep -c '^pairs' '$T/pairs') -eq 2 ]]"
+rm -rf "$T/elsewhere" "$T/played"
+NO_BUILD=1 built bash -c "echo played >>'$T/played'" >/dev/null 2>"$T/err"; code=$?
+check "no scorer built ends 1 before anything plays" "[[ $code -eq 1 && ! -e '$T/played' ]] && grep -q 'no same_voice_pairs at' '$T/err'"
+
 # A failed round still stops the recorder and removes everything.
 rm -f "$T/pairs"
 run false >/dev/null; code=$?

@@ -98,8 +98,14 @@ sha() { if command -v sha256sum >/dev/null; then sha256sum "$1"; else shasum -a 
 pairs=${SAME_VOICE_PAIRS:-}
 if [[ -z $pairs ]]; then
   (cd "$here" && cargo build -q --release -p lamp-voice-eval --example same_voice_pairs) || exit 1
-  pairs="$here/target/release/examples/same_voice_pairs"
+  # Where cargo put it: CARGO_TARGET_DIR when set, relative to the checkout as cargo takes it (the first
+  # builder's 10:36 run kept its builds out of the checkout), else the checkout's own target.
+  target=${CARGO_TARGET_DIR:-target}
+  [[ $target == /* ]] || target="$here/$target"
+  pairs="$target/release/examples/same_voice_pairs"
 fi
+# Found before anything is recorded or played, never after the round.
+[[ -x $pairs ]] || { echo "no same_voice_pairs at $pairs: set SAME_VOICE_PAIRS" >&2; exit 1; }
 echo "model sha256 $(sha "$model")"
 
 # The connection opens first, so a password typed is not timed as the clock.
