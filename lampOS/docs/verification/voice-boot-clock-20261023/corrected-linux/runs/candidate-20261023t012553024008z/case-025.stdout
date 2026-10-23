@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"monotonic":1033768.19064753,"pid":1,"offsets":"monotonic           0         0\nboottime            0         0\n","time_namespace":"time:[4026531834]","realtime":1792718924.6421,"uid":1000,"boottime":1033768.19065521,"phase":"outer_before"}
+BOOT_CLOCK_RECEIPT {"realtime":1792718924.65869,"monotonic":60.207237165,"time_namespace":"time:[4026532607]","offsets":"monotonic    -1033708         0\nboottime     -1033708         0\n","pid":3,"phase":"namespace_before","uid":1000,"boottime":60.207244987}
+BOOT_CLOCK_RECEIPT {"phase":"test_child_before_exec","uid":1000,"pid":4,"boottime":60.207960679,"realtime":1792718924.6594,"monotonic":60.207947479,"offsets":"monotonic    -1033708         0\nboottime     -1033708         0\n","time_namespace":"time:[4026532607]"}
+
+running 1 test
+test coordinator::tests::hand_controls::only_the_hums_own_ring_frames_are_marked_listening ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.05s
+
+BOOT_CLOCK_RECEIPT {"phase":"namespace_after","uid":1000,"pid":3,"boottime":60.264260279,"test_wait_status":0,"realtime":1792718924.7157,"monotonic":60.264251479,"offsets":"monotonic    -1033708         0\nboottime     -1033708         0\n","time_namespace":"time:[4026532607]"}
+BOOT_CLOCK_RECEIPT {"realtime":1792718924.7168,"uid":1000,"phase":"outer_after","boottime":1033768.26536046,"offsets":"monotonic           0         0\nboottime            0         0\n","time_namespace":"time:[4026531834]","pid":1,"namespace_wait_status":0,"monotonic":1033768.2653539}

@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"realtime":1792718940.17405,"monotonic":1033783.72260099,"boottime":1033783.72260966,"pid":1,"phase":"outer_before","time_namespace":"time:[4026531834]","uid":1000,"offsets":"monotonic           0         0\nboottime            0         0\n"}
+BOOT_CLOCK_RECEIPT {"phase":"namespace_before","pid":3,"monotonic":60.748150712,"boottime":60.748161887,"realtime":1792718940.19961,"offsets":"monotonic    -1033723         0\nboottime     -1033723         0\n","uid":1000,"time_namespace":"time:[4026532607]"}
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026532607]","uid":1000,"offsets":"monotonic    -1033723         0\nboottime     -1033723         0\n","realtime":1792718940.20114,"boottime":60.749683579,"monotonic":60.749675477,"pid":4,"phase":"test_child_before_exec"}
+
+running 1 test
+test coordinator::tests::turn_taking::v1_baseline_full_reply_echo_never_replaces_owner_or_queues_start ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"boottime":60.761555109,"monotonic":60.761547845,"pid":3,"phase":"namespace_after","uid":1000,"time_namespace":"time:[4026532607]","test_wait_status":0,"realtime":1792718940.21301,"offsets":"monotonic    -1033723         0\nboottime     -1033723         0\n"}
+BOOT_CLOCK_RECEIPT {"monotonic":1033783.7639854,"realtime":1792718940.21544,"boottime":1033783.76399371,"phase":"outer_after","pid":1,"time_namespace":"time:[4026531834]","namespace_wait_status":0,"uid":1000,"offsets":"monotonic           0         0\nboottime            0         0\n"}

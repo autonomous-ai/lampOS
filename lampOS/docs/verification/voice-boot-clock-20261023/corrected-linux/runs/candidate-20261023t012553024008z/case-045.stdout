@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026531834]","phase":"outer_before","boottime":1033776.97634531,"uid":1000,"monotonic":1033776.97633463,"offsets":"monotonic           0         0\nboottime            0         0\n","pid":1,"realtime":1792718933.42779}
+BOOT_CLOCK_RECEIPT {"realtime":1792718933.46473,"monotonic":61.013274021,"offsets":"monotonic    -1033716         0\nboottime     -1033716         0\n","boottime":61.013282682,"uid":1000,"time_namespace":"time:[4026532607]","phase":"namespace_before","pid":3}
+BOOT_CLOCK_RECEIPT {"monotonic":61.014396554,"realtime":1792718933.46586,"time_namespace":"time:[4026532607]","uid":1000,"boottime":61.014409964,"offsets":"monotonic    -1033716         0\nboottime     -1033716         0\n","pid":4,"phase":"test_child_before_exec"}
+
+running 1 test
+test coordinator::tests::turn_taking::a_waited_sound_needs_the_memory_the_wait_gives_the_mask ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"realtime":1792718933.47834,"monotonic":61.026881036,"boottime":61.02689249,"offsets":"monotonic    -1033716         0\nboottime     -1033716         0\n","test_wait_status":0,"time_namespace":"time:[4026532607]","uid":1000,"phase":"namespace_after","pid":3}
+BOOT_CLOCK_RECEIPT {"boottime":1033777.02871297,"uid":1000,"phase":"outer_after","time_namespace":"time:[4026531834]","namespace_wait_status":0,"pid":1,"realtime":1792718933.48016,"offsets":"monotonic           0         0\nboottime            0         0\n","monotonic":1033777.02870327}

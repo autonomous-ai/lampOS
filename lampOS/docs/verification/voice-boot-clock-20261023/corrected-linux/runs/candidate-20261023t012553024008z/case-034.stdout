@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"realtime":1792718928.76108,"time_namespace":"time:[4026531834]","phase":"outer_before","offsets":"monotonic           0         0\nboottime            0         0\n","boottime":1033772.30964135,"uid":1000,"monotonic":1033772.30963276,"pid":1}
+BOOT_CLOCK_RECEIPT {"uid":1000,"time_namespace":"time:[4026532607]","boottime":60.328229991,"pid":3,"realtime":1792718928.77967,"offsets":"monotonic    -1033712         0\nboottime     -1033712         0\n","phase":"namespace_before","monotonic":60.328222728}
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026532607]","boottime":60.328940864,"pid":4,"uid":1000,"phase":"test_child_before_exec","monotonic":60.328934648,"realtime":1792718928.78039,"offsets":"monotonic    -1033712         0\nboottime     -1033712         0\n"}
+
+running 1 test
+test coordinator::tests::turn_taking::a_line_that_cuts_a_reply_is_told_how_much_of_it_was_played ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026532607]","boottime":60.336313042,"pid":3,"uid":1000,"phase":"namespace_after","monotonic":60.336305638,"realtime":1792718928.78776,"test_wait_status":0,"offsets":"monotonic    -1033712         0\nboottime     -1033712         0\n"}
+BOOT_CLOCK_RECEIPT {"phase":"outer_after","realtime":1792718928.78936,"namespace_wait_status":0,"time_namespace":"time:[4026531834]","uid":1000,"monotonic":1033772.33791107,"pid":1,"offsets":"monotonic           0         0\nboottime            0         0\n","boottime":1033772.33791848}

@@ -1,0 +1,12 @@
+BOOT_CLOCK_RECEIPT {"pid":1,"realtime":1792718922.12617,"boottime":1033765.67472754,"offsets":"monotonic           0         0\nboottime            0         0\n","time_namespace":"time:[4026531834]","monotonic":1033765.67471944,"uid":1000,"phase":"outer_before"}
+BOOT_CLOCK_RECEIPT {"monotonic":60.692434188,"time_namespace":"time:[4026532607]","boottime":60.69244236,"pid":3,"realtime":1792718922.14389,"phase":"namespace_before","offsets":"monotonic    -1033705         0\nboottime     -1033705         0\n","uid":1000}
+BOOT_CLOCK_RECEIPT {"realtime":1792718922.14462,"phase":"test_child_before_exec","offsets":"monotonic    -1033705         0\nboottime     -1033705         0\n","uid":1000,"monotonic":60.693169296,"time_namespace":"time:[4026532607]","boottime":60.693176281,"pid":4}
+
+running 1 test
+test coordinator::tests::hand_controls::a_wake_expires_while_permission_is_unavailable_and_later_open_cannot_revive_it ... {"seconds":null,"status":"listening_ready"}
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.05s
+
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026532607]","monotonic":60.752203081,"pid":3,"boottime":60.752210344,"phase":"namespace_after","realtime":1792718922.20365,"uid":1000,"test_wait_status":0,"offsets":"monotonic    -1033705         0\nboottime     -1033705         0\n"}
+BOOT_CLOCK_RECEIPT {"realtime":1792718922.20485,"pid":1,"time_namespace":"time:[4026531834]","offsets":"monotonic           0         0\nboottime            0         0\n","monotonic":1033765.75340091,"boottime":1033765.75340747,"phase":"outer_after","uid":1000,"namespace_wait_status":0}

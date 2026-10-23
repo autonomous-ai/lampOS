@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"monotonic":1033788.89280907,"realtime":1792718945.34426,"pid":1,"phase":"outer_before","uid":1000,"boottime":1033788.89281738,"offsets":"monotonic           0         0\nboottime            0         0\n","time_namespace":"time:[4026531834]"}
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026532607]","pid":3,"uid":1000,"phase":"namespace_before","offsets":"monotonic    -1033728         0\nboottime     -1033728         0\n","realtime":1792718945.36194,"boottime":60.910499443,"monotonic":60.910491691}
+BOOT_CLOCK_RECEIPT {"boottime":60.911297551,"monotonic":60.911290218,"realtime":1792718945.36274,"offsets":"monotonic    -1033728         0\nboottime     -1033728         0\n","uid":1000,"pid":4,"phase":"test_child_before_exec","time_namespace":"time:[4026532607]"}
+
+running 1 test
+test coordinator::tests::turn_taking::with_words_a_sound_decided_without_echo_evidence_is_never_held_for_its_words ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"realtime":1792718945.37075,"boottime":60.919302516,"monotonic":60.919295811,"uid":1000,"pid":3,"phase":"namespace_after","offsets":"monotonic    -1033728         0\nboottime     -1033728         0\n","test_wait_status":0,"time_namespace":"time:[4026532607]"}
+BOOT_CLOCK_RECEIPT {"uid":1000,"boottime":1033788.92066014,"offsets":"monotonic           0         0\nboottime            0         0\n","time_namespace":"time:[4026531834]","realtime":1792718945.3721,"monotonic":1033788.92065309,"pid":1,"phase":"outer_after","namespace_wait_status":0}

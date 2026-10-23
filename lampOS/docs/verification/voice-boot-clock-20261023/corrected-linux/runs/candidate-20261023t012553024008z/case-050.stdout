@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026531834]","pid":1,"boottime":1033779.37595599,"offsets":"monotonic           0         0\nboottime            0         0\n","realtime":1792718935.8274,"monotonic":1033779.37594684,"phase":"outer_before","uid":1000}
+BOOT_CLOCK_RECEIPT {"pid":3,"monotonic":60.394969285,"uid":1000,"realtime":1792718935.84642,"time_namespace":"time:[4026532607]","offsets":"monotonic    -1033719         0\nboottime     -1033719         0\n","phase":"namespace_before","boottime":60.394977526}
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026532607]","realtime":1792718935.8473,"uid":1000,"monotonic":60.395821033,"pid":4,"boottime":60.395835979,"phase":"test_child_before_exec","offsets":"monotonic    -1033719         0\nboottime     -1033719         0\n"}
+
+running 1 test
+test coordinator::tests::turn_taking::once_the_answer_sounds_a_waited_sound_is_judged_by_its_pause_then ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026532607]","realtime":1792718935.85532,"uid":1000,"monotonic":60.403869929,"pid":3,"test_wait_status":0,"boottime":60.403876913,"phase":"namespace_after","offsets":"monotonic    -1033719         0\nboottime     -1033719         0\n"}
+BOOT_CLOCK_RECEIPT {"uid":1000,"phase":"outer_after","monotonic":1033779.40520521,"namespace_wait_status":0,"realtime":1792718935.85666,"offsets":"monotonic           0         0\nboottime            0         0\n","boottime":1033779.40521205,"time_namespace":"time:[4026531834]","pid":1}

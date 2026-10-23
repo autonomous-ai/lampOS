@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"uid":1000,"monotonic":1033782.89799893,"boottime":1033782.89800696,"realtime":1792718939.34945,"pid":1,"time_namespace":"time:[4026531834]","offsets":"monotonic           0         0\nboottime            0         0\n","phase":"outer_before"}
+BOOT_CLOCK_RECEIPT {"phase":"namespace_before","uid":1000,"realtime":1792718939.36715,"offsets":"monotonic    -1033722         0\nboottime     -1033722         0\n","pid":3,"boottime":60.915707742,"monotonic":60.91570006,"time_namespace":"time:[4026532607]"}
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026532607]","monotonic":60.916396544,"uid":1000,"phase":"test_child_before_exec","realtime":1792718939.36785,"offsets":"monotonic    -1033722         0\nboottime     -1033722         0\n","pid":4,"boottime":60.916405624}
+
+running 1 test
+test coordinator::tests::turn_taking::v1_baseline_does_not_suppress_previously_accepted_input_or_owned_outage_drain ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"test_wait_status":0,"time_namespace":"time:[4026532607]","monotonic":60.922357802,"uid":1000,"phase":"namespace_after","realtime":1792718939.37381,"offsets":"monotonic    -1033722         0\nboottime     -1033722         0\n","pid":3,"boottime":60.922364507}
+BOOT_CLOCK_RECEIPT {"monotonic":1033782.9235221,"uid":1000,"namespace_wait_status":0,"realtime":1792718939.37497,"boottime":1033782.92352881,"pid":1,"offsets":"monotonic           0         0\nboottime            0         0\n","time_namespace":"time:[4026531834]","phase":"outer_after"}

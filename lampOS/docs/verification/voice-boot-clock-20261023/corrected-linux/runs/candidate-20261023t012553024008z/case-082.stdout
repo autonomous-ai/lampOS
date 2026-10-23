@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"offsets":"monotonic           0         0\nboottime            0         0\n","monotonic":1033794.58238632,"realtime":1792718951.03384,"phase":"outer_before","uid":1000,"pid":1,"boottime":1033794.5823961,"time_namespace":"time:[4026531834]"}
+BOOT_CLOCK_RECEIPT {"boottime":60.60021338,"monotonic":60.600204789,"phase":"namespace_before","realtime":1792718951.05166,"time_namespace":"time:[4026532607]","uid":1000,"offsets":"monotonic    -1033734         0\nboottime     -1033734         0\n","pid":3}
+BOOT_CLOCK_RECEIPT {"uid":1000,"time_namespace":"time:[4026532607]","offsets":"monotonic    -1033734         0\nboottime     -1033734         0\n","pid":4,"monotonic":60.601347088,"phase":"test_child_before_exec","boottime":60.601358054,"realtime":1792718951.0528}
+
+running 1 test
+test second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.02s
+
+BOOT_CLOCK_RECEIPT {"test_wait_status":0,"boottime":60.626925021,"monotonic":60.626916291,"phase":"namespace_after","realtime":1792718951.07837,"time_namespace":"time:[4026532607]","uid":1000,"offsets":"monotonic    -1033734         0\nboottime     -1033734         0\n","pid":3}
+BOOT_CLOCK_RECEIPT {"monotonic":1033794.62842262,"realtime":1792718951.07987,"phase":"outer_after","uid":1000,"pid":1,"time_namespace":"time:[4026531834]","boottime":1033794.62842946,"namespace_wait_status":0,"offsets":"monotonic           0         0\nboottime            0         0\n"}

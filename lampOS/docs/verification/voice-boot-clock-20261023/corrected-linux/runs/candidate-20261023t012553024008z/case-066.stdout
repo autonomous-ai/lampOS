@@ -1,0 +1,12 @@
+BOOT_CLOCK_RECEIPT {"offsets":"monotonic           0         0\nboottime            0         0\n","realtime":1792718942.18964,"pid":1,"time_namespace":"time:[4026531834]","monotonic":1033785.73818459,"phase":"outer_before","boottime":1033785.7381936,"uid":1000}
+BOOT_CLOCK_RECEIPT {"phase":"namespace_before","monotonic":60.756838042,"time_namespace":"time:[4026532607]","pid":3,"boottime":60.756846843,"realtime":1792718942.20829,"uid":1000,"offsets":"monotonic    -1033725         0\nboottime     -1033725         0\n"}
+BOOT_CLOCK_RECEIPT {"phase":"test_child_before_exec","pid":4,"time_namespace":"time:[4026532607]","monotonic":60.757815929,"realtime":1792718942.20927,"uid":1000,"boottime":60.757825847,"offsets":"monotonic    -1033725         0\nboottime     -1033725         0\n"}
+
+running 1 test
+test coordinator::tests::turn_taking::valid_control_receipts_and_short_read_gap_never_forward_masked_preroll ... acceptance_age_us=99000 drain_age_us=90000 tail_end_offset_us=120000 next_first_read_offset_us=121000 capture_completion_gap_us=21000 accepted_prefix_offsets=[131000, 141000, 151000, 161000, 171000, 181000]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"phase":"namespace_after","pid":3,"time_namespace":"time:[4026532607]","monotonic":60.764514181,"realtime":1792718942.21596,"uid":1000,"boottime":60.764520816,"offsets":"monotonic    -1033725         0\nboottime     -1033725         0\n","test_wait_status":0}
+BOOT_CLOCK_RECEIPT {"boottime":1033785.76570027,"uid":1000,"phase":"outer_after","namespace_wait_status":0,"monotonic":1033785.76569371,"realtime":1792718942.21714,"offsets":"monotonic           0         0\nboottime            0         0\n","time_namespace":"time:[4026531834]","pid":1}

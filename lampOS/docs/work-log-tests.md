@@ -1,5 +1,23 @@
 # Tests work log
 
+## 2026-10-23 08:36 +0700 — corrected Linux boot-clock gate passes
+
+Corrected `da595851f` on `f477d6c49` passes all **86** selected cases once
+in isolated Linux x86 time namespaces. Child monotonic clocks at execution
+were **60.043–61.017 s**. The compiled census retains the same **3,583**
+names and **15** ignored names; no full-library pass is inferred from it.
+Linux formatting and strict all-target Voice Clippy pass, as does the final
+6,523-file source proof. [Complete corrected receipt](verification/voice-boot-clock-20261023/corrected-linux/)
+retains every command and all 202 raw output streams. No baseline test was
+repeated and the initial candidate failure remains published.
+
+The frozen Mac comparison has started: full default-parallel Voice before
+and after, the literal 240-second modulo control, the 0.5-second history
+sweep and stale-audio negative control, then Voice and five direct-reader
+gates plus workspace build. These are pending, not passing results. #2839's
+real Tasks/stand-in Harness regression is written test-only and awaits CPU;
+no product fix is authorized or made.
+
 ## 2026-10-23 08:22 +0700 — boot-clock regression isolated and corrected
 
 The first native Linux x86 run caught a candidate defect: base held-lines

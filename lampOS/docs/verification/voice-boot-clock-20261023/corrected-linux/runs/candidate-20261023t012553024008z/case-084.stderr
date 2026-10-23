@@ -1,0 +1,6 @@
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on
+lamp-voice second: request 3: no conversation going on: in a busy room, the line began 12 s after the lamp's words ended and never after its call, past the 8 s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: no conversation going on: in a busy room, the line began 12 s after the lamp's words ended and never after its call, past the 8 s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)

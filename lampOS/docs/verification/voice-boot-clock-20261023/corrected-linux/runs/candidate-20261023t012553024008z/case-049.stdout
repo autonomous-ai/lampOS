@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"realtime":1792718935.36702,"uid":1000,"pid":1,"time_namespace":"time:[4026531834]","boottime":1033778.91557324,"monotonic":1033778.91556242,"phase":"outer_before","offsets":"monotonic           0         0\nboottime            0         0\n"}
+BOOT_CLOCK_RECEIPT {"offsets":"monotonic    -1033718         0\nboottime     -1033718         0\n","monotonic":60.939567811,"boottime":60.93957717,"time_namespace":"time:[4026532607]","realtime":1792718935.39102,"phase":"namespace_before","uid":1000,"pid":3}
+BOOT_CLOCK_RECEIPT {"pid":4,"uid":1000,"offsets":"monotonic    -1033718         0\nboottime     -1033718         0\n","monotonic":60.940739724,"realtime":1792718935.3922,"phase":"test_child_before_exec","boottime":60.94075062,"time_namespace":"time:[4026532607]"}
+
+running 1 test
+test coordinator::tests::turn_taking::independent_speaker_socket_second_drain_catches_first_write_after_empty_check ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"pid":3,"uid":1000,"offsets":"monotonic    -1033718         0\nboottime     -1033718         0\n","monotonic":60.949095445,"test_wait_status":0,"realtime":1792718935.40055,"phase":"namespace_after","boottime":60.949104944,"time_namespace":"time:[4026532607]"}
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026531834]","pid":1,"boottime":1033778.95050036,"uid":1000,"namespace_wait_status":0,"realtime":1792718935.40195,"offsets":"monotonic           0         0\nboottime            0         0\n","phase":"outer_after","monotonic":1033778.95049254}

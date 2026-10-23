@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"offsets":"monotonic           0         0\nboottime            0         0\n","phase":"outer_before","time_namespace":"time:[4026531834]","boottime":1033783.30314035,"monotonic":1033783.3031326,"uid":1000,"realtime":1792718939.75458,"pid":1}
+BOOT_CLOCK_RECEIPT {"realtime":1792718939.7742,"uid":1000,"time_namespace":"time:[4026532607]","boottime":60.322759753,"phase":"namespace_before","monotonic":60.322751162,"pid":3,"offsets":"monotonic    -1033723         0\nboottime     -1033723         0\n"}
+BOOT_CLOCK_RECEIPT {"uid":1000,"realtime":1792718939.77514,"boottime":60.323697269,"phase":"test_child_before_exec","time_namespace":"time:[4026532607]","monotonic":60.323686723,"offsets":"monotonic    -1033723         0\nboottime     -1033723         0\n","pid":4}
+
+running 1 test
+test coordinator::tests::turn_taking::v1_baseline_first_write_race_waits_then_discards_original_overlapping_input ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"uid":1000,"realtime":1792718939.78118,"boottime":60.329737661,"phase":"namespace_after","time_namespace":"time:[4026532607]","test_wait_status":0,"monotonic":60.329730676,"offsets":"monotonic    -1033723         0\nboottime     -1033723         0\n","pid":3}
+BOOT_CLOCK_RECEIPT {"realtime":1792718939.78278,"pid":1,"monotonic":1033783.33132668,"uid":1000,"namespace_wait_status":0,"boottime":1033783.33133374,"time_namespace":"time:[4026531834]","phase":"outer_after","offsets":"monotonic           0         0\nboottime            0         0\n"}

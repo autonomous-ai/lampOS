@@ -1,0 +1,36 @@
+--- original/run_linux.py
++++ corrected/run_linux.py
+@@ -306,8 +306,10 @@
+         if set(ignored_names) & {c['name'] for c in cases}:
+             raise RuntimeError('Selected case is ignored; stop rather than silently claiming a pass')
+         if self.role == 'candidate':
+-            prior_ledger = json.loads((Path(self.plan['evidence_root']) / 'baseline-execution-started.json').read_text())
+-            prior = json.loads((Path(prior_ledger['run']) / 'compiled-inventory.json').read_text())
++            reference = self.plan['baseline_inventory_reference']
++            if not reference['reuse_only_no_baseline_execution'] or sha_file(reference['path']) != reference['sha256']:
++                raise RuntimeError('Frozen original baseline inventory reference mismatch')
++            prior = json.loads(Path(reference['path']).read_text())
+             if prior['names'] != sorted(names):
+                 save(self.out / 'inventory-delta.json', {'added': sorted(set(names)-set(prior['names'])),
+                      'removed': sorted(set(prior['names'])-set(names))})
+@@ -344,6 +346,11 @@
+             self.flush()
+             if not valid:
+                 raise RuntimeError('Exact case outcome did not meet the frozen expectation; no retry: ' + case['name'])
++        # Separately recorded Linux quality gates; only reached after all exact cases pass.
++        for gate in self.plan['post_case_gates']:
++            argv, name = self.container(gate['label'], write=True, workdir=cwd, command=gate['argv'])
++            self.checked(gate['label'], argv, timeout=gate['watchdog_seconds'],
++                         container_name=name, storage_watch=True)
+         argv, name = self.container('source-final-byte-proof', interactive=True, workdir=snapshot,
+                                     command=['sha256sum', '--check', '--strict', '-'])
+         self.checked('source-final-byte-proof', argv, timeout=60, input_bytes=sums, container_name=name)
+@@ -360,7 +367,7 @@
+ def main():
+     parser = argparse.ArgumentParser()
+     parser.add_argument('--plan', required=True)
+-    parser.add_argument('--role', choices=['baseline', 'candidate'], required=True)
++    parser.add_argument('--role', choices=['candidate'], required=True)
+     parser.add_argument('--execute-authorized', action='store_true')
+     args = parser.parse_args()
+     path = Path(args.plan).resolve()

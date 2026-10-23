@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"pid":1,"realtime":1792718918.69908,"uid":1000,"monotonic":1033762.24763345,"phase":"outer_before","boottime":1033762.2476412,"offsets":"monotonic           0         0\nboottime            0         0\n","time_namespace":"time:[4026531834]"}
+BOOT_CLOCK_RECEIPT {"boottime":60.266017095,"phase":"namespace_before","time_namespace":"time:[4026532607]","monotonic":60.266008295,"offsets":"monotonic    -1033702         0\nboottime     -1033702         0\n","uid":1000,"pid":3,"realtime":1792718918.71746}
+BOOT_CLOCK_RECEIPT {"offsets":"monotonic    -1033702         0\nboottime     -1033702         0\n","pid":4,"realtime":1792718918.7184,"uid":1000,"boottime":60.26695545,"phase":"test_child_before_exec","monotonic":60.266946161,"time_namespace":"time:[4026532607]"}
+
+running 1 test
+test coordinator::tests::hand_controls::a_privacy_worker_failing_in_a_ridden_gap_marks_its_end ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.05s
+
+BOOT_CLOCK_RECEIPT {"offsets":"monotonic    -1033702         0\nboottime     -1033702         0\n","pid":3,"realtime":1792718918.76848,"uid":1000,"boottime":60.317033692,"phase":"namespace_after","test_wait_status":0,"monotonic":60.317026499,"time_namespace":"time:[4026532607]"}
+BOOT_CLOCK_RECEIPT {"phase":"outer_after","monotonic":1033762.31822055,"namespace_wait_status":0,"uid":1000,"pid":1,"realtime":1792718918.76967,"time_namespace":"time:[4026531834]","boottime":1033762.31822705,"offsets":"monotonic           0         0\nboottime            0         0\n"}

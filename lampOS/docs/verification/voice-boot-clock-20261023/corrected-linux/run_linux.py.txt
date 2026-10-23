@@ -1,0 +1,396 @@
+#!/usr/bin/env python3
+"""Bounded, offline, exclusively Tests-owned Linux x86 build and namespace runner.
+
+Default invocation validates a plan only. Execution additionally requires an explicit
+--execute-authorized flag supplied after the root agent grants this exact plan.
+"""
+import argparse
+from datetime import datetime, timezone
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import signal
+import subprocess
+import threading
+import time
+
+IMAGE = 'eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c'
+CV = 'tests-boot-clock-cargo-20261023'
+TV = 'tests-boot-clock-target-20261023'
+CLEAR = ['CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER', 'CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER',
+         'CC_aarch64_unknown_linux_gnu', 'CXX_aarch64_unknown_linux_gnu', 'AR_aarch64_unknown_linux_gnu',
+         'PKG_CONFIG_ALLOW_CROSS', 'PKG_CONFIG_PATH_aarch64_unknown_linux_gnu',
+         'BINDGEN_EXTRA_CLANG_ARGS_aarch64_unknown_linux_gnu', 'CARGO_BUILD_TARGET',
+         'RUST_TEST_THREADS', 'RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS', 'RUSTC_WRAPPER', 'RUSTC_WORKSPACE_WRAPPER']
+
+# Perl uses the actual Linux clock_gettime clocks, independently for the two offsets.
+# All runner watchdogs below use host time.monotonic, outside these namespaces.
+INNER = r'''
+use strict; use warnings; use Time::HiRes qw(clock_gettime); use JSON::PP qw(encode_json);
+$|=1;
+my $wanted=shift @ARGV;
+sub snap { my($phase)=@_; my $ns=readlink('/proc/self/ns/time');
+  open(my $fh,'<','/proc/self/timens_offsets') or die $!; local $/; my $off=<$fh>;
+  return {phase=>$phase,pid=>$$,uid=>$<,monotonic=>clock_gettime(1),boottime=>clock_gettime(7),
+          realtime=>clock_gettime(0),time_namespace=>$ns,offsets=>$off}; }
+my $before=snap('namespace_before'); print 'BOOT_CLOCK_RECEIPT '.encode_json($before)."\n";
+die 'namespace clock not at requested boundary' unless $before->{monotonic}>=$wanted &&
+ $before->{monotonic}<$wanted+2 && $before->{boottime}>=$wanted && $before->{boottime}<$wanted+2;
+my $pid=fork(); defined($pid) or die $!;
+if(!$pid) { print 'BOOT_CLOCK_RECEIPT '.encode_json(snap('test_child_before_exec'))."\n";
+  exec {$ARGV[0]} @ARGV; die 'exec failed: '.$!; }
+waitpid($pid,0); my $status=$?;
+my $after=snap('namespace_after'); $after->{test_wait_status}=$status;
+print 'BOOT_CLOCK_RECEIPT '.encode_json($after)."\n";
+exit(($status & 127) ? 128+($status & 127) : ($status >> 8));
+'''
+OUTER = r'''
+use strict; use warnings; use Time::HiRes qw(clock_gettime); use JSON::PP qw(encode_json);
+$|=1;
+my $wanted=shift @ARGV; my $inner=shift @ARGV;
+sub snap { my($phase)=@_; my $ns=readlink('/proc/self/ns/time');
+  open(my $fh,'<','/proc/self/timens_offsets') or die $!; local $/; my $off=<$fh>;
+  return {phase=>$phase,pid=>$$,uid=>$<,monotonic=>clock_gettime(1),boottime=>clock_gettime(7),
+          realtime=>clock_gettime(0),time_namespace=>$ns,offsets=>$off}; }
+my $before=snap('outer_before'); print 'BOOT_CLOCK_RECEIPT '.encode_json($before)."\n";
+my $om=$wanted-int($before->{monotonic}); my $ob=$wanted-int($before->{boottime});
+my $pid=fork(); defined($pid) or die $!;
+if(!$pid) { exec 'unshare','--user','--map-current-user','--time','--fork',
+  '--monotonic='.$om,'--boottime='.$ob,'perl','-e',$inner,'--',$wanted,@ARGV; die $!; }
+waitpid($pid,0); my $status=$?;
+my $after=snap('outer_after'); $after->{namespace_wait_status}=$status;
+print 'BOOT_CLOCK_RECEIPT '.encode_json($after)."\n";
+exit(($status & 127) ? 128+($status & 127) : ($status >> 8));
+'''
+
+
+def sha_file(path):
+    with Path(path).open('rb') as stream:
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def save(path, value):
+    Path(path).write_text(json.dumps(value, indent=2) + '\n')
+
+
+class Runner:
+    def __init__(self, plan, role, plan_path):
+        self.plan, self.role, self.plan_path = plan, role, plan_path
+        stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
+        self.id = role + '-' + stamp.lower()
+        self.out = Path(plan['evidence_root']) / 'runs' / self.id
+        self.out.mkdir(parents=True)
+        self.results = {'role': role, 'plan_sha256': sha_file(plan_path), 'run_id': self.id,
+                        'commands': [], 'tests': [], 'status': 'started'}
+        self.ledger = Path(plan['evidence_root']) / (role + '-execution-started.json')
+        with self.ledger.open('x') as stream:
+            json.dump({'run': str(self.out), 'plan_sha256': self.results['plan_sha256'],
+                       'rule': 'Do not repeat any failed observation automatically'}, stream)
+            stream.write('\n')
+        save(self.out / 'plan.json', plan)
+        (self.out / 'namespace-inner.pl').write_text(INNER)
+        (self.out / 'namespace-outer.pl').write_text(OUTER)
+
+    def flush(self):
+        save(self.out / 'results.json', self.results)
+
+    def container(self, stage, *, write=False, interactive=False, workdir=None, command=None, initialize_target=False):
+        name = 'tests-boot-clock-' + self.id + '-' + stage
+        argv = ['podman', 'run', '--rm', '--name', name, '--label', 'owner=tests',
+                '--label', 'task=boot-clock-20261023', '--pull=never', '--network=none', '--read-only',
+                '--tmpfs', '/tmp:rw,size=256m,mode=1777',
+                '--volume', CV + ':/cargo' + ('' if write else ':ro'),
+                '--volume', TV + ':/target' + ((':U' if initialize_target else '') if write else ':ro')]
+        if interactive:
+            argv += ['--interactive']
+        if workdir:
+            argv += ['--workdir', workdir]
+        argv += ['--env', 'CARGO_HOME=/cargo', '--env', 'CARGO_TARGET_DIR=/target/build',
+                 '--env', 'CARGO_BUILD_JOBS=2', '--env', 'CARGO_PROFILE_DEV_DEBUG=0',
+                 '--env', 'CARGO_PROFILE_TEST_DEBUG=0', '--env', 'CARGO_INCREMENTAL=0',
+                 '--env', 'CARGO_NET_OFFLINE=true', '--entrypoint', '/usr/bin/env', IMAGE]
+        for key in CLEAR:
+            argv += ['-u', key]
+        argv += command or []
+        return argv, name
+
+    def command(self, label, argv, *, timeout=60, input_path=None, input_bytes=None, container_name=None,
+                storage_watch=False):
+        start = time.monotonic()
+        stdout_path, stderr_path = self.out / (label + '.stdout'), self.out / (label + '.stderr')
+        record = {'label': label, 'argv': argv, 'watchdog_seconds': timeout, 'started_utc': datetime.now(timezone.utc).isoformat()}
+        if input_path:
+            record['stdin_file'] = {'path': str(input_path), 'bytes': Path(input_path).stat().st_size,
+                                    'sha256': sha_file(input_path)}
+        if input_bytes is not None:
+            record['stdin_bytes'] = len(input_bytes)
+            record['stdin_sha256'] = hashlib.sha256(input_bytes).hexdigest()
+        feed_errors, storage = [], []
+        reason, storage_errors = None, 0
+        with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
+            process = subprocess.Popen(argv, stdin=subprocess.PIPE if input_path or input_bytes is not None else subprocess.DEVNULL,
+                                       stdout=stdout, stderr=stderr, start_new_session=True)
+            def feed():
+                try:
+                    if input_path:
+                        with Path(input_path).open('rb') as source:
+                            for block in iter(lambda: source.read(1024 * 1024), b''):
+                                process.stdin.write(block)
+                    elif input_bytes is not None:
+                        process.stdin.write(input_bytes)
+                    process.stdin.close()
+                except BaseException as error:
+                    feed_errors.append(repr(error))
+            feeder = None
+            if input_path or input_bytes is not None:
+                feeder = threading.Thread(target=feed, daemon=True)
+                feeder.start()
+            next_storage, next_notice = start + 5, start + 30
+            while process.poll() is None:
+                now = time.monotonic()
+                if now - start > timeout:
+                    reason = 'host_monotonic_watchdog'
+                    break
+                if storage_watch and container_name and now >= next_storage:
+                    try:
+                        check = subprocess.run(['podman', 'exec', container_name, 'du', '-sk', '/cargo', '/target'],
+                                               capture_output=True, timeout=15)
+                    except subprocess.TimeoutExpired as error:
+                        storage.append({'elapsed_seconds': now-start, 'observer_timeout': repr(error)})
+                        reason = 'owned_storage_observer_timeout'
+                        break
+                    row = {'elapsed_seconds': now-start, 'exit': check.returncode,
+                           'stdout': check.stdout.decode(errors='replace'), 'stderr': check.stderr.decode(errors='replace')}
+                    storage.append(row)
+                    if check.returncode == 0:
+                        storage_errors = 0
+                        total = sum(int(line.split()[0]) * 1024 for line in row['stdout'].splitlines())
+                        row['total_bytes'] = total
+                        if total >= self.plan['storage_stop_bytes']:
+                            reason = 'owned_storage_6GiB_guard'
+                            break
+                    elif process.poll() is None:
+                        storage_errors += 1
+                        if storage_errors >= 2:
+                            reason = 'owned_storage_observer_unavailable'
+                            break
+                    next_storage = now + 5
+                if now >= next_notice:
+                    print(f'{label}: running {now-start:.1f}s', flush=True)
+                    next_notice = now + 30
+                try:
+                    process.wait(timeout=min(1, max(0.1, timeout-(now-start))))
+                except subprocess.TimeoutExpired:
+                    pass
+            if reason:
+                # Only this run's uniquely named container and this runner's own client process group.
+                if container_name:
+                    cleanup = subprocess.run(['podman', 'kill', container_name], capture_output=True, timeout=20)
+                    record['owned_container_cleanup'] = {'argv': ['podman', 'kill', container_name],
+                        'exit': cleanup.returncode, 'stdout': cleanup.stdout.decode(errors='replace'),
+                        'stderr': cleanup.stderr.decode(errors='replace')}
+                if process.poll() is None:
+                    os.killpg(process.pid, signal.SIGTERM)
+                    try:
+                        process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(process.pid, signal.SIGKILL)
+                        process.wait(timeout=10)
+            if feeder:
+                feeder.join(timeout=5)
+            record.update(exit=process.returncode, wall_seconds=time.monotonic()-start,
+                          stop_reason=reason, feeder_errors=feed_errors, storage_observations=storage)
+        for key, path in [('stdout', stdout_path), ('stderr', stderr_path)]:
+            record[key] = {'path': str(path), 'bytes': path.stat().st_size, 'sha256': sha_file(path)}
+        self.results['commands'].append(record)
+        self.flush()
+        print(f"{label}: exit={record['exit']} wall={record['wall_seconds']:.3f}s stop={reason}", flush=True)
+        if reason or feed_errors:
+            raise RuntimeError('Bounded stage stopped; no retry: ' + label)
+        return record
+
+    def checked(self, *args, **kwargs):
+        result = self.command(*args, **kwargs)
+        if result['exit'] != 0:
+            raise RuntimeError('Stage failed; no retry: ' + result['label'])
+        return result
+
+    def run(self):
+        snapshot_dir = Path(self.plan['evidence_root']) / 'snapshots' / self.role
+        manifest = json.loads((snapshot_dir / 'source-manifest.json').read_text())
+        if sha_file(manifest['archive']) != manifest['archive_sha256']:
+            raise RuntimeError('Immutable source archive hash mismatch')
+        if manifest['base'] != self.plan['base'] or manifest['source_ref'] != self.plan['snapshots'][self.role]['ref']:
+            raise RuntimeError('Immutable source ref mismatch')
+        self.results['source_manifest'] = {'path': str(snapshot_dir / 'source-manifest.json'),
+                                         'sha256': sha_file(snapshot_dir / 'source-manifest.json'),
+                                         'aggregate': manifest['source_aggregate_sha256']}
+        for volume in [CV, TV]:
+            rec = self.checked('inspect-' + volume, ['podman', 'volume', 'inspect', volume])
+            obj = json.loads(Path(rec['stdout']['path']).read_text())[0]
+            if obj.get('Name') != volume or obj.get('Labels', {}).get('owner') != 'tests':
+                raise RuntimeError('Owned volume identity mismatch')
+        argv, name = self.container('environment-preflight', command=['sh', '-eu', '-c',
+            'id\nuname -m\nrustc -vV\nperl -MJSON::PP -MTime::HiRes -e "print qq(perl-clock-json-ready\\n)"\ndu -sk /cargo /target\ndf -Pk /target\n'])
+        preflight = self.checked('environment-preflight', argv, container_name=name)
+        text = Path(preflight['stdout']['path']).read_text()
+        if 'host: x86_64-unknown-linux-gnu' not in text or 'perl-clock-json-ready' not in text:
+            raise RuntimeError('Native compiler or namespace helper environment mismatch')
+        total = sum(int(line.split()[0])*1024 for line in text.splitlines()
+                    if re.match(r'^\d+\s+/(cargo|target)$', line))
+        if total + manifest['source_regular_file_bytes'] >= self.plan['storage_stop_bytes']:
+            raise RuntimeError('Insufficient bounded source/target storage before compilation')
+        snapshot = '/target/snapshots/' + self.role + '-' + manifest['archive_sha256'][:16]
+        cwd = snapshot + '/lampOS'
+        imports = ['sh', '-eu', '-c', 'test ! -e "$1"\nmkdir -p "$1"\ntar --extract --no-same-owner --file=- --directory="$1"\n', 'sh', snapshot]
+        argv, name = self.container('source-import', write=True, interactive=True, command=imports,
+                                    initialize_target=self.role == 'baseline')
+        self.checked('source-import', argv, timeout=180, input_path=manifest['archive'], container_name=name, storage_watch=True)
+        sums = (snapshot_dir / 'source-files.sha256').read_bytes()
+        argv, name = self.container('source-verify-before', interactive=True, workdir=snapshot,
+                                    command=['sha256sum', '--check', '--strict', '-'])
+        self.checked('source-verify-before', argv, timeout=60, input_bytes=sums, container_name=name)
+        fresh = ['sh', '-eu', '-c', 'find "$1" -type f -exec touch {} +\nfind "$1" -type f | wc -l\nchmod -R a-w "$1"\n', 'sh', snapshot]
+        argv, name = self.container('source-freshness', write=True, command=fresh)
+        freshness = self.checked('source-freshness', argv, timeout=60, container_name=name)
+        if int(Path(freshness['stdout']['path']).read_text().strip()) != manifest['tracked_file_count']:
+            raise RuntimeError('Source freshness file census mismatch')
+        argv, name = self.container('source-verify-after-freshness', interactive=True, workdir=snapshot,
+                                    command=['sha256sum', '--check', '--strict', '-'])
+        self.checked('source-verify-after-freshness', argv, timeout=60, input_bytes=sums, container_name=name)
+        cargo = ['cargo', 'test', '--offline', '--locked', '--target', 'x86_64-unknown-linux-gnu',
+                 '-p', 'lamp-voice', '--lib', '--no-run', '--message-format=json-render-diagnostics']
+        argv, name = self.container('compile', write=True, workdir=cwd, command=cargo)
+        build = self.checked('compile', argv, timeout=self.plan['build_watchdog_seconds'], container_name=name, storage_watch=True)
+        artifacts = []
+        for line in Path(build['stdout']['path']).read_text().splitlines():
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if item.get('reason') == 'compiler-artifact' and item.get('executable'):
+                artifacts.append(item)
+        save(self.out / 'cargo-executable-artifacts.json', artifacts)
+        selected = [a for a in artifacts if a['target']['name'] == 'lamp_voice' and a['target']['kind'] == ['lib'] and a['profile']['test']]
+        if len(selected) != 1:
+            raise RuntimeError('Cargo did not produce exactly one identified Voice library test executable')
+        binary = selected[0]['executable']
+        if not binary.startswith('/target/build/x86_64-unknown-linux-gnu/'):
+            raise RuntimeError('Cargo artifact is outside the explicit native x86 target')
+        retained = '/target/retained/' + self.role + '-' + manifest['archive_sha256'][:16]
+        copy = ['sh', '-eu', '-c', 'test ! -e "$2"\nmkdir -p /target/retained\ncp -- "$1" "$2"\nchmod a-w "$2"\nsha256sum "$1" "$2"\nfile "$2"\n', 'sh', binary, retained]
+        argv, name = self.container('retain-binary', write=True, command=copy)
+        identity = self.checked('retain-binary', argv, container_name=name)
+        identity_text = Path(identity['stdout']['path']).read_text()
+        hashes = re.findall(r'^([a-f0-9]{64})  ', identity_text, re.M)
+        if len(hashes) != 2 or hashes[0] != hashes[1] or 'ELF 64-bit' not in identity_text or 'x86-64' not in identity_text:
+            raise RuntimeError('Native ELF binary identity check failed')
+        self.results['binary'] = {'cargo_path': binary, 'retained_path': retained, 'sha256': hashes[0], 'target': selected[0]}
+        inventory_cmd = [retained, '--list', '--format', 'terse']
+        argv, name = self.container('compiled-inventory', workdir=cwd, command=inventory_cmd)
+        listing = self.checked('compiled-inventory', argv, timeout=60, container_name=name)
+        names = [line[:-6] for line in Path(listing['stdout']['path']).read_text().splitlines() if line.endswith(': test')]
+        if len(names) != len(set(names)) or not names:
+            raise RuntimeError('Invalid compiled inventory')
+        save(self.out / 'compiled-inventory.json', {'test_count': len(names), 'names': sorted(names)})
+        self.results['compiled_inventory_count'] = len(names)
+        cases = self.plan['snapshots'][self.role]['cases']
+        if any(c['name'] not in names for c in cases):
+            raise RuntimeError('Source-derived case absent from actual compiled inventory')
+        argv, name = self.container('ignored-inventory', workdir=cwd,
+                                    command=[retained, '--ignored', '--list', '--format', 'terse'])
+        ignored = self.checked('ignored-inventory', argv, timeout=60, container_name=name)
+        ignored_names = [line[:-6] for line in Path(ignored['stdout']['path']).read_text().splitlines() if line.endswith(': test')]
+        if set(ignored_names) & {c['name'] for c in cases}:
+            raise RuntimeError('Selected case is ignored; stop rather than silently claiming a pass')
+        if self.role == 'candidate':
+            reference = self.plan['baseline_inventory_reference']
+            if not reference['reuse_only_no_baseline_execution'] or sha_file(reference['path']) != reference['sha256']:
+                raise RuntimeError('Frozen original baseline inventory reference mismatch')
+            prior = json.loads(Path(reference['path']).read_text())
+            if prior['names'] != sorted(names):
+                save(self.out / 'inventory-delta.json', {'added': sorted(set(names)-set(prior['names'])),
+                     'removed': sorted(set(prior['names'])-set(names))})
+                raise RuntimeError('Baseline/candidate compiled census differs; requires explicit review')
+        for number, case in enumerate(cases, 1):
+            label = f'case-{number:03d}'
+            argv, name = self.container(label, workdir=cwd, command=['perl', '-e', OUTER, '--',
+                  str(case['clock_seconds']), INNER, retained, case['name'], '--exact', '--nocapture', '--test-threads=1'])
+            result = self.command(label, argv, timeout=case['watchdog_seconds'], container_name=name)
+            stdout = Path(result['stdout']['path']).read_text()
+            stderr = Path(result['stderr']['path']).read_text()
+            clocks = [json.loads(line.split(' ', 1)[1]) for line in stdout.splitlines() if line.startswith('BOOT_CLOCK_RECEIPT ')]
+            by_phase = {r['phase']: r for r in clocks}
+            if set(by_phase) != {'outer_before', 'namespace_before', 'test_child_before_exec', 'namespace_after', 'outer_after'}:
+                raise RuntimeError('Incomplete namespace/child/outer clock evidence')
+            before, child, after = by_phase['outer_before'], by_phase['test_child_before_exec'], by_phase['outer_after']
+            if child['time_namespace'] == before['time_namespace'] or after['time_namespace'] != before['time_namespace']:
+                raise RuntimeError('Time namespace inheritance/isolation mismatch')
+            if before['offsets'] != after['offsets'] or after['monotonic'] < before['monotonic'] or after['boottime'] < before['boottime']:
+                raise RuntimeError('Outer clock domain unexpectedly changed')
+            for key in ['monotonic', 'boottime']:
+                if not case['clock_seconds'] <= child[key] < case['clock_seconds'] + 2:
+                    raise RuntimeError('Test child did not begin at the requested fresh boundary')
+            summaries = re.findall(r'test result: (ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out', stdout)
+            expected = ('0', '1') if case['expected_exit'] == 101 else ('1', '0')
+            valid = (result['exit'] == case['expected_exit'] and len(summaries) == 1 and
+                     summaries[0][1:3] == expected and summaries[0][3:5] == ('0', '0') and
+                     int(summaries[0][5]) == len(names)-1 and
+                     summaries[0][0] == ('FAILED' if case['expected_exit'] == 101 else 'ok') and
+                     case['name'] in stdout and all(re.search(p, stdout + '\n' + stderr) for p in case.get('required_patterns', [])))
+            observation = {'case': case, 'command_label': label, 'clocks': clocks,
+                           'test_summaries': summaries, 'expected_outcome_matched': bool(valid)}
+            self.results['tests'].append(observation)
+            self.flush()
+            if not valid:
+                raise RuntimeError('Exact case outcome did not meet the frozen expectation; no retry: ' + case['name'])
+        # Separately recorded Linux quality gates; only reached after all exact cases pass.
+        for gate in self.plan['post_case_gates']:
+            argv, name = self.container(gate['label'], write=True, workdir=cwd, command=gate['argv'])
+            self.checked(gate['label'], argv, timeout=gate['watchdog_seconds'],
+                         container_name=name, storage_watch=True)
+        argv, name = self.container('source-final-byte-proof', interactive=True, workdir=snapshot,
+                                    command=['sha256sum', '--check', '--strict', '-'])
+        self.checked('source-final-byte-proof', argv, timeout=60, input_bytes=sums, container_name=name)
+        argv, name = self.container('final-storage', command=['du', '-sk', '/cargo', '/target'])
+        storage = self.checked('final-storage', argv, container_name=name)
+        total = sum(int(line.split()[0])*1024 for line in Path(storage['stdout']['path']).read_text().splitlines())
+        if total >= self.plan['storage_stop_bytes']:
+            raise RuntimeError('Final owned storage reached the conservative guard')
+        self.results['final_owned_storage_bytes'] = total
+        self.results['status'] = 'all_frozen_expectations_matched'
+        self.flush()
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--plan', required=True)
+    parser.add_argument('--role', choices=['candidate'], required=True)
+    parser.add_argument('--execute-authorized', action='store_true')
+    args = parser.parse_args()
+    path = Path(args.plan).resolve()
+    plan = json.loads(path.read_text())
+    role = plan['snapshots'][args.role]
+    assert plan['image'] == IMAGE and plan['cargo_volume'] == CV and plan['target_volume'] == TV
+    assert plan['storage_stop_bytes'] == 6 * 1024**3 and plan['storage_budget_bytes'] == 8 * 1024**3
+    assert len({c['name'] for c in role['cases']}) == len(role['cases'])
+    assert all(c['clock_seconds'] == 60 and c['expected_exit'] in (0,101) for c in role['cases'])
+    if not args.execute_authorized:
+        print(json.dumps({'status': 'plan-valid-no-execution', 'role': args.role, 'source_ref': role['ref'],
+                          'case_count': len(role['cases']), 'plan_sha256': sha_file(path)}, indent=2))
+        return
+    runner = Runner(plan, args.role, path)
+    try:
+        runner.run()
+    except BaseException as error:
+        runner.results['status'] = 'stopped_without_retry'
+        runner.results['error'] = repr(error)
+        runner.flush()
+        print('STOP:', repr(error), flush=True)
+        raise
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"pid":1,"boottime":1033789.28482359,"uid":1000,"offsets":"monotonic           0         0\nboottime            0         0\n","time_namespace":"time:[4026531834]","phase":"outer_before","realtime":1792718945.73627,"monotonic":1033789.28481528}
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026532607]","monotonic":60.302450335,"boottime":60.302458717,"pid":3,"offsets":"monotonic    -1033729         0\nboottime     -1033729         0\n","uid":1000,"realtime":1792718945.7539,"phase":"namespace_before"}
+BOOT_CLOCK_RECEIPT {"pid":4,"monotonic":60.303269885,"boottime":60.303278406,"time_namespace":"time:[4026532607]","realtime":1792718945.75472,"phase":"test_child_before_exec","offsets":"monotonic    -1033729         0\nboottime     -1033729         0\n","uid":1000}
+
+running 1 test
+test coordinator::tests::turn_taking::with_words_a_sound_is_never_held_for_them_past_its_end ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"pid":3,"monotonic":60.310154691,"boottime":60.310161326,"time_namespace":"time:[4026532607]","test_wait_status":0,"realtime":1792718945.7616,"phase":"namespace_after","offsets":"monotonic    -1033729         0\nboottime     -1033729         0\n","uid":1000}
+BOOT_CLOCK_RECEIPT {"namespace_wait_status":0,"uid":1000,"boottime":1033789.31130831,"pid":1,"monotonic":1033789.31130188,"phase":"outer_after","realtime":1792718945.76275,"time_namespace":"time:[4026531834]","offsets":"monotonic           0         0\nboottime            0         0\n"}

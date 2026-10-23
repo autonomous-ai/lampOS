@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"monotonic":1033796.26262572,"phase":"outer_before","realtime":1792718952.71408,"pid":1,"uid":1000,"boottime":1033796.26263375,"offsets":"monotonic           0         0\nboottime            0         0\n","time_namespace":"time:[4026531834]"}
+BOOT_CLOCK_RECEIPT {"pid":3,"offsets":"monotonic    -1033736         0\nboottime     -1033736         0\n","monotonic":60.281088992,"phase":"namespace_before","time_namespace":"time:[4026532607]","uid":1000,"boottime":60.281096885,"realtime":1792718952.73254}
+BOOT_CLOCK_RECEIPT {"monotonic":60.281827942,"pid":4,"offsets":"monotonic    -1033736         0\nboottime     -1033736         0\n","realtime":1792718952.73328,"boottime":60.281834368,"time_namespace":"time:[4026532607]","uid":1000,"phase":"test_child_before_exec"}
+
+running 1 test
+test stop_words::tests::audio_queued_for_a_yield_never_goes_once_it_is_forgotten_rested_or_dropped ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.92s
+
+BOOT_CLOCK_RECEIPT {"pid":3,"offsets":"monotonic    -1033736         0\nboottime     -1033736         0\n","monotonic":61.20782944,"test_wait_status":0,"phase":"namespace_after","time_namespace":"time:[4026532607]","uid":1000,"boottime":61.207836634,"realtime":1792718953.65928}
+BOOT_CLOCK_RECEIPT {"offsets":"monotonic           0         0\nboottime            0         0\n","time_namespace":"time:[4026531834]","boottime":1033797.20946344,"namespace_wait_status":0,"uid":1000,"pid":1,"realtime":1792718953.66091,"monotonic":1033797.20945464,"phase":"outer_after"}

@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"boottime":1033773.54212043,"pid":1,"monotonic":1033773.54211233,"offsets":"monotonic           0         0\nboottime            0         0\n","phase":"outer_before","realtime":1792718929.99356,"time_namespace":"time:[4026531834]","uid":1000}
+BOOT_CLOCK_RECEIPT {"uid":1000,"boottime":60.560085151,"pid":3,"offsets":"monotonic    -1033713         0\nboottime     -1033713         0\n","phase":"namespace_before","realtime":1792718930.01153,"monotonic":60.56007663,"time_namespace":"time:[4026532607]"}
+BOOT_CLOCK_RECEIPT {"realtime":1792718930.01248,"monotonic":60.561024554,"time_namespace":"time:[4026532607]","pid":4,"offsets":"monotonic    -1033713         0\nboottime     -1033713         0\n","phase":"test_child_before_exec","uid":1000,"boottime":60.561035449}
+
+running 1 test
+test coordinator::tests::turn_taking::a_request_begun_soon_after_the_lamps_words_says_so_in_its_start ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"realtime":1792718930.01999,"monotonic":60.568538375,"test_wait_status":0,"time_namespace":"time:[4026532607]","pid":3,"offsets":"monotonic    -1033713         0\nboottime     -1033713         0\n","phase":"namespace_after","uid":1000,"boottime":60.568547245}
+BOOT_CLOCK_RECEIPT {"namespace_wait_status":0,"realtime":1792718930.02165,"time_namespace":"time:[4026531834]","uid":1000,"monotonic":1033773.57018844,"offsets":"monotonic           0         0\nboottime            0         0\n","phase":"outer_after","boottime":1033773.57019815,"pid":1}

@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"monotonic":1033795.02315484,"boottime":1033795.02316231,"phase":"outer_before","pid":1,"time_namespace":"time:[4026531834]","realtime":1792718951.47461,"offsets":"monotonic           0         0\nboottime            0         0\n","uid":1000}
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026532607]","offsets":"monotonic    -1033735         0\nboottime     -1033735         0\n","realtime":1792718951.49308,"uid":1000,"pid":3,"boottime":60.041632706,"phase":"namespace_before","monotonic":60.04162202}
+BOOT_CLOCK_RECEIPT {"boottime":60.042856094,"phase":"test_child_before_exec","pid":4,"uid":1000,"offsets":"monotonic    -1033735         0\nboottime     -1033735         0\n","realtime":1792718951.4943,"time_namespace":"time:[4026532607]","monotonic":60.042847154}
+
+running 1 test
+test second_provider::worker::tests::the_policy_is_told_the_name_a_line_left_unanswered_and_the_lamp_speaking_lately ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"boottime":60.049537933,"phase":"namespace_after","pid":3,"test_wait_status":0,"uid":1000,"offsets":"monotonic    -1033735         0\nboottime     -1033735         0\n","realtime":1792718951.50098,"time_namespace":"time:[4026532607]","monotonic":60.049531508}
+BOOT_CLOCK_RECEIPT {"pid":1,"time_namespace":"time:[4026531834]","monotonic":1033795.05079506,"boottime":1033795.05080176,"phase":"outer_after","namespace_wait_status":0,"offsets":"monotonic           0         0\nboottime            0         0\n","uid":1000,"realtime":1792718951.50224}

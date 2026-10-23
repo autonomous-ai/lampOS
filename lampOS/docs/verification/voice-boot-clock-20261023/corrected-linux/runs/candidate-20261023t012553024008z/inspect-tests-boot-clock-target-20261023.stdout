@@ -1,0 +1,20 @@
+[
+     {
+          "Name": "tests-boot-clock-target-20261023",
+          "Driver": "local",
+          "Mountpoint": "/var/home/core/.local/share/containers/storage/volumes/tests-boot-clock-target-20261023/_data",
+          "CreatedAt": "2026-10-23T07:47:30.649685812+07:00",
+          "Labels": {
+               "owner": "tests",
+               "scope": "public-offline-x86",
+               "task": "boot-clock-20261023"
+          },
+          "Scope": "local",
+          "Options": {},
+          "UID": 1000,
+          "GID": 1000,
+          "MountCount": 0,
+          "NeedsCopyUp": true,
+          "LockNumber": 7
+     }
+]

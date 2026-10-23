@@ -1,0 +1,6 @@
+lamp-voice: the eyes are told no at once: privacy gap
+lamp-voice: the privacy switch's readings lapsed: nothing is heard, and the conversation waits up to 1000 ms for a fresh one
+lamp-voice: the privacy switch reads open again after 316 ms: the conversation goes on
+lamp-voice: the eyes are told no at once: privacy gap
+lamp-voice: the privacy switch's readings lapsed: nothing is heard, and the conversation waits up to 1000 ms for a fresh one
+lamp-voice: the privacy gap ends the conversation after 1000 ms: no fresh reading

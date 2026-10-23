@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"uid":1000,"time_namespace":"time:[4026531834]","pid":1,"monotonic":1033761.86890543,"phase":"outer_before","boottime":1033761.86891353,"realtime":1792718918.32036,"offsets":"monotonic           0         0\nboottime            0         0\n"}
+BOOT_CLOCK_RECEIPT {"pid":3,"phase":"namespace_before","uid":1000,"boottime":60.891173941,"realtime":1792718918.34262,"offsets":"monotonic    -1033701         0\nboottime     -1033701         0\n","monotonic":60.891163743,"time_namespace":"time:[4026532607]"}
+BOOT_CLOCK_RECEIPT {"realtime":1792718918.34346,"pid":4,"phase":"test_child_before_exec","uid":1000,"boottime":60.892017307,"monotonic":60.892008717,"time_namespace":"time:[4026532607]","offsets":"monotonic    -1033701         0\nboottime     -1033701         0\n"}
+
+running 1 test
+test coordinator::tests::hand_controls::a_lamp_put_to_sleep_from_the_head_ends_its_conversation_as_a_mute_named_head_sleep ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.02s
+
+BOOT_CLOCK_RECEIPT {"offsets":"monotonic    -1033701         0\nboottime     -1033701         0\n","monotonic":60.919921466,"time_namespace":"time:[4026532607]","pid":3,"test_wait_status":0,"phase":"namespace_after","uid":1000,"boottime":60.91992838,"realtime":1792718918.37137}
+BOOT_CLOCK_RECEIPT {"uid":1000,"namespace_wait_status":0,"pid":1,"time_namespace":"time:[4026531834]","monotonic":1033761.92142975,"phase":"outer_after","boottime":1033761.92143715,"offsets":"monotonic           0         0\nboottime            0         0\n","realtime":1792718918.37288}

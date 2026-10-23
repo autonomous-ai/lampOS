@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"pid":1,"offsets":"monotonic           0         0\nboottime            0         0\n","realtime":1792718946.93377,"uid":1000,"time_namespace":"time:[4026531834]","phase":"outer_before","boottime":1033790.48233078,"monotonic":1033790.48232219}
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026532607]","pid":3,"offsets":"monotonic    -1033730         0\nboottime     -1033730         0\n","phase":"namespace_before","uid":1000,"monotonic":60.500670564,"realtime":1792718946.95212,"boottime":60.500678456}
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026532607]","pid":4,"offsets":"monotonic    -1033730         0\nboottime     -1033730         0\n","phase":"test_child_before_exec","uid":1000,"realtime":1792718946.95304,"monotonic":60.501583845,"boottime":60.501592715}
+
+running 1 test
+test coordinator::tests::turn_taking::with_words_a_stop_the_person_went_on_from_takes_the_turn_and_a_lone_one_stops ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026532607]","pid":3,"offsets":"monotonic    -1033730         0\nboottime     -1033730         0\n","phase":"namespace_after","uid":1000,"realtime":1792718946.96194,"monotonic":60.510491962,"boottime":60.510499436,"test_wait_status":0}
+BOOT_CLOCK_RECEIPT {"monotonic":1033790.51178219,"boottime":1033790.51183108,"phase":"outer_after","time_namespace":"time:[4026531834]","offsets":"monotonic           0         0\nboottime            0         0\n","realtime":1792718946.96328,"uid":1000,"pid":1,"namespace_wait_status":0}

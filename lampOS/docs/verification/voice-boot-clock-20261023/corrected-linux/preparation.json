@@ -1,0 +1,70 @@
+{
+  "state": "prepared-no-Cargo-or-test-execution",
+  "source_ref": "da595851f239cd6456cc1fb4565d3fc272675702",
+  "base": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+  "case_count": 86,
+  "case_names_and_order_unchanged": true,
+  "syntax_checks": "python3 -m py_compile freeze_source.py run_linux.py: exit0",
+  "dry_plan_check": "run_linux.py --plan plan.json --role candidate (without --execute-authorized): exit0",
+  "plan_sha256": "0f35612336a89835248eda95d145cfcb81468202be88a712533beeffe51edf49",
+  "files": [
+    {
+      "path": "plan.json",
+      "bytes": 26503,
+      "sha256": "0f35612336a89835248eda95d145cfcb81468202be88a712533beeffe51edf49"
+    },
+    {
+      "path": "run_linux.py",
+      "bytes": 25441,
+      "sha256": "64fd4f0c98656b7cf52e038e6d563993e195a77891d8cfbae9bc2428ce2a761b"
+    },
+    {
+      "path": "freeze_source.py",
+      "bytes": 7834,
+      "sha256": "df36de9f7bb96793e94760820367a0708457d8ed5b44998ea5645f1f5db27c13"
+    },
+    {
+      "path": "authored-case-inventory.json",
+      "bytes": 29120,
+      "sha256": "acda19cc6ce3ccd38f0536dcdfefccaa5f407c9c91bb5fb2e7eb30e27cc4d636"
+    },
+    {
+      "path": "source-correction.patch",
+      "bytes": 2467,
+      "sha256": "c0e94dd77333ae02d7681f715873ebc3e0ef3495e3e1deb75683309d2f94261b"
+    },
+    {
+      "path": "runner-change.patch",
+      "bytes": 2385,
+      "sha256": "d17c0b1edfd230369035fbc296246ad27e3a305f296ffd071b2db722c379ada4"
+    },
+    {
+      "path": "plan-change.diff",
+      "bytes": 4086,
+      "sha256": "91a185924398c8acad2f07b723b670e7191fcb53894dbebb8ddfbf96484fa606"
+    },
+    {
+      "path": "README.md",
+      "bytes": 3944,
+      "sha256": "da1c8000ab4eab30a030fa43a78e7c8f5ce183165cf0c86f76fd258ace56920e"
+    },
+    {
+      "path": "snapshots/candidate/source-manifest.json",
+      "bytes": 3065945,
+      "sha256": "a18a3de9115435cd3c4189340b6ddfdc7a16d74bc03671b93ea9eb996198246b"
+    },
+    {
+      "path": "snapshots/candidate/source-files.sha256",
+      "bytes": 892691,
+      "sha256": "a7f7cc36c655b02f6e48b85396f38bdfe3575b5356f0c905f309e6ede07e8f14"
+    }
+  ],
+  "archive": {
+    "archive": "/private/tmp/tests-boot-clock-linux-corrected-20261023/snapshots/candidate/source.tar",
+    "archive_sha256": "f6f7ecd767bcd573c96b814a2c6dae68cd739fa3426bb375ac67c835f4d20d2c",
+    "archive_bytes": 209264640,
+    "source_aggregate_sha256": "8985d412314f2f91b158720f2c20269e33ee8b28ca28387bf57edf13423c86f0",
+    "tracked_file_count": 6523
+  },
+  "execution_granted": false
+}

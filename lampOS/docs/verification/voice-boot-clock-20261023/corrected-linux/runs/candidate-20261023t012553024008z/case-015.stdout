@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"offsets":"monotonic           0         0\nboottime            0         0\n","monotonic":1033762.99273044,"boottime":1033762.99273848,"pid":1,"phase":"outer_before","uid":1000,"time_namespace":"time:[4026531834]","realtime":1792718919.44418}
+BOOT_CLOCK_RECEIPT {"boottime":61.01037214,"time_namespace":"time:[4026532607]","realtime":1792718919.46182,"offsets":"monotonic    -1033702         0\nboottime     -1033702         0\n","uid":1000,"pid":3,"monotonic":61.010364387,"phase":"namespace_before"}
+BOOT_CLOCK_RECEIPT {"uid":1000,"offsets":"monotonic    -1033702         0\nboottime     -1033702         0\n","monotonic":61.011129528,"pid":4,"phase":"test_child_before_exec","boottime":61.011138538,"realtime":1792718919.46259,"time_namespace":"time:[4026532607]"}
+
+running 1 test
+test coordinator::tests::hand_controls::a_ridden_gap_gives_the_camera_and_the_eyes_nothing_until_it_reopens ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.24s
+
+BOOT_CLOCK_RECEIPT {"phase":"namespace_after","monotonic":61.257811743,"pid":3,"uid":1000,"offsets":"monotonic    -1033702         0\nboottime     -1033702         0\n","time_namespace":"time:[4026532607]","test_wait_status":0,"realtime":1792718919.70927,"boottime":61.257820404}
+BOOT_CLOCK_RECEIPT {"realtime":1792718919.71081,"time_namespace":"time:[4026531834]","uid":1000,"namespace_wait_status":0,"boottime":1033763.25936626,"pid":1,"monotonic":1033763.25935809,"offsets":"monotonic           0         0\nboottime            0         0\n","phase":"outer_after"}

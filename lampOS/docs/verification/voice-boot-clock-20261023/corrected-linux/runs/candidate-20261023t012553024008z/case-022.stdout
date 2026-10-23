@@ -1,0 +1,12 @@
+BOOT_CLOCK_RECEIPT {"pid":1,"realtime":1792718923.05434,"boottime":1033766.60289839,"offsets":"monotonic           0         0\nboottime            0         0\n","uid":1000,"time_namespace":"time:[4026531834]","monotonic":1033766.60289043,"phase":"outer_before"}
+BOOT_CLOCK_RECEIPT {"realtime":1792718923.07389,"pid":3,"offsets":"monotonic    -1033706         0\nboottime     -1033706         0\n","boottime":60.622442917,"phase":"namespace_before","uid":1000,"time_namespace":"time:[4026532607]","monotonic":60.622434606}
+BOOT_CLOCK_RECEIPT {"pid":4,"realtime":1792718923.07484,"time_namespace":"time:[4026532607]","monotonic":60.623379177,"uid":1000,"boottime":60.623390561,"offsets":"monotonic    -1033706         0\nboottime     -1033706         0\n","phase":"test_child_before_exec"}
+
+running 1 test
+test coordinator::tests::hand_controls::a_wake_waits_for_microphone_permission_and_fresh_capture_before_one_hm ... {"seconds":null,"status":"listening_ready"}
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.04s
+
+BOOT_CLOCK_RECEIPT {"pid":3,"realtime":1792718923.12025,"test_wait_status":0,"time_namespace":"time:[4026532607]","monotonic":60.668800568,"uid":1000,"boottime":60.668809648,"offsets":"monotonic    -1033706         0\nboottime     -1033706         0\n","phase":"namespace_after"}
+BOOT_CLOCK_RECEIPT {"namespace_wait_status":0,"time_namespace":"time:[4026531834]","monotonic":1033766.67016511,"uid":1000,"offsets":"monotonic           0         0\nboottime            0         0\n","phase":"outer_after","pid":1,"boottime":1033766.67017175,"realtime":1792718923.12162}

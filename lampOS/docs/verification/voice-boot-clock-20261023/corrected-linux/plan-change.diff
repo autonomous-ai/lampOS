@@ -1,0 +1,100 @@
+--- original/plan.json
++++ corrected/plan.json
+@@ -1,7 +1,7 @@
+ {
+   "version": 1,
+   "worktree": "/private/tmp/tests-codex-boot-clock-fixtures-20261023",
+-  "evidence_root": "/private/tmp/tests-boot-clock-linux-20261023",
++  "evidence_root": "/private/tmp/tests-boot-clock-linux-corrected-20261023",
+   "base": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+   "image": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+   "cargo_volume": "tests-boot-clock-cargo-20261023",
+@@ -10,7 +10,7 @@
+   "storage_budget_bytes": 8589934592,
+   "build_watchdog_seconds": 2700,
+   "architecture": "Linux x86_64-unknown-linux-gnu in rootless Podman VM; no ARM build",
+-  "authored_case_inventory_sha256": "e842e699ff693eb3992640f589cb8e6bf4c2f3bd66ff7a51c25cc3a13a55a557",
++  "authored_case_inventory_sha256": "acda19cc6ce3ccd38f0536dcdfefccaa5f407c9c91bb5fb2e7eb30e27cc4d636",
+   "scope_limits": [
+     "60.x-second Linux checks do not reproduce or prove histories shorter than60seconds",
+     "No Policy integration coverage",
+@@ -18,31 +18,13 @@
+     "No production or device activation claim"
+   ],
+   "snapshots": {
+-    "baseline": {
+-      "ref": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+-      "source_mode": "commit",
+-      "root_source_freeze_approved": true,
+-      "allowed_changed_sha256": {},
+-      "cases": [
+-        {
+-          "name": "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+-          "clock_seconds": 60,
+-          "expected_exit": 101,
+-          "watchdog_seconds": 120,
+-          "required_patterns": [
+-            "attempt to subtract with overflow",
+-            "src/second_provider/worker\\.rs"
+-          ]
+-        }
+-      ]
+-    },
+     "candidate": {
+-      "ref": "b5f2e39d2a1d561364c754c1ff904ca588c63c29",
++      "ref": "da595851f239cd6456cc1fb4565d3fc272675702",
+       "source_mode": "commit",
+       "root_source_freeze_approved": true,
+       "allowed_changed_sha256": {
+         "lampOS/crates/voice/src/coordinator/second.rs": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+-        "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "feaefd6d0817c1361f2f17553e3ede56a8c6b709a226eafd23e023198c751df4",
++        "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+         "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+         "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "65af6a4a052ef808e094284373f4c155bf4f09250a09c2c090b9b225c77cda6e",
+         "lampOS/crates/voice/src/scenario_clock.rs": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+@@ -654,5 +636,44 @@
+         }
+       ]
+     }
+-  }
++  },
++  "baseline_inventory_reference": {
++    "path": "/private/tmp/tests-boot-clock-linux-20261023/runs/baseline-20261023t010211777596z/compiled-inventory.json",
++    "sha256": "1ff0b6e4e7a7a5c2c23a1c155a9d28a728d0650ed294508d1e798d239fb1d6ba",
++    "receipt": "/private/tmp/tests-boot-clock-linux-20261023/runs/baseline-20261023t010211777596z",
++    "source_ref": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
++    "binary_sha256": "442130b0537e141fd32cda7da604b0a5fc39777fed0458569f4190fb774176d3",
++    "reuse_only_no_baseline_execution": true
++  },
++  "historical_candidate_failure_reference": "/private/tmp/tests-boot-clock-linux-20261023/terminal-summary-initial.json",
++  "post_case_gates": [
++    {
++      "label": "linux-fmt",
++      "argv": [
++        "cargo",
++        "fmt",
++        "--all",
++        "--check"
++      ],
++      "watchdog_seconds": 600
++    },
++    {
++      "label": "linux-voice-clippy",
++      "argv": [
++        "cargo",
++        "clippy",
++        "--offline",
++        "--locked",
++        "--target",
++        "x86_64-unknown-linux-gnu",
++        "-p",
++        "lamp-voice",
++        "--all-targets",
++        "--",
++        "-D",
++        "warnings"
++      ],
++      "watchdog_seconds": 2700
++    }
++  ]
+ }

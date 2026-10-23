@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"monotonic":1033768.56853107,"uid":1000,"pid":1,"realtime":1792718925.01998,"offsets":"monotonic           0         0\nboottime            0         0\n","phase":"outer_before","boottime":1033768.56853945,"time_namespace":"time:[4026531834]"}
+BOOT_CLOCK_RECEIPT {"phase":"namespace_before","realtime":1792718925.03773,"monotonic":60.586283184,"boottime":60.586290937,"offsets":"monotonic    -1033708         0\nboottime     -1033708         0\n","pid":3,"time_namespace":"time:[4026532607]","uid":1000}
+BOOT_CLOCK_RECEIPT {"realtime":1792718925.03859,"phase":"test_child_before_exec","boottime":60.587150647,"monotonic":60.587142336,"offsets":"monotonic    -1033708         0\nboottime     -1033708         0\n","pid":4,"time_namespace":"time:[4026532607]","uid":1000}
+
+running 1 test
+test coordinator::tests::hand_controls::returning_to_sleep_cancels_a_wake_waiting_for_permission ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.04s
+
+BOOT_CLOCK_RECEIPT {"realtime":1792718925.08139,"phase":"namespace_after","boottime":60.62995156,"monotonic":60.629944576,"offsets":"monotonic    -1033708         0\nboottime     -1033708         0\n","pid":3,"time_namespace":"time:[4026532607]","uid":1000,"test_wait_status":0}
+BOOT_CLOCK_RECEIPT {"monotonic":1033768.63102953,"uid":1000,"pid":1,"realtime":1792718925.08248,"offsets":"monotonic           0         0\nboottime            0         0\n","phase":"outer_after","namespace_wait_status":0,"time_namespace":"time:[4026531834]","boottime":1033768.63103624}

@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"pid":1,"uid":1000,"phase":"outer_before","time_namespace":"time:[4026531834]","realtime":1792718921.71609,"monotonic":1033765.26463375,"offsets":"monotonic           0         0\nboottime            0         0\n","boottime":1033765.26464206}
+BOOT_CLOCK_RECEIPT {"phase":"namespace_before","monotonic":60.284224163,"offsets":"monotonic    -1033705         0\nboottime     -1033705         0\n","pid":3,"time_namespace":"time:[4026532607]","realtime":1792718921.73568,"boottime":60.284232265,"uid":1000}
+BOOT_CLOCK_RECEIPT {"monotonic":60.285122637,"offsets":"monotonic    -1033705         0\nboottime     -1033705         0\n","phase":"test_child_before_exec","time_namespace":"time:[4026532607]","pid":4,"boottime":60.285131647,"realtime":1792718921.73658,"uid":1000}
+
+running 1 test
+test coordinator::tests::hand_controls::a_tap_while_the_lamp_is_still_thinking_keeps_its_answer_and_does_not_hum ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.03s
+
+BOOT_CLOCK_RECEIPT {"monotonic":60.316746828,"offsets":"monotonic    -1033705         0\nboottime     -1033705         0\n","phase":"namespace_after","time_namespace":"time:[4026532607]","pid":3,"test_wait_status":0,"boottime":60.316753952,"realtime":1792718921.7682,"uid":1000}
+BOOT_CLOCK_RECEIPT {"offsets":"monotonic           0         0\nboottime            0         0\n","monotonic":1033765.31837063,"boottime":1033765.31837797,"uid":1000,"pid":1,"realtime":1792718921.76982,"namespace_wait_status":0,"phase":"outer_after","time_namespace":"time:[4026531834]"}

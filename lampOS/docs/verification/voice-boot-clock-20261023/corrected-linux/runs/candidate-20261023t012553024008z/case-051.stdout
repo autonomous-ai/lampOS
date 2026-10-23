@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026531834]","phase":"outer_before","uid":1000,"boottime":1033779.76161261,"offsets":"monotonic           0         0\nboottime            0         0\n","realtime":1792718936.21306,"monotonic":1033779.76160402,"pid":1}
+BOOT_CLOCK_RECEIPT {"phase":"namespace_before","monotonic":60.779348455,"time_namespace":"time:[4026532607]","uid":1000,"pid":3,"boottime":60.779356347,"offsets":"monotonic    -1033719         0\nboottime     -1033719         0\n","realtime":1792718936.2308}
+BOOT_CLOCK_RECEIPT {"phase":"test_child_before_exec","time_namespace":"time:[4026532607]","monotonic":60.780173173,"pid":4,"uid":1000,"offsets":"monotonic    -1033719         0\nboottime     -1033719         0\n","boottime":60.780183789,"realtime":1792718936.23163}
+
+running 1 test
+test coordinator::tests::turn_taking::pre_dispatch_input_can_replace_reply_and_late_old_write_cannot_fault_successor ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"test_wait_status":0,"phase":"namespace_after","time_namespace":"time:[4026532607]","monotonic":60.787831641,"pid":3,"uid":1000,"offsets":"monotonic    -1033719         0\nboottime     -1033719         0\n","boottime":60.787838626,"realtime":1792718936.23928}
+BOOT_CLOCK_RECEIPT {"offsets":"monotonic           0         0\nboottime            0         0\n","realtime":1792718936.24071,"phase":"outer_after","boottime":1033779.78926589,"uid":1000,"time_namespace":"time:[4026531834]","namespace_wait_status":0,"monotonic":1033779.78925932,"pid":1}

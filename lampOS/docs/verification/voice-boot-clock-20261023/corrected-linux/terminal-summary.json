@@ -1,0 +1,65 @@
+{
+  "status": "all_frozen_expectations_matched",
+  "receipt": "/private/tmp/tests-boot-clock-linux-corrected-20261023/runs/candidate-20261023t012553024008z",
+  "source_ref": "da595851f239cd6456cc1fb4565d3fc272675702",
+  "base": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+  "plan_sha256": "0f35612336a89835248eda95d145cfcb81468202be88a712533beeffe51edf49",
+  "binary_sha256": "ff294bfec0144abeecc6b7bebee1d0d1037ffac976786706c3fe4f590a3f4297",
+  "binary_path": "/target/retained/candidate-f6f7ecd767bcd573",
+  "compiled_census": 3583,
+  "compiled_names_equal_to_original_baseline": true,
+  "compiled_ignored_count": 15,
+  "compiled_ignored_names_unchanged": true,
+  "selected_passed": 86,
+  "selected_failed": 0,
+  "selected_ignored": 0,
+  "selected_unrun": 0,
+  "cases_each_run_once": true,
+  "test_child_monotonic_range_seconds": [
+    60.042847154,
+    61.016885755
+  ],
+  "test_child_boottime_range_seconds": [
+    60.042856094,
+    61.016898257
+  ],
+  "namespace_parent_child_after_identity_equal_all_cases": true,
+  "gates": [
+    {
+      "label": "compile",
+      "exit": 0,
+      "wall_seconds": 143.5551855089143
+    },
+    {
+      "label": "linux-fmt",
+      "exit": 0,
+      "wall_seconds": 13.516856302972883
+    },
+    {
+      "label": "linux-voice-clippy",
+      "exit": 0,
+      "wall_seconds": 133.59314869297668
+    },
+    {
+      "label": "source-final-byte-proof",
+      "exit": 0,
+      "wall_seconds": 2.4174594301730394
+    },
+    {
+      "label": "final-storage",
+      "exit": 0,
+      "wall_seconds": 0.48346793791279197
+    }
+  ],
+  "final_owned_storage_bytes": 2847330304,
+  "verified_raw_output_count": 202,
+  "initial_failure_receipt_retained": "/private/tmp/tests-boot-clock-linux-20261023/terminal-summary-initial.json",
+  "baseline_tests_reexecuted": false,
+  "cpu_released": true,
+  "limitations": [
+    "60.x-second Linux checks do not reproduce or prove histories shorter than60seconds",
+    "No Policy integration coverage",
+    "No ignored latency-probe coverage",
+    "No production or device activation claim"
+  ]
+}

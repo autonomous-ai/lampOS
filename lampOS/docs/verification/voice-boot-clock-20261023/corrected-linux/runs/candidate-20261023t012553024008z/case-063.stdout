@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"phase":"outer_before","uid":1000,"pid":1,"offsets":"monotonic           0         0\nboottime            0         0\n","time_namespace":"time:[4026531834]","boottime":1033784.57325503,"monotonic":1033784.57324546,"realtime":1792718941.0247}
+BOOT_CLOCK_RECEIPT {"monotonic":60.591646709,"offsets":"monotonic    -1033724         0\nboottime     -1033724         0\n","realtime":1792718941.0431,"boottime":60.591655579,"pid":3,"phase":"namespace_before","time_namespace":"time:[4026532607]","uid":1000}
+BOOT_CLOCK_RECEIPT {"monotonic":60.592831752,"boottime":60.592841251,"offsets":"monotonic    -1033724         0\nboottime     -1033724         0\n","realtime":1792718941.04428,"phase":"test_child_before_exec","time_namespace":"time:[4026532607]","pid":4,"uid":1000}
+
+running 1 test
+test coordinator::tests::turn_taking::v1_baseline_privacy_loss_and_capture_lineage_change_never_reopen_old_candidate ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"boottime":60.59965293,"offsets":"monotonic    -1033724         0\nboottime     -1033724         0\n","realtime":1792718941.0511,"monotonic":60.599645387,"test_wait_status":0,"uid":1000,"pid":3,"phase":"namespace_after","time_namespace":"time:[4026532607]"}
+BOOT_CLOCK_RECEIPT {"pid":1,"offsets":"monotonic           0         0\nboottime            0         0\n","time_namespace":"time:[4026531834]","phase":"outer_after","uid":1000,"namespace_wait_status":0,"realtime":1792718941.05246,"monotonic":1033784.6010063,"boottime":1033784.60101307}

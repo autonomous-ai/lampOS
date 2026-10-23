@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"pid":1,"time_namespace":"time:[4026531834]","boottime":1033794.17143841,"phase":"outer_before","monotonic":1033794.17142723,"uid":1000,"offsets":"monotonic           0         0\nboottime            0         0\n","realtime":1792718950.62288}
+BOOT_CLOCK_RECEIPT {"time_namespace":"time:[4026532607]","monotonic":60.204246805,"offsets":"monotonic    -1033734         0\nboottime     -1033734         0\n","boottime":60.20425784,"pid":3,"realtime":1792718950.6557,"uid":1000,"phase":"namespace_before"}
+BOOT_CLOCK_RECEIPT {"realtime":1792718950.65696,"pid":4,"uid":1000,"phase":"test_child_before_exec","offsets":"monotonic    -1033734         0\nboottime     -1033734         0\n","time_namespace":"time:[4026532607]","monotonic":60.205490308,"boottime":60.205510283}
+
+running 1 test
+test second_provider::worker::tests::a_near_hearing_counts_only_around_the_lines_start ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+
+BOOT_CLOCK_RECEIPT {"realtime":1792718950.66882,"pid":3,"uid":1000,"phase":"namespace_after","offsets":"monotonic    -1033734         0\nboottime     -1033734         0\n","test_wait_status":0,"time_namespace":"time:[4026532607]","monotonic":60.217364073,"boottime":60.217373293}
+BOOT_CLOCK_RECEIPT {"boottime":1033794.21923191,"time_namespace":"time:[4026531834]","pid":1,"offsets":"monotonic           0         0\nboottime            0         0\n","realtime":1792718950.67068,"uid":1000,"namespace_wait_status":0,"monotonic":1033794.21921927,"phase":"outer_after"}

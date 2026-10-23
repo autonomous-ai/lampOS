@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"uid":1000,"pid":1,"phase":"outer_before","offsets":"monotonic           0         0\nboottime            0         0\n","boottime":1033768.97763481,"monotonic":1033768.97762713,"realtime":1792718925.42908,"time_namespace":"time:[4026531834]"}
+BOOT_CLOCK_RECEIPT {"pid":3,"monotonic":60.995611412,"uid":1000,"phase":"namespace_before","offsets":"monotonic    -1033708         0\nboottime     -1033708         0\n","boottime":60.995619164,"realtime":1792718925.44706,"time_namespace":"time:[4026532607]"}
+BOOT_CLOCK_RECEIPT {"uid":1000,"monotonic":60.996401767,"pid":4,"phase":"test_child_before_exec","boottime":60.996410148,"realtime":1792718925.44785,"offsets":"monotonic    -1033708         0\nboottime     -1033708         0\n","time_namespace":"time:[4026532607]"}
+
+running 1 test
+test coordinator::tests::hand_controls::the_muted_wait_says_the_switch_cannot_be_read_while_workers_end_at_start ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.05s
+
+BOOT_CLOCK_RECEIPT {"uid":1000,"monotonic":61.053583427,"pid":3,"test_wait_status":0,"phase":"namespace_after","boottime":61.053591669,"realtime":1792718925.50504,"offsets":"monotonic    -1033708         0\nboottime     -1033708         0\n","time_namespace":"time:[4026532607]"}
+BOOT_CLOCK_RECEIPT {"uid":1000,"pid":1,"time_namespace":"time:[4026531834]","namespace_wait_status":0,"monotonic":1033769.05478649,"realtime":1792718925.50624,"boottime":1033769.0547932,"phase":"outer_after","offsets":"monotonic           0         0\nboottime            0         0\n"}

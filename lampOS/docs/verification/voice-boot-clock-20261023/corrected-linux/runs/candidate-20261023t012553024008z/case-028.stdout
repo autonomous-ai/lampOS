@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"monotonic":1033769.40586856,"boottime":1033769.40587702,"uid":1000,"time_namespace":"time:[4026531834]","realtime":1792718925.85732,"offsets":"monotonic           0         0\nboottime            0         0\n","pid":1,"phase":"outer_before"}
+BOOT_CLOCK_RECEIPT {"boottime":60.424098277,"pid":3,"realtime":1792718925.87554,"uid":1000,"monotonic":60.424090524,"time_namespace":"time:[4026532607]","offsets":"monotonic    -1033709         0\nboottime     -1033709         0\n","phase":"namespace_before"}
+BOOT_CLOCK_RECEIPT {"realtime":1792718925.87632,"pid":4,"boottime":60.424877667,"phase":"test_child_before_exec","offsets":"monotonic    -1033709         0\nboottime     -1033709         0\n","time_namespace":"time:[4026532607]","uid":1000,"monotonic":60.424868936}
+
+running 1 test
+test coordinator::tests::hand_controls::the_muted_waits_own_closures_count_the_slide_for_a_taps_face ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.01s
+
+BOOT_CLOCK_RECEIPT {"boottime":60.438801983,"pid":3,"realtime":1792718925.89025,"test_wait_status":0,"monotonic":60.438795418,"uid":1000,"phase":"namespace_after","offsets":"monotonic    -1033709         0\nboottime     -1033709         0\n","time_namespace":"time:[4026532607]"}
+BOOT_CLOCK_RECEIPT {"realtime":1792718925.89139,"time_namespace":"time:[4026531834]","phase":"outer_after","namespace_wait_status":0,"offsets":"monotonic           0         0\nboottime            0         0\n","pid":1,"boottime":1033769.43994777,"monotonic":1033769.43994072,"uid":1000}
