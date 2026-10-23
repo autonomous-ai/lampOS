@@ -1,0 +1,51 @@
+{
+  "pr": 3271,
+  "url": "https://github.com/autonomous-ai/lampOS/pull/3271",
+  "source_binding_at_commit_before_push": {
+    "commit": "55f671b12ef08c93f11ae235980f69cf7059b7a8",
+    "parent": "810e05109bced3beca88a5b602930cfed5fba4e5",
+    "tree": "c4f5ef905e6b1059badd4450c243a19b7d0165b4",
+    "branch": "tests/1569-cue-peer-closed",
+    "worktree": "/private/tmp/tests-codex-cue-peer-closed-20261023",
+    "source_aggregate_sha256": "3e1f5da09ccd82ebce4cbec531c9e0e1cd0abc4baf301faf4e4abdfa7d7bc61f",
+    "source_bytes_modes_symlinks_identical_to_gate": true,
+    "tracked_paths": 10033,
+    "authored_paths": [
+      "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "file_hashes": {
+      "lampOS/crates/voice/tests/it/fixture_provider.rs": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+      "lampOS/docs/voice-test-fixtures.md": "f28c90d1963e99f731c2457783d298750b10ee434b1163efbb719f6e0c65b0ee"
+    },
+    "gate_results_sha256": "b96f4fbf583cbd881812e4b8cf6df347323a4a77866e18e8146e4860304b6c76",
+    "gate_native_session": 65126,
+    "gate_runner_exit": 1,
+    "unwaived_failed_test_steps": [
+      "voice-default-parallel"
+    ],
+    "candidate_commit_at_execution": null,
+    "binding_created_after_gate": true,
+    "clean_worktree": true,
+    "pushed": false,
+    "PR_readiness": "Draft; failed tests and required native CI/review remain explicit."
+  },
+  "publication_independently_verified": {
+    "head": "55f671b12ef08c93f11ae235980f69cf7059b7a8",
+    "base": "lamp-voice",
+    "draft": true,
+    "label": "builder:tests",
+    "files": [
+      "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "single_line_commit_body_empty": true,
+    "source_changes_after_gate": false
+  },
+  "required_ci": {
+    "arm64_run": 39964412356,
+    "clippy_run": 39964412421,
+    "status_at_record": "running"
+  },
+  "readiness": "Draft; one local latency failure unwaived; native CI and reviewer disposition pending."
+}
