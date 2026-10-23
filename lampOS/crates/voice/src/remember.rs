@@ -5005,15 +5005,16 @@ impl DaysClient {
     }
 
     /// That `person` said "forget everything" on the local day of `now`
-    /// ([`ROOM_AFTER_FORGET_ENVIRONMENT`]). With [`FORGOT_MOST`] people
-    /// held, those of an earlier day go first, then the earliest.
-    fn forgot_everything_on(&self, person: &str, now: u64, zone: Option<&LocalTime>) {
+    /// ([`ROOM_AFTER_FORGET_ENVIRONMENT`]), and whether it is now held.
+    /// With [`FORGOT_MOST`] people held, those of an earlier day go first,
+    /// then the earliest.
+    fn forgot_everything_on(&self, person: &str, now: u64, zone: Option<&LocalTime>) -> bool {
         if !self.room_after_forget.load(Ordering::Acquire) {
-            return;
+            return false;
         }
         let today = local_day(now, zone);
         let Ok(mut forgot) = self.forgot_everything.lock() else {
-            return;
+            return false;
         };
         if !forgot.contains_key(person) && forgot.len() >= FORGOT_MOST {
             forgot.retain(|_, day| *day >= today);
@@ -5027,6 +5028,7 @@ impl DaysClient {
             }
         }
         forgot.insert(person.to_owned(), today);
+        true
     }
 
     /// Whether `person` said "forget everything" on the local day of `now`,
@@ -5391,8 +5393,14 @@ impl DaysClient {
             if call.name == FORGET_EVERYTHING
                 && answer["ok"] == true
                 && let Some(person) = person
+                && self.forgot_everything_on(person, now, zone)
+                && let Ok(mut context) = self.context.lock()
             {
-                self.forgot_everything_on(person, now, zone);
+                // A note read begun before this, even after the change
+                // marked as the forget was sent, may hold the room's lines
+                // about them: it is no longer current, removed nothing
+                // included (reviewer-two's P2 on #3142).
+                context.changing();
             }
             // Everything includes the rules they gave, kept beside their
             // memory in a scope of their own (#813).
@@ -8343,6 +8351,112 @@ mod tests {
             assert_eq!(served.join().unwrap().len(), 2);
             drop(client);
             std::fs::remove_file(&socket).unwrap();
+        }
+    }
+
+    /// Reviewer-two's P2 on #3142: a note read for Mai begun while her
+    /// forget everything is with the store, after the change marked as it
+    /// was sent, holds the room's lines about a person unfiltered; once the
+    /// forget is answered it is not current and is never taken, whatever
+    /// the store removed. With no read overlapping, the read after is
+    /// filtered and taken. Off, the overlapping read is taken as before.
+    /// The forget's answer is held until the read is done: no timing is
+    /// assumed.
+    #[test]
+    fn a_note_read_during_a_forget_everything_is_fenced_by_the_room_filter() {
+        for (label, on, removed, overlapping) in [
+            ("none-removed", true, 0, true),
+            ("removed", true, 2, true),
+            ("after", true, 0, false),
+            ("off", false, 0, true),
+        ] {
+            let socket = std::env::temp_dir().join(format!(
+                "lamp-remember-raf-fence-{label}-{}.sock",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_file(&socket);
+            let listener = UnixListener::bind(&socket).unwrap();
+            let (forgetting, sent) = std::sync::mpsc::channel();
+            let (release, released) = std::sync::mpsc::channel::<()>();
+            let released = Arc::new(Mutex::new(released));
+            // The forget and the read's two opens.
+            let served = std::thread::spawn(move || {
+                let answering: Vec<_> = (0..3)
+                    .map(|_| {
+                        let (mut stream, _) = listener.accept().unwrap();
+                        let (forgetting, released) = (forgetting.clone(), Arc::clone(&released));
+                        std::thread::spawn(move || {
+                            let mut line = String::new();
+                            BufReader::new(stream.try_clone().unwrap())
+                                .read_line(&mut line)
+                                .unwrap();
+                            let request: Value = serde_json::from_str(&line).unwrap();
+                            let answer = if request["op"] == "forget_all" {
+                                forgetting.send(()).unwrap();
+                                released
+                                    .lock()
+                                    .unwrap()
+                                    .recv_timeout(Duration::from_secs(2))
+                                    .expect("released");
+                                json!({"ok":true,"removed":removed})
+                            } else {
+                                room_about_colour(&request)
+                            };
+                            let _ = writeln!(stream, "{answer}");
+                            request["op"].as_str().unwrap().to_owned()
+                        })
+                    })
+                    .collect();
+                answering
+                    .into_iter()
+                    .map(|answering| answering.join().unwrap())
+                    .collect::<Vec<_>>()
+            });
+            let client = Arc::new(resumes_test_client(socket.clone(), false));
+            client.forget_all.store(true, Ordering::Release);
+            client.room_after_forget.store(on, Ordering::Release);
+            let read = || {
+                client.read_note_within(1, Some(MAI), false, Duration::from_secs(2), (true, false))
+            };
+            let forget = {
+                let client = Arc::clone(&client);
+                std::thread::spawn(move || {
+                    client
+                        .run_at(
+                            &call(FORGET_EVERYTHING, json!({})),
+                            Duration::from_secs(1),
+                            unix_ms(),
+                            crate::local_time::system(),
+                            Some(MAI),
+                        )
+                        .0
+                })
+            };
+            sent.recv_timeout(Duration::from_secs(2))
+                .expect("the forget reached the store");
+            let during = overlapping.then(read);
+            if let Some(during) = &during {
+                assert!(during.complete(), "{label}");
+                assert_eq!(during.text.matches("green").count(), 2, "{label}");
+                assert!(during.current(), "{label}: current until answered");
+            }
+            release.send(()).unwrap();
+            let told = forget.join().unwrap();
+            assert_eq!(told["forgotten"], removed > 0, "{label}: {told}");
+            let read = during.unwrap_or_else(read);
+            let fenced = on && overlapping;
+            assert_eq!(read.current(), !fenced, "{label}");
+            if !overlapping {
+                assert!(!read.text.contains("green"), "{label}: {}", read.text);
+                assert!(read.text.contains("The meeting is at four"), "{label}");
+            }
+            assert_eq!(read.adopt().is_some(), !fenced, "{label}");
+            assert_eq!(
+                served.join().unwrap().len(),
+                3,
+                "{label}: the forget and two opens"
+            );
+            let _ = std::fs::remove_file(&socket);
         }
     }
 
