@@ -552,6 +552,19 @@ fn apply(
         &BTreeMap::new(),
     )
     .map_err(|error| error.to_string())?;
+    crate::head_touch::project(
+        root,
+        &root.join("etc/systemd/system"),
+        &BTreeMap::new(),
+        &signed.settings,
+        &mut steps,
+    )?;
+    crate::head_touch::verify(
+        root,
+        &root.join("etc/systemd/system"),
+        &BTreeMap::new(),
+        &steps,
+    )?;
     if let Some(plan) = &signed.reset_plan {
         steps.extend(
             reset_plan_step(root, plan, &recorded.settings).map_err(|error| error.to_string())?,

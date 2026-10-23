@@ -38,6 +38,9 @@ use std::{
 #[path = "round/process_cuts.rs"]
 pub(crate) mod process_cuts;
 
+#[path = "round/head_touch.rs"]
+mod head_touch;
+
 #[path = "round/restart_order.rs"]
 mod restart_order;
 #[path = "round/restart_quiet.rs"]

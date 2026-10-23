@@ -736,7 +736,20 @@ impl Run<'_, '_> {
             .map_err(|error| Outcome::Failed(format!("the units cannot be read: {error}")))?;
         let carried = self.carried_units(&manifest, &installed)?;
         let taken = self.models_of(&manifest, state, &installed)?;
-        self.settings_of(&manifest, state, envelope)?;
+        let future_units: BTreeMap<String, String> = carried
+            .iter()
+            .filter(|(name, _)| {
+                installed.iter().any(|part| {
+                    &part.unit == *name
+                        && manifest
+                            .files
+                            .iter()
+                            .any(|file| file.name == part.program.binary)
+                })
+            })
+            .map(|(name, text)| (name.clone(), text.clone()))
+            .collect();
+        self.settings_of(&manifest, state, envelope, &future_units)?;
         // A part that reads a model or a setting the switch changes is
         // restarted with it. Not for the reset plan: the reset reads it
         // again each time the button is held (#806).
@@ -770,6 +783,36 @@ impl Run<'_, '_> {
             &forced,
         )
         .map_err(Outcome::Refused)?;
+        if manifest.settings.is_empty() {
+            crate::head_touch::verify(
+                &self.config.root,
+                &self.config.on(&self.config.units),
+                &future_units,
+                &[],
+            )
+            .map_err(Outcome::Refused)?;
+        }
+        if self
+            .setting_writes
+            .iter()
+            .any(|path| path == crate::head_touch::PINS)
+            && crate::head_touch::active_pins(
+                &self.config.root,
+                &self.config.on(&self.config.units),
+                &future_units,
+            )
+            .map_err(Outcome::Refused)?
+            .as_deref()
+                == Some(crate::head_touch::PINS)
+            && !changes.iter().any(|change| {
+                change.unit == "lamp-controls.service"
+                    && models::reads(&change.after, crate::head_touch::PINS)
+            })
+        {
+            return Err(Outcome::Refused(
+                "head pins need their Controls reader included in the switch".into(),
+            ));
+        }
         self.rollback_order = Some(rollback_order);
         self.fetching = to_fetch(self.config, &changes, &self.placings);
         self.room(&changes)?;
@@ -944,6 +987,7 @@ impl Run<'_, '_> {
         manifest: &Manifest,
         state: &State,
         envelope: Vec<u8>,
+        future_units: &BTreeMap<String, String>,
     ) -> Result<(), Outcome> {
         self.setting_writes.clear();
         self.image_writes.clear();
@@ -957,6 +1001,23 @@ impl Run<'_, '_> {
                 &BTreeMap::new(),
             )
             .map_err(|error| Outcome::Failed(format!("the settings cannot be read: {error}")))?;
+            if self.config.settings {
+                crate::head_touch::project(
+                    &self.config.root,
+                    &self.config.on(&self.config.units),
+                    future_units,
+                    &manifest.settings,
+                    &mut steps,
+                )
+                .map_err(Outcome::Refused)?;
+            }
+            crate::head_touch::verify(
+                &self.config.root,
+                &self.config.on(&self.config.units),
+                future_units,
+                if self.config.settings { &steps } else { &[] },
+            )
+            .map_err(Outcome::Refused)?;
             // Setup's reset plan, over any plan the lamp has (#806).
             if let Some(plan) = &manifest.reset_plan {
                 steps.extend(
@@ -1699,6 +1760,22 @@ impl Run<'_, '_> {
         Ok(())
     }
 
+    fn write_changes(&mut self, changes: &[Change]) -> Result<(), String> {
+        self.write_units(
+            changes
+                .iter()
+                .filter(|change| change.link.is_none() || change.after != change.before)
+                .map(|change| (change.unit.as_str(), change.after.as_str())),
+        )
+        .and_then(|()| {
+            self.set_links(changes.iter().filter_map(|change| {
+                let link = change.link.as_ref()?;
+                Some((link.path.as_str(), link.new.as_str()))
+            }))
+        })
+        .and_then(|()| self.switch_models())
+    }
+
     /// Steps 7 and 8.
     fn switch(
         &mut self,
@@ -1790,8 +1867,20 @@ impl Run<'_, '_> {
         {
             return Outcome::Failed(format!("the journal cannot be written: {error}"));
         }
-        // The settings first, by lamp-update-apply: one that fails puts back
-        // what it wrote, and nothing else has moved.
+        // Head pins depend on the candidate units; other settings retain
+        // their established apply-before-units ordering.
+        let head_pins = changes.iter().any(|change| {
+            change.unit == "lamp-controls.service"
+                && models::reads(&change.after, crate::head_touch::PINS)
+        }) && self
+            .setting_writes
+            .iter()
+            .any(|path| path == crate::head_touch::PINS);
+        if head_pins && let Err(why) = self.write_changes(&changes) {
+            return self.put_back(state, &build, &backs, None, why, String::new());
+        }
+        // Read the candidate units now installed on disk, before restarting
+        // any reader. A failure restores both units and settings from the journal.
         let mut unrestarted = Vec::new();
         if !self.setting_writes.is_empty() {
             self.applying = Some(build.sequence);
@@ -1811,23 +1900,15 @@ impl Run<'_, '_> {
                 unrestarted = self.only_for(&changes, &missing);
             }
         }
-        // A linked part's unit is written only when the build changes it;
-        // its link is what moves.
-        let written = self
-            .write_units(
-                changes
-                    .iter()
-                    .filter(|change| change.link.is_none() || change.after != change.before)
-                    .map(|change| (change.unit.as_str(), change.after.as_str())),
-            )
-            .and_then(|()| {
-                self.set_links(changes.iter().filter_map(|change| {
-                    let link = change.link.as_ref()?;
-                    Some((link.path.as_str(), link.new.as_str()))
-                }))
-            })
-            .and_then(|()| self.switch_models());
-        if let Err(why) = written {
+        if !head_pins && let Err(why) = self.write_changes(&changes) {
+            return self.put_back(state, &build, &backs, None, why, String::new());
+        }
+        if let Err(why) = crate::head_touch::verify(
+            &self.config.root,
+            &self.config.on(&self.config.units),
+            &BTreeMap::new(),
+            &[],
+        ) {
             return self.put_back(state, &build, &backs, None, why, String::new());
         }
         // Writing and reloading took a moment: still quiet, or nothing is
@@ -2182,7 +2263,16 @@ impl Run<'_, '_> {
                 .iter()
                 .filter(|back| models::reads(&text, &back.path))
                 .all(|back| models::is_back(self.config, back));
-            if now.is_ok_and(|now| now == text) && link_as_was && models_as_were {
+            // Controls may have read the candidate pins after a reboot even
+            // when its binary and unit never changed. Reload restored pins.
+            let head_pins_to_restore = journal.settings
+                && models::reads(&text, crate::head_touch::PINS)
+                && apply::wrote(self.records.folder(), journal.build.sequence);
+            if now.is_ok_and(|now| now == text)
+                && link_as_was
+                && models_as_were
+                && !head_pins_to_restore
+            {
                 continue;
             }
             backs.push(Back {

@@ -1073,8 +1073,8 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   `lampos.conf` with no record that is one install ever shipped
   (`apply::TMPFILES_SHIPPED`) is the build's before, and any other is the
   lamp's own. The round looks at this at step 4. A build whose only change is its settings is switched too.
-- **Root, small.** At the switch, after the journal and before any unit,
-  link or model moves, the round stages `apply/request.json` and the
+- **Root, small.** At the switch, after the journal and normally before any
+  unit, link or model moves (the paired head-pins exception is below), the round stages `apply/request.json` and the
   build's envelope in its records and starts `lamp-update-apply.service`
   (`systemctl restart`, which waits for a one-shot). That runs
   `/usr/local/lib/lampos/lamp-update-back apply`, install's fixed copy,
@@ -1091,6 +1091,35 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   there is only what the path rules allow), `/var/lib/lampOS`, the records,
   `/run` (for the tmpfiles) and `/usr/local/libexec`, the update key
   read-only, no network.
+- **Head pins follow their readers (#2948).** When the signed settings carry
+  `/etc/lampOS/controls/controls-pins.json` and Controls actually reads that
+  path, build-owned pins keep
+  `legacy_head: true` with old Voice and Expression units. Only the complete
+  new pair (Voice `LAMP_HEAD_TOUCH=on` and `--controls-mute`, Expression
+  `--head-touch`) gets false. Controls, Expression and Voice's head reader
+  must use the same effective bus root (explicit flag, then `LAMP_BUS_ROOT`,
+  then the default). Voice's enabled privacy reader must share that root too.
+  The helper verifies the signed input first,
+  derives only this compatibility bit, and records the hash of the actual
+  written bytes. Local wiring is still kept by the three-way rule; an
+  incompatible custom file, partial pair, or nonliteral/local override of
+  the mode refuses the round rather than guessing. Harmless exit-note
+  drop-ins do not block it. Controls' effective `--pins` path selects the
+  file checked: build-local/custom active pins are kept byte-for-byte and
+  checked against their readers, while an unused product pins file follows
+  ordinary settings handling without imposing a head-reader restart.
+  Settings-off preserves old pins; a unit change
+  incompatible with those preserved pins is refused before writes.
+  For a head-pins write, candidate units and links are placed after the
+  journal but before apply, so the helper reads the units being installed.
+  No service is restarted until the resulting pins match those units.
+  An older fixed helper still writes the signed bytes unchanged: if that
+  breaks the pair, the round puts everything back and names the mismatch.
+  `lamp-update install` refreshes that fixed helper; a self-update alone
+  does not. A cut after apply restores the pins and restarts their Controls
+  reader even if its unit and binary never changed. This is update-time
+  coordination, with no added work in the live touch path. Host regressions
+  do not establish physical tap latency or flash durability.
 - **Restarted with it.** A part whose unit names a written path, or its
   folder as a folder, is restarted and watched with the switch, as for a
   model: the controls for `controls.json`, the expression for
