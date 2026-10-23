@@ -1401,10 +1401,12 @@ pub enum Ask {
     PhotoAsked(String),
     /// Their yes: kept as an ordinary print. With `LAMP_PHOTO_SPEAKER=on`
     /// (#2856), `face` is the passing id, under its boot (`boot/f3`), of the
-    /// face the voice heard saying it.
+    /// face the voice heard saying it: `None` with no `face` key,
+    /// `Some(None)` with `"face":null`, so the switch off can refuse any
+    /// `face` key as the parser before it did (Fourth's P3 on #3257).
     PhotoYes {
         name: String,
-        face: Option<String>,
+        face: Option<Option<String>>,
     },
     /// Their no: deleted.
     PhotoNo(String),
@@ -1433,7 +1435,15 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
         photo_no: Option<String>,
         visits_yes: Option<String>,
         visits_no: Option<String>,
-        face: Option<String>,
+        /// Absent is `None`, `null` is `Some(None)`: only a yes may carry
+        /// it, even as `null`.
+        #[serde(default, deserialize_with = "present")]
+        face: Option<Option<String>>,
+    }
+    fn present<'de, D: serde::Deserializer<'de>>(
+        given: D,
+    ) -> std::result::Result<Option<Option<String>>, D::Error> {
+        Option::<String>::deserialize(given).map(Some)
     }
     if let Ok(consent) = serde_json::from_slice::<Consent>(line) {
         return match consent {
@@ -3590,9 +3600,20 @@ mod tests {
             ask_of(br#"{"photo_yes":"A","face":"b0/f3"}"#),
             Some(Ask::PhotoYes {
                 name: "A".into(),
-                face: Some("b0/f3".into())
+                face: Some(Some("b0/f3".into()))
             })
         );
+        // `null` is a `face` key too, not its absence (Fourth's P3 on
+        // #3257): told apart for the yes, and refused beside anything else.
+        assert_eq!(
+            ask_of(br#"{"photo_yes":"A","face":null}"#),
+            Some(Ask::PhotoYes {
+                name: "A".into(),
+                face: Some(None)
+            })
+        );
+        assert_eq!(ask_of(br#"{"photo_here":true,"face":null}"#), None);
+        assert_eq!(ask_of(br#"{"photo_no":"A","face":null}"#), None);
         assert_eq!(ask_of(br#"{"photo_no":"A","face":"b0/f3"}"#), None);
         assert_eq!(ask_of(br#"{"photo_here":true,"face":"b0/f3"}"#), None);
         assert_eq!(ask_of(br#"{"photo_asked":"A","face":"b0/f3"}"#), None);
