@@ -282,8 +282,11 @@ pub struct Interruption {
 /// its words come some 0.7 s later.
 pub const BACKCHANNEL_WORDS_WAIT_BLOCKS: u8 = 50;
 /// Speech in the clear in a yield that commits it even when its words are
-/// a backchannel, and that no hold waits past: 400 ms, a sentence.
-pub const BACKCHANNEL_SPEECH_BLOCKS: u8 = 40;
+/// a backchannel, and that no hold waits past: 700 ms, a sentence. A
+/// spoken backchannel runs past 400 ms: on lamp-52e6 on 23 Oct a played
+/// "Yeah." and "Uh-huh.", about 0.5 s of sound each, reached 400 ms in the
+/// clear and committed, their words a backchannel or not yet come (#2939).
+pub const BACKCHANNEL_SPEECH_BLOCKS: u8 = 70;
 
 impl Interruption {
     pub const fn new(rule: Confirmation) -> Self {

@@ -11606,11 +11606,19 @@ fn hear_stop_words(
             count,
             backchannel,
         } => {
-            mask.words(stop, backchannel);
+            // With backchannel holds, words that came empty are none: the
+            // yield is held as a wordless one and resumes at the bound
+            // (#2939, lamp-52e6 on 23 Oct: "0 words" committed a turn).
+            let wordless = count == 0 && mask.holds_backchannels();
+            if !wordless {
+                mask.words(stop, backchannel);
+            }
             eprintln!(
                 "lamp-voice: a yield's words came: {count} {}, {}",
                 if count == 1 { "word" } else { "words" },
-                if stop {
+                if wordless {
+                    "held as a yield with no words"
+                } else if stop {
                     "a stop phrase"
                 } else if backchannel && mask.holds_backchannels() {
                     "a backchannel: the answer goes on"

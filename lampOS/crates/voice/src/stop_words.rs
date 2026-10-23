@@ -317,12 +317,23 @@ pub fn holds_backchannels() -> bool {
 }
 
 /// Words that only acknowledge, said while the lamp speaks: "Mm-hm.",
-/// "Yeah.", "Oh, okay." Hyphens are joined first, so "uh-huh" is "uhhuh".
-/// "Uh", "so", "no", "what" and "huh" are left out: they may begin a turn.
+/// "Yeah.", "Oh, okay." Hyphens and other dashes are joined first, so
+/// "uh-huh", with a hyphen or a dash, is "uhhuh"; the speech-to-text's other
+/// spellings are on it too: "Mhmm.", "Mmm.", "Uh-hum.", "Yea", "Yeh"
+/// (#2939, lamp-52e6 on 23 Oct: a played "Uh-huh." came as one word not on
+/// the list and committed). "Uh", "so", "no", "what" and "huh" are left
+/// out: they may begin a turn; so is "uh-uh", a no. "Oh", "ah", "hm" and
+/// "hmm" only lead another ([`LEADS_ONLY`]).
 const BACKCHANNELS: &[&str] = &[
-    "mm", "mhm", "mmhm", "mmhmm", "hm", "hmm", "uhhuh", "yeah", "yes", "yep", "yup", "ok", "okay",
-    "alright", "right", "oh", "ah", "sure",
+    "mm", "mmm", "mhm", "mhmm", "mmhm", "mmhmm", "hm", "hmm", "uhhuh", "uhhum", "yeah", "yea",
+    "yeh", "yah", "yes", "yep", "yup", "ok", "okay", "okey", "alright", "right", "oh", "ah",
+    "sure",
 ];
+/// Backchannel words that are one only before another ("Oh, okay.", "Hmm,
+/// I see."): alone, "Oh." or "Hmm." may open a turn, and on lamp-52e6 on
+/// 23 Oct a "So." and an "Ahem." said over the lamp each came as one word
+/// taken for a backchannel and held.
+const LEADS_ONLY: &[&str] = &["oh", "ah", "hm", "hmm"];
 /// The same, when the speech-to-text is told Vietnamese (`stt_language`).
 /// "Rồi" and "đúng" are left out: as often a reply ("done", "that's right")
 /// as an acknowledgment (the reviewer-lead on #2959).
@@ -334,6 +345,7 @@ const BACKCHANNEL_PAIRS: &[(&str, &str)] = &[
     ("i", "see"),
     ("all", "right"),
     ("uh", "huh"),
+    ("uh", "hum"),
     ("mm", "hm"),
     ("mm", "hmm"),
     ("got", "it"),
@@ -354,7 +366,11 @@ pub fn lamp_asked(said: &str) -> bool {
 /// phrase.
 pub fn backchannel(heard: &str, vietnamese: bool) -> bool {
     use unicode_normalization::UnicodeNormalization;
-    let heard: String = heard.nfc().filter(|c| *c != '-').collect();
+    // Any hyphen or dash: "uh\u{2011}huh", "mm\u{2013}hm".
+    let heard: String = heard
+        .nfc()
+        .filter(|c| !matches!(c, '-' | '\u{2010}'..='\u{2015}' | '\u{2212}'))
+        .collect();
     let list = if vietnamese {
         BACKCHANNELS_VI
     } else {
@@ -373,7 +389,8 @@ pub fn backchannel(heard: &str, vietnamese: bool) -> bool {
         at += if pair { 2 } else { 1 };
         units += 1;
     }
-    !heard.contains('?') && (1..=2).contains(&units) && !stop_phrase(&heard)
+    let leads_only = !vietnamese && said.iter().all(|word| LEADS_ONLY.contains(&word.as_str()));
+    !heard.contains('?') && (1..=2).contains(&units) && !leads_only && !stop_phrase(&heard)
 }
 
 /// Whether `word`, lower case, is one of the stop words, or a word of a
@@ -786,7 +803,13 @@ impl StopWords {
             // before the yield, leave it undecided and its commit held
             // (reviewer-two's P2 on #3200). A backchannel so far is told,
             // and told again as words if a later final adds more.
-            if self.yielded && decides && (!self.told || self.yield_backchannel) {
+            // A final with no words is none: the yield stays undecided,
+            // and resumes at the bound as with no words (#2939).
+            if self.yielded
+                && decides
+                && !heard.trim().is_empty()
+                && (!self.told || self.yield_backchannel)
+            {
                 if !self.yield_words.is_empty() {
                     self.yield_words.push(' ');
                 }
@@ -1922,6 +1945,16 @@ mod tests {
             ("Yeah?", false, false),
             ("Uh", false, false),
             ("So", false, false),
+            // Alone they may open a turn; before another they lead it.
+            ("Oh.", false, false),
+            ("Hmm.", false, false),
+            ("Oh, oh.", false, false),
+            ("Hmm, okay.", false, true),
+            // The speech-to-text's spellings, any dash (#2939).
+            ("Mhmm.", false, true),
+            ("Uh\u{2011}huh.", false, true),
+            ("Mm\u{2013}hm.", false, true),
+            ("Uh-uh.", false, false),
             ("No.", false, false),
             ("Yeah, yeah, yeah.", false, false),
             ("", false, false),

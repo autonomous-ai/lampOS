@@ -896,7 +896,10 @@ once that backchannels aren't held, and nothing changes. On lamp-52e6 on 22 Octo
   plainly. With the switch, while its words are awaited, that commit is
   held (`Interruption::hold_backchannels` in `audio/src/duplex.rs`): on the
   quiet rule until they come, on the speech rule only while the speech is
-  under 400 ms (`BACKCHANNEL_SPEECH_BLOCKS`). The hold is tied to when
+  under 700 ms (`BACKCHANNEL_SPEECH_BLOCKS`; it was 400 ms until lamp-52e6
+  at 12:56 on 23 October, where a played "Yeah." and "Uh-huh.", some 0.5 s
+  of sound each, reached it and committed as turns, with `heard-always` and
+  with `heard`). The hold is tied to when
   the words are asked for, after 100 ms of stillness, not to when the
   commit fell due: it lasts until 500 ms after the ask
   (`BACKCHANNEL_WORDS_WAIT_BLOCKS`; the relay answers in about 250-350 ms),
@@ -906,21 +909,29 @@ once that backchannels aren't held, and nothing changes. On lamp-52e6 on 22 Octo
   request kept for the commit is never older than the duplex hold allows;
   the mask remembers as many blocks as for a waited sound (`WAITED_HEARD`).
 - **A backchannel resumes.** Words of one or two, all on the list, with no
-  "?" and no stop phrase (`stop_words::backchannel`, read after hyphens are
-  joined and NFC): mm, mhm, mmhm, mmhmm, hm, hmm, uhhuh, yeah, yes, yep,
-  yup, ok, okay, alright, right, oh, ah, sure; a pair counts as one word:
-  "I see", "all right", "uh huh", "mm hm", "mm hmm", "got it", so "Oh, I
+  "?" and no stop phrase (`stop_words::backchannel`, read after hyphens
+  and other dashes are joined and NFC): mm, mmm, mhm, mhmm, mmhm, mmhmm,
+  uhhuh, uhhum, yeah, yea, yeh, yah, yes, yep, yup, ok, okay, okey,
+  alright, right, sure, the speech-to-text's spellings among them (on
+  lamp-52e6 on 23 October a played "Uh-huh." came as one word not on the
+  list and committed); oh, ah, hm and hmm only before another
+  (`LEADS_ONLY`: "Oh, okay." and "Hmm, I see." are backchannels, a lone
+  "Oh." or "Hmm." commits; that day a "So." and an "Ahem." over the lamp
+  each came as one such word and were held); a pair counts as one word:
+  "I see", "all right", "uh huh", "uh hum", "mm hm", "mm hmm", "got it", so "Oh, I
   see." and "Okay, sure." are backchannels (`BACKCHANNEL_PAIRS`; on
   lamp-52e6 on 23 October "Right" came as two words and committed); with `stt_language` vi, ừ,
-  ừm, ờ, à, ồ, dạ, vâng, ok. Left out, so they commit: uh, so, no, what,
+  ừm, ờ, à, ồ, dạ, vâng, ok. Left out, so they commit: uh, uh-uh, so, no, what,
   huh, hả, and "rồi" and "đúng", as often a reply as an acknowledgment.
   Nor are they a backchannel when the lamp's last finished sentence
   before the yield was a question (`stop_words::lamp_asked`, from the
   lamp's words stamped by when they play): "Yes." to "Shall I go on?" is
   an answer and commits, as today. The resume wait (400 ms of stillness) then resumes the
   answer, and the candidate is suppressed, so no turn starts. A backchannel
-  commits only if its speech reaches 400 ms, a sentence.
-- **Anything else commits at once**, empty words included.
+  commits only if its speech reaches 700 ms, a sentence.
+- **Anything else commits at once.** Empty words are no words (below), on
+  both modes: on lamp-52e6 on 23 October "a yield's words came: 0 words"
+  committed a turn; the journal now says "held as a yield with no words".
 - **No words resume the answer.** A yield whose words never come, by the
   bound or before the yield ends, resumes the reply as a backchannel does:
   no turn, no cut (lamp-52e6 on #3200: 2.3 s into a story a wordless yield,
@@ -929,7 +940,7 @@ once that backchannels aren't held, and nothing changes. On lamp-52e6 on 22 Octo
   commit was held 200 ms: the answer goes on"). Words that come after are
   dropped with the yield: a slow speech-to-text starts no second answer and
   leaves nothing yielding; a person who goes on talking yields the lamp
-  again. Only speech reaching 400 ms, a sentence, commits without words
+  again. Only speech reaching 700 ms, a sentence, commits without words
   ("... committed"). A stop phrase ("wait" is one) and a forced
   `stop/heard` are never held.
 - **With `heard-always`** (#2939, lamp-52e6 at 09:44 on 23 October: 5 of
