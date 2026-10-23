@@ -9,7 +9,9 @@ The first invocation passed formatting, strict all-target VoiceEval Clippy
 and workspace build. Its full test package was launched in the restricted
 sandbox by mistake: **509 passed, 114 failed**. Of those failures, 113
 explicitly reported denied fixture socket bindings; one failed reading a
-missing relay file. This is invalid qualification, not a product result.
+missing relay file; the cause of that missing-file observation was not traced.
+The denied socket operations invalidate this invocation as full qualification;
+the separate missing-file failure remains unclassified.
 All output and command metadata are retained in [restricted.json](restricted.json).
 
 The unchanged full package command then ran once with the required local

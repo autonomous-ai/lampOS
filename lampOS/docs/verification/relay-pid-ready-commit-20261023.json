@@ -4,5 +4,7 @@
   "head": "e228f645212fa32d6e9c1446f6d01621fe2c563d",
   "base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
   "range_diff": "1:  7f2f0eeccd = 1:  e228f64521 lampOS: wait for the relay worker PID write before closing transport\n",
-  "full_current_base_gate": "pending"
+  "full_current_base_gate": "pending",
+  "qualified_source_branch": "tests/1569-relay-qualified-base62",
+  "historical_commit_available": "Pushed after reviewer P3; immutable controlled source now fetchable by commit."
 }

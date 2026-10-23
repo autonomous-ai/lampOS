@@ -1,5 +1,14 @@
 # Tests work log
 
+## 2026-10-23 17:06 +0700 — relay review provenance clarification
+
+Ready for lamp-voice: yes (#3255; reviewer gate remains).
+
+The exact original controlled source `7f2f0eecc` is now published on
+`tests/1569-relay-qualified-base62` after reviewer P3. The restricted run
+contains 113 explicit permission denials and one unclassified missing-file
+failure; no causal claim is made for the latter. Raw outputs are unchanged.
+
 ## 2026-10-23 17:02 +0700 — relay ready; exact-head Linux formatting published
 
 Ready for lamp-voice: yes (#3255; reviewer read and train remain).
