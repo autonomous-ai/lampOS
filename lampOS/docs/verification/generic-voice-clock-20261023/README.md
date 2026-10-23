@@ -65,6 +65,15 @@ Native gates for the exact head subsequently passed:
 - [Linux Clippy 39938443224](https://github.com/autonomous-ai/lampOS/actions/runs/39938443224):
   every workspace crate and target passed with warnings denied.
 
-The reviewer-lead posted READ-OK on the exact head. Explicit Linux
-formatting remains with Tests; the integration base is still `b5a199368`.
-No CI rerun or test weakening was used.
+The reviewer-lead posted READ-OK on the exact head. Linux formatting also
+passed in [receipt 0fd7a46b9](https://github.com/autonomous-ai/lampOS/tree/0fd7a46b9/lampOS/docs/verification/generic-voice-unit-linux-fmt-20261023),
+with Rust/Cargo 1.96.0 and rustfmt 1.9.0 on Linux x86_64. The receipt's
+commit, parent, root tree and lampOS tree match the pushed source locally;
+all 21 indexed receipt files and 20 embedded raw streams have verified
+hashes. The raw formatter sentinel is `cargo_fmt_exit=0`, and before/after
+source fingerprints match. The archive audit records 6,680 verified Git
+blob/mode identities. An earlier archive preparation timeout is retained;
+only the export budget changed, and the formatter ran once.
+
+The integration base is still `b5a199368`. First owns merge. No CI rerun
+or test weakening was used.

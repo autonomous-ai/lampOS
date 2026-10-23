@@ -5,6 +5,24 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 17:46 — clock formatting verified; merge belongs to First
+
+Ready for lamp-voice: yes (#3260); no device acceptance is claimed.
+
+- Verified the exact-head Linux format receipt at `0fd7a46b9`: all 21
+  indexed files and 20 raw streams hash correctly, the source commit,
+  parent and trees match `7c3693e66`, and the one formatter invocation
+  exited zero with matching source fingerprints. The archive timeout is
+  retained as preparation evidence, not a failed formatter retry.
+- #3260 now has Mac/Linux fmt, strict Clippy, host update gates, successful
+  native ARM64 and reviewer-lead READ-OK on current `b5a199368`. The PR
+  body and Queue carry the result. First owns its latest-base merge.
+- All remaining Third work is blocked on named owners: Second supplies
+  the #2948 settings transition fix for review; El supplies #3248's
+  retained-hand fix; the physical/product and Live comparison rows remain
+  with First/Fifth and their attending operators. No local or CI job is
+  left running for this change.
+
 ## 2026-10-23 17:44 — clock native gates green; remaining work has owners
 
 Ready for lamp-voice: no (exact-head Linux formatting receipt pending).
