@@ -7651,3 +7651,50 @@ skills, so removal across updates needs an explicit retained disabled state.
 #2800 still depends on the tone person session. The lead coordinates the
 remaining #1809 and #2824 person checks. No lamp, install, provider call,
 product-default activation or quality-row increase occurred.
+
+## 2026-10-23 09:19 +07: Common native gate, review corrections and Peek access qualification
+
+Common #3064 is published as `bf6b4e96a`, one commit on `b7700b7c2`.
+ARM64 run 39886004723 passed 10,930 tests, zero failed, 67 skipped,
+including one leaky pass; four doc and twelve own-harness tests also passed.
+All 28 required controls have actual PASS lines. Strict Linux workspace
+all-target Clippy run 39886004747 passed. Both executed merge `240f16690`,
+tree `2f75b5f83`: only `docs/build-rows.md` differs from the author tree.
+The uploaded archive digest and all 49 manifest members were verified
+without extracting another binary tree. This is PR-profile merge-tree
+qualification, not signed release or lamp acceptance. Receipts are under
+`/private/tmp/fourth-common-ci-bf6b4e96a-20261023/`.
+
+Mac formatting, strict workspace Clippy, workspace build and all Eyes tests
+passed. Full Memory retained two failures (289 passed, 6 ignored before
+that target stopped), and Voice retained one (3,911 passed, 14 ignored
+including separately completed remaining targets). Each failed case passed
+once alone on unchanged source; that does not replace the failed full runs
+or establish their cause. Original commands, exits and source hashes remain
+in `/private/tmp/fourth-common-train23-checks-20261023/`. No assertion or
+timeout was weakened.
+
+The returning-track carry has reviewer-three's READ-OK. Reviewer-lead's
+settings/default and current known-person lamp P2s remain open. The docs
+now distinguish the unleased private-context refusal from unchanged
+session-person journalling, and label the old lamp results as historical.
+A source-only proposal for First records the four missing 4ace unit entries,
+compatible Voice/Eyes binary requirement and stationary-face cadence cost;
+no unit or lamp was changed. The later train introduced fresh conflicts;
+the current carry preserves the late keeper as write-only and adds a
+constructor regression. Its source is not covered by the published CI.
+
+Peek #2789 piece 2 has passed Mac formatting, strict workspace Clippy,
+four reader controls and six census controls. Its full fourteen-crate
+affected/consumer gate continues on frozen source. Linux Clippy found one
+needless borrow in the root-only DAC test, retained for correction after
+that frozen run. Linux Records' earlier focused run passed 143 tests;
+the final cross-identity access and thirteen distinct-group rollback
+controls have not yet executed. An older-binary compatibility fixture is
+also underway. No account, default, unit, bus access or lamp changed.
+
+Fetched `b3a1ece0b` and fast-forwarded the clean primary checkout; its
+AGENTS.md includes the current Queue and one-build-apart rules. Read
+Queue and own PR comments through 09:14:23 and answered on #3064 and #3126.
+Name/Photo publication still waits for merged Common. The separate Peek
+subscriber grant and Photo removal-state decisions are with First.
