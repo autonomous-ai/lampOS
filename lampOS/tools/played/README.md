@@ -187,10 +187,14 @@ ARMS="off:LAMP_X=off" lampOS/tools/played/desk-kit.sh --dry [SCENARIO ...]
   on lamp-voice (`zz-desk-kit.conf` included: another run's, or one left
   behind, to be removed by hand) or its face is already shown, and stops
   on an HTTP 429 from the relay. On any exit it closes the face, and
-  removes the drop-in and restarts the voice only when this run wrote it:
-  the first arm creates the file only if none is there, its first line
-  names this run, and the file is removed only while that line is still
-  in it. An interrupt before the first arm leaves the lamp as it was.
+  removes the drop-in and restarts the voice only when this run wrote it.
+  The file's first line names this run. Under one lock on the lamp
+  (`flock /run/lock/desk-kit.lock`), the first arm writes it only if none
+  is there, a later arm only while that line is still in it, and the
+  put-back removes it only then. When the file is no longer this run's,
+  it writes nothing and stops (exit 3). Each write is staged first, so a
+  cut-off send leaves no empty drop-in. An interrupt before the first
+  arm leaves the lamp as it was.
 - **The face**: `FACE`, an image or page on your Mac (never in the repo),
   shown full screen on the built-in display for the whole run (`FACE_SIZE`,
   default `1728,1117`), as a person facing the lamp. Without it no face is
