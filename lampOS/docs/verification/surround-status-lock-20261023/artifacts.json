@@ -1,0 +1,151 @@
+{
+  "controls": [
+    {
+      "control": "before-host-stall",
+      "binary": "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-50a8a8b420ba541f",
+      "bytes": 35718728,
+      "sha256": "a51aa7fc8a5568607d984f779253f9dc2e44ea05ecf56a141d93b8112ebcea85",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [
+        "default"
+      ],
+      "fresh": false,
+      "test_count": 263,
+      "inventory_sha256": "ea955eb57bd58ab120de25f6ae21894bd28355445baa69e42b79f4ccb240ffa2",
+      "binary_architecture": "Mach-O 64-bit x86_64"
+    },
+    {
+      "control": "after-host-stall",
+      "binary": "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-50a8a8b420ba541f",
+      "bytes": 35724080,
+      "sha256": "9a9ccef705b9e6a1cf90ae074dc3af3a9526e8aa595d6ca424e4749cd16bdfba",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [
+        "default"
+      ],
+      "fresh": false,
+      "test_count": 263,
+      "inventory_sha256": "ea955eb57bd58ab120de25f6ae21894bd28355445baa69e42b79f4ccb240ffa2",
+      "binary_architecture": "Mach-O 64-bit x86_64"
+    },
+    {
+      "control": "held-poll-lock",
+      "binary": "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-50a8a8b420ba541f",
+      "bytes": 35724032,
+      "sha256": "b0c3340fee6e91343e6717b61b4f4b988865e3e753f4e4ab26d215e744b4d752",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [
+        "default"
+      ],
+      "fresh": false,
+      "test_count": 263,
+      "inventory_sha256": "ea955eb57bd58ab120de25f6ae21894bd28355445baa69e42b79f4ccb240ffa2",
+      "binary_architecture": "Mach-O 64-bit x86_64"
+    },
+    {
+      "control": "missing-deadline",
+      "binary": "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-50a8a8b420ba541f",
+      "bytes": 35724176,
+      "sha256": "8bdb970db6b53bb1a51927016083f0e010af424f40b0a43d2b63c8f27bfcb9ac",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [
+        "default"
+      ],
+      "fresh": false,
+      "test_count": 263,
+      "inventory_sha256": "ea955eb57bd58ab120de25f6ae21894bd28355445baa69e42b79f4ccb240ffa2",
+      "binary_architecture": "Mach-O 64-bit x86_64"
+    }
+  ],
+  "final_full_suite": {
+    "groups": [
+      {
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      {
+        "passed": 263,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      }
+    ],
+    "totals": {
+      "passed": 265,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "test_wall_seconds": 167.353925,
+    "binaries": [
+      {
+        "path": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_surround-680e78289ba86dfe",
+        "bytes": 6084332,
+        "sha256": "d2cca01c8fdda204c9abbd55b9031a7bbde52f6c4bda7c63c3904da0893a85bd",
+        "file": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_surround-680e78289ba86dfe: Mach-O 64-bit executable x86_64",
+        "mtime_ns": 1792715118636267860,
+        "unchanged_since_test_command_completed": true
+      },
+      {
+        "path": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_surround-c5702477f0c8320a",
+        "bytes": 941840,
+        "sha256": "cafe4cea82c6feb8d13ea3b14004eea6272b4807e6d9ef5c0a469243d6eb35da",
+        "file": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_surround-c5702477f0c8320a: Mach-O 64-bit executable x86_64",
+        "mtime_ns": 1792715120092470384,
+        "unchanged_since_test_command_completed": true
+      },
+      {
+        "path": "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-50a8a8b420ba541f",
+        "bytes": 35724096,
+        "sha256": "f0a04951fe4f18e0ef35898197d4d2ba18ed8c9faabb710b996dc9cc6e7a6ad9",
+        "file": "/private/tmp/tests-codex-small-native-20261022/debug/deps/it-50a8a8b420ba541f: Mach-O 64-bit executable x86_64",
+        "mtime_ns": 1792715133107415550,
+        "unchanged_since_test_command_completed": true
+      }
+    ]
+  },
+  "bulk_inventory_limit": "Full --list streams remain external; count, digest and named-test uniqueness were checked before each control."
+}

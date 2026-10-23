@@ -1,0 +1,50 @@
+{
+  "branch": "tests/1339-surround-status-lock",
+  "env": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-small-native-20261022",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true"
+  },
+  "RUST_TEST_THREADS": "unset",
+  "host_context": "SMALL and CPU exclusively assigned; MAIN unused by this task",
+  "architecture_limit": "Compiler and binary architecture recorded; physical hardware/translation not inferred.",
+  "reverse_dependents": {
+    "packages": [
+      "lamp-surround"
+    ],
+    "reverse_dependents": [],
+    "method": "Transitive incoming resolved dependency edges among workspace members, including dev/build dependencies."
+  },
+  "linux_formatting": {
+    "argv": [
+      "/usr/local/bin/podman",
+      "run",
+      "--rm",
+      "--network=none",
+      "--pull=never",
+      "-i",
+      "localhost/lampos-fourth-native-user-check:latest",
+      "sh",
+      "-c",
+      "mkdir -p /tmp/source && tar -xf - -C /tmp/source && cd /tmp/source/lampOS && rustc -vV && cargo fmt --all --check"
+    ],
+    "started_utc": "2026-10-23T00:30:30.102863+00:00",
+    "exit_code": 0,
+    "timed_out": false,
+    "wall_seconds": 18.897426732815802,
+    "archive_sha256": "abe6c9876033ac2769add25c729bd097c6a39f8e1d64d0c5f7bcc1bafa0a29cc",
+    "archive_bytes": 215879680,
+    "scope": "HEAD git archive overlaid with exact frozen candidate file bytes; no shared native target and no compilation; no network",
+    "stdout": {
+      "bytes": 196,
+      "sha256": "f64c55ed9f210d80a9b248206104a47175faf5ec94a093e4ad132549209089fc"
+    },
+    "stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}
