@@ -8201,7 +8201,7 @@ Only those two test-only compiler corrections were applied; assertions
 are unchanged. Corrected tree bd269b7b1 is under fresh gates. No Photo
 native qualification, origin approval, lamp result or score is claimed.
 
-## 2026-10-23 21:23 +07: Photo current Common carry pushed
+## 2026-10-23 21:21 +07: Photo current Common carry pushed
 
 Ready for lamp-voice: no (#2988 original-capture, review and physical holds)
 
@@ -8229,3 +8229,23 @@ as five product/test/documentation paths, without a runtime delta. Its own
 both-host gates are next; product activation remains held for review and
 First's person-at-lamp checks. Common's current source/settings dispositions
 remain with First, reviewer-lead and El; its native receipt is already posted.
+
+## 2026-10-23 21:36 +07: Photo native receipt verified; train 50 carry
+
+Ready for lamp-voice: no (#2988 origin, review and physical holds)
+
+Photo c71274d32 passes ARM64 39967057269 and Clippy 39967057642.
+Native: 11220/0/69, one leaky pass, no selected tests unrun. All 96 Photo
+and 80 Common dependency controls pass (175 distinct); docs 4/0, process
+12/0 and relay pass. Both workflows executed exact author tree c419e6c26.
+Artifact 12507514335 has all 49 checksums and AArch64 ELF headers verified.
+Public receipt: verification/photo-current-native-20261023/receipt.json.
+
+Train 50 09f8e7412 landed during these checks. Object-level integration
+finds no path overlap or conflict for Common, Photo or Name, and every own
+blob/mode is exact, but that is not a new-source gate. The clean Common
+carry will be checked after Name's frozen local gates release the targets;
+Photo and Name follow its qualified dependency. Old-source observations
+stay retained. Name Mac has passed all 112 selected controls, with helper
+first/repeated entry-to-return 411/90 microseconds; workspace build and
+Linux checks remain active. No device, replay-proof or row-score claim.
