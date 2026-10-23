@@ -426,7 +426,7 @@ agent on the person's computer
    `lamp-addons` drops every `addon/proposal` whose source is not `skills`
    (`crates/addons/src/runtime.rs`). It gains one more accepted source, the
    remote service, stamped as such: its proposals carry `addon` as
-   `remote:<computer>`, and the judge gives them their own, stricter rates
+   `remote-<computer>` (below), and the judge gives them their own, stricter rates
    and their own reasons (below). The service never writes as `lamp-skills`
    and never impersonates an add-on on the lamp.
 3. **Release: after the 70 shipping rows**, off by default. addons.md has
@@ -459,8 +459,9 @@ In Harness's terms (`addon.publish`, openharness#1485):
 | `at` | optional, the device's time in Unix ms | the lamp's wall clock when the summary was made |
 
 Harness forgets what was published on every hello and on a restart, and
-the service then publishes its whole set again. With the yes withdrawn it
-publishes nothing.
+the service then publishes its whole set again, if the yes still holds.
+With the yes withdrawn it publishes nothing. Withdrawing is not the same as
+stopping, though: see "Withdrawing the yes" below.
 
 ### What a proposal becomes
 
@@ -472,13 +473,39 @@ it with a reason given back as the decision:
 | Harness | `AddonProposal` |
 |---|---|
 | `proposalId` | kept by the service with the lamp's own `proposal` number, to send the decision back |
-| `addon` | not trusted: `remote:<computer>`, from the machine Harness says it came from; the given name is journaled only |
+| `addon` | not trusted: `remote-<computer>`, where `<computer>` is the first 12 lowercase hex digits of the SHA-256 of the machine id Harness says it came from; the given name is journaled only |
+| (none) | `version`: the remote contract's, `1.0.0` for this design, never the agent's |
 | `act` | `light` or `say`; anything else is dropped (`not_for_remote`) |
 | `why` | one of the remote reasons (below); anything else is dropped |
 | `sure` | as given, 0 to 1 |
 | `holdsMs` | as given, 1 s to 30 s; the lamp judges with its own clock and drops one received late |
 | `params` | for `light`: colour, level 1 to 5, optional pattern, as `AddonLight` |
-| `note` | for `say` only: the line, at most 300 bytes, quoted and untrusted as every add-on note is |
+| `note` | for `say` only, and only if a remote say carries words at all (open, below): at most 300 bytes on one line, quoted and untrusted as every add-on note is |
+
+**The conversion, checked against today's validator**
+(`AddonProposal::check`, `crates/msgs/src/addon.rs`). Without these, a
+proposal the judge accepted the source of would still be dropped as not
+well formed:
+
+- **Name.** `remote-` and 12 hex digits is 19 characters of lowercase
+  letters, digits and hyphens, so it passes today's name check unchanged.
+  So that no skill on the lamp can take it, `lamp-skills` refuses to load a
+  folder whose name starts `remote-`. That refusal lands at least one build
+  before the judge accepts the remote source. The judge tells the two
+  writers apart by the bus source, not by the name; the name only keys the
+  rates and the journal.
+- **Version.** A remote proposal has no installed package to take a
+  version from. It carries the contract's version, `1.0.0`, which passes
+  the MAJOR.MINOR.PATCH check.
+- **Reasons.** The remote reasons are not in `ADDON_WHYS` today. Adding
+  them is a schema change to `crates/msgs`, landed with its readers, and
+  the judge accepts each one only from the remote source.
+- **Note.** Harness's `note` allows a newline; lampOS's check refuses every
+  control character. The service drops a note with any control character,
+  as `note_not_one_line`, and never rewrites it: changing an untrusted line
+  to make it pass would let it carry what the check refuses. If the first
+  version takes no words for a remote say (open, below), every `note` is
+  dropped as `no_remote_words`.
 
 The kept or dropped answer goes back as `addon.decision` (`decision`, and
 `reason`: the rule that decided, at most 200 characters). A decision that
@@ -496,14 +523,41 @@ first.
 - **Off** (the service's switch not set): it opens nothing, publishes
   nothing and writes nothing; the judge's accepted sources are what they
   are today.
-- **The yes withdrawn:** every topic is withdrawn (`null`), and every
-  proposal from that computer is dropped, `by` rule, "no yes for this
-  computer".
+- **The yes withdrawn:** on the lamp it takes effect at once, with no
+  network needed. The service publishes nothing more, and the judge drops
+  every proposal from that computer, `by` rule, "no yes for this computer".
+  What the computer has already read cannot be taken back (see
+  "Withdrawing the yes").
 - **Harness not installed, signed out, or its daemon down:** the service
   publishes nothing, and its health says why, as `lamp-tasks`' does.
 - **The lamp asleep, paused or private:** the judge drops, as for any
   add-on. The service sends no queue of old proposals afterwards: a
   proposal holds 30 s at most.
+
+### Withdrawing the yes
+
+Harness keeps a device's published values readable after its link closes
+(openharness#1485, "Lifetime"). They go only when the device sends a new
+hello, someone unpairs it, or that computer's daemon restarts. So if the
+yes is withdrawn while the link is down, the `null` batch cannot arrive,
+and agents on the computer can still read the last summaries. This design
+does not claim more than that:
+
+- **On the lamp, immediate:** as in "Off, out and failing" above.
+- **Toward the computer, acknowledged:** the service sends `null` for every
+  topic, and counts the withdrawal as done only when Harness answers that
+  batch, or when the next hello has cleared everything. Until then it keeps
+  the withdrawal pending on disk across restarts, retries when the link is
+  back, and publishes nothing new, even if the yes is given again, before
+  the withdrawal is acknowledged.
+- **What the person is told:** "withdrawn on the lamp". While it is
+  pending: "your computer may still show the lamp's last summaries until
+  it reconnects".
+- **To settle in openharness#1654, before any code:** the published
+  values of a device whose link is closed must expire, or be cleared when
+  the link closes, and there must be a revocation that reaches the
+  computer without waiting for the lamp. Until Harness has one, the
+  retained cache is a known limit, written in the app's consent words.
 
 ### Open for remote add-ons
 
