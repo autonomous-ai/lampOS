@@ -8049,8 +8049,8 @@ mod tests {
         std::fs::remove_file(&socket).unwrap();
     }
 
-    /// Mai and Lan, two known people, for `LAMP_MEMORY_ROOM_AFTER_FORGET`.
-    const MAI: &str = "p-0a1b2c3d4e5f6071";
+    /// Lan, a second known person beside [`MAI`], for
+    /// `LAMP_MEMORY_ROOM_AFTER_FORGET`.
     const LAN: &str = "p-8192a3b4c5d6e7f8";
 
     /// The memory of the c0a4 case (#2849, #1693): a known person's own
