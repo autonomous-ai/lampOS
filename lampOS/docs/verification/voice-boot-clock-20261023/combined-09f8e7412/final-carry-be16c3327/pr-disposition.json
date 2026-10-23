@@ -1,0 +1,25 @@
+{
+  "combined": {
+    "baseRefName": "lamp-voice",
+    "headRefOid": "224e0bd767e23e6d420f29830de9a4f55c3b0c3b",
+    "isDraft": true,
+    "mergeStateStatus": "UNSTABLE",
+    "mergeable": "MERGEABLE",
+    "number": 3190,
+    "state": "OPEN",
+    "title": "lampOS: bind fixture clocks, observe child startup and cue peer closure",
+    "url": "https://github.com/autonomous-ai/lampOS/pull/3190"
+  },
+  "superseded": {
+    "headRefOid": "55f671b12ef08c93f11ae235980f69cf7059b7a8",
+    "isDraft": true,
+    "mergedAt": null,
+    "number": 3271,
+    "state": "CLOSED",
+    "url": "https://github.com/autonomous-ai/lampOS/pull/3271"
+  },
+  "peer_branch_retained": true,
+  "closure_comment": "https://github.com/autonomous-ai/lampOS/pull/3271#issuecomment-6368957577",
+  "local_full_gate_is_failed": true,
+  "readiness": "Draft/HOLD retained; no failure waived."
+}

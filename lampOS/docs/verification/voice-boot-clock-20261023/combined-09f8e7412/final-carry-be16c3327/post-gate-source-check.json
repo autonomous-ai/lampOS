@@ -1,0 +1,10 @@
+{
+  "head": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+  "status": " M lampOS/crates/voice/tests/it/fixture_provider.rs\n M lampOS/docs/voice-test-fixtures.md\n",
+  "hashes": {
+    "lampOS/crates/voice/tests/it/fixture_provider.rs": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+    "lampOS/docs/voice-test-fixtures.md": "77388c4a7523c56e20e5cbe9406f721e52db4463be34482ff831b6a0dd884615"
+  },
+  "combined_diff_sha256": "bb3763ab79a30e2e9a1f902e4a36b679590dc08966d304aec4f1cd996f78e0ea",
+  "preparation_observation": "Initial read-only status parser stripped leading porcelain spaces and rejected the expected two paths; corrected parser retains raw status bytes. No source or Git mutation and no test command occurred."
+}

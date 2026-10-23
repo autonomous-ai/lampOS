@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-23T15:55:39.117699+00:00",
+  "refs": {
+    "refs/heads/tests/archive-3190-executed-base-4e8ea747cd-20261023": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+    "refs/heads/tests/archive-3190-executed-combined-72a62a51c-20261023": "72a62a51c065002eeff4407dba77c56088e3649f"
+  },
+  "remote_verified": true,
+  "creation": "Both refs absent before push; each push ref used an empty explicit lease.",
+  "precommit_base_role": "4e8 is the rebased boot commit before the two peer overlays.",
+  "executed_tree_role": "72a62 binds the exact complete executed overlay on09f after execution; no execution timestamp was rewritten.",
+  "branch_status": ""
+}

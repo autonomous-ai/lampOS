@@ -1,0 +1,27 @@
+{
+  "before": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+  "after": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+  "tree_entries_before": 10055,
+  "tree_entries_after": 10055,
+  "identical_entries_except_named_document": 10054,
+  "changed": {
+    "lampOS/docs/build-rows.md": {
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "oid": "3f744c60776ff4e881af9ff602a3ea950e53516e"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "oid": "f73cf7f994ab1ac48be864a4fcd28712da1dfa7e"
+      }
+    }
+  },
+  "diff": {
+    "encoding": "utf-8",
+    "bytes": 4101,
+    "sha256": "29e335e994a0bebaf0654ea2fc521869832a4d79a16eb50efcea268ac6516d70",
+    "text": "diff --git a/lampOS/docs/build-rows.md b/lampOS/docs/build-rows.md\nindex 3f744c6077..f73cf7f994 100644\n--- a/lampOS/docs/build-rows.md\n+++ b/lampOS/docs/build-rows.md\n@@ -1,8 +1,8 @@\n # Where V2 is: the build rows and the quality rows\n \n-Written by the first builder from the team's review page at 2026-10-23 18:58 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.\n+Written by the first builder from the team's review page at 2026-10-23 21:47 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.\n \n-**Build 92.3% over 70 rows. Quality 63.4% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.\n+**Build 92.4% over 70 rows. Quality 63.4% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.\n \n **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.\n \n@@ -68,7 +68,7 @@ Written by the first builder from the team's review page at 2026-10-23 18:58 (+0\n | Keeps going when one part fails | 1.00 | \u2014 | \u2014 | Built: each part its own unit, restarted alone, health says how the lamp is |\n | Change the Wi-Fi, name or time zone after setup, without a reset | 0.95 | #1982 #1995 #2038 #2851 #2852 #2853 | fourteen, nine | 22 Oct 16:1x, up from 0.9: the settings and Wi-Fi helpers take a request only from lamp-cloud\u2019s unit (#2696), and install puts their units on every product lamp (Sixth\u2019s #2926, carried as #2955). |\n | Hand-overs from a home lamp: Harness installed, the person signed in | 0.88 | #751 #765 #798 #1854 #2702 #2838 #2839 #2840 #2841 #2842 | seventh, eighth | 23 Oct 16:1x, up from 0.85: a bare project name now takes every hand-over, not only the first (#3217), and each hand-over\u2019s outcome is one journal line without the ask (#3234). |\n-| Updates cover the whole lamp, so V3, V4 and V5 update a shipped lamp in place: units, models, the updater itself, rollback, every part\u2019s saved data read across versions | 0.60 | #1369 #1505 #2700 #2809 #2810 | migrate, tests | 23 Oct 09:2x, up from 0.55: an update restarts the parts the voice calls before the voice, and rolls back the same way (#3173, train 27), and the rule that every part works with the previous build of the other side is wr\u2026 |\n+| Updates cover the whole lamp, so V3, V4 and V5 update a shipped lamp in place: units, models, the updater itself, rollback, every part\u2019s saved data read across versions | 0.65 | #1369 #1505 #2700 #2809 #2810 | migrate, tests | 23 Oct 21:4x, up from 0.6: an update now pairs the head pins with the units that read them, so a lamp is never left with the head answering nothing (Second, #3269, 09f8e7412). |\n | The company sees its lamps in homes: health, crash and support logs, opt-in | 0.95 | #1683 #1755 #2862 | jarvis, mobile, backend | 22 Oct 12:46, up from 0.9: the health report lists the product parts that have failed, under the same consent (Second, #2764). |\n | The factory\u2019s per-lamp steps: body poses, touch pads, the update key | 0.85 | #1682 #1717 #1744 #2817 #2818 | third, thirteen | 23 Oct 12:2x, up from 0.7: the factory steps ran whole on lamp-52e6, 6 of 6 with nothing set by hand: steps 1\u20134, the body file with its measured stand, pad lines 97 and 98, the self-test report naming the lamp, and the a\u2026 |\n | Reads your mood from your face or voice *(mood, for later: not in the build figure)* | 0.45 | #2796 #2797 #2798 #2799 #2800 | ten, fourth | 23 Oct 02:1x, up from 0.35: the product units carry the face reader, Blendshape alone (#2953, #2799 closed), and onboarding\u2019s one ask whether the lamp may notice how a face seems, keeping only a yes, is merged (#3082, tr\u2026 |\n"
+  }
+}

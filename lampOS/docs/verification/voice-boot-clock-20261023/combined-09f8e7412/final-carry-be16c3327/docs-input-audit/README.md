@@ -1,0 +1,11 @@
+# Documentation-only base delta input audit
+
+The immutable `09f8e7412` → `be16c3327` delta changes only `lampOS/docs/build-rows.md`: three table/status lines. All other tracked path modes, types and Git object IDs are equal. This audit does not change or relabel the combined gate, which executed on `4e8ea747cd` plus two frozen peer overlays over `09f8e7412`. A final fetch still has to confirm the target has not advanced further.
+
+No compiled or runtime test input for this page was found. The audit examined direct document references, include/glob/directory readers, all 53 tracked Cargo manifests (46 workspace members), Cargo configuration, and the sole local build script. The camera build script reads four pinned Linux UAPI headers, not documentation. Explicit documentation inputs include memory/attention/install/brain-build/switches pages and named verification fixtures; none is build-rows. The dynamic Eyes replay path is confined to `docs/verification/`.
+
+The broad source census readers recurse under crate source/tests: Update's CI-path scan walks `lampOS/crates`, its scratch-name scan walks each crate's `src` and `tests`, and Voice's switch census walks Voice/Msgs source. They do not enumerate or read the documentation directory. Other directory reads found in the scan are runtime/fixture stores, logs, models, skills, deployment inputs or OS directories; no documentation tree traversal was found. The only tool glob match is the played quiet-gate metadata/events scan. The workflow documentation exclusion was not used as the proof of input independence.
+
+This is a source/input audit, not a newly executed gate, compiler-artifact equality claim, or waiver of any failed test. A final docs-only carry must retain the original gate's source identity, use fresh formatting, and obtain its own native CI. If the target changes again, re-audit that additional delta before carrying.
+
+`base-delta.json` binds the full exact diff and tree comparison; `build-inputs.json` lists all manifest/build identities; `reviewed-readers.json` has exact source hashes and bounded source slices; `searches.json` preserves raw search results and commands. Earlier search attempts with a nonexistent root Cargo.toml or truncated display were corrected before this record; no Cargo/test was run for this audit.

@@ -1,0 +1,14 @@
+{
+  "command": [
+    "git",
+    "fetch",
+    "origin",
+    "lamp-voice"
+  ],
+  "at": "2026-10-23T15:43:14.809744+00:00",
+  "exit": 0,
+  "stdout": "",
+  "stderr": "From https://github.com/autonomous-ai/lampOS\n * branch                  lamp-voice -> FETCH_HEAD\n",
+  "origin_tip": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+  "delta": "M\tlampOS/docs/build-rows.md\n"
+}

@@ -1,5 +1,23 @@
 # Tests work log
 
+## 2026-10-23 23:03 +0700 — combined head pushed and executed source preserved
+
+Ready for lamp-voice: no; nine local failures remain unwaived.
+
+The [final carry binding](verification/voice-boot-clock-20261023/combined-09f8e7412/final-carry-be16c3327/)
+records #3190 at 224e0bd76 on be16c3327. Both original execution identities
+are fetchable on own archive refs. Root checked all eighteen payload hashes,
+all nine authored blobs against both commits, and the sole whole-tree delta,
+docs/build-rows.md. The source-input audit and fresh final-head Mac formatting
+are separate from the executed local gate; its 7,184/9/32 is not relabelled.
+
+#3271 is closed as superseded, not merged, and its failed evidence and branch
+remain. Current native Clippy passed; ARM64 is still running. The full-gate
+manifest total is corrected from 2,412,646 to 2,412,683 bytes for reviewer-two's
+P3; all seventeen payload files and their individual hashes remain unchanged.
+The accepted light trace is terminal and being published separately. The newly
+assigned Skills early-refusal fixture repair is claimed on the Queue.
+
 ## 2026-10-23 22:46 +0700 — combined clock and peer local Mac gate complete
 
 Ready for lamp-voice: no; all nine actual failures remain held.

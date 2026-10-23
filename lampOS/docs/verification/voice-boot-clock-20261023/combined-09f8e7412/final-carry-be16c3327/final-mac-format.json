@@ -1,0 +1,33 @@
+{
+  "head": "224e0bd767e23e6d420f29830de9a4f55c3b0c3b",
+  "parent": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+  "tree": "2a7a4b98ff1ef14c65b06bafecb246da6ec49d1b",
+  "command": [
+    "cargo",
+    "fmt",
+    "--all",
+    "--check"
+  ],
+  "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS",
+  "exit": 0,
+  "wall_seconds": 11.876145055983216,
+  "source_aggregate_before": "ac21c5df3b64194de79a540e29de5824366361aa8b63a6c9939381598a3d0514",
+  "source_aggregate_after": "ac21c5df3b64194de79a540e29de5824366361aa8b63a6c9939381598a3d0514",
+  "tracked_paths": 10055,
+  "source_unchanged": true,
+  "source_map_sha256": "ea6bb6f389cb5def33e6f50c96f11cabe6f59aeb8ca5aeae975455187c6667b4",
+  "only_difference_from_executed_full_gate": [
+    "lampOS/docs/build-rows.md"
+  ],
+  "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+  "at": "2026-10-23T15:46:18.529874+00:00",
+  "limits": "Formatting only, no build/test or MAIN access; prior full-gate failures remain unwaived.",
+  "stdout": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

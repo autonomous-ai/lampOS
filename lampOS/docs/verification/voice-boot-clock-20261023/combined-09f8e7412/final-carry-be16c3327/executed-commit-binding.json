@@ -1,0 +1,21 @@
+{
+  "at": "2026-10-23T15:44:35.184777+00:00",
+  "executed_uncommitted_head": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+  "executed_base": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+  "source_aggregate_sha256": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d",
+  "post_execution_commit": "72a62a51c065002eeff4407dba77c56088e3649f",
+  "tree": "57311e08b86ab76be8da259bb837e37664b9b870",
+  "exact_combined_patch_preserved": true,
+  "changed_paths": [
+    "lampOS/crates/voice/src/coordinator/second.rs",
+    "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+    "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+    "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+    "lampOS/crates/voice/src/scenario_clock.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs",
+    "lampOS/crates/voice/src/stop_words.rs",
+    "lampOS/crates/voice/tests/it/fixture_provider.rs",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "clean": true
+}

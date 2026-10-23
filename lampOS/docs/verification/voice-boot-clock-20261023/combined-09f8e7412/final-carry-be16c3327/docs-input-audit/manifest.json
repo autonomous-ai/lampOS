@@ -1,0 +1,24 @@
+{
+  "files": {
+    "README.md": {
+      "bytes": 2317,
+      "sha256": "9004813cfd075caae0ebd700854672886420c5d171bf5aa500d686f7c19aadc7"
+    },
+    "base-delta.json": {
+      "bytes": 4880,
+      "sha256": "01d27aa7a36187cb34f14e1331babdb55cef4df20ef5cfa5b6e3991f5b9bfcee"
+    },
+    "build-inputs.json": {
+      "bytes": 13707,
+      "sha256": "fb81caa318ceba728fc100cb82517cdec567b02e2927a94c2f079e574af37ecc"
+    },
+    "reviewed-readers.json": {
+      "bytes": 15717,
+      "sha256": "5880336df172ec5ce6168b9cc2e35905749f2804c38996d0c0d057ae1066d7ea"
+    },
+    "searches.json": {
+      "bytes": 92049,
+      "sha256": "27f7cca1eb1ed4cd2033703258d1c6dc55a81abfd59175ce254fd65d00050ae7"
+    }
+  }
+}

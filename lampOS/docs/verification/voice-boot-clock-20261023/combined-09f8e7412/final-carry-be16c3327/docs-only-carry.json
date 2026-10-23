@@ -1,0 +1,18 @@
+{
+  "at": "2026-10-23T15:45:10.888852+00:00",
+  "executed_commit": "72a62a51c065002eeff4407dba77c56088e3649f",
+  "executed_base": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+  "preserved_local_branch": "tests/1569-combined-qualified-72a62a51c",
+  "final_head": "224e0bd767e23e6d420f29830de9a4f55c3b0c3b",
+  "final_base": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+  "final_tree": "2a7a4b98ff1ef14c65b06bafecb246da6ec49d1b",
+  "exact_patch_sha256": "bb3763ab79a30e2e9a1f902e4a36b679590dc08966d304aec4f1cd996f78e0ea",
+  "authored_patch_equal": true,
+  "only_whole_tree_difference": [
+    "lampOS/docs/build-rows.md"
+  ],
+  "source_input_audit": "docs-input-audit/manifest.json",
+  "range_diff": "1:  72a62a51c0 = 1:  224e0bd767 lampOS: bind fixture clocks and wait for cue peer closure\n",
+  "clean": true,
+  "qualification": "Local full gate remains on executed 09f source. Final carried source has only audited build-rows.md drift; no full test re-execution. Fresh formatting and native CI are distinct."
+}

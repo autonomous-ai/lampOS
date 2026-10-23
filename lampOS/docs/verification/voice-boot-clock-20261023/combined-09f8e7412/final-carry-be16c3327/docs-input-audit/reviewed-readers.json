@@ -1,0 +1,114 @@
+{
+  "sources_identical_on_both_bases": true,
+  "records": [
+    {
+      "path": "lampOS/crates/camera/build.rs",
+      "blob_before": "d596a866c9a50cab9747394b5082f0bab95267af",
+      "blob_after": "d596a866c9a50cab9747394b5082f0bab95267af",
+      "bytes": 3376,
+      "sha256": "c59f2f7019d8223764515a0c759900904cc6068b6d82dc91b4deb24f7ea168a8",
+      "slices": [
+        {
+          "first_line": 1,
+          "last_line": 95,
+          "text": "use sha2::{Digest, Sha256};\nuse std::{env, fs, path::PathBuf};\n\nconst HEADER_ENV: &str = \"V4L2R_VIDEODEV2_H_PATH\";\nconst BUNDLE: &str = \"vendor/linux-uapi-v6.12-adc218676eef/include\";\nconst HEADERS: &[(&str, u64, &str)] = &[\n    (\n        \"linux/videodev2.h\",\n        103727,\n        \"81d95175596837bfd89a0645e2970dbddcb31f328cbdca4ebe88b3daecd19504\",\n    ),\n    (\n        \"linux/v4l2-common.h\",\n        2056,\n        \"db7d65a8a88a520f43abc3821109a60e600ced91756027362059a16945802427\",\n    ),\n    (\n        \"linux/v4l2-controls.h\",\n        149407,\n        \"d8b27bd5d3b3b03626dc2b87a522bb874218d5d0352e20931ee89e477c60f96b\",\n    ),\n    (\n        \"videodev2.h\",\n        29,\n        \"59b2db1e75ff6926fdec6a7d3c0eb25f49facde3a13c2925d15f89e13fad5a3e\",\n    ),\n];\n\nfn main() {\n    println!(\"cargo::rerun-if-env-changed={HEADER_ENV}\");\n    if let Err(error) = verify_bundle() {\n        panic!(\"camera UAPI build input check failed: {error}\");\n    }\n}\n\nfn verify_bundle() -> Result<(), String> {\n    let crate_dir =\n        PathBuf::from(env::var_os(\"CARGO_MANIFEST_DIR\").ok_or(\"missing crate directory\")?)\n            .canonicalize()\n            .map_err(|error| format!(\"resolve crate directory: {error}\"))?;\n    let workspace = crate_dir\n        .parent()\n        .and_then(|path| path.parent())\n        .ok_or(\"camera crate is not inside the standalone workspace\")?;\n    let expected_root = workspace.join(BUNDLE);\n    let canonical_root = expected_root\n        .canonicalize()\n        .map_err(|error| format!(\"missing bundled camera headers: {error}\"))?;\n    if canonical_root != expected_root {\n        return Err(\n            \"bundled camera headers must be inside the workspace without symlink indirection\"\n                .into(),\n        );\n    }\n    let selected = env::var(HEADER_ENV).map_err(|_| {\n        format!(\"{HEADER_ENV} is missing or invalid; build from the lampOS workspace root so .cargo/config.toml is loaded\")\n    })?;\n    let selected_root = PathBuf::from(selected)\n        .canonicalize()\n        .map_err(|error| format!(\"resolve selected camera headers: {error}\"))?;\n    if selected_root != expected_root {\n        return Err(format!(\n            \"{HEADER_ENV} must select the bundled camera headers\"\n        ));\n    }\n\n    for &(relative, length, digest) in HEADERS {\n        let path = expected_root.join(relative);\n        println!(\"cargo::rerun-if-changed={}\", path.display());\n        let metadata = fs::symlink_metadata(&path)\n            .map_err(|error| format!(\"read bundled header metadata {relative}: {error}\"))?;\n        if !metadata.is_file() || metadata.len() != length {\n            return Err(format!(\n                \"bundled header {relative} is not a regular file of the pinned length\"\n            ));\n        }\n        if path\n            .canonicalize()\n            .map_err(|error| format!(\"resolve bundled header {relative}: {error}\"))?\n            != path\n        {\n            return Err(format!(\n                \"bundled header {relative} must not traverse symlinks\"\n            ));\n        }\n        let bytes =\n            fs::read(&path).map_err(|error| format!(\"read bundled header {relative}: {error}\"))?;\n        if format!(\"{:x}\", Sha256::digest(&bytes)) != digest {\n            return Err(format!(\n                \"bundled header {relative} does not match its pinned SHA256\"\n            ));\n        }\n    }\n    Ok(())\n}\n"
+        }
+      ]
+    },
+    {
+      "path": "lampOS/.cargo/config.toml",
+      "blob_before": "b3515e952d3665dd4c6a26887a6812bc9c597dca",
+      "blob_after": "b3515e952d3665dd4c6a26887a6812bc9c597dca",
+      "bytes": 210,
+      "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71",
+      "slices": [
+        {
+          "first_line": 1,
+          "last_line": 3,
+          "text": "# Resolve the camera UAPI bundle from this standalone workspace, not host media headers.\n[env]\nV4L2R_VIDEODEV2_H_PATH = { value = \"vendor/linux-uapi-v6.12-adc218676eef/include\", relative = true, force = true }\n"
+        }
+      ]
+    },
+    {
+      "path": "lampOS/crates/update/tests/it/ci_paths.rs",
+      "blob_before": "a80a8e67b0a3f29afb4e2be266a25c09100584a7",
+      "blob_after": "a80a8e67b0a3f29afb4e2be266a25c09100584a7",
+      "bytes": 6579,
+      "sha256": "da2d09282d8c6ee4248f61bdfc904d21eb2b28f89e72d9639d88b8777c5e4725",
+      "slices": [
+        {
+          "first_line": 1,
+          "last_line": 38,
+          "text": "//! The ARM64 workflow skips a pull request that changes only docs a build\n//! never reads (the project lead on #1711, #1791): its `pull_request` paths\n//! leave out `lampOS/docs/**/*.md` and `lampOS/builders/**`, and name back\n//! the docs that code or tests read. A doc a test reads but the workflow\n//! leaves out would let a change to it merge without the run that tests it.\n//! The clippy workflow (#2082) has the same paths, so both are held to it:\n//! a doc named back in one and not the other would drift (the reviewer's P3\n//! on #2082).\n//! This holds the list to the code: every `docs/\u2026/*.md` or `builders/\u2026` path\n//! named in a string in a crate's code (`include_str!`, a path a test opens)\n//! must be named back after the line that leaves it out.\n//!\n//! A path put together from pieces (`join(\"docs\").join(\"x.md\")`) is not\n//! seen: name such a path in one string.\nuse std::{\n    fs,\n    path::{Path, PathBuf},\n};\n\n/// The workflows whose `pull_request` paths leave docs out and name back the\n/// ones code reads.\nconst WORKFLOWS: [&str; 2] = [\n    \"../.github/workflows/lampos-arm64.yml\",\n    \"../.github/workflows/lampos-clippy.yml\",\n];\n\n/// Each Rust file under `dir`.\nfn sources(dir: &Path, found: &mut Vec<PathBuf>) {\n    for entry in fs::read_dir(dir).unwrap().flatten() {\n        let path = entry.path();\n        if path.is_dir() {\n            sources(&path, found);\n        } else if path.extension().is_some_and(|extension| extension == \"rs\") {\n            found.push(path);\n        }\n    }\n}\n\n"
+        },
+        {
+          "first_line": 85,
+          "last_line": 122,
+          "text": "}\n\n#[test]\nfn every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths() {\n    let lampos = Path::new(env!(\"CARGO_MANIFEST_DIR\")).join(\"../..\");\n    let mut files = Vec::new();\n    sources(&lampos.join(\"crates\"), &mut files);\n    assert!(files.len() > 100, \"{} files\", files.len());\n    let mut read = Vec::new();\n    for file in &files {\n        // This file's own examples, in the test below, are not reads.\n        if file.ends_with(\"update/tests/it/ci_paths.rs\") {\n            continue;\n        }\n        let text = fs::read_to_string(file).unwrap_or_default();\n        for path in named_in(&text) {\n            read.push((path, file.strip_prefix(&lampos).unwrap_or(file).to_owned()));\n        }\n    }\n    assert!(\n        read.iter().any(|(path, _)| path == \"docs/switches.md\"),\n        \"the scan found what it should: {read:?}\"\n    );\n    for workflow_path in WORKFLOWS {\n        // A copy of lampOS alone (a podman export) has no workflow; GitHub's\n        // checkout always has it.\n        let Ok(workflow) = fs::read_to_string(lampos.join(workflow_path)) else {\n            assert!(\n                std::env::var_os(\"GITHUB_ACTIONS\").is_none(),\n                \"no {workflow_path} on GitHub Actions\"\n            );\n            eprintln!(\"no {workflow_path} beside this lampOS: not checked\");\n            continue;\n        };\n        named_back(&pull_request_paths(&workflow), &read, workflow_path);\n    }\n}\n\n"
+        }
+      ]
+    },
+    {
+      "path": "lampOS/crates/update/tests/it/scratch_paths.rs",
+      "blob_before": "46fb6547f53d7905beff5041655a923b9ac3754f",
+      "blob_after": "46fb6547f53d7905beff5041655a923b9ac3754f",
+      "bytes": 8385,
+      "sha256": "40749f7cf74a1f5bcb11ebce3ba36866710fdf2d3ad13eb85fa1d75169b62554",
+      "slices": [
+        {
+          "first_line": 20,
+          "last_line": 40,
+          "text": "    fs,\n    path::{Path, PathBuf},\n};\n\n/// Each Rust file under `dir`.\nfn sources(dir: &Path, found: &mut Vec<PathBuf>) {\n    let Ok(entries) = fs::read_dir(dir) else {\n        return;\n    };\n    for entry in entries.flatten() {\n        let path = entry.path();\n        if path.is_dir() {\n            sources(&path, found);\n        } else if path.extension().is_some_and(|extension| extension == \"rs\") {\n            found.push(path);\n        }\n    }\n}\n\n/// The test binary `file` of a crate is built into, as `src`, `it` or the\n/// file's own name, or `None` for a file outside the crate's tests (a\n"
+        },
+        {
+          "first_line": 137,
+          "last_line": 168,
+          "text": "#[test]\nfn no_two_files_of_a_test_binary_build_the_same_scratch_folder() {\n    let crates = Path::new(env!(\"CARGO_MANIFEST_DIR\")).join(\"..\");\n    let mut built: BTreeMap<(String, String, String), BTreeSet<String>> = BTreeMap::new();\n    let mut seen = 0;\n    for entry in fs::read_dir(&crates).unwrap().flatten() {\n        let root = entry.path();\n        let Some(name) = root.file_name().and_then(|name| name.to_str()) else {\n            continue;\n        };\n        let mut files = Vec::new();\n        sources(&root.join(\"src\"), &mut files);\n        sources(&root.join(\"tests\"), &mut files);\n        for file in files {\n            let within = file.strip_prefix(&root).unwrap();\n            let Some(binary) = binary(within) else {\n                continue;\n            };\n            let text = fs::read_to_string(&file).unwrap();\n            for scratch in scratch_names(&text) {\n                seen += 1;\n                built\n                    .entry((name.to_owned(), binary.clone(), scratch))\n                    .or_default()\n                    .insert(within.display().to_string());\n            }\n        }\n    }\n    // The workspace builds many: an empty read means this one went wrong.\n    assert!(\n        seen > 300,\n        \"only {seen} scratch names found under {crates:?}\"\n"
+        }
+      ]
+    },
+    {
+      "path": "lampOS/crates/voice/src/process/switch_census_tests.rs",
+      "blob_before": "0c50fff7eefda00f273b5f894850beb3e4367af1",
+      "blob_after": "0c50fff7eefda00f273b5f894850beb3e4367af1",
+      "bytes": 30231,
+      "sha256": "ca138b1211e34bbc3e2a997891b6bcac6db218cef725e186d39e64b5044ed119",
+      "slices": [
+        {
+          "first_line": 192,
+          "last_line": 206,
+          "text": "fn rust_files(path: &Path, files: &mut Vec<PathBuf>) {\n    if path.is_dir() {\n        let mut entries: Vec<PathBuf> = std::fs::read_dir(path)\n            .unwrap()\n            .map(|entry| entry.unwrap().path())\n            .collect();\n        entries.sort();\n        for entry in entries {\n            rust_files(&entry, files);\n        }\n    } else if path.extension().is_some_and(|extension| extension == \"rs\") {\n        files.push(path.to_owned());\n    }\n}\n\n"
+        },
+        {
+          "first_line": 492,
+          "last_line": 508,
+          "text": "fn census_leaving_out(left_out: &[&str]) -> Census {\n    let manifest = Path::new(env!(\"CARGO_MANIFEST_DIR\"));\n    let voice = manifest.join(\"src\").canonicalize().unwrap();\n    let msgs = manifest.join(\"../msgs/src\").canonicalize().unwrap();\n    let mut known = BTreeMap::new();\n    let mut sources = Vec::new();\n    for root in [&voice, &msgs] {\n        let mut files = Vec::new();\n        rust_files(root, &mut files);\n        for file in files {\n            let module = module_of(&file, &voice, &msgs);\n            let code = code(&std::fs::read_to_string(&file).unwrap());\n            for (name, value) in constants(&code) {\n                known.insert(format!(\"{module}::{name}\"), value);\n            }\n            sources.push((file, module, code));\n        }\n"
+        },
+        {
+          "first_line": 552,
+          "last_line": 559,
+          "text": "    let mut read: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();\n    let mut follow: Vec<(Function, String)> = Vec::new();\n    for side in WORKER_SIDE {\n        let mut files = Vec::new();\n        rust_files(&voice.join(side).canonicalize().unwrap(), &mut files);\n        for file in files {\n            let shown = file\n                .strip_prefix(&voice)\n"
+        },
+        {
+          "first_line": 818,
+          "last_line": 831,
+          "text": "\n#[test]\nfn the_coordinators_functions_are_still_in_their_files() {\n    let source = Path::new(env!(\"CARGO_MANIFEST_DIR\")).join(\"src\");\n    for (file, run, _) in COORDINATOR_RUN {\n        let code = code(&std::fs::read_to_string(source.join(file)).unwrap());\n        assert!(\n            functions(&code)\n                .iter()\n                .any(|(owner, name, _)| owner.is_empty() && name == run),\n            \"COORDINATOR_RUN names {file}'s {run}, no longer there\"\n        );\n    }\n}\n"
+        }
+      ]
+    },
+    {
+      "path": "lampOS/crates/eyes/tests/full_look_replay.rs",
+      "blob_before": "59a54d9cf98c517115952ce6de93926e8ef329a3",
+      "blob_after": "59a54d9cf98c517115952ce6de93926e8ef329a3",
+      "bytes": 4866,
+      "sha256": "7cb6358955a639e9638bd95013beb7932fa82a2d959d494e7894fafc578c05f6",
+      "slices": [
+        {
+          "first_line": 1,
+          "last_line": 35,
+          "text": "//! A full look's head settle replayed on lamp-52e6's recorded\n//! `body/joint_states` (`docs/verification/look-at-name-lamp-52e6-20261014`),\n//! as the reviewer replayed it on #1251: one ask every 10 ms from its start to 2.8 s\n//! before its end (4,113 asks),\n//! the joints read at the ask and then every 50 ms as the eyes read them, a\n//! frame every 33 ms. Counts the waits that reach the 2 s cap.\n//! `FULL_LOOK_REPLAY=1 cargo test -p lamp-eyes --test full_look_replay -- --nocapture`\n//! also prints every ask's wait. lamp-06c1's V1 roll\n//! (`v1-moves-lamp-06c1-20261016`) is replayed the same way.\nuse base64::{Engine, engine::general_purpose::STANDARD};\nuse lamp_eyes::full_look::{Head, SETTLE_AT_MOST_US, Wanted, head_of};\nuse lamp_msgs::JointState;\n\nconst LAMP_52E6: &str = \"look-at-name-lamp-52e6-20261014/body_joint_states.jsonl\";\nconst LAMP_06C1: &str = \"v1-moves-lamp-06c1-20261016/roll-body_joint_states.jsonl\";\n\nfn recording(name: &str) -> Vec<(u64, u64, JointState)> {\n    let path = format!(\n        \"{}/../../docs/verification/{name}\",\n        env!(\"CARGO_MANIFEST_DIR\")\n    );\n    std::fs::read_to_string(path)\n        .unwrap()\n        .lines()\n        .filter_map(|line| {\n            let row: serde_json::Value = serde_json::from_str(line).unwrap();\n            let header = row.get(\"header\")?;\n            let payload = STANDARD.decode(row[\"payload_b64\"].as_str()?).unwrap();\n            Some((\n                header[\"at_unix_ms\"].as_u64()?,\n                header[\"expires_ms\"].as_u64()?,\n                serde_json::from_slice(&payload).unwrap(),\n            ))\n        })\n        .collect()\n"
+        }
+      ]
+    }
+  ]
+}
