@@ -1,0 +1,25 @@
+{
+  "head": "7a9fc09ba2d096d6f60b33de54b30617e6302e9a",
+  "host": "Darwin arm64; Rust 1.96.0",
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "clippy",
+    "-q",
+    "-p",
+    "lamp-voice",
+    "--all-targets",
+    "--offline",
+    "--message-format=short",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 34.883,
+  "bound_files": 6528,
+  "inputs_unchanged": true,
+  "log_bytes": 0,
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "result_lines": []
+}

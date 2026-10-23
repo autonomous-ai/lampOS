@@ -1,3 +1,29 @@
+## Current checkpoint: 2026-10-23 08:14 +07, updater counters pass and guard PR ready
+
+Ready for lamp-voice: #3160 read clean, new-head native checks running; updater gate in progress
+
+The updater's seven dependency-order and two quiet-boundary regressions
+failed on unchanged `f477d6c49` before production edits. All nine now pass,
+plus six parser tests. Removing only the forward Voice boundary makes both
+quiet tests fail again; the candidate was restored exactly. Candidate and
+saved old unit graphs determine startup order; inactive/unchanged parts
+remain untouched. Full changed-crate Mac checks are running. First owns
+the decision whether the 07:49 off-switch rule includes this correctness
+fix; Nine is assigned its source read. No lamp result is claimed.
+
+#3160 is non-draft, with Tests' READ-OK and previous-head native ARM64
+**7,042 / 0 / 31 skipped**, Linux Clippy and explicit Linux formatting all
+passed. The equal current-base carry is `96fa27cdf` on `b7700b7c2`; refreshed
+Mac Voice **3,829 / 0 / 14 ignored**, fmt and strict Clippy passed. Current
+source Linux formatting passed too; official jobs now run on that new head.
+[Full updated receipts](verification/shared-thread-fixtures-20261023/README.md).
+Seventh still owns both #3130 data-loss corrections; Second re-reads the
+new push when it arrives. #2810's attended unplug and #1812's real release
+remain person/key/route handoffs, with their prepared evidence already
+published. #694's shared Second label is stale; its name work is Nine's.
+
+---
+
 ## Current checkpoint: 2026-10-23 07:51 +07, updater restart-order tests first
 
 Ready for lamp-voice: #3160 native checks pending; updater piece in progress

@@ -1,0 +1,86 @@
+diff --git a/lampOS/crates/voice/src/provider_worker.rs b/lampOS/crates/voice/src/provider_worker.rs
+index 50deaf4b7..ed30ee01d 100644
+--- a/lampOS/crates/voice/src/provider_worker.rs
++++ b/lampOS/crates/voice/src/provider_worker.rs
+@@ -6929,6 +6929,7 @@ pub(crate) mod tests {
+     /// sent.
+     #[test]
+     fn the_live_worker_sends_a_sign_ins_words_as_one_line_and_scrubs_the_persons() {
++        let _thread = one_thread();
+         let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+             .lock()
+             .unwrap_or_else(std::sync::PoisonError::into_inner);
+@@ -7317,6 +7318,7 @@ pub(crate) mod tests {
+     /// opens. The next line's Start ends it, and that line is kept.
+     #[test]
+     fn the_sentence_after_count_only_never_reaches_the_live_thread() {
++        let _one = one_thread();
+         let kept = std::mem::take(&mut *crate::thread::THREAD.lock().unwrap());
+         let mut owner = controller();
+         let mut handoff = InputHandoff::default();
+diff --git a/lampOS/crates/voice/src/remember.rs b/lampOS/crates/voice/src/remember.rs
+index 778db9b43..c5619086e 100644
+--- a/lampOS/crates/voice/src/remember.rs
++++ b/lampOS/crates/voice/src/remember.rs
+@@ -12108,6 +12108,7 @@ mod tests {
+     #[test]
+     fn the_light_rule_is_kept_and_forgotten_in_the_rooms_scope() {
+         use crate::rules::{FORGET_RULE, KEEP_RULE};
++        let _one = crate::provider_worker::tests::one_thread();
+         let call = |name: &str, args: Value| ToolCall {
+             id: "c1".into(),
+             name: name.into(),
+diff --git a/lampOS/crates/voice/src/second_provider/tests.rs b/lampOS/crates/voice/src/second_provider/tests.rs
+index b6b170f09..122a4a736 100644
+--- a/lampOS/crates/voice/src/second_provider/tests.rs
++++ b/lampOS/crates/voice/src/second_provider/tests.rs
+@@ -2357,6 +2357,7 @@ async fn lines_the_route_gave_up_are_no_talk_past_the_lamp() {
+ /// got a word out. On the lamp, four of the five were held.
+ #[tokio::test(start_paused = true)]
+ async fn the_owners_ten_lines_are_let_out_though_each_answer_was_cut_by_the_next() {
++    let _one = crate::provider_worker::tests::one_thread();
+     let lines = [
+         "Lamp, what time is this?",
+         "Hey, Lamp. Watch the weather in Hanoi today.",
+@@ -6871,6 +6872,7 @@ async fn a_held_lines_yes_runs_for_no_one_though_the_face_is_back_before_the_cal
+ /// talk in the room is. On lamp-0c89 (21 Oct, #1968) both yeses were taken.
+ #[tokio::test(start_paused = true)]
+ async fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room() {
++    let _one = crate::provider_worker::tests::one_thread();
+     let photo = crate::photo_faces::note("Lan");
+     for (lamp_said, heard, called) in [
+         (
+diff --git a/lampOS/docs/verification/shared-thread-fixtures-20261023/README.md b/lampOS/docs/verification/shared-thread-fixtures-20261023/README.md
+new file mode 100644
+index 000000000..d5dbabd59
+--- /dev/null
++++ b/lampOS/docs/verification/shared-thread-fixtures-20261023/README.md
+@@ -0,0 +1,28 @@
++# Guard the additional conversation fixtures
++
++Five Voice fixtures write the process-wide conversation without acquiring
++its existing `one_thread()` guard: Live sign-in, Live CountOnly, the ten
++interrupted questions, photo yes/no answers, and room light-rule forgetting.
++Each now holds that guard from before fixture work until cleanup finishes.
++The sign-in fixture takes it before its existing agent-task lock. Assertions,
++timeouts and production behavior are unchanged.
++
++An ordered control runs the actual CountOnly fixture between the own-answers
++fixture installing its conversation and judging its third line. The real
++unguarded `mem::take(THREAD)` reproduces its original assertion failure:
++**0 passed / 1 failed**. Adding the guard preserves every original case:
++**1 passed / 0 failed**. Both fixtures retain their assertions and bounds.
++[Complete controls and restored source](https://github.com/autonomous-ai/lampOS/blob/432b46426/lampOS/docs/verification/shared-thread-fixtures-20261023/README.md)
++also retain the initial control-only channel teardown error and correction.
++This proves an additional interference path, not the cause of #1569 row 79's
++historical uncaptured panic. Tests' separate #3023 Music-stop guard remains
++outside this correction.
++
++On the Mac, Rust 1.96.0 `cargo fmt --all --check`, strict all-target Voice
++Clippy, and `cargo test -q -p lamp-voice --offline --no-fail-fast --
++--test-threads=2` passed: **3,815 passed, 0 failed, 14 ignored**, with no
++filtering. All 6,519 tracked inputs stayed unchanged during the gate on
++`ae4ab0022` plus these five guard additions. The changed test names occur
++only in Voice under `crates/`; no other crate changed. Native PR ARM64 and
++Linux Clippy qualification is recorded on the PR and Second's log. No device
++operation or audio result is claimed.
