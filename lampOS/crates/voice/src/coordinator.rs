@@ -5917,6 +5917,8 @@ fn conversation_with_gate_inner(
                             .with_source(crate::stop_words::source())
                             .with_hold(crate::stop_words::holds_for_own_words())
                             .with_gain(crate::stop_words::gain_from_environment())
+                            .with_language(language.as_deref())
+                            .with_backchannel_holds(crate::stop_words::holds_backchannels())
                     } else {
                         // Heard in a yield the source stays the default
                         // (`Processed`), so the gain is passed only when the
@@ -5987,9 +5989,10 @@ fn conversation_with_gate_inner(
         )?;
     }
     // A backchannel held as a yield (#2939, `LAMP_BACKCHANNEL_HOLDS=on`):
-    // only with a yield's words heard (`LAMP_STOP_WORDS=heard`).
+    // only with a yield's words heard (`LAMP_STOP_WORDS=heard` or
+    // `heard-always`).
     let backchannel_holds = crate::stop_words::holds_backchannels()
-        && if stop_words.is_some() && !always {
+        && if stop_words.is_some() {
             eprintln!(
                 "lamp-voice: backchannel holds: a yield's commit waits for its words, up to {} ms after they are asked for, and a backchannel resumes the answer",
                 u16::from(lamp_audio::duplex::BACKCHANNEL_WORDS_WAIT_BLOCKS) * 10
@@ -5997,7 +6000,7 @@ fn conversation_with_gate_inner(
             true
         } else {
             eprintln!(
-                "lamp-voice: {} is set, but backchannels are held only with {}=heard: not held",
+                "lamp-voice: {} is set, but backchannels are held only with {}=heard or heard-always: not held",
                 crate::stop_words::BACKCHANNEL_ENVIRONMENT,
                 crate::stop_words::ENVIRONMENT
             );
