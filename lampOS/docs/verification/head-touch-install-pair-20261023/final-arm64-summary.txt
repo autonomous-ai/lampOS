@@ -1,0 +1,53 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:59:06.9330128Z HEAD is now at 5827303 Merge 92088b7eaf1127cba12037399e7a8f7aef451846 into be16c3327524ccef8a1908a3b8ebf40c16efba8a
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:18:51.1198995Z         LEAK [   0.223s] ( 8925/11072) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:21.2120411Z      Summary [ 202.364s] 11072 tests run: 11072 passed (1 leaky), 69 skipped
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:21.4939768Z    Doc-tests lamp_actions
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:21.5917411Z    Doc-tests lamp_addons
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:21.6252310Z    Doc-tests lamp_air
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:21.6519545Z    Doc-tests lamp_audio
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:21.8270892Z    Doc-tests lamp_body
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:22.1768355Z    Doc-tests lamp_bus
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:22.6109542Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:22.6154015Z    Doc-tests lamp_camera
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:22.7273824Z    Doc-tests lamp_cloud
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:22.8874005Z    Doc-tests lamp_controls
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:23.1242159Z    Doc-tests lamp_ears
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:23.1637272Z    Doc-tests lamp_environment
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:23.1912578Z    Doc-tests lamp_expression
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:23.3667748Z    Doc-tests lamp_eyes
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:23.5342752Z    Doc-tests lamp_gemini
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:23.6529421Z    Doc-tests lamp_health
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:23.6997256Z    Doc-tests lamp_ipc
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:24.0517533Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:24.0562210Z    Doc-tests lamp_keeper
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:24.0997863Z    Doc-tests lamp_lean
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:24.1462335Z    Doc-tests lamp_local_time
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:24.1681229Z    Doc-tests lamp_memory
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:24.3217033Z    Doc-tests lamp_mood
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:24.3870990Z    Doc-tests lamp_msgs
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:25.3409267Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:25.3456603Z    Doc-tests lamp_name
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:25.3831905Z    Doc-tests lamp_near_call
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:25.4114848Z    Doc-tests lamp_observer
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:25.4534292Z    Doc-tests lamp_peek
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:25.4985144Z    Doc-tests lamp_policy
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:25.7188024Z    Doc-tests lamp_records
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:25.8169367Z    Doc-tests lamp_ring
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:25.8492259Z    Doc-tests lamp_same_voice
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:25.8804489Z    Doc-tests lamp_schedule
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:26.1227517Z    Doc-tests lamp_selftest
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:26.1744947Z    Doc-tests lamp_settings
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:26.2514601Z    Doc-tests lamp_setup
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:26.3570091Z    Doc-tests lamp_skills
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:26.6623778Z    Doc-tests lamp_sound_fixtures
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:26.7163241Z    Doc-tests lamp_station
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:26.8304159Z    Doc-tests lamp_surround
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:27.2612207Z    Doc-tests lamp_tasks
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:27.4920425Z    Doc-tests lamp_turn_end
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:27.5309811Z    Doc-tests lamp_turn_end_wire
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:27.5616562Z    Doc-tests lamp_turn_owner
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:27.6223642Z    Doc-tests lamp_update
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:27.8459916Z    Doc-tests lamp_voice
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:29.8420823Z    Doc-tests lamp_voice_eval
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:30.4177064Z    Doc-tests lamp_voice_processes
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T16:19:35.1352029Z test result: 12 passed; 0 failed

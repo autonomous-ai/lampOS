@@ -62,9 +62,26 @@ also passed. Its checked merge `3b72fc4b5` has the same tree as that authored
 head. [Retained summary](first-head-native.txt). Those results do not qualify
 the follow-up head.
 
-Fresh official native gates and source-only Linux formatting are requested
-for `92088b7ea`. The privacy reader re-reads the two-commit range; the units
-reader checks the combined carry and update pairing. The first builder's
-explicit HOLD remains until those reads and its exact-head READ-OK. No
-ARM64 binary was linked on the Mac, and no exact-new-build physical acceptance
-or acoustic latency result is claimed.
+Final-head native gates now pass. ARM64 [39982838063](https://github.com/autonomous-ai/lampOS/actions/runs/39982838063)
+reports **11,072 passed, 0 failed, 69 skipped**, one Voice LEAK in
+`same_voice::tests::each_line_the_check_says_is_said_to_its_journal`;
+doc tests **4/0** and process harnesses **12/0** pass. Strict Linux Clippy
+[39982838072](https://github.com/autonomous-ai/lampOS/actions/runs/39982838072)
+passes. No gate was retried. [Raw summary](final-arm64-summary.txt),
+[ARM64 metadata](final-arm64.json), [Clippy metadata](final-linux-clippy.json)
+and [source/output binding](native-source.json) are retained.
+
+The log confirms checkout of merge `5827303d6`, whose tree is identical
+to authored `92088b7ea`. Fourth's [Linux formatting receipt](linux-fmt-receipt.json)
+passes on the same repository tree and lampOS subtree: isolated read-only
+source, normal Debian 12 user, Rust 1.96, network disabled, source guards
+and cleanup pass. This closes formatting only; the independent native runs
+above supply build/test/Clippy evidence.
+
+The privacy reader posted [READ-OK](https://github.com/autonomous-ai/lampOS/pull/3275#issuecomment-6369251496)
+on the final head. Its shared-default P3 is [answered explicitly](https://github.com/autonomous-ai/lampOS/pull/3275#issuecomment-6369268879):
+the skills hum intentionally shares the changed default; tap-only ear evidence
+is not extended to that path. First [assigned Second the remaining units/update read](https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6369468837)
+after the original reader was unavailable. First's exact-head READ-OK and
+merge remain required. No ARM64 binary was linked on the Mac and no new
+physical acceptance is claimed. The remaining product trial is #3276.

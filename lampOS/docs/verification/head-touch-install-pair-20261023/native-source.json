@@ -1,0 +1,21 @@
+{
+  "head": "92088b7eaf1127cba12037399e7a8f7aef451846",
+  "base": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+  "checked_merge": "5827303d66aec3eb75441b4c9ac18dd8c95d6a7b",
+  "authored_and_merge_tree": "fd526b051d729a6976b012aef342ab8a1db1d004",
+  "lampOS_subtree": "7f160fbc9efb075676ae15041e7ef6acc489ffad",
+  "arm64_passed": 11072,
+  "arm64_failed": 0,
+  "arm64_skipped": 69,
+  "arm64_leaky": 1,
+  "doc_passed": 4,
+  "process_passed": 12,
+  "linux_fmt_receipt_origin": "https://github.com/autonomous-ai/lampOS/blob/dfad5c0346/lampOS/docs/verification/third-linux-fmt-92088b7ea-20261023/receipt.json",
+  "raw_arm64_log_sha256": "96dc9cb881a1cedd17e2ab8fde0cb9294457fcc93fab011207d01a95f0f58903",
+  "files": {
+    "final-arm64.json": "03e90df1121157771c8d149d3a496fcd3153881db3a821b8584667c4d96fa513",
+    "final-linux-clippy.json": "807cc1c113a5f507f6c69ec8feaee71174eac65f4aee232c226161381f10cb6e",
+    "linux-fmt-receipt.json": "87e7a2e8a6532d18f632aa314a14b2bf19cbf3658901d0a78d15faebc74a7573",
+    "final-arm64-summary.txt": "8bc9188a1533b4873c41ae1287d7010b7b96a52bd5f820f0be70a20a1ba8fff9"
+  }
+}

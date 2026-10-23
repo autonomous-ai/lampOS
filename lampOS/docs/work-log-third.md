@@ -5,6 +5,29 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 23:24 — final native gates pass
+
+- #3275 `92088b7ea`: ARM64 **11,072/0/69 skipped**, one reported Voice
+  LEAK; docs **4/0**, process **12/0**; strict Linux Clippy passes. Checked
+  merge `5827303d6` has the authored tree exactly. Fourth's source-only
+  Linux formatting receipt matches both tree identities. [Receipt](verification/head-touch-install-pair-20261023/followup.md).
+- Privacy READ-OK is posted; its shared skills-hum question is answered
+  explicitly without claiming tap-only evidence for other sound paths.
+  First assigned Second the remaining units/update read, then owns its
+  exact-head READ-OK and merge. No gate retry or device action.
+
+## 2026-10-23 23:20 — product acceptance continuation claimed
+
+- First closed #1798 on its delivered factory/regression work and opened
+  #3276 for the remaining product activation and physical acceptance.
+  Claimed it; Third still has no lamp access.
+- Prepared an [unexecuted acceptance sheet](verification/head-touch-acceptance-20261023/run-sheet.md)
+  separating physical contact/release, acoustic onset, ALSA first write,
+  listening readiness and retained capture, with camera and SIGKILL rows.
+- #3275 remains `92088b7ea`: Mac gates, Linux formatting and Linux Clippy
+  pass; reviewer-three READ-OK. ARM64, the units read and First's decision
+  remain watched. The product run belongs to the lamp owner and operator.
+
 ## 2026-10-23 23:00 — assigned cue and review correction pushed
 
 - #3275 is now `92088b7ea` on current `be16c3327`. The original three
