@@ -1,0 +1,51 @@
+# id	voice	kind	text ({0.8} = 0.8 s of silence between the pieces, rendered separately)
+a01	v8	ask	Lamp, what time is it?
+a02	v1	ask	Lamp, what's the weather in Hanoi tomorrow?
+a03	v6	ask	Hey Lamp, what time is it in London right now?
+a04	v2	ask	Lamp, can you make the light a little warmer?
+a05	v5	ask	Lamp, set a timer for ten minutes.
+a06	v7	ask	Lamp, how far is the moon from the earth?
+a07	v4	ask	Lamp, what's a good dinner I can make with rice, eggs and some spinach?
+a08	v3	ask	Lamp, who won the last World Cup?
+a09	v8	ask	Lamp, turn the light down a bit, it's too bright.
+a10	v1	ask	Lamp, what's the weather like in Saigon this weekend?
+p01	v8	pause	Lamp, I'm thinking about {0.9} going for a run tomorrow morning. Is that a good idea?
+p02	v1	pause	Lamp, can you tell me {1.1} um {0.6} how long it takes to boil an egg?
+p03	v6	pause	Lamp, what's the weather {0.8} in Da Nang {0.7} on Saturday?
+p04	v2	pause	Lamp, I need a gift for my sister. {1.2} She likes cooking and plants. What should I get her?
+p05	v5	pause	Lamp, remind me {1.0} in twenty minutes {0.8} to call my mom.
+p06	v7	pause	Lamp, so I have a meeting at three, {1.0} and I'm worried I won't finish my slides. Any tips?
+p07	v4	pause	Lamp, what's {0.7} um, {0.9} what's a word that means really happy?
+p08	v3	pause	Lamp, can you explain {1.3} how a rainbow forms? Keep it short.
+p09	v8	pause	Lamp, I've been feeling a bit tired lately. {1.4} Like, every afternoon. Why could that be?
+p10	v1	pause	Lamp, what should I {0.8} watch tonight? {0.9} Something funny, not too long.
+p11	v6	pause	Lamp, my friend is coming over {1.0} and she doesn't eat meat. {0.8} What can I cook?
+p12	v2	pause	Lamp, how do you say {0.9} thank you very much {0.6} in Vietnamese?
+f01	v8	follow	And what about the day after?
+f02	v1	follow	Is that hot or cold for this time of year?
+f03	v6	follow	Okay, and how long does that take?
+f04	v2	follow	Can you make it a bit dimmer than that?
+f05	v5	follow	Make it fifteen instead.
+f06	v7	follow	Why is that?
+f07	v4	follow	That sounds good. What else do I need for it?
+f08	v3	follow	Who scored the winning goal?
+f09	v8	follow	Hmm, and what if I go in the evening instead?
+f10	v1	follow	Can you say that again, but shorter?
+f11	v6	follow	And in Saigon?
+f12	v2	follow	Thanks! And how about sorry?
+l01	v7	long	Lamp, I'm planning a trip to Da Lat next month with three friends, we want to stay two nights, we like coffee and hiking, and we don't want to spend too much. What would you suggest?
+l02	v3	long	Lamp, my laptop has been really slow since yesterday, it takes ages to open the browser and the fan is always loud, what should I check first?
+l03	v4	long	Lamp, I want to start reading more, I used to love fantasy books but I haven't read anything in a year, can you suggest one to get me back into it?
+l04	v5	long	Lamp, I'm making pho for the first time this weekend for my family, what's the one thing people usually get wrong?
+d01	v8	desk	Did you send the slides to Sam yet?
+d02	v1	desk	Not yet, I'll do it after lunch.
+d03	v6	desk	Are you coming to the meeting at four?
+d04	v2	desk	I think so, but I might be a bit late.
+d05	v5	desk	Can you pass me the charger? The white one.
+d06	v7	desk	Here you go. Is your phone dying again?
+d07	v4	desk	What time does the shop close today?
+d08	v3	desk	I think around nine, but I'm not sure.
+d09	v8	desk	That lamp is cute, where did you get it?
+d10	v1	desk	It's from the office, they're testing it.
+d11	v6	desk	Do you want coffee? I'm going downstairs.
+d12	v2	desk	Yes please, a latte, no sugar.

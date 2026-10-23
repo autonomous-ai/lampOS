@@ -231,6 +231,42 @@ goes on into the next, and it is `L` when it names the lamp (or give
 `--dry` runs it, prints the drop-ins and the scenes, and scores the
 SCENARIO files given, with no lamp and nothing played.
 
+## Night rounds (desk-kit-2)
+
+`night.py ROUND [SCENE ...]` plays desk-kit-2's 50 made people's lines from
+this computer's speakers to your lamp, scene by scene, and scores each line
+from the voice's own events, its journal and the bus: words heard against
+the script, lines split into pieces, cut-short words let go, joined, the
+first answer sound, and whether each line was answered or held as its kind
+says (desk talk between colleagues must be held, every other line
+answered). A follow-up waits for the lamp's real answer: `a+S` plays S s
+after the answer's last sample, `d+S` S s after its first (cutting in),
+`g+S` S s after the previous clip. Nothing on the lamp is changed.
+
+```sh
+export LAMP_HOST=<your lamp's address>
+lampOS/tools/played/night.py --check            # the kit only: no lamp, nothing played
+lampOS/tools/played/night.py r1 weather desk1 moon
+lampOS/tools/played/night_compare.py r1 r2      # two rounds side by side
+```
+
+- **The lines** are `desk-kit-2/lines.tsv`: 10 asks, 12 hesitant asks
+  (`{0.8}` is a pause between pieces), 12 follow-ups, 4 long asks and 12
+  lines of desk talk, from eight made voices coded `v1` to `v8` (ElevenLabs
+  premade voices). The names in them are made up.
+- **The audio** is one versioned tar, `desk-kit-2.tar`, fetched once into
+  `$PLAYED_OUT` from https://cdn.autonomous.ai/os/test-kits/desk-kit-2.tar
+  (`gs://s3-autonomous-upgrade-3/os/test-kits/`) and refused unless its
+  sha256 is `NIGHT_KIT_SHA256` (`60128bcd…`), so every lamp hears the same
+  lines. The WAVs (16-bit mono, 24 kHz) were rendered once through a lamp's
+  own speech route, so no key is ever on a computer. `NIGHT_WAV=<folder>`
+  uses WAVs on this computer instead.
+- **Results:** `$PLAYED_OUT/night/ROUND.txt` (a summary line, then each line
+  with what was said, heard and answered) and `ROUND.json`.
+- **When:** run it in an empty room. It plays nothing between 12:00 and
+  14:00 on weekdays (`LAMP_PLAY_AT_LUNCH=yes` overrides), and on a shared
+  lamp it runs under the lamp's lease, as the desk kit does.
+
 ## What it needs
 
 - A Mac beside the lamp, its speaker where the lamp can hear it.
@@ -251,6 +287,9 @@ SCENARIO files given, with no lamp and nothing played.
 | `LAMP_KNOWN_HOSTS` | optional | A known_hosts file the lamp's key must be in. Otherwise your own known_hosts decides. |
 | `PLAYED_OUT` | `~/lamp-played` | Where results and the spoken lines go. |
 | `LAMP_SAY_RATE` | `185` | `say`'s speaking rate. |
+| `NIGHT_KIT_TAR` | `desk-kit-2` | night.py's kit tar, fetched once into `$PLAYED_OUT`. |
+| `NIGHT_KIT_SHA256` | the kit's | The sha256 the fetched tar must have, or it is refused. |
+| `NIGHT_WAV` | the kit's `wav/` | A folder of the lines' WAVs on this computer, used instead of the tar. |
 
 All ssh goes through `lamp_ssh`, which you can also use yourself:
 `lamp_ssh 'systemctl is-active lamp-voice' </dev/null`.
