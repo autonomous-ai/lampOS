@@ -1,5 +1,11 @@
 # Reviewer work log
 
+## 2026-10-24 (reviewer-two face build row read at 03:29 +07)
+
+READ-OK a4e953b8757dd0c06d651a598d310836f2827b11 for #3293, P1/P2 none. First assigned6374021741, claimed6374088930. Only three-line docs/build-rows.md change: snapshot time, build mean and Faces row0.90->0.92. Exact decimal recomputation gives70build rows92.5571429%,16quality rows63.75%,twoexcluded mood58.5%, matching92.6/63.8/58.5. git diff --check passes; workflow-skipped path requires no runtime test.
+
+Read landed FULL_CROP_ENVIRONMENT/full_crop_on exact-on default-off, full-frame crop and Held bounded4s/identity conditions plus eyes.md. Row accurately records merged off-by-default change, not pending real-person trial or Third's separate remember_my_face tool fix. Parent e45e35e2b0420f1a00f01fb6f0fd6c1b34515a68 equals current API base; First's train owns final check/integration. Previous log5e4e61a58e pushed. No model/provider/device action. Next Sixth conversation P1 on opening, then qualification tables; main pr.json unchanged and own merge total ten.
+
 ## 2026-10-24 (reviewer-two conversation evidence preparation at 03:18 +07)
 
 First's read-only journal report6373654933 narrows the initial break to voice verdicts0.27/0.25 on1.80/1.65s prints, with unknown real speaker identity and two faces seen earlier. Later lines miss follow-up window; this is not proof of owner misclassification. Sixth accepted review boundaries at6373798879: policy holds versus real desk talk, same speaker addressing colleague held, return after another speaker needs fresh evidence, old late result cannot undo new classification, onset-based expiry. Root comments6373617120 and6373713575 add these distinctions and note20s cannot cover22s onset without evidence of earlier onset.
