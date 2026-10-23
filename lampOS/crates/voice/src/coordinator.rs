@@ -11602,7 +11602,7 @@ fn hear_stop_words(
         }
         _ => None,
     };
-    match words.block(
+    let tell = words.block(
         replying,
         sounding,
         mask.yield_in_force(),
@@ -11610,7 +11610,11 @@ fn hear_stop_words(
         held,
         captured_at_us,
         samples,
-    ) {
+    );
+    if words.take_asked() {
+        mask.words_asked();
+    }
+    match tell {
         crate::stop_words::Tell::Nothing => {}
         crate::stop_words::Tell::Await => mask.await_words(),
         crate::stop_words::Tell::Words {

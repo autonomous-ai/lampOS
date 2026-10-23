@@ -455,6 +455,13 @@ impl PlaybackMask {
             duplex.interruption.await_words();
         }
     }
+    /// The yield's listener asked for its words: see
+    /// `Interruption::words_asked`.
+    pub fn words_asked(&mut self) {
+        if let Some(duplex) = self.duplex.as_mut() {
+            duplex.interruption.words_asked();
+        }
+    }
     /// A forced yield committed since the last look: the stop was a stop,
     /// and the reply ends, whether or not anything said in it is admitted
     /// (a commit alone only lets a waiting request through).

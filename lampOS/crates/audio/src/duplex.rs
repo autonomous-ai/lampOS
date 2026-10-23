@@ -269,6 +269,14 @@ pub struct Interruption {
     /// Whether the words of the yield in force, or the last one, were a
     /// backchannel; `None` until they came.
     backchannel: Option<bool>,
+    /// Speech in the clear in the yield in force when its words came, or
+    /// when they were asked for if that was sooner: what follows is speech
+    /// they did not hear (#2939).
+    speech_at_words: u8,
+    /// Speech in the clear in the yield in force when its listener first
+    /// asked for its words ([`Self::words_asked`]): what was said after is
+    /// not in the words that ask brings (reviewer-two's P2s on #3295).
+    speech_at_ask: Option<u8>,
     /// Blocks the commit of the yield in force, or the last one, was held
     /// for its words.
     held: u16,
@@ -304,6 +312,8 @@ impl Interruption {
             holds_backchannels: false,
             words_asked_after_still: 0,
             backchannel: None,
+            speech_at_words: 0,
+            speech_at_ask: None,
             held: 0,
         }
     }
@@ -314,7 +324,8 @@ impl Interruption {
     /// `words_asked_after_still` still blocks, never past the yield's
     /// deadline, and only while its speech in the clear is under
     /// [`BACKCHANNEL_SPEECH_BLOCKS`]. Words that are a backchannel
-    /// let stillness resume it, unless that speech reaches a sentence; any
+    /// let stillness resume it, unless that speech reaches a sentence or
+    /// speech goes on after they came and reaches the speech rule; any
     /// other words end the hold, and a due commit commits. No words by the
     /// hold's end resume the reply: a wordless yield is room sound or the
     /// lamp's own echo, and ends no answer. A stop word and a forced yield
@@ -379,12 +390,24 @@ impl Interruption {
         }
     }
 
+    /// The listener asked for the words said in the yield in force: its
+    /// first ask is where they end, whatever stillness this rule has seen
+    /// (`heard` asks at a still block, `heard-always` also after the
+    /// detector's own pause, before this rule counts one). Nothing without
+    /// a yield in force.
+    pub fn words_asked(&mut self) {
+        if let State::Yielded { speech, .. } = self.state {
+            self.speech_at_ask.get_or_insert(speech);
+        }
+    }
+
     /// The words said in the yield in force came: a stop word commits it at
     /// its next block, and anything else lets stillness resume it as before.
     /// Whether they were a backchannel is kept for the record, and with
     /// [`Self::hold_backchannels`] decides the commit held for them.
     pub fn words(&mut self, stop: bool, backchannel: bool) {
-        if self.yielded() {
+        if let State::Yielded { speech, .. } = self.state {
+            self.speech_at_words = self.speech_at_ask.map_or(speech, |asked| asked.min(speech));
             self.words_pending = false;
             self.stop_heard = stop;
             self.backchannel = Some(backchannel);
@@ -452,6 +475,8 @@ impl Interruption {
                 self.yields += 1;
                 self.forced_yield = forced;
                 self.backchannel = None;
+                self.speech_at_words = 0;
+                self.speech_at_ask = None;
                 self.held = 0;
                 Step::Yield
             }
@@ -475,10 +500,16 @@ impl Interruption {
                 }
                 let quiet = *still >= self.rule.silence_blocks.max(1);
                 let sentence = *speech >= BACKCHANNEL_SPEECH_BLOCKS;
-                // A backchannel commits only as a sentence would (#2939).
+                // A backchannel commits only as a sentence would (#2939),
+                // or as any speech does once it goes on after its words
+                // were asked for: they were asked for at a pause and heard
+                // nothing said after it, however late they came (lamp-52e6 on 24 Oct, a "Stop, stop." whose
+                // first word came as "yeah" over the lamp and whose second,
+                // 250 ms in the clear, was held as that backchannel).
+                let after_words = speech.saturating_sub(self.speech_at_words);
                 let due = self.stop_heard
                     || if self.holds_backchannels && self.backchannel == Some(true) {
-                        sentence
+                        sentence || after_words >= self.rule.speech_blocks.max(1)
                     } else {
                         *speech >= self.rule.speech_blocks.max(1)
                             || (quiet && *seen >= self.rule.plain_blocks.max(1))
