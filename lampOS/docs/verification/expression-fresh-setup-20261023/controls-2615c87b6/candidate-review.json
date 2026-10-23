@@ -1,0 +1,33 @@
+{
+  "scope": "Read-only candidate audit; no hooks, Cargo, target or source changes",
+  "head": "2615c87b636d8e39d8df9548b00af7ed4e164f70",
+  "status": " M lampOS/crates/expression/tests/runtime.rs\n M lampOS/docs/expression.md\n",
+  "candidate_files": {
+    "lampOS/crates/expression/tests/runtime.rs": {
+      "head_sha256": "ed1ed5d64f6338357b25bdcbda739985b1c68c501695d20d9bf2e374ce6318e4",
+      "candidate_sha256": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95"
+    },
+    "lampOS/docs/expression.md": {
+      "head_sha256": "eed243fe00dd913f5ed11809b6d25c1123941c5da09192f27057de51ce1217be",
+      "candidate_sha256": "3a430011794fb6fd1768a92beca373c4c8276d1273a0bc69a20b2c385d623bc8"
+    }
+  },
+  "patch_sha256": "9bc2076d4daa8ac8f596aca7ee6c59595da313c8b71485db55d46acd0c2419df",
+  "inverse_permutation_restores_entire_runtime_source": true,
+  "populate_body_byte_identical": true,
+  "preserved_tails": [
+    {
+      "test": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "from": "let output = service.step(|| 10_000_000, wall);",
+      "sha256": "f2237a8a3b92f7d6fd7b3fed20bb4174375611b2f9e00971cddb6835621475dd",
+      "bytes": 1056
+    },
+    {
+      "test": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "from": "service.step(...) through both final face assertions",
+      "sha256": "0a158fae619904a701a7b0cacbfbf7743b8824a1dc8806cfcfed816215d903f8",
+      "bytes": 275
+    }
+  ],
+  "method": "Extract each named top-level function through its column-zero closing brace. Reverse only the two known setup permutations and comment correction, then require the complete runtime.rs bytes to equal HEAD. Compare each original post-setup tail and populate body byte-for-byte."
+}

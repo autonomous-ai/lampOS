@@ -1,0 +1,106 @@
+[
+  {
+    "pr": 3190,
+    "worktree": "/private/tmp/tests-codex-boot-clock-current-20261023",
+    "branch": "tests/1569-boot-clock-current",
+    "old_head": "4b92b677d379b6ac1dadbd9e306320a04af48672",
+    "old_base": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+    "new_base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+    "status": "pushed; new-base gates pending, prior HOLD unchanged",
+    "archive_ref": "refs/heads/tests/archive-3190-4b92b677d-20261023",
+    "authored_paths": [
+      "lampOS/crates/voice/src/coordinator/second.rs",
+      "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "lampOS/crates/voice/src/scenario_clock.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/stop_words.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "before_patch_sha256": "9397fa5cadeccec3b612c274a3a741a5041f0bb39a563d5316444fe454abd403",
+    "old_source_sha256": {
+      "lampOS/crates/voice/src/coordinator/second.rs": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+      "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+      "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+      "lampOS/crates/voice/src/scenario_clock.rs": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "lampOS/crates/voice/src/second_provider/worker.rs": "c8fd3cf2298b965b1652bcfb8357ea0038fb88d33a2f9a97647b15ba4af2f645",
+      "lampOS/crates/voice/src/stop_words.rs": "ca09b676897fc05724646f55de270db866a2131f374fe0ab77fed8c1f510cdda",
+      "lampOS/docs/voice-test-fixtures.md": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c"
+    },
+    "new_head": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+    "new_tree": "6d032f9cda19dbce74a73c05a134c3878cbd8783",
+    "after_patch_sha256": "9397fa5cadeccec3b612c274a3a741a5041f0bb39a563d5316444fe454abd403",
+    "patch_bytes_equal": true,
+    "new_source_sha256": {
+      "lampOS/crates/voice/src/coordinator/second.rs": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+      "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+      "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+      "lampOS/crates/voice/src/scenario_clock.rs": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "lampOS/crates/voice/src/second_provider/worker.rs": "c8fd3cf2298b965b1652bcfb8357ea0038fb88d33a2f9a97647b15ba4af2f645",
+      "lampOS/crates/voice/src/stop_words.rs": "ca09b676897fc05724646f55de270db866a2131f374fe0ab77fed8c1f510cdda",
+      "lampOS/docs/voice-test-fixtures.md": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c"
+    },
+    "authored_source_bytes_equal": true,
+    "range_diff": "1:  4b92b677d3 = 1:  f121d6391e lampOS: give voice fixtures a shared clock and observed child startup\n",
+    "conflicts": false,
+    "push_exit_code": 0,
+    "remote_PR_after_push": {
+      "baseRefName": "lamp-voice",
+      "headRefName": "tests/1569-boot-clock-current",
+      "headRefOid": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+      "isDraft": true,
+      "number": 3190,
+      "state": "OPEN",
+      "url": "https://github.com/autonomous-ai/lampOS/pull/3190"
+    },
+    "remote_archive_ref": "refs/remotes/origin/tests/archive-3190-4b92b677d-20261023",
+    "worktree_clean_after_carry": true,
+    "local_qualification_new_head": "Not run; prior local observations stay bound to old heads."
+  },
+  {
+    "pr": 3218,
+    "worktree": "/private/tmp/tests-codex-phone-news-start-20261023",
+    "branch": "tests/1806-phone-news-start",
+    "old_head": "238403b1c5959fe8834aba09cfbbf24f03b6d893",
+    "old_base": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+    "new_base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+    "status": "pushed; new-base gates pending, prior HOLD unchanged",
+    "archive_ref": "refs/heads/tests/archive-3218-238403b1c-20261023",
+    "authored_paths": [
+      "lampOS/crates/voice/src/messages.rs",
+      "lampOS/docs/messages.md"
+    ],
+    "before_patch_sha256": "ea0cb1fba78dc608cd3eaa651bbf984534ff6dda44e795dcdda46762c63d8f0d",
+    "old_source_sha256": {
+      "lampOS/crates/voice/src/messages.rs": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "lampOS/docs/messages.md": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3"
+    },
+    "new_head": "328f7da0f5c1fd729bd5d22a974f9c0a67cf07dd",
+    "new_tree": "7636b69a7317c7a0c7b1089d6b7325d39bfbb62a",
+    "after_patch_sha256": "ea0cb1fba78dc608cd3eaa651bbf984534ff6dda44e795dcdda46762c63d8f0d",
+    "patch_bytes_equal": true,
+    "new_source_sha256": {
+      "lampOS/crates/voice/src/messages.rs": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "lampOS/docs/messages.md": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3"
+    },
+    "authored_source_bytes_equal": true,
+    "range_diff": "1:  238403b1c5 = 1:  328f7da0f5 lampOS: wait for the phone-news round before timing text preemption\n",
+    "conflicts": false,
+    "push_exit_code": 0,
+    "remote_PR_after_push": {
+      "baseRefName": "lamp-voice",
+      "headRefName": "tests/1806-phone-news-start",
+      "headRefOid": "328f7da0f5c1fd729bd5d22a974f9c0a67cf07dd",
+      "isDraft": true,
+      "number": 3218,
+      "state": "OPEN",
+      "url": "https://github.com/autonomous-ai/lampOS/pull/3218"
+    },
+    "remote_archive_ref": "refs/remotes/origin/tests/archive-3218-238403b1c-20261023",
+    "worktree_clean_after_carry": true,
+    "local_qualification_new_head": "Not run; prior local observations stay bound to old heads."
+  }
+]

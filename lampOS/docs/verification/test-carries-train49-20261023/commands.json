@@ -1,0 +1,205 @@
+[
+  {
+    "command": [
+      "git",
+      "branch",
+      "tests/archive-3190-4b92b677d-20261023",
+      "4b92b677d379b6ac1dadbd9e306320a04af48672"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023",
+    "started_at": "2026-10-23T12:55:44.550089+00:00",
+    "exit_code": 0,
+    "wall_seconds": 0.036006066016852856,
+    "stdout_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "command": [
+      "git",
+      "-c",
+      "core.editor=true",
+      "rebase",
+      "--onto",
+      "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023",
+    "started_at": "2026-10-23T12:55:44.835689+00:00",
+    "exit_code": 0,
+    "wall_seconds": 0.21808397816494107,
+    "stdout_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 90,
+    "stderr_sha256": "44b79ea9df671dc5e88e855ed28a6e5707049e72f82cfc83e88bfd392f50d3ac"
+  },
+  {
+    "command": [
+      "git",
+      "range-diff",
+      "--no-color",
+      "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850..4b92b677d379b6ac1dadbd9e306320a04af48672",
+      "810e05109bced3beca88a5b602930cfed5fba4e5..f121d6391e53bf709ffbf07807e8657f7e86d3ce"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023",
+    "started_at": "2026-10-23T12:55:45.151643+00:00",
+    "exit_code": 0,
+    "wall_seconds": 0.11154431523755193,
+    "stdout_bytes": 102,
+    "stdout_sha256": "87d021467be3d87a8383ccf7a3486f035199540ccdfdee0ee439ef5b2fb9f480",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023",
+    "started_at": "2026-10-23T12:55:45.501253+00:00",
+    "exit_code": 0,
+    "wall_seconds": 0.038624984677881,
+    "stdout_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "command": [
+      "git",
+      "push",
+      "--force-with-lease=refs/heads/tests/1569-boot-clock-current:4b92b677d379b6ac1dadbd9e306320a04af48672",
+      "origin",
+      "HEAD:refs/heads/tests/1569-boot-clock-current"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023",
+    "started_at": "2026-10-23T12:55:45.709211+00:00",
+    "exit_code": 0,
+    "wall_seconds": 2.487121493089944,
+    "stdout_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 128,
+    "stderr_sha256": "8c1f2485f76bc6caa24d53561fd9d33a6df9afc9da57c01286909f43503db921"
+  },
+  {
+    "command": [
+      "git",
+      "branch",
+      "tests/archive-3218-238403b1c-20261023",
+      "238403b1c5959fe8834aba09cfbbf24f03b6d893"
+    ],
+    "cwd": "/private/tmp/tests-codex-phone-news-start-20261023",
+    "started_at": "2026-10-23T12:55:48.737009+00:00",
+    "exit_code": 0,
+    "wall_seconds": 0.030618544202297926,
+    "stdout_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "command": [
+      "git",
+      "-c",
+      "core.editor=true",
+      "rebase",
+      "--onto",
+      "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850"
+    ],
+    "cwd": "/private/tmp/tests-codex-phone-news-start-20261023",
+    "started_at": "2026-10-23T12:55:48.827818+00:00",
+    "exit_code": 0,
+    "wall_seconds": 0.20962320500984788,
+    "stdout_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 88,
+    "stderr_sha256": "b549e31cd4b8c3de8541ba4a25a44253aa0ea0ad3485a9a973beba49bddeee7a"
+  },
+  {
+    "command": [
+      "git",
+      "range-diff",
+      "--no-color",
+      "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850..238403b1c5959fe8834aba09cfbbf24f03b6d893",
+      "810e05109bced3beca88a5b602930cfed5fba4e5..328f7da0f5c1fd729bd5d22a974f9c0a67cf07dd"
+    ],
+    "cwd": "/private/tmp/tests-codex-phone-news-start-20261023",
+    "started_at": "2026-10-23T12:55:49.123704+00:00",
+    "exit_code": 0,
+    "wall_seconds": 0.07349313469603658,
+    "stdout_bytes": 100,
+    "stdout_sha256": "ab4cceeb21fd7c48c020d4833588e11f78215bf91998cbbdc2b848a23aa143d1",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "cwd": "/private/tmp/tests-codex-phone-news-start-20261023",
+    "started_at": "2026-10-23T12:55:49.253649+00:00",
+    "exit_code": 0,
+    "wall_seconds": 0.03719237307086587,
+    "stdout_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "command": [
+      "git",
+      "push",
+      "--force-with-lease=refs/heads/tests/1806-phone-news-start:238403b1c5959fe8834aba09cfbbf24f03b6d893",
+      "origin",
+      "HEAD:refs/heads/tests/1806-phone-news-start"
+    ],
+    "cwd": "/private/tmp/tests-codex-phone-news-start-20261023",
+    "started_at": "2026-10-23T12:55:49.486065+00:00",
+    "exit_code": 0,
+    "wall_seconds": 2.3112711659632623,
+    "stdout_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 126,
+    "stderr_sha256": "3514e2e79a10d62de330bc8fdba35d8f7079ef434b2f961bfa2fb74711ddab3c"
+  },
+  {
+    "command": [
+      "git",
+      "fetch",
+      "origin",
+      "lamp-voice",
+      "tests/1569-boot-clock-current",
+      "tests/1806-phone-news-start"
+    ],
+    "cwd": "/private/tmp/tests-codex-phone-news-start-20261023",
+    "started_at": "2026-10-23T12:52:51.571050+00:00",
+    "exit_code": 0,
+    "wall_seconds": 0.7215275848284364,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "818bbefc055e063a2a5c0c9c10b7b24439c75a239b27843d37f246c7ab49f2f4"
+  },
+  {
+    "command": [
+      "git",
+      "push",
+      "--atomic",
+      "--force-with-lease=refs/heads/tests/archive-3190-4b92b677d-20261023:",
+      "--force-with-lease=refs/heads/tests/archive-3218-238403b1c-20261023:",
+      "origin",
+      "refs/heads/tests/archive-3190-4b92b677d-20261023:refs/heads/tests/archive-3190-4b92b677d-20261023",
+      "refs/heads/tests/archive-3218-238403b1c-20261023:refs/heads/tests/archive-3218-238403b1c-20261023"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023",
+    "started_at": "2026-10-23T12:58:49.743080+00:00",
+    "exit_code": 0,
+    "wall_seconds": 2.563073188997805,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "2175a540e61450b472fde91fa98c1b2e4ba2d064535f4dc0e9750b9249eb0a58",
+    "purpose": "Preserve the superseded exact gate heads under new owned remote archival refs without overwriting any existing ref."
+  }
+]

@@ -1,0 +1,367 @@
+{
+  "old_base": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+  "new_base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+  "old_tree": "bfc542f17318518ef5dea21dd9f196ec47fbf96d",
+  "new_tree": "6e25adfa7d21377d28f31b2fcaac6f9497de26d5",
+  "changed_paths": [
+    {
+      "path": "lampOS/builders/devin-local-tester.md",
+      "old_base": {
+        "exists": false,
+        "bytes": null,
+        "sha256": null
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 2344,
+        "sha256": "9ad00beea9d3ed04f7a261bf02cace24d778c6f04624a15d44f40ec2be54cfa8"
+      }
+    },
+    {
+      "path": "lampOS/crates/eyes/src/bus_out.rs",
+      "old_base": {
+        "exists": true,
+        "bytes": 65198,
+        "sha256": "35d96a671c04a267ba5e63be20bbbb18b5644c38bed2df85e0e19e243720b81c"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 65390,
+        "sha256": "1c73a8571845e0d2aa1855adc24208c1fc684dea3cc48b69b2a29494de7901fd"
+      }
+    },
+    {
+      "path": "lampOS/crates/eyes/src/main.rs",
+      "old_base": {
+        "exists": true,
+        "bytes": 151832,
+        "sha256": "0aa947982620213bc18d558b052099cdc6b969d17e1859f2a8ec82c42d0fd425"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 160523,
+        "sha256": "484944178730908d02c42a2b455cb5f5b7ecdaac50b6256b8dc056604019cdfe"
+      }
+    },
+    {
+      "path": "lampOS/crates/eyes/src/permit.rs",
+      "old_base": {
+        "exists": true,
+        "bytes": 11551,
+        "sha256": "2c7180bb348528edb8c386d6a09ea49dcfbba03d074bea9716c7beb6b6c48780"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 13814,
+        "sha256": "7bd5c375cb651872697b0ac30f714ae7ef3cf4ba4754936878ee04f31d45ca9d"
+      }
+    },
+    {
+      "path": "lampOS/crates/eyes/src/photo.rs",
+      "old_base": {
+        "exists": true,
+        "bytes": 33095,
+        "sha256": "c061ff93ee6c80a37def8d7f37bcd2fec43a36f9970adca8bc7875a3b3ee35d8"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 52427,
+        "sha256": "a3a5e8f869c32b3a51f792f448001925963690248a1d7e5a42a4afb38b51d6af"
+      }
+    },
+    {
+      "path": "lampOS/crates/eyes/src/who.rs",
+      "old_base": {
+        "exists": true,
+        "bytes": 180093,
+        "sha256": "68abe8244725fcf2af58cef0e59a9894b16549e6db1935411b96b5a31442e393"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 181109,
+        "sha256": "fd02af45bb256b077fedafef1b98a673a31656563f5b3e310489f1d778b3ae55"
+      }
+    },
+    {
+      "path": "lampOS/crates/records/src/config.rs",
+      "old_base": {
+        "exists": true,
+        "bytes": 13932,
+        "sha256": "0225f087483572483beca770f784d0b4c726c1920ce6481ea096a686bcce04ca"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 25173,
+        "sha256": "04cf500e2c92c1aa7be1296f4dc5402fe0f00fec6150d7ef2407112f3bb54263"
+      }
+    },
+    {
+      "path": "lampOS/crates/records/src/run.rs",
+      "old_base": {
+        "exists": true,
+        "bytes": 14461,
+        "sha256": "87b08aaf108074b4f97b317a1ade74a5f47771c62ebcd28cfdc6dab5a6d89574"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 14657,
+        "sha256": "40365064fee62a999208238364cadd90b7c02503f84a7cdd0367ae2ad1c29d54"
+      }
+    },
+    {
+      "path": "lampOS/crates/records/src/store.rs",
+      "old_base": {
+        "exists": true,
+        "bytes": 63702,
+        "sha256": "bf1f186497cbc491622da8fa04ee47c9f1c3fa12774eaa51743ad5ea772f4ee7"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 77987,
+        "sha256": "9641132c156e1cd813d28ff4018b7bf8ac9dc4f608f455b5a9d178058167e9a9"
+      }
+    },
+    {
+      "path": "lampOS/crates/tasks/src/engine.rs",
+      "old_base": {
+        "exists": true,
+        "bytes": 220636,
+        "sha256": "a560b24a4142ee3fd89fc5379ee0ae91bcfa974d686ea70e88c03b4225fcf10d"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 220636,
+        "sha256": "0130f2c50d2895dabfd02557600fa4a13fed953de02e885ca6c715d54643fdf3"
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator.rs",
+      "old_base": {
+        "exists": true,
+        "bytes": 750173,
+        "sha256": "58aed649ad730f8a1cd52cdac1746dd016b067751a22bd58be8c4ba84676df6c"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 750394,
+        "sha256": "ee2c8d4ca4ae2100453eace97f377d73c44d47d29fd96277ebb6aec97ff42db8"
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+      "old_base": {
+        "exists": true,
+        "bytes": 218128,
+        "sha256": "f0641f3ca4bee52d1b3d725343bdc67d4d7dbc202738f69270e798395a38aa5c"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 222082,
+        "sha256": "418607b8c2f0b03895b7f4f083bd0fbe69e17045c07d7de1ff50ad8e0ca2afb4"
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/lib.rs",
+      "old_base": {
+        "exists": true,
+        "bytes": 4394,
+        "sha256": "5b897b5a80027b334fcaa16b295aa29e516402c97592cace64f1c8739fef42e4"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 4414,
+        "sha256": "743f759a1b899724c2f31501600db0802d3ca324421982497e3cff9d6acd6b18"
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/process/switch_census_tests.rs",
+      "old_base": {
+        "exists": true,
+        "bytes": 29830,
+        "sha256": "12f4b1f3acf80538c56cb489aac106aa9e1fa96f14bc0948add05685ce616901"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 30231,
+        "sha256": "ca138b1211e34bbc3e2a997891b6bcac6db218cef725e186d39e64b5044ed119"
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/service_trace.rs",
+      "old_base": {
+        "exists": true,
+        "bytes": 16355,
+        "sha256": "1cef19a2633e493613a99a7d6765ff7fb55c92966a564755fcb62c828fc094be"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 30629,
+        "sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe"
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/session_reader.rs",
+      "old_base": {
+        "exists": false,
+        "bytes": null,
+        "sha256": null
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 18532,
+        "sha256": "c4f76b716b2e7d1b606a901537327f6212c1303073f816c2b0689940d9ceb712"
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+      "old_base": {
+        "exists": false,
+        "bytes": null,
+        "sha256": null
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 30147,
+        "sha256": "94940c5bcdaa9cffb7e7cf69b5f682249edb18308e804b6de404223136d5063a"
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/session_state.rs",
+      "old_base": {
+        "exists": true,
+        "bytes": 17221,
+        "sha256": "9467598c61f7ee8ca2ea79accec15fde029e1419569e7e2192b3ecac7921d9a5"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 17702,
+        "sha256": "3324e3e7fcb485001442dd6a1682cd98d1dae91211e5ce46e71822343feb9e2f"
+      }
+    },
+    {
+      "path": "lampOS/deploy/lamp-a0ae/LAMP.md",
+      "old_base": {
+        "exists": false,
+        "bytes": null,
+        "sha256": null
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 383,
+        "sha256": "429e82ba7529e79a4ff7a92875524056d2c4461d10d485c03465ea3222de4285"
+      }
+    },
+    {
+      "path": "lampOS/docs/addons.md",
+      "old_base": {
+        "exists": true,
+        "bytes": 34853,
+        "sha256": "be1901bbb289e30a903253aafcaeed6c6fb60ae1fc263c4f6a7227142e9d5eb3"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 36037,
+        "sha256": "0a9a3781d7b624bb11d1942470142e58f4f1594b22efad595be482ff064b58a0"
+      }
+    },
+    {
+      "path": "lampOS/docs/build-rows.md",
+      "old_base": {
+        "exists": true,
+        "bytes": 19908,
+        "sha256": "57b80183b0146723a31e882eb3658b84a8f9e38dbe45fd316ee0318f7cb13086"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 19914,
+        "sha256": "447ed67eb5bfa2a6f052b87c4d47b50d44d939bb63f41ca13b33efe790492449"
+      }
+    },
+    {
+      "path": "lampOS/docs/eyes.md",
+      "old_base": {
+        "exists": true,
+        "bytes": 150203,
+        "sha256": "8a20d90dcfd6a9d7b609daefb572bad81b97a2a0d65777261e6796877a854fda"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 153342,
+        "sha256": "02599d00316c4c51678aa6cfcf73d1177b322cd6f4d092fd77d39c22e240d3ca"
+      }
+    },
+    {
+      "path": "lampOS/docs/peek.md",
+      "old_base": {
+        "exists": true,
+        "bytes": 20997,
+        "sha256": "343ce7e94d6052b1c50fbc76ab84feefb7f2ae443d693a4e471cece3062cc25c"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 25712,
+        "sha256": "8106853c7e75de7878a150ba6984b6fda180b0f4f2e143fa722e3327443177b8"
+      }
+    },
+    {
+      "path": "lampOS/docs/records.md",
+      "old_base": {
+        "exists": true,
+        "bytes": 48587,
+        "sha256": "72f27edf36396de48faaf4a261b0da44287ecdd5123c9d969ce2fe8eda191c74"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 51916,
+        "sha256": "a526116a399f0f783eb32c820dec02a2e8a780f171fa03eec22c3b023fa7aedd"
+      }
+    },
+    {
+      "path": "lampOS/docs/reuse-decisions.md",
+      "old_base": {
+        "exists": true,
+        "bytes": 110977,
+        "sha256": "27c82ca86b27bd32669520e421939c9724b2d3acdacf07a0e0addfcfae0b46a6"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 114426,
+        "sha256": "a3bcd45b461cfd3c4a15c1fa91994ee1559f5416efcc4f1e17b42399feb2cb9a"
+      }
+    },
+    {
+      "path": "lampOS/docs/switches.md",
+      "old_base": {
+        "exists": true,
+        "bytes": 288070,
+        "sha256": "1e02e89389eccd418a73bf08f499d2bddd915511210e0c6b86f3c87de0ca86d9"
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 289692,
+        "sha256": "6e85ffe252f58fc1b8f5c61c06db32057824bb3c123054dd61ea988f00da98ea"
+      }
+    },
+    {
+      "path": "lampOS/docs/work-log-devin-local-tester.md",
+      "old_base": {
+        "exists": false,
+        "bytes": null,
+        "sha256": null
+      },
+      "new_base": {
+        "exists": true,
+        "bytes": 1143,
+        "sha256": "e2d77aba38008851275b0a6c38b1fcf0d58323d9e7b76bdf617120a1d13fd8e4"
+      }
+    }
+  ],
+  "authored_paths_with_upstream_overlap": [],
+  "full_upstream_diff": {
+    "external_file": "/private/tmp/tests-carry-post-train45-20261023/upstream-full-diff.stdout.txt",
+    "bytes": 214148,
+    "sha256": "c5fa1c60971be588202d2923848b9f2cdec14f1d583afa045d4b19ffd718cafc"
+  },
+  "full_diff_availability": "Retained externally; not a remote availability promise. Exact immutable old/new Git identities reconstruct all changed source.",
+  "scope": "Substantial upstream Voice session reader/trace/coordinator, Records, Eyes and Tasks changes are present. This is source evidence only, not qualification."
+}

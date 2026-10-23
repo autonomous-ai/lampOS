@@ -1,0 +1,102 @@
+{
+  "status": "Frozen before diagnostic-hook preparation; execution requires a later explicit CPU/MAIN grant",
+  "base": "2615c87b636d8e39d8df9548b00af7ed4e164f70",
+  "shipping_worktree": "/private/tmp/tests-codex-expression-fresh-setup-20261023",
+  "review_sha256": "35b95a392af319aa4385f6a6f9471723bcf5d949d7ab59bf7acf51f68c142982",
+  "source_files": {
+    "lampOS/crates/expression/tests/runtime.rs": {
+      "head_sha256": "ed1ed5d64f6338357b25bdcbda739985b1c68c501695d20d9bf2e374ce6318e4",
+      "candidate_sha256": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95"
+    },
+    "lampOS/docs/expression.md": {
+      "head_sha256": "eed243fe00dd913f5ed11809b6d25c1123941c5da09192f27057de51ce1217be",
+      "candidate_sha256": "3a430011794fb6fd1768a92beca373c4c8276d1273a0bc69a20b2c385d623bc8"
+    }
+  },
+  "before_control_worktree": "/private/tmp/tests-codex-expression-control-before-20261023",
+  "after_control_worktree": "/private/tmp/tests-codex-expression-control-after-20261023",
+  "worktree_creation": "Root prepares these own disposable worktrees at the exact base; runner never changes branches or Git refs. Shipping worktree is read-only.",
+  "target": "/private/tmp/tests-codex-1569-target",
+  "rust_toolchain": "1.96.0-x86_64-apple-darwin",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "RUST_TEST_THREADS": "UNSET"
+  },
+  "permissions": "Launch requires require_escalated for private Unix sockets; preflight Unix datagram and loopback TCP before Cargo.",
+  "build_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-expression",
+    "--test",
+    "runtime",
+    "--no-run",
+    "--message-format=json-render-diagnostics"
+  ],
+  "build_timeout_seconds": 1200,
+  "test_timeout_seconds": 30,
+  "expiry_condition_timeout_seconds": 4,
+  "expiry_poll_ms": 1,
+  "witness_topic": "fixture/setup_expiry",
+  "witness_contract": "Separate from every product input; actual VoiceTiming declaration unchanged at500ms, bus expiry grace50ms. No production topic, schema or source change.",
+  "setup_boundary": "Immediately after the initial constructor/options block. The same test-only helper moves with that existing block; no product function instrumented.",
+  "expiry_condition": "The exact retained header identity/payload is unchanged and Bus::latest returns expired=true at real wall time strictly beyond header.at_unix_ms+expires_ms+EXPIRY_GRACE_MS. No fixed completion sleep.",
+  "negative_control": "After the first actual populate and before first step, wait for that actual VoiceTiming header to expire. For offline-face, apply only when offline_face=true; false stays healthy and its original assertion must pass.",
+  "observations": [
+    {
+      "variant": "before",
+      "mode": "setup",
+      "test": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "expected_exit": 101,
+      "expected_result": "original freshness expect fails"
+    },
+    {
+      "variant": "before",
+      "mode": "setup",
+      "test": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "expected_exit": 101,
+      "expected_result": "original freshness expect fails"
+    },
+    {
+      "variant": "after",
+      "mode": "setup",
+      "test": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "expected_exit": 0,
+      "expected_result": "all original assertions pass"
+    },
+    {
+      "variant": "after",
+      "mode": "setup",
+      "test": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "expected_exit": 0,
+      "expected_result": "all original assertions pass"
+    },
+    {
+      "variant": "after",
+      "mode": "after_publish",
+      "test": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "expected_exit": 101,
+      "expected_result": "original freshness expect still fails"
+    },
+    {
+      "variant": "after",
+      "mode": "after_publish",
+      "test": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "expected_exit": 101,
+      "expected_result": "original freshness expect still fails"
+    }
+  ],
+  "offline_branch_limits": "Old delayed false arm fails, so true arm is explicitly unrun. New delayed pass includes both false and true originals. New after-publication-expiry control requires false arm healthy, then fails only true at the original expect.",
+  "assertion_invariants": "Every original assertion and tail unchanged; logical 10_000_000/12_000_000/12_100_000 values, captured wall, lease200ms bound, input-loss/restart checks, both face outcomes and all product timing unchanged.",
+  "source_invariants": "Only scratch runtime test hooks; no product-source edits, expiry changes, input republish, hidden exact-case retries or cache reuse without source freshness.",
+  "restoration": "Save source closures before mutation. In finally restore before WT to exact baseline and after WT to exact shipping two-file candidate; verify whole tracked-source hashes and the untouched shipping worktree. Cargo/build failures and all observations retained.",
+  "execution_once": "One before compile, two before observations; one after compile, four after observations. No retry of any observed failure. Metadata --list/--ignored inventories are not test execution.",
+  "recording": "Full raw stdout/stderr/commands/exits; actual artifact hash/file/rustc identity; source hashes before/after every command; exact input/header/payload/control markers; actual terminal row and branch reachability. Production Subscriber::admit remains unobserved; helper snapshots and original results are labeled as such.",
+  "unexecuted_normal_gates": "After restoration, root schedules original full runtime/package/fmt/strictClippy/workspace gate separately; this control runner must not add runs."
+}

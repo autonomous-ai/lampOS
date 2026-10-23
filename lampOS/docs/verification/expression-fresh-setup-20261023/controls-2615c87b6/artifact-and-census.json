@@ -1,0 +1,133 @@
+{
+  "metadata_only_inventory": true,
+  "records": [
+    {
+      "variant": "before",
+      "path_at_execution": "/private/tmp/tests-codex-1569-target/debug/deps/runtime-f9b92bb4002b831f",
+      "sha256": "37d047f1f9c7e9eb39bfadb126580f1c6ab0b31e5e356e5d5e90b5785ec6417f",
+      "bytes": 6431072,
+      "source_aggregate_sha256": "78ab50b6d45329b91f5352a70c1275d7526a151b201aee68e656010d9b0775c2",
+      "target": {
+        "name": "runtime",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "compiled_census": {
+        "metadata_only": true,
+        "artifact": "37d047f1f9c7e9eb39bfadb126580f1c6ab0b31e5e356e5d5e90b5785ec6417f",
+        "all": [
+          "a_closed_switch_reads_from_the_last_privacy_lease_said",
+          "a_full_output_record_stops_growing_and_counts_loss",
+          "a_note_about_one_turn_is_not_a_warning_and_a_fault_or_a_lacking_input_is",
+          "a_saved_light_setting_remains_valid_after_days_without_a_change",
+          "boot_identity_cannot_be_empty_or_a_path",
+          "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+          "mood_in_reads_only_a_fresh_valid_state_from_mood",
+          "offline_face_reads_only_a_fresh_offline_from_lamp_online",
+          "older_topics_are_aged_by_wall_time_not_private_publisher_time",
+          "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+          "paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed",
+          "shadow_mode_has_diagnostics_but_never_an_actuator_request",
+          "sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had",
+          "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+          "sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up",
+          "sleep_name::activity_adaptation_keeps_the_source_clock_and_owner",
+          "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+          "sleep_name::name_adaptation_keeps_publication_delay_and_ago_ms",
+          "sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus",
+          "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+          "sleep_name::the_switch_closed_mid_look_ends_it",
+          "slow_input_draining_does_not_make_old_joints_fresh",
+          "the_heads_topics_are_read_only_with_head_touch",
+          "the_liveliness_taken_is_said_and_nothing_with_mood_off",
+          "two_expression_processes_cannot_own_one_bus",
+          "typed_timing_keeps_its_shared_stamp_and_bad_inputs_are_counted",
+          "without_a_pause_said_expression_asks_exactly_as_before"
+        ],
+        "ignored": []
+      },
+      "file_output": {
+        "external_source": "/private/tmp/tests-expression-fresh-setup-controls-20261023/run-20261023T124735.462357Z/before/file.stdout",
+        "original_bytes": 106,
+        "original_sha256": "55ad30f16e56320732eb83d404283e0219e57af6bc4a6dc98c0583050044c923",
+        "encoding": "Exact UTF-8; no normalization",
+        "utf8": "/private/tmp/tests-codex-1569-target/debug/deps/runtime-f9b92bb4002b831f: Mach-O 64-bit executable x86_64\n"
+      }
+    },
+    {
+      "variant": "after",
+      "path_at_execution": "/private/tmp/tests-codex-1569-target/debug/deps/runtime-f9b92bb4002b831f",
+      "sha256": "fbb910d707398b57da7824becd269ec6db516e969d15ba95b3bb8b1542bafe1f",
+      "bytes": 6431072,
+      "source_aggregate_sha256": "2922117519f29683f37cd1bfc0c6554119d7d39e4ed5531928481c69b1053d72",
+      "target": {
+        "name": "runtime",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "compiled_census": {
+        "metadata_only": true,
+        "artifact": "fbb910d707398b57da7824becd269ec6db516e969d15ba95b3bb8b1542bafe1f",
+        "all": [
+          "a_closed_switch_reads_from_the_last_privacy_lease_said",
+          "a_full_output_record_stops_growing_and_counts_loss",
+          "a_note_about_one_turn_is_not_a_warning_and_a_fault_or_a_lacking_input_is",
+          "a_saved_light_setting_remains_valid_after_days_without_a_change",
+          "boot_identity_cannot_be_empty_or_a_path",
+          "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+          "mood_in_reads_only_a_fresh_valid_state_from_mood",
+          "offline_face_reads_only_a_fresh_offline_from_lamp_online",
+          "older_topics_are_aged_by_wall_time_not_private_publisher_time",
+          "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+          "paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed",
+          "shadow_mode_has_diagnostics_but_never_an_actuator_request",
+          "sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had",
+          "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+          "sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up",
+          "sleep_name::activity_adaptation_keeps_the_source_clock_and_owner",
+          "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+          "sleep_name::name_adaptation_keeps_publication_delay_and_ago_ms",
+          "sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus",
+          "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+          "sleep_name::the_switch_closed_mid_look_ends_it",
+          "slow_input_draining_does_not_make_old_joints_fresh",
+          "the_heads_topics_are_read_only_with_head_touch",
+          "the_liveliness_taken_is_said_and_nothing_with_mood_off",
+          "two_expression_processes_cannot_own_one_bus",
+          "typed_timing_keeps_its_shared_stamp_and_bad_inputs_are_counted",
+          "without_a_pause_said_expression_asks_exactly_as_before"
+        ],
+        "ignored": []
+      },
+      "file_output": {
+        "external_source": "/private/tmp/tests-expression-fresh-setup-controls-20261023/run-20261023T124735.462357Z/after/file.stdout",
+        "original_bytes": 106,
+        "original_sha256": "55ad30f16e56320732eb83d404283e0219e57af6bc4a6dc98c0583050044c923",
+        "encoding": "Exact UTF-8; no normalization",
+        "utf8": "/private/tmp/tests-codex-1569-target/debug/deps/runtime-f9b92bb4002b831f: Mach-O 64-bit executable x86_64\n"
+      }
+    }
+  ],
+  "scope": "27 compiled runtime cases in each artifact, no ignored cases. Each of six executions selected exactly one original case, leaving 26 filtered. The inventory is not 27 executed passes.",
+  "availability": "Artifact hashes/file identity were recorded before MAIN release; binaries are not published and mutable cache paths are not an availability promise."
+}

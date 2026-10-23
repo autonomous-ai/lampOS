@@ -1,0 +1,69 @@
+{
+  "plan_sha256": "1cf3cfc2f1148de58cd9089250cf6ba0431e92d34245fe410bedbb0291ff9246",
+  "helper_sha256": "913a8b5bef938aa51a47c4d443f21758b67bd90986cc305e8f393e1b27787eed",
+  "variants": {
+    "before": {
+      "original_sha256": "ed1ed5d64f6338357b25bdcbda739985b1c68c501695d20d9bf2e374ce6318e4",
+      "hooked_sha256": "8ef7556da19a5a7240ab396390248f5502a92a3f0180e6bdb4298e8114f57e8e",
+      "patch_sha256": "a6110e916c376dcbde38151c247ff65bcb0c74d792d8fcdf61f8b529dc7c947e",
+      "inverse_hook_removal_restores_every_original_byte": true,
+      "apply_checks": [
+        {
+          "command": [
+            "git",
+            "apply",
+            "--check",
+            "--whitespace=error",
+            "/private/tmp/tests-expression-fresh-setup-controls-20261023/before-control.patch"
+          ],
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "command": [
+            "git",
+            "apply",
+            "--whitespace=error",
+            "/private/tmp/tests-expression-fresh-setup-controls-20261023/before-control.patch"
+          ],
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ]
+    },
+    "after": {
+      "original_sha256": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95",
+      "hooked_sha256": "2341c998ea391ddb1d1698d5da30d5f9c1d7d7e25eb76aabc90dc180fd5a3577",
+      "patch_sha256": "f84f32d6b9f858b7fe2660a0aec56a2142cbfe02548bdba5b409fe8350a9003b",
+      "inverse_hook_removal_restores_every_original_byte": true,
+      "apply_checks": [
+        {
+          "command": [
+            "git",
+            "apply",
+            "--check",
+            "--whitespace=error",
+            "/private/tmp/tests-expression-fresh-setup-controls-20261023/after-control.patch"
+          ],
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "command": [
+            "git",
+            "apply",
+            "--whitespace=error",
+            "/private/tmp/tests-expression-fresh-setup-controls-20261023/after-control.patch"
+          ],
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ]
+    }
+  },
+  "Cargo_executed": false
+}

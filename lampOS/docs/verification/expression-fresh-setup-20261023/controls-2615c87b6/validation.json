@@ -1,0 +1,149 @@
+{
+  "status": "passed",
+  "six_observations": "all matched; four expected original-assertion failures retained",
+  "normal_test_gate": "not executed here",
+  "raw_results_sha256": "a09d3fec55f8436ff07e47dc157d5b8d089a5c9c7f32376d24aebb8f0e63cdef",
+  "checks": {
+    "json": [
+      "after-control.patch.json",
+      "artifact-and-census.json",
+      "before-control.patch.json",
+      "candidate-review.json",
+      "candidate.diff.json",
+      "command-results.json",
+      "control-plan.json",
+      "external-raw-index.json",
+      "hook-preparation.json",
+      "native-streams.json",
+      "observations.json",
+      "plan-freeze.json",
+      "source-and-restoration.json"
+    ],
+    "exact_wrappers": [
+      "after-control.patch.json",
+      "artifact-and-census.json/records/0/file_output",
+      "artifact-and-census.json/records/1/file_output",
+      "before-control.patch.json",
+      "candidate.diff.json",
+      "native-streams.json/streams/rustc/stdout",
+      "native-streams.json/streams/rustc/stderr",
+      "native-streams.json/streams/before/compile/stderr",
+      "native-streams.json/streams/before/file/stdout",
+      "native-streams.json/streams/before/file/stderr",
+      "native-streams.json/streams/before/all/stdout",
+      "native-streams.json/streams/before/all/stderr",
+      "native-streams.json/streams/before/ignored/stdout",
+      "native-streams.json/streams/before/ignored/stderr",
+      "native-streams.json/streams/after/compile/stderr",
+      "native-streams.json/streams/after/file/stdout",
+      "native-streams.json/streams/after/file/stderr",
+      "native-streams.json/streams/after/all/stdout",
+      "native-streams.json/streams/after/all/stderr",
+      "native-streams.json/streams/after/ignored/stdout",
+      "native-streams.json/streams/after/ignored/stderr",
+      "native-streams.json/streams/before/observation-1/test/stdout",
+      "native-streams.json/streams/before/observation-1/test/stderr",
+      "native-streams.json/streams/before/observation-2/test/stdout",
+      "native-streams.json/streams/before/observation-2/test/stderr",
+      "native-streams.json/streams/after/observation-3/test/stdout",
+      "native-streams.json/streams/after/observation-3/test/stderr",
+      "native-streams.json/streams/after/observation-4/test/stdout",
+      "native-streams.json/streams/after/observation-4/test/stderr",
+      "native-streams.json/streams/after/observation-5/test/stdout",
+      "native-streams.json/streams/after/observation-5/test/stderr",
+      "native-streams.json/streams/after/observation-6/test/stdout",
+      "native-streams.json/streams/after/observation-6/test/stderr"
+    ],
+    "whitespace": [
+      {
+        "path": "README.md",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "path": "after-control.patch.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "path": "artifact-and-census.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "path": "before-control.patch.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "path": "candidate-review.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "path": "candidate.diff.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "path": "command-results.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "path": "control-plan.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "path": "external-raw-index.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "path": "hook-preparation.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "path": "native-streams.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "path": "observations.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "path": "plan-freeze.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "path": "source-and-restoration.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      }
+    ],
+    "links": [
+      "observations.json",
+      "candidate-review.json",
+      "candidate.diff.json",
+      "artifact-and-census.json",
+      "command-results.json",
+      "control-plan.json",
+      "plan-freeze.json",
+      "source-and-restoration.json",
+      "before-control.patch.json",
+      "after-control.patch.json",
+      "hook-preparation.json",
+      "native-streams.json",
+      "external-raw-index.json",
+      "validation.json",
+      "manifest.json"
+    ]
+  },
+  "source_or_target_access_during_sealing": "None; captured external evidence only",
+  "no_index_exit_note": "Exit 1 with zero whitespace diagnostics means ordinary new-file difference; it is not relabeled zero."
+}

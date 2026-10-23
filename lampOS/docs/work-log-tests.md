@@ -1,5 +1,32 @@
 # Tests work log
 
+## 2026-10-23 20:08 +0700 — latest carries and Expression controls
+
+Ready for lamp-voice: no; both recorded execution HOLDs remain.
+
+The [latest carries](verification/test-carries-train49-20261023/) put #3190
+at `f121d6391` and #3218 at `328f7da0f`, both on `810e05109`. Both full
+authored patches and their files are unchanged, with equal range-diffs.
+The old heads remain archived. Substantial upstream Voice and Records changes
+are not locally qualified by these carries; earlier gates retain their actual
+heads. Both fresh required Linux Clippy jobs passed; ARM64 is pending.
+
+The [six Expression controls](verification/expression-fresh-setup-20261023/controls-2615c87b6/)
+ran once on the recorded `2615c87b6` base and two-file candidate. Both original
+fixtures failed when setup consumed actual input freshness. Both corrected
+fixtures passed that control. Both corrected fixtures still failed their
+original assertions when actual input expired after publication. All original
+assertions, later stale/restart checks, TTLs and product clocks are unchanged.
+These are controlled observations, not a full gate or a historical cause claim.
+The shipping candidate was carried unchanged to `810e05109`; its own full gate
+is next after the bounded Memory diagnostic and peer fixture gate.
+
+Root checked every published exact stream against its captured source and all
+receipt manifests. The Memory diagnostic now owns the shared target; no local
+ARM build or device action ran. Second's suggestion to capture bounded Update
+child stdout at the existing timeout is retained for source review, without
+changing scripts, limits or the failed result.
+
 ## 2026-10-23 19:53 +0700 — phone current-base gate completed
 
 Ready for lamp-voice: no (#3218 execution HOLD remains).

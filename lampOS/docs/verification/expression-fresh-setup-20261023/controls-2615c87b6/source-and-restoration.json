@@ -1,0 +1,166 @@
+{
+  "base": "2615c87b636d8e39d8df9548b00af7ed4e164f70",
+  "source_files": {
+    "lampOS/crates/expression/tests/runtime.rs": {
+      "head_sha256": "ed1ed5d64f6338357b25bdcbda739985b1c68c501695d20d9bf2e374ce6318e4",
+      "candidate_sha256": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95"
+    },
+    "lampOS/docs/expression.md": {
+      "head_sha256": "eed243fe00dd913f5ed11809b6d25c1123941c5da09192f27057de51ce1217be",
+      "candidate_sha256": "3a430011794fb6fd1768a92beca373c4c8276d1273a0bc69a20b2c385d623bc8"
+    }
+  },
+  "source_maps": [
+    {
+      "variant": "before",
+      "name": "restored-source-map.json",
+      "external_path": "/private/tmp/tests-expression-fresh-setup-controls-20261023/run-20261023T124735.462357Z/before/restored-source-map.json",
+      "sha256": "111e473b16a0e3edfac798e93c0c34b32a7f012f94c4b9242e589241c7151acd",
+      "tracked_paths": 10031,
+      "lampOS_paths": 6685,
+      "literal_symlinks": 1
+    },
+    {
+      "variant": "before",
+      "name": "hooked-source-map.json",
+      "external_path": "/private/tmp/tests-expression-fresh-setup-controls-20261023/run-20261023T124735.462357Z/before/hooked-source-map.json",
+      "sha256": "97afc08df41c5d4326ba6bfc739b87e733263a02da56448897c9bbc8952a9e6b",
+      "tracked_paths": 10031,
+      "lampOS_paths": 6685,
+      "literal_symlinks": 1
+    },
+    {
+      "variant": "after",
+      "name": "restored-source-map.json",
+      "external_path": "/private/tmp/tests-expression-fresh-setup-controls-20261023/run-20261023T124735.462357Z/after/restored-source-map.json",
+      "sha256": "5b460211da9228b82e732189d940c515018c5c08563f9f489c2458a3b0daecbb",
+      "tracked_paths": 10031,
+      "lampOS_paths": 6685,
+      "literal_symlinks": 1
+    },
+    {
+      "variant": "after",
+      "name": "hooked-source-map.json",
+      "external_path": "/private/tmp/tests-expression-fresh-setup-controls-20261023/run-20261023T124735.462357Z/after/hooked-source-map.json",
+      "sha256": "9fce5fb290d4f380d40d1e544c137ba2a620c2fa0613106db80017264ca16db5",
+      "tracked_paths": 10031,
+      "lampOS_paths": 6685,
+      "literal_symlinks": 1
+    }
+  ],
+  "build_source_bindings": [
+    {
+      "variant": "before",
+      "command": {
+        "command": [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-expression",
+          "--test",
+          "runtime",
+          "--no-run",
+          "--message-format=json-render-diagnostics"
+        ],
+        "cwd": "/private/tmp/tests-codex-expression-control-before-20261023/lampOS",
+        "started_at": "2026-10-23T12:47:45.300316+00:00",
+        "timeout_seconds": 1200,
+        "stdout": "compile.stdout",
+        "stderr": "compile.stderr",
+        "timed_out": false,
+        "cleanup_signals": [],
+        "owned_pid": 99989,
+        "owned_process_group": 99989,
+        "exit_code": 0,
+        "finished_at": "2026-10-23T12:48:04.295542+00:00",
+        "wall_seconds": 18.995692,
+        "stdout_bytes": 48895,
+        "stdout_sha256": "9edfd8b81d7975e4f4873f0cfa4400f5af064404f7a1c7cc802718dae37036d5",
+        "stderr_bytes": 1358,
+        "stderr_sha256": "5d8b9ba6c4745dc58f0cb33ecc529aa53f931783502c60a67fec58614e6f209d"
+      },
+      "source_aggregate_sha256": "78ab50b6d45329b91f5352a70c1275d7526a151b201aee68e656010d9b0775c2",
+      "restored_source_aggregate_sha256": "137a1f099a50c5e86d252d0fb6057a20c3b0b24977e43ce2e71fc5091047f55c"
+    },
+    {
+      "variant": "after",
+      "command": {
+        "command": [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-expression",
+          "--test",
+          "runtime",
+          "--no-run",
+          "--message-format=json-render-diagnostics"
+        ],
+        "cwd": "/private/tmp/tests-codex-expression-control-after-20261023/lampOS",
+        "started_at": "2026-10-23T12:48:43.820554+00:00",
+        "timeout_seconds": 1200,
+        "stdout": "compile.stdout",
+        "stderr": "compile.stderr",
+        "timed_out": false,
+        "cleanup_signals": [],
+        "owned_pid": 3951,
+        "owned_process_group": 3951,
+        "exit_code": 0,
+        "finished_at": "2026-10-23T12:48:54.403695+00:00",
+        "wall_seconds": 10.5834,
+        "stdout_bytes": 48848,
+        "stdout_sha256": "688da8926ecb262b401f0d1be12e630c7828743edae0836d0d863a17db1a4dfb",
+        "stderr_bytes": 1088,
+        "stderr_sha256": "d81d217ca52e25cde52b39955341db793762029adfabe5d5c130d2a80d70df90"
+      },
+      "source_aggregate_sha256": "2922117519f29683f37cd1bfc0c6554119d7d39e4ed5531928481c69b1053d72",
+      "restored_source_aggregate_sha256": "139506247f06c17ccbfc08c61ce31baa4c698e863cf9307c1e38be0d45c3173f"
+    }
+  ],
+  "restoration": [
+    {
+      "variant": "before",
+      "worktree": "/private/tmp/tests-codex-expression-control-before-20261023",
+      "restored_exact_bytes": true,
+      "source_aggregate_sha256": "137a1f099a50c5e86d252d0fb6057a20c3b0b24977e43ce2e71fc5091047f55c",
+      "tracked_paths": 10031
+    },
+    {
+      "variant": "after",
+      "worktree": "/private/tmp/tests-codex-expression-control-after-20261023",
+      "restored_exact_bytes": true,
+      "source_aggregate_sha256": "139506247f06c17ccbfc08c61ce31baa4c698e863cf9307c1e38be0d45c3173f",
+      "tracked_paths": 10031
+    }
+  ],
+  "shipping_candidate_two_files_and_HEAD_unchanged": true,
+  "socket_preflight": {
+    "unix_datagram": "passed",
+    "loopback_tcp": "passed",
+    "completed_before_Cargo": true
+  },
+  "controlled_environment": {
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true"
+  },
+  "RUST_TEST_THREADS": "unset",
+  "platform_projection": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "kernel": "Darwin Kernel Version 25.6.0: Fri Jul 31 19:11:49 PDT 2026; root:xnu-12377.161.14~5/RELEASE_X86_64",
+    "reported_machine": "x86_64",
+    "physical_hardware_ISA": "not independently measured"
+  },
+  "source_freshness": "All tracked input mtimes refreshed before each variant compile; complete bytes/modes/literal symlinks guarded around commands. No source timestamps inside the test protocol changed.",
+  "restoration_scope": "Only the exact runtime/docs files in owned disposable worktrees were written. Before returned to baseline; after returned to the two-file shipping candidate. Shipping worktree was read-only.",
+  "raw_results_sha256": "a09d3fec55f8436ff07e47dc157d5b8d089a5c9c7f32376d24aebb8f0e63cdef",
+  "raw_results_external": "/private/tmp/tests-expression-fresh-setup-controls-20261023/run-20261023T124735.462357Z/results.json"
+}

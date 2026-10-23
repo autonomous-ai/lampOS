@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "full_patch_bytes_equal_both": true,
+  "authored_file_hashes_equal_both": true,
+  "range_diff_equal_both": true,
+  "raw_utf8_envelope_hashes_verified": true,
+  "source_and_dependency_git_identities_verified": true,
+  "all_JSON_and_links_valid": true,
+  "all_text_whitespace_valid": true,
+  "default_scratch_index_diff_check_exit": 0,
+  "local_Cargo_executed": false,
+  "no_new_source_qualification_claim": true
+}
