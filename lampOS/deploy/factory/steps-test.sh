@@ -100,6 +100,12 @@ if [[ $1 == discover-head ]]; then
 fi
 while [[ $# -gt 0 ]]; do [[ $1 == --output ]] && echo '{"calibrated":true}' >"$2"; shift; done
 EOF
+# The keeper: FAKE_KEEPER_FAIL, a pause it cannot say.
+cat >"$T/bin/keeper" <<'EOF'
+#!/usr/bin/env bash
+echo "keeper $*" >>"$FAKE_LOG"
+[[ -z ${FAKE_KEEPER_FAIL:-} ]]
+EOF
 cat >"$T/bin/selftest" <<'EOF'
 #!/usr/bin/env bash
 echo "selftest $*" >>"$FAKE_LOG"
@@ -119,7 +125,7 @@ lamp() {
 }
 run() {
   ETC_ROOT=$T/root MEASURE_BIN=$T/bin/measure BODY_BIN=$T/bin/body MOOD_BIN=$T/bin/mood STAND_WAIT=0 HEAD_STAND_WAIT=0 QUIET_WAIT=0 \
-    CONTROLS_BIN=$T/bin/controls SELFTEST_BIN=$T/bin/selftest SYSTEMCTL=$T/bin/systemctl \
+    CONTROLS_BIN=$T/bin/controls SELFTEST_BIN=$T/bin/selftest KEEPER_BIN=$T/bin/keeper SYSTEMCTL=$T/bin/systemctl \
     FAKE_LOG=$T/log bash "$STEPS" --unit-id lamp-test "$@" </dev/null >"$T/out" 2>&1
 }
 ENV=etc/lampOS/body/lamp.env
@@ -176,10 +182,18 @@ lamp; FAKE_BODY_STATE=active FAKE_EXPRESSION_STATE=active FAKE_SELFTEST_EXIT=1 A
 check "a failed self-test still starts lamp-expression again" '[[ $status == 1 ]] && [[ $(grep -c "systemctl start lamp-expression" "$T/log") == 1 ]]'
 lamp; FAKE_BODY_STATE=inactive ASK_ANSWER=y run --write --from 4; status=$?
 check "--from 4 with lamp-body down: it is started and stood, so head_move is checked (#2818)" '[[ $status == 0 ]] && grep -q "lamp-body is inactive: starting it" "$T/out" && [[ $(grep "systemctl start lamp-body\|^mood --socket $T/root/run/lampos-body\|^selftest" "$T/log" | sed "s/ --.*//" | uniq | tr "\n" "|") == "systemctl start lamp-body|mood|selftest|" ]]'
+# #2818: an up voice wakes the lamp to the room and an awake lamp stands, so
+# a passed step 4 leaves it paused, the pause cleared before its own stand.
+lamp; FAKE_BODY_STATE=active FAKE_VOICE_STATE=active ASK_ANSWER=y run --write --from 4; status=$?
+check "a passed self-test leaves the lamp paused, an earlier pause cleared before the stand (#2818)" '[[ $status == 0 ]] && [[ $(grep "^keeper\|^mood\|^selftest" "$T/log" | sed "s/ --.*//" | uniq | tr "\n" "|") == "keeper resume|mood|selftest|keeper pause|" ]] && grep -q "the lamp is paused until it is next started" "$T/out"'
+lamp; FAKE_BODY_STATE=active FAKE_SELFTEST_EXIT=1 ASK_ANSWER=y run --write --from 4; status=$?
+check "a failed self-test does not pause the lamp" '[[ $status == 1 ]] && ! grep -q "^keeper pause" "$T/log"'
+lamp; FAKE_BODY_STATE=active FAKE_KEEPER_FAIL=1 ASK_ANSWER=y run --write --from 4; status=$?
+check "a pause the keeper cannot say fails step 4 and says the arm is not left at rest" '[[ $status == 1 ]] && grep -q "could not pause the lamp with .*the arm is not left at rest" "$T/out" && grep -q "step 4 (the self-test) failed" "$T/out"'
 lamp; FAKE_BODY_STATE=active ASK_ANSWER=n run --write --from 4; status=$?
 check "step 4 without a yes stands nothing" '[[ $status == 1 ]] && ! grep -q "^mood\|^selftest" "$T/log"'
 lamp; FAKE_BODY_STATE=active run --from 4; status=$?
-check "step 4 dry stands nothing" '[[ $status == 0 ]] && ! grep -q "^mood\|^selftest" "$T/log"'
+check "step 4 dry stands nothing and pauses nothing" '[[ $status == 0 ]] && ! grep -q "^mood\|^selftest\|^keeper" "$T/log"'
 
 # One step at a time, as a station with a person at it runs them.
 lamp; : >"$T/log"; ASK_ANSWER=y run --write --from 2 --to 3 --update-key "$KEYFILE"; status=$?

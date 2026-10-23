@@ -645,7 +645,7 @@ again, so step 4 starts a `lamp-body` that is not active
 (`systemctl start lamp-body`), whatever step the run began at, before the
 stand, and waits up to 30 s (`BODY_START_WAIT`) for its mood socket; one
 that does not come up fails step 4 and says to fix it first, since a
-self-test without it leaves `head_move` unchecked (#2818). A key already in place is kept
+self-test without it leaves `head_move` unchecked (#2818). A passed step 4 then runs `lamp-keeper pause` (`/usr/local/bin/lamp-keeper`, [keeper.md](keeper.md), "Named states and the pause"): left as it is, the up voice wakes the lamp to anyone talking and an awake lamp stands, so on lamp-52e6, in a talking office, the arm never rested after the steps (#2818), and a factory is no quieter. Paused, every mood is rest and calls, looks and Expression's requests are dropped, so the body folds once its awake time runs out and holds there, and the voice takes no turn; the pause lives in `/run`, so the lamp's next start is not paused. A pause the keeper cannot say fails step 4 ("the arm is not left at rest"), and a failed self-test pauses nothing. Step 4's stand runs `lamp-keeper resume` first, when the keeper is there, so that a second pass in the same power-up can stand the lamp. A key already in place is kept
 when it is the same and fails the step when it is not. A failed step stops
 the rest and says which; `--from N` goes on from it. It runs nothing but
 the lamp's own binaries and the shell. `deploy/factory/steps-test.sh` tests
