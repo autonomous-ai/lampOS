@@ -12,6 +12,8 @@ pub(crate) const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
 const CONTROLS: &str = "lamp-controls.service";
 const VOICE: &str = "lamp-voice.service";
 const EXPRESSION: &str = "lamp-expression.service";
+const BODY: &str = "lamp-body.service";
+const BODY_ENV: &str = "/etc/lampOS/body/lamp.env";
 
 fn read(path: &Path) -> Result<Option<String>, String> {
     match fs::read_to_string(path) {
@@ -211,6 +213,72 @@ fn bus_root(text: &str, flag: Option<&str>, empty_is_default: bool) -> Result<St
     Ok(root.into())
 }
 
+// Body deliberately reads its factory calibration and expands the hostname and
+// poses in ExecStart. Admit only those known exceptions to the literal reader.
+// A calibration file can override Environment= too, so inspect its resulting
+// bytes rather than assuming it contains poses. These per-lamp calibration
+// paths are not allowed manifest settings; install and update preserve them.
+fn body_reader(
+    root: &Path,
+    units: &Path,
+    carried: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let text = match carried.get(BODY) {
+        Some(text) => text.clone(),
+        None => read(&units.join(BODY))?.ok_or("head touch needs installed lamp-body.service")?,
+    };
+    let mut normalized = Vec::new();
+    let mut commands = 0;
+    for line in service(&text).lines() {
+        let calibration_path = line
+            .strip_prefix("EnvironmentFile=")
+            .map(|path| path.strip_prefix('-').unwrap_or(path))
+            .filter(|path| matches!(*path, BODY_ENV | "/var/lib/lampos-body/measured.env"));
+        if let Some(path) = calibration_path {
+            let calibration = read(&root.join(path.trim_start_matches('/')))?;
+            // A new lamp may not have measured poses yet. The required file
+            // then prevents Body from starting, as it did before this check.
+            for line in calibration.as_deref().unwrap_or_default().lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with(['#', ';']) {
+                    continue;
+                }
+                let poses = line
+                    .strip_prefix("BODY_POSES=\"")
+                    .and_then(|value| value.strip_suffix('"'));
+                if poses.is_none_or(|value| value.contains(['"', '\\'])) {
+                    return Err("head touch needs Body calibration to contain only literal BODY_POSES; its environment could change the sleep reader".into());
+                }
+            }
+            continue;
+        }
+        if let Some(command) = line.strip_prefix("ExecStart=") {
+            commands += 1;
+            let command = command
+                .split_whitespace()
+                .map(|word| match word {
+                    "%H" => "lamp-hostname",
+                    "$BODY_POSES" => "",
+                    _ => word,
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            normalized.push(format!("ExecStart={command}"));
+        } else {
+            normalized.push(line.to_owned());
+        }
+    }
+    if commands != 1 {
+        return Err("head touch needs one literal Body ExecStart".into());
+    }
+    let normalized = BTreeMap::from([(
+        BODY.to_owned(),
+        format!("[Service]\n{}", normalized.join("\n")),
+    )]);
+    reader(root, units, &normalized, BODY)?
+        .ok_or("head touch needs installed lamp-body.service".into())
+}
+
 fn legacy(root: &Path, units: &Path, carried: &BTreeMap<String, String>) -> Result<bool, String> {
     let mut texts = Vec::new();
     for name in [VOICE, EXPRESSION, CONTROLS] {
@@ -238,6 +306,14 @@ fn legacy(root: &Path, units: &Path, carried: &BTreeMap<String, String>) -> Resu
             == Path::new(&controls);
     if Path::new(&expression_root) != Path::new(&controls) || !privacy_matches || !voice_matches {
         return Err("head touch needs its enabled readers and Controls on the same bus, including the enabled privacy reader".into());
+    }
+    if voice {
+        let body = body_reader(root, units, carried)?;
+        if unit::environment(&body, "LAMP_HEAD_TOUCH").as_deref() != Some("on")
+            || Path::new(&bus_root(&body, None, true)?) != Path::new(&controls)
+        {
+            return Err("head touch needs Body's sleep reader enabled on the same bus as Voice and Controls".into());
+        }
     }
     Ok(!voice)
 }

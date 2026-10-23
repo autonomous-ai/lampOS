@@ -1126,10 +1126,18 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   `/etc/lampOS/controls/controls-pins.json` and Controls actually reads that
   path, build-owned pins keep
   `legacy_head: true` with old Voice and Expression units. Only the complete
-  new pair (Voice `LAMP_HEAD_TOUCH=on` and `--controls-mute`, Expression
-  `--head-touch`) gets false. Controls, Expression and Voice's head reader
+  new bundle (Voice `LAMP_HEAD_TOUCH=on` and `--controls-mute`, Expression
+  `--head-touch`, and Body `LAMP_HEAD_TOUCH=on`) gets false. Controls,
+  Expression and Voice's head reader
   must use the same effective bus root (explicit flag, then `LAMP_BUS_ROOT`,
   then the default). Voice's enabled privacy reader must share that root too.
+  Body's sleep reader must also use that bus, with its empty or unset
+  `LAMP_BUS_ROOT` selecting the default. Its known calibration files retain
+  the literal `BODY_POSES` format described in [install](install.md);
+  their existing contents are checked, so a file cannot silently disable or
+  redirect Body's sleep reader. These per-lamp files remain excluded from
+  manifest settings and are not rewritten by the check.
+  Legacy head-off readers do not acquire a new Body requirement.
   The helper verifies the signed input first,
   derives only this compatibility bit, and records the hash of the actual
   written bytes. Local wiring is still kept by the three-way rule; an

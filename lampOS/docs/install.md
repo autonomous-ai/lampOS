@@ -709,12 +709,20 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    (`/etc/lampOS/update/key.pub` unless `--key-file` says otherwise), as a
    round does. No key, no install.
    After taking the updater lock, it preflights the product Voice,
-   Expression and Controls units it will install against the relevant
+   Expression, Controls and Body units it will install against the relevant
    local overrides it will preserve. This uses the updater's existing
    literal-mode rules: Voice's head reader, its `--controls-mute`,
    Expression's head reader and Controls' delivery must agree, with their
    enabled readers on the same bus, including Voice's enabled privacy
-   reader. Conflicting or unknown modes, including relevant drop-ins or
+   reader and Body's enabled sleep reader. Body retains the product's
+   `%H` and `$BODY_POSES` substitutions and its known calibration files
+   (`/etc/lampOS/body/lamp.env`, and the generic unit's optional
+   `/var/lib/lampos-body/measured.env`). A present calibration file must
+   contain only comments, blank lines and literal single-line, double-quoted
+   `BODY_POSES` assignments; other environment settings could override the
+   sleep reader and are refused. An unmeasured lamp may still lack its
+   required poses file, which keeps Body stopped until calibration.
+   Conflicting or unknown modes, including relevant drop-ins or
    expansions that those rules cannot verify, refuse the install. This
    happens before reading or repairing state, making users, moving links,
    or writing units or head files. Local drop-ins and head files remain
