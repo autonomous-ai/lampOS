@@ -199,6 +199,16 @@ ARMS="off:LAMP_X=off" lampOS/tools/played/desk-kit.sh --dry [SCENARIO ...]
   it writes nothing and stops (exit 3). Each write is staged first, so a
   cut-off send leaves no empty drop-in. An interrupt before the first
   arm leaves the lamp as it was.
+- **When the Mac is lost mid-run** (asleep, off the network): with each
+  arm's drop-in the lamp arms its own guard, a `systemd-run` timer
+  (`zz-desk-kit-guard`). One arm (`TRIALS` x 8 + 3 minutes) and 10 minutes
+  after it, the guard removes the drop-in under the same lock, only while
+  its first line still names this run, and restarts the voice only then.
+  The put-back stops it. `stand-in.sh` arms the same kind of guard
+  (`zz-played-stand-in-guard`, `PLAYED_GUARD_S`, default an hour), and
+  `full-look-row.sh` one for the eyes. A guard is a transient unit, so a
+  reboot clears it with the drop-in. Tests: `desk-kit-test.sh`,
+  `stand-in-test.sh`.
 - **The face**: `FACE`, an image or page on your Mac (never in the repo),
   shown full screen on the built-in display for the whole run (`FACE_SIZE`,
   default `1728,1117`), as a person facing the lamp. Without it no face is
