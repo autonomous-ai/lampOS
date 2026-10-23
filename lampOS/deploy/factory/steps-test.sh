@@ -184,15 +184,17 @@ check "step 4 dry stands nothing" '[[ $status == 0 ]] && ! grep -q "^mood\|^self
 # One step at a time, as a station with a person at it runs them.
 lamp; : >"$T/log"; ASK_ANSWER=y run --write --from 2 --to 3 --update-key "$KEYFILE"; status=$?
 check "--from 2 --to 3 runs only steps 2 and 3" '[[ $status == 0 ]] && grep -q "steps 2 to 3 done (write)" "$T/out" && ! grep -q "^measure\|^selftest" "$T/log" && grep -q "^controls discover-head" "$T/log"'
-# The voice and the ears lose the privacy switch while lamp-controls is
-# stopped (#2818): those running are restarted after Controls is back and
-# before the self-test, which needs fresh reads of them; none running, none.
+# A listening voice that loses the privacy switch keeps the restart guard's
+# mute (#2818): those of the voice and ears that run are stopped before
+# lamp-controls is, and started again only once Controls is back (after its
+# restart on the new pins) and before the self-test; none running, none.
+line() { grep -n "$1" "$T/log" | "${2:-head}" -1 | cut -d: -f1; }
 lamp; FAKE_VOICE_STATE=active ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
-check "the voice and ears are restarted after Controls is back, before the self-test" '[[ $status == 0 ]] && [[ $(grep -n "systemctl start lamp-controls" "$T/log" | tail -1 | cut -d: -f1) -lt $(grep -n "^systemctl restart lamp-voice lamp-ears$" "$T/log" | cut -d: -f1) ]] && [[ $(grep -n "^systemctl restart lamp-voice" "$T/log" | cut -d: -f1) -lt $(grep -n "^selftest" "$T/log" | cut -d: -f1) ]] && [[ $(grep -c "^systemctl restart lamp-voice" "$T/log") == 1 ]]'
+check "the voice and ears are stopped before Controls is, started after Controls is back, before the self-test" '[[ $status == 0 ]] && [[ $(line "^systemctl stop lamp-voice lamp-ears$") -lt $(line "^systemctl stop lamp-controls$") ]] && [[ $(line "lamp-controls$" tail) -lt $(line "^systemctl start lamp-voice lamp-ears$") ]] && [[ $(line "^systemctl start lamp-voice") -lt $(line "^selftest") ]] && [[ $(grep -c "^systemctl \(start\|stop\) lamp-voice" "$T/log") == 2 ]] && ! grep -q "^systemctl restart lamp-voice" "$T/log"'
 lamp; ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
-check "a voice and ears not running are not started" '[[ $status == 0 ]] && ! grep -q "^systemctl restart.*lamp-\(voice\|ears\)" "$T/log"'
+check "a voice and ears not running are neither stopped nor started" '[[ $status == 0 ]] && ! grep -q "^systemctl \(stop\|start\|restart\).*lamp-\(voice\|ears\)" "$T/log"'
 lamp; FAKE_VOICE_STATE=active FAKE_DISCOVERY_EXIT=1 ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
-check "a failed touch step still restarts the voice and ears" '[[ $status == 1 ]] && grep -q "^systemctl restart lamp-voice lamp-ears$" "$T/log"'
+check "a failed touch step still starts the voice and ears again, after Controls" '[[ $status == 1 ]] && [[ $(line "^systemctl start lamp-controls$" tail) -lt $(line "^systemctl start lamp-voice lamp-ears$") ]]'
 lamp; run --from 3 --to 2; status=$?
 check "--to before --from is refused" '[[ $status == 2 ]]'
 

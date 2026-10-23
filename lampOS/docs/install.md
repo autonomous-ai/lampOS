@@ -607,15 +607,19 @@ active-high, so a line with nothing on it reads as not touched), the rest of
 the pins file kept; anything but two such lines writes nothing. On an MPR121
 it calibrates. Either way `lamp-controls` is started again however the step
 ends, and dry it only says what it would run, without stopping
-`lamp-controls`. While it is stopped the voice cannot read the privacy
-switch, so the microphones close and `lamp-ears` with them, and the ring
-stops saying what it shows; on lamp-52e6 they did not come back once
-Controls did, and step 4's self-test failed `room_mic` and `ring` on
-`ears/level` and `light/state` as old as the step's stop (#2818). So
-`lamp-voice` and `lamp-ears`, those of them running when `lamp-controls` was
-first stopped, are restarted after the step, however it or the script ends
-("restarted lamp-voice lamp-ears"); the self-test still needs a fresh read
-of each, so a dead microphone or ring still fails. For a test with no person, `HEAD_LINES_FROM=FILE` passes
+`lamp-controls`. A listening voice that loses the privacy switch ends its
+conversation on it and keeps the restart guard's mute
+([controls.md](controls.md)), so the microphones stay closed, `lamp-ears`
+with them, and the ring stops saying what it shows, even across a restart:
+on lamp-52e6 step 4's self-test failed `room_mic` and `ring` on
+`ears/level` and `light/state` as old as the step's stop, with
+`record.json.restart-guard` left (#2818, after #3074's restart). So
+`lamp-voice` and `lamp-ears`, those of them running, are stopped before
+`lamp-controls` is ("stopped lamp-voice lamp-ears"), a stop the voice was
+asked for, which releases the guard and keeps a person's own mute, and
+started again once Controls is back, after the step, however it or the
+script ends ("started lamp-voice lamp-ears again"); the self-test still
+needs a fresh read of each, so a dead microphone or ring still fails. For a test with no person, `HEAD_LINES_FROM=FILE` passes
 `discover-head --lines-from FILE`, the head lines read from FILE (the high
 lines' numbers, or `none`), which a script writes to touch them (#2818). Its
 probes are forced off, so its pads would all read active-high: with it the
