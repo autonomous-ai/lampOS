@@ -6,8 +6,8 @@ Assigned by First on Queue #3126, 24 October 00:03. Read #3278 at
 All 255 authored paths retain identical bytes and Git modes, with one
 unchanged commit by range-diff. Only the five upstream Eyes paths differ.
 
-**Source and local evidence: no P1/P2.** Fresh carried-head native and Linux
-formatting evidence remain to be read before the final qualification result.
+**READ-OK `baed91ead`: no P1/P2.** Current-head native and Linux formatting
+evidence are verified below. First owns the final latest-base check and merge.
 
 ## Source and evidence
 
@@ -57,6 +57,22 @@ Second's exact-head Linux formatting receipt at `37306496f` matches the
 reviewed tree/subtree and 6,963 before/after file hashes; its command log,
 exit zero, restricted source-only container and owner-checked cleanup agree.
 The disclosed first setup failure happened before Cargo and is not a test pass.
+
+## Final carried-head qualification
+
+Primary logs for `baed91ead`: ARM64 **39993981374**, **11,069 passed including
+one Voice LEAK / 0 failed / 71 skipped**, process harness **12/0**. Strict
+workspace Clippy **39993981366** passes. Both checked merge `6637984494`, whose
+repository tree `642c8009948a5ecd7af819a49226c9f450d762a2` equals the PR head.
+[Terminal metadata](final-arm64.json) and [raw log hashes](native-log-hashes.json)
+are retained; the full logs remain in local scratch.
+
+Second's final Linux formatting receipt `6baa7314c` passes on `baed91ead`.
+Third reconstructed all **6,963** regular-file hashes from the exact Git
+archive: manifest `c1bdfbd65317a4f88f716e79399f02e57c13e4b3e306a351b584aa34f62cc96f`
+matches both recorded manifests. Source trees, command result, normal
+terminal exit and owner-checked removal agree. No fixture execution was
+repeated by Third. The recorded base is current `1291ef1f4` at this read.
 
 One process-kill boundary per direction with fake systemctl/health does not
 qualify physical power loss, production systemd, flash durability, attended

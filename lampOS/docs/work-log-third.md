@@ -5,7 +5,7 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
-## 2026-10-24 00:26 — release-pair review and train-51 carry
+## 2026-10-24 00:22 — release-pair review and train-51 carry
 
 - #3278 source and local evidence read at `7ebb876be`, carried unchanged
   across all 255 authored paths to `baed91ead`: no P1/P2. All 234 raw-file

@@ -8,7 +8,7 @@ Repository tree `ab4d9cd6d049efb2c3481f0265b478b354c76f4f`, lampOS subtree
 `ffd1ceec4475747a24ba04d24b9eb2fd81b37aa1`.
 **Local gate passed; fresh Linux gates and exact-head reviews remain.**
 
-Latest carry, 24 October 00:23: `06ae9205fc10b39f7eb880941cadcf758043b11c`
+Latest carry, 24 October 00:19: `06ae9205fc10b39f7eb880941cadcf758043b11c`
 on train 51 `1291ef1f4`, repository tree
 `17cc9531976b8b38ed5774a24b37ab90d07f3065`, lampOS subtree
 `9810e7613abe12219517f43586ec689eedf28e63`.
@@ -17,7 +17,13 @@ The five repair hashes and Update source/dependencies are unchanged;
 the integration delta is Eyes source/docs. Mac formatting passes again.
 This carries the original local result; fresh native gates qualify the new
 head. Reviewer-three's `a449e539f` privacy read found its paths unchanged;
-Second's Body repair read and First's final disposition are still required.
+Second's Body repair READ-OK is now posted at exact `06ae9205f`, with the
+original refusal control independently passing 1/0. Its Linux formatting
+receipt at `c10b653e2` passes; Third reconstructed all 6,709 regular-file
+hashes from the exact Git archive and matched both recorded manifests
+(`381b48f8117f6d67b3ca053bdfd679659813020bde6266ad7a55eba8bde461ed`).
+The source trees, exit zero and cleanup agree. Fresh native gates and First's
+final disposition remain required.
 
 ## Failure retained
 

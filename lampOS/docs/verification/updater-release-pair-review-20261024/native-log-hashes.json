@@ -1,0 +1,10 @@
+{
+  "/private/tmp/third-3278-final-arm64.log": {
+    "sha256": "8f2228845a954cd36d7d40fb84f79712dd5014a645f999438f8a3f6415a4d93c",
+    "bytes": 2640347
+  },
+  "/private/tmp/third-3278-final-clippy.log": {
+    "sha256": "efeb92ff7ff3839656372068745de28dbc10dd568c8ba14742f00bb3ac9134fe",
+    "bytes": 76292
+  }
+}
