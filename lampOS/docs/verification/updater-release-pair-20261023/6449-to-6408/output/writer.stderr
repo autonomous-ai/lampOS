@@ -1,0 +1,5 @@
+lamp-update: once channel=lamp-voice url=file:///case/channel/ lamp=fixture apply=on self=off key=b5efbc41ae3c3438
+lamp-update: installed /opt/lampOS/records/6803dba3e1a14dacf40306c2cfd821daaef83fd01d9562fd8e745b3f36fb5962/ beside /opt/lampOS/records/c7f8e0c5c49fe959ddcc3702e99f2e12c0503e3f5675a86eea4c5fe3931836ad/
+lamp-update: installed /opt/lampOS/air/95f7449551916f0559fd1dccb79177ef497572424783e1365282ed77df1986f0/ beside /opt/lampOS/air/d3f8d652ce330e5095eaf4904035b4a29f2bd93bfe5a3fe36b3286e226acd1d8/
+lamp-update: installed /opt/lampOS/schedule/d2270a4d7e982b3a8e5019545637278478d7d3791489fe4a4aab12cfcde250ed/ beside /opt/lampOS/schedule/9d3c14ea8c076a256afb4541a451eaf63277626287fbccf85e7e5b682ec21903/
+lamp-update: switching to build 2

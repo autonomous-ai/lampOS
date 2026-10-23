@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "sequence": 2,
+  "files": [
+    {
+      "path": "/etc/lampOS/records.json",
+      "bytes": "eyJmaXh0dXJlIjoiYmVmb3JlIHJlY29yZHMifQo=",
+      "mode": 416,
+      "record": "425116d71cb03aba8fc4ecd3eee23c8c1068b3a67ef8392a4483d007568514c0",
+      "wrote": "c436aaa54e8b649064cae3180f1eb49b6c66ef1205b1ca6e641e837805832bc7"
+    },
+    {
+      "path": "/etc/lampOS/controls/controls.json",
+      "bytes": "eyJmaXh0dXJlIjoiYmVmb3JlIGNvbnRyb2xzIn0K",
+      "mode": 384,
+      "record": "b6e89f0a9c7d3584747056b3c4df699e73edc0d8fca0c4b4b583a82b99443575",
+      "wrote": "735a35bc48681cfa3dab56af35e5456363e7ccd7d6c5a007a5361b9ebf630216"
+    }
+  ]
+}

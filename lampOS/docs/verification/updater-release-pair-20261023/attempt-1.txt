@@ -1,0 +1,11 @@
+
+running 2 tests
+release-pair evidence: <retained>/6449-to-6408
+{"exit":0,"phase":"container","stderr":"Killed\n","stdout":"real CLI release pair 6449 -> 6408 completed\n"}
+{"cut":"first ordinary restart, after real journal/settings/unit/link writes","network":"none","next_round_exit":1,"physical_power_cut":false,"recoverer":"6408","recovery_exit":1,"release_6408_sha256":"f731555d6b783a69eb00bc2ff774e8ad922988284c9f3a9114010fa75fa51778","release_6449_sha256":"c953a32e802f41dc1bc741bef1fe910faa286f27c6cb1a1988aad435c5331434","result":"passed","signal_sent":"SIGKILL to verified owned process group","systemctl":"fixture","writer":"6449","writer_shell_wait_status":137}
+.release-pair evidence: <retained>/6408-to-6449
+{"exit":0,"phase":"container","stderr":"Killed\n","stdout":"real CLI release pair 6408 -> 6449 completed\n"}
+{"cut":"first ordinary restart, after real journal/settings/unit/link writes","network":"none","next_round_exit":1,"physical_power_cut":false,"recoverer":"6449","recovery_exit":1,"release_6408_sha256":"f731555d6b783a69eb00bc2ff774e8ad922988284c9f3a9114010fa75fa51778","release_6449_sha256":"c953a32e802f41dc1bc741bef1fe910faa286f27c6cb1a1988aad435c5331434","result":"passed","signal_sent":"SIGKILL to verified owned process group","systemctl":"fixture","writer":"6408","writer_shell_wait_status":137}
+.
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.85s
+

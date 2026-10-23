@@ -1,0 +1,85 @@
+{
+  "platform": "macOS, Rust 1.96.0",
+  "source_runtime_base": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+  "format": {
+    "command": "cargo +1.96.0 fmt --all --check",
+    "exit": 0
+  },
+  "clippy": {
+    "command": "cargo +1.96.0 clippy -q --locked --offline -p lamp-update --all-targets --message-format=short -- -D warnings",
+    "exit": 0,
+    "output": "clippy.txt"
+  },
+  "shell_syntax": {
+    "commands": [
+      "sh -n crates/update/tests/release_pair/run.sh",
+      "sh -n crates/update/tests/release_pair/systemctl.sh"
+    ],
+    "exit": 0
+  },
+  "package_tests": {
+    "status": "passed",
+    "exit": 0,
+    "command": "cargo +1.96.0 test -q --locked --offline -p lamp-update -- --test-threads=2",
+    "standard_result_rows": [
+      [
+        120,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        5,
+        0,
+        0
+      ],
+      [
+        82,
+        0,
+        0
+      ],
+      [
+        13,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        2
+      ],
+      [
+        151,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        0
+      ]
+    ],
+    "totals_standard_rows": [
+      371,
+      0,
+      6
+    ],
+    "raw_output": "package-tests.txt",
+    "raw_sha256": "10f1253309bd37d0f104a556fe7fc76ec6ad3abdd2ad48cdc5a5e6a216b43c76"
+  },
+  "dependent_scope": "New private fixture/test names and environment variables occur only in crates/update. No runtime/API source changes; no dependent crate test reruns or full local workspace gate."
+}
