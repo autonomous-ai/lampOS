@@ -1,0 +1,141 @@
+{
+  "old_boot_head": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+  "old_peer_head": "55f671b12ef08c93f11ae235980f69cf7059b7a8",
+  "old_base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+  "new_base": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+  "rebased_boot_head": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+  "worktree": "/private/tmp/tests-codex-boot-clock-current-20261023",
+  "branch": "tests/1569-boot-clock-current",
+  "archive_ref": "refs/heads/tests/archive-3190-f121d6391-20261023",
+  "archive_remote_verified": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+  "status": "Prepared combined overlay; not committed or pushed; no Cargo executed",
+  "dirty_paths": [
+    "lampOS/crates/voice/tests/it/fixture_provider.rs",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "union_paths": [
+    "lampOS/crates/voice/src/coordinator/second.rs",
+    "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+    "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+    "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+    "lampOS/crates/voice/src/scenario_clock.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs",
+    "lampOS/crates/voice/src/stop_words.rs",
+    "lampOS/crates/voice/tests/it/fixture_provider.rs",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "records": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/second.rs",
+      "bytes": 76253,
+      "sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+      "base_blob": "d5a949670c21e9a246990abaa6232d40b9092b67",
+      "base_bytes_equal_prior810e": true,
+      "exact_reviewed_source": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+      "byte_equal_reviewed_source": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "bytes": 133195,
+      "sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+      "base_blob": "87b775273be3775b2b9f2ab64f0e0186c455a40b",
+      "base_bytes_equal_prior810e": true,
+      "exact_reviewed_source": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+      "byte_equal_reviewed_source": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "bytes": 109424,
+      "sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "base_blob": "93309939096ead4b8fcba90ea5b23703efaa8bb2",
+      "base_bytes_equal_prior810e": true,
+      "exact_reviewed_source": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+      "byte_equal_reviewed_source": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "bytes": 80770,
+      "sha256": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+      "base_blob": "8fe40927d304c123840bd73221f8b7a72abfbfd3",
+      "base_bytes_equal_prior810e": true,
+      "exact_reviewed_source": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+      "byte_equal_reviewed_source": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/scenario_clock.rs",
+      "bytes": 19561,
+      "sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "base_blob": "46def4e92fa76d4abcccca90d87a8ab427e22e97",
+      "base_bytes_equal_prior810e": true,
+      "exact_reviewed_source": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+      "byte_equal_reviewed_source": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "bytes": 771430,
+      "sha256": "c8fd3cf2298b965b1652bcfb8357ea0038fb88d33a2f9a97647b15ba4af2f645",
+      "base_blob": "b4a80268976424bb08aa85065b61be164abe6c44",
+      "base_bytes_equal_prior810e": true,
+      "exact_reviewed_source": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+      "byte_equal_reviewed_source": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/stop_words.rs",
+      "bytes": 146296,
+      "sha256": "ca09b676897fc05724646f55de270db866a2131f374fe0ab77fed8c1f510cdda",
+      "base_blob": "8a7449c9b602c4507b0ce59f14d4580fa2e4fccd",
+      "base_bytes_equal_prior810e": true,
+      "exact_reviewed_source": "f121d6391e53bf709ffbf07807e8657f7e86d3ce",
+      "byte_equal_reviewed_source": true
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "bytes": 45782,
+      "sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+      "base_blob": "bd47b9a138b67d994ba6e61ba2da63b5c5cb9a22",
+      "base_bytes_equal_prior810e": true,
+      "exact_reviewed_source": "55f671b12ef08c93f11ae235980f69cf7059b7a8",
+      "byte_equal_reviewed_source": true
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "bytes": 33187,
+      "sha256": "77388c4a7523c56e20e5cbe9406f721e52db4463be34482ff831b6a0dd884615",
+      "base_blob": "1c14f56a5976219337737834f6278bec8bd6da2e",
+      "base_bytes_equal_prior810e": true
+    }
+  ],
+  "proofs": {
+    "no_rebase_or_apply_conflicts": true,
+    "rebase_range_diff_equal": true,
+    "boot_added_removed_lines_preserved": true,
+    "peer_added_removed_lines_preserved": true,
+    "all_eight_Rust_files_byte_equal_reviewed_inputs": true,
+    "all_nine_current_base_blobs_equal_prior810e": true,
+    "every_existing_assertion_preserved_by_identical_Rust_blob_and_unchanged_base": true,
+    "both_doc_additions_preserved": true
+  },
+  "patches": {
+    "boot-before.patch": {
+      "bytes": 32023,
+      "sha256": "3f744f5f2490b3c70e5897545f29e154aa38843917bf7fe82992e6aa388e8778"
+    },
+    "peer-before.patch": {
+      "bytes": 3380,
+      "sha256": "0688625440c18c28d53aef11b8f2794aca1dacbf908e0e061a2eca20a423666f"
+    },
+    "boot-rebase-range-diff.txt": {
+      "bytes": 102,
+      "sha256": "a67ced459b1e923dd640055ca8f440108dc7c8164ad01b6f9b61faded3ac5022"
+    },
+    "peer-after.patch": {
+      "bytes": 3380,
+      "sha256": "7b7bdef0d519e8fe52c4b3c1346d871db93f26b9f6cc1dd5fad23aac24c84b16"
+    },
+    "combined.patch": {
+      "bytes": 35200,
+      "sha256": "bb3763ab79a30e2e9a1f902e4a36b679590dc08966d304aec4f1cd996f78e0ea"
+    }
+  },
+  "qualification": "New latest-base combined source needs its own gate; historical failures and controls remain on their recorded sources."
+}

@@ -1,0 +1,7 @@
+{
+  "external_source": "/private/tmp/tests-3190-peer-fold-20261023/boot-rebase-range-diff.txt",
+  "original_bytes": 102,
+  "original_sha256": "a67ced459b1e923dd640055ca8f440108dc7c8164ad01b6f9b61faded3ac5022",
+  "encoding": "Exact UTF-8 decoded bytes; no normalization",
+  "utf8": "1:  f121d6391e = 1:  4e8ea747cd lampOS: give voice fixtures a shared clock and observed child startup\n"
+}

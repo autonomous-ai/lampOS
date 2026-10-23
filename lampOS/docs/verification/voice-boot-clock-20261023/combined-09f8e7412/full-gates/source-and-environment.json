@@ -1,0 +1,107 @@
+{
+  "identity": {
+    "worktree": "/private/tmp/tests-codex-boot-clock-current-20261023",
+    "head": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+    "base_tree": "1a2db98b23f06944cbe06dd567f3ff3c11c0cae8",
+    "qualification_base": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "branch": "tests/1569-boot-clock-current",
+    "tracked_paths": 10055,
+    "lampos_paths": 6709,
+    "source_aggregate_sha256": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d",
+    "owned_paths": [
+      "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "combined_authored_paths": [
+      "lampOS/crates/voice/src/coordinator/second.rs",
+      "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "lampOS/crates/voice/src/scenario_clock.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/stop_words.rs",
+      "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "source_map_sha256": "b92be8c24a20160abb688b967ac7b38fe75e013c0f605c38e772648c59f8e290",
+    "only_owned_files_differ_from_HEAD": true,
+    "overlay_limit": "HEAD is the equal-rebased boot commit; only reviewed peer source and combined doc are dirty. Execution does not yet bind a final combined commit."
+  },
+  "candidate_commit_at_execution": null,
+  "source_unchanged": true,
+  "source_before_sha256": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d",
+  "source_after_sha256": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d",
+  "freshness": {
+    "mtime_ns": 1792767346840934000,
+    "paths": 10055,
+    "before_sha256": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d",
+    "after_sha256": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d",
+    "bytes_modes_symlinks_identical": true
+  },
+  "per_step_source_aggregates": [
+    {
+      "step": "fmt",
+      "before": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d",
+      "after": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d"
+    },
+    {
+      "step": "clippy",
+      "before": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d",
+      "after": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d"
+    },
+    {
+      "step": "voice-default-parallel",
+      "before": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d",
+      "after": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d"
+    },
+    {
+      "step": "readers-default-parallel",
+      "before": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d",
+      "after": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d"
+    },
+    {
+      "step": "workspace-build",
+      "before": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d",
+      "after": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d"
+    },
+    {
+      "step": "diff-check",
+      "before": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d",
+      "after": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d"
+    }
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "RUST_BACKTRACE": "1",
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_TARGET_TMPDIR": null,
+    "RUSTC_WRAPPER": null,
+    "RUSTC_WORKSPACE_WRAPPER": null,
+    "LAMP_RELAY_PID_CONTROL_DIR": null
+  },
+  "PATH_prefix": "/Users/autonomous/.cargo/bin:",
+  "socket_preflight": "AF_UNIX datagram and IPv4 loopback succeeded before Cargo",
+  "launch_permissions": "Explicitly authorized require_escalated for local fixture sockets.",
+  "architecture": "Rust host x86_64-apple-darwin and captured Mach-O x86_64 artifacts; physical hardware ISA not independently measured.",
+  "source_map": {
+    "external_file": "/private/tmp/tests-3190-peer-fold-gates-20261023/source-map.json",
+    "bytes": 2759039,
+    "sha256": "b92be8c24a20160abb688b967ac7b38fe75e013c0f605c38e772648c59f8e290"
+  },
+  "original_results_json": {
+    "external_file": "/private/tmp/tests-3190-peer-fold-gates-20261023/run-2026-10-23T145546.121457Z/results.json",
+    "bytes": 98611,
+    "sha256": "8bcd34b409d26f813024b621a0e1734dd6e77134ccf00be11250e7731469fa5d"
+  },
+  "limit": "All tracked repository inputs/modes/symlink values were guarded; bulk map remains external. Two declared dirty files are the exact tested source, with no candidate commit claimed at execution time."
+}

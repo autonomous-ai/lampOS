@@ -1,0 +1,91 @@
+{
+  "scope": "Every payload except this manifest.",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 6283,
+      "sha256": "b6b6386a2ed348d8d1d9d0f4cff6f6b335992c8a190169ed045c9a195478835a"
+    },
+    {
+      "path": "affected-cases.json",
+      "bytes": 76255,
+      "sha256": "942cf188afec5874ded9fc781f76148d30d993c5309fd7e7c78df1c0a03ba865"
+    },
+    {
+      "path": "artifact-bindings.json",
+      "bytes": 79625,
+      "sha256": "8056b2442695606cc24355fdd1847ce2a998693829f04db6aa848bb86131bafb"
+    },
+    {
+      "path": "authored.patch.json",
+      "bytes": 36426,
+      "sha256": "ccd13c10cf883b4d6318e5681e8781e005e2465538a8f69e7a1308ed63d4e06b"
+    },
+    {
+      "path": "census-and-outcomes.json",
+      "bytes": 1245972,
+      "sha256": "4bbee4a6407499b1f37b8da748041c5a32766dbd29f68d51040c3da4bde301e6"
+    },
+    {
+      "path": "command-results.json",
+      "bytes": 9386,
+      "sha256": "c03d03cabea9eb915424c43a8b97912b2eb4569e329237d8d5325c5be9a26f71"
+    },
+    {
+      "path": "dependency-closure.json",
+      "bytes": 29604,
+      "sha256": "beb706d205ee67df7859270272f730b19497f288ae47c63eea99390925e12674"
+    },
+    {
+      "path": "external-raw-index.json",
+      "bytes": 87496,
+      "sha256": "b5d8167741f5288cd0ee7a899984ec375bf75dda3403d257359ce11866631a39"
+    },
+    {
+      "path": "failures.json",
+      "bytes": 19000,
+      "sha256": "7e9f18f59357a1e1bc56de03e5ab91dfa8cac29f1ccb7d5ec9e6dd96c6103449"
+    },
+    {
+      "path": "fold-proof.json",
+      "bytes": 6149,
+      "sha256": "73589d1ce6547b089ce629f836aa7ae3f92ce4a3cc5938180d757784ecac38cd"
+    },
+    {
+      "path": "fold-range-diff.json",
+      "bytes": 389,
+      "sha256": "6109bd12190a746caa5206775dcf2998a5e292834603f13d89ffa0cedb962bad"
+    },
+    {
+      "path": "gate-plan.json",
+      "bytes": 8718,
+      "sha256": "c40efd5977246921325e0a57c61a56b1493659c080f0e2acdd9dbc4df2aa6a4b"
+    },
+    {
+      "path": "light-call-boundary.json",
+      "bytes": 2663,
+      "sha256": "4fa6de96ec9067ad248f2ba42df17bcc0a9c43e9ac7ed41354803e0d5f197042"
+    },
+    {
+      "path": "native-streams.json",
+      "bytes": 796564,
+      "sha256": "beb691b70e67f171da1949bbb02313d8a46220cee33734cb0e8df6f3b786066a"
+    },
+    {
+      "path": "source-and-environment.json",
+      "bytes": 5001,
+      "sha256": "762460be4abd4cf1c1eb8b8cf1918599c6502db21cbc55e6b85609b40e85388a"
+    },
+    {
+      "path": "source-self-review.json",
+      "bytes": 1664,
+      "sha256": "13a017fcda533650b3d29451c017a5cb31a015b0ced30e52e5b4a58226182457"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 1488,
+      "sha256": "c306f351d0748a300a7b480189e641389e7258d5280e0b9abc3899b60e007f0b"
+    }
+  ],
+  "total_payload_bytes": 2412646
+}

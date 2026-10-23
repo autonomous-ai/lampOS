@@ -1,5 +1,31 @@
 # Tests work log
 
+## 2026-10-23 22:46 +0700 — combined clock and peer local Mac gate complete
+
+Ready for lamp-voice: no; all nine actual failures remain held.
+
+The [complete combined local Mac gate](verification/voice-boot-clock-20261023/combined-09f8e7412/full-gates/)
+finished 7,184 / 9 / 32 across all 74 targets and 7,225 identities, with none
+incomplete or unrun. Full Voice: 3,931 / 3 / 15; eleven readers: 3,253 / 6 / 17.
+All 88 selected clock, child-startup and peer cases passed. Formatting, strict
+12-package Clippy, workspace build and full diff/source guards passed.
+The execution remains bound to 4e8ea747cd on 09f8e7412 plus two frozen overlays.
+
+Failures remain named with complete output: Voice search/watchdog, privacy
+admission and light latency; Body predecessor/socket cleanup; four Expression
+runtime cases; and Memory follow-up forget retry. The two Expression setup
+cases already have a separate reviewed correction in #3273, but this gate did
+not contain it. No source-equality argument, later diagnostic or selected-case
+pass clears any failed observation. No test or failed gate was repeated.
+
+Root verified seventeen payloads, sixteen exact stream projections, all nine
+failure blocks, all target/case counts and all 88 selected passing rows.
+Published platform labels explicitly distinguish this local Mac gate from
+Linux ARM64 CI. The final docs-only carry and pushed combined-head binding
+are separate steps; they will preserve this executed identity. The shared
+target is released for the accepted light phase diagnostic after verifier
+review and remaining local formatting, without changing this completed run.
+
 ## 2026-10-23 22:28 +0700 — combined Voice failure boundaries audited
 
 Ready for lamp-voice: no; the overall combined gate is still running.
