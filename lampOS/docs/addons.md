@@ -449,6 +449,23 @@ summaries leave the lamp, and every agent on that computer can read them.
 It never publishes a transcript, a picture, a sound, a face, a name or
 memory.
 
+Each topic comes from one part of the lamp, and some of those parts are off
+on a lamp as shipped. A topic whose part is off is not on the bus, and the
+service doesn't publish it. To the computer it is unknown. It is never
+filled in from another topic, such as `room/state` for `room/presence`:
+
+| Topic | Made by | Only with |
+|---|---|---|
+| `voice/state` | lamp-voice | always |
+| `room/presence` | lamp-eyes | `LAMP_PRESENCE=on` (not in `docs/switches.md` yet) |
+| `mood/state` | lamp-mood | `LAMP_MOOD=on` |
+| `light/state` | lamp-actions (the ring) | always |
+| `ears/classes` | lamp-ears | `LAMP_EARS_CLASSES=on`, which needs `LAMP_PRIVACY_CONTROLS=on` |
+| `clock/local` | no bus part: lamp-skills computes it inside its engine | the service computes it from the lamp's local time the same way |
+
+A remote add-on that needs a topic the lamp doesn't publish gets nothing to
+act on. Turning a part on is that part's own row, not this design's.
+
 In Harness's terms (`addon.publish`, openharness#1485):
 
 | Field | Rule (Harness's) | The lamp |
@@ -478,7 +495,7 @@ it with a reason given back as the decision:
 | `act` | `light` or `say`; anything else is dropped (`not_for_remote`) |
 | `why` | one of the remote reasons (below); anything else is dropped |
 | `sure` | as given, 0 to 1 |
-| `holdsMs` | as given, 1 s to 30 s; the lamp judges with its own clock and drops one received late |
+| `holdsMs` | as given, 1 s to 30 s. The judge counts the age from when the service writes the proposal on the lamp's bus (the header's time, `addons/src/runtime.rs:224`), not from the computer's `at`. Time spent crossing Harness isn't counted, so the service drops a proposal whose Harness receipt is already older than its `holdsMs` |
 | `params` | for `light`: colour, level 1 to 5, optional pattern, as `AddonLight` |
 | `note` | for `say` only, and only if a remote say carries words at all (open, below): at most 300 bytes on one line, quoted and untrusted as every add-on note is |
 
