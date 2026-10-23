@@ -1,0 +1,69 @@
+{
+  "current": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+  "prior_gate_base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+  "paths": [
+    {
+      "path": "lampOS/crates/voice/tests/it/light_call.rs",
+      "current_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+      "bytes": 3214,
+      "git_blob": "2827452b9b6336d505c82219f036424858626ee5",
+      "same_bytes_as_810e05109": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/ring_light.rs",
+      "current_sha256": "1001f5d7a8d827273728f84baee3f23980a63b100a5d4fbf30f3b3cd5007c4f6",
+      "bytes": 81921,
+      "git_blob": "3e4591ab55caba9f7a52eaa95e4bf4276290116c",
+      "same_bytes_as_810e05109": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/ring_worker.rs",
+      "current_sha256": "b3eb8740d4fb7be949a4729bc2c3ac3028345c89edfeba92e1f72ac04e7a71c2",
+      "bytes": 44836,
+      "git_blob": "8a2410ac60c048d852a3fbf59c7d00b1208bad27",
+      "same_bytes_as_810e05109": true
+    },
+    {
+      "path": "lampOS/crates/actions/src/light.rs",
+      "current_sha256": "dfbdf2b49476bcf4e934e6980361b3a453d9050f7e6ccc2ae86b028770e1edf9",
+      "bytes": 32086,
+      "git_blob": "74ddcbd937afa1345d02cdfa5cfba54201339c0b",
+      "same_bytes_as_810e05109": true
+    },
+    {
+      "path": "lampOS/crates/actions/src/lib.rs",
+      "current_sha256": "86ad090b98e50c11b4946b9a9d97b5e3ebdb2f41bf592adcdc44e42715949965",
+      "bytes": 22153,
+      "git_blob": "b84c8e777a6b8af509c94b58edbd49a0a9b2a734",
+      "same_bytes_as_810e05109": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/lib.rs",
+      "current_sha256": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+      "bytes": 17782,
+      "git_blob": "481c493ec637b959974d7810299727c321ca408e",
+      "same_bytes_as_810e05109": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/publish.rs",
+      "current_sha256": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+      "bytes": 32256,
+      "git_blob": "e77ff9701bd60af6102913e8acde45ac33582931",
+      "same_bytes_as_810e05109": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/subscribe.rs",
+      "current_sha256": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+      "bytes": 38012,
+      "git_blob": "cb70bd3b17dce6c6909c3e8e94fb9102d40f54df",
+      "same_bytes_as_810e05109": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/wire.rs",
+      "current_sha256": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920",
+      "bytes": 13555,
+      "git_blob": "163e6a31afd997dd305de616954799df83dd1d17",
+      "same_bytes_as_810e05109": true
+    }
+  ]
+}

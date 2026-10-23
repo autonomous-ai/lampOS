@@ -1,5 +1,24 @@
 # Tests work log
 
+## 2026-10-23 22:04 +0700 — light-call blocker source audit
+
+Ready for lamp-voice: no; no new test observation or waiver.
+
+The [source-only light-call audit](verification/light-call-phase-audit-20261023/)
+finds that the fixture already observes real ring state before its timing loop.
+There is no evidenced missing readiness event to repair. Fourteen of twenty
+peer samples and thirteen of twenty Expression samples exceed or equal 25 ms;
+one cold first call alone cannot explain either complete retained array.
+The fixture sleeps a full two milliseconds after each tick, while production
+sleeps the remaining pass budget. Their actual contribution remains unmeasured.
+
+Root verified nine source files against both recorded bases and both complete
+failure blocks. A bounded fixture-only ordered phase trace is proposed for
+review, preserving all twenty calls, both real polls, the original latency
+assertion and default parallel workload. No product or test source was edited,
+no new execution ran, and no readiness workaround or scope expansion is applied.
+The combined clock/peer qualification remains the active shared-target work.
+
 ## 2026-10-23 22:00 +0700 — Update diagnostic complete and combined Linux formatting
 
 Ready for lamp-voice: no; historical failed qualifications remain unwaived.
