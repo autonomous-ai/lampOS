@@ -346,9 +346,11 @@ hand trial (#2857) passed tap, stroke, a 3 s hold to sleep, a wake tap and
 while listening, observed the restart guard's mute, then reached readiness
 about 300 ms after an injected tap; a chosen sleep mute stayed closed.
 That injected-input result is recovery/readiness evidence, not a real-hand
-or first-speaker latency measurement. The cue's code default remains
-−35 dBFS. Thirteen's separately owned −20 dBFS carry is pending; neither its
-landing nor audible-cue acceptance is established by these checks.
+or first-speaker latency measurement. Separately, the lamp-c0a4 hand trial
+found the tap cue audible only with an ear at the lamp at −30 dBFS, faint at
+−25, and clear at −20 at the product speaker level. The 23 October decision
+sets its default to −20 dBFS. That tap trial does not qualify the shared
+sleep-breath or other hum paths, or establish acceptance on this exact build.
 
 **Neither: the person's.** The time zone (#820). Setup links `/etc/localtime`
 to the zone the person's phone gives and names it in `/etc/timezone` (#806).

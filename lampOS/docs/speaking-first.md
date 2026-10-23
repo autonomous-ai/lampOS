@@ -462,7 +462,7 @@ that a link is refused and a FIFO never holds the reader; by the open
 file's own metadata (`fstat`) a regular file of at most 148,140 bytes; a WAV
 of 16-bit mono PCM at the speaker path's 24 kHz, 1 frame to 3 s; no 10 ms
 of it louder than -30 dBFS RMS (well under the lamp's speech, about -20
-dBFS; the head tap's "hm?" is -35) and no sample past -12 dBFS, so that a
+dBFS) and no sample past -12 dBFS, so that a
 train of clicks is refused too. `lamp-skills` checks a skill's sounds at
 load with this same function. Its samples go to the voice, which never
 waits for the lamp to be at rest: at its next pass the sound is refused at
@@ -485,7 +485,7 @@ otherwise: a person speaking over it ends it as any turn). The voice traces
 `skill_sound` with the skill, whether it plays and why not.
 
 `cue: "hum"` uses the same sound admission and speaker path. Its samples
-come from the existing head-cue renderer at -35 dBFS, without a file, model
+come from the existing head-cue renderer at its -20 dBFS default, without a file, model
 request or extra actuator writer. It is an alternative to every other
 content field; other cue values are refused. Its acoustic result remains
 part of [Bedtime and Morning's lamp comparison](bedtime-morning.md).

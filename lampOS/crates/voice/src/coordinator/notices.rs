@@ -31,9 +31,9 @@ pub(super) struct FailureNotices {
 }
 
 /// How loud the fallback sigh is, as RMS over its loudest tenth of a
-/// second: under the lamp's speech (about -20 dBFS), as the head tap's
-/// sounds are, but louder than they are (-35), since it stands in for a
-/// line the person waits for. Not yet measured against a lamp's speech.
+/// second: under the lamp's speech (about -20 dBFS). This fallback level
+/// is independent of the head tap's measured default. Not yet measured
+/// against a lamp's speech.
 pub(super) const FALLBACK_DBFS: f64 = -26.0;
 pub(super) struct Recording {
     /// The provisioned notice; none for a sound made here (the head tap's
