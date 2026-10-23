@@ -13,7 +13,7 @@ must be.
   2026-10-23. It has no `deploy/lamp-a0ae/LAMP.md` yet; the first builder
   decides whether this builder owns it or borrows it.
 - **Lamp address:** `lamp-a0ae.local`
-- **Owner file:** none yet (`deploy/lamp-a0ae/LAMP.md` once the first
+- **Owner file:** `deploy/lamp-a0ae/LAMP.md`, with `owner: devin-local-tester`
   builder agrees)
 
 ## Its work
@@ -33,7 +33,7 @@ Never `lamp-voice`, and never another builder's branch.
 ## What it owns
 
 - Crates: none
-- Deploy folders: none yet
+- Deploy folders: `deploy/lamp-a0ae/`
 - Log: `lampOS/docs/work-log-devin-local-tester.md`
 - Tasks: the `builder:devin-local-tester` issues, in the order of the Queue
   issue ([#3126](https://github.com/autonomous-ai/lampOS/issues/3126))
