@@ -1548,8 +1548,9 @@ pub enum ForgetPick {
     /// The last thing they asked to keep (`forget_last`): only for a bare
     /// "forget that" or "what I just said".
     Last,
-    // #2808 adds its case here: a bare forget just after a follow-up was
-    // asked picks that follow-up's entry by id ([`Recent`]).
+    /// The follow-up the lamp just asked the same person about, by its id
+    /// ([`Recent::asked`]): a bare "forget that" right after the ask (#2808).
+    Asked(u64),
 }
 
 /// What the session did just before a bare forget, for [`pick_forget`].
@@ -1558,8 +1559,9 @@ pub struct Recent {
     /// What a named forget in the same scope named, within
     /// [`HELD_FORGET_FOR`] and with nothing kept since ([`Carry`]).
     pub named: Option<String>,
-    // #2808: the follow-up just asked of the same person, if any, as the
-    // voice's `mark_if_asked` knows it.
+    /// The follow-up just asked of the same person, within
+    /// [`FORGET_ASKED_LINES`] of their lines ([`bare_forget_target`]).
+    pub asked: Option<u64>,
 }
 
 /// What `call` removes, from the heard line `said` (or, with nothing heard,
@@ -1569,7 +1571,8 @@ pub struct Recent {
 /// no `about` of the model's with [`FORGET_ABOUT_ENVIRONMENT`]) that names
 /// a subject ([`named_subject`]) is [`ForgetPick::Named`]; a bare one just
 /// after a named forget is that subject again (Twelve's "Yes, please forget
-/// it."); any other bare one is [`ForgetPick::Last`].
+/// it."); a bare one just after a follow-up was asked is that follow-up
+/// ([`ForgetPick::Asked`], #2808); any other bare one is [`ForgetPick::Last`].
 pub fn pick_forget(call: &ToolCall, said: Option<&str>, recent: &Recent) -> ForgetPick {
     if call.name != FORGET
         || (forget_all_on() && call.args.get("source_id").is_some_and(|id| !id.is_null()))
@@ -1588,7 +1591,9 @@ pub fn pick_forget(call: &ToolCall, said: Option<&str>, recent: &Recent) -> Forg
         None => model(),
     }
     .or_else(|| recent.named.clone())
-    .map_or(ForgetPick::Last, ForgetPick::Named)
+    .map(ForgetPick::Named)
+    .or_else(|| recent.asked.map(ForgetPick::Asked))
+    .unwrap_or(ForgetPick::Last)
 }
 
 /// The lamp's guard on a `forget` ([`pick_forget`]) in `person`'s scope,
@@ -1613,6 +1618,7 @@ pub fn named_forget_with(
             .as_ref()
             .filter(|(whose, _, at)| whose.as_deref() == person && at.elapsed() <= HELD_FORGET_FOR)
             .map(|(_, about, _)| about.clone()),
+        asked: None,
     };
     let ForgetPick::Named(subject) = pick_forget(call, said, &recent) else {
         return None;
@@ -2923,6 +2929,13 @@ fn replace_session(
     fresh: bool,
 ) -> (Option<String>, Option<String>) {
     let previous_person = std::mem::replace(&mut context.session_person, person.map(str::to_owned));
+    // The follow-up just asked about outlives an open for the same person
+    // within its bound: the note's refresh after a refused forget opens the
+    // next session, and their retry must still forget that entry, not their
+    // newest (Second on #3130). Anyone else, or nobody known, lets it go.
+    if bare_forget_target(context, person).is_none() {
+        context.just_asked = None;
+    }
     if context.session.as_deref() == Some(name) {
         (
             None,
@@ -3557,6 +3570,36 @@ struct DaysContext {
     /// and decided it: an offer made again in the same session (a note
     /// asked again) never decides twice.
     event_turn: Option<EventTurn>,
+    /// The follow-up the lamp last asked about (from [`Self::asking`], in
+    /// [`DaysClient::mark_if_asked`]): whose, its id, how many of their
+    /// lines finished since, and when it was asked. A bare "forget that" of
+    /// theirs soon after forgets it ([`bare_forget_target`]). Emptied as a
+    /// session closes, as one opens for anyone else, nobody known or past
+    /// its bound (one for the same person within it keeps it), by a
+    /// remember of theirs, and by a confirmed forget of theirs; a refused
+    /// or lost one leaves it for their retry.
+    just_asked: Option<(String, u64, u32, Instant)>,
+}
+
+/// How many of their lines after the lamp asked about a follow-up a bare
+/// "forget that" may be to forget it: the first or the second.
+const FORGET_ASKED_LINES: u32 = 2;
+
+/// The entry a bare "forget that" (no subject named) from `speaker`
+/// forgets by id: the follow-up the lamp just asked them about, kept by
+/// `remember` or by the end-of-talk pass as an observation, when it is
+/// theirs and their line is within [`FORGET_ASKED_LINES`] of the ask.
+/// `None` is their newest kept thing (`forget_last`), as before. Within [`HELD_FORGET_FOR`]
+/// of the ask too, like a named forget's carry: minutes of talk to someone
+/// else are not "that" (reviewer-two's P2 on #3130). Only with
+/// `LAMP_MEMORY_THREADS`: off, nothing is offered, so nothing is asked.
+/// #3113 owns the one picker; this is its after-a-follow-up case.
+fn bare_forget_target(context: &DaysContext, speaker: Option<&str>) -> Option<u64> {
+    let (whose, id, lines, at) = context.just_asked.as_ref()?;
+    (Some(whose.as_str()) == speaker
+        && *lines < FORGET_ASKED_LINES
+        && at.elapsed() <= HELD_FORGET_FOR)
+        .then_some(*id)
 }
 
 /// A dated follow-up offered this session ([`DaysContext::event_turn`]).
@@ -4580,6 +4623,16 @@ enum Listed {
     Whole(Vec<u64>, Vec<usize>),
 }
 
+/// An older lamp-memory, updated after the voice, refuses the listing's
+/// `observations` ([`Listed::Refused`], #3113): nothing is removed, never
+/// the last kept thing instead, and the person is told plainly.
+fn older_memory_refused() -> (Value, bool) {
+    (
+        json!({"forgotten": false, "note": "My memory couldn't look that up just now, so I forgot nothing, and nothing else instead. Tell them plainly: \"I couldn't forget that just now.\""}),
+        true,
+    )
+}
+
 enum DaysJob {
     Exchange {
         /// The request it answered; 0 for none known.
@@ -4760,6 +4813,7 @@ impl DaysClient {
             context.carried.clear();
         }
         let unoffered = context.let_event_go();
+        context.just_asked = None;
         drop(context);
         self.take_back(unoffered);
         for (name, person) in open {
@@ -5314,6 +5368,60 @@ impl DaysClient {
                     heard_named(call),
                 );
             }
+            // "Forget that" right after a follow-up: the entry it was about
+            // (the first builder, 03:29), as [`pick_forget`] picks it, and
+            // the slot let go. Off, nothing is asked, and the context is not
+            // even looked at. Waited for, as after the store's answer below:
+            // it is never held across I/O, and a busy one must not fail a
+            // forget (reviewer-two's P3 on #3130). Its exchanges since the
+            // ask cite the follow-up, so the store's forget takes them too.
+            FORGET if self.threads.load(Ordering::Acquire) => {
+                let mut context = self.context.lock().ok();
+                let recent = Recent {
+                    named: None,
+                    asked: context
+                        .as_deref()
+                        .and_then(|context| bare_forget_target(context, person)),
+                };
+                match pick_forget(call, None, &recent) {
+                    // The slot stays until the store confirms: a confirmed
+                    // forget of theirs lets it go (after the answer). A refused,
+                    // failed or lost one leaves it, and gives back this
+                    // line, so their retry forgets the same id again and
+                    // never falls to `forget_last` of another kept thing
+                    // (Second's P2 on #3130).
+                    ForgetPick::Asked(id) => {
+                        if let Some((_, _, lines, _)) = context
+                            .as_mut()
+                            .and_then(|context| context.just_asked.as_mut())
+                        {
+                            *lines = lines.saturating_sub(1);
+                        }
+                        drop(context);
+                        // An older lamp-memory, updated after the voice, may
+                        // take another kept thing citing the same exchange
+                        // with it (Second's second P2 on #3130): #3113's
+                        // probe first, its listing that an older one
+                        // refuses, and a refusal forgets nothing.
+                        let until = started + deadline;
+                        let left = || {
+                            until
+                                .checked_duration_since(Instant::now())
+                                .filter(|left| !left.is_zero())
+                        };
+                        match self.about_matching(person, &[], left, lease) {
+                            Listed::Gone => return (gone(), false),
+                            Listed::Refused => return older_memory_refused(),
+                            Listed::Cut | Listed::Whole(..) => {}
+                        }
+                        eprintln!(
+                            "lamp-voice provider: a bare forget after a follow-up forgets entry {id}"
+                        );
+                        Some(json!({"op":"forget","id":id}))
+                    }
+                    _ => None,
+                }
+            }
             _ => None,
         };
         let Some(mut request) = days_request.or_else(|| request(call, now, zone)) else {
@@ -5523,6 +5631,19 @@ impl DaysClient {
             }
             (told, ids)
         };
+        // A forget of theirs the store confirmed, told or not, lets the
+        // follow-up they were asked about go. Only theirs: another's
+        // forget leaves it for their retry (Second's P2 on #3130).
+        if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING)
+            && told["forgotten"] == true
+            && let Ok(mut context) = self.context.lock()
+            && context
+                .just_asked
+                .as_ref()
+                .is_some_and(|(whose, ..)| Some(whose.as_str()) == person)
+        {
+            context.just_asked = None;
+        }
         if !scope_current(lease) || !crate::tools::sendable(&told) || started.elapsed() >= deadline
         {
             // Answered: its outcome is known, though it isn't told. A forget
@@ -5551,6 +5672,16 @@ impl DaysClient {
                     .map(|(_, id)| *id)
             })
             .flatten();
+        // A newer kept thing of theirs is "that" now, not the follow-up.
+        if call.name == REMEMBER
+            && !ids.is_empty()
+            && context
+                .just_asked
+                .as_ref()
+                .is_some_and(|(whose, ..)| Some(whose.as_str()) == person)
+        {
+            context.just_asked = None;
+        }
         // What this turn's call gave, with what each says, for the link to
         // its exchange (#2176 finding 14). Only with the switch.
         let linking = self.link_used.load(Ordering::Acquire);
@@ -5672,15 +5803,7 @@ impl DaysClient {
                 true,
             )
         };
-        // An older lamp-memory, updated after the voice, refuses the
-        // listing's `observations` (#3113): nothing is removed, never the
-        // last kept thing instead, and the person is told plainly.
-        let refused = || {
-            (
-                json!({"forgotten": false, "note": "My memory couldn't look that up just now, so I forgot nothing, and nothing else instead. Tell them plainly: \"I couldn't forget that just now.\""}),
-                true,
-            )
-        };
+        let refused = older_memory_refused;
         let mut scope = person;
         let (mut matching, mut missed) = match self.about_matching(scope, &words, left, lease) {
             Listed::Gone => return (gone(), false),
@@ -6021,9 +6144,9 @@ impl DaysClient {
     }
 
     /// [`EVENTS_ENVIRONMENT`] on for this client, as the environment sets
-    /// it when the client is made: for other parts' tests.
-    #[cfg(test)]
-    pub(crate) fn telling_events(&self) {
+    /// it when the client is made: for the real store's contract tests and
+    /// other parts' tests.
+    pub fn telling_events(&self) {
         self.events.store(true, Ordering::Release);
     }
 
@@ -6275,15 +6398,25 @@ impl DaysClient {
     /// once (`follow_up_asked`), so it is never offered again. Apart from
     /// the journal ([`hand_on_days`]): a remember or forget turn's reply is
     /// kept out of the journal but still marks it (reviewer-two's P2 on
-    /// #2894).
-    fn mark_if_asked(&self, said: &str, person: Option<&str>) {
+    /// #2894). Each of the person's finished exchanges counts as one of
+    /// their lines since the last ask ([`DaysContext::just_asked`]). Public
+    /// for the real store's contract tests.
+    pub fn mark_if_asked(&self, said: &str, person: Option<&str>) {
         let Ok(mut context) = self.context.lock() else {
             return;
         };
+        if let Some((whose, _, lines, _)) = context.just_asked.as_mut()
+            && Some(whose.as_str()) == person
+        {
+            *lines = lines.saturating_add(1);
+        }
         let at = context.asking.iter().position(|(whose, _, words, dated)| {
             Some(whose.as_str()) == person && asks_about(said, words, *dated)
         });
         let asked = at.map(|at| context.asking.remove(at));
+        if let Some((whose, id, _, _)) = &asked {
+            context.just_asked = Some((whose.clone(), *id, 0, Instant::now()));
+        }
         drop(context);
         if let Some((whose, id, _, _)) = asked {
             let _ = self.jobs.try_send(DaysJob::Asked { person: whose, id });
@@ -10228,6 +10361,374 @@ mod tests {
         );
         assert_eq!(flipped.event_turn(Some(MINH), "What time is it?"), None);
         assert!(taken_back(&work).is_empty(), "flipped");
+    }
+
+    /// The person [`offered_an_event`] offers follow-up 12 to.
+    const ASKED_OF: &str = "p-be9688998f085098";
+    const THE_ASK: &str = "Hey! How was your sister's wedding?";
+
+    /// The first builder, 03:29: a bare "forget that" in either of the
+    /// person's next two lines after the lamp asked about a follow-up is
+    /// sent as `forget` of its id, once; their third line is `forget_last`.
+    #[test]
+    fn a_bare_forget_in_their_next_two_lines_forgets_the_follow_up_asked() {
+        let (client, _work) = offered_an_event("forget-asked-window", true, true);
+        let target =
+            |client: &DaysClient, who| bare_forget_target(&client.context.lock().unwrap(), who);
+        assert_eq!(target(&client, Some(ASKED_OF)), None, "not asked yet");
+        client.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        assert_eq!(
+            target(&client, Some(ASKED_OF)),
+            Some(12),
+            "their first line"
+        );
+        client.mark_if_asked("Glad to hear it.", Some(ASKED_OF));
+        assert_eq!(
+            target(&client, Some(ASKED_OF)),
+            Some(12),
+            "their second line"
+        );
+        client.mark_if_asked("Sounds fun.", Some(ASKED_OF));
+        assert_eq!(target(&client, Some(ASKED_OF)), None, "their third line");
+        // What is sent: the follow-up's id, in their scope, then, the slot
+        // taken, `forget_last` for the next bare forget.
+        let (socket, served) = memory("fa-sent", 3, |request| match request["op"].as_str() {
+            Some("kept") => json!({"ok":true,"entries":[]}),
+            Some("forget") => json!({"ok":true,"removed":3}),
+            _ => json!({"ok":true,"removed":null}),
+        });
+        let client = asked_with_memory("forget-asked-sent", &socket);
+        let forget = call(FORGET, json!({}));
+        let deadline = Duration::from_secs(2);
+        assert_eq!(
+            client.run_for(&forget, deadline, Some(ASKED_OF)).0,
+            json!({"forgotten":true})
+        );
+        let _ = client.run_for(&forget, deadline, Some(ASKED_OF));
+        let read = served.join().unwrap();
+        // #3113's probe first: an older memory refuses its listing.
+        assert_eq!(read[0], probe());
+        assert_eq!(read[1], json!({"op":"forget","id":12,"person":ASKED_OF}));
+        assert_eq!(
+            read[2],
+            json!({"op":"forget_last","kind":"kept","person":ASKED_OF})
+        );
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #3113's older-memory probe, as [`ASKED_OF`]'s, that a forget of the
+    /// follow-up asked is sent after.
+    fn probe() -> Value {
+        json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true,"person":ASKED_OF})
+    }
+
+    /// Reviewer-two's P2 on #3130: past [`HELD_FORGET_FOR`] of the ask, a
+    /// bare forget in their next line is `forget_last` again.
+    #[test]
+    fn a_bare_forget_past_a_minute_of_the_ask_is_forget_last() {
+        let (socket, served) = memory("fa-late", 1, |_| json!({"ok":true,"removed":null}));
+        let client = asked_with_memory("forget-asked-late", &socket);
+        let late = Instant::now()
+            .checked_sub(HELD_FORGET_FOR + Duration::from_secs(1))
+            .unwrap();
+        client
+            .context
+            .lock()
+            .unwrap()
+            .just_asked
+            .as_mut()
+            .unwrap()
+            .3 = late;
+        let _ = client.run_for(
+            &call(FORGET, json!({})),
+            Duration::from_secs(2),
+            Some(ASKED_OF),
+        );
+        assert_eq!(
+            served.join().unwrap()[0],
+            json!({"op":"forget_last","kind":"kept","person":ASKED_OF})
+        );
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// Second's P2 on #3130: a forget of the follow-up the store refuses,
+    /// or whose answer is lost, leaves the slot, so the same person's bare
+    /// retry, even in their second line, forgets the same id again and
+    /// never `forget_last`'s another kept thing (30 here). The retry's
+    /// success removes it. An older memory, refusing #3113's probe, is
+    /// sent no forget at all (Second's second P2 on #3130), and the slot
+    /// stays for the retry too.
+    #[test]
+    fn a_refused_forget_of_the_follow_up_is_retried_by_id_never_forget_last() {
+        static KEPT: Mutex<Vec<u64>> = Mutex::new(Vec::new());
+        static FIRST: Mutex<Option<(&str, Value)>> = Mutex::new(None);
+        let forget_once = json!({"op":"forget","id":12,"person":ASKED_OF});
+        // Refused by the store, answered but not understood (lost: it may
+        // have committed), or the probe refused by an older memory.
+        for (name, op, first, sent) in [
+            (
+                "refused",
+                "forget",
+                json!({"ok":false,"error":"io"}),
+                vec![probe(), forget_once.clone()],
+            ),
+            (
+                "lost",
+                "forget",
+                json!({"ok":true}),
+                vec![probe(), forget_once.clone()],
+            ),
+            (
+                "older",
+                "kept",
+                json!({"ok":false,"error":"bad_request"}),
+                vec![probe()],
+            ),
+        ] {
+            *KEPT.lock().unwrap() = vec![12, 30];
+            *FIRST.lock().unwrap() = Some((op, first));
+            let (socket, served) = memory(&format!("fa-{name}"), sent.len() + 2, |request| {
+                let mut first = FIRST.lock().unwrap();
+                if first.as_ref().is_some_and(|(op, _)| request["op"] == *op) {
+                    return first.take().unwrap().1;
+                }
+                drop(first);
+                let mut kept = KEPT.lock().unwrap();
+                match request["op"].as_str() {
+                    Some("kept") => json!({"ok":true,"entries":[]}),
+                    Some("forget") => {
+                        let id = request["id"].as_u64().unwrap();
+                        let before = kept.len();
+                        kept.retain(|kept| *kept != id);
+                        json!({"ok":true,"removed":before - kept.len()})
+                    }
+                    Some("forget_last") => json!({"ok":true,"removed":kept.pop().map(|_| 1)}),
+                    _ => json!({"ok":false}),
+                }
+            });
+            let client = asked_with_memory(&format!("forget-asked-{name}"), &socket);
+            // Their first line after the ask, then the forget in their second.
+            client.mark_if_asked("Glad to hear it.", Some(ASKED_OF));
+            let forget = call(FORGET, json!({}));
+            let deadline = Duration::from_secs(2);
+            assert_ne!(
+                client.run_for(&forget, deadline, Some(ASKED_OF)).0["forgotten"],
+                true,
+                "{name}"
+            );
+            // The failed turn's exchange finishes; they say it again.
+            client.mark_if_asked("Sorry, I couldn't forget that.", Some(ASKED_OF));
+            assert_eq!(
+                client.run_for(&forget, deadline, Some(ASKED_OF)).0,
+                json!({"forgotten":true}),
+                "{name}"
+            );
+            let read = served.join().unwrap();
+            let mut sent = sent;
+            sent.extend([probe(), forget_once.clone()]);
+            assert_eq!(read, sent, "{name}");
+            assert_eq!(*KEPT.lock().unwrap(), vec![30], "{name}");
+            // Confirmed: the slot is gone.
+            assert_eq!(
+                bare_forget_target(&client.context.lock().unwrap(), Some(ASKED_OF)),
+                None,
+                "{name}"
+            );
+            std::fs::remove_file(&socket).unwrap();
+        }
+    }
+
+    /// After a refused forget of the follow-up, another person's bare
+    /// forget is `forget_last` of their own, and the asked person's slot
+    /// is left as it was.
+    #[test]
+    fn a_refused_forget_leaves_the_slot_and_another_s_forget_is_forget_last() {
+        let (socket, served) = memory("fa-refused-other", 3, |request| {
+            match request["op"].as_str() {
+                Some("kept") => json!({"ok":true,"entries":[]}),
+                Some("forget") => json!({"ok":false,"error":"io"}),
+                _ => json!({"ok":true,"removed":1}),
+            }
+        });
+        let client = asked_with_memory("forget-asked-refused-other", &socket);
+        let forget = call(FORGET, json!({}));
+        let deadline = Duration::from_secs(2);
+        let _ = client.run_for(&forget, deadline, Some(ASKED_OF));
+        const OTHER: &str = "p-0123456789abcdef";
+        assert_eq!(
+            client.run_for(&forget, deadline, Some(OTHER)).0,
+            json!({"forgotten":true})
+        );
+        let read = served.join().unwrap();
+        assert_eq!(read[0], probe());
+        assert_eq!(read[1], json!({"op":"forget","id":12,"person":ASKED_OF}));
+        assert_eq!(
+            read[2],
+            json!({"op":"forget_last","kind":"kept","person":OTHER})
+        );
+        let context = client.context.lock().unwrap();
+        assert_eq!(
+            context.just_asked.as_ref().map(|slot| (slot.1, slot.2)),
+            Some((12, 0))
+        );
+        assert_eq!(bare_forget_target(&context, Some(ASKED_OF)), Some(12));
+        drop(context);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// The one picker (#2808 in #3113's): right after a follow-up was asked,
+    /// a bare forget picks its id; a named one still picks what it names.
+    #[test]
+    fn pick_forget_takes_the_follow_up_asked_only_for_a_bare_forget() {
+        let forget = call(FORGET, json!({}));
+        let asked = Recent {
+            named: None,
+            asked: Some(12),
+        };
+        for said in [Some("Forget that."), Some("quên cái đó đi"), None] {
+            assert_eq!(
+                pick_forget(&forget, said, &asked),
+                ForgetPick::Asked(12),
+                "{said:?}"
+            );
+        }
+        assert_eq!(
+            pick_forget(
+                &forget,
+                Some("Lamp, please forget my favourite colour."),
+                &asked
+            ),
+            ForgetPick::Named("favourite colour".into())
+        );
+        assert_eq!(
+            pick_forget(&forget, Some("Forget that."), &Recent::default()),
+            ForgetPick::Last
+        );
+    }
+
+    /// A Days client on `socket`, its session offered follow-up 12 of
+    /// [`ASKED_OF`]'s and the lamp having just asked about it.
+    fn asked_with_memory(name: &str, socket: &Path) -> DaysClient {
+        let (probe, _work) = offered_an_event(name, true, true);
+        // Asked on the probe, whose writer's jobs go nowhere.
+        probe.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        let client = DaysClient::new(socket.to_path_buf()).unwrap();
+        client.threads.store(true, Ordering::Release);
+        *client.context.lock().unwrap() = std::mem::take(&mut *probe.context.lock().unwrap());
+        client
+    }
+
+    /// Fault #1: another person's bare forget, or the room's, is
+    /// `forget_last` of their own, and leaves the asked person's slot.
+    #[test]
+    fn another_speaker_s_bare_forget_never_takes_the_follow_up_asked() {
+        let (client, _work) = offered_an_event("forget-asked-other", true, true);
+        client.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        // Another person's finished line counts none of theirs.
+        client.mark_if_asked("Sure.", Some("p-0123456789abcdef"));
+        let context = client.context.lock().unwrap();
+        assert_eq!(
+            bare_forget_target(&context, Some("p-0123456789abcdef")),
+            None
+        );
+        assert_eq!(bare_forget_target(&context, None), None);
+        assert_eq!(bare_forget_target(&context, Some(ASKED_OF)), Some(12));
+    }
+
+    /// A thing they asked to keep after the ask is the newer "that": the
+    /// slot goes, so `forget_last` forgets it. Another's keeps it.
+    #[test]
+    fn a_remember_after_the_ask_makes_the_bare_forget_forget_last() {
+        let (socket, served) = memory("fa-keep", 2, |_| json!({"ok":true,"id":30}));
+        let client = asked_with_memory("forget-asked-remember", &socket);
+        let keep = call(REMEMBER, json!({"text":"likes tea"}));
+        let deadline = Duration::from_secs(2);
+        assert!(
+            client
+                .run_for(&keep, deadline, Some("p-0123456789abcdef"))
+                .1
+        );
+        let target = |client: &DaysClient| {
+            bare_forget_target(&client.context.lock().unwrap(), Some(ASKED_OF))
+        };
+        assert_eq!(target(&client), Some(12), "another's remember");
+        assert!(client.run_for(&keep, deadline, Some(ASKED_OF)).1);
+        assert_eq!(target(&client), None, "theirs");
+        served.join().unwrap();
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// A session closing lets the slot go, and so does one opening for
+    /// another person, nobody known, or past the bound. One opening for the
+    /// same person within it, the note's refresh after a refused forget,
+    /// keeps it (Second on #3130).
+    #[test]
+    fn a_session_change_lets_the_follow_up_asked_go() {
+        let (client, _work) = offered_an_event("forget-asked-closed", true, true);
+        client.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        client.close_open_session(Duration::from_millis(20));
+        let context = client.context.lock().unwrap();
+        assert_eq!(bare_forget_target(&context, Some(ASKED_OF)), None, "closed");
+        drop(context);
+        let (jobs, _) = sync_channel(16);
+        let open = |context: &mut DaysContext, name: &str, person: Option<&str>| {
+            let _ = replace_session(context, &jobs, (name, person), true);
+            bare_forget_target(context, Some(ASKED_OF))
+        };
+        let (client, work) = offered_an_event("forget-asked-opened", true, true);
+        client.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        let mut context = client.context.lock().unwrap();
+        assert_eq!(
+            open(&mut context, "same", Some(ASKED_OF)),
+            Some(12),
+            "same person"
+        );
+        assert_eq!(open(&mut context, "nobody", None), None, "nobody known");
+        drop(context);
+        drop(work);
+        let (client, work) = offered_an_event("forget-asked-another", true, true);
+        client.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        let mut context = client.context.lock().unwrap();
+        let other = Some("p-0123456789abcdef");
+        assert_eq!(open(&mut context, "another", other), None, "another person");
+        // Back to them: what another's open let go stays gone.
+        assert_eq!(
+            open(&mut context, "them-again", Some(ASKED_OF)),
+            None,
+            "gone"
+        );
+        drop(context);
+        drop(work);
+        let (client, work) = offered_an_event("forget-asked-late", true, true);
+        client.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        let mut context = client.context.lock().unwrap();
+        if let Some(slot) = context.just_asked.as_mut() {
+            slot.3 -= HELD_FORGET_FOR + Duration::from_secs(1);
+        }
+        assert_eq!(open(&mut context, "late", Some(ASKED_OF)), None, "expired");
+        assert!(context.just_asked.is_none(), "expired slot let go");
+        drop(work);
+    }
+
+    /// With `LAMP_MEMORY_THREADS` off nothing is offered, so nothing is
+    /// asked and a bare forget is `forget_last` as before.
+    #[test]
+    fn with_threads_off_a_bare_forget_is_forget_last() {
+        let (socket, served) = memory("fa-off", 2, |request| match request["op"].as_str() {
+            Some("session_open") => {
+                json!({"ok":true,"snapshot":snapshot(request["session"].as_str().unwrap())})
+            }
+            _ => json!({"ok":false}),
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.threads.store(false, Ordering::Release);
+        let _ = client.told_for_session_within(1, Some(ASKED_OF), false, Duration::from_secs(2));
+        served.join().unwrap();
+        std::fs::remove_file(&socket).unwrap();
+        client.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        let context = client.context.lock().unwrap();
+        assert!(context.asking.is_empty());
+        assert_eq!(bare_forget_target(&context, Some(ASKED_OF)), None);
     }
 
     /// The first builder on #2805, 22 Oct 20:28, and the c0a4 set on #3059
@@ -16600,6 +17101,7 @@ mod tests {
         assert_eq!(pick_forget(&forget, None, &none), ForgetPick::Last);
         let named = Recent {
             named: Some("favourite colour".into()),
+            asked: None,
         };
         assert_eq!(
             pick_forget(&forget, Some("Yes, please forget it."), &named),
