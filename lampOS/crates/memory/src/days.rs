@@ -1140,8 +1140,11 @@ impl Days {
     /// (`Person::rules`), in one transaction: the app's removal of the
     /// person (`docs/memory.md`, "Forgetting a person"). The same erase as
     /// [`Self::forget_all`] of each, so a crash between them never leaves
-    /// the person forgotten and their rules kept. The removed entries, then
-    /// the removed rules.
+    /// the person forgotten and their rules kept. Their id comes off every
+    /// room line they were seen saying in the same transaction, so no one
+    /// later remembered by the same name takes those lines over
+    /// (reviewer-three's P2 on #3213); the lines stay, as they did before
+    /// the speakers table. The removed entries, then the removed rules.
     pub fn forget_person(&mut self, person: &Person) -> Result<(u64, u64)> {
         let rules = person
             .rules()
@@ -1149,6 +1152,7 @@ impl Days {
         let tx = self.db.transaction()?;
         let removed = empty(&tx, Some(person))?;
         let ruled = empty(&tx, Some(&rules))?;
+        tx.execute("DELETE FROM speakers WHERE speaker=?1", [person.as_str()])?;
         tx.commit()?;
         self.forget_set_aside()?;
         Ok((removed, ruled))
