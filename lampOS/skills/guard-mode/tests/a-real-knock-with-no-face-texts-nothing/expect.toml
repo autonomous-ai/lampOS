@@ -1,0 +1,14 @@
+# #2562: asked at 14:20 and the desk empty from 49 s; a real knock at 14:31,
+# ESC-50 1-103999-A-30 scored by the pinned YAMNet, door 0.648 at 660 s, and
+# no face, voice or anyone at the desk after: a sound alone is nobody coming
+# in, and nothing is texted.
+clock = "14:20"
+
+[[call_tool]]
+name = "keep_watch"
+at = "4s"
+args = { turn = "on" }
+
+[[expect]]
+at = "4s"
+call = "light"
