@@ -123,7 +123,7 @@ is released or the reader has failed.
 | You talk over it | Stops and listens | Now for sentences (6 of 10 played), weak for one word; tonight's work |
 | Two people talk near it | Stays out | Now. A glance at whoever laughs was dropped (the lead on #1711, 21 Oct: the owner never asked for it); `skills/laugh-glance` stays parked and off |
 | A bang, something dropped | One startled glance, then lets it go; the next ones get nothing | Now when awake; resting #710 |
-| Music | Once, a slight sway when music has played a while, only if it is not working with you | Built, off: `skills/music-sway` on `ears/classes` (#1669), its bar kept from lamp-52e6 (#2475) |
+| Music | Once, a slight sway when music has played a while, only if it is not working with you | Installed on in the product since #2834: `skills/music-sway` on `ears/classes` (#1669), its bar kept from lamp-52e6 (#2475). It sways only once the product's ears run their sound classes, after YAMNet's distribution review (sound-events.md); its lamp row after a full update is still owed |
 | A long silence | Breathing eye, tiny shifts of weight; dozes after a while | Rest clip now; sleep to build |
 
 ### Sight
@@ -132,8 +132,8 @@ is released or the reader has failed.
 |---|---|---|
 | Someone sits down | Looks up, eye brightens; a person it knows gets a word now and then ("you're back"), a stranger a glance | Faces now; who it knows to build |
 | You look at it | Looks back; the eye opens | To build |
-| You leave | Watches you go a moment, settles | Built, not yet tried: `skills/watch-you-leave` (#1669 (e)), a small base turn toward the side the sitter left by, held about 2 s; a core skill held out of the product until the arm hour |
-| You have been working long without a break | Once in a while, a stretch of its own, as an invitation, never a lecture | To build |
+| You leave | Watches you go a moment, settles | Built: `skills/watch-you-leave` (#1669 (e)), a small base turn toward the side the sitter left by, held about 2 s; on in the product since #2834, with the eyes' `LAMP_ACTIVITY`; its lamp row, someone at the arm after a full update, is still owed |
+| You have been working long without a break | Once in a while, a stretch of its own, as an invitation, never a lecture | Built, on in the product: `skills/stretch-break`. Since #2834 the product's eyes say `room/activity`, so it also waits while a head is down and lets that sitting's stretch go if they don't look up within ten minutes |
 
 ### The air and the day
 

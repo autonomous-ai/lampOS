@@ -1474,7 +1474,8 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     assert!(root.join("bedtime-morning/SKILL.md").is_file());
     // Inventory includes the disabled core and its grants; only live skills
-    // contribute functions. The eleven live skills offer Dance and
+    // contribute functions. The thirteen live skills (with music sway and
+    // watch you leave since #2834, which declare none) offer Dance and
     // prepare_to_unplug, the latter hidden at run time unless LAMP_UNPLUG=on.
     let inventory = lamp_skills::load_each(&root);
     assert_eq!(inventory.len(), 20);
@@ -1498,7 +1499,7 @@ fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
     );
     let (live, errors) = lamp_skills::load_all(&root);
     assert!(errors.is_empty(), "{errors:?}");
-    assert_eq!(live.len(), 11);
+    assert_eq!(live.len(), 13);
     assert!(live.iter().all(|skill| skill.name != bedtime.name));
     // Each core skill installed off is disabled on the lamp and adds no
     // function, its tool or not: the 2 above are all a session is told.
@@ -2028,6 +2029,45 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
             .lines()
             .any(|line| line == "Environment=LAMP_MOOD_SEEMS=on")
     );
+}
+
+/// Music sway and watch you leave are core skills in the product (#2834):
+/// installed on, out of `PRODUCT_SKILLS_OFF`, and the eyes say `room/stood_up`
+/// (`LAMP_ACTIVITY=place`, by place only), which watch you leave reads.
+/// Music sway reads the ears' sound classes, which the product turns on
+/// separately, once YAMNet's weights may be shipped; until then it has
+/// nothing to read and never sways. Both stay quiet at night by their own
+/// `[quiet]`.
+#[test]
+fn music_sway_and_watch_you_leave_are_on_in_the_product() {
+    let skills = ["music-sway", "watch-you-leave"];
+    for skill in skills {
+        assert!(install::PRODUCT_SKILLS.contains(&skill), "{skill}");
+        assert!(
+            !install::PRODUCT_SKILLS_OFF
+                .iter()
+                .any(|(off, _)| *off == skill),
+            "{skill}"
+        );
+        let toml = fs::read_to_string(skills_root().join(skill).join("skill.toml")).unwrap();
+        assert!(toml.contains("\n[quiet]"), "{skill} is quiet at night");
+    }
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    for skill in skills {
+        assert_eq!(
+            fs::read(lamp.on(&format!("/var/lib/lampOS/skills/{skill}/skill.toml"))).unwrap(),
+            fs::read(skills_root().join(skill).join("skill.toml")).unwrap(),
+            "{skill} is installed as its own file, turned on"
+        );
+    }
+    let set = |unit: &str, line: &str| unit.lines().any(|each| each.trim() == line);
+    let eyes = include_str!("../../../deploy/product/lamp-eyes.service");
+    assert!(set(eyes, "Environment=LAMP_BUS=on"));
+    // By place only: the unit passes `--recogniser`, and `on` would tell
+    // the sitter by face print, which waits for its privacy read (eyes.md).
+    assert!(set(eyes, "Environment=LAMP_ACTIVITY=place"));
+    assert!(eyes.contains("--recogniser"));
 }
 
 /// Where the product's voice finds its recorded lines (#1844).

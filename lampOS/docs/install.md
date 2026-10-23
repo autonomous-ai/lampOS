@@ -218,12 +218,19 @@ on lamp-52e6 with the lead (20 Oct 11:35): one slow droop for a failed
 part, and the light back after; it adds no function. Prepare-to-unplug is
 enabled but stays hidden and inactive unless `LAMP_UNPLUG=on`.
 Bedtime and Morning is included with `enabled = false`, awaiting its lamp
-comparison (#1672); it adds no active trigger or advertised tool. Eight
-core skills not yet tried on a lamp are installed disabled
-(`install::PRODUCT_SKILLS_OFF`, each with why): Light out when you leave
-(#1677, [presence.md](presence.md), which must never take the light of
-someone reading face down), Watches you leave and Music sway (#1669), Light
-scenes, Point the light and Light show (#1679), and Smoky air and Dusty air
+comparison (#1672); it adds no active trigger or advertised tool. Watches
+you leave and Music sway (#1669) are on in the product since #2834, with
+the eyes' `LAMP_ACTIVITY=place` for Watches you leave: the sitter followed
+by place only, never by a face print. With `room/activity` said, Stretch
+break, already on, also waits while a head is down (reading, writing) and
+lets that sitting's stretch go if they don't look up within its ten minutes. Music sway reads
+the ears' sound classes, which stay off in the product until YAMNet's
+weights may be shipped (sound-events.md), so until then it never sways.
+Six core skills not yet tried on a lamp are
+installed disabled (`install::PRODUCT_SKILLS_OFF`, each with why): Light out
+when you leave (#1677, [presence.md](presence.md), which must never take the
+light of someone reading face down), Light scenes, Point the light and Light
+show (#1679), and Smoky air and Dusty air
 (#1684), until they are measured for false alarms on real traces. Install
 and a round's bundle write `enabled = false` (`install::OFF_LINE`) above
 each one's own `skill.toml`, so the folder in `lampOS/skills/`, and a lamp

@@ -23,6 +23,10 @@ StateDirectoryMode=0700
 # Looking is never worth a late word.
 Nice=10
 Environment=LAMP_BUS=on
+# room/activity and room/stood_up, which watch you leave and stretch break
+# read (#2834, eyes.md): the sitter followed by place only, never told by a
+# face print, though --recogniser is passed, until that path's privacy read.
+Environment=LAMP_ACTIVITY=place
 # Whether each face is speaking, from YuNet's five marks, on humans/faces/tracked: the voice's
 # LAMP_SECOND_SPEAKING_FACE reads it (#720, #2008; the lead, 21 Oct 07:19 on #1711).
 Environment=LAMP_EYES_SPEAKING=on

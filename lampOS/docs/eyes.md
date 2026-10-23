@@ -1979,7 +1979,10 @@ side-on at 0.40 to 0.53 across, where the sitter had sat at 0.44).
 
 **Told by face, with the recogniser** (#1678's (d); the owner's yes, 19 Oct
 15:57, recorded on #1827; switched on on a lamp only after Third's privacy
-read, lamp-4ace first).
+read, lamp-4ace first). Only with `LAMP_ACTIVITY=on`: `LAMP_ACTIVITY=place`,
+the product's since #2834, says the same topics with the sitter followed by
+place alone, and never takes a print, though the eyes have `--recogniser`
+for other reasons.
 When the eyes also have `--recogniser` (the pinned SFace), the sitter is
 told from others by face. In the sitting's first minutes one print of the
 sitter is taken every 20 s, up to six (about a second of SFace), and their
