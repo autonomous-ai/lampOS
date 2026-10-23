@@ -445,6 +445,122 @@ pub fn switch_link_used(on: bool) -> bool {
     *LINK_USED.get_or_init(|| on)
 }
 
+/// Only the exact value `on`, with the Days client (#2849, the first
+/// builder's yes, 23 Oct 09:37; off unless set): a room line said by one
+/// known person keeps their id beside it in the memory (`speaker` on
+/// `append_linked` and `remember`), and that person's "forget everything"
+/// (`forget_all`, answered `ok`) also sends `forget_said`, so the room's
+/// lines they said go too. The speaker is only ever the one known face the
+/// eyes saw saying that line ([`speaker_of`]), so it needs
+/// `LAMP_EYES_SPEAKING=on`; without it no line has a speaker, and the start
+/// says so. The id is never told to anyone nor used to pick what is said.
+/// Off, nothing new is sent.
+pub const ROOM_SPEAKER_ENVIRONMENT: &str = "LAMP_MEMORY_ROOM_SPEAKER";
+static ROOM_SPEAKER: OnceLock<bool> = OnceLock::new();
+
+/// Whether the room's lines keep who said them ([`ROOM_SPEAKER_ENVIRONMENT`]).
+pub fn room_speaker_on() -> bool {
+    ROOM_SPEAKER.get() == Some(&true)
+}
+
+/// Set it once for this process, as [`start`] does from the environment;
+/// the first setting stands.
+pub fn switch_room_speaker(on: bool) -> bool {
+    *ROOM_SPEAKER.get_or_init(|| on)
+}
+
+/// The journal's line when an older memory refused a room line's speaker
+/// and took the line without it: said once, and no speaker is sent again
+/// in this run.
+pub const ROOM_SPEAKER_KEPT_WITHOUT: &str = "room line kept without its speaker (older memory)";
+
+/// The start's line with [`ROOM_SPEAKER_ENVIRONMENT`] on and the eyes not
+/// judging who speaks.
+pub const ROOM_SPEAKER_NO_EYES: &str = "no room line is kept with who said it: the room speaker switch is on but the eyes do not judge who speaks (LAMP_EYES_SPEAKING)";
+
+/// Who said a room line (#2849): the memory id ([`crate::known_faces::memory_person`])
+/// of the known person whose face, and no other, the eyes saw saying it
+/// ([`crate::speaking_faces::seen_saying`]), as the line was read when it
+/// was heard (`line`). A face merely in view, two faces speaking, another
+/// face, a stale known file, or a line not read is nobody: `None`. Voice
+/// alone never names anyone.
+pub fn speaker_of(line: Option<&crate::speaking_faces::LineSeen>) -> Option<String> {
+    let line = line?;
+    let (name, _) = line.known.as_ref()?;
+    let id = crate::known_faces::memory_person(name);
+    (lamp_msgs::known::is_person_id(&id)
+        && crate::speaking_faces::seen_saying(&line.speakers, &id, line.known.clone()))
+    .then_some(id)
+}
+
+/// Whether a room line is sent with who said it, shared by the client and
+/// its writer ([`HandOns`]): [`ROOM_SPEAKER_ENVIRONMENT`], read when the
+/// client is made, and whether an older memory has refused the field in
+/// this run ([`send_with_speaker`]).
+#[derive(Default)]
+struct RoomSpeaker {
+    on: AtomicBool,
+    refused: AtomicBool,
+}
+
+impl RoomSpeaker {
+    /// The speaker of request `request`'s line, for a write in `person`'s
+    /// scope: only the room's (`None`), with the switch, while no older
+    /// memory refused it, and only one seen saying it ([`speaker_of`]).
+    fn of(&self, person: Option<&str>, request: Option<u64>) -> Option<String> {
+        if person.is_some() || !self.on.load(Ordering::Acquire) {
+            return None;
+        }
+        if self.refused.load(Ordering::Acquire) {
+            return None;
+        }
+        let request = request.filter(|request| *request != 0)?;
+        speaker_of(crate::speaking_faces::line_seen(request).as_ref())
+    }
+}
+
+/// Sends a write by `send`. One with a `speaker` that the memory refuses
+/// as `bad_request` (an older memory, whose requests are strict) is sent
+/// again once without it, and its answer is the write's. Taken then, the
+/// line is kept as it was before #2849, the journal says
+/// [`ROOM_SPEAKER_KEPT_WITHOUT`] once, and no speaker is sent for the rest
+/// of the run.
+fn send_with_speaker(
+    speaker: &RoomSpeaker,
+    mut line: Value,
+    send: impl Fn(&Value) -> Option<Value>,
+) -> Option<Value> {
+    let answer = send(&line);
+    let refused = answer
+        .as_ref()
+        .is_some_and(|answer| answer["ok"] == false && answer["error"] == "bad_request");
+    if !refused || line.as_object_mut()?.remove("speaker").is_none() {
+        return answer;
+    }
+    let again = send(&line);
+    if again.as_ref().is_some_and(|again| again["ok"] == true)
+        && !speaker.refused.swap(true, Ordering::AcqRel)
+    {
+        eprintln!("lamp-voice provider: {ROOM_SPEAKER_KEPT_WITHOUT}");
+    }
+    again
+}
+
+/// The journal's line for `forget_said`'s answer after a person's forget
+/// everything (#2849): counts only, never a line.
+fn forget_said_told(answer: Option<&Value>) -> String {
+    match answer {
+        Some(answer) if answer["ok"] == true => format!(
+            "forget everything also removed {} of the room's lines they were seen saying",
+            answer["removed"].as_u64().unwrap_or(0)
+        ),
+        Some(answer) if answer["error"] == "unknown_op" => {
+            "forget everything: an older memory has no forget_said; the room's lines they said are kept".to_owned()
+        }
+        _ => "forget everything: the room's lines they said could not be removed now".to_owned(),
+    }
+}
+
 /// The most days a recall's span names, both ends counted: the memory's
 /// own bound (#2176).
 const SPAN_DAYS: u64 = 14;
@@ -2176,6 +2292,13 @@ pub fn start(socket: PathBuf, known: Option<PathBuf>) {
     );
     switch_replaces(days && std::env::var(REPLACES_ENVIRONMENT).ok().as_deref() == Some("on"));
     switch_link_used(days && std::env::var(LINK_USED_ENVIRONMENT).ok().as_deref() == Some("on"));
+    // Who said a room line (#2849): only from the face seen saying it.
+    if switch_room_speaker(
+        days && std::env::var(ROOM_SPEAKER_ENVIRONMENT).ok().as_deref() == Some("on"),
+    ) && !crate::speaking_faces::eyes_from_environment()
+    {
+        eprintln!("lamp-voice provider: {ROOM_SPEAKER_NO_EYES}");
+    }
     if days {
         DAYS.get_or_init(|| {
             // The optional thread file contains no source IDs. A new Days
@@ -3440,6 +3563,8 @@ struct HandOns {
     /// Answers whose hand-on is held ([`hold`]), with what each turn's end
     /// knew, newest last.
     held: Mutex<VecDeque<Held>>,
+    /// Whether the room's lines go with who said them (#2849).
+    room_speaker: RoomSpeaker,
 }
 
 /// At most this many answers held at once.
@@ -4709,6 +4834,10 @@ impl DaysClient {
         let current = Arc::new(Mutex::new(Current::default()));
         let writing = Arc::clone(&current);
         let hand_ons = Arc::new(HandOns::default());
+        hand_ons
+            .room_speaker
+            .on
+            .store(room_speaker_on(), Ordering::Release);
         let handing = Arc::clone(&hand_ons);
         let context = Arc::new(Mutex::new(DaysContext::default()));
         let (words, follows) = (crate::early_words::on(), crate::follows_face::on());
@@ -5492,6 +5621,13 @@ impl DaysClient {
             request["replaces"] = json!(old);
             request["shown"] = json!(context.shown(person));
         }
+        // A room's kept thing, with who was seen saying the line that asked
+        // for it (#2849): their words, so their forget everything takes it.
+        if call.name == REMEMBER
+            && let Some(speaker) = self.hand_ons.room_speaker.of(person, asked_in)
+        {
+            request["speaker"] = json!(speaker);
+        }
         let request_text = request["text"].as_str().map(str::to_owned);
         let writes = matches!(call.name.as_str(), REMEMBER | FORGET | FORGET_EVERYTHING);
         if writes {
@@ -5542,11 +5678,19 @@ impl DaysClient {
                         .min(FORGET_SETTLE),
                 );
             }
-            let Some(left) = deadline.checked_sub(started.elapsed()) else {
+            if deadline.checked_sub(started.elapsed()).is_none() {
                 return settled((gone(), false));
-            };
-            let answer =
-                bounded_exchange_scoped(&self.socket, &for_person(request, person), left, lease);
+            }
+            // In what is left of the call's time, a resend without a
+            // speaker too ([`send_with_speaker`]).
+            let answer = send_with_speaker(
+                &self.hand_ons.room_speaker,
+                for_person(request, person),
+                |line| {
+                    let left = deadline.checked_sub(started.elapsed())?;
+                    bounded_exchange_scoped(&self.socket, line, left, lease)
+                },
+            );
             let Some(answer) = answer else {
                 return lost((gone(), false));
             };
@@ -5593,6 +5737,20 @@ impl DaysClient {
                     }
                     return lost((gone(), false));
                 }
+            }
+            // And the room's lines they were seen saying (#2849), once their
+            // own are gone: removed, or kept by an older memory, journalled
+            // with counts only. What they are told is as before either way.
+            if call.name == FORGET_EVERYTHING
+                && answer["ok"] == true
+                && let Some(speaker) = person
+                && self.hand_ons.room_speaker.on.load(Ordering::Acquire)
+            {
+                let said = json!({"op":"forget_said","speaker":speaker});
+                let answer = deadline
+                    .checked_sub(started.elapsed())
+                    .and_then(|left| bounded_exchange_scoped(&self.socket, &said, left, lease));
+                eprintln!("lamp-voice provider: {}", forget_said_told(answer.as_ref()));
             }
             // And the household's yes to music and laughter, and to how a
             // face seems: "a forget or the reset wipes it" (the lead on
@@ -7642,17 +7800,20 @@ fn days_writer(
                     conversation.began = began_at(at_unix_ms);
                 }
                 conversation.finished = Some(finished);
-                let answer = bounded_exchange(
-                    socket,
-                    &for_person(
-                        linked(
-                            json!({"op":"append_linked","at_unix_ms":at_unix_ms,"heard":heard,"said":said,"source_ids":sources}),
-                            rules,
-                        ),
-                        person.as_deref(),
+                let mut line = for_person(
+                    linked(
+                        json!({"op":"append_linked","at_unix_ms":at_unix_ms,"heard":heard,"said":said,"source_ids":sources}),
+                        rules,
                     ),
-                    WRITER_DEADLINE,
+                    person.as_deref(),
                 );
+                // Who said a room line, seen (#2849).
+                if let Some(speaker) = hand_ons.room_speaker.of(person.as_deref(), Some(request)) {
+                    line["speaker"] = json!(speaker);
+                }
+                let answer = send_with_speaker(&hand_ons.room_speaker, line, |line| {
+                    bounded_exchange(socket, line, WRITER_DEADLINE)
+                });
                 conversation.person = person;
                 let id = answer
                     .filter(|answer| answer["ok"] == true)
@@ -17664,6 +17825,352 @@ mod tests {
                 "{forget_all} {forget_about}: {}",
                 forget.description
             );
+        }
+    }
+
+    /// #2849: who said a room line, as the eyes read it when it was heard.
+    mod room_speaker {
+        use super::*;
+        use crate::speaking_faces::{LineSeen, saw_line};
+
+        const NOW: u64 = 1_792_000_000_000;
+
+        fn mai() -> String {
+            crate::known_faces::memory_person("Mai")
+        }
+
+        /// A memory that answers up to `requests` request lines, each with
+        /// what `answer` makes of it, and gives back those it read, waiting
+        /// at most [`WITHIN`] in all: a request that never comes fails the
+        /// test's count, never hangs it.
+        fn memory(
+            name: &str,
+            requests: usize,
+            answer: fn(&Value) -> Value,
+        ) -> (PathBuf, std::thread::JoinHandle<Vec<Value>>) {
+            const WITHIN: Duration = Duration::from_secs(5);
+            let socket = std::env::temp_dir()
+                .join(format!("lamp-remember-{name}-{}.sock", std::process::id()));
+            let _ = std::fs::remove_file(&socket);
+            let listener = UnixListener::bind(&socket).unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let served = std::thread::spawn(move || {
+                let until = Instant::now() + WITHIN;
+                let mut read = Vec::new();
+                while read.len() < requests && Instant::now() < until {
+                    let mut stream = match listener.accept() {
+                        Ok((stream, _)) => stream,
+                        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                            std::thread::sleep(Duration::from_millis(5));
+                            continue;
+                        }
+                        Err(error) => panic!("{error}"),
+                    };
+                    stream.set_nonblocking(false).unwrap();
+                    stream
+                        .set_read_timeout(Some(
+                            until
+                                .saturating_duration_since(Instant::now())
+                                .max(Duration::from_millis(1)),
+                        ))
+                        .unwrap();
+                    let mut line = String::new();
+                    if BufReader::new(stream.try_clone().unwrap())
+                        .read_line(&mut line)
+                        .is_err()
+                    {
+                        break;
+                    }
+                    let request: Value = serde_json::from_str(&line).unwrap();
+                    stream
+                        .write_all(format!("{}\n", answer(&request)).as_bytes())
+                        .unwrap();
+                    read.push(request);
+                }
+                read
+            });
+            (socket, served)
+        }
+
+        fn seen(request: u64, speakers: &[&str], known: Option<(&str, &str)>) -> LineSeen {
+            LineSeen {
+                request,
+                speakers: speakers.iter().map(|id| (*id).to_owned()).collect(),
+                known: known.map(|(name, face)| (name.to_owned(), face.to_owned())),
+            }
+        }
+
+        /// The speaker is the one known person whose own face, and no
+        /// other, was seen saying the line. Their face merely in view (no
+        /// face read speaking), two faces speaking, another face, no known
+        /// person, or no reading at all is nobody: voice alone never names.
+        #[test]
+        fn the_speaker_is_only_one_known_face_seen_saying_the_line() {
+            let mai_face = Some(("Mai", "b1/f1"));
+            assert_eq!(
+                speaker_of(Some(&seen(1, &["b1/f1"], mai_face))),
+                Some(mai())
+            );
+            for (line, why) in [
+                (seen(1, &[], mai_face), "her face in view, not speaking"),
+                (seen(1, &["b1/f1", "b1/f2"], mai_face), "two faces"),
+                (seen(1, &["b1/f2"], mai_face), "another face"),
+                (seen(1, &["b0/f1"], mai_face), "her id from an older boot"),
+                (seen(1, &["b1/f1"], None), "no known person"),
+            ] {
+                assert_eq!(speaker_of(Some(&line)), None, "{why}");
+            }
+            assert_eq!(speaker_of(None), None, "not read");
+            // A person's own line, the switch off, or no request: none.
+            let request = 2_849_000;
+            saw_line(seen(request, &["b1/f1"], mai_face));
+            let speaker = RoomSpeaker::default();
+            assert_eq!(speaker.of(None, Some(request)), None, "off");
+            speaker.on.store(true, Ordering::Release);
+            assert_eq!(speaker.of(None, Some(request)), Some(mai()));
+            assert_eq!(speaker.of(Some(&mai()), Some(request)), None, "theirs");
+            assert_eq!(speaker.of(None, None), None);
+            assert_eq!(speaker.of(None, Some(0)), None);
+            speaker.refused.store(true, Ordering::Release);
+            assert_eq!(speaker.of(None, Some(request)), None, "refused");
+        }
+
+        fn speaking_client(socket: &Path, on: bool) -> DaysClient {
+            let client = DaysClient::with_idle(socket.to_owned(), Duration::from_secs(60)).unwrap();
+            client.hand_ons.room_speaker.on.store(on, Ordering::Release);
+            client
+        }
+
+        fn room_lines(client: &DaysClient, first: u64) {
+            let mai_face = Some(("Mai", "b1/f1"));
+            saw_line(seen(first, &["b1/f1"], mai_face));
+            saw_line(seen(first + 1, &["b1/f1", "b1/f2"], mai_face));
+            saw_line(seen(first + 2, &[], mai_face));
+            for request in first..first + 4 {
+                assert!(client.finished_exchange_of(
+                    request,
+                    NOW,
+                    "The plants need water",
+                    "Noted",
+                    None
+                ));
+            }
+        }
+
+        /// With the switch, a room line seen said by one known face is
+        /// written with their id; two faces, a face only in view, or a line
+        /// never read, without. Off, no line has one.
+        #[test]
+        fn with_the_switch_a_room_line_seen_said_by_one_known_face_carries_their_id() {
+            for on in [true, false] {
+                let (socket, served) =
+                    memory(&format!("speaker-{on}"), 4, |_| json!({"ok":true,"id":7}));
+                let client = speaking_client(&socket, on);
+                room_lines(&client, 2_849_010 + u64::from(on) * 10);
+                let read = served.join().unwrap();
+                assert_eq!(read.len(), 4, "{read:?}");
+                let speakers: Vec<Option<&str>> = read
+                    .iter()
+                    .map(|line| {
+                        assert_eq!(line["op"], "append_linked", "{line}");
+                        line.get("speaker").and_then(Value::as_str)
+                    })
+                    .collect();
+                let mai = mai();
+                let expected = if on {
+                    vec![Some(mai.as_str()), None, None, None]
+                } else {
+                    vec![None; 4]
+                };
+                assert_eq!(speakers, expected, "on {on}");
+                drop(client);
+                std::fs::remove_file(&socket).unwrap();
+            }
+        }
+
+        /// An older memory refuses a line carrying `speaker` (its requests
+        /// are strict): the line is sent again once without it and kept, and
+        /// no speaker is sent for the rest of the run. A memory that refuses
+        /// the line for another reason refuses it without the speaker too:
+        /// that is no older memory, and the next line still has its speaker.
+        #[test]
+        fn an_older_memory_keeps_the_room_line_without_its_speaker() {
+            let (socket, served) = memory("speaker-older", 3, |request| {
+                if request.get("speaker").is_some() {
+                    json!({"ok":false,"error":"bad_request","message":"invalid fields for this operation"})
+                } else {
+                    json!({"ok":true,"id":7})
+                }
+            });
+            let client = speaking_client(&socket, true);
+            let mai_face = Some(("Mai", "b1/f1"));
+            for request in [2_849_100, 2_849_101] {
+                saw_line(seen(request, &["b1/f1"], mai_face));
+                assert!(client.finished_exchange_of(request, NOW, "Plants", "Noted", None));
+            }
+            let read = served.join().unwrap();
+            assert_eq!(read.len(), 3, "{read:?}");
+            assert_eq!(read[0]["speaker"], json!(mai()), "{read:?}");
+            let mut without = read[0].clone();
+            without.as_object_mut().unwrap().remove("speaker");
+            assert_eq!(read[1], without, "sent again, once, without it");
+            assert!(read[2].get("speaker").is_none(), "{read:?}");
+            assert!(client.hand_ons.room_speaker.refused.load(Ordering::Acquire));
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+
+            let (socket, served) = memory(
+                "speaker-refused",
+                4,
+                |_| json!({"ok":false,"error":"bad_request","message":"a source ID does not exist for this person"}),
+            );
+            let client = speaking_client(&socket, true);
+            for request in [2_849_110, 2_849_111] {
+                saw_line(seen(request, &["b1/f1"], mai_face));
+                assert!(client.finished_exchange_of(request, NOW, "Plants", "Noted", None));
+            }
+            let read = served.join().unwrap();
+            assert_eq!(read.len(), 4, "{read:?}");
+            let carried: Vec<bool> = read
+                .iter()
+                .map(|line| line.get("speaker").is_some())
+                .collect();
+            assert_eq!(carried, [true, false, true, false]);
+            assert!(!client.hand_ons.room_speaker.refused.load(Ordering::Acquire));
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+        }
+
+        /// A room `remember` asked for in a line seen said by one known face
+        /// carries their id: their words. What the model is told never has
+        /// it. An older memory keeps it without, as a line is.
+        #[test]
+        fn a_rooms_remember_carries_who_was_seen_asking_and_is_told_without_it() {
+            let remember = call(REMEMBER, json!({"text":"The plants need water"}));
+            let mai_face = Some(("Mai", "b1/f1"));
+            let (socket, served) = memory("speaker-remember", 1, |_| json!({"ok":true,"id":3}));
+            let client = speaking_client(&socket, true);
+            saw_line(seen(2_849_200, &["b1/f1"], mai_face));
+            let (told, answered) =
+                client.run_in(&remember, Duration::from_secs(2), None, 2_849_200);
+            assert!(answered, "{told}");
+            assert_eq!(told["remembered"], true, "{told}");
+            assert!(!told.to_string().contains(&mai()), "{told}");
+            assert!(!told.to_string().contains("speaker"), "{told}");
+            let read = served.join().unwrap();
+            assert_eq!(read.len(), 1, "{read:?}");
+            assert_eq!(read[0]["op"], "remember");
+            assert_eq!(read[0]["speaker"], json!(mai()));
+            assert!(read[0].get("person").is_none());
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+
+            let (socket, served) = memory("speaker-remember-older", 3, |request| {
+                if request.get("speaker").is_some() {
+                    json!({"ok":false,"error":"bad_request","message":"invalid fields for this operation"})
+                } else {
+                    json!({"ok":true,"id":3})
+                }
+            });
+            let client = speaking_client(&socket, true);
+            for request in [2_849_210, 2_849_211] {
+                saw_line(seen(request, &["b1/f1"], mai_face));
+                let (told, _) = client.run_in(&remember, Duration::from_secs(2), None, request);
+                assert_eq!(told["remembered"], true, "{told}");
+            }
+            let read = served.join().unwrap();
+            assert_eq!(read.len(), 3, "{read:?}");
+            let carried: Vec<bool> = read
+                .iter()
+                .map(|line| line.get("speaker").is_some())
+                .collect();
+            assert_eq!(carried, [true, false, false]);
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+        }
+
+        /// A known person's forget everything, answered `ok`, also sends
+        /// `forget_said` with their id; what they are told is as without
+        /// the switch, whether the memory removed the room's lines or, an
+        /// older one, answered `unknown_op` (nothing more removed). Off, or
+        /// with their own forget refused, it is not sent.
+        #[test]
+        fn a_known_persons_forget_everything_also_forgets_what_they_said_in_the_room() {
+            const MINH: &str = "p-be9688998f085098";
+            let forget = |socket: &Path, on: bool| {
+                let client = speaking_client(socket, on);
+                client.forget_all.store(true, Ordering::Release);
+                let (told, answered) = client.run_at(
+                    &call(FORGET_EVERYTHING, json!({})),
+                    Duration::from_secs(2),
+                    NOW,
+                    None,
+                    Some(MINH),
+                );
+                (told, answered)
+            };
+            let (socket, served) =
+                memory("speaker-forget-off", 1, |_| json!({"ok":true,"removed":3}));
+            let (off, answered) = forget(&socket, false);
+            assert!(answered);
+            assert_eq!(
+                served.join().unwrap(),
+                [json!({"op":"forget_all","person":MINH})]
+            );
+            std::fs::remove_file(&socket).unwrap();
+            assert_eq!(off["forgotten"], true, "{off}");
+            for (name, said) in [
+                ("speaker-forget-newer", json!({"ok":true,"removed":2})),
+                (
+                    "speaker-forget-older",
+                    json!({"ok":false,"error":"unknown_op","message":"the memory operation is unknown"}),
+                ),
+            ] {
+                let (socket, served) = if said["ok"] == true {
+                    memory(name, 2, |request| match request["op"].as_str() {
+                        Some("forget_all") => json!({"ok":true,"removed":3}),
+                        _ => json!({"ok":true,"removed":2}),
+                    })
+                } else {
+                    memory(name, 2, |request| match request["op"].as_str() {
+                        Some("forget_all") => json!({"ok":true,"removed":3}),
+                        _ => {
+                            json!({"ok":false,"error":"unknown_op","message":"the memory operation is unknown"})
+                        }
+                    })
+                };
+                let (told, answered) = forget(&socket, true);
+                assert!(answered, "{name}");
+                assert_eq!(told, off, "{name}");
+                assert_eq!(
+                    served.join().unwrap(),
+                    [
+                        json!({"op":"forget_all","person":MINH}),
+                        json!({"op":"forget_said","speaker":MINH})
+                    ],
+                    "{name}"
+                );
+                std::fs::remove_file(&socket).unwrap();
+            }
+            // Their own forget refused: nothing more is sent.
+            let (socket, served) = memory(
+                "speaker-forget-refused",
+                1,
+                |_| json!({"ok":false,"error":"storage","message":"x"}),
+            );
+            forget(&socket, true);
+            assert_eq!(served.join().unwrap().len(), 1);
+            std::fs::remove_file(&socket).unwrap();
+            // The journal's lines are counts only.
+            assert_eq!(
+                forget_said_told(Some(&json!({"ok":true,"removed":2}))),
+                "forget everything also removed 2 of the room's lines they were seen saying"
+            );
+            assert!(
+                forget_said_told(Some(&json!({"ok":false,"error":"unknown_op"})))
+                    .contains("older memory")
+            );
+            assert!(forget_said_told(None).contains("could not be removed"));
         }
     }
 }
