@@ -928,7 +928,20 @@ once that backchannels aren't held, and nothing changes. On lamp-52e6 on 22 Octo
   lamp's words stamped by when they play): "Yes." to "Shall I go on?" is
   an answer and commits, as today. The resume wait (400 ms of stillness) then resumes the
   answer, and the candidate is suppressed, so no turn starts. A backchannel
-  commits only if its speech reaches 700 ms, a sentence.
+  commits only if its speech reaches 700 ms, a sentence, or if speech goes
+  on after its words were asked for: those words were asked for at a pause
+  and heard nothing said after it, however late they came, so that speech
+  commits on the ordinary 60 ms rule. The pause is the listener's own first
+  ask in the yield, told to the duplex rule: with `heard` its tenth still
+  block, with `heard-always` also the detector's 200 ms pause, which can
+  come while the lamp's sound is still dying away, before the rule counts
+  a still block (reviewer-two on #3295)
+  (lamp-52e6 at 03:08 on 24 October: a played "Stop, stop." 1.79 s into a
+  story; its first word, under the lamp's voice, came as "yeah", and its
+  second, some 250 ms in the clear after those words came, was held as
+  that backchannel until the yield's deadline resumed the story). A
+  backchannel whose words come after its speech, as a spoken "Yeah." does,
+  is still held.
 - **Anything else commits at once.** Empty words are no words (below), on
   both modes: on lamp-52e6 on 23 October "a yield's words came: 0 words"
   committed a turn; the journal now says "held as a yield with no words".
@@ -965,9 +978,17 @@ once that backchannels aren't held, and nothing changes. On lamp-52e6 on 22 Octo
   before the yield's mark reached it decides nothing; on Flux only an
   `EndOfTurn` is final; a result with no account of its finality decides
   nothing. Each errs toward no decision, so the yield then resumes at the
-  bound, as with no words (reviewer-two on #3200; lamp-52e6 on #3200). A stop
-  phrase among them is told as no stop: it stops the lamp as a hand Stop
-  does, as without the switch. A face turned to the lamp plays no part:
+  bound, as with no words (reviewer-two on #3200; lamp-52e6 on #3200). The
+  hold reads stop words itself: a stop phrase among them ("Stop, stop.",
+  "Okay, stop.", "Lamp, stop.") is told as a stop and commits the yield at
+  its words, as with `heard`, whether or not the stop also stops the lamp
+  as a hand Stop does. It is read as a stop over the lamp is: words the lamp
+  has just said itself ("the fox had to wait") are no stop, and with the
+  stop hold they are told when the hold decides, as no stop if the lamp's
+  own text then holds them, as a stop at most 150 ms on (reviewer-two on
+  #3295); before #2939's 24 October fix it was told as no stop, and
+  a stop that ended over the lamp, with no plain word or speech in the
+  clear after it, resumed the answer. A face turned to the lamp plays no part:
   the duplex rule decides the hold, and "its answer is played: someone is
   turned to the lamp" is the busy-room rule's verdict on a turn already
   committed.
