@@ -6929,6 +6929,7 @@ pub(crate) mod tests {
     /// sent.
     #[test]
     fn the_live_worker_sends_a_sign_ins_words_as_one_line_and_scrubs_the_persons() {
+        let _thread = one_thread();
         let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -7317,6 +7318,7 @@ pub(crate) mod tests {
     /// opens. The next line's Start ends it, and that line is kept.
     #[test]
     fn the_sentence_after_count_only_never_reaches_the_live_thread() {
+        let _one = one_thread();
         let kept = std::mem::take(&mut *crate::thread::THREAD.lock().unwrap());
         let mut owner = controller();
         let mut handoff = InputHandoff::default();

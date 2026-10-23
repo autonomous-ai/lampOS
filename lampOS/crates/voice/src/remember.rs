@@ -12108,6 +12108,7 @@ mod tests {
     #[test]
     fn the_light_rule_is_kept_and_forgotten_in_the_rooms_scope() {
         use crate::rules::{FORGET_RULE, KEEP_RULE};
+        let _one = crate::provider_worker::tests::one_thread();
         let call = |name: &str, args: Value| ToolCall {
             id: "c1".into(),
             name: name.into(),
