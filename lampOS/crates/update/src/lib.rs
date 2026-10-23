@@ -13,6 +13,7 @@
 pub mod apply;
 pub mod check_units;
 pub mod fetch;
+mod head_touch;
 pub mod image;
 pub mod install;
 pub mod judge;

@@ -1,0 +1,21 @@
+{
+  "head": "c062243b6da9b5dad14551d176ef79d81483758e",
+  "run": "https://github.com/autonomous-ai/lampOS/actions/runs/39952201001",
+  "conclusion": "success",
+  "nextest_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T12:38:16.5711144Z      Summary [ 200.075s] 11025 tests run: 11025 passed (1 leaky), 68 skipped",
+  "nextest": {
+    "passed": 11025,
+    "failed": 0,
+    "skipped": 68,
+    "passing_leaky": 1
+  },
+  "doctests": {
+    "passed": 4,
+    "failed": 0
+  },
+  "process_harnesses": {
+    "passed": 12,
+    "failed": 0
+  },
+  "limitation": "Original held head only; the two review regressions were not part of this run. Does not qualify the correction."
+}

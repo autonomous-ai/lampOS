@@ -1,0 +1,23 @@
+{
+  "tested_source_commit": "2a16663117be5df6da5fbbbf1ce584bfb2e6ea2b",
+  "integration_base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+  "git_blobs": {
+    "lampOS/crates/update/src/head_touch.rs": "6b03616f6ecec221b7f61d876fc438ed777e862c",
+    "lampOS/crates/update/src/round.rs": "5ab7a4a9ab017062a3c437f5e91219086edc3eac",
+    "lampOS/crates/update/src/apply.rs": "2c6ed3d65cc44498839c0bdee26ff2c8f4708d5b",
+    "lampOS/crates/update/tests/round/head_touch.rs": "2221b31cc421b8477db1bc891d481c85143729a3"
+  },
+  "platform": "Darwin ARM64",
+  "rust": "1.96.0",
+  "update": {
+    "passed": 371,
+    "failed": 0,
+    "ignored": 4,
+    "round": 151,
+    "head_touch": 28
+  },
+  "fmt": "pass",
+  "linux_source_only_fmt": "pass",
+  "strict_clippy": "pass",
+  "official_native": "pending corrected head"
+}
