@@ -21,6 +21,9 @@ LINES = HERE + '/desk-kit-2/lines.tsv'
 KIT = os.environ.get('NIGHT_KIT_TAR', 'desk-kit-2')
 KIT_SHA256 = os.environ.get('NIGHT_KIT_SHA256', '60128bcda66193ba118a2b442ff42c24c9b6e9e39f7818ce219e200190711729')
 WAV = os.environ.get('NIGHT_WAV') or f'{OUT}/{KIT}/wav'
+# This run's name on the lamp: its bus taps subscribe under it and its events tail runs as it, so stop_on_lamp() ends
+# exactly this run's (a tap on a quiet topic would otherwise live until its next write fails, hours later).
+TAG = f'night{os.getpid()}'   # the bus's rule for a name: [a-z][a-z0-9_]{0,31}
 
 # Each scene: (line id, when). The first step of a scene waits for a quiet lamp. Timers and reminders are left out: they
 # would sound later in the night.
@@ -80,9 +83,9 @@ class Events:
     """The newest session's events, followed live over one ssh."""
     def __init__(self):
         cmd = ('S=$(sudo -n ls -t /var/lib/lampOS/voice/sessions | head -1); '
-               'exec sudo -n tail -n 0 -q -F /var/lib/lampOS/voice/sessions/$S/metadata/events-0.jsonl '
+               f'exec sudo -n bash -c "exec -a {TAG}_events tail -n 0 -q -F /var/lib/lampOS/voice/sessions/$S/metadata/events-0.jsonl '
                '/var/lib/lampOS/voice/sessions/$S/metadata/events-1.jsonl /var/lib/lampOS/voice/sessions/$S/metadata/events-2.jsonl '
-               '/var/lib/lampOS/voice/sessions/$S/metadata/events-3.jsonl 2>/dev/null')
+               '/var/lib/lampOS/voice/sessions/$S/metadata/events-3.jsonl" 2>/dev/null')
         self.p = subprocess.Popen(SSH + [cmd], stdout=subprocess.PIPE, stdin=subprocess.DEVNULL, text=True, bufsize=1)
         os.set_blocking(self.p.stdout.fileno(), False)
         self.rows, self.buf = [], ''
@@ -139,7 +142,7 @@ class Events:
 class Names:
     """lamp-name's hearings off the bus (name/heard, name/rising, name/near when it exists), each with the Mac time it came."""
     def __init__(self):
-        cmd = ('for t in name/heard name/rising name/near; do /usr/local/bin/lamp-bus tap $t --name night_names --seconds 36000 '
+        cmd = ('for t in name/heard name/rising name/near; do /usr/local/bin/lamp-bus tap $t --name ' + TAG + '_names --seconds 36000 '
                '| sed -u "s|^|$t |" & done; wait')
         self.p = subprocess.Popen(SSH + [cmd], stdout=subprocess.PIPE, stdin=subprocess.DEVNULL, text=True, bufsize=1)
         os.set_blocking(self.p.stdout.fileno(), False)
@@ -171,7 +174,7 @@ class Names:
 class Heard:
     """What the voice heard, off the bus (voice/heard: the model's transcript with its request), followed live."""
     def __init__(self):
-        self.p = subprocess.Popen(SSH + ['exec /usr/local/bin/lamp-bus tap voice/heard --name night_heard --seconds 36000'],
+        self.p = subprocess.Popen(SSH + [f'exec /usr/local/bin/lamp-bus tap voice/heard --name {TAG}_heard --seconds 36000'],
                                   stdout=subprocess.PIPE, stdin=subprocess.DEVNULL, text=True, bufsize=1)
         os.set_blocking(self.p.stdout.fileno(), False)
         self.by, self.buf = {}, ''
@@ -193,6 +196,11 @@ class Heard:
                     self.by[int(r['request'])] = r['text']   # the bus never marks a piece last: keep the newest
 
     def close(self): self.p.kill()
+
+
+def stop_on_lamp():
+    """Ends this run's taps and events tail on the lamp; the bracket keeps pkill from matching its own command line."""
+    lamp(f"pkill -f '[{TAG[0]}]{TAG[1:]}_names'; pkill -f '[{TAG[0]}]{TAG[1:]}_heard'; sudo -n pkill -f '[{TAG[0]}]{TAG[1:]}_events'; true")
 
 
 def play(id_):
@@ -308,7 +316,7 @@ def main():
             run_scene(n, SCENES[n], ev, played); hb.pump(); nm.pump()
         time.sleep(3); ev.pump(); hb.pump(); nm.pump()
     finally:
-        ev.close(); hb.close(); nm.close()
+        ev.close(); hb.close(); nm.close(); stop_on_lamp()
     J = journal(began, time.time())
     rows = score(played, ev, J, L, hb.by)
     # lamp-name's best score per topic within 3.5 s of the clip's start (its hearings land 1.45–1.90 s in).
