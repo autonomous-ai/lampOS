@@ -936,7 +936,8 @@ light = { dim = 1 }
         format!("Here it is.\n\n```skill.toml\n{toml}```\n\n```markdown SKILL.md\n{card}```\n")
     }
 
-    /// The brief and the longest request fit the tasks part's 1,000 bytes;
+    /// The brief and the longest request fit in 1,000 bytes, half the tasks
+    /// part's 2,000, so a repair has room for the check's lines;
     /// it carries the request and nothing else of the conversation, and a
     /// longer request is refused, never cut.
     #[test]

@@ -268,8 +268,10 @@ Devin since #1854, see "Devin" below; Devin Cloud, see "Devin Cloud"). A
 project is an explicit name
 (at most 128 UTF-8 bytes) or an absolute/`~/` folder (at most 512 bytes).
 Leading option/target syntax, ambiguous relative folders, control characters
-and whitespace around a project are refused. Text is at most 1,000 UTF-8
-bytes, nonempty, without NUL and not beginning with `--`, which the inspected
+and whitespace around a project are refused. Text is at most 2,000 UTF-8
+bytes (1,000 until #2813's made-skill repair needed room for a brief, the
+request and the check's lines; Harness 0.4.57 took a 1,999-character
+`--task` on a Linux laptop on 23 Oct), nonempty, without NUL and not beginning with `--`, which the inspected
 CLI parser treats as another option. The confirmed text is never rewritten.
 
 A name's folder is made by Harness on its first `new` (`~/harnesses/<name>`),
@@ -514,7 +516,7 @@ started once its answer is told:
 |---|---|
 | Retained tasks | 16. When full, the oldest task that is over (never sent, expired, cancelled, or its agent finished, stopped or failed) gives way to the new one; only when all 16 are still going (waiting for a yes, being handed over, working, or asking the person) is preparation refused. Until 2026-10-15 a full store refused every new task for good: lamp-4ace stopped handing work over at its sixteenth |
 | Observations | 4 distinct records per task; no silent eviction of delivery evidence |
-| Text | Task and selected speech: 1,000 bytes each; observed ask: 4 KiB; answer: 16 KiB |
+| Text | Task: 2,000 bytes; selected speech: 1,000 bytes; observed ask: 4 KiB; answer: 16 KiB |
 | Local transport | 8 KiB request; 128 KiB response, enough for escaped bounded observation text |
 | Clients | 4 workers, 4 queued sockets, 16 queued owner requests |
 | Client deadlines | 300 ms complete request, 1,100 ms owner receipt, 1,200 ms total server service |
@@ -1882,7 +1884,7 @@ The worker's `--tasks-make-skill`, after `--tasks-needs`, gives the model
 - **The prepare.** It goes as `start_agent_task`'s does: `prepare`, then
   `confirm_agent_task` on the person's yes, within 120 s, as the same
   pending work. Its `text` is the brief and the request (at most 180 bytes)
-  within the tasks part's 1,000 bytes. The brief begins "Write one lamp
+  within 1,000 bytes, half the tasks part's 2,000. The brief begins "Write one lamp
   skill (lampOS lamp-skills)", which is how the voice knows the task again.
 - **The model's answer.** It is told `"skill": <the request>`, never the
   brief, and `next` asks it to say the request back.

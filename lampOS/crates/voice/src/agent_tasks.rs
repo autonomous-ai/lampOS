@@ -165,8 +165,10 @@ pub const CHECK: &str = "check_agent_task";
 pub const WHO: &str = "who";
 /// A yes counts this long after the task was prepared.
 pub const CONFIRM_WITHIN: Duration = Duration::from_secs(120);
-/// The longest task text the tasks part takes.
-const MOST_TASK_BYTES: usize = 1_000;
+/// The longest task text the tasks part takes (lamp-tasks'
+/// `MAX_PROMPT_BYTES`, 2,000 since #2813: a made skill's repair carries its
+/// brief, the request and the check's lines).
+pub(crate) const MOST_TASK_BYTES: usize = 2_000;
 /// The longest the first read of the staff holds up the provider worker's
 /// start, as for the memory's: the tasks part answered a request on
 /// lamp-4ace in 35 ms (`docs/tasks.md`), and a socket nobody serves fails
@@ -2393,6 +2395,38 @@ pub(crate) mod tests {
         os::unix::net::UnixListener,
         sync::mpsc,
     };
+
+    /// The voice hands over up to the tasks part's own bound, 2,000 bytes,
+    /// and refuses past it before asking anything (#2813).
+    #[test]
+    fn a_task_is_handed_over_up_to_two_thousand_bytes() {
+        let nowhere = Path::new("/nonexistent/lamp-tasks");
+        let over = "é".repeat(MOST_TASK_BYTES / 2) + "x";
+        assert_eq!(
+            hand_over(
+                nowhere,
+                "office",
+                false,
+                &over,
+                "t",
+                Duration::from_millis(50)
+            ),
+            Err("it was too long to hand over")
+        );
+        // At the bound it is asked of the tasks part, here not there.
+        let at = "é".repeat(MOST_TASK_BYTES / 2);
+        assert_eq!(
+            hand_over(
+                nowhere,
+                "office",
+                false,
+                &at,
+                "t",
+                Duration::from_millis(50)
+            ),
+            Err("the computer couldn't be reached")
+        );
+    }
 
     /// #811, with the reviewer's P2: a lamp whose tasks part needs a file
     /// that is not there (no Harness) tells the model in light words that
