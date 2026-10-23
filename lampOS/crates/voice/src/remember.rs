@@ -5068,7 +5068,7 @@ impl DaysClient {
                 }
             }
             // The room's kept things and observations that name them, such
-            // as "Mai's dentist is Friday" said with nobody known (#2849's
+            // as "Linh's dentist is Friday" said with nobody known (#2849's
             // find, seen again in #1693's c0a4 run): only with their own
             // forgotten and their name known, never the room's other lines.
             // Their own memory is already gone, so a failure here is only
@@ -5083,6 +5083,14 @@ impl DaysClient {
                     .checked_sub(started.elapsed())
                     .and_then(|left| bounded_exchange_scoped(&self.socket, &naming, left, lease))
                 {
+                    // A name that is also a common word: the store searched
+                    // nothing (reviewer-three's P1 and Eighth's P2 on #3143,
+                    // the first builder's decision 06:34).
+                    Some(answer) if answer["ok"] == true && answer["skipped"] == "common_word" => {
+                        eprintln!(
+                            "lamp-voice provider: forget everything: the room's lines naming them not searched (the name is a common word)"
+                        )
+                    }
                     Some(answer) if answer["ok"] == true => eprintln!(
                         "lamp-voice provider: forget everything: the room's lines naming them, {} removed",
                         answer["removed"].as_u64().unwrap_or(0)
@@ -7883,7 +7891,7 @@ mod tests {
     fn forgetting_everything_also_takes_the_rooms_lines_naming_them() {
         let known =
             std::env::temp_dir().join(format!("lamp-remember-naming-known-{}", std::process::id()));
-        std::fs::write(&known, "Mai\n").unwrap();
+        std::fs::write(&known, "Linh\n").unwrap();
         // Each mock waits this long for one request more than the call
         // should make: a missing request, or an extra one, fails the
         // assertion instead of hanging the test.
@@ -7929,7 +7937,7 @@ mod tests {
             served.join().unwrap(),
             [
                 json!({"op":"forget_all","person":mai}),
-                json!({"op":"forget_naming","name":"Mai"})
+                json!({"op":"forget_naming","name":"Linh"})
             ]
         );
         drop(client);

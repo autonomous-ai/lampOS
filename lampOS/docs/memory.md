@@ -343,7 +343,7 @@ order; it does not return observations. New operations are:
 {"op":"append_linked","at_unix_ms":1791892800000,"heard":"My coffee?","said":"Black.","source_ids":[2]}
 {"op":"append_linked","person":"p-be9688998f085098","at_unix_ms":1791892800000,"heard":"Who am I?","said":"Minh.","source_ids":[],"rule_ids":[1]}
 {"op":"forget","id":2}
-{"op":"forget_naming","name":"Mai"}
+{"op":"forget_naming","name":"Linh"}
 {"op":"session_open","session":"voice_1","max_bytes":1200}
 {"op":"session_close","session":"voice_1"}
 {"op":"conversation_end","conversation":"turn_1","source_ids":[1],"previous_ids":[]}
@@ -356,7 +356,11 @@ responses in the same person's store. `search` returns ranked records with
 their provenance; `forget` returns a count after removal and index checks.
 `forget_naming` removes the room's (`everyone`) kept things and
 observations that name someone, those rows alone (never the exchange they
-came from, nor its other children), and returns the count; it refuses any other person
+came from, nor its other children), with every version of each, and
+returns the count. It matches a name written with its capital ("I saw
+Linh today", never "linh hồn"); a name that is also a common word
+(months, weekdays, "Will", "May", "Mai"…) searches nothing and answers
+`{"ok":true,"removed":0,"skipped":"common_word"}`; it refuses any other person
 ([the rule](memory-days.md#request-contract)).
 The base `remember` may also name the person's own exchanges it came from,
 `{"op":"remember",…,"source_ids":[3]}` (#1693); forgetting it then removes
@@ -717,20 +721,29 @@ the unchanged legacy client, used unless the new Days client is selected.
     the TV must never empty it (the reviewer on #1723).
   - **The room's lines that name them** (#2849's find, seen again in
     #1693's c0a4 run): something said about them with nobody known, such
-    as "Mai's dentist is Friday", is kept as the room's, so emptying their
+    as "Linh's dentist is Friday", is kept as the room's, so emptying their
     own scope left it. When their own `forget_all` succeeds and the eyes
     know their name (the face at the lamp is theirs), the voice also sends
     `forget_naming {name}` with no person. The store removes the room's
-    kept things and observations that name them as a whole word, those
-    rows alone: unlike `forget`, never the exchange a line came from, whose
-    other children are the household's (the review of #3113 on #3127). The
+    kept things and observations that name them, written with their
+    capital, so a word in lower case stays. A name that is also a common
+    word (months, weekdays, "Will", "May", "Mai"…) searches nothing, so
+    "the plumber will come" or "chiều mai" (tomorrow afternoon) stays
+    (reviewer-three's P1 and Eighth's P2 on #3143, the first builder's
+    decision 06:34); their own lines still go with their `forget_all`.
+    Two people with the same name lose each other's room lines that name
+    it. Those rows alone, with every version of each: unlike `forget`,
+    never the exchange a line came from, whose other children are the
+    household's (the review of #3113 on #3127). The
     room's exchanges and every other room line stay.
     The journal says `forget everything: the room's lines naming them, N
-    removed`, counts only, never the name. A failure there is only
+    removed`, or `the room's lines naming them not searched (the name is a
+    common word)`, counts only, never the name. A failure there is only
     journalled: their own memory is already gone. No new switch: only with
     `LAMP_MEMORY_FORGET_ALL`. Tests:
     `days::forget_naming_removes_the_rooms_lines_that_name_them_only`,
     `days::forget_naming_leaves_a_sibling_kept_in_the_same_conversation`,
+    `days::forget_naming_searches_nothing_for_a_common_word`,
     `days_protocol::forget_naming_is_the_rooms_only_and_answers_a_count`
     and `remember::forgetting_everything_also_takes_the_rooms_lines_naming_them`.
   - Both clear the conversation thread and stop journalling until a fresh

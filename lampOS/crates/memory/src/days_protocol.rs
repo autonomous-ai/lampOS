@@ -1,7 +1,7 @@
 //! Opt-in requests, plus the unchanged legacy response shapes. Model payloads
 //! are data for an offline caller; no request here invokes inference.
 use crate::{
-    days::{Days, Error, Result, Wider},
+    days::{Days, Error, Naming, Result, Wider},
     protocol::{self, Request, Response, Who},
     store::{Ask, Day, Person},
     tidy,
@@ -426,7 +426,13 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
                     "forget_naming acts on the room's memory only",
                 ));
             }
-            json!({"ok":true,"removed":store.forget_naming(&name)?})
+            // A name that is also a common word searches nothing.
+            match store.forget_naming(&name)? {
+                Naming::Removed(removed) => json!({"ok":true,"removed":removed}),
+                Naming::CommonWord => {
+                    json!({"ok":true,"removed":0,"skipped":"common_word"})
+                }
+            }
         }
         Extra::SessionOpen {
             person,
@@ -1120,7 +1126,7 @@ mod tests {
         };
         const ALEX: &str = "p-0123456789abcdef";
         for line in [
-            json!({"op":"remember","at_unix_ms":NOW_MS,"text":"Alex likes tea"}),
+            json!({"op":"remember","at_unix_ms":NOW_MS,"text":"Tea is what Alex likes"}),
             json!({"op":"remember","at_unix_ms":NOW_MS,"text":"the tea is in the cupboard"}),
             json!({"op":"remember","person":ALEX,"at_unix_ms":NOW_MS,"text":"Alex likes tea"}),
         ] {
@@ -1163,6 +1169,11 @@ mod tests {
             }
             ask(store, line)["entries"].as_array().unwrap().len()
         };
+        // A name that is also a common word: nothing searched.
+        assert_eq!(
+            ask(&mut store, json!({"op":"forget_naming","name":"May"})),
+            json!({"ok":true,"removed":0,"skipped":"common_word"})
+        );
         assert_eq!(kept(&mut store, None), 1);
         assert_eq!(kept(&mut store, Some(ALEX)), 1);
     }
