@@ -902,6 +902,9 @@ enum Word {
     /// Over the lamp, then 250 ms of speech in the clear once its sound is
     /// gone: the speech commits it at its sixth block.
     Speech,
+    /// The same with 500 ms of speech in the clear: a backchannel as played
+    /// on lamp-52e6 on 23 Oct (#2939), some 0.5 s of sound.
+    Long,
 }
 
 /// #828, step 2, through the production hearing, yield and commit, with
@@ -977,7 +980,7 @@ fn a_short_word_heard_by(
     // "Stop.", 120 ms over the lamp.
     let shares = match word {
         Word::Plain => Some((10, 0)),
-        Word::Over | Word::Speech => OVER,
+        Word::Over | Word::Speech | Word::Long => OVER,
     };
     h.blocks(ONSET + 2, 0.9, Some(evidence(0, shares)));
     let yielded_at = h.events("duplex_yield")[0]["frame_sequence"]
@@ -986,9 +989,11 @@ fn a_short_word_heard_by(
     for quiet in 1..=29 {
         h.block(0.1, Some(evidence(quiet, None)));
     }
-    if let Word::Speech = word {
-        h.blocks(25, 0.9, Some(evidence(40, None)));
-    }
+    match word {
+        Word::Speech => h.blocks(25, 0.9, Some(evidence(40, None))),
+        Word::Long => h.blocks(50, 0.9, Some(evidence(40, None))),
+        Word::Over | Word::Plain => Vec::new(),
+    };
     let mut settled = None;
     for _ in 0..150 {
         h.block(0.1, Some(evidence(40, None)));
@@ -1523,7 +1528,7 @@ fn with_backchannel_holds_a_yields_real_words_still_commit_a_turn() {
 /// #2939: two backchannels the reply went on after are a person, not the
 /// lamp's own voice, and cost no fruitless yield: a third line 5 s after
 /// the second still makes the lamp yield, and commits once it is a
-/// sentence (400 ms of speech) though no words came for it.
+/// sentence (700 ms of speech) though no words came for it.
 #[test]
 fn with_backchannel_holds_two_backchannels_leave_the_reply_yielding() {
     let mut h = Harness::new(TurnTaking::Duplex, 40_000);
@@ -1545,6 +1550,129 @@ fn with_backchannel_holds_two_backchannels_leave_the_reply_yielding() {
     let commit = &h.events("duplex_commit")[0];
     assert_eq!(commit["backchannel"], Value::Null);
     assert_eq!(h.events("turn_finished")[0]["outcome"], "user_interrupted");
+}
+
+/// lamp-52e6 at 12:56 on 23 Oct (#2939), `heard-always` and the switch on:
+/// a played "Yeah.", some 0.5 s of sound, reached 400 ms of speech in the
+/// clear and committed as a turn though its words were a backchannel, and
+/// the story stopped; with `heard`, "Uh-huh." did the same. A backchannel
+/// of 500 ms now resumes on both, its words given at once or after the
+/// hold's wait; the switch off, each commits as before.
+#[test]
+fn with_backchannel_holds_a_half_second_backchannel_resumes_heard_or_heard_always() {
+    for words in [
+        "Yeah.", "Mm-hm.", "Uh-huh.", "Okay.", "Right.", "I see.", "Got it.",
+    ] {
+        let (_, _, committed, event) = a_short_word(Some(words), Word::Long, true, false);
+        assert!(!committed, "{words} heard");
+        assert_eq!(event["kind"], "duplex_resume", "{words} heard");
+        let (_, committed, event) = a_short_word_heard_always(words, Word::Long, true);
+        assert!(!committed, "{words} heard-always");
+        assert_eq!(event["kind"], "duplex_resume", "{words} heard-always");
+        let (_, _, committed, _) = a_short_word(Some(words), Word::Long, false, false);
+        assert!(committed, "{words} off");
+        let (_, committed, _) = a_short_word_heard_always(words, Word::Long, false);
+        assert!(committed, "{words} heard-always off");
+    }
+    // Its words after the hold's wait: resumed with no words, no turn.
+    let (_, _, committed, event) =
+        a_short_word_after("", 60, Some("Yeah."), Word::Long, true, false);
+    assert!(!committed);
+    assert_eq!(event["kind"], "duplex_resume");
+}
+
+/// #2939: a 500 ms yield whose words never come, or end before the yield
+/// does, resumes on both modes: "a yield ended before its words came"
+/// cuts nothing.
+#[test]
+fn with_backchannel_holds_a_half_second_wordless_yield_resumes() {
+    let (_, _, committed, event) = a_short_word(None, Word::Long, true, false);
+    assert!(!committed);
+    assert_eq!(event["kind"], "duplex_resume");
+    let stop_words = crate::stop_words::StopWords::always_counted(
+        Box::new(AlwaysEars {
+            words: None,
+            flushed: false,
+        }),
+        None,
+    )
+    .with_backchannel_holds(true);
+    let (_, committed, event) = a_short_word_heard_by(stop_words, "", Word::Long, true);
+    assert!(!committed);
+    assert_eq!(event["kind"], "duplex_resume");
+}
+
+/// lamp-52e6 on 23 Oct (#2939), `heard`: "a yield's words came: 0 words,
+/// not a stop phrase" committed a turn. Words that come empty are none,
+/// on both modes, with the switch; without it they commit as before.
+#[test]
+fn with_backchannel_holds_empty_words_resume_the_reply() {
+    for word in [Word::Plain, Word::Long] {
+        let (_, _, committed, event) = a_short_word(Some(""), word, true, false);
+        assert!(!committed, "{word:?} heard");
+        assert_eq!(event["kind"], "duplex_resume");
+        let (_, committed, event) = a_short_word_heard_always("", word, true);
+        assert!(!committed, "{word:?} heard-always");
+        assert_eq!(event["kind"], "duplex_resume");
+        let (_, _, committed, _) = a_short_word(Some(""), word, false, false);
+        assert!(committed, "{word:?} off");
+    }
+}
+
+/// lamp-52e6 on 23 Oct (#2939), `heard`: a played "Uh-huh." came as one
+/// word not on the list and committed. The speech-to-text's spellings of
+/// the backchannels, any dash among them, resume.
+#[test]
+fn with_backchannel_holds_the_speech_to_texts_spellings_resume() {
+    for words in [
+        "Mhmm.",
+        "Mmm.",
+        "Uh\u{2013}huh.",
+        "Uh\u{2011}huh.",
+        "Mm\u{2014}hm.",
+        "Uh-hum.",
+        "Uh hum.",
+        "Yea.",
+        "Yeh.",
+        "Oh, okay.",
+        "Hmm, I see.",
+    ] {
+        let (_, _, committed, event) = a_short_word(Some(words), Word::Plain, true, false);
+        assert!(!committed, "{words} heard");
+        assert_eq!(event["backchannel"], true, "{words}");
+        let (_, committed, _) = a_short_word_heard_always(words, Word::Plain, true);
+        assert!(!committed, "{words} heard-always");
+    }
+}
+
+/// #2939: a turn opener, a stop and a backchannel with a stop still commit
+/// with the switch on, on both modes, at their full length too: "So." and
+/// "Ahem." were held as backchannels on lamp-52e6 on 23 Oct, each heard as
+/// one word; a lone "Oh." or "Hmm." may open a turn as well.
+#[test]
+fn with_backchannel_holds_openers_and_stops_still_commit() {
+    for words in [
+        "So.",
+        "Uh.",
+        "Oh.",
+        "Ah.",
+        "Hmm.",
+        "Hm.",
+        "Ahem.",
+        "But",
+        "Wait.",
+        "Uh-uh.",
+        "Yeah, stop.",
+        "Lamp.",
+    ] {
+        for word in [Word::Plain, Word::Long] {
+            let (_, _, committed, event) = a_short_word(Some(words), word, true, false);
+            assert!(committed, "{words} {word:?} heard");
+            assert_eq!(event["backchannel"], false, "{words} {word:?}");
+            let (_, committed, _) = a_short_word_heard_always(words, word, true);
+            assert!(committed, "{words} {word:?} heard-always");
+        }
+    }
 }
 
 #[test]
