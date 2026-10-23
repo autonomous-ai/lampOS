@@ -545,6 +545,44 @@ fn bound_cue(private: &Private) -> (UnixDatagram, CueSink) {
     sink.set_boot(boot());
     (peer, sink)
 }
+
+fn wait_for_cue_peer_closure(path: &Path) {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut live_probes = 0;
+    loop {
+        assert!(
+            Instant::now() < deadline,
+            "cue peer closure was not observed within 5 s: {} ({live_probes} live probes)",
+            path.display()
+        );
+        // A copied receiver can outlive the local handle. Probe only its lifetime,
+        // leaving the product's first and only send to the assertion below.
+        let probe = UnixDatagram::unbound().unwrap();
+        probe.set_nonblocking(true).unwrap();
+        let closed = match probe.connect(path) {
+            Ok(()) => {
+                live_probes += 1;
+                false
+            }
+            Err(error) if error.kind() == io::ErrorKind::ConnectionRefused => true,
+            Err(error) => panic!(
+                "cue peer closure probe failed for {}: {error}",
+                path.display()
+            ),
+        };
+        drop(probe);
+        assert!(
+            Instant::now() < deadline,
+            "cue peer closure was not observed within 5 s: {} ({live_probes} live probes)",
+            path.display()
+        );
+        if closed {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+}
+
 #[test]
 fn cues_are_bounded_ordered_fresh_and_keep_owner_epoch_context() {
     let private = Private::new();
@@ -688,6 +726,7 @@ fn stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying() {
     let private2 = Private::new();
     let (peer, mut sink) = bound_cue(&private2);
     drop(peer);
+    wait_for_cue_peer_closure(&private2.path.join("cue"));
     assert!(sink.scan(&trace, AT).is_some());
 }
 
