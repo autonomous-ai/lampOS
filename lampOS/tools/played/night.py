@@ -266,8 +266,9 @@ def score(played, ev, J, L, heard_by):
                 m = re.search(rf'request {q} first answer audio (\d+) ms', l)
                 if m: firsts.append(int(m.group(1)))
                 if re.search(rf"request {q}'s words, cut short, are let go", l): let_go += 1
-                # A join is told only as "request N: K lines joined into it ..."; "request N: not joined with request M's
-                # words" is a refusal, counted apart (the voice writes refusals far more often).
+                # The voice logs no line for a join that went through: "request N: K lines joined into it ..." is written
+                # only when none of those lines' answers played (LAMP_JOIN_CUT_WORDS), so `joined` is that subset. "request
+                # N: not joined with request M's words" is a refusal, counted apart.
                 m = re.search(rf'request {q}: (\d+) lines joined into it', l)
                 if m: joined += int(m.group(1))
                 if re.search(rf'request {q}: not joined with request', l): not_joined += 1
