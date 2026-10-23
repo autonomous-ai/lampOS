@@ -442,20 +442,45 @@ pub fn is_here(
     here.is_some_and(|(here, ago)| ago < fresh && crate::who::same_name(here, name))
 }
 
+/// Off unless `LAMP_PHOTO_SPEAKER=on` on lamp-eyes (#2856): `photo_here`
+/// names the passing id of the face that matched the photo, and a yes is
+/// kept only with that id ([`is_that_face`]). Off, both answer as before.
+pub const SPEAKER_ENVIRONMENT: &str = "LAMP_PHOTO_SPEAKER";
+
+pub fn speaker_from_environment() -> bool {
+    std::env::var(SPEAKER_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// Whether a yes's `face` is the one that matched the photo here (`here`,
+/// `boot/f3`, `None` while speaking isn't judged): the same id under the
+/// same boot, or the yes is not kept. It closes the gap between the voice's
+/// `photo_here` and its yes, in which another face could have come.
+pub fn is_that_face(here: Option<&str>, face: Option<&str>) -> bool {
+    here.is_some() && here == face
+}
+
 /// The eyes' answer to `{"photo_here":true}`: the face from a photo seen at
 /// the lamp within `fresh` (`here`: its name and how long ago), and whether
 /// that face was asked about, its own mark. A face let go and added again
 /// under the same name is a new face, not asked yet (Mobile on #1968).
+/// With `speaker` ([`SPEAKER_ENVIRONMENT`]), also that face's passing id
+/// (`face`), or `null`.
 pub fn here_answer(
     unconfirmed: &Unconfirmeds,
     here: Option<(&str, std::time::Duration)>,
+    face: Option<&str>,
+    speaker: bool,
     fresh: std::time::Duration,
 ) -> serde_json::Value {
     let name = here.filter(|(_, ago)| *ago < fresh).map(|(name, _)| name);
-    serde_json::json!({
+    let mut answer = serde_json::json!({
         "photo_here": name,
         "asked": name.map(|name| unconfirmed.was_asked(name)),
-    })
+    });
+    if speaker {
+        answer["face"] = serde_json::json!(name.and(face));
+    }
+    answer
 }
 
 /// The asked names whose meeting is over: not seen for [`MEETING_GAP_US`]
@@ -659,18 +684,18 @@ mod tests {
         let fresh = std::time::Duration::from_secs(5);
         let near = Some(("Hoa", std::time::Duration::from_secs(1)));
         assert_eq!(
-            here_answer(&faces, near, fresh),
+            here_answer(&faces, near, None, false, fresh),
             serde_json::json!({"photo_here": "Hoa", "asked": true})
         );
         assert_eq!(
-            here_answer(&faces, Some(("Hoa", fresh)), fresh),
+            here_answer(&faces, Some(("Hoa", fresh)), None, false, fresh),
             serde_json::json!({"photo_here": null, "asked": null})
         );
         // Let go and added again under the name: a new face, not asked.
         assert!(faces.let_go("Hoa").unwrap());
         faces.add("Hoa", unit(3), 1_000).unwrap();
         assert_eq!(
-            here_answer(&faces, near, fresh),
+            here_answer(&faces, near, None, false, fresh),
             serde_json::json!({"photo_here": "Hoa", "asked": false})
         );
         assert!(faces.asked("Hoa").unwrap());
@@ -806,6 +831,50 @@ mod tests {
         assert!(!is_here(Some(("Lan", ago(5))), "Lan", fresh));
         assert!(!is_here(Some(("Minh", ago(1))), "Lan", fresh));
         assert!(!is_here(None, "Lan", fresh));
+    }
+
+    /// With `LAMP_PHOTO_SPEAKER=on` (#2856) a yes is kept only with the
+    /// passing id, under its boot, of the face that matched the photo.
+    #[test]
+    fn a_yes_is_kept_only_from_the_face_that_matched_the_photo() {
+        assert!(is_that_face(Some("b1/f3"), Some("b1/f3")));
+        // Another face, the same id from an older boot, none, or none judged.
+        assert!(!is_that_face(Some("b1/f3"), Some("b1/f4")));
+        assert!(!is_that_face(Some("b1/f3"), Some("b0/f3")));
+        assert!(!is_that_face(Some("b1/f3"), None));
+        assert!(!is_that_face(None, None));
+        assert!(!is_that_face(None, Some("b1/f3")));
+    }
+
+    /// `photo_here` names that face with the switch on, and is today's
+    /// answer, without `face`, with it off.
+    #[test]
+    fn the_face_here_is_named_only_with_the_switch_on() {
+        let dir = folder("speaker");
+        let path = dir.join("people.json.from-photos");
+        let mut faces = Unconfirmeds::open(path);
+        faces.add("Hoa", unit(3), 1_000).unwrap();
+        let fresh = std::time::Duration::from_secs(5);
+        let near = Some(("Hoa", std::time::Duration::from_secs(1)));
+        assert_eq!(
+            here_answer(&faces, near, Some("b1/f3"), false, fresh),
+            serde_json::json!({"photo_here": "Hoa", "asked": false})
+        );
+        assert_eq!(
+            here_answer(&faces, near, Some("b1/f3"), true, fresh),
+            serde_json::json!({"photo_here": "Hoa", "asked": false, "face": "b1/f3"})
+        );
+        // Speaking not judged: no face to name.
+        assert_eq!(
+            here_answer(&faces, near, None, true, fresh),
+            serde_json::json!({"photo_here": "Hoa", "asked": false, "face": null})
+        );
+        // Nobody fresh here: no face either.
+        assert_eq!(
+            here_answer(&faces, Some(("Hoa", fresh)), Some("b1/f3"), true, fresh),
+            serde_json::json!({"photo_here": null, "asked": null, "face": null})
+        );
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

@@ -636,6 +636,12 @@ impl BusOut {
         self.ids.last.get(index).map(|id| format!("f{id}"))
     }
 
+    /// The faces publisher's boot: a passing id means a face only under it
+    /// (`boot/f3`, as the voice keeps it).
+    pub fn faces_boot(&self) -> &str {
+        self.faces.boot()
+    }
+
     /// The passing ids that read speaking in the last look (none unless
     /// speaking is judged), and the detector's index of a passing id in it:
     /// for turning to the one the lamp answers (`crate::answered`).
