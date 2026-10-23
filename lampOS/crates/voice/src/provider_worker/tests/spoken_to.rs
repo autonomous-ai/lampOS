@@ -785,7 +785,10 @@ async fn with_the_switch_two_lines_the_lamp_left_alone_end_its_conversation() {
 /// clock, so that the long lines pass in a moment.
 #[tokio::test(start_paused = true)]
 async fn with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds() {
-    let _clock = logical_clock();
+    // The worker and its backdated answer share an epoch with 15 s of history.
+    let clock =
+        crate::scenario_clock::Scope::enter_at(Duration::from_secs(60), 600_000_000).unwrap();
+    clock.set_pump(|_| Ok(())).unwrap();
     let follow_up = "And what about tomorrow?";
     for (on, busy, ago_s, long_s, line, answered) in [
         (false, true, 12, 0, follow_up, true),
