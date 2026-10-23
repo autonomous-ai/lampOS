@@ -536,6 +536,46 @@ pub enum YesEnded<C> {
     Refuse(C, &'static str),
 }
 
+/// A waiting yes's caller, the voice's connection: whether it has closed
+/// it, so the yes was withdrawn (Fourth's 17:01 on #2856).
+pub trait Caller {
+    fn closed(&self) -> bool;
+}
+
+impl Caller for std::os::unix::net::UnixStream {
+    /// A read that doesn't wait: the connection's end (nothing more will
+    /// come) or an error is closed; nothing to read yet, or a byte, is open.
+    /// Its one line was read already and only the answer is left to write,
+    /// so a stray byte this takes is lost to no one. The stream is left
+    /// blocking, as it was accepted.
+    fn closed(&self) -> bool {
+        if self.set_nonblocking(true).is_err() {
+            return true;
+        }
+        let read = (&mut &*self).read(&mut [0u8]);
+        let _ = self.set_nonblocking(false);
+        match read {
+            Ok(0) => true,
+            Ok(_) => false,
+            Err(error) => !matches!(
+                error.kind(),
+                io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted
+            ),
+        }
+    }
+}
+
+impl<C: Caller> YesEnded<C> {
+    /// The last fence before a yes is kept: a caller that closed meanwhile
+    /// makes it `peer_closed`, and nothing is kept.
+    pub fn fenced(self) -> Self {
+        match self {
+            YesEnded::Keep(_, caller) if caller.closed() => YesEnded::Refuse(caller, "peer_closed"),
+            ended => ended,
+        }
+    }
+}
+
 /// A look's part in a waiting yes: when its frame was captured, the
 /// permission's hold and the record of the yes's name now, and the near
 /// face's match and passing id ([`yes_after_look`]).
@@ -548,7 +588,7 @@ pub struct YesLook<'a> {
     pub face: Option<&'a str>,
 }
 
-impl<C> PendingYes<C> {
+impl<C: Caller> PendingYes<C> {
     pub fn new(
         name: String,
         face: Option<String>,
@@ -571,11 +611,15 @@ impl<C> PendingYes<C> {
         &self.name
     }
 
-    /// Every turn: past [`YES_LOOK_WITHIN`] it is `not_that_face`; under
-    /// another hold, or none, the camera was shut meanwhile and it is
-    /// `eyes_shut`, for good, though the camera opens again. Else it waits.
+    /// Every turn: a caller that closed its connection withdrew the yes,
+    /// `peer_closed` ([`Caller`]); past [`YES_LOOK_WITHIN`] it is
+    /// `not_that_face`; under another hold, or none, the camera was shut
+    /// meanwhile and it is `eyes_shut`, for good, though the camera opens
+    /// again. Else it waits.
     pub fn checked(self, now_us: u64, hold: Option<u64>) -> Result<YesEnded<C>, Self> {
-        if now_us >= self.arrived_us + YES_LOOK_WITHIN.as_micros() as u64 {
+        if self.caller.closed() {
+            Ok(YesEnded::Refuse(self.caller, "peer_closed"))
+        } else if now_us >= self.arrived_us + YES_LOOK_WITHIN.as_micros() as u64 {
             Ok(YesEnded::Refuse(self.caller, "not_that_face"))
         } else if hold != Some(self.hold) {
             Ok(YesEnded::Refuse(self.caller, "eyes_shut"))
@@ -1032,8 +1076,80 @@ mod tests {
         ));
     }
 
-    /// The waiting yes's caller, a number here; its arrival at 1 s.
+    /// The waiting yes's caller, a number here, that never closes; its
+    /// arrival at 1 s.
     const ARRIVED_US: u64 = 1_000_000;
+
+    impl Caller for u32 {
+        fn closed(&self) -> bool {
+            false
+        }
+    }
+
+    fn yes_on(
+        caller: std::os::unix::net::UnixStream,
+    ) -> PendingYes<std::os::unix::net::UnixStream> {
+        PendingYes::new(
+            "Mirel".into(),
+            Some("b1/f1".into()),
+            caller,
+            1,
+            3,
+            ARRIVED_US,
+        )
+    }
+
+    fn why<C>(ended: Result<YesEnded<C>, PendingYes<C>>) -> Option<&'static str> {
+        match ended {
+            Ok(YesEnded::Refuse(_, why)) => Some(why),
+            Ok(YesEnded::Keep(..)) => Some("kept"),
+            Err(_) => None,
+        }
+    }
+
+    /// Fourth's barrier on #2856 (17:01): the yes is accepted, the voice
+    /// closes its connection before the forced look, then a matching frame
+    /// comes: nothing is kept. The same at a turn without a look, and at
+    /// the last fence before the keep. An open caller still keeps.
+    #[test]
+    fn a_yes_whose_voice_closed_its_connection_keeps_nothing() {
+        use std::os::unix::net::UnixStream;
+        let (ours, voice) = UnixStream::pair().unwrap();
+        let waiting = yes_on(ours);
+        drop(voice);
+        assert_eq!(
+            why(waiting.looked(&look(ARRIVED_US + 60_000, ARRIVED_US + 120_000))),
+            Some("peer_closed")
+        );
+
+        let (ours, voice) = UnixStream::pair().unwrap();
+        let waiting = yes_on(ours);
+        let Err(waiting) = waiting.checked(ARRIVED_US + 60_000, Some(3)) else {
+            panic!("an open caller's yes ended");
+        };
+        drop(voice);
+        assert_eq!(
+            why(waiting.checked(ARRIVED_US + 60_000, Some(3))),
+            Some("peer_closed")
+        );
+
+        // Kept by the look, closed before the fence: refused there.
+        let (ours, voice) = UnixStream::pair().unwrap();
+        let ended = yes_on(ours).looked(&look(ARRIVED_US + 60_000, ARRIVED_US + 120_000));
+        let Ok(ended @ YesEnded::Keep(..)) = ended else {
+            panic!("an open caller's matching look was not kept");
+        };
+        drop(voice);
+        assert!(matches!(ended.fenced(), YesEnded::Refuse(_, "peer_closed")));
+
+        // Open to the end: kept.
+        let (ours, _voice) = UnixStream::pair().unwrap();
+        let ended = yes_on(ours).looked(&look(ARRIVED_US + 60_000, ARRIVED_US + 120_000));
+        assert!(matches!(
+            ended.ok().map(YesEnded::fenced),
+            Some(YesEnded::Keep(..))
+        ));
+    }
 
     fn pending(record: u64) -> PendingYes<u32> {
         PendingYes::new(
