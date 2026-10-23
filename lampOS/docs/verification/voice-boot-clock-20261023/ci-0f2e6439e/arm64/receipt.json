@@ -1,0 +1,256 @@
+{
+  "run_id": 39895142741,
+  "job_id": 120223721854,
+  "run_status": "completed",
+  "run_conclusion": "success",
+  "job_status": "completed",
+  "job_conclusion": "success",
+  "actual_checkout": "8843f45cab0b21c3035d1707199a7dc46852249a",
+  "parents": [
+    "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+    "0f2e6439e018680af247080983c9ec0c258c3229"
+  ],
+  "merge_tree": "ae902f07d55fec0816543294d866e6ab37043c74",
+  "whole_tree_equals_head": true,
+  "started_at": "2026-10-23T03:27:53Z",
+  "completed_at": "2026-10-23T03:40:00Z",
+  "job_seconds": 727.0,
+  "runner_labels": [
+    "ubuntu-22.04-arm"
+  ],
+  "rust_toolchain": "1.96.0-aarch64-unknown-linux-gnu",
+  "runtime_census": {
+    "selected": 7136,
+    "statuses": {
+      "PASS": 7135,
+      "LEAK": 1
+    },
+    "starting_binaries": 62,
+    "binaries_with_terminal_rows": 58,
+    "skipped_tests": 32,
+    "skipped_binaries": 106,
+    "duplicate_output_rows": 34,
+    "ordinal_coverage_complete": true,
+    "seconds": 141.134
+  },
+  "effective_profile": {
+    "name": "pr",
+    "default_filter": "all()",
+    "includes_realtime": true
+  },
+  "scope_lines": [
+    "2026-10-23T03:32:43.7938971Z Changed: lamp-voice. With the crates that depend on them and the three that read other crates' files (lamp-cloud, lamp-voice-eval, lamp-update): 12 of 46 crates.",
+    "2026-10-23T03:32:43.8041797Z   PICKED: package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)"
+  ],
+  "starting_line": "2026-10-23T03:37:15.8188384Z     Starting 7136 tests across 62 binaries (32 tests and 106 binaries skipped)",
+  "summary_line": "2026-10-23T03:39:36.9522982Z      Summary [ 141.134s] 7136 tests run: 7136 passed (1 leaky), 32 skipped",
+  "affected_counts": {
+    "PASS": 86
+  },
+  "affected_match_counts": {
+    "literal name": 85,
+    "unique source prefix; log name is masked": 1
+  },
+  "failure_rows": [],
+  "leaky_rows": [
+    {
+      "status": "LEAK",
+      "seconds": 0.227,
+      "ordinal": 5017,
+      "total": 7136,
+      "binary": "lamp-voice",
+      "name": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+      "raw_line": 5705
+    }
+  ],
+  "step_durations": [
+    {
+      "name": "Set up job",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:27:54Z",
+      "completed_at": "2026-10-23T03:27:56Z",
+      "seconds": 2.0
+    },
+    {
+      "name": "system packages",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:27:56Z",
+      "completed_at": "2026-10-23T03:28:16Z",
+      "seconds": 20.0
+    },
+    {
+      "name": "Run actions/checkout@v4",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:28:16Z",
+      "completed_at": "2026-10-23T03:28:22Z",
+      "seconds": 6.0
+    },
+    {
+      "name": "publication failure tests (offline, no signing secret)",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:28:22Z",
+      "completed_at": "2026-10-23T03:28:23Z",
+      "seconds": 1.0
+    },
+    {
+      "name": "Rust 1.96.0",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:28:23Z",
+      "completed_at": "2026-10-23T03:28:28Z",
+      "seconds": 5.0
+    },
+    {
+      "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:28:28Z",
+      "completed_at": "2026-10-23T03:28:29Z",
+      "seconds": 1.0
+    },
+    {
+      "name": "restore the cache",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:28:29Z",
+      "completed_at": "2026-10-23T03:29:02Z",
+      "seconds": 33.0
+    },
+    {
+      "name": "unchanged source files get the cached build's times back",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:29:02Z",
+      "completed_at": "2026-10-23T03:29:03Z",
+      "seconds": 1.0
+    },
+    {
+      "name": "record fresh source times for a cold publication build",
+      "conclusion": "skipped",
+      "started_at": "2026-10-23T03:29:03Z",
+      "completed_at": "2026-10-23T03:29:03Z",
+      "seconds": 0.0
+    },
+    {
+      "name": "Run taiki-e/install-action@v2",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:29:03Z",
+      "completed_at": "2026-10-23T03:29:04Z",
+      "seconds": 1.0
+    },
+    {
+      "name": "build (release, the lamps' binaries)",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:29:04Z",
+      "completed_at": "2026-10-23T03:31:19Z",
+      "seconds": 135.0
+    },
+    {
+      "name": "every built lamp-* binary is classified for the lamp-os package",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:31:19Z",
+      "completed_at": "2026-10-23T03:31:19Z",
+      "seconds": 0.0
+    },
+    {
+      "name": "build the two selected artifact examples without filename collisions",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:31:19Z",
+      "completed_at": "2026-10-23T03:32:43Z",
+      "seconds": 84.0
+    },
+    {
+      "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:32:43Z",
+      "completed_at": "2026-10-23T03:32:43Z",
+      "seconds": 0.0
+    },
+    {
+      "name": "which crates a pull request tests",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:32:43Z",
+      "completed_at": "2026-10-23T03:32:43Z",
+      "seconds": 0.0
+    },
+    {
+      "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:32:43Z",
+      "completed_at": "2026-10-23T03:39:36Z",
+      "seconds": 413.0
+    },
+    {
+      "name": "doc tests and the own-harness tests (nextest runs neither)",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:39:36Z",
+      "completed_at": "2026-10-23T03:39:50Z",
+      "seconds": 14.0
+    },
+    {
+      "name": "export only current Cargo targets and their SHA-256",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:39:50Z",
+      "completed_at": "2026-10-23T03:39:51Z",
+      "seconds": 1.0
+    },
+    {
+      "name": "Run actions/upload-artifact@v4",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:39:51Z",
+      "completed_at": "2026-10-23T03:39:58Z",
+      "seconds": 7.0
+    },
+    {
+      "name": "discard the isolated example target before saving the cache",
+      "conclusion": "skipped",
+      "started_at": "2026-10-23T03:39:58Z",
+      "completed_at": "2026-10-23T03:39:58Z",
+      "seconds": 0.0
+    },
+    {
+      "name": "save the cache",
+      "conclusion": "skipped",
+      "started_at": "2026-10-23T03:39:58Z",
+      "completed_at": "2026-10-23T03:39:58Z",
+      "seconds": 0.0
+    },
+    {
+      "name": "Post Run actions/checkout@v4",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:39:58Z",
+      "completed_at": "2026-10-23T03:39:58Z",
+      "seconds": 0.0
+    },
+    {
+      "name": "Complete job",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:39:58Z",
+      "completed_at": "2026-10-23T03:39:58Z",
+      "seconds": 0.0
+    }
+  ],
+  "log_bytes": 1257751,
+  "log_sha256": "1c6fb63602592660ecaff2afd53d0b08c4461ebf51b0f86442e7b4dbdb246307",
+  "limits": [
+    "This is PR-selected package runtime coverage, not every workspace test.",
+    "The console does not enumerate skipped names/reasons or identify starting binaries with no terminal rows.",
+    "Final-output status repetitions are counted once; original streams remain intact.",
+    "One source-matched masked name is explicit in the affected-case census.",
+    "Cache restoration/source-time reuse is not an independent cold-build proof.",
+    "No workflow rerun, local ARM build or additional test run was performed while collecting evidence."
+  ],
+  "terminal_observed_by_root_at": "2026-10-23T03:42:01Z",
+  "artifact": {
+    "id": 12477265444,
+    "name": "lampos-arm64-0f2e6439e018680af247080983c9ec0c258c3229",
+    "reported_zip_bytes": 114924997,
+    "reported_zip_sha256": "503fdc60ed137679db328229ff7dcca27c66df2895f2564d2fc4a7be24d0040d",
+    "reported_workspace_binaries": 47,
+    "reported_selected_examples": 2,
+    "reported_uploaded_files": 50,
+    "retention_days": 7,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39895142741/artifacts/12477265444",
+    "downloaded": false
+  },
+  "nextest_version": "0.9.148",
+  "cores": 4,
+  "test_compile_cargo_reported": "4m 31s",
+  "release_workspace_build_cargo_reported": "2m 14s"
+}

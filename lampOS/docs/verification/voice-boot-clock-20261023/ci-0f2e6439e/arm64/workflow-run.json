@@ -1,0 +1,15 @@
+{
+  "id": 39895142741,
+  "name": "lampOS on ARM64",
+  "event": "pull_request",
+  "run_number": 6325,
+  "run_attempt": 1,
+  "head_sha": "0f2e6439e018680af247080983c9ec0c258c3229",
+  "path": ".github/workflows/lampos-arm64.yml",
+  "status": "completed",
+  "conclusion": "success",
+  "created_at": "2026-10-23T03:27:48Z",
+  "updated_at": "2026-10-23T03:40:00Z",
+  "run_started_at": "2026-10-23T03:27:48Z",
+  "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39895142741"
+}

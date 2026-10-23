@@ -1,0 +1,64 @@
+{
+  "previous_head": "172389869129a7466623cc9b45d1c536f42f7429",
+  "new_head": "0f2e6439e018680af247080983c9ec0c258c3229",
+  "range_diff": "1:  1723898691 = 1:  0f2e6439e0 lampOS: give backdated voice fixtures a shared clock history",
+  "all_eight_changed_file_bytes_equal": false,
+  "files": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/second.rs",
+      "old_sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+      "new_sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "old_sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+      "new_sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "old_sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "new_sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "old_sha256": "65af6a4a052ef808e094284373f4c155bf4f09250a09c2c090b9b225c77cda6e",
+      "new_sha256": "65af6a4a052ef808e094284373f4c155bf4f09250a09c2c090b9b225c77cda6e",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/scenario_clock.rs",
+      "old_sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "new_sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "old_sha256": "a5144c77508ee1d19ff651290f42e4b8f442193bf22a366c595c973dbf0e9123",
+      "new_sha256": "b08a0665ba5c100795d391b5ceb9d74e44a0e40c84654ad85de15935b7d38177",
+      "equal": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/stop_words.rs",
+      "old_sha256": "5524521c56061be6af4b8ee95d52ecc3b9b1d3c3ee4a2344db4fa75dbf4f9a0f",
+      "new_sha256": "5524521c56061be6af4b8ee95d52ecc3b9b1d3c3ee4a2344db4fa75dbf4f9a0f",
+      "equal": true
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "old_sha256": "7a3164aec84b4fb303944d8e97056e21e8c3563acc469779b376ae0b06510194",
+      "new_sha256": "7a3164aec84b4fb303944d8e97056e21e8c3563acc469779b376ae0b06510194",
+      "equal": true
+    }
+  ],
+  "configs": {
+    "source-lampos-clippy.yml": true,
+    "source-lampos-arm64.yml": true,
+    "source-lampos-pr-crates.py": true,
+    "source-nextest.toml": true
+  },
+  "whole_tree_equal": false,
+  "limit": "Patch/fixture source equality does not transfer prior runtime qualification to this changed upstream tree. Its separate ARM run39895142741 is now terminal and recorded here; these are not a controlled causal or speedup pair."
+}

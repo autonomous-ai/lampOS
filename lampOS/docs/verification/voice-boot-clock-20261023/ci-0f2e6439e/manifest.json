@@ -1,0 +1,118 @@
+{
+  "README.md": {
+    "bytes": 5476,
+    "sha256": "96bba4d37e0922e277155aae1db87e9b789e959f428dc9185b1a4bd1f14a4106"
+  },
+  "affected-case-inventory-inherited.json": {
+    "bytes": 29120,
+    "sha256": "acda19cc6ce3ccd38f0536dcdfefccaa5f407c9c91bb5fb2e7eb30e27cc4d636"
+  },
+  "arm64/affected-census.json": {
+    "bytes": 49028,
+    "sha256": "545fe7c456b4d3c3e5fbec51f714315e92ebac792913374759e2ee916e660ee9"
+  },
+  "arm64/binary-durations.json": {
+    "bytes": 74392,
+    "sha256": "320ba13d56c33d94f9efd96905a17e465db01917ccf3951dceb19c6a58537383"
+  },
+  "arm64/download-log.json": {
+    "bytes": 322,
+    "sha256": "6da11897b905a3739caa8578092cf684ce2325875b8a6513b74ae995d2478370"
+  },
+  "arm64/job.log.json": {
+    "bytes": 1267180,
+    "sha256": "4a2c831a49cc89fbf2a6143e80b7f49636afaf25a5b690ce038de51f0576015d"
+  },
+  "arm64/masked-name-matches.json": {
+    "bytes": 657,
+    "sha256": "ec48b858f5433c3c39af107bfd81b33c7da65f1ae98ebc6598ee34711015caa7"
+  },
+  "arm64/receipt.json": {
+    "bytes": 8683,
+    "sha256": "18122bdea5e251f4c976ae4390dd2de00800563868de97d4948ce14064633827"
+  },
+  "arm64/selected-terminal-census.json": {
+    "bytes": 1713526,
+    "sha256": "b30178fa542c904e973ce4bc07225107787af3deb0e3575b7f2eede9aff20c7f"
+  },
+  "arm64/separate-harness-census.json": {
+    "bytes": 7820,
+    "sha256": "22a9dc736ba3b842ec3b40de63d51ea75fde3c8e078854ffee8444cd2bd86e31"
+  },
+  "arm64/workflow-jobs.json": {
+    "bytes": 7936,
+    "sha256": "396054ca321838ff00ca2ed72201b9559c2aa593a51dcfc49e0bbad3bf5c446f"
+  },
+  "arm64/workflow-run.json": {
+    "bytes": 486,
+    "sha256": "576f1c09dc3b625342857c76527178a1a65106c13ef98a8270d858d954725104"
+  },
+  "attribution-scan.json": {
+    "bytes": 1091,
+    "sha256": "8bd3fa2ff2a18ea49dce2ff0c8b682779a00427e6be3dd6a3f4c47b01384caf6"
+  },
+  "carry-comparison.json": {
+    "bytes": 2930,
+    "sha256": "fb88303ba78f219ab4954726a500a5e88b4227961e631fceffc64370f070e494"
+  },
+  "changed-source-identities.json": {
+    "bytes": 2265,
+    "sha256": "aceb488eb454a3328481df690478faa39f95ae0fe9b6e383ae6f0aa7c2a457e9"
+  },
+  "clippy/download-log.json": {
+    "bytes": 320,
+    "sha256": "2ed935ea0bd5333ffbffacca0cbe711db9d7af40371b0d5b0bd446a9d1543433"
+  },
+  "clippy/job.log.json": {
+    "bytes": 38062,
+    "sha256": "34490da13c4e1b24554ea054ff19cf7382a279f23e4ac576253ccc59a38dd22d"
+  },
+  "clippy/merge-commit.json": {
+    "bytes": 367,
+    "sha256": "f74ed9508375380cd62f6c37d3afda632b2d5da83e2ea57a6bca4dfc0d6a29aa"
+  },
+  "clippy/merge-root-tree.json": {
+    "bytes": 5120,
+    "sha256": "85cf68c0b0b8b18395c45c19986eedf52411e89bcc6996c01293b2875b2b29cf"
+  },
+  "clippy/receipt.json": {
+    "bytes": 3198,
+    "sha256": "2f0b18eee58fb11a275f07a217e6d28d08d34dd618091da52f911002dd6e333b"
+  },
+  "clippy/workflow-jobs.json": {
+    "bytes": 3140,
+    "sha256": "a9d045124a64cfc448cb050d39173c44a4327dfd3e9dc5e8c14a149e03ac1de3"
+  },
+  "clippy/workflow-run.json": {
+    "bytes": 485,
+    "sha256": "8c9b036acbd77224a04a34d51ddba6f4a3c64757b3db1d608e56653aea667fae"
+  },
+  "metadata-projections.json": {
+    "bytes": 1755,
+    "sha256": "d84cb0d9a18062c2dae9a825c3105a52b31840fbef1f5f1d437944297e9a69ea"
+  },
+  "previous-ci-census-comparison.json": {
+    "bytes": 2399,
+    "sha256": "88e28ec7129578c069dcb71e98c22cbde4d0873e7e35143e31eba8f253fdc2ab"
+  },
+  "source-binding.json": {
+    "bytes": 3953,
+    "sha256": "ae8975bcbe08ced85a3efe231fadea93eb292cc58b4c8a415211b0d79438b4ae"
+  },
+  "source-lampos-arm64.yml": {
+    "bytes": 18332,
+    "sha256": "ad1a4cd650db5f2a721b510263ff5c1697b09f872646395fb4cab6173f8757f9"
+  },
+  "source-lampos-clippy.yml": {
+    "bytes": 4189,
+    "sha256": "2b41648cade7109e94995fd076f638166345867600e38e5e9aa9438a9b18c9ac"
+  },
+  "source-nextest.toml": {
+    "bytes": 5157,
+    "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+  },
+  "source-selection-script.json": {
+    "bytes": 5960,
+    "sha256": "37540e2708db115e7ca0a95857aca31d7f21cce07f4fc93e867a0d61badbe683"
+  }
+}

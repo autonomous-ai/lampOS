@@ -1,5 +1,23 @@
 # Tests work log
 
+## 2026-10-23 10:47 +0700 — rebased boot-clock ARM64 and Clippy passed
+
+Ready for lamp-voice: no (#3190, Mac comparison and review remain).
+
+The [current-head CI receipt](verification/voice-boot-clock-20261023/ci-0f2e6439e/)
+binds exact head `0f2e6439e` and base `e5cd73aca` to tested merge `8843f45ca`;
+the complete merge tree equals the head. Native Linux ARM64 run `39895142741`
+passed **7,136 tests with zero failures and 32 skipped**, including one leaky
+pass. All 86 affected cases passed; one console name is masked and uniquely
+bound to exact source. Four doctests, 12 process-harness cases and the relay
+harness also passed separately. Linux Clippy `39895141878` is green.
+
+The selected PR census includes realtime and covers 12 packages. Its 14 extra
+Voice cases come with the changed upstream tree; no timing or causal comparison
+to the previous head is claimed. Both full raw logs and minimal provenance are
+preserved. The fixed default-parallel Mac baseline continues on the complete
+repository; the earlier five candidate-only failures remain unclassified.
+
 ## 2026-10-23 10:40 +0700 — phone-news event control catches a false pass
 
 Ready for lamp-voice: no (full gates pending for the two-file #1806 slice).

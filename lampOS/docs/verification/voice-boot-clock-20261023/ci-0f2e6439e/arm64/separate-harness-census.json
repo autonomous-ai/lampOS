@@ -1,0 +1,410 @@
+{
+  "docs": [
+    {
+      "crate": "lamp_actions",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8254
+    },
+    {
+      "crate": "lamp_addons",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8260
+    },
+    {
+      "crate": "lamp_air",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8266
+    },
+    {
+      "crate": "lamp_audio",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8272
+    },
+    {
+      "crate": "lamp_body",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8278
+    },
+    {
+      "crate": "lamp_bus",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8286
+    },
+    {
+      "crate": "lamp_camera",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8293
+    },
+    {
+      "crate": "lamp_cloud",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8299
+    },
+    {
+      "crate": "lamp_controls",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8305
+    },
+    {
+      "crate": "lamp_ears",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8311
+    },
+    {
+      "crate": "lamp_environment",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8317
+    },
+    {
+      "crate": "lamp_expression",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8323
+    },
+    {
+      "crate": "lamp_eyes",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8329
+    },
+    {
+      "crate": "lamp_gemini",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8335
+    },
+    {
+      "crate": "lamp_health",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8341
+    },
+    {
+      "crate": "lamp_ipc",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8348
+    },
+    {
+      "crate": "lamp_keeper",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8355
+    },
+    {
+      "crate": "lamp_lean",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8361
+    },
+    {
+      "crate": "lamp_local_time",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8367
+    },
+    {
+      "crate": "lamp_memory",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8373
+    },
+    {
+      "crate": "lamp_mood",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8379
+    },
+    {
+      "crate": "lamp_msgs",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8386
+    },
+    {
+      "crate": "lamp_name",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8393
+    },
+    {
+      "crate": "lamp_near_call",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8399
+    },
+    {
+      "crate": "lamp_observer",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8405
+    },
+    {
+      "crate": "lamp_peek",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8411
+    },
+    {
+      "crate": "lamp_policy",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8417
+    },
+    {
+      "crate": "lamp_records",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8423
+    },
+    {
+      "crate": "lamp_ring",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8429
+    },
+    {
+      "crate": "lamp_same_voice",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8435
+    },
+    {
+      "crate": "lamp_schedule",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8441
+    },
+    {
+      "crate": "lamp_selftest",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8447
+    },
+    {
+      "crate": "lamp_settings",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8453
+    },
+    {
+      "crate": "lamp_setup",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8459
+    },
+    {
+      "crate": "lamp_skills",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8465
+    },
+    {
+      "crate": "lamp_sound_fixtures",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8471
+    },
+    {
+      "crate": "lamp_station",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8477
+    },
+    {
+      "crate": "lamp_surround",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8483
+    },
+    {
+      "crate": "lamp_tasks",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8489
+    },
+    {
+      "crate": "lamp_turn_end",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8495
+    },
+    {
+      "crate": "lamp_turn_end_wire",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8501
+    },
+    {
+      "crate": "lamp_turn_owner",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8507
+    },
+    {
+      "crate": "lamp_update",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8513
+    },
+    {
+      "crate": "lamp_voice",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8519
+    },
+    {
+      "crate": "lamp_voice_eval",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8525
+    },
+    {
+      "crate": "lamp_voice_processes",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8531
+    }
+  ],
+  "relay_signals": [
+    {
+      "raw_line": 8535,
+      "line": "2026-10-23T03:39:45.9497409Z relay_signals: ok"
+    }
+  ],
+  "relay_limit": "No numeric count printed by this own harness.",
+  "process": [
+    {
+      "name": "an_idle_worker_stays_ready_across_a_long_quiet",
+      "result": "PASS",
+      "milliseconds": 2009,
+      "raw_line": 8539
+    },
+    {
+      "name": "a_worker_reporting_another_model_is_refused_before_any_request",
+      "result": "PASS",
+      "milliseconds": 2,
+      "raw_line": 8540
+    },
+    {
+      "name": "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way",
+      "result": "PASS",
+      "milliseconds": 4,
+      "raw_line": 8541
+    },
+    {
+      "name": "verdict_carries_identity_and_one_request_at_a_time",
+      "result": "PASS",
+      "milliseconds": 56,
+      "raw_line": 8542
+    },
+    {
+      "name": "missing_model_is_final_and_never_restarted",
+      "result": "PASS",
+      "milliseconds": 162,
+      "raw_line": 8543
+    },
+    {
+      "name": "missing_executable_fails_at_once",
+      "result": "PASS",
+      "milliseconds": 2,
+      "raw_line": 8544
+    },
+    {
+      "name": "startup_failures_are_final",
+      "result": "PASS",
+      "milliseconds": 411,
+      "raw_line": 8545
+    },
+    {
+      "name": "serving_failures_are_replaced_within_budget",
+      "result": "PASS",
+      "milliseconds": 514,
+      "raw_line": 8546
+    },
+    {
+      "name": "protocol_violations_are_replaced",
+      "result": "PASS",
+      "milliseconds": 177,
+      "raw_line": 8547
+    },
+    {
+      "name": "cancelled_answers_are_never_delivered",
+      "result": "PASS",
+      "milliseconds": 155,
+      "raw_line": 8548
+    },
+    {
+      "name": "close_during_inference_never_waits",
+      "result": "PASS",
+      "milliseconds": 233,
+      "raw_line": 8549
+    },
+    {
+      "name": "sustained_requests_stay_bounded",
+      "result": "PASS",
+      "milliseconds": 690,
+      "raw_line": 8551
+    }
+  ],
+  "process_summary": [
+    "2026-10-23T03:39:50.4953753Z test result: 12 passed; 0 failed"
+  ]
+}

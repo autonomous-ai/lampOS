@@ -1,0 +1,68 @@
+{
+  "previous_head": "172389869129a7466623cc9b45d1c536f42f7429",
+  "current_head": "0f2e6439e018680af247080983c9ec0c258c3229",
+  "previous_selected": 7122,
+  "current_selected": 7136,
+  "added": [
+    {
+      "binary": "lamp-voice",
+      "name": "remember::tests::a_note_read_during_a_forget_everything_is_fenced_by_the_room_filter"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "remember::tests::a_vietnamese_kept_thing_is_found_with_or_without_its_accents"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "remember::tests::about_someone_is_first_and_third_person_words_and_possessives"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "remember::tests::after_forget_everything_the_room_s_lines_about_a_person_are_not_in_their_note_that_day"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "remember::tests::after_forget_everything_the_room_s_lines_about_a_person_are_not_recalled_that_day"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "remember::tests::after_forget_everything_the_room_s_lines_naming_them_are_left_out_that_day"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "remember::tests::english_hit_words_are_as_before_but_the_memorys_common_words"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "remember::tests::names_them_is_the_whole_name_as_whole_words"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "remember::tests::search_common_is_the_memorys_own_list"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "remember::tests::the_hits_switch_is_off_unless_exactly_on"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "remember::tests::the_journal_line_counts_what_was_told_and_never_says_it"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "remember::tests::unaccented_function_words_find_no_accented_kept_thing"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "remember::tests::vietnamese_function_words_alone_are_never_a_hit"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "second_provider::tests::unplayed_join::a_played_answer_after_words_let_go_keeps_the_conversation_going"
+    }
+  ],
+  "removed": [],
+  "previous_skipped": 31,
+  "current_skipped": 32,
+  "limit": "These are separate CI observations on different upstream trees, not a controlled causal or speedup pair. Skipped names are not printed, so the additional skipped identity is not inferred."
+}

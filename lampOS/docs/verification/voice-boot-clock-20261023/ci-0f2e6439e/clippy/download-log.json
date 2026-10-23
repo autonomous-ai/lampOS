@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "gh",
+    "api",
+    "repos/autonomous-ai/lampOS/actions/jobs/120223719617/logs"
+  ],
+  "started": "2026-10-23T03:33:06.257115+00:00",
+  "finished": "2026-10-23T03:33:08.135590+00:00",
+  "exit_code": 0,
+  "bytes": 37296,
+  "sha256": "0d7fcd703dd12bdaf6030c7d8120b599dfa85638270e729fc595d8b5f88869df"
+}

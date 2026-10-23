@@ -1,0 +1,30 @@
+{
+  "policy": "Explicit provenance projections; original API responses remain unchanged externally and are bound by these hashes.",
+  "records": {
+    "clippy/workflow-run.json": {
+      "original_bytes": 12724,
+      "original_sha256": "400e6bca374889a46eedb23b7484f93445101bcf6b47b90a9be6a913cbc4de8a",
+      "projection": "Workflow/job identity, descriptive name, head, status, timestamps, URL, runner labels and step status/timestamps only; accounts/attribution omitted."
+    },
+    "clippy/workflow-jobs.json": {
+      "original_bytes": 2635,
+      "original_sha256": "67c057acd8ac32305d9509dbaab0ab70b15e509c1878e4d0861b6f86da1cca77",
+      "projection": "Workflow/job identity, descriptive name, head, status, timestamps, URL, runner labels and step status/timestamps only; accounts/attribution omitted."
+    },
+    "arm64/workflow-run.json": {
+      "original_bytes": 12725,
+      "original_sha256": "e388613f896be972325a7ffef0996a57a263773eff320cf3dd5196c64a68c3bc",
+      "projection": "Workflow/job identity, descriptive name, head, status, timestamps, URL, runner labels and step status/timestamps only; accounts/attribution omitted."
+    },
+    "arm64/workflow-jobs.json": {
+      "original_bytes": 7021,
+      "original_sha256": "d19f1aa9f4931d7ba76177ea47429258959d95499ea5f8c4c0d4d4988216971c",
+      "projection": "Workflow/job identity, descriptive name, head, status, timestamps, URL, runner labels and step status/timestamps only; accounts/attribution omitted."
+    },
+    "clippy/merge-commit.json": {
+      "original_bytes": 2603,
+      "original_sha256": "4361fa795f83b07bba3e3c639f45f3d498c65628076fcbdc3e2033cdbb03ed35",
+      "projection": "Commit/tree/parent SHAs and author/committer times; no name/email/message."
+    }
+  }
+}

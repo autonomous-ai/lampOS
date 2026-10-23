@@ -1,0 +1,100 @@
+{
+  "workflow_id": 39895141878,
+  "job_id": 120223719617,
+  "status": "completed",
+  "conclusion": "success",
+  "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+  "rust_toolchain": "1.96.0-x86_64-unknown-linux-gnu",
+  "rustc": "1.96.0 (ac68faa20 2026-05-25)",
+  "actual_checkout": "8843f45cab0b21c3035d1707199a7dc46852249a",
+  "parents": [
+    "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+    "0f2e6439e018680af247080983c9ec0c258c3229"
+  ],
+  "merge_tree": "ae902f07d55fec0816543294d866e6ab37043c74",
+  "pr_head": "0f2e6439e018680af247080983c9ec0c258c3229",
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "whole_tree_equals_pr_head": true,
+  "lampOS_tree": "0eef484e6380d5387fbbd9b5d633367fc592ae7f",
+  "github_tree": "d6cdf1fbf133c642ef9aeadd0cd40bdae4b03acf",
+  "job_started_at": "2026-10-23T03:27:51Z",
+  "job_completed_at": "2026-10-23T03:30:33Z",
+  "job_seconds": 162.0,
+  "step_durations": [
+    {
+      "name": "Set up job",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:27:51Z",
+      "completed_at": "2026-10-23T03:27:52Z",
+      "seconds": 1.0
+    },
+    {
+      "name": "system packages",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:27:52Z",
+      "completed_at": "2026-10-23T03:28:11Z",
+      "seconds": 19.0
+    },
+    {
+      "name": "Run actions/checkout@v4",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:28:11Z",
+      "completed_at": "2026-10-23T03:28:17Z",
+      "seconds": 6.0
+    },
+    {
+      "name": "Rust 1.96.0",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:28:17Z",
+      "completed_at": "2026-10-23T03:28:26Z",
+      "seconds": 9.0
+    },
+    {
+      "name": "restore the cache",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:28:26Z",
+      "completed_at": "2026-10-23T03:28:55Z",
+      "seconds": 29.0
+    },
+    {
+      "name": "unchanged source files get the cached build's times back",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:28:55Z",
+      "completed_at": "2026-10-23T03:28:56Z",
+      "seconds": 1.0
+    },
+    {
+      "name": "clippy (every crate and target, warnings as errors)",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:28:56Z",
+      "completed_at": "2026-10-23T03:30:26Z",
+      "seconds": 90.0
+    },
+    {
+      "name": "save the cache",
+      "conclusion": "skipped",
+      "started_at": "2026-10-23T03:30:26Z",
+      "completed_at": "2026-10-23T03:30:26Z",
+      "seconds": 0.0
+    },
+    {
+      "name": "Post Run actions/checkout@v4",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:30:26Z",
+      "completed_at": "2026-10-23T03:30:27Z",
+      "seconds": 1.0
+    },
+    {
+      "name": "Complete job",
+      "conclusion": "success",
+      "started_at": "2026-10-23T03:30:27Z",
+      "completed_at": "2026-10-23T03:30:27Z",
+      "seconds": 0.0
+    }
+  ],
+  "cargo_reported_duration": "1m 27s",
+  "runtime_tests_executed": 0,
+  "log_bytes": 37296,
+  "log_sha256": "0d7fcd703dd12bdaf6030c7d8120b599dfa85638270e729fc595d8b5f88869df",
+  "cache_note": "Restored target cache and source times; exact source tree identity is not a cold-build claim."
+}
