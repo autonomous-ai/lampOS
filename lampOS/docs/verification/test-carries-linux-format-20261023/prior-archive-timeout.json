@@ -1,0 +1,95 @@
+{
+  "head": "0c2cb3df2672d08f580f0c6ccad9781f054bdbf9",
+  "commands": [
+    {
+      "name": "source-identity",
+      "command": [
+        "git",
+        "show",
+        "-s",
+        "--format=%H%n%T%n%P",
+        "0c2cb3df2672d08f580f0c6ccad9781f054bdbf9"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier",
+      "started_utc": "2026-10-23T05:58:42.185792+00:00",
+      "finished_utc": "2026-10-23T05:58:42.390921+00:00",
+      "elapsed_seconds": 0.20517984637990594,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 60,
+      "stdout_bytes": 123,
+      "stderr_bytes": 0,
+      "stdout_sha256": "50655f59c8f8e6a94b2f86a76f4d31f63897623b5cf5319c3e3eb90028c2432e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "workspace-tree",
+      "command": [
+        "git",
+        "rev-parse",
+        "0c2cb3df2672d08f580f0c6ccad9781f054bdbf9:lampOS"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier",
+      "started_utc": "2026-10-23T05:58:42.476083+00:00",
+      "finished_utc": "2026-10-23T05:58:42.669119+00:00",
+      "elapsed_seconds": 0.19310135301202536,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 60,
+      "stdout_bytes": 41,
+      "stderr_bytes": 0,
+      "stdout_sha256": "61a51a48d72b7fe42b6e9d5b0f0b023d2fb86de3e8d1e57a92a02482e6142381",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "image-inspect",
+      "command": [
+        "podman",
+        "image",
+        "inspect",
+        "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c"
+      ],
+      "cwd": null,
+      "started_utc": "2026-10-23T05:58:42.798910+00:00",
+      "finished_utc": "2026-10-23T05:58:43.166028+00:00",
+      "elapsed_seconds": 0.36722127022221684,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 60,
+      "stdout_bytes": 7701,
+      "stderr_bytes": 0,
+      "stdout_sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "archive",
+      "command": [
+        "git",
+        "archive",
+        "--format=tar",
+        "--output=/private/tmp/tests-3190-0c2-linux-fmt-20261023/run-20261023T055842.020807Z/source-lampOS.tar",
+        "0c2cb3df2672d08f580f0c6ccad9781f054bdbf9",
+        "lampOS"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier",
+      "started_utc": "2026-10-23T05:58:43.281920+00:00",
+      "finished_utc": "2026-10-23T05:59:43.397534+00:00",
+      "elapsed_seconds": 60.117559659294784,
+      "exit_code": null,
+      "timed_out": true,
+      "timeout_seconds": 60,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "terminal_format_result": null,
+  "formatter_invoked": false,
+  "classification": "Source-archive preparation timed out after60s. No formatting pass or failure was obtained; no old-head rerun. New current-head plans use an explicit180s archive timeout.",
+  "source": {
+    "path": "/private/tmp/tests-3190-0c2-linux-fmt-20261023/run-20261023T055842.020807Z/commands.json",
+    "bytes": 2859,
+    "sha256": "9f3db15a4b70182399811bd5fbc744c89f54266388a6cd391f112a947a61ee14"
+  }
+}

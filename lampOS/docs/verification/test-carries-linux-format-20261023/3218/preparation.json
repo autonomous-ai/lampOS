@@ -1,0 +1,23 @@
+{
+  "prepared_at": "2026-10-23T09:49:51.968917+00:00",
+  "source": {
+    "commit": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e",
+    "root_tree": "e7e1a36bd1fdcf7eb7ac0fb47ff2205ace97ef04",
+    "parents": [
+      "cf462adb04f64d699c226dd3b1781c0ad927068f"
+    ],
+    "workspace_tree": "59d99ca38b838ef4a9ee207c6e0170607e5ee5d5"
+  },
+  "tracked_lampOS_entries": 6680,
+  "source_tree_sha256": "6e45d514a02ed800f7a1d603c80a1705bdff8f2baa09316b6243a834e816cc01",
+  "runner_sha256": "511416d0861b72b9a6e046a887b64f70fad12cadd66a337439f80ed2ebcc4c88",
+  "plan_sha256": "236a2c2174db6fb3d7a2ba4b3e231200fbbf5aa21b23c8248e81abcef81403d2",
+  "runner_AST": "passed",
+  "prepare_only_exit": 0,
+  "Cargo_calls": 0,
+  "container_calls": 0,
+  "target_access": false,
+  "source_edits": false,
+  "change": "Only the git archive command timeout increased from 60 s to 180 s. Container formatting remains 300 s. The old 0c2 archive timeout is preserved; no formatter ran there.",
+  "old_runner_sha256": "62cb40972561bf66a12944df84357edbc6549034c7e0ffad7c0f0c6419ea6e37"
+}

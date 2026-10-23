@@ -1,0 +1,19 @@
+{
+  "source_kind": "exact_git_commit",
+  "source": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e",
+  "candidate_commit": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e",
+  "declared_overlays": [],
+  "format_container_exit": 0,
+  "timed_out": false,
+  "container_elapsed_seconds": 17.879068373702466,
+  "timing_boundary": "Entire container command including setup, extraction, rustfmt and source hashing.",
+  "formatting_success": true,
+  "source_archive_unchanged": true,
+  "git_identity_unchanged": true,
+  "snapshots_unchanged": true,
+  "compilation": false,
+  "tests": false,
+  "ARM_build": false,
+  "source_edits": false,
+  "evidence_directory": "/private/tmp/tests-3218-4e1e00e52-linux-fmt-20261023/run-20261023T095549.033245Z"
+}

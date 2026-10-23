@@ -1,0 +1,17 @@
+{
+  "label": "3190-d5d0383ac",
+  "kind": "exact_git_commit",
+  "pr": 3190,
+  "source": {
+    "commit": "d5d0383accafac8aa54c352eba65b1b0d5a44d9d",
+    "root_tree": "278baa2eace61124fe255386404dc84410b446a8",
+    "parents": [
+      "cf462adb04f64d699c226dd3b1781c0ad927068f"
+    ],
+    "workspace_tree": "1d66a43d74c8a4480e7f2d228610c646d2edce48"
+  },
+  "expected_parent": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+  "overlays": [],
+  "image": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "status": "prepared only; CPU grant required; no formatting run yet"
+}

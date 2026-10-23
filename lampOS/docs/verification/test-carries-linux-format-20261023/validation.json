@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "all_three_exit_zero": true,
+  "format_sentinels_observed": 3,
+  "source_fingerprints_unchanged": 3,
+  "immutable_head_parent_tree_checks": 3,
+  "Linux_x86_toolchain_confirmed": true,
+  "raw_stream_hashes_and_lengths_verified": true,
+  "scripts_binaries_archives_omitted": true,
+  "older_archive_timeout_retained": true,
+  "JSON_whitespace": "passed"
+}

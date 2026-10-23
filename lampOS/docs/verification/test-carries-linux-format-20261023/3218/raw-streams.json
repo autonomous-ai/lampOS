@@ -1,0 +1,80 @@
+{
+  "source-identity.stdout": {
+    "encoding": "UTF-8",
+    "bytes": 123,
+    "sha256": "ad74ef739b0917d7aac1d5b4b3f6ed88d8c02683eac0e16655e76177b5653e80",
+    "text": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e\ne7e1a36bd1fdcf7eb7ac0fb47ff2205ace97ef04\ncf462adb04f64d699c226dd3b1781c0ad927068f\n"
+  },
+  "source-identity.stderr": {
+    "encoding": "UTF-8",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "workspace-tree.stdout": {
+    "encoding": "UTF-8",
+    "bytes": 41,
+    "sha256": "89f9981887e37da0701774a4a71e4357f3f60fe1c7900b83a1e4a17d289c3e04",
+    "text": "59d99ca38b838ef4a9ee207c6e0170607e5ee5d5\n"
+  },
+  "workspace-tree.stderr": {
+    "encoding": "UTF-8",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "image-inspect.stderr": {
+    "encoding": "UTF-8",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "archive.stdout": {
+    "encoding": "UTF-8",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "archive.stderr": {
+    "encoding": "UTF-8",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "archive-commit.stdout": {
+    "encoding": "UTF-8",
+    "bytes": 41,
+    "sha256": "12de7d0a4164a0c4bd32f89abb1c0d140a3f44fc25a9a22861cb490654474e9e",
+    "text": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e\n"
+  },
+  "archive-commit.stderr": {
+    "encoding": "UTF-8",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "format.stdout": {
+    "encoding": "UTF-8",
+    "bytes": 746,
+    "sha256": "a83ad3372a82860e06b2bfb122168ff94adc993edd7c1e628ae262575ab9fa6f",
+    "text": "Linux 493ea36c9936 6.12.13-200.fc41.x86_64 #1 SMP PREEMPT_DYNAMIC Sat Feb  8 20:05:26 UTC 2025 x86_64 GNU/Linux\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nrustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.96.0\nLLVM version: 22.1.2\nhost: x86_64-unknown-linux-gnu\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nsource-before-manifest d9fc8dbba13e7b6180f77bd39129d84210460d6ef0224a71e0765512b51ffccb  /tmp/source-before.sha256\nsource-after-manifest d9fc8dbba13e7b6180f77bd39129d84210460d6ef0224a71e0765512b51ffccb  /tmp/source-after.sha256\ncargo_fmt_exit=0\n"
+  },
+  "format.stderr": {
+    "encoding": "UTF-8",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "final-source-identity.stdout": {
+    "encoding": "UTF-8",
+    "bytes": 123,
+    "sha256": "ad74ef739b0917d7aac1d5b4b3f6ed88d8c02683eac0e16655e76177b5653e80",
+    "text": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e\ne7e1a36bd1fdcf7eb7ac0fb47ff2205ace97ef04\ncf462adb04f64d699c226dd3b1781c0ad927068f\n"
+  },
+  "final-source-identity.stderr": {
+    "encoding": "UTF-8",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  }
+}

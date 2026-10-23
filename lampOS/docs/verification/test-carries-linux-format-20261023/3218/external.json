@@ -1,0 +1,44 @@
+[
+  {
+    "path": "/private/tmp/tests-3218-4e1e00e52-linux-fmt-20261023/run-20261023T095549.033245Z/image-inspect.stdout",
+    "bytes": 7701,
+    "sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74",
+    "reason": "Raw image configuration remains external; portable projection below contains only identity/OS/architecture/user."
+  },
+  {
+    "path": "/private/tmp/tests-3218-4e1e00e52-linux-fmt-20261023/run.py",
+    "bytes": 9359,
+    "sha256": "511416d0861b72b9a6e046a887b64f70fad12cadd66a337439f80ed2ebcc4c88",
+    "reason": "External preparation/runner/full Git-tree inventory retained by hash; source or script bulk not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3218-4e1e00e52-linux-fmt-20261023/source-tree.json",
+    "bytes": 1203300,
+    "sha256": "6e45d514a02ed800f7a1d603c80a1705bdff8f2baa09316b6243a834e816cc01",
+    "reason": "External preparation/runner/full Git-tree inventory retained by hash; source or script bulk not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3218-4e1e00e52-linux-fmt-20261023/runner-change.patch",
+    "bytes": 677,
+    "sha256": "af60992e950ec10bd7bbef830775ea4b9ceb2f14e73ecd08d14a69ce49836b10",
+    "reason": "External preparation/runner/full Git-tree inventory retained by hash; source or script bulk not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3218-4e1e00e52-linux-fmt-20261023/SHA256SUMS",
+    "bytes": 657,
+    "sha256": "1ae540ddfaa5d42c09657b2ad2025534e7a68f6ea01bef067e3f298ff0ba984d",
+    "reason": "External preparation/runner/full Git-tree inventory retained by hash; source or script bulk not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3218-4e1e00e52-linux-fmt-20261023/run-20261023T095549.033245Z/manifest.json",
+    "bytes": 2340,
+    "sha256": "7a7a7d03ee4718d739d9a99bc94bc6a0a25951a843bd1e9fcabacbd51de50ccd",
+    "reason": "External preparation/runner/full Git-tree inventory retained by hash; source or script bulk not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3218-4e1e00e52-linux-fmt-20261023/run-20261023T095549.033245Z/source-lampOS.tar",
+    "bytes": 211793920,
+    "sha256": "fedd17b4f7c44cf9228a08c504dd24e1810fabbe40d01b48997bd29d4df7babd",
+    "reason": "Source archive identity checked by the executed runner; archive not copied into publication or rehashed by this packaging step."
+  }
+]

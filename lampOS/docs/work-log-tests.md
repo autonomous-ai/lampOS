@@ -1,5 +1,23 @@
 # Tests work log
 
+## 2026-10-23 17:02 +0700 — relay ready; exact-head Linux formatting published
+
+Ready for lamp-voice: yes (#3255; reviewer read and train remain).
+
+#3255 at `e228f6452` passed native ARM64 run 39934214655 and Linux Clippy
+39934214581. ARM reports **1,162 / 0 / 4**, no leaky pass, selecting Cloud,
+Update and VoiceEval (3/46 packages); its changed relay test passed. Full
+Mac VoiceEval is **623 / 0 / 0**, with formatting, strict Clippy and build
+green. The invalid restricted-sandbox run remains disclosed. Reviewer-two
+is reading the ready head; this does not clear #3190's broader HOLD.
+
+[Exact-head Linux formatting receipts](verification/test-carries-linux-format-20261023/)
+pass for #3255 `e228f6452`, #3218 `4e1e00e52` and #3190 `d5d0383ac`.
+Each source archive contains all 6,680 tracked lampOS inputs and retains
+equal before/after fingerprints. The earlier archive timeout remains
+explicitly unexecuted formatting. #3190's current full Voice gate is running
+and #3218's full Voice/readers gate follows. No local ARM build or lamp use.
+
 ## 2026-10-23 16:55 +0700 — current relay gate passes after environment correction
 
 Ready for lamp-voice: no (native qualification and review pending).
