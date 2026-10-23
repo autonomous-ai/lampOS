@@ -5,6 +5,26 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 17:21 — generic voice clock pushed as #3260
+
+Ready for lamp-voice: no (native gates and review pending).
+
+- #3260 is pushed at `7c3693e66` on `b5a199368`: the five assigned
+  product clock/session flags in the generic voice template, with its
+  census, function/context regression and dependency docs.
+- The [gate receipt](verification/generic-voice-clock-20261023/README.md)
+  records both tests failing before, full update tests 343/0 after, and
+  the equal latest-base carry's 125/0 focused gate, fmt and strict Clippy.
+  The restricted-sandbox attempt and five failures remain disclosed;
+  the corrected permission run changed neither source nor fixtures.
+- ARM64 `39938443228` and Linux Clippy `39938443224` are running.
+  Tests was asked for exact-head Linux fmt; the reviewer-lead for the read.
+  First owns the merge. No acoustic latency or lamp result is claimed.
+- First accepted the #2948 conditional OTA finding and assigned its
+  independent update fix to Second. The published controls were handed on;
+  this carry stays held until the correction is verified with it.
+  El still owns #3248's stationary-hand repair.
+
 ## 2026-10-23 17:06 — touch carry review finds a conditional update gap
 
 Ready for lamp-voice: no (#2948 transition held; generic clock gate continues).
