@@ -18,6 +18,14 @@
   "sha256": {
     "body-override.patch": "ed39ce675dc345140e3c87ef8d4454752be9d494fb1bea27dd7973adb5d27d4f",
     "body-override.txt": "1ca9401107139fc811728de14975808c46fa0ac938a2674e0b8b881a5cd531b0",
-    "install.txt": "5eecab1a3dcf2b72689d9cd3a5ec49e4c1d9feac43ba28bb1e8658468c557941"
+    "install.txt": "5eecab1a3dcf2b72689d9cd3a5ec49e4c1d9feac43ba28bb1e8658468c557941",
+    "round.txt": "b341f6750107f6628bace074a148fe3f92de6035adefea9e1a1eef1c6a1b16b5"
+  },
+  "existing_round_controls": {
+    "passed": 28,
+    "failed": 0,
+    "ignored": 0,
+    "exit": 0,
+    "duration_seconds": 128.64
   }
 }

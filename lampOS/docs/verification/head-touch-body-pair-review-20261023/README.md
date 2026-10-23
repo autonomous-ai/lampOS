@@ -25,8 +25,10 @@ This does not establish a microphone privacy violation or a servo-limit bypass.
 
 The original six installer head-pair controls pass **6 / 0 / 0**, exit 0,
 in 3.22 seconds. No original test assertion or production file was changed.
-The separate 28-case update-round check was still running when this receipt
-was written; it is not counted as passed here.
+The separate update-round check then passed **28 / 0 / 0**, exit 0, in
+128.64 seconds (`round.txt`). Runtime and round-fixture source were unchanged;
+the additive installer fixture is not compiled by that target. The Body P2
+remains; these original cases do not test a Body-off override.
 
 Commands, from the isolated exact-head `lampOS/` checkout, with Rust 1.96.0,
 two build jobs and the existing Mac cache:
@@ -36,7 +38,9 @@ cargo +1.96.0 test -q --locked --offline -p lamp-update --test install -- instal
 cargo +1.96.0 test -q --locked --offline -p lamp-update --test install second_review_body_head_off_refuses_before_bundle_mutation -- --exact --nocapture
 ```
 
-The first ran before the additive patch. The second ran once after it.
+The round command was `cargo +1.96.0 test -q --locked --offline -p lamp-update --test round head_touch:: -- --test-threads=2`.
+
+The first installer command ran before the additive patch. The second ran once after it.
 `receipt.json` hashes both raw logs and the patch. The exact runtime and
 existing fixture source remains the PR head.
 
