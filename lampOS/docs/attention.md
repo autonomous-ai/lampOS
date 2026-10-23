@@ -2338,7 +2338,8 @@ eyes' newest look, or a line in another voice, make it busy at once
 (`room_told::RoomTold::count_held_talk`, `two_people`). What the model is told
 of the conversation is not changed. Off until a real desk-talk set passes.
 Its costs: in a busy room an answer to the lamp's own question begun more than
-8 s after its words needs the name; in a room not known to be busy a person
+the follow-up window after its words (8 s unless `LAMP_FOLLOW_UP_FOR_MS` sets
+it) needs the name; in a room not known to be busy a person
 alone facing the lamp on a phone call is answered line after line, as before
 the switch: the lamp holds none of it, and one face makes no busy room. So is
 a colleague off camera, with no voice model, while the person faces the lamp,

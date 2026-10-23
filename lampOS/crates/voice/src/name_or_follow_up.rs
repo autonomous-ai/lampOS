@@ -78,17 +78,19 @@ pub const FOLLOW_UP_FOR: Duration = Duration::from_secs(8);
 /// whole number of ms from [`FOR_LEAST`] to [`FOR_MOST`]: the lead's
 /// decision 4 (#1711, 23 Oct 08:2x), a second person's follow-up without the
 /// name answered within the window, so the window is a setting. Read only
-/// with the switch on; anything else is said once and ignored.
+/// with the switch on; anything else is said once a coordinator, and
+/// ignored.
 pub const FOR_ENVIRONMENT: &str = "LAMP_FOLLOW_UP_FOR_MS";
 /// The worker's flag for it, with its value, right after [`FLAG`].
 pub const FOR_FLAG: &str = "--follow-up-for-ms";
 /// The shortest window the setting takes: under it, "And tomorrow?" said
 /// as the answer ends would need the name.
 const FOR_LEAST: Duration = Duration::from_secs(1);
-/// The longest: the second route's busy room keeps a conversation going on
-/// only so long anyway
-/// (`second_provider::worker::BUSY_GOING_ON_FOR`), so a longer window
-/// would widen nothing there.
+/// The longest: chosen, as policy, to match how long a busy room keeps a
+/// conversation going on without the switch
+/// (`second_provider::worker::BUSY_GOING_ON_FOR`, 15 s). It is no ceiling
+/// the code would impose: with the switch, in a busy room, the window alone
+/// decides, so a longer one would let desk talk in longer.
 const FOR_MOST: Duration = Duration::from_secs(15);
 
 /// The window the worker was given, in ms ([`FOLLOW_UP_FOR`] until then).
@@ -98,16 +100,20 @@ static FOR_MS: AtomicU64 = AtomicU64::new(FOLLOW_UP_FOR.as_millis() as u64);
 pub fn arguments_from_environment() -> Vec<String> {
     let value = std::env::var(ENVIRONMENT).ok();
     let window = std::env::var(FOR_ENVIRONMENT).ok();
+    // Said once a coordinator, not at each worker start.
+    static SAID: std::sync::Once = std::sync::Once::new();
     if value.as_deref() == Some("on")
         && let Some(window) = window.as_deref()
         && within(window).is_none()
     {
+        SAID.call_once(|| {
         eprintln!(
             "lamp-voice: {FOR_ENVIRONMENT}={window:?} is not a whole number of ms from {} to {}; a follow-up has {} s",
             FOR_LEAST.as_millis(),
             FOR_MOST.as_millis(),
             seconds(FOLLOW_UP_FOR)
         );
+        });
     }
     arguments_with(value.as_deref(), window.as_deref())
 }
@@ -148,13 +154,26 @@ pub fn take(flags: &[String]) -> (bool, &[String]) {
 }
 
 /// Take a leading [`FOR_FLAG`] and its value off a worker's flags, right
-/// after [`take`]: the window, when its value is one.
+/// after [`take`]: the window, when its value is one. One that isn't, or
+/// none, is said, and the window stays as it was; the coordinator writes
+/// neither.
 pub fn take_for(flags: &[String]) -> (Option<Duration>, &[String]) {
-    match flags {
-        [flag, value, rest @ ..] if flag == FOR_FLAG => (within(value), rest),
+    let (value, rest) = match flags {
+        [flag, value, rest @ ..] if flag == FOR_FLAG => (Some(value.as_str()), rest),
         [flag] if flag == FOR_FLAG => (None, &flags[1..]),
-        _ => (None, flags),
+        _ => return (None, flags),
+    };
+    let window = value.and_then(within);
+    if window.is_none() {
+        eprintln!(
+            "lamp-voice provider: {FOR_FLAG} {} is not a window of {} to {} ms; a follow-up has {} s",
+            value.unwrap_or("with no value"),
+            FOR_LEAST.as_millis(),
+            FOR_MOST.as_millis(),
+            seconds(follow_up_for())
+        );
     }
+    (window, rest)
 }
 
 /// The worker's window from now on: what [`take_for`] took.
