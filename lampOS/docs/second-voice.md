@@ -3161,6 +3161,34 @@ after a take-over, but now for every turn:
   couldn't read keeps the sign, so with their speaking read off nothing
   changes. Risk: a person turned to the lamp and asking, whose mouth reads
   still, needs its name in a busy room.
+- **A face turned to the lamp lets out only a line it is seen speaking**
+  (`LAMP_TURNED_FACE_SPEAKS=on`; with `--attention`). On lamp-52e6 on 24 Oct
+  at 05:31, with the owner's still face turned to the lamp, two other
+  voices' desk talk, never saying its name, was answered: `no conversation
+  going on: ...` then `its answer is played: someone is turned to the lamp`
+  (`attention::decide_called`, the `TURNED` arm), and `room/state` stayed
+  `unknown`. With the switch, the eyes' speaking faces are read over the
+  line (`worker::Heeding::silence_turned`): when a face turned to the lamp
+  read still in at least half the looks and none turned to it read speaking
+  in any look (`speaking_faces::turned_not_seen_speaking`; a look whose
+  turned mouth went unread spoils nothing, unlike `LAMP_TURNED_SPEAKING`),
+  and the line's print, as far as it is known, is not the conversation's
+  voice at `SAME_FROM` (0.70), the sign is taken away in any room: `request
+  N: the face turned to the lamp was not seen speaking the line, nor is it
+  in the conversation's voice: nobody is turned to it
+  (LAMP_TURNED_FACE_SPEAKS)`. The line, held, is talk for the room
+  (`room_told::RoomTold::face_not_speaking`): it joins the run that makes a
+  room busy (3 within 60 s, 2 from a quiet one), so a desk where two people
+  talk past someone at the lamp reads busy, with or without
+  `LAMP_NAME_OR_FOLLOW_UP`. The 22 Oct rule that a lone voice with nobody in
+  view never makes the room busy stands: here a face is in view and its
+  mouth reads still while the voice talks. With no mouths read
+  (`LAMP_EYES_SPEAKING` off, or never read through the line) the face is a
+  sign as before: fail open, so a person alone at a lamp whose eyes can't
+  read mouths is still answered. A line carried by `LAMP_SAME_SPEAKER_CARRIES`
+  goes on as the conversation, before the face is read, and stays carried.
+  Risk: the owner turned to the lamp and asking, whose mouth the eyes read
+  still through the whole line, needs its name or a follow-up.
 - **A session's trust is the caller's** (with `LAMP_QUIET_GOING_ON_SAME_ONE=on`
   or `LAMP_GOING_ON_NOT_OWN=on` and `LAMP_SAME_VOICE_MODEL`, the first
   builder at 09:40 on #2428). Past its first two lines a session is trusted

@@ -195,6 +195,9 @@ pub struct RoomTold {
     /// ([`Self::seen_talking`]).
     held_talk: bool,
     talking_seen: Option<u64>,
+    /// The request whose face turned to the lamp was seen not speaking it
+    /// (`LAMP_TURNED_FACE_SPEAKS`, [`Self::face_not_speaking`]).
+    not_speaking: Option<u64>,
     /// The request let out only as the same speaker's conversation carried
     /// on ([`Self::carried`]), until it is closed.
     carried: Option<u64>,
@@ -231,6 +234,7 @@ impl RoomTold {
             ends_sooner: false,
             held_talk: false,
             talking_seen: None,
+            not_speaking: None,
             carried: None,
             room: Room::Unknown,
             told: None,
@@ -253,6 +257,19 @@ impl RoomTold {
     /// two lines in a row were never left alone.
     pub fn count_held_talk(&mut self, on: bool) {
         self.held_talk = on;
+    }
+
+    /// `request` was said while the only faces turned to the lamp were seen
+    /// not speaking it (`LAMP_TURNED_FACE_SPEAKS`,
+    /// `speaking_faces::SpeakingFaces::turned_not_seen_speaking`): someone
+    /// at the lamp listening while another voice talks. Held, in any room,
+    /// it is talk, and joins the run that makes the room busy, so a desk
+    /// where two people talk past a still face turned to the lamp reads
+    /// busy (lamp-52e6 on 24 Oct at 05:31). Not a lone voice with nobody in
+    /// view ([`Self::count_held_talk`]'s note): a face is in view, and its
+    /// mouth is read still while the voice talks.
+    pub fn face_not_speaking(&mut self, request: u64) {
+        self.not_speaking = Some(request);
     }
 
     /// `request` was said with someone in view and not turned to the lamp
@@ -487,6 +504,9 @@ impl RoomTold {
                     && (crate::attention::said_to_another(why)
                         || why == crate::attention::NOT_SPOKEN_TO
                             && self.talking_seen == Some(request)) => {}
+            // `LAMP_TURNED_FACE_SPEAKS`: said past a face turned to the lamp
+            // and seen not speaking it, in any room, it is talk.
+            Some(crate::attention::Verdict::Hold(_)) if self.not_speaking == Some(request) => {}
             Some(crate::attention::Verdict::Hold(_)) => self.held(request),
             _ => {}
         }
@@ -2106,6 +2126,65 @@ mod tests {
         room.ended(1, 311 * S);
         room.judged(1, Some(Verdict::Hold(NOT_SPOKEN_TO)), true);
         assert_eq!(room.at(312 * S), Room::Busy);
+    }
+
+    /// `LAMP_TURNED_FACE_SPEAKS` (lamp-52e6, 24 Oct 05:31): lines held
+    /// while the only face turned to the lamp was seen not speaking them are
+    /// talk, whatever `LAMP_NAME_OR_FOLLOW_UP`: three within a minute make a
+    /// room not yet known busy (two a quiet one, `QUIET_ENDS_RUN`), and in a
+    /// busy room they keep it so. The same lines
+    /// held with no such face are held lines, and the room stays quiet: a
+    /// lone voice with nobody in view still never makes it busy.
+    #[test]
+    fn lines_held_past_a_still_face_turned_to_the_lamp_are_talk() {
+        use crate::attention::{BUSY_UNCALLED, NOT_SPOKEN_TO, Verdict};
+        const S: u64 = 1_000_000;
+        let unknown = || {
+            let mut room = RoomTold::new();
+            room.count_only_talk(true);
+            room
+        };
+        let quiet = || {
+            let mut room = unknown();
+            room.at(0);
+            assert_eq!(room.at(301 * S), Room::Quiet);
+            room
+        };
+        let line = |room: &mut RoomTold, request: u64, at: u64, why: &'static str, still: bool| {
+            room.heard(request, at * S);
+            room.ended(request, at * S + S / 2);
+            if still {
+                room.face_not_speaking(request);
+            }
+            room.judged(request, Some(Verdict::Hold(why)), false);
+            room.left_unanswered(request, at * S + S)
+        };
+        let mut room = unknown();
+        for (request, at) in [(1, 310), (2, 320)] {
+            assert_eq!(
+                line(&mut room, request, at, NOT_SPOKEN_TO, true),
+                Left::Talk
+            );
+            assert_eq!(room.at(at * S + 2 * S), Room::Unknown, "line {request}");
+        }
+        assert_eq!(line(&mut room, 3, 330, NOT_SPOKEN_TO, true), Left::Talk);
+        assert_eq!(room.at(332 * S), Room::Busy, "three within a minute");
+        assert_eq!(line(&mut room, 4, 340, BUSY_UNCALLED, true), Left::Talk);
+        assert_eq!(room.at(342 * S), Room::Busy);
+        let mut room = quiet();
+        assert_eq!(line(&mut room, 1, 310, NOT_SPOKEN_TO, true), Left::Talk);
+        assert_eq!(room.at(312 * S), Room::Quiet);
+        assert_eq!(line(&mut room, 2, 320, NOT_SPOKEN_TO, true), Left::Talk);
+        assert_eq!(room.at(322 * S), Room::Busy, "two from a quiet room");
+        for mut room in [unknown(), quiet()] {
+            for (request, at) in [(1, 310), (2, 320), (3, 330)] {
+                assert_eq!(
+                    line(&mut room, request, at, NOT_SPOKEN_TO, false),
+                    Left::Held
+                );
+            }
+            assert_ne!(room.at(332 * S), Room::Busy, "no face read still");
+        }
     }
 
     /// `LAMP_NAME_OR_FOLLOW_UP`: two people at the lamp, two faces in view
