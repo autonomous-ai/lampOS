@@ -90,3 +90,15 @@ CREATE TABLE IF NOT EXISTS follow_up_offers (
     offers INTEGER NOT NULL,
     offered_unix_ms INTEGER NOT NULL
 );
+-- #2849 (the first builder's yes, 23 Oct 09:37; the voice's
+-- LAMP_MEMORY_ROOM_SPEAKER): who said a room line, the id of the one known
+-- person whose face was seen saying it; no row when nobody was. Only for the
+-- room's (`everyone`) exchanges and kept things, and read only by
+-- `forget_said`, never told. Its row goes with the entry when that is
+-- forgotten or expires. Older builds pass this table over; `user_version`
+-- stays 1.
+CREATE TABLE IF NOT EXISTS speakers (
+    rid INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE,
+    speaker TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS speakers_by ON speakers(speaker);

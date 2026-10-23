@@ -25,6 +25,18 @@ enum Extra {
         /// followed (#813): forgetting one removes this exchange.
         #[serde(default)]
         rule_ids: Vec<u64>,
+        /// #2849: on a room line only, the one known person seen saying it
+        /// (`Days::append_ruled_by`).
+        #[serde(default)]
+        speaker: Option<String>,
+    },
+    /// #2849 (the first builder's yes, 23 Oct 09:37): the room's lines
+    /// `speaker` said, and what was made only from them, removed
+    /// (`Days::forget_said`). The room's alone.
+    ForgetSaid {
+        #[serde(default)]
+        person: Who,
+        speaker: String,
     },
     Search {
         #[serde(default)]
@@ -219,8 +231,17 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             at_unix_ms,
             heard,
             said,
+            speaker,
         } => value(Response::Added {
-            id: store.append(&one(person)?, at_unix_ms, &heard, &said, &[])?,
+            id: store.append_ruled_by(
+                &one(person)?,
+                at_unix_ms,
+                &heard,
+                &said,
+                &[],
+                &[],
+                speaker.as_deref(),
+            )?,
         }),
         // #2510: a correction, checked here, of a kept thing the session
         // was shown; refused, nothing is written.
@@ -232,9 +253,10 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             replaces: Some(old),
             shown,
             on,
+            speaker,
             ..
         } => {
-            let id = store.remember_replacing_on(
+            let id = store.remember_replacing_on_by(
                 &one(person)?,
                 at_unix_ms,
                 &text,
@@ -242,6 +264,7 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
                 old,
                 &shown,
                 on.as_deref(),
+                speaker.as_deref(),
             )?;
             json!({"ok":true,"id":id,"replaced":old})
         }
@@ -252,16 +275,18 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             source_ids,
             once: false,
             on,
+            speaker,
             ..
         } => value(Response::Added {
             id: store
-                .remember_on(
+                .remember_on_by(
                     &one(person)?,
                     at_unix_ms,
                     &text,
                     &source_ids,
                     false,
                     on.as_deref(),
+                    speaker.as_deref(),
                 )?
                 .0,
         }),
@@ -275,14 +300,16 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             source_ids,
             once: true,
             on,
+            speaker,
             ..
-        } => match store.remember_on(
+        } => match store.remember_on_by(
             &one(person)?,
             at_unix_ms,
             &text,
             &source_ids,
             true,
             on.as_deref(),
+            speaker.as_deref(),
         )? {
             (id, true) => json!({"ok":true,"id":id,"existing":true}),
             (id, false) => value(Response::Added { id }),
@@ -345,8 +372,18 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             said,
             source_ids,
             rule_ids,
+            speaker,
         } => {
-            json!({"ok":true,"id":store.append_ruled(&one(person)?,at_unix_ms,&heard,&said,&source_ids,&rule_ids)?})
+            json!({"ok":true,"id":store.append_ruled_by(&one(person)?,at_unix_ms,&heard,&said,&source_ids,&rule_ids,speaker.as_deref())?})
+        }
+        Extra::ForgetSaid { person, speaker } => {
+            if one(person)?.as_str() != Person::EVERYONE {
+                return Err(Error::new(
+                    "bad_person",
+                    "forget_said is the room's: who said a line is kept only for the room's",
+                ));
+            }
+            json!({"ok":true,"removed":store.forget_said(&speaker)?})
         }
         Extra::Search {
             person,
@@ -506,6 +543,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "conversation_end",
             "tidy_apply",
             "adopt",
+            "forget_said",
         ];
         const OLD: &[&str] = &[
             "append",
@@ -672,6 +710,14 @@ mod tests {
         );
         assert_eq!(
             forgot(&mut store, json!({"op":"status","person":null})),
+            None
+        );
+        // #2849: the room's lines a person said are not all of anyone's.
+        assert_eq!(
+            forgot(
+                &mut store,
+                json!({"op":"forget_said","speaker":"p-0123456789abcdef"})
+            ),
             None
         );
     }
@@ -1123,7 +1169,9 @@ mod tests {
                 "session_close",
                 "conversation_end",
                 "conversation_end",
-                "tidy_apply"
+                "tidy_apply",
+                // Who said the room's lines, forgotten (#2849).
+                "forget_said"
             ]
         );
         assert_eq!(submissions, [false, true]);
