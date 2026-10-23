@@ -312,8 +312,10 @@ impl Interruption {
     /// deadline, and only while its speech in the clear is under
     /// [`BACKCHANNEL_SPEECH_BLOCKS`]. Words that are a backchannel
     /// let stillness resume it, unless that speech reaches a sentence; any
-    /// other words end the hold, and a due commit commits. A stop word and
-    /// a forced yield are never held.
+    /// other words end the hold, and a due commit commits. No words by the
+    /// hold's end resume the reply: a wordless yield is room sound or the
+    /// lamp's own echo, and ends no answer. A stop word and a forced yield
+    /// are never held.
     pub fn hold_backchannels(&mut self, words_asked_after_still: u8) {
         self.holds_backchannels = true;
         self.words_asked_after_still = words_asked_after_still;
@@ -478,29 +480,37 @@ impl Interruption {
                         *speech >= self.rule.speech_blocks.max(1)
                             || (quiet && *seen >= self.rule.plain_blocks.max(1))
                     };
-                // Held for its words, while they may yet be a backchannel,
-                // and never past the deadline: the request kept for the
-                // commit is kept no longer than a yield lasts.
-                let held = due
-                    && *blocks < self.rule.deadline_blocks
-                    && self.holds_backchannels
+                // Awaiting words that may yet be a backchannel: a due
+                // commit waits for them, and one whose words never come
+                // resumes the reply rather than end it (lamp-52e6 on #3200:
+                // a wordless yield, room sound or the lamp's own echo, cut a
+                // story). A sentence still commits without them.
+                let wordless = self.holds_backchannels
                     && self.words_pending
                     && !self.stop_heard
                     && !self.forced_yield
-                    && !sentence
+                    && !sentence;
+                // Held for its words, never past the deadline: the request
+                // kept for the commit is kept no longer than a yield lasts.
+                let held = due
+                    && wordless
+                    && *blocks < self.rule.deadline_blocks
                     && u16::from(*still)
                         < u16::from(self.words_asked_after_still)
                             + u16::from(BACKCHANNEL_WORDS_WAIT_BLOCKS);
                 if held {
                     self.held += 1;
                     Step::Carry
-                } else if due {
+                } else if due && !wordless {
                     self.state = LISTENING;
                     self.words_pending = false;
                     self.stop_heard = false;
                     self.commits += 1;
                     Step::Commit
-                } else if (quiet && !self.words_pending) || *blocks >= self.rule.deadline_blocks {
+                } else if due
+                    || (quiet && !self.words_pending)
+                    || *blocks >= self.rule.deadline_blocks
+                {
                     self.state = LISTENING;
                     self.words_pending = false;
                     self.stop_heard = false;
