@@ -5,6 +5,19 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 00:26 — release-pair review and train-51 carry
+
+- #3278 source and local evidence read at `7ebb876be`, carried unchanged
+  across all 255 authored paths to `baed91ead`: no P1/P2. All 234 raw-file
+  bindings and 166 snapshot checks pass. Nonblocking provenance P3 is
+  recorded in the [review](verification/updater-release-pair-review-20261024/README.md).
+- Reviewed-head ARM64 **11,068 passed including one LEAK / 0 failed / 71
+  skipped**, Clippy and source-only Linux formatting pass. Fresh carry
+  qualification remains with the current native runs and formatting receipt.
+- #3275 is carried to `06ae9205f` on `1291ef1f4`: six equal commits,
+  unchanged tested Update source/dependencies, Mac formatting passes. Its
+  fresh native gate and Second's Body read remain watched.
+
 ## 2026-10-24 00:16 — Body repair pushed on the latest base
 
 - #3275 `a449e539f`, based on `822efff7c`: full Mac Update **385/0/4 ignored**,

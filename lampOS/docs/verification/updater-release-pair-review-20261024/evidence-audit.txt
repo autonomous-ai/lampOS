@@ -1,0 +1,84 @@
+{
+  "review_head": "7ebb876be004a84981cc71bf8b01e3eb3a06eb4c",
+  "review_scope": "Read-only committed evidence audit; no test/build/container/CI execution or GitHub actions.",
+  "source_carry": {
+    "from": "d5d4d048b0b7fc850abc49d38c9964eaf03ac780",
+    "fixture_files": 3,
+    "sha256_matches": 3,
+    "evidence_directory_diff": "none",
+    "update_cargo_and_product_source_diff": "none"
+  },
+  "artifact_bindings": {
+    "all_committed_raw_files_hashed": 234,
+    "per_direction": 117,
+    "missing": 0,
+    "hash_or_size_mismatches": 0,
+    "metadata_hashes_matched": 4,
+    "manual_output_published_sha_match": true,
+    "package_output_sha_match": true,
+    "committed_evidence_files": 251
+  },
+  "observed_results": {
+    "manual_cases": [
+      2,
+      0,
+      0
+    ],
+    "manual_duration_seconds": 4.85,
+    "package_totals": [
+      371,
+      0,
+      6
+    ],
+    "per_direction_container_exit": 0,
+    "writer_wait_status": 137,
+    "apply_helper_exit": 0,
+    "recovery_helper_exit": 0,
+    "recovery_exit": 1,
+    "next_refusal_exit": 1
+  },
+  "independent_snapshot_checks": {
+    "per_direction": 83,
+    "passed_total": 166,
+    "failed": 0,
+    "basis": [
+      "Decode before settings from retained forward-back.json; compare recorded mode/hash and exact recovered/next bytes.",
+      "Compare each restored unit to cut/records/previous; compare saved old link to recovered links and selected executable hashes.",
+      "Verify cut settings/new units/new selected bytes differ; journal checksum is unchanged at recovery boundary.",
+      "Verify state installed/previous, settings and unknown canary preserved; made cleared; exactly one failed-candidate refusal; next state byte-identical.",
+      "Verify exact restart sequence uses old Air-before-Records order; inactive Schedule not restarted; no next-round host calls.",
+      "Verify fixture public-key fingerprint matches writer diagnostics."
+    ]
+  },
+  "environment": {
+    "container_image": "sha256:7dc3bb4b3b88bb00e16e37eeb5c98a74f9d926f956584eb8c009c9ca86023cd2",
+    "platform": "linux/arm64",
+    "network": "none",
+    "mounts": [],
+    "init": true,
+    "memory_bytes": 536870912,
+    "pids_limit": 64,
+    "terminal_status": "both exited0, neither OOMKilled",
+    "cleanup": "Matching owner-label/removal streams and final empty listing retained."
+  },
+  "findings": [
+    {
+      "severity": "P3",
+      "path": "lampOS/docs/verification/updater-release-pair-20261023/README.md:14",
+      "summary": "Claim that current executable matches the manifest updater entry is not independently reconstructible from retained files.",
+      "detail": "artifact-binding.json retains only the manifest-envelope SHA256, and release-6449.json repeats that asset digest; neither raw public envelope nor decoded updater entry/comparison output is retained. Executable digest/size, source commit and successful publisher metadata are internally consistent.",
+      "suggestion": "Retain the public envelope or a bounded decoded updater entry plus digest/check receipt. This is evidence completeness only; no recovery failure or signature-authentication claim is inferred."
+    }
+  ],
+  "P1_P2": "none in this evidence audit",
+  "limits": [
+    "No standalone before snapshot or original signed fixture channel envelope is committed; old settings and modes are reconstructible from actual back.json, old units and links from previous/, and initial state from the pinned fixture source.",
+    "Source modes are retained in files.json and asserted by the fixture; Git normalizes non-executable checkout permission bits (55 mode differences per direction), so checkout stat is not independent proof of original source modes.",
+    "Actual release binary files are intentionally not committed; this audit binds retained /proc writer hashes, source digest checks and immutable asset metadata, not a fresh binary acquisition.",
+    "Public release key is pending and independent cryptographic authenticity is explicitly unclaimed. Signed fixture channel uses separate generated keys.",
+    "One pre-first-ordinary-restart cut each way; fake systemctl/service health, no real systemd, timing/latency/device/motor qualification, additional cuts or physical power-loss durability.",
+    "SIGKILL plus shell wait137 is recorded, not WIFSIGNALED.",
+    "Original unredacted manual log is represented by a hash only; published log hash is independently verified.",
+    "Reviewer-two already identified absent separate source-after record; not repeated as a new finding."
+  ]
+}
