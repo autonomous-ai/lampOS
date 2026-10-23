@@ -1,0 +1,17 @@
+{
+  "head": "4df51b492673975071e9e6a329d59bdab2e2c59e",
+  "base": "e6b88eac27096cd395e1a7c8555a13cbd6b68cf5",
+  "original_reviewed_head": "ef85204dd5653602f31ce41ed1c66df1135144ca",
+  "bound_files": 6648,
+  "tested_files_unchanged_through_commit": true,
+  "changed_runtime_and_tests_match_original": [
+    "lampOS/crates/update/src/round.rs",
+    "lampOS/crates/update/src/unit.rs",
+    "lampOS/crates/update/src/unit/restart_order.rs",
+    "lampOS/crates/update/tests/round.rs",
+    "lampOS/crates/update/tests/round/restart_order.rs",
+    "lampOS/crates/update/tests/round/restart_quiet.rs"
+  ],
+  "public_branch_left_at_original_head": true,
+  "reason": "Train 27 already carries the reviewed original. This gated local carry is retained; its prose corrections go in the follow-up instead of changing the train source."
+}
