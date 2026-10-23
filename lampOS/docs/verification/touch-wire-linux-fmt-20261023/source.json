@@ -1,0 +1,84 @@
+{
+  "pr": {
+    "baseRefName": "lamp-voice",
+    "baseRefOid": "498aca8a2c37e02dcdcde9e15d297cedc52040fc",
+    "headRefName": "third/touch-additive-fields",
+    "headRefOid": "418f618e8572392d1df09df07399d0ac2231b1c1",
+    "number": 3204,
+    "title": "lampOS: keep touch readers compatible with added fields",
+    "url": "https://github.com/autonomous-ai/lampOS/pull/3204"
+  },
+  "commit": "418f618e8572392d1df09df07399d0ac2231b1c1",
+  "parent": "498aca8a2c37e02dcdcde9e15d297cedc52040fc",
+  "root_tree": "e67ee12f4ab179e38f4b136d6f51afee62545db6",
+  "workspace_tree": "ad6362c98db49f4da424a20e8b863fc1d5a6f1ac",
+  "input_scope": "All tracked lampOS files from the exact immutable Git commit; no worktree overlay.",
+  "archive_file": "source-lampOS.tar",
+  "archive_bytes": 210288640,
+  "archive_sha256": "c5114b2524daf70fd9355791857ba4dc53d976c5cf5b2d0a3f703173539aaebf",
+  "image_id": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "image_os": "linux",
+  "image_architecture": "amd64",
+  "prior_method": "/private/tmp/tests-3162-linux-fmt-20261023.py",
+  "prior_method_sha256": "fcb7ea4eb6fbab4c86a9c610fd4bebe627cdf6df66e52ef7200b77faf2528ced",
+  "runner_sha256": "1f35d2aedafa8746b080d5f2e2881e4d2cf978518f85b59680b9b63e69432bde",
+  "prepared_source_proof_sha256": "ef97d9808a5c874c035821b0ef1a00c9d23c794ae2e351898a95b01e35764326",
+  "tracked_lampOS_entries": 6655,
+  "tracked_lampOS_blob_bytes": 204427860,
+  "git_ls_tree_r_l_z_sha256": "c72e05e42e24628944bb4bfa77da23b6fe1d2e6b05f59f0b0e3b22b55b96a830",
+  "root_rustfmt_config_present": false,
+  "workspace_toolchain": "[toolchain]\nchannel = \"1.96.0\"\nprofile = \"minimal\"\ncomponents = [\"clippy\", \"rustfmt\"]\n",
+  "changed_paths": [
+    {
+      "path": "lampOS/crates/controls/tests/it/touch_receiver.rs",
+      "mode": "100644",
+      "git_blob": "ad628159b42b1d9f8e546f2eca7a1e8ee76c304c",
+      "bytes": 19760,
+      "sha256": "5b51d405f049dae4a540ef6d3a175741cf3b99f05dd107bcefcbd1db71102c35"
+    },
+    {
+      "path": "lampOS/crates/msgs/src/controls.rs",
+      "mode": "100644",
+      "git_blob": "4a2163ec3642c3a750867bded228d3e315b54d63",
+      "bytes": 30063,
+      "sha256": "33ce8ce455a7dfeac9cc5050951146ff16e409d202c6c78452b6634d95f96a62"
+    },
+    {
+      "path": "lampOS/crates/msgs/tests/it/touch.rs",
+      "mode": "100644",
+      "git_blob": "a705df5cd038d2a031681472a3195c092e0915bf",
+      "bytes": 19516,
+      "sha256": "bb03a6cf8e1be8cd07dd3382edc3797eb2074b9b54a1a1d073bd8b321fe4d19e"
+    },
+    {
+      "path": "lampOS/docs/msgs.md",
+      "mode": "100644",
+      "git_blob": "a65b85f6cf07fbfeb71979032968f6e89f6df347",
+      "bytes": 52014,
+      "sha256": "409a88f88240ee7cf5fe53b3e81292a01120000783a5aceee8a9ebafcca0fa5c"
+    },
+    {
+      "path": "lampOS/docs/verification/touch-wire-compat-20261023/README.md",
+      "mode": "100644",
+      "git_blob": "69f3454a9d907a46d0675658e4e01275d8556ef7",
+      "bytes": 5657,
+      "sha256": "19e555f858acae47294173c1e0e406555458bf65131e1a96910cf7023b008d41"
+    }
+  ],
+  "carry_note": "PR reports 7406f1a61 = 418f618e8 with identical five authored blobs. Exact current head and parent are verified locally; the earlier commit is absent locally, so its reported range-diff is not independently recomputed.",
+  "preparation_read_failure": {
+    "command": [
+      "git",
+      "range-diff",
+      "7406f1a61^..7406f1a61",
+      "498aca8a2c37e02dcdcde9e15d297cedc52040fc..418f618e8572392d1df09df07399d0ac2231b1c1"
+    ],
+    "exit_code": 128,
+    "reason": "Earlier commit object unavailable locally; no fetch or branch change performed."
+  },
+  "input_archive_publication": "Not bundled. Retained externally; reproducible from the pinned Git commit with the exact git archive command in commands.json.",
+  "before_after_regular_file_bytes_and_symlink_targets_manifest_sha256": "0638248479bf4c70a0324c3ef8efa9a558050f287a676b78427b481bce5c2d4e",
+  "fingerprint_scope": "The in-container command hashes every regular file under the extracted lampOS tree and lists every symlink target. It does not hash inode metadata. Complete transient per-file manifests were compared byte-for-byte; their SHA-256 digests and construction command were retained, not the manifests themselves.",
+  "result_source_identity_unchanged": true,
+  "result_archive_unchanged": true
+}

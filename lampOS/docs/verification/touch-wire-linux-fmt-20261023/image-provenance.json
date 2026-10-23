@@ -1,0 +1,14 @@
+{
+  "projection": "Only image identity, platform, creation time and configured container UID/GID are published; the complete original response remains external. No image author, labels, build history or account metadata is included.",
+  "id": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "os": "linux",
+  "architecture": "amd64",
+  "created": "2026-10-14T17:55:59.324085844Z",
+  "configured_user": "1000:1000",
+  "original_response": {
+    "file": "image-inspect.stdout",
+    "bytes": 7701,
+    "sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74",
+    "published": false
+  }
+}

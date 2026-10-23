@@ -1,0 +1,32 @@
+{
+  "files": {
+    "README.md": {
+      "bytes": 3230,
+      "sha256": "68ff9328ae3145c3793a0d6ea80f0a5dedeae950efb2cfbec2fbf1ccb6a41d74"
+    },
+    "command-streams.json": {
+      "bytes": 4477,
+      "sha256": "77726f4510417d6c8af58d5ecd38fa4404630f6eeec51fe666fc9ee7c7591708"
+    },
+    "commands.json": {
+      "bytes": 6913,
+      "sha256": "0614c985e620ce0431c8f60d1753d6a07e31c137887e251e1690e311913aa50f"
+    },
+    "image-provenance.json": {
+      "bytes": 627,
+      "sha256": "6652c76e2d2289087ecc304a2faf226bd6470a7e0a6a418904556300407f8e5e"
+    },
+    "result.json": {
+      "bytes": 1608,
+      "sha256": "1173559757086c8f52581457d12689ce007c6dc2c4bbda9124c4ca88d42a8b5f"
+    },
+    "source.json": {
+      "bytes": 4323,
+      "sha256": "744c9b838e53a95b6d3300cd6a294ba118db0e6e9507fccfad464f1aeaced2ad"
+    },
+    "verification.json": {
+      "bytes": 618,
+      "sha256": "c10f60b33baf427fee67be5ba9ed6da87eaab3283740bea8da9bfd2842217f42"
+    }
+  }
+}

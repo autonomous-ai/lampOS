@@ -1,0 +1,103 @@
+{
+  "representation": "Each text value decodes to the complete original UTF-8 stream, with no whitespace normalization or redaction. The image-inspect response is excluded from this publication and represented by the minimal projection in image-provenance.json.",
+  "commands": {
+    "pr-identity": {
+      "stdout": {
+        "encoding": "UTF-8",
+        "bytes": 323,
+        "sha256": "699ac9ded0533ed79cbdc0d426e30e4fd1c7ccb021c8893556b12b47d8ceebda",
+        "text": "{\"baseRefName\":\"lamp-voice\",\"baseRefOid\":\"498aca8a2c37e02dcdcde9e15d297cedc52040fc\",\"headRefName\":\"third/touch-additive-fields\",\"headRefOid\":\"418f618e8572392d1df09df07399d0ac2231b1c1\",\"number\":3204,\"title\":\"lampOS: keep touch readers compatible with added fields\",\"url\":\"https://github.com/autonomous-ai/lampOS/pull/3204\"}\n"
+      },
+      "stderr": {
+        "encoding": "UTF-8",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      }
+    },
+    "source-identity": {
+      "stdout": {
+        "encoding": "UTF-8",
+        "bytes": 123,
+        "sha256": "161b028029253c8015b73229626cfb2f5c786003dbb360f618739c0f597e6002",
+        "text": "418f618e8572392d1df09df07399d0ac2231b1c1\ne67ee12f4ab179e38f4b136d6f51afee62545db6\n498aca8a2c37e02dcdcde9e15d297cedc52040fc\n"
+      },
+      "stderr": {
+        "encoding": "UTF-8",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      }
+    },
+    "workspace-tree": {
+      "stdout": {
+        "encoding": "UTF-8",
+        "bytes": 41,
+        "sha256": "13c717d733e2c4113d6397c734abb869fb692e1c319f9f9027dc3294d518dbbf",
+        "text": "ad6362c98db49f4da424a20e8b863fc1d5a6f1ac\n"
+      },
+      "stderr": {
+        "encoding": "UTF-8",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      }
+    },
+    "archive": {
+      "stdout": {
+        "encoding": "UTF-8",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      },
+      "stderr": {
+        "encoding": "UTF-8",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      }
+    },
+    "archive-commit": {
+      "stdout": {
+        "encoding": "UTF-8",
+        "bytes": 41,
+        "sha256": "58fe4118d9ce1ead52e798609cab0e26acc752842925fe9a309a1414e88e9a4a",
+        "text": "418f618e8572392d1df09df07399d0ac2231b1c1\n"
+      },
+      "stderr": {
+        "encoding": "UTF-8",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      }
+    },
+    "format": {
+      "stdout": {
+        "encoding": "UTF-8",
+        "bytes": 746,
+        "sha256": "2122b71f6ec49c8dfd3f459dfce7b367a73d13ee4a54683ac75f63b262606103",
+        "text": "Linux 1d3c23af46b2 6.12.13-200.fc41.x86_64 #1 SMP PREEMPT_DYNAMIC Sat Feb  8 20:05:26 UTC 2025 x86_64 GNU/Linux\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nrustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.96.0\nLLVM version: 22.1.2\nhost: x86_64-unknown-linux-gnu\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nsource-before-manifest 0638248479bf4c70a0324c3ef8efa9a558050f287a676b78427b481bce5c2d4e  /tmp/source-before.sha256\nsource-after-manifest 0638248479bf4c70a0324c3ef8efa9a558050f287a676b78427b481bce5c2d4e  /tmp/source-after.sha256\ncargo_fmt_exit=0\n"
+      },
+      "stderr": {
+        "encoding": "UTF-8",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      }
+    },
+    "final-source-identity": {
+      "stdout": {
+        "encoding": "UTF-8",
+        "bytes": 123,
+        "sha256": "161b028029253c8015b73229626cfb2f5c786003dbb360f618739c0f597e6002",
+        "text": "418f618e8572392d1df09df07399d0ac2231b1c1\ne67ee12f4ab179e38f4b136d6f51afee62545db6\n498aca8a2c37e02dcdcde9e15d297cedc52040fc\n"
+      },
+      "stderr": {
+        "encoding": "UTF-8",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      }
+    }
+  }
+}

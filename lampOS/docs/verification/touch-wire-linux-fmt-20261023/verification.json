@@ -1,0 +1,18 @@
+{
+  "all_published_json_parsed": true,
+  "lossless_streams_checked": 14,
+  "lossless_stream_method": "Decode each text field as UTF-8, compare bytes exactly with the original file, then verify byte count and SHA-256.",
+  "all_published_files_whitespace_checked": true,
+  "whitespace_command": [
+    "git",
+    "diff",
+    "--no-index",
+    "--check",
+    "/dev/null",
+    "FILE"
+  ],
+  "source_commands_rerun": false,
+  "formatting_rerun": false,
+  "publication_metadata_policy": "Only minimal provenance fields; full image metadata remains external with its original hash.",
+  "file_manifest_excludes_itself": true
+}

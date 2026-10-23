@@ -1,0 +1,45 @@
+{
+  "pr": 3204,
+  "head": "418f618e8572392d1df09df07399d0ac2231b1c1",
+  "parent": "498aca8a2c37e02dcdcde9e15d297cedc52040fc",
+  "command": "cargo fmt --all --check",
+  "cwd": "/tmp/source/lampOS",
+  "cargo_fmt_exit": 0,
+  "container_exit": 0,
+  "timed_out": false,
+  "executions": 1,
+  "started_utc": "2026-10-23T04:20:07.834775+00:00",
+  "finished_utc": "2026-10-23T04:20:24.573181+00:00",
+  "container_elapsed_seconds": 16.738352718297392,
+  "timing_boundary": "Entire podman run including startup, toolchain identity commands, archive extraction, formatting check and before/after source hashing; not isolated rustfmt duration.",
+  "platform": {
+    "os": "Linux",
+    "image_architecture": "amd64",
+    "rust_host": "x86_64-unknown-linux-gnu"
+  },
+  "toolchain": {
+    "cargo": "1.96.0 (30a34c682 2026-05-25)",
+    "rustfmt": "1.9.0-stable (ac68faa20c 2026-05-25)",
+    "rustc": "1.96.0 (ac68faa20 2026-05-25)"
+  },
+  "source_fingerprints_equal": true,
+  "input_archive_unchanged": true,
+  "git_source_identity_unchanged": true,
+  "scope": "Exact-head formatting verification only; no compilation, tests, source edit, ARM build, device access or workflow rerun.",
+  "container_isolation": {
+    "network": "none",
+    "rootfs": "read-only",
+    "tmpfs": "/tmp:rw,size=1g,mode=1777",
+    "image_pull": "never",
+    "host_mounts": [],
+    "shared_build_targets": []
+  },
+  "stdout": {
+    "bytes": 746,
+    "sha256": "2122b71f6ec49c8dfd3f459dfce7b367a73d13ee4a54683ac75f63b262606103"
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

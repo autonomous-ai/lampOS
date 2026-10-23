@@ -1,5 +1,16 @@
 # Tests work log
 
+## 2026-10-23 11:26 +0700 — #3204 Linux formatting receipt delivered
+
+The [requested Linux check](verification/touch-wire-linux-fmt-20261023/)
+ran `cargo fmt --all --check` once on exact head `418f618e8`, parent
+`498aca8a2`, and exited zero. The existing isolated Linux x86 container used
+Rust/Cargo 1.96.0 and rustfmt 1.9.0; all source fingerprints remained equal.
+The 16.738-second command includes startup, extraction and hashing, not just
+formatting. Full streams and immutable source identities are retained.
+This verifies formatting only. Third retains #3204 and its merge readiness;
+no source edit, build, test, ARM build or device access occurred here.
+
 ## 2026-10-23 11:14 +0700 — current-base Voice comparison has no added failed cases
 
 Ready for lamp-voice: no (#3190, reader/build qualification and review pending).
