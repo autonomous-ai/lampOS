@@ -1,0 +1,202 @@
+{
+  "observed_at_utc": "2026-10-23T09:50:20.926874+00:00",
+  "source_head": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+  "source_tree": "4c5c6894939372cd0979c773898a80b5f3904d09",
+  "host": "Darwin arm64",
+  "rust": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "command": "cargo +1.96.0 build -q --locked --offline -p lamp-update --bin lamp-update",
+  "exit_code": 0,
+  "build_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "binary_sha256": "9b3b28696739556714de90966d545217c62b6441b7a0803b08d622f6410f788d",
+  "files": [
+    {
+      "path": "lampOS/Cargo.lock",
+      "sha256": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c"
+    },
+    {
+      "path": "lampOS/Cargo.toml",
+      "sha256": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7"
+    },
+    {
+      "path": "lampOS/crates/update/Cargo.toml",
+      "sha256": "2e791c3e5eb8fc99f4ade7a0a6c484c60a0f988a5bf25c37a25176c6bf7a7792"
+    },
+    {
+      "path": "lampOS/crates/update/src/apply.rs",
+      "sha256": "89db5a74e01e2ce5419ef4de9c6c0c87001941a4de36ea39c7805573de497274"
+    },
+    {
+      "path": "lampOS/crates/update/src/check_units.rs",
+      "sha256": "1c5cde0249f9d15ed566af3bd90bf490900b6184e2f81c77954fe89723d3d5f5"
+    },
+    {
+      "path": "lampOS/crates/update/src/fetch.rs",
+      "sha256": "752e1e2f5e09256b58fc3f9c9cf139dab0e09d3ed0bdcf230118edc882f3b881"
+    },
+    {
+      "path": "lampOS/crates/update/src/image.rs",
+      "sha256": "638716079df7e1770cb9c778814ae857a7e242b23519ed8bf490fe1f99a5466c"
+    },
+    {
+      "path": "lampOS/crates/update/src/install.rs",
+      "sha256": "e278c80b2303c1952faa6dd2f1299049f098e4a671dddaeb6431c774ea8368a4"
+    },
+    {
+      "path": "lampOS/crates/update/src/judge.rs",
+      "sha256": "3a5670311ae6741a8c08620bfa1591c886b4a1165d45688ba4ea996357fc830f"
+    },
+    {
+      "path": "lampOS/crates/update/src/lib.rs",
+      "sha256": "0dee46c6481bdd66b01b692bf3b37b01d9501a1d2b051e8d739491062fac63a0"
+    },
+    {
+      "path": "lampOS/crates/update/src/main.rs",
+      "sha256": "f841cce11f5583b06d5c4d695feb506d1455ced2338f62de34bbfabbbcc91277"
+    },
+    {
+      "path": "lampOS/crates/update/src/manifest.rs",
+      "sha256": "e58a57baa24b995e500c5565e05aabb5c95892d0d0811c39896a254653c2230f"
+    },
+    {
+      "path": "lampOS/crates/update/src/models.rs",
+      "sha256": "246d7ea10b652ec6265253c2a4af5df61e2c09b77963ff602087d4ffe5cd8384"
+    },
+    {
+      "path": "lampOS/crates/update/src/own.rs",
+      "sha256": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7"
+    },
+    {
+      "path": "lampOS/crates/update/src/product_skills.rs",
+      "sha256": "140bab39dd74570a3329210178d9c02db4da78e6417b7f0664891cfdf644bf1f"
+    },
+    {
+      "path": "lampOS/crates/update/src/publish.rs",
+      "sha256": "90af8f48962c22d163b1f1cb19c1e1a32e307b2f1269c7715d3ed743a3e05ad6"
+    },
+    {
+      "path": "lampOS/crates/update/src/quiet.rs",
+      "sha256": "8de6893ad64de665957effcd3a8236190ad6d53494fc8b7ae0968cdb01b7e6e5"
+    },
+    {
+      "path": "lampOS/crates/update/src/records.rs",
+      "sha256": "8d561cb9619f6bee959ab666409043672cf71766e868c5b1f2f285f9137735f3"
+    },
+    {
+      "path": "lampOS/crates/update/src/round.rs",
+      "sha256": "8c30f94ec870a3b2b4d2901623364e7d14cb71b32b1d66fcc3d0d96be12af299"
+    },
+    {
+      "path": "lampOS/crates/update/src/status.rs",
+      "sha256": "3b4d0ab9ffcd0f77084f47f2627c2d4517a4e31d5ca3b21093aa695959e7126b"
+    },
+    {
+      "path": "lampOS/crates/update/src/unit.rs",
+      "sha256": "9358bcea284bb10f93f53030e0b0575e60b325f43ff6bb7c141e7524b6c20fc7"
+    },
+    {
+      "path": "lampOS/crates/update/src/unit/restart_order.rs",
+      "sha256": "c3a9ebfc49f6f8297d761c0bcae16d905823416054b67d3df749204c80fc0bb6"
+    },
+    {
+      "path": "lampOS/crates/update/src/world.rs",
+      "sha256": "e33a959f95b787be18810533dfd62b3ed3a459b2998dd8d75934f3b00c84f571"
+    },
+    {
+      "path": "lampOS/crates/update/tests/fixtures/reset-plan-4de8ebe1c.json",
+      "sha256": "5dff6f81202528430637a63818bb7f159a912fb4c83dcde6386d56ab9ac4e3d4"
+    },
+    {
+      "path": "lampOS/crates/update/tests/fixtures/reset-plan-ef6a2b9a7.json",
+      "sha256": "de872e78cb60d724ce35d49ebff92be6cfba6caf5e38824c1e5d06cca60e7506"
+    },
+    {
+      "path": "lampOS/crates/update/tests/fixtures/stores/README.md",
+      "sha256": "75af3b67ba178a21f66dd8b4a124aa4b434df605d4d06a67e4f48725de86c015"
+    },
+    {
+      "path": "lampOS/crates/update/tests/fixtures/stores/journal-2026-10-21.json",
+      "sha256": "a8f8e5ab6eca656cadc9313cdef31f1c516dec63b0fcf076969a215ff794b770"
+    },
+    {
+      "path": "lampOS/crates/update/tests/fixtures/stores/journal-2026-10-23.json",
+      "sha256": "957d5640ee1268de2b88718876e972fce64272668ffc7c205ac9364728133a02"
+    },
+    {
+      "path": "lampOS/crates/update/tests/fixtures/stores/state-2026-10-21.json",
+      "sha256": "233dde8f72ac8db24b29d53ae2ceb5c2522ac872e8758cc4e531384a7df90838"
+    },
+    {
+      "path": "lampOS/crates/update/tests/fixtures/stores/state-2026-10-23.json",
+      "sha256": "233dde8f72ac8db24b29d53ae2ceb5c2522ac872e8758cc4e531384a7df90838"
+    },
+    {
+      "path": "lampOS/crates/update/tests/functions.rs",
+      "sha256": "3448d8f0896888a5f424a82756818abc2f08b8ee2a05697e27392d3b2d15b5d5"
+    },
+    {
+      "path": "lampOS/crates/update/tests/install.rs",
+      "sha256": "6a022e3541e3b45bb694fe4384d1b6cd56a094a242d9c38fce2be96e0b438232"
+    },
+    {
+      "path": "lampOS/crates/update/tests/it/ci_paths.rs",
+      "sha256": "da2d09282d8c6ee4248f61bdfc904d21eb2b28f89e72d9639d88b8777c5e4725"
+    },
+    {
+      "path": "lampOS/crates/update/tests/it/image_journal.rs",
+      "sha256": "415143feed902d28f9a88a8bb85c209efacc8babfd6c53f9f0f9492907688ea2"
+    },
+    {
+      "path": "lampOS/crates/update/tests/it/image_ramlog.rs",
+      "sha256": "37ab4e2af82c460c01b35e496d0a1fbda98e9be672d50ad0259b4e00fc9a1d11"
+    },
+    {
+      "path": "lampOS/crates/update/tests/it/main.rs",
+      "sha256": "7b486c660aa349e676019b3f55ae292947be9381241ae5436c7ee86225683535"
+    },
+    {
+      "path": "lampOS/crates/update/tests/it/scratch_paths.rs",
+      "sha256": "40749f7cf74a1f5bcb11ebce3ba36866710fdf2d3ad13eb85fa1d75169b62554"
+    },
+    {
+      "path": "lampOS/crates/update/tests/round.rs",
+      "sha256": "4bcec0291665c3804e2a33bd35e7119ebb4ada9288e321b6be4c56c68dfc7141"
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/process_cuts.rs",
+      "sha256": "e5a04534cb6878c2f1656918d95677292167ddff1cee597800ed590ac6846d6c"
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/restart_order.rs",
+      "sha256": "a5ccc9f79612fbf2edb547e70910b17adc9dd0d01b3e21150ac7477c8ecf8acc"
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/restart_quiet.rs",
+      "sha256": "29b5404b6b61cfa8b44199dc06a7781bd18748d756e7b5a253d5c943993e9c73"
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/self_cuts.rs",
+      "sha256": "9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013"
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/self_recovery.rs",
+      "sha256": "2cce3692a1376a60cec1752c8fbcd3e760561f38f3988648ed32013da45363de"
+    },
+    {
+      "path": "lampOS/crates/update/tests/self_cli_exec.rs",
+      "sha256": "008d2f7a8533835a75d661967bd7817c27d66897417fea9a4f4dc8b81ef015cd"
+    },
+    {
+      "path": "lampOS/crates/update/tests/self_cli_exec/linux.rs",
+      "sha256": "b7833c418d5e62fb52b43cbcad5cb01e2120917bea40225a024073f2d6bbf9b8"
+    },
+    {
+      "path": "lampOS/crates/update/tests/self_process_cuts.rs",
+      "sha256": "34e68d2c1964c42b12f9d5c88af041133c891737ff683c1c25118f50deacf8a3"
+    },
+    {
+      "path": "lampOS/rust-toolchain.toml",
+      "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+    }
+  ],
+  "limits": "Local Mac CLI build for read-only manifest checks; not an ARM64 gate or the released executable."
+}

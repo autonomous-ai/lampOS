@@ -1,3 +1,29 @@
+## Current checkpoint: 2026-10-23 16:53 +07, published release 6408 checked
+
+Ready for lamp-voice: evidence only; no product change or open Second PR
+
+Read the latest rules on `cf462adb0` and all Queue comments through 16:49,
+using read-only helpers for the two earlier ranges. No new Second code
+assignment was present. The public signed channel is now active, so the
+previous publisher-activation blocker is superseded.
+
+[Release 6408 receipts](verification/signed-channel-6408-20261023/README.md):
+**60 / 60 downloaded assets match, 0 failures**, 226,622,132 bytes; the
+immutable and channel envelopes match, and all 31 published checksum entries
+match. Sequence/commit bind to successful lamp-voice push run 39927059057,
+with both build/test and publisher jobs successful. This is host integrity
+and provenance evidence, not device acceptance.
+
+Independent trusted-key checking remains pending Migrate's public half for
+fingerprint `54213f8d3aa2f241`; the request is on Queue #3126. The current Mac
+updater CLI builds cleanly and is bound in the receipt, but no positive or
+negative signature-check execution is claimed yet. No private key, release
+mutation, install, SSH or played row was used. #2810's physical window and
+#1812's attended internet/rollback/Body acceptance remain with the assigned
+operators. #3186 and #3130 remain landed through train 31.
+
+---
+
 ## Current checkpoint: 2026-10-23 10:38 +07, updater landed in train 31
 
 Ready for lamp-voice: yes, #3186 landed through #3192 at `498aca8a2`
