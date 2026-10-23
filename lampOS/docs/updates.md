@@ -473,7 +473,9 @@ workflow change.
    installed beside, nothing is switched, status 4, and the next round tries
    again.
 8. **Switch.** The units as they are, each moved link with the build it
-   names, and the journal are written; then the new units (a product part's
+   names, and the journal are written. The journal includes the validated
+   old startup order of every changed unit, including inactive units,
+   preserving dependency paths through unchanged units. Then the new units (a product part's
    only if the build changed it), `systemctl daemon-reload`, and each
    product part's `current` replaced whole: a new link made beside as
    `.current.lamp-update`, renamed over it, the folder synced. Quiet is asked once more: if
@@ -487,27 +489,40 @@ workflow change.
    checked again: a prerequisite's restart may have taken time. If no quiet
    moment arrives within `--quiet-wait-s`, the changes are put back,
    including parts already restarted; the voice has not been restarted.
+   During this wait, old Voice can talk to already-restarted new servers
+   for up to the configured bound (3600 s by default). Compatibility is
+   required in both directions; restart order does not make the round atomic.
 9. **Watch.** Every second for `--watch-s` (60): each restarted unit must
    not fail, stop, be in `auto-restart`, be started again by systemd
    (`NRestarts`) or change process (`MainPID`). At the end it must be
    running, and if it was in `lamp/health` before the switch it must be
    there again, not stale, and not in error unless it was before. A part
    that never reported is judged by systemd alone.
-10. **Back.** A part not well: the old startup graph is reconstructed from
-    the saved unit declarations and unchanged installed units. It must be
-    valid before any restoration write; otherwise the journal and recovery
-    prefix are kept. Every changed unit is then written back as it was,
-    reloaded, every moved link named its old build again (replaced
-    whole, as at the switch), each product skill's file the switch wrote put
-    back as it was (or removed, with any folder made for it if still empty;
-    a file the lamp changed since it was written is left, and said), and
-    those restarted are restarted again in the old graph's startup order.
+10. **Back.** A part not well: the journal's validated old startup order is
+    used without rereading the installed dependency graph. Later changes or
+    read failures in that graph cannot veto the saved restart order. Every
+    changed unit is then written back as it was, reloaded, every moved link named
+    its old build again (replaced whole, as at the switch), each product
+    skill's file the switch wrote put back as it was (or removed, with any
+    folder made for it if still empty; a file the lamp changed since it was
+    written is left, and said), and those restarted are restarted again in
+    that saved order. Already-restored and inactive members gain no restart.
+    The saved order must name all journal units exactly once, before any
+    already-restored prefix is excluded. A present malformed order keeps
+    the journal and every restoration prefix intact and starts no new round.
+    Older journals without the field reconstruct the old graph from saved
+    declarations and unchanged installed units; an unreadable or cyclic
+    graph retains the journal before any restoration write. Their journal
+    is not rewritten to add an order, preserving later fields it may hold.
     Unless the voice is what failed, queued speech is read at its own
     restart boundary and the between-turn wait runs there (resting, nothing
     heard or said for 5 s; at once if its state cannot be seen). If that
     bounded wait expires, the voice is put back anyway and this is said.
     They are watched again, the outcome says how the previous build is,
     and the build is refused from then on.
+    If installed units cannot be read during cleanup, all build folders
+    and their `made` records are kept, with one journal line; unreadable
+    inventory is never treated as proof that a live build is unused.
     **What a part not well said of itself goes into the outcome** (#1505):
     the unit that failed on the new build (read before it is put back), and
     the first unit found not well on the old one (the watch stops there),
@@ -1497,30 +1512,33 @@ memory's protocol and the tool calls between crates.
   an older lamp-memory refuses `observations`, so the voice removes nothing
   and tells the person it couldn't forget.
 
-Why the window can't be zero (read at `02c8d3851`):
+Why the window can't be zero:
 
 - **Signed together.** lamp-voice and lamp-memory are both `core`
   (`deploy/package-binaries.json:4-5`), and one envelope covers the whole
   manifest (`.github/scripts/lampos-publish.py:196-231`). Publishing is
   still off (`.github/workflows/lampos-arm64.yml:279`).
-- **Not switched as one step.** Each `current` link is renamed in turn
-  (`crates/update/src/round.rs:1632-1641`), and each unit is restarted
-  separately, the voice first (`round.rs:1868-1883`, step 8 above). The new
-  voice runs against the old memory until memory's restart comes round.
-- **Failures leave it longer.** If a later unit fails to restart, the round
-  puts the build back with the new voice running. The put-back restarts the
-  voice last and waits up to `--quiet-wait-s` (3600 s) for a gap between
-  turns (`round.rs:2066-2075`), all that time on the old memory. A power
-  cut between two renames, or a part that wasn't running (switched, not
-  started), leaves the same mix.
+- **Not switched as one step.** Each `current` link is renamed in turn,
+  and each active changed unit is restarted separately, in the candidate
+  unit graph's startup order (step 8 above). Voice's declared prerequisites
+  restart before it; old Voice can talk to new Memory while Voice waits
+  for its own quiet boundary, up to `--quiet-wait-s` (3600 s by default).
+  Dependents that declare themselves after Voice still restart after it.
+- **Failures leave a mixed build.** Put-back uses the saved old startup
+  graph and waits for a gap between turns at Voice's own restart boundary.
+  New Voice can therefore talk to restored old servers during that wait.
+  A failed restart, a power cut between renames, or a part that was not
+  running (switched, not started) can also leave two versions in use.
 - **Test lamps skew on purpose.** lamp-4ace's units pin each part's build,
   and `deploy.sh` swaps the voice alone (`deploy/lamp-4ace/RUNBOOK.md:51`).
   lamp-06c1 runs a hand-swapped voice on an older build
   (`deploy/lamp-06c1/LAMP.md:2`).
 
-Restarting in dependency order, the voice last, shortens the window. It is
-a separate change (#3126, item 1). It does not remove the rule: a failed
-restart, a put-back or a power cut still leaves two builds talking.
+Dependency order changes which side moves first; it does not remove the
+compatibility rule. The updater reads the managed base service files:
+drop-ins, aliases, symlinked units and dependency paths through external,
+socket or target units are not resolved. Restart order is not a readiness
+handshake or an atomic protocol cutover.
 
 ## Every part's saved data, one version ahead
 
