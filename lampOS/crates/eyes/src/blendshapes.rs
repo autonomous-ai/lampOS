@@ -178,6 +178,23 @@ impl Reader {
     }
 }
 
+/// What the `eyes-seems` thread takes from one crop's mesh: how open the
+/// mouth is (`mesh::mouth_open`), each look, for the speaking read, and,
+/// only with `seems` (a read is due, at most every 2 s), how the face seems
+/// from the same points, so one mesh pass serves both.
+pub fn read_crop(
+    landmarks: &[f32],
+    eye_line: (f32, f32),
+    seems: Option<impl FnOnce(&[f32]) -> std::result::Result<HumanSeems, String>>,
+) -> (Option<f32>, Option<std::result::Result<HumanSeems, String>>) {
+    let read = seems.map(|read| {
+        points(landmarks, eye_line)
+            .ok_or_else(|| "no face to read".to_owned())
+            .and_then(|points| read(&points))
+    });
+    (crate::mesh::mouth_open(landmarks), read)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -345,5 +362,50 @@ mod tests {
                 .fold(0.0f32, f32::max);
             assert!(worst < 1e-4, "{worst}");
         }
+    }
+
+    /// With `--seems-blendshapes` the mesh is the `eyes-seems` thread's, so
+    /// the speaking read's mouth comes from that thread's pass: every crop
+    /// gives how open the mouth is, and only a crop whose seems read is due
+    /// is also read by the model, from the same landmarks.
+    #[test]
+    fn each_crop_gives_the_mouth_and_only_a_due_one_a_seems_read() {
+        use crate::mesh::{BROW, CHIN, LANDMARKS, LOWER_LIP, UPPER_LIP};
+        let mut landmarks = vec![0.0f32; LANDMARKS * 3];
+        for (at, y) in [
+            (BROW, 40.0),
+            (CHIN, 240.0),
+            (UPPER_LIP, 180.0),
+            (LOWER_LIP, 190.0),
+        ] {
+            landmarks[at * 3] = 128.0;
+            landmarks[at * 3 + 1] = y;
+        }
+        let never = |_: &[f32]| -> std::result::Result<HumanSeems, String> {
+            panic!("no seems read was due")
+        };
+        assert_eq!(
+            read_crop(&landmarks, (0.0, 1.0), None::<fn(&[f32]) -> _>),
+            (Some(0.05), None)
+        );
+        let mut asked = 0;
+        let (open, read) = read_crop(
+            &landmarks,
+            (0.0, 1.0),
+            Some(|points: &[f32]| {
+                asked += 1;
+                assert_eq!(points.len(), POINTS.len() * 2);
+                Err("read".to_owned())
+            }),
+        );
+        assert_eq!(
+            (open, read, asked),
+            (Some(0.05), Some(Err("read".to_owned())), 1)
+        );
+        let (open, read) = read_crop(&landmarks[..30], (0.0, 1.0), Some(never));
+        assert_eq!(
+            (open, read),
+            (None, Some(Err("no face to read".to_owned())))
+        );
     }
 }
