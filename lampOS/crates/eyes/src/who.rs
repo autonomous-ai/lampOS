@@ -910,6 +910,19 @@ impl People {
             .reduce(f32::max)
     }
 
+    /// How alike this print is to `name`'s own kept prints, at best; `None`
+    /// when nobody by that name is kept. What a held person's hold is
+    /// judged on ([`Held::keeps_print`]).
+    pub fn likeness_to(&self, name: &str, print: &[f32]) -> Option<f32> {
+        self.people
+            .iter()
+            .find(|person| same_name(&person.name, name))?
+            .prints
+            .iter()
+            .map(|kept| likeness(kept, print))
+            .reduce(f32::max)
+    }
+
     /// Whose print this is, and how alike: the best match at or over
     /// [`SAME_PERSON`], or nobody.
     pub fn who(&self, print: &[f32]) -> Option<(String, f32)> {
@@ -1666,12 +1679,22 @@ pub fn full_crop_on() -> bool {
 /// [`SAME_PERSON`] look to look, and each miss took their name away.
 pub const KNOWN_HOLD: Duration = Duration::from_secs(4);
 
+/// Within the hold, a printed near face that matched nobody keeps the held
+/// name only if it is at least this alike to that person's own prints. The
+/// reviewers on #3285: the same person's flicker sat at 0.34 to 0.36 against
+/// [`SAME_PERSON`] (0.363), and a stranger scores lower; 0.30 keeps that
+/// flicker with some room and lets anyone further off go. To be tuned from
+/// the journal's score line.
+pub const HOLD_LIKENESS: f32 = 0.30;
+
 /// When the known person last matched, to hold them through a short miss.
 /// Off, nobody is ever held: each miss lets go, as before.
 #[derive(Debug)]
 pub struct Held {
     on: bool,
     matched_at: Option<Instant>,
+    /// The near face's passing id at that match, while speaking is judged.
+    matched_id: Option<String>,
 }
 
 impl Held {
@@ -1679,6 +1702,7 @@ impl Held {
         Self {
             on,
             matched_at: None,
+            matched_id: None,
         }
     }
 
@@ -1686,9 +1710,10 @@ impl Held {
         self.on
     }
 
-    /// A check matched someone.
-    pub fn matched(&mut self, now: Instant) {
+    /// A check matched someone, whose near face had this passing id.
+    pub fn matched(&mut self, now: Instant, id: Option<String>) {
         self.matched_at = Some(now);
+        self.matched_id = id;
     }
 
     /// Whether a check that found nobody keeps the one known: only within
@@ -1700,9 +1725,24 @@ impl Held {
                 .is_some_and(|at| now.saturating_duration_since(at) < KNOWN_HOLD)
     }
 
+    /// Whether a check that printed a near face matching nobody keeps the
+    /// one known: within the hold, only while that face is still at least
+    /// [`HOLD_LIKENESS`] to the held person's prints (`likeness`, `None` if
+    /// they are no longer kept) and, when the match had a passing id, has
+    /// the same one. A stranger sitting down is let go at once.
+    pub fn keeps_print(&self, now: Instant, likeness: Option<f32>, id: Option<&str>) -> bool {
+        self.keeps(now)
+            && likeness.is_some_and(|likeness| likeness >= HOLD_LIKENESS)
+            && self
+                .matched_id
+                .as_deref()
+                .is_none_or(|matched| id == Some(matched))
+    }
+
     /// Let go at once: the camera closed, or the check let them go.
     pub fn let_go(&mut self) {
         self.matched_at = None;
+        self.matched_id = None;
     }
 }
 
@@ -2405,22 +2445,49 @@ mod tests {
         let mut held = Held::new(true);
         // Nobody matched yet: nobody to hold.
         assert!(!held.keeps(start));
-        held.matched(start);
+        held.matched(start, None);
         // The next check, two seconds on, finds nobody: still them.
         assert!(held.keeps(start + RECOGNISE_EVERY));
         // The check after that finds nobody: let go.
         assert!(!held.keeps(start + 2 * RECOGNISE_EVERY));
         assert!(!held.keeps(start + KNOWN_HOLD));
         // A match renews the hold.
-        held.matched(start + 2 * RECOGNISE_EVERY);
+        held.matched(start + 2 * RECOGNISE_EVERY, None);
         assert!(held.keeps(start + 3 * RECOGNISE_EVERY));
+    }
+
+    #[test]
+    fn a_printed_face_keeps_the_held_name_only_if_it_still_looks_like_them() {
+        let start = Instant::now();
+        let then = start + RECOGNISE_EVERY;
+        let mut held = Held::new(true);
+        held.matched(start, Some("f3".to_owned()));
+        // (a) No usable print: held.
+        assert!(held.keeps(then));
+        // (b) A stranger's print, far from the held person: let go, no name.
+        assert!(!held.keeps_print(then, Some(0.12), Some("f3")));
+        assert!(!held.keeps_print(then, Some(HOLD_LIKENESS - 0.001), Some("f3")));
+        // The held person no longer kept: let go.
+        assert!(!held.keeps_print(then, None, Some("f3")));
+        // (c) Close to the held person, the same face: held.
+        assert!(held.keeps_print(then, Some(0.35), Some("f3")));
+        assert!(held.keeps_print(then, Some(HOLD_LIKENESS), Some("f3")));
+        // (d) Another passing id, or none where the match had one: let go.
+        assert!(!held.keeps_print(then, Some(0.35), Some("f4")));
+        assert!(!held.keeps_print(then, Some(0.35), None));
+        // (e) Past the hold: let go, however alike.
+        assert!(!held.keeps_print(start + KNOWN_HOLD, Some(0.35), Some("f3")));
+        // A match with no passing id (speaking not judged): likeness alone.
+        held.matched(start, None);
+        assert!(held.keeps_print(then, Some(0.35), Some("f9")));
+        assert!(!held.keeps_print(then, Some(0.12), None));
     }
 
     #[test]
     fn a_camera_closed_lets_a_held_person_go_at_once() {
         let start = Instant::now();
         let mut held = Held::new(true);
-        held.matched(start);
+        held.matched(start, None);
         held.let_go();
         assert!(!held.keeps(start));
         assert!(!held.keeps(start + Duration::from_millis(1)));
@@ -2430,7 +2497,7 @@ mod tests {
     fn without_the_switch_nobody_is_held() {
         let start = Instant::now();
         let mut held = Held::new(false);
-        held.matched(start);
+        held.matched(start, None);
         assert!(!held.on());
         assert!(!held.keeps(start));
         assert!(!held.keeps(start + RECOGNISE_EVERY));
