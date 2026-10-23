@@ -92,6 +92,14 @@ Environment=LAMP_TURN_END_NO_SPIN=on
 Environment=LAMP_FAINT_HOLD_MS=400
 # A short sound before the awaited answer has sounded does not cut it off (#1123).
 Environment=LAMP_WAIT_KEEPS_ANSWER=on
+# The product's clock and opening context. These read the system clock,
+# /etc/localtime and /usr/share/zoneinfo; no product-only configuration is needed.
+# An unsynchronised clock is reported as unset rather than guessed.
+Environment=LAMP_TOOLS=on
+Environment=LAMP_CLOCK=on
+Environment=LAMP_TIME_PLACES=on
+Environment=LAMP_KERNEL_CLOCK=on
+Environment=LAMP_SESSION_FACT=on
 # Not here: LAMP_NAMES=checked, which needs the eyes' who socket (LAMP_EYES_WHO_SOCKET, lamp-eyes
 # --who-socket with its recogniser); this package's eyes run without them, so it would do nothing.
 # Nor the second route (LAMP_VOICE_ROUTE=second): nothing in this package writes

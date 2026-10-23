@@ -38,6 +38,16 @@ on or removed.
   (speeds, poses, reaches) are left out: they configure, they don't turn a
   behaviour on.
 
+The generic voice template (`deploy/units/lamp-voice.service`) also sets
+`LAMP_TOOLS`, `LAMP_CLOCK`, `LAMP_TIME_PLACES`, `LAMP_KERNEL_CLOCK` and
+`LAMP_SESSION_FACT` to `on`, matching the product. The update unit census
+checks all five, and its function test reads the generic unit to check the
+clock declaration, time context and session fact. They need the system
+clock and zone files, not product-only configuration. A clock the kernel
+does not know to be synchronised is reported as unset; the local zone
+still needs to be correct. This is configuration and host-test evidence,
+not a moved-lamp spoken-time or latency result.
+
 ## Reserved repair controller name
 
 `LAMP_FACE_REPAIR` is reserved by the inactive face-repair controller core.
