@@ -82,6 +82,7 @@ use super::{cache, percentile};
 use crate::second_config::{
     CREDENTIALS_ENV, DEEPSEEK_CREDENTIAL, SecondConfig, TtsProvider, unit_credential,
 };
+use crate::second_provider::net::routes::Routes;
 use serde_json::Value;
 use std::{
     ffi::OsStr,
@@ -862,12 +863,20 @@ pub struct Mode {
 }
 
 /// The probe, as `lamp-voice probe-cascade … --wire [--kept] [--speech]` or `--wire --socket`
-/// runs it.
-pub fn run(provider_config: &Path, second_config: &Path, runs: u32, mode: Mode) -> io::Result<()> {
+/// runs it. `routes` are the relay's near addresses, read as the voice
+/// reads them ([`super::relay_routes`]): the relay target reaches the one
+/// the voice would, and says which ([`super::Relay`]).
+pub fn run(
+    provider_config: &Path,
+    second_config: &Path,
+    runs: u32,
+    mode: Mode,
+    routes: &Routes,
+) -> io::Result<()> {
     if mode.socket {
-        return run_socket(second_config, runs);
+        return run_socket(second_config, runs, routes);
     }
-    let prepared = prepare(provider_config, second_config, runs, mode)?;
+    let prepared = prepare(provider_config, second_config, runs, mode, routes)?;
     if mode.kept {
         run_kept(&prepared, runs)
     } else {
@@ -880,6 +889,7 @@ fn prepare(
     second_config: &Path,
     runs: u32,
     mode: Mode,
+    routes: &Routes,
 ) -> io::Result<Prepared> {
     let config = crate::second_config::load_from_path(second_config)?
         .with_environment(|name| std::env::var_os(name))?;
@@ -896,7 +906,13 @@ fn prepare(
         }
     };
     let targets = if mode.speech {
-        speech_targets(&config, credentials.as_deref(), runs, &how("each target"))?
+        speech_targets(
+            &config,
+            credentials.as_deref(),
+            runs,
+            &how("each target"),
+            routes,
+        )?
     } else {
         chat_targets(
             provider_config,
@@ -905,6 +921,7 @@ fn prepare(
             runs,
             &how("each target and size"),
             mode.sizes,
+            routes,
         )?
     };
     Ok(Prepared { targets, tls })
@@ -919,6 +936,7 @@ fn chat_targets(
     runs: u32,
     how: &str,
     sizes: bool,
+    routes: &Routes,
 ) -> io::Result<Vec<(&'static str, Vec<Kind>)>> {
     let provider = crate::config::ProviderConfig::load(provider_config)?;
     let character: Arc<str> = provider.instruction(false)?.into();
@@ -949,8 +967,11 @@ fn chat_targets(
             .collect()
     };
     let mut targets = Vec::new();
-    match &config.hosted.deepseek_base_url {
-        Some(base) => targets.push(("relay", kinds(base, config.llm_key.expose())?)),
+    match super::deepseek_relay(config, routes) {
+        Some(relay) => {
+            println!("wire target=relay:{}", relay.told());
+            targets.push(("relay", kinds(relay.url(), config.llm_key.expose())?));
+        }
         None => println!(
             "wire target=relay: left out: no deepseek_base_url (systemd-run does not carry the voice unit's LAMP_SECOND_DEEPSEEK_BASE_URL: give it with -E)"
         ),
@@ -998,6 +1019,7 @@ fn speech_targets(
     credentials: Option<&OsStr>,
     runs: u32,
     how: &str,
+    routes: &Routes,
 ) -> io::Result<Vec<(&'static str, Vec<Kind>)>> {
     if config.tts_provider != TtsProvider::ElevenLabs {
         println!(
@@ -1029,13 +1051,15 @@ fn speech_targets(
         Ok((kind, own))
     };
     let mut targets = Vec::new();
-    let (route, own) = kind(&config.tts_base_url, config.tts_key.expose())?;
+    let relay = super::speech_relay(config, routes);
+    let (route, own) = kind(relay.url(), config.tts_key.expose())?;
     if own {
         println!(
             "wire speech target=relay: left out: the route's speech goes to ElevenLabs' own API"
         );
         targets.push(("direct", vec![route]));
     } else {
+        println!("wire speech target=relay:{}", relay.told());
         targets.push(("relay", vec![route]));
         match unit_credential(credentials, ELEVENLABS_CREDENTIAL) {
             Ok(key) => targets.push(("direct", vec![kind(ELEVENLABS_BASE_URL, key.expose())?.0])),
@@ -1518,7 +1542,7 @@ fn socket_model(environment: Option<String>) -> String {
 /// `--wire --socket`: each run, each target, one piece on a kept HTTP
 /// connection as the route sends them, and another of the same length on a
 /// speech socket opened [`SOCKET_AHEAD`] before it, the two in turn first.
-fn run_socket(second_config: &Path, runs: u32) -> io::Result<()> {
+fn run_socket(second_config: &Path, runs: u32, routes: &Routes) -> io::Result<()> {
     let config = crate::second_config::load_from_path(second_config)?
         .with_environment(|name| std::env::var_os(name))?;
     let credentials = std::env::var_os(CREDENTIALS_ENV);
@@ -1533,19 +1557,21 @@ fn run_socket(second_config: &Path, runs: u32) -> io::Result<()> {
         socket_model(std::env::var(crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT).ok());
     let voice = config.tts_voice.as_deref();
     let mut targets: Vec<(&'static str, String, String)> = Vec::new();
-    if on_elevenlabs(&config.tts_base_url) {
+    let relay = super::speech_relay(&config, routes);
+    if on_elevenlabs(relay.url()) {
         println!(
             "wire socket target=relay: left out: the route's speech goes to ElevenLabs' own API"
         );
         targets.push((
             "direct",
-            config.tts_base_url.clone(),
+            relay.url().to_owned(),
             config.tts_key.expose().to_owned(),
         ));
     } else {
+        println!("wire socket target=relay:{}", relay.told());
         targets.push((
             "relay",
-            config.tts_base_url.clone(),
+            relay.url().to_owned(),
             config.tts_key.expose().to_owned(),
         ));
         match unit_credential(credentials.as_deref(), ELEVENLABS_CREDENTIAL) {
