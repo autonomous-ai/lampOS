@@ -129,5 +129,56 @@ check "a refused sudo leaves no copy behind" '[[ -z $(ls -A "$T/tmp") ]]'
 out=$(PATH=$T/bin:$PATH LAMP_SSH="sshpass -e ssh" "$SYNC" --lamp pi@lamp --dir "$L" --state-dir "$S" 2>&1 </dev/null)
 check "LAMP_SSH replaces the ssh command" 'grep -q "^sshpass -e" "$FAKE_LOG"'
 
+# AppleDouble and Finder files (Jarvis's 09:04 on 06c1: a Mac's tar wrote seven `._*`) are never
+# carried, whether macOS tar adds them to the archive or a source tree holds them.
+# A stand-in tar that adds a `._` twin beside each file it packs, as macOS tar does for a file
+# with extended attributes, and logs whether COPYFILE_DISABLE was set.
+printf '%s\n' '#!/usr/bin/env bash' \
+  'echo "tar COPYFILE_DISABLE=${COPYFILE_DISABLE:-}" >>"$FAKE_LOG"' \
+  'if [[ " $* " == *" -cf "* ]]; then' \
+  '  c=; for a in "$@"; do [[ $prev == -C ]] && c=$a; prev=$a; done' \
+  '  list=${@: -1}; while IFS= read -r f; do d=$(dirname "$f"); echo junk >"$c/$d/._$(basename "$f")"; echo "$d/._$(basename "$f")" >>"$list"; done < <(cat "$list")' \
+  '  : >"$c/.DS_Store"; echo .DS_Store >>"$list"' \
+  'fi' \
+  'exec "$REAL_TAR" "$@"' >"$T/bin/tar"
+chmod +x "$T/bin/tar"
+export REAL_TAR=$(command -v tar)
+A=$T/apple
+: >"$FAKE_LOG"
+out=$(PATH=$T/bin:$PATH "$SYNC" --apply --dir "$A" --state-dir "$S" 2>&1); code=$?
+check "apply through a tar that adds ._ files still writes the skills" '[[ $code -eq 0 && -f $A/startle/skill.toml ]]'
+check "no ._ file is written" '[[ -z $(find "$A" -name "._*") ]]'
+check "no .DS_Store is written" '[[ -z $(find "$A" -name .DS_Store) ]]'
+check "each one is said refused" '[[ $out == *"refused: startle/._skill.toml"* ]]'
+check "tar packs with COPYFILE_DISABLE=1" 'grep -q "^tar COPYFILE_DISABLE=1" "$FAKE_LOG"'
+rm "$T/bin/tar"
+# The lamp's own ._ files (left by an earlier run) are said as safe to remove, never deleted.
+echo junk >"$A/startle/._SKILL.md"
+out=$("$SYNC" --dir "$A" --state-dir "$S" 2>&1)
+check "a ._ file on the lamp is listed as not a skill's" '[[ $out == *"left: startle/._SKILL.md (an AppleDouble or Finder file"* ]]'
+check "a ._ file on the lamp is not deleted" '[[ -f $A/startle/._SKILL.md ]]'
+# A source tree holding ._x and .DS_Store (a commit made from a Mac) syncs without them.
+G=$T/repo
+mkdir -p "$G/lampOS/deploy" "$G/lampOS/crates/update/src"
+cp "$SYNC" "$G/lampOS/deploy/"
+cp "$REPO/lampOS/crates/update/src/install.rs" "$G/lampOS/crates/update/src/"
+cp -R "$REPO/lampOS/skills" "$G/lampOS/"
+echo junk >"$G/lampOS/skills/startle/._x" && echo junk >"$G/lampOS/skills/startle/.DS_Store"
+git -C "$G" init -q && git -C "$G" add -A && git -C "$G" -c user.name=t -c user.email=t@t commit -qm t
+# A Mac's tar reads a `._x` entry as metadata for the next file and stops (Fourteen on #3184):
+# a stand-in tar that fails to unpack any archive holding one, as macOS bsdtar does.
+printf '%s\n' '#!/usr/bin/env bash' \
+  'if [[ " $* " == *" -x "* && " $* " != *" -f "* ]]; then' \
+  '  in=$(mktemp); cat >"$in"' \
+  '  if "$REAL_TAR" -tf "$in" | grep -qE "(^|/)(\._[^/]*|\.DS_Store)$"; then echo "Failed to restore metadata" >&2; rm -f "$in"; exit 1; fi' \
+  '  "$REAL_TAR" "$@" -f "$in"; s=$?; rm -f "$in"; exit $s' \
+  'fi' \
+  'exec "$REAL_TAR" "$@"' >"$T/bin/tar"
+chmod +x "$T/bin/tar"
+out=$(PATH=$T/bin:$PATH "$G/lampOS/deploy/sync-skills.sh" --apply --dir "$T/fromrepo" --state-dir "$S" 2>&1); code=$?
+rm "$T/bin/tar"
+check "a source tree with ._x syncs through a Mac's tar" '[[ $code -eq 0 && -f $T/fromrepo/startle/skill.toml ]]'
+check "a source tree's ._x and .DS_Store are not carried" '[[ ! -e $T/fromrepo/startle/._x && ! -e $T/fromrepo/startle/.DS_Store ]]'
+
 echo
 if [[ $failures -eq 0 ]]; then echo "all passed"; else echo "$failures failed"; exit 1; fi

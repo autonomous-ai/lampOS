@@ -32,6 +32,9 @@
 # lamp-skills reloads by itself) and check their journals for "skill.toml: No such file".
 # Runs on bash 3.2 (a Mac's) as well; the lamp's side needs only POSIX sh and its own tools.
 set -euo pipefail
+# A Mac's tar packs an AppleDouble `._name` beside each file with extended attributes, and its
+# cp can copy them too: never (Jarvis's 09:04, seven `._*` written into 06c1's skills).
+export COPYFILE_DISABLE=1
 
 usage="usage: sync-skills.sh [--apply] [--rev REV] [--lamp SSH_TARGET] [--dir DIR] [--state-dir DIR]"
 apply=0 rev=HEAD lamp= dir=/var/lib/lampOS/skills state=/var/lib/lampos-skills-state
@@ -57,7 +60,11 @@ trap 'rm -rf "$work"' EXIT
 sum() { if command -v sha256sum >/dev/null; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
 
 # The build's skills and install's lists, as REV has them.
-git -C "$repo" archive "$commit" lampOS/skills lampOS/crates/update/src/install.rs | tar -x -C "$work"
+# AppleDouble and Finder files are left out of the archive itself: a Mac's tar reads a `._x`
+# entry as metadata for the next file and stops (Fourteen on #3184), so excluding them on
+# extract would be too late.
+git -C "$repo" archive "$commit" lampOS/skills lampOS/crates/update/src/install.rs \
+  ':(exclude,glob)**/._*' ':(exclude,glob)**/.DS_Store' | tar -x -C "$work"
 install_rs=$work/lampOS/crates/update/src/install.rs
 block() {  # the lines of install.rs's `pub const $1: …` list
   awk -v list="pub const $1:" 'index($0, list) == 1 { on = 1; next } on && /^\];/ { exit } on' "$install_rs"
@@ -161,6 +168,9 @@ while IFS= read -r file; do
 done < <(cd "$stage" && find . -type f | sed 's#^\./##' | sort)
 for skill in "${product[@]}"; do
   awk -v s="./$skill/" '{ name = substr($0, 67) } index(name, s) == 1 { print substr(name, 3) }' <<<"$lamp_sums" | while IFS= read -r file; do
+    case ${file##*/} in
+      ._* | .DS_Store) echo "left: $file (an AppleDouble or Finder file, not a skill's; never deleted here, safe to remove)"; continue ;;
+    esac
     [[ -f $stage/$file ]] || grep -qxF "$file" "$work/kept-off" || echo "left: $file (on the lamp, not the build's; never deleted)"
   done
 done
@@ -179,6 +189,9 @@ in=$(mktemp -d "$parent/.sync-skills.XXXXXX") || exit 1
 s=0
 if tar -x --no-same-owner --no-same-permissions -C "$in" -f "$archive"; then
   (cd "$in" && find . -type f | while IFS= read -r f; do
+    case ${f##*/} in
+      ._* | .DS_Store) echo "refused: ${f#./} (an AppleDouble or Finder file, never written)" >&2; continue ;;
+    esac
     mkdir -p "$dir/$(dirname "$f")" || exit 1
     if [ "$(id -u)" = 0 ] && [ -e "$dir/$f" ]; then chown "$(stat -c %u:%g "$dir/$f")" "$f"; fi
     mv -f "$f" "$dir/$f" || exit 1
@@ -188,7 +201,10 @@ else
 fi
 rm -rf "$in"
 exit $s'
-tar -C "$stage" -cf "$work/write.tar" -T "$work/write"
+# A Mac's bsdtar also packs extended attributes as pax headers the lamp's tar warns about.
+no_xattrs=()
+if tar --version 2>/dev/null | grep -q bsdtar; then no_xattrs=(--no-xattrs --no-mac-metadata); fi
+tar ${no_xattrs[@]+"${no_xattrs[@]}"} -C "$stage" -cf "$work/write.tar" -T "$work/write"
 parent=$(dirname "$dir")
 if [[ -n $lamp ]]; then
   remote=$(on_lamp "mktemp")

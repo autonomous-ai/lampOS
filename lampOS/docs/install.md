@@ -998,7 +998,7 @@ itself, never reads half a file, and a changed file keeps its owner.
 `--dir` and `--state-dir` name other folders; without `--lamp` it runs
 here, on the lamp's own shell. Its ssh is key only (`BatchMode`);
 `LAMP_SSH="sshpass -e ssh"` with `SSHPASS` reaches a lamp by password. It
-runs on a Mac's bash 3.2 too. Then restart the parts that read the folders at start
+runs on a Mac's bash 3.2 too. It never carries an AppleDouble `._*` or a `.DS_Store`: a Mac's tar packs with `COPYFILE_DISABLE=1`, and `--apply` refuses to write either name, and says so; one already on the lamp is listed as safe to remove (23 Oct, seven written into lamp-06c1 from a Mac before this). Then restart the parts that read the folders at start
 (lamp-voice, lamp-expression; lamp-skills reloads by itself) and check
 their journals for `skill.toml: No such file`. On lamp-75c9 (installed by
 `lamp-update install` of `ef1eb0cf2`), its dry run at that build found
