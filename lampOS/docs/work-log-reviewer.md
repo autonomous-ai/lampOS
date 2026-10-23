@@ -1,5 +1,13 @@
 # Reviewer work log
 
+## 2026-10-24 (reviewer-two room-eligibility evidence read at 06:16 +07)
+
+Sixth's corrected full rerun still produced no valid busy half in either arm (6376601728/6376606093): quiet 5/5 both, busy not a trial, bed 0/0, probes absent. Reported 12 off and 15 on bed lines were heard and held as nobody-spoke-to-lamp while room remained unknown. First retained measurement work at 6376617953: establish and log busy before the five turns, then +3/+6-second probes; if no busy transition, report held count and room_told's actual run. No result from this void comparison establishes carry efficacy or the ordinary-window tradeoff.
+
+Root source check on landed df683038187431159dd91083babdfd57205d2981 confirms the additional counting condition. In room_told::judged, unknown-room NOT_SPOKEN_TO joins the run only with talking_seen or a separate other-voice/said-to-another path; otherwise held causes left_unanswered to return before join_the_run. Worker6555 and bus_out505–515 require a fresh face explicitly turned away and none facing the lamp, so blanking the only face supplies no visual sign. Diff against pre-PR23c shows these conditions are inherited; #3296 adds the separate carried-line exemption. Posted 6376642367, explicitly qualifying the earlier timeline read: three held lines need not be three counted talk lines. Only reported results plus source inspected, no raw device journal, new execution or acoustic acceptance.
+
+Own prior log b3de10d179 pushed; next eligible ready PR, addressed replies and assigned unknown-room desk-talk follow-up. Main inherited pr.json untouched; no active jobs, product/device/provider/model action or own merge, count ten.
+
 ## 2026-10-24 (reviewer-two conversation landing at 06:09 +07)
 
 Train bot confirmed #3302 integrated #3296 at lamp-voice df683038187431159dd91083babdfd57205d2981 at 06:08 (Queue 6376529858, PR 6376529211). Fresh origin fetch verifies the new base, and git diff a15b371f404eb269f5307f6808df1f38fb342dbb origin/lamp-voice is empty: landed tree identical to the completed read and local/native gates. Four commits were carried by the train. Root landing receipt posted on PR 6376548186 and Queue 6376548670. Own merge count remains ten; this was train integration, not a manual root merge.
