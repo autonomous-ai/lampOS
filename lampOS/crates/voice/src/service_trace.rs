@@ -23,12 +23,31 @@ const SEGMENTS: usize = 4;
 const SEGMENT_BYTES: u64 = 4 * 1024 * 1024;
 pub(crate) const FINISH_WAIT: Duration = Duration::from_millis(500);
 
+#[cfg(test)]
+thread_local! {
+    static TEST_SEGMENT_BYTES: std::cell::Cell<u64> = const { std::cell::Cell::new(SEGMENT_BYTES) };
+}
+/// Exercise the actual startup and writer with small rolling files. This
+/// setting belongs only to the constructing test thread, never another run.
+#[cfg(all(test, target_os = "linux"))]
+pub(crate) fn small_segments<T>(limit: u64, start: impl FnOnce() -> T) -> T {
+    struct Restore(u64);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            TEST_SEGMENT_BYTES.set(self.0);
+        }
+    }
+    assert!((256..=SEGMENT_BYTES).contains(&limit));
+    let _restore = Restore(TEST_SEGMENT_BYTES.replace(limit));
+    start()
+}
+
 struct Packet {
     bytes: [u8; MAX_EVENT_BYTES],
     len: usize,
 }
 impl Packet {
-    fn encode(event: &Value) -> io::Result<Self> {
+    fn encode(event: &impl Serialize) -> io::Result<Self> {
         let mut packet = Self {
             bytes: [0; MAX_EVENT_BYTES],
             len: 0,
@@ -57,6 +76,160 @@ pub(crate) fn event_fits(event: &Value) -> bool {
     Packet::encode(event).is_ok()
 }
 
+/// A successful reader grant exposes only this versioned, flat projection.
+/// Every string is selected from a fixed vocabulary; no field, nested object,
+/// unknown kind or status can carry source words, paths or private identities.
+/// The private writer still serializes the original Value byte-for-byte.
+#[derive(Serialize)]
+struct SharedMetadata {
+    shared_metadata: u8,
+    kind: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    service_sequence: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    turn: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    at_us: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    admission_basis: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    decided_at_us: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    words_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cue_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chat_first_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    first_answer_audio_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    after_decision_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    outcome: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    playback_gaps: Option<u64>,
+}
+fn listed(value: &Value, values: &'static [&'static str]) -> Option<&'static str> {
+    let value = value.as_str()?;
+    values.iter().copied().find(|allowed| *allowed == value)
+}
+impl SharedMetadata {
+    fn of(event: &Value) -> Self {
+        // These are the kinds Peek's Turns reader understands. Anything else
+        // contributes an event/count without publishing the original kind.
+        let kind = listed(
+            &event["kind"],
+            &[
+                "input_admitted",
+                "answer_stages",
+                "answer_first_audio",
+                "turn_finished",
+                "floor_held",
+                "answer_waits",
+                "input_let_go_answer_waits",
+                "input_let_go_own_line",
+                "input_let_go_body_moving",
+                "asker_first_answer_held",
+                "provider_turn_unclear",
+                "provider_turn_failed",
+            ],
+        )
+        .unwrap_or("service_event");
+        let number = |key: &str| event[key].as_u64();
+        let stages = kind == "answer_stages";
+        Self {
+            shared_metadata: 1,
+            kind,
+            service_sequence: number("service_sequence"),
+            turn: number("turn"),
+            at_us: number("at_us"),
+            admission_basis: (kind == "input_admitted")
+                .then(|| {
+                    listed(
+                        &event["admission_basis"],
+                        &[
+                            "directed_session_vad_only",
+                            "directed_session_v1_baseline",
+                            "directed_session_duplex",
+                            "classifier_decision",
+                            "local_speech",
+                            "skill_says",
+                            "lamp_tells_news",
+                            "continued_after_early_end",
+                            "back_online",
+                            "lamp_looks",
+                            "asked_again",
+                            "lamp_looks_again",
+                            "onboarding_privacy_invitation",
+                            "onboarding_near_call_prompt",
+                            "onboarding_giving_way_invitation",
+                            "onboarding_invitation",
+                            "lamp_leads_setup",
+                            "photo_face_ask",
+                            "schedule_reminder",
+                            "fixture_at_ms",
+                            "head_wake_cue",
+                            "look_note",
+                        ],
+                    )
+                })
+                .flatten(),
+            decided_at_us: stages.then(|| number("decided_at_us")).flatten(),
+            words_ms: stages.then(|| number("words_ms")).flatten(),
+            cue_ms: stages.then(|| number("cue_ms")).flatten(),
+            chat_first_ms: stages.then(|| number("chat_first_ms")).flatten(),
+            first_answer_audio_ms: stages.then(|| number("first_answer_audio_ms")).flatten(),
+            after_decision_ms: (kind == "answer_first_audio")
+                .then(|| number("after_decision_ms"))
+                .flatten(),
+            outcome: (kind == "turn_finished")
+                .then(|| {
+                    listed(
+                        &event["outcome"],
+                        &[
+                            "audio_written_unscored",
+                            "audio_written_with_playback_gaps_unscored",
+                            "no_audio_answer",
+                            "provider_failed",
+                            "user_interrupted",
+                            "provider_interrupted",
+                            "deadline_cancelled",
+                            "runtime_failed",
+                            "privacy_muted",
+                            "head_sleep",
+                            "software_muted",
+                            "hand_stop",
+                            "head_stop",
+                            "spoken_stop",
+                            "body_pushed",
+                            "capture_gap",
+                            "second_route_failed",
+                            "service_stopped",
+                            "unplug_authority_lost",
+                            "reminder_authority_lost",
+                            "privacy_gap",
+                            "reminder_deferred",
+                            "onboarding_sentence",
+                            "nothing_said",
+                            "reminder_lease_expired",
+                            "requested_audio_revoked",
+                            "unclear",
+                            "onboarding_near_call",
+                            "not_speech",
+                            "playback_discarded",
+                            "speaker_lapsed",
+                            "cancelled",
+                        ],
+                    )
+                })
+                .flatten(),
+            playback_gaps: (kind == "turn_finished")
+                .then(|| number("playback_gaps"))
+                .flatten(),
+        }
+    }
+}
+
 #[derive(Default)]
 struct Health {
     closed: AtomicBool,
@@ -66,6 +239,7 @@ struct Health {
     written: AtomicU64,
     accepted: AtomicU64,
     rotations: AtomicU64,
+    reader_unavailable: AtomicBool,
 }
 #[derive(Clone, Copy, Debug, Serialize)]
 pub(crate) struct Report {
@@ -93,7 +267,10 @@ impl Health {
         Report {
             acknowledged,
             finish_attempted,
-            degraded: failed || dropped > 0 || (finish_attempted && !acknowledged),
+            degraded: failed
+                || self.reader_unavailable.load(Ordering::Acquire)
+                || dropped > 0
+                || (finish_attempted && !acknowledged),
             writer_failed: failed,
             initialization_failed: false,
             dropped_events: dropped,
@@ -106,6 +283,9 @@ impl Health {
 }
 
 pub(crate) struct ServiceTrace {
+    /// True only after a verified successful group grant; never changed by
+    /// an event or rotation. Projection happens before bytes enter the queue.
+    shared_metadata: bool,
     queue: Option<Producer<Packet>>,
     health: Arc<Health>,
     writer: Thread,
@@ -118,9 +298,34 @@ impl ServiceTrace {
         let store = Files::open(output)?;
         Self::spawn(store)
     }
+    pub(crate) fn start_with_reader(
+        output: &Path,
+        reader: io::Result<crate::session_reader::Reader>,
+    ) -> io::Result<Self> {
+        let store = Files::open(output)?;
+        let shared = match reader {
+            Ok(reader) => reader.grant(output, &store.segments, &store.health_file)?,
+            Err(_) => false,
+        };
+        if !shared {
+            eprintln!("lamp-voice serve: session reader unavailable; metadata remains private");
+        }
+        let mut writer = Self::spawn_with_reader_health(store, !shared)?;
+        writer.shared_metadata = shared;
+        Ok(writer)
+    }
     fn spawn(store: impl Store + Send + 'static) -> io::Result<Self> {
+        Self::spawn_with_reader_health(store, false)
+    }
+    fn spawn_with_reader_health(
+        store: impl Store + Send + 'static,
+        reader_unavailable: bool,
+    ) -> io::Result<Self> {
         let (producer, consumer) = RingBuffer::new(QUEUE_CAPACITY);
-        let health = Arc::new(Health::default());
+        let health = Arc::new(Health {
+            reader_unavailable: AtomicBool::new(reader_unavailable),
+            ..Health::default()
+        });
         let shared = Arc::clone(&health);
         let (tx, done) = mpsc::sync_channel(1);
         let handle = thread::Builder::new()
@@ -133,6 +338,7 @@ impl ServiceTrace {
         // Deliberately detach: filesystem calls cannot be preempted by Rust.
         drop(handle);
         Ok(Self {
+            shared_metadata: false,
             queue: Some(producer),
             health,
             writer,
@@ -150,7 +356,12 @@ impl ServiceTrace {
             self.lost(false);
             return;
         }
-        let packet = match Packet::encode(event) {
+        let encoded = if self.shared_metadata {
+            Packet::encode(&SharedMetadata::of(event))
+        } else {
+            Packet::encode(event)
+        };
+        let packet = match encoded {
             Ok(packet) => packet,
             Err(_) => {
                 self.lost(true);
@@ -171,6 +382,17 @@ impl ServiceTrace {
     #[cfg(test)]
     pub(crate) fn health(&self) -> Report {
         self.health.report(false, false)
+    }
+    /// Test data assertions may observe eventual completion separately from the
+    /// immutable report returned at the production finish deadline.
+    #[cfg(test)]
+    pub(crate) fn observe_completion_for_test(&self, first: &Report, wait: Duration) -> Report {
+        if !first.acknowledged {
+            self.done
+                .recv_timeout(wait)
+                .expect("test writer completion");
+        }
+        self.health.report(true, true)
     }
     pub(crate) fn finish(&mut self, wait: Duration) -> Report {
         self.queue.take();
@@ -257,7 +479,10 @@ impl Files {
             generation: 0,
             bytes: 0,
             events: 0,
+            #[cfg(not(test))]
             limit: SEGMENT_BYTES,
+            #[cfg(test)]
+            limit: TEST_SEGMENT_BYTES.get(),
         })
     }
     fn header(&mut self) -> io::Result<()> {
@@ -419,9 +644,10 @@ mod tests {
         let report = writer.finish(Duration::ZERO);
         assert!(!report.acknowledged && report.degraded);
         release.send(()).unwrap();
-        writer.done.recv_timeout(Duration::from_secs(2)).unwrap();
+        let completed = writer.observe_completion_for_test(&report, Duration::from_secs(2));
+        assert!(completed.acknowledged && !completed.writer_failed);
         // A late writer exit cannot rewrite the already returned timed-out report.
-        assert!(!report.acknowledged);
+        assert!(!report.acknowledged && report.degraded);
     }
     #[test]
     fn oversized_event_is_dropped_not_truncated_into_a_misleading_record() {
@@ -436,6 +662,56 @@ mod tests {
         assert_eq!(report.dropped_events, 1);
         assert_eq!(report.written_events, 0);
     }
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn shared_session_rotation_keeps_granted_descriptors_and_private_health() {
+        use std::os::unix::fs::MetadataExt;
+        let dir = crate::process::SessionDirectory::create().unwrap();
+        let base = dir.path.canonicalize().unwrap();
+        let voice = base.join("voice");
+        let sessions = voice.join("sessions");
+        let output = sessions.join("new");
+        fs::create_dir(&voice).unwrap();
+        fs::create_dir(&sessions).unwrap();
+        fs::set_permissions(&voice, fs::Permissions::from_mode(0o710)).unwrap();
+        fs::set_permissions(&sessions, fs::Permissions::from_mode(0o750)).unwrap();
+        let gid = rustix::process::getegid().as_raw();
+        let reader = crate::session_reader::Reader::prepare(&output, gid).unwrap();
+        fs::create_dir(&output).unwrap();
+        fs::set_permissions(&output, fs::Permissions::from_mode(0o700)).unwrap();
+        let mut files = Files::open(&output).unwrap();
+        assert!(
+            reader
+                .grant(&output, &files.segments, &files.health_file)
+                .unwrap()
+        );
+        let pinned: Vec<_> = files
+            .segments
+            .iter()
+            .map(|f| f.metadata().unwrap().ino())
+            .collect();
+        files.limit = 512;
+        let health = Health::default();
+        for n in 0..100 {
+            let packet =
+                Packet::encode(&serde_json::json!({"n":n,"text":"x".repeat(100)})).unwrap();
+            files.event(&packet.bytes[..packet.len], &health).unwrap();
+        }
+        files.finish(&health).unwrap();
+        assert!(health.rotations.load(Ordering::Acquire) > SEGMENTS as u64);
+        for (slot, original) in pinned.iter().enumerate() {
+            let meta = fs::metadata(output.join(format!("metadata/events-{slot}.jsonl"))).unwrap();
+            assert_eq!(
+                (meta.ino(), meta.gid(), meta.mode() & 0o7777),
+                (*original, gid, 0o640)
+            );
+            assert!(meta.len() <= 512);
+        }
+        assert_eq!(files.health_file.metadata().unwrap().mode() & 0o7777, 0o600);
+        drop(files);
+        fs::remove_dir_all(&voice).unwrap();
+    }
+
     #[test]
     fn rotation_uses_only_pinned_files_and_bounded_disk_space() {
         let dir = crate::process::SessionDirectory::create().unwrap();
@@ -462,6 +738,65 @@ mod tests {
             for line in fs::read_to_string(path).unwrap().lines() {
                 serde_json::from_str::<Value>(line).unwrap();
             }
+        }
+    }
+    #[test]
+    fn private_and_failed_reader_traces_keep_the_original_records_and_finite_state() {
+        let event = serde_json::json!({"kind":"transcript","turn":7,
+            "text":"PRIVATE_TRACE_CONTROL","nested":{"path":"/private/control"},
+            "outcome":"unlisted status","finished":true});
+        let mut finite = crate::session_state::SessionState::finite();
+        finite.record(event.clone()).unwrap();
+        assert_eq!(finite.as_slice(), std::slice::from_ref(&event));
+        for failed_reader in [false, true] {
+            let dir = crate::process::SessionDirectory::create().unwrap();
+            let mut state = if failed_reader {
+                crate::session_state::SessionState::service_with_reader(
+                    &dir.path,
+                    Err(io::Error::new(
+                        io::ErrorKind::PermissionDenied,
+                        "synthetic refusal",
+                    )),
+                )
+            } else {
+                crate::session_state::SessionState::service(&dir.path)
+            };
+            state.record(event.clone()).unwrap();
+            state.flush(&mut None, 1);
+            let bounded = state.finish_logging().unwrap();
+            assert!(!bounded.writer_failed, "bounded finish: {bounded:?}");
+            assert!(bounded.finish_attempted);
+            assert_eq!(bounded.degraded, failed_reader || !bounded.acknowledged);
+            let report = state
+                .writer_for_test()
+                .observe_completion_for_test(&bounded, Duration::from_secs(5));
+            assert!(report.acknowledged && !report.writer_failed);
+            assert_eq!(report.degraded, failed_reader);
+            assert_eq!((report.written_events, report.dropped_events), (1, 0));
+            let mut expected = event.clone();
+            expected["service_sequence"] = serde_json::json!(1);
+            let bytes = fs::read(dir.path.join("metadata/events-0.jsonl")).unwrap();
+            let records: Vec<_> = bytes
+                .split(|byte| *byte == b'\n')
+                .filter(|line| !line.is_empty())
+                .collect();
+            let mut exact = serde_json::to_vec(&expected).unwrap();
+            assert_eq!(records.len(), 2);
+            assert_eq!(
+                records[1],
+                exact.as_slice(),
+                "private JSON is byte-equivalent"
+            );
+            exact.push(b'\n');
+            assert!(bytes.ends_with(&exact));
+            assert_eq!(
+                fs::metadata(dir.path.join("metadata/health.json"))
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o7777,
+                0o600
+            );
         }
     }
 }

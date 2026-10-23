@@ -224,7 +224,13 @@ pub fn execute_with(
             continue;
         }
         let mut observations = crate::ProcessObservations::default();
-        let mut result = match Store::open(&root.path) {
+        let mut result = match root
+            .session_read_group
+            .as_deref()
+            .map(crate::config::session_reader_gid)
+            .transpose()
+            .and_then(|gid| Store::open_with_reader_gid(&root.path, gid))
+        {
             Ok(mut store) => root_with(
                 root,
                 now_unix_s,

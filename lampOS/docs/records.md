@@ -83,6 +83,60 @@ refused. A protected sticky temporary ancestor is allowed for private test
 fixtures. Descendant mount crossings, including bind mounts, are refused on
 Linux. Missing or blocked `openat2` is a refusal, not a weaker fallback.
 
+### Optional session-reader group (#2789)
+
+An office installation can give a dedicated reader access to service events
+without giving it the voice's account or other private state. Set
+`session_read_group` on the particular `voice_service_metadata` root in
+`records.json`, matching Voice's `LAMP_SESSION_READ_GROUP`. Omission or JSON
+`null` keeps the private policy. This setting does not enable retention or
+change its limits. Its name participates in the configuration fingerprint;
+an omitted policy preserves the historical private-policy fingerprint.
+
+The name is 1–128 ASCII characters, starts with a letter and otherwise uses
+letters, digits, `_` or `-`. Records resolves one unique exact entry from the
+local `/etc/group` once before opening that root. The read is capped at 1 MiB
+and refuses a link, special file, duplicate name, invalid ID or read failure.
+There is no NSS/network lookup or numeric-ID setting. A failed lookup refuses
+that root visibly; it never falls back to another group.
+
+| Object | Private policy/history | Explicit reader policy |
+|---|---|---|
+| Sessions root, invocation directory, `metadata/` | 0700 | 0750 with the pinned reader GID, or private historical 0700 |
+| `events-0.jsonl` through `events-3.jsonl` | 0600 | 0640 with the pinned reader GID, or private historical 0600 |
+| `health.json` | 0600 | 0600 |
+| Records quarantine | 0700 | 0700 |
+
+Owner, file link count, filesystem, exact mode and captured identity checks
+still apply. With a reader policy, any access or default ACL is refused,
+including one on private historical entries or quarantine. The ACL check
+uses retained descriptors and is repeated with the existing identity and
+layout checks before deletion. A platform without the Linux ACL verifier
+refuses the opt-in policy. With no reader policy, the existing private-only
+behavior is unchanged. Records neither reads event contents nor changes
+permissions or ownership.
+
+Shared modes alone do not establish that the contents are safe for a reader.
+Voice's successful-grant path writes the fixed, flat `shared_metadata: 1`
+projection described in [Peek](peek.md#session-reader-access): approved turn
+kinds/statuses and unsigned counters/timings, with other records reduced to
+a fixed generic event. Transcripts, nested payloads, paths and identities are
+excluded at serialization, not merely ignored by Peek. Records does not
+parse, certify or redact those contents; its retention decisions remain
+based on the same pinned filesystem identities. Private and historical
+trace formats and the private health schema are unchanged. Previously
+shared files are not rewritten by this change.
+
+Install compatible Records before enabling Voice's producer grant. Older
+readers can ignore this additive field but still reject shared modes; they
+must not be described as maintaining the new layout. Voice grants access
+only to a new service invocation and its retained event descriptors. Existing
+sessions are not widened, and rotation does not reopen or re-grant files.
+The dedicated account, narrowly prepared parent traversal, a bus view that
+excludes raw speech before delivery, and the authorized install/restart test
+remain separate from this retention policy. Subscriber-only access alone
+cannot protect payloads already delivered; see [Peek](peek.md#session-reader-access).
+
 ### Which session is live
 
 A directory's age, name, `writer_finished` field or an absent main PID is

@@ -54,6 +54,7 @@ pub struct Store {
     path: Option<PathBuf>,
     identity: Node,
     owner: u32,
+    reader_gid: Option<u32>,
     snapshots: BTreeMap<String, Candidate>,
     #[cfg(test)]
     failure: Option<Failure>,
@@ -127,6 +128,48 @@ impl Node {
         {
             return Err(invalid(
                 "directory must be owned, private, and on the root filesystem",
+            ));
+        }
+        Ok(())
+    }
+
+    fn session_directory(&self, owner: u32, dev: i128, reader_gid: Option<u32>) -> io::Result<()> {
+        if self.mode & 0o7777 == 0o700 {
+            return self.directory(owner, dev);
+        }
+        if self.kind != FileType::Directory
+            || self.uid != i128::from(owner)
+            || self.dev != dev
+            || self.mode & 0o7777 != 0o750
+            || reader_gid.map(i128::from) != Some(self.gid)
+        {
+            return Err(invalid(
+                "session directory must be private or match the pinned reader group",
+            ));
+        }
+        Ok(())
+    }
+
+    fn session_record(
+        &self,
+        owner: u32,
+        dev: i128,
+        reader_gid: Option<u32>,
+        health: bool,
+    ) -> io::Result<()> {
+        if self.mode & 0o7777 == 0o600 {
+            return self.record(owner, dev);
+        }
+        if health
+            || self.kind != FileType::RegularFile
+            || self.uid != i128::from(owner)
+            || self.dev != dev
+            || self.nlink != 1
+            || self.mode & 0o7777 != 0o640
+            || reader_gid.map(i128::from) != Some(self.gid)
+        {
+            return Err(invalid(
+                "event record must be private or match the pinned reader group; health stays private",
             ));
         }
         Ok(())
@@ -213,11 +256,23 @@ impl Store {
     /// closed. The macOS fallback is for local development tests only and makes
     /// no Linux mount-confinement or unchanged-directory-atime claim.
     pub fn open(root: &Path) -> io::Result<Self> {
-        let owner = rustix::process::geteuid().as_raw();
-        let (parent, name, directory) = trusted_root(root, owner)?;
-        Self::from_open(parent, name, directory, Some(root.to_owned()), owner)
+        Self::open_with_reader_gid(root, None)
     }
 
+    pub(crate) fn open_with_reader_gid(root: &Path, reader_gid: Option<u32>) -> io::Result<Self> {
+        let owner = rustix::process::geteuid().as_raw();
+        let (parent, name, directory) = trusted_root(root, owner, reader_gid)?;
+        Self::from_open_policy(
+            parent,
+            name,
+            directory,
+            Some(root.to_owned()),
+            owner,
+            reader_gid,
+        )
+    }
+
+    #[cfg(test)]
     fn from_open(
         parent: File,
         name: OsString,
@@ -225,8 +280,20 @@ impl Store {
         path: Option<PathBuf>,
         owner: u32,
     ) -> io::Result<Self> {
+        Self::from_open_policy(parent, name, root, path, owner, None)
+    }
+
+    fn from_open_policy(
+        parent: File,
+        name: OsString,
+        root: File,
+        path: Option<PathBuf>,
+        owner: u32,
+        reader_gid: Option<u32>,
+    ) -> io::Result<Self> {
         let identity = Node::of(&root)?;
-        identity.directory(owner, identity.dev)?;
+        identity.session_directory(owner, identity.dev, reader_gid)?;
+        reader_acl(&root, reader_gid)?;
         if Node::at(&parent, &name)? != identity {
             return Err(invalid("root changed while opening it"));
         }
@@ -240,6 +307,7 @@ impl Store {
             path,
             identity,
             owner,
+            reader_gid,
             snapshots: BTreeMap::new(),
             #[cfg(test)]
             failure: None,
@@ -248,14 +316,15 @@ impl Store {
 
     fn check_root(&self) -> io::Result<()> {
         let current = Node::of(&self.root)?;
-        current.directory(self.owner, self.identity.dev)?;
+        current.session_directory(self.owner, self.identity.dev, self.reader_gid)?;
+        reader_acl(&self.root, self.reader_gid)?;
         if !self.identity.same_object(&current)
             || !current.same_object(&Node::at(&self.parent, &self.name)?)
         {
             return Err(invalid("configured root was replaced or moved"));
         }
         if let Some(path) = &self.path {
-            let (_, _, reopened) = trusted_root(path, self.owner)?;
+            let (_, _, reopened) = trusted_root(path, self.owner, self.reader_gid)?;
             if !current.same_object(&Node::of(&reopened)?) {
                 return Err(invalid("configured root ancestry changed"));
             }
@@ -374,7 +443,8 @@ impl Store {
     fn read_tree(&self, parent: &File, name: &OsStr, pending: bool) -> io::Result<OpenTree> {
         let session = child_directory(parent, name)?;
         let session_node = Node::of(&session)?;
-        session_node.directory(self.owner, self.identity.dev)?;
+        session_node.session_directory(self.owner, self.identity.dev, self.reader_gid)?;
+        reader_acl(&session, self.reader_gid)?;
         if Node::at(parent, name)? != session_node {
             return Err(invalid("session changed while opening it"));
         }
@@ -385,7 +455,8 @@ impl Store {
         if children.as_slice() == [OsString::from("metadata")] {
             let directory = child_directory(&session, OsStr::new("metadata"))?;
             let before = Node::of(&directory)?;
-            before.directory(self.owner, self.identity.dev)?;
+            before.session_directory(self.owner, self.identity.dev, self.reader_gid)?;
+            reader_acl(&directory, self.reader_gid)?;
             if Node::at(&session, OsStr::new("metadata"))? != before {
                 return Err(invalid("metadata directory changed while opening it"));
             }
@@ -394,8 +465,13 @@ impl Store {
                 else {
                     return Err(invalid("unknown entry in metadata directory"));
                 };
-                let node = record_node(&directory, OsStr::new(file_name))?;
-                node.record(self.owner, self.identity.dev)?;
+                let node = record_node(&directory, OsStr::new(file_name), self.reader_gid)?;
+                node.session_record(
+                    self.owner,
+                    self.identity.dev,
+                    self.reader_gid,
+                    file_name == "health.json",
+                )?;
                 files.insert(file_name.to_owned(), node);
             }
             // Recheck the collected names and nodes: reject a writer observed
@@ -408,7 +484,7 @@ impl Store {
                 return Err(invalid("metadata directory changed during inventory"));
             }
             for (file_name, node) in &files {
-                if record_node(&directory, OsStr::new(file_name))? != *node {
+                if record_node(&directory, OsStr::new(file_name), self.reader_gid)? != *node {
                     return Err(invalid("record changed during inventory"));
                 }
             }
@@ -435,6 +511,7 @@ impl Store {
         let trash = child_directory(&self.root, OsStr::new(TRASH))?;
         let node = Node::of(&trash)?;
         node.directory(self.owner, self.identity.dev)?;
+        reader_acl(&trash, self.reader_gid)?;
         if Node::at(&self.root, OsStr::new(TRASH))? != node {
             return Err(invalid("quarantine directory changed while opening it"));
         }
@@ -547,7 +624,9 @@ impl Store {
                     OsStr::new("metadata"),
                     opened.tree.metadata.as_ref().expect("opened metadata"),
                 )?;
-                let current = record_node(metadata, OsStr::new(name))?;
+                reader_acl(&opened.session, self.reader_gid)?;
+                reader_acl(metadata, self.reader_gid)?;
+                let current = record_node(metadata, OsStr::new(name), self.reader_gid)?;
                 if current != *expected {
                     return Err(invalid("record changed before unlink"));
                 }
@@ -572,6 +651,8 @@ impl Store {
             if !names(metadata, 0)?.is_empty() {
                 return Err(invalid("metadata directory is no longer empty"));
             }
+            reader_acl(&opened.session, self.reader_gid)?;
+            reader_acl(metadata, self.reader_gid)?;
             let current = Node::of(metadata)?;
             self.unlink(
                 &opened.session,
@@ -589,6 +670,7 @@ impl Store {
         if !names(&opened.session, 0)?.is_empty() {
             return Err(invalid("session directory is no longer empty"));
         }
+        reader_acl(&opened.session, self.reader_gid)?;
         let current = Node::of(&opened.session)?;
         self.unlink(
             &trash,
@@ -605,6 +687,7 @@ impl Store {
     fn check_quarantine(&self, trash: &File) -> io::Result<()> {
         let current = Node::of(trash)?;
         current.directory(self.owner, self.identity.dev)?;
+        reader_acl(trash, self.reader_gid)?;
         if !current.same_object(&Node::at(&self.root, OsStr::new(TRASH))?) {
             return Err(invalid("quarantine was replaced or moved"));
         }
@@ -726,7 +809,7 @@ fn child_directory(parent: &File, name: &OsStr) -> io::Result<File> {
     }
 }
 
-fn record_node(parent: &File, name: &OsStr) -> io::Result<Node> {
+fn record_node(parent: &File, name: &OsStr, reader_gid: Option<u32>) -> io::Result<Node> {
     let node = Node::at(parent, name)?;
     #[cfg(target_os = "linux")]
     {
@@ -745,7 +828,64 @@ fn record_node(parent: &File, name: &OsStr) -> io::Result<Node> {
             return Err(invalid("record changed while inspecting it"));
         }
     }
+    if reader_gid.is_some() {
+        if node.kind != FileType::RegularFile {
+            return Err(invalid("record is not a regular file"));
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let file: File = fs::openat2(
+                parent,
+                name,
+                OFlags::RDONLY
+                    | OFlags::NONBLOCK
+                    | OFlags::NOFOLLOW
+                    | OFlags::CLOEXEC
+                    | OFlags::NOATIME,
+                Mode::empty(),
+                fs::ResolveFlags::BENEATH
+                    | fs::ResolveFlags::NO_SYMLINKS
+                    | fs::ResolveFlags::NO_XDEV,
+            )?
+            .into();
+            reader_acl(&file, reader_gid)?;
+            if Node::of(&file)? != node {
+                return Err(invalid("record changed during ACL verification"));
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        return Err(invalid("session-reader ACL verification requires Linux"));
+    }
     Ok(node)
+}
+
+/// Presence of either POSIX ACL is refused, rather than trusting mode bits or
+/// stripping inherited permissions. No attribute value or record data is read.
+fn reader_acl(file: &File, reader_gid: Option<u32>) -> io::Result<()> {
+    if reader_gid.is_none() {
+        return Ok(());
+    }
+    #[cfg(target_os = "linux")]
+    {
+        for name in ["system.posix_acl_access", "system.posix_acl_default"] {
+            match fs::fgetxattr(file, name, &mut [0u8; 1]) {
+                Err(rustix::io::Errno::NODATA) => {}
+                Ok(_) | Err(rustix::io::Errno::RANGE) => {
+                    return Err(invalid("unexpected session-reader ACL"));
+                }
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = file;
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "session-reader ACL verification requires Linux",
+        ))
+    }
 }
 
 fn require_link(parent: &File, name: &OsStr, expected: &Node) -> io::Result<()> {
@@ -775,7 +915,11 @@ fn names(directory: &File, limit: usize) -> io::Result<Vec<OsString>> {
     Ok(result)
 }
 
-fn trusted_root(path: &Path, owner: u32) -> io::Result<(File, OsString, File)> {
+fn trusted_root(
+    path: &Path,
+    owner: u32,
+    reader_gid: Option<u32>,
+) -> io::Result<(File, OsString, File)> {
     if !path.is_absolute() || path.as_os_str().as_bytes().len() > 4096 {
         return Err(invalid("root must be a bounded absolute path"));
     }
@@ -802,7 +946,8 @@ fn trusted_root(path: &Path, owner: u32) -> io::Result<(File, OsString, File)> {
     }
     let root: File = fs::openat(&parent, *name, flags(), Mode::empty())?.into();
     let node = Node::of(&root)?;
-    node.directory(owner, node.dev)?;
+    node.session_directory(owner, node.dev, reader_gid)?;
+    reader_acl(&root, reader_gid)?;
     // This second opening supplies NOATIME and verifies the Linux primitives;
     // opening a directory without enumerating it does not read its entries.
     let root = child_directory(&root, OsStr::new("."))?;
@@ -1747,5 +1892,235 @@ mod tests {
                 vec![b'x'; 8192]
             );
         }
+    }
+    #[test]
+    fn session_read_group_roles_pin_gid_and_keep_health_and_quarantine_private() {
+        let fixture = Fixture::new();
+        let id = fixture.session(900, 5);
+        let owner = rustix::process::geteuid().as_raw();
+        let mut directory = node(&fixture.root.join(&id));
+        let gid = u32::try_from(directory.gid).unwrap();
+        let dev = directory.dev;
+        assert!(directory.session_directory(owner, dev, Some(gid)).is_ok());
+        directory.mode = (directory.mode & !0o7777) | 0o750;
+        assert!(directory.session_directory(owner, dev, None).is_err());
+        assert!(directory.session_directory(owner, dev, Some(gid)).is_ok());
+        assert!(
+            directory
+                .session_directory(owner, dev, Some(gid.wrapping_add(1)))
+                .is_err()
+        );
+        assert!(
+            directory.directory(owner, dev).is_err(),
+            "quarantine stays private"
+        );
+        for mode in [0o710, 0o770, 0o755, 0o2750] {
+            directory.mode = (directory.mode & !0o7777) | mode;
+            assert!(directory.session_directory(owner, dev, Some(gid)).is_err());
+        }
+        let mut event = node(&fixture.record(&id, RECORDS[0]));
+        assert!(event.session_record(owner, dev, Some(gid), false).is_ok());
+        event.mode = (event.mode & !0o7777) | 0o640;
+        assert!(event.session_record(owner, dev, Some(gid), false).is_ok());
+        assert!(event.session_record(owner, dev, None, false).is_err());
+        assert!(event.session_record(owner, dev, Some(gid), true).is_err());
+        assert!(
+            event
+                .session_record(owner, dev, Some(gid.wrapping_add(1)), false)
+                .is_err()
+        );
+        for mode in [0o644, 0o660, 0o740, 0o4640] {
+            event.mode = (event.mode & !0o7777) | mode;
+            assert!(event.session_record(owner, dev, Some(gid), false).is_err());
+        }
+        event.mode = (event.mode & !0o7777) | 0o640;
+        event.nlink = 2;
+        assert!(event.session_record(owner, dev, Some(gid), false).is_err());
+        event.nlink = 1;
+        event.uid += 1;
+        assert!(event.session_record(owner, dev, Some(gid), false).is_err());
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    #[test]
+    fn session_read_group_unsupported_acl_verification_fails_closed() {
+        let fixture = Fixture::new();
+        assert!(Store::open_with_reader_gid(&fixture.root, Some(42)).is_err());
+        assert!(Store::open(&fixture.root).is_ok());
+    }
+
+    #[cfg(target_os = "linux")]
+    fn reader_fixture(fixture: &Fixture) -> (Store, u32) {
+        let gid = rustix::process::getegid().as_raw();
+        let store = Store::open_with_reader_gid(&fixture.root, Some(gid)).unwrap();
+        (store, gid)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn share(fixture: &Fixture, id: &str) {
+        for path in [
+            fixture.root.clone(),
+            fixture.root.join(id),
+            fixture.root.join(id).join("metadata"),
+        ] {
+            stdfs::set_permissions(path, Permissions::from_mode(0o750)).unwrap();
+        }
+        for name in &RECORDS[..4] {
+            stdfs::set_permissions(fixture.record(id, name), Permissions::from_mode(0o640))
+                .unwrap();
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn session_read_group_shared_and_historical_sessions_are_retained_and_removed() {
+        if store_cannot_run_here() {
+            return;
+        }
+        let fixture = Fixture::new();
+        let old = fixture.session(910, 5);
+        let shared = fixture.session(911, 5);
+        share(&fixture, &shared);
+        assert!(Store::open(&fixture.root).is_err());
+        let (mut store, _) = reader_fixture(&fixture);
+        let inventory = store.inventory().unwrap();
+        assert!(inventory.refused.is_empty(), "{:?}", inventory.refused);
+        assert_eq!(inventory.sessions.len(), 2);
+        assert!(store.remove(&old).unwrap().complete);
+        assert!(store.remove(&shared).unwrap().complete);
+        assert_eq!(node(&fixture.root.join(TRASH)).mode & 0o7777, 0o700);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn session_read_group_revalidates_changed_modes_and_private_roles_before_delete() {
+        if store_cannot_run_here() {
+            return;
+        }
+        for role in ["event", "health", "metadata", "root", "quarantine"] {
+            let fixture = Fixture::new();
+            let id = fixture.session(920, 5);
+            share(&fixture, &id);
+            let (mut store, _) = reader_fixture(&fixture);
+            assert_eq!(store.inventory().unwrap().sessions.len(), 1);
+            let path = match role {
+                "event" => fixture.record(&id, RECORDS[0]),
+                "health" => fixture.record(&id, "health.json"),
+                "metadata" => fixture.root.join(&id).join("metadata"),
+                "root" => fixture.root.clone(),
+                _ => {
+                    private_dir(&fixture.root.join(TRASH));
+                    fixture.root.join(TRASH)
+                }
+            };
+            let mode = if role == "health" {
+                0o640
+            } else if role == "event" {
+                0o660
+            } else {
+                0o770
+            };
+            stdfs::set_permissions(path, Permissions::from_mode(mode)).unwrap();
+            assert!(store.remove(&id).is_err(), "{role}");
+            assert!(fixture.record(&id, RECORDS[0]).exists(), "{role}");
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn add_reader_acl(path: &Path, default: bool) {
+        let file = File::open(path).unwrap();
+        let mut acl = 2u32.to_le_bytes().to_vec();
+        // Named-user ACL with the same group mask as 0750/0640. Mode alone
+        // cannot detect this added reader; the descriptor ACL check must.
+        let directory = node(path).kind == FileType::Directory;
+        let group = if directory { 5u16 } else { 4u16 };
+        for (tag, permissions, id) in [
+            (1u16, if directory { 7 } else { 6 }, u32::MAX),
+            (2, 4, rustix::process::geteuid().as_raw().wrapping_add(1)),
+            (4, group, u32::MAX),
+            (16, group, u32::MAX),
+            (32, 0, u32::MAX),
+        ] {
+            acl.extend(tag.to_le_bytes());
+            acl.extend(permissions.to_le_bytes());
+            acl.extend(id.to_le_bytes());
+        }
+        fs::fsetxattr(
+            &file,
+            if default {
+                "system.posix_acl_default"
+            } else {
+                "system.posix_acl_access"
+            },
+            &acl,
+            fs::XattrFlags::empty(),
+        )
+        .unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn session_read_group_rejects_access_and_inherited_acl_at_inventory_and_revalidation() {
+        if store_cannot_run_here() {
+            return;
+        }
+        for (role, default) in [
+            ("root", true),
+            ("session", true),
+            ("metadata", false),
+            ("event", false),
+            ("health", false),
+            ("quarantine", true),
+        ] {
+            for after_inventory in [false, true] {
+                let fixture = Fixture::new();
+                let id = fixture.session(930, 5);
+                share(&fixture, &id);
+                let (mut store, _) = reader_fixture(&fixture);
+                if after_inventory {
+                    assert_eq!(store.inventory().unwrap().sessions.len(), 1);
+                }
+                let path = match role {
+                    "root" => fixture.root.clone(),
+                    "session" => fixture.root.join(&id),
+                    "metadata" => fixture.root.join(&id).join("metadata"),
+                    "event" => fixture.record(&id, RECORDS[0]),
+                    "quarantine" => {
+                        private_dir(&fixture.root.join(TRASH));
+                        fixture.root.join(TRASH)
+                    }
+                    _ => fixture.record(&id, "health.json"),
+                };
+                add_reader_acl(&path, default);
+                if after_inventory {
+                    assert!(store.remove(&id).is_err(), "{role}");
+                } else if role == "root" {
+                    assert!(store.inventory().is_err());
+                } else {
+                    assert_eq!(store.inventory().unwrap().refused.len(), 1, "{role}");
+                }
+                assert!(fixture.record(&id, RECORDS[0]).exists());
+            }
+        }
+    }
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn session_read_group_unconfigured_keeps_historical_private_acl_behavior() {
+        if store_cannot_run_here() {
+            return;
+        }
+        let fixture = Fixture::new();
+        let id = fixture.session(940, 5);
+        // The opt-in must not silently add ACL requirements to old private
+        // roots. A default ACL changes neither these existing private modes
+        // nor the pre-existing Records contract for a None policy.
+        add_reader_acl(&fixture.root, true);
+        let mut store = Store::open(&fixture.root).unwrap();
+        assert_eq!(store.inventory().unwrap().sessions.len(), 1);
+        assert!(store.remove(&id).unwrap().complete);
+        assert!(
+            Store::open_with_reader_gid(&fixture.root, Some(rustix::process::getegid().as_raw()))
+                .is_err()
+        );
     }
 }
