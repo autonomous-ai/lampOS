@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/usr/bin/file",
+    "/private/tmp/tests-codex-sign-in-code-once-evidence-20261023/corrected-focused-20261023T020229.067418Z/lamp-voice-tests"
+  ],
+  "read_only_metadata_collected_utc": "2026-10-23T02:20:50.634307+00:00",
+  "encoding": "utf-8",
+  "original_bytes": 153,
+  "original_sha256": "1b07366a4414ca034c2e281694d6c91bc2eae0cf5ca361a051098295de2e7bf2",
+  "text": "/private/tmp/tests-codex-sign-in-code-once-evidence-20261023/corrected-focused-20261023T020229.067418Z/lamp-voice-tests: Mach-O 64-bit executable x86_64\n"
+}

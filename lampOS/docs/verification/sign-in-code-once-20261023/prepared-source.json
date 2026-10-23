@@ -1,0 +1,49 @@
+{
+  "head": "b7700b7c268c0c22e26c1c88c9e9ee359cddf550",
+  "worktree": "/private/tmp/tests-codex-sign-in-code-once-20261023",
+  "only_new_cfg_test_module": true,
+  "original_source_and_existing_tests_byte_identical_after_removing_new_module": true,
+  "extraction": {
+    "start_marker": "    mod code_delivery {\\n",
+    "end_marker": "    /// Jarvis's P2 and the reviewer's P3 5 on #2137",
+    "start_byte": 36746,
+    "end_byte": 52069
+  },
+  "files": {
+    "lampOS/crates/voice/src/sign_in.rs": {
+      "sha256": "3107b74fe2e4223bbe9f8df22237f42b350513faa94675492af5e3326fdde50f",
+      "bytes": 78007
+    },
+    "lampOS/docs/tasks.md": {
+      "sha256": "d5a42e81fd8de2c6434f1df9123b66d6e12ee9cafb959e5d74ad333a1eb10035",
+      "bytes": 191401
+    }
+  },
+  "tests": [
+    "sign_in::tests::code_delivery::a_sign_in_code_is_delivered_once_and_repeated_only_on_request",
+    "sign_in::tests::code_delivery::a_queued_sign_in_code_is_not_repeated_by_the_pending_start"
+  ],
+  "commands_run": [
+    "rustfmt --edition 2024 --check lampOS/crates/voice/src/sign_in.rs",
+    "git diff --check"
+  ],
+  "cargo_run": false,
+  "expected_unproven_result": "Direct case passes; queued case expected to fail before_repeat == 1 with 2 deliveries. No product-failure reproduction claimed until execution.",
+  "common_guard_revision": {
+    "only_change_from_previous_prepared_source": "one_thread guard acquired before ONE_AT_A_TIME",
+    "guard_lifetime": "entire check, including Tasks drop and forget, both after scoped child joins",
+    "scoped_child_acquires_common_or_agent_tasks_guard": false,
+    "original_production_deadlines_and_assertions_unchanged": true,
+    "previous_receipt": "prepared-before-common-guard.json",
+    "previous_receipt_sha256": "2d7c5a439262ab3608434785f19885323992d15499a1c033773e8c3c066f972d",
+    "previous_patch": "prepared-before-common-guard.patch",
+    "previous_patch_sha256": "6c072223d4c2aefd083f64a2f06af947a2c2288a5d91c935676a67090d5d3006"
+  },
+  "fixture_subscriber_correction": {
+    "only_change": "code-test to code_test",
+    "previous_prepared_receipt": "prepared-before-subscriber-correction.json",
+    "initial_failure_receipt": "first-focused-20261023T015735.786135Z",
+    "product_path_reached_in_initial_attempt": false,
+    "original_source_and_assertions_otherwise_identical": true
+  }
+}

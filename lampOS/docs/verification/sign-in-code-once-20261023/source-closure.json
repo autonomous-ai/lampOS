@@ -1,0 +1,58 @@
+{
+  "first-invalid-subscriber": {
+    "tracked_lampOS_file_count": 6526,
+    "all_before_after_file_bytes_equal": true,
+    "before_map_sha256": "5774a1cf2084be1851c307620d8fd81628ecdafb1f00eacffe6e672beb5af794",
+    "after_map_sha256": "5774a1cf2084be1851c307620d8fd81628ecdafb1f00eacffe6e672beb5af794",
+    "changed_files": {
+      "lampOS/crates/voice/src/sign_in.rs": {
+        "sha256": "95324c355544d1b71e93900a5e3a4bbaf66f85386c23bfc732564f36305fc3ff",
+        "bytes": 78007
+      },
+      "lampOS/docs/tasks.md": {
+        "sha256": "d5a42e81fd8de2c6434f1df9123b66d6e12ee9cafb959e5d74ad333a1eb10035",
+        "bytes": 191401
+      }
+    },
+    "cargo_exit": 101,
+    "artifact": {
+      "compiled_path": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "saved_path": "/private/tmp/tests-codex-sign-in-code-once-evidence-20261023/first-focused-20261023T015735.786135Z/lamp-voice-tests",
+      "bytes": 114668632,
+      "sha256": "46ff72213c46b64bab98f639d3d5ba67fd496fed94f3cb70554c81a77c75dae3",
+      "file": "/private/tmp/tests-codex-sign-in-code-once-evidence-20261023/first-focused-20261023T015735.786135Z/lamp-voice-tests: Mach-O 64-bit executable x86_64",
+      "lipo": "Non-fat file: /private/tmp/tests-codex-sign-in-code-once-evidence-20261023/first-focused-20261023T015735.786135Z/lamp-voice-tests is architecture: x86_64"
+    }
+  },
+  "corrected-overlap": {
+    "tracked_lampOS_file_count": 6526,
+    "all_before_after_file_bytes_equal": true,
+    "before_map_sha256": "7b075ee5da632a34040b4583a88fa49737e34300f78d701af43e231bcda1a42d",
+    "after_map_sha256": "7b075ee5da632a34040b4583a88fa49737e34300f78d701af43e231bcda1a42d",
+    "changed_files": {
+      "lampOS/crates/voice/src/sign_in.rs": {
+        "sha256": "3107b74fe2e4223bbe9f8df22237f42b350513faa94675492af5e3326fdde50f",
+        "bytes": 78007
+      },
+      "lampOS/docs/tasks.md": {
+        "sha256": "d5a42e81fd8de2c6434f1df9123b66d6e12ee9cafb959e5d74ad333a1eb10035",
+        "bytes": 191401
+      }
+    },
+    "cargo_exit": 101,
+    "artifact": {
+      "compiled_path": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "saved_path": "/private/tmp/tests-codex-sign-in-code-once-evidence-20261023/corrected-focused-20261023T020229.067418Z/lamp-voice-tests",
+      "bytes": 114668632,
+      "sha256": "03bbf8c230f5d64bf172448dd50bac71a6d96195ebef0d37d1fa6a1d7cf54823",
+      "file": "/private/tmp/tests-codex-sign-in-code-once-evidence-20261023/corrected-focused-20261023T020229.067418Z/lamp-voice-tests: Mach-O 64-bit executable x86_64",
+      "lipo": "Non-fat file: /private/tmp/tests-codex-sign-in-code-once-evidence-20261023/corrected-focused-20261023T020229.067418Z/lamp-voice-tests is architecture: x86_64"
+    }
+  },
+  "between_executions": {
+    "only_file_content_changed": "lampOS/crates/voice/src/sign_in.rs",
+    "exact_change": "test-only subscriber code-test to code_test",
+    "all_other_tracked_files_identical": true,
+    "original_source_and_existing_assertions_restored_by_removing_new_cfg_test_module": true
+  }
+}

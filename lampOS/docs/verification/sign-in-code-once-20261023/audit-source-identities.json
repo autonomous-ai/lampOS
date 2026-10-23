@@ -1,0 +1,75 @@
+{
+  "head": "b7700b7c268c0c22e26c1c88c9e9ee359cddf550",
+  "files": {
+    "lampOS/crates/voice/src/sign_in.rs": {
+      "sha256": "3107b74fe2e4223bbe9f8df22237f42b350513faa94675492af5e3326fdde50f",
+      "bytes": 78007,
+      "base_git_blob": "29e841784c7ba239d9256c2d19a8842ed0dfe4ee"
+    },
+    "lampOS/crates/voice/src/task_news.rs": {
+      "sha256": "976bda631fd828868ed0816238fe5bffd74ec842f5af9c79836dfa8b23d2dba8",
+      "bytes": 189024,
+      "base_git_blob": "7861d06ac461eb6aa6ff529bf4fb9f199f2df681"
+    },
+    "lampOS/crates/voice/src/coordinator.rs": {
+      "sha256": "af986bc504be639c32eae17247de46d28bc1fd2eb10263cedd09a96b08b6e7b1",
+      "bytes": 748769,
+      "base_git_blob": "428fdfbbb3ce7b23bf9897844b1c22dcf0e42d3e"
+    },
+    "lampOS/crates/voice/src/provider_worker.rs": {
+      "sha256": "3c8ecf35bc61eb00b8f131b30ce2078d181ed7091f1d1a494c0c9459a4b80787",
+      "bytes": 680195,
+      "base_git_blob": "50deaf4b78587eba52f04a58b88bd2b20adf2c2f"
+    },
+    "lampOS/crates/voice/src/second_provider/worker.rs": {
+      "sha256": "e049e0d33f89545f4aeafe75f7ea29c9610cf81e9f4bbe917a120672c5efa2b5",
+      "bytes": 758117,
+      "base_git_blob": "8e0ab06c7444a9e8f9f87d2d83829e7640401104"
+    },
+    "lampOS/crates/voice/src/tools.rs": {
+      "sha256": "f254fcc6ec38df92a5bdd9d32b22ad21efd79beb11d5f4a9424777827065fdcb",
+      "bytes": 177845,
+      "base_git_blob": "209ce40dc9100e67b337262c230b41e8d92ec9ab"
+    },
+    "lampOS/crates/voice/src/agent_tasks.rs": {
+      "sha256": "dae1606c8ff3e4ffbacbcb29f75e7fd591d93f1e36dbcd05a0e5d1043b0e51d3",
+      "bytes": 265620,
+      "base_git_blob": "11602ca13cf932e76c126a5c90459a0bd5bdd2b6"
+    },
+    "lampOS/crates/tasks/src/sign_in.rs": {
+      "sha256": "0283f93dd374e2681ae1fc46ed6d531a836c114e87e3cf4e68970e94e2199dd9",
+      "bytes": 30082,
+      "base_git_blob": "1fa1fd03c048d70af28f92581f67b4020563c640"
+    },
+    "lampOS/crates/tasks/src/runtime.rs": {
+      "sha256": "dfc31dc9e888901c43bf5a3bbf0efb94ec273189a117ec3d83073625bb50a077",
+      "bytes": 124192,
+      "base_git_blob": "2a88e7ff4e63f14d5674119843fe65094d9e057e"
+    },
+    "lampOS/crates/tasks/src/protocol.rs": {
+      "sha256": "8372fc52f4f086e2ba1820f421e211cf4917bb56e6cc21c1cc01b6a6f57866b1",
+      "bytes": 9699,
+      "base_git_blob": "d7c2d9394599d850d179f245044b911693b4b540"
+    },
+    "lampOS/docs/tasks.md": {
+      "sha256": "d5a42e81fd8de2c6434f1df9123b66d6e12ee9cafb959e5d74ad333a1eb10035",
+      "bytes": 191401,
+      "base_git_blob": "c7f449739873b157718315dc7a9ccd4fdb9a6c4a"
+    },
+    "lampOS/crates/voice/src/main.rs": {
+      "sha256": "72af6a82c5d1c8423f60216cf72ef2fd5e32c4ee2309d4247d9542196483b10f",
+      "bytes": 57330,
+      "base_git_blob": "0f2859a395d34dbd0d74b9970757532d0bd44c8c"
+    },
+    "lampOS/crates/voice/src/process.rs": {
+      "sha256": "dca04eb54ac30f713571276e35812edd7a6e4ec9bb2b268d10247ecfac91c8aa",
+      "bytes": 100547,
+      "base_git_blob": "dd3829428ae649fed7f61a6b3aecc9ff5f55a556"
+    }
+  },
+  "subsequently_read_compatibility_rule": {
+    "git_blob": "71ecf94711cc45917265e37ad7484ee0bb7f9d82",
+    "sha256": "0954b38728a27cbe4413e5a2b8898ad8a5b1fad83f594ffabcaa81c18a7f1dad",
+    "scope": "One-build-apart communication works in both directions; old readers ignore new fields and new readers refused by old servers fail safely and explain."
+  }
+}

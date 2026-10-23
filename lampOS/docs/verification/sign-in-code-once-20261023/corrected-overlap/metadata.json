@@ -1,0 +1,83 @@
+{
+  "worktree": "/private/tmp/tests-codex-sign-in-code-once-20261023",
+  "head": "b7700b7c268c0c22e26c1c88c9e9ee359cddf550",
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--offline",
+    "sign_in::tests::code_delivery::",
+    "--",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "cwd": "/private/tmp/tests-codex-sign-in-code-once-20261023/lampOS",
+  "target": "/private/tmp/tests-codex-small-native-20261022",
+  "environment": {
+    "PATH": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/usr/local/go/bin:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/Users/autonomous/.codex/tmp/arg0-macos/codex-arg051yt9E:/Users/autonomous/.harness/runtime/grid-0.3.59-darwin-x64/bin:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin",
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-small-native-20261022",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TERM_COLOR": "never"
+  },
+  "rust_test_threads": "unset",
+  "cargo_build_target": "unset",
+  "source_files": 6526,
+  "refreshed_tracked_input_mtimes": true,
+  "source_before_sha256": "7b075ee5da632a34040b4583a88fa49737e34300f78d701af43e231bcda1a42d",
+  "expected_changed_files": {
+    "lampOS/crates/voice/src/sign_in.rs": "3107b74fe2e4223bbe9f8df22237f42b350513faa94675492af5e3326fdde50f",
+    "lampOS/docs/tasks.md": "d5a42e81fd8de2c6434f1df9123b66d6e12ee9cafb959e5d74ad333a1eb10035"
+  },
+  "timeout_seconds": 1800,
+  "runner_pid": 3163,
+  "retries": 0,
+  "previous_attempt": "first-focused-20261023T015735.786135Z",
+  "revision": "test subscriber identifier corrected before product path was reached",
+  "started_utc": "2026-10-23T02:02:32.205923+00:00",
+  "cargo_pid": 3344,
+  "owned_process_group": 3344,
+  "timed_out": false,
+  "cargo_exit": 101,
+  "elapsed_seconds": 122.96342785377055,
+  "finished_utc": "2026-10-23T02:04:35.221295+00:00",
+  "tracked_source_unchanged": true,
+  "source_after_sha256": "7b075ee5da632a34040b4583a88fa49737e34300f78d701af43e231bcda1a42d",
+  "streams": {
+    "stdout.txt": {
+      "sha256": "22d5b1c79025cb8ae647b750279085266e655cf9533d5c79833a442033aaf2a2",
+      "bytes": 447
+    },
+    "stderr.txt": {
+      "sha256": "14e5212906d7629090c243e7dc6965de9643044bcf08dab61d5ee93a077aace4",
+      "bytes": 3492
+    }
+  },
+  "test_summary": [
+    "test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 3562 filtered out; finished in 0.86s"
+  ],
+  "test_rows": [
+    [
+      "sign_in::tests::code_delivery::a_queued_sign_in_code_is_not_repeated_by_the_pending_start",
+      "FAILED"
+    ],
+    [
+      "sign_in::tests::code_delivery::a_sign_in_code_is_delivered_once_and_repeated_only_on_request",
+      "ok"
+    ]
+  ],
+  "stage": "tests",
+  "artifact": {
+    "compiled_path": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+    "saved_path": "/private/tmp/tests-codex-sign-in-code-once-evidence-20261023/corrected-focused-20261023T020229.067418Z/lamp-voice-tests",
+    "bytes": 114668632,
+    "sha256": "03bbf8c230f5d64bf172448dd50bac71a6d96195ebef0d37d1fa6a1d7cf54823",
+    "file": "/private/tmp/tests-codex-sign-in-code-once-evidence-20261023/corrected-focused-20261023T020229.067418Z/lamp-voice-tests: Mach-O 64-bit executable x86_64",
+    "lipo": "Non-fat file: /private/tmp/tests-codex-sign-in-code-once-evidence-20261023/corrected-focused-20261023T020229.067418Z/lamp-voice-tests is architecture: x86_64"
+  }
+}

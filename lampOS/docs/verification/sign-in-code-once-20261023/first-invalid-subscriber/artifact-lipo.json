@@ -1,0 +1,12 @@
+{
+  "command": [
+    "/usr/bin/lipo",
+    "-info",
+    "/private/tmp/tests-codex-sign-in-code-once-evidence-20261023/first-focused-20261023T015735.786135Z/lamp-voice-tests"
+  ],
+  "read_only_metadata_collected_utc": "2026-10-23T02:20:50.610639+00:00",
+  "encoding": "utf-8",
+  "original_bytes": 154,
+  "original_sha256": "c3b421e9219c70d61a623a4a3e7246f9299b7e97c4869baae48374f086127f6c",
+  "text": "Non-fat file: /private/tmp/tests-codex-sign-in-code-once-evidence-20261023/first-focused-20261023T015735.786135Z/lamp-voice-tests is architecture: x86_64\n"
+}

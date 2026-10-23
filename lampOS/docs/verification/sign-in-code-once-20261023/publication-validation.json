@@ -1,0 +1,31 @@
+{
+  "lossless_wrappers_checked": 19,
+  "json_files_parsed": 29,
+  "patch_replay": [
+    {
+      "patch": "source-change.patch.json",
+      "applied_from_base": true,
+      "expected_source_hash_verified": "3107b74fe2e4223bbe9f8df22237f42b350513faa94675492af5e3326fdde50f",
+      "identifier_followup_verified": false
+    },
+    {
+      "patch": "source-before-fixture-correction.patch.json",
+      "applied_from_base": true,
+      "expected_source_hash_verified": "95324c355544d1b71e93900a5e3a4bbaf66f85386c23bfc732564f36305fc3ff",
+      "identifier_followup_verified": true
+    }
+  ],
+  "authored_worktree_still_frozen": true,
+  "cargo_or_binary_test_executions_during_packaging": 0,
+  "note": "Patch replay used only disposable copies of two text files; the authored worktree and all targets remained untouched.",
+  "final_source_hashes": {
+    "lampOS/crates/voice/src/sign_in.rs": "3107b74fe2e4223bbe9f8df22237f42b350513faa94675492af5e3326fdde50f",
+    "lampOS/docs/tasks.md": "d5a42e81fd8de2c6434f1df9123b66d6e12ee9cafb959e5d74ad333a1eb10035"
+  },
+  "source_guard": {
+    "head": "b7700b7c268c0c22e26c1c88c9e9ee359cddf550",
+    "only_two_authored_paths_dirty": true,
+    "removing_nested_code_delivery_module_restores_base_file_exactly": true
+  },
+  "scope_proposal": "Read-only product proposal includes concrete initial take-code operation, two-process evidence, one-way ownership lifecycle, expiry, exact mixed-build refusal behavior, and explicitly unresolved queued-repeat/session-revocation stronger ordering."
+}

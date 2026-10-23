@@ -1,0 +1,6 @@
+{
+  "encoding": "utf-8",
+  "original_bytes": 537,
+  "original_sha256": "6b051a745168b934a8dde3ff059ff5dd3b75426b773698dd31049c5d625b5f74",
+  "text": "--- a/lampOS/crates/voice/src/sign_in.rs\n+++ b/lampOS/crates/voice/src/sign_in.rs\n@@ -1096,7 +1096,7 @@\n                 };\n                 let mut ready = Bus::new(&config.bus_root)\n                     .unwrap()\n-                    .subscribe_typed(Diagnostic::TOPIC, \"code-test\", Diagnostic::TYPE)\n+                    .subscribe_typed(Diagnostic::TOPIC, \"code_test\", Diagnostic::TYPE)\n                     .unwrap();\n                 let (lines, received) = mpsc::channel();\n                 let (read, receipt) = mpsc::channel();\n"
+}

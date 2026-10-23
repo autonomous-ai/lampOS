@@ -1,0 +1,81 @@
+{
+  "worktree": "/private/tmp/tests-codex-sign-in-code-once-20261023",
+  "head": "b7700b7c268c0c22e26c1c88c9e9ee359cddf550",
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--offline",
+    "sign_in::tests::code_delivery::",
+    "--",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "cwd": "/private/tmp/tests-codex-sign-in-code-once-20261023/lampOS",
+  "target": "/private/tmp/tests-codex-small-native-20261022",
+  "environment": {
+    "PATH": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/usr/local/go/bin:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/Users/autonomous/.codex/tmp/arg0-macos/codex-arg051yt9E:/Users/autonomous/.harness/runtime/grid-0.3.59-darwin-x64/bin:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin",
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-small-native-20261022",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TERM_COLOR": "never"
+  },
+  "rust_test_threads": "unset",
+  "cargo_build_target": "unset",
+  "source_files": 6526,
+  "refreshed_tracked_input_mtimes": true,
+  "source_before_sha256": "5774a1cf2084be1851c307620d8fd81628ecdafb1f00eacffe6e672beb5af794",
+  "expected_changed_files": {
+    "lampOS/crates/voice/src/sign_in.rs": "95324c355544d1b71e93900a5e3a4bbaf66f85386c23bfc732564f36305fc3ff",
+    "lampOS/docs/tasks.md": "d5a42e81fd8de2c6434f1df9123b66d6e12ee9cafb959e5d74ad333a1eb10035"
+  },
+  "timeout_seconds": 1800,
+  "runner_pid": 86095,
+  "retries": 0,
+  "started_utc": "2026-10-23T01:57:39.858356+00:00",
+  "cargo_pid": 86199,
+  "owned_process_group": 86199,
+  "timed_out": false,
+  "cargo_exit": 101,
+  "elapsed_seconds": 125.79833236336708,
+  "finished_utc": "2026-10-23T01:59:45.655532+00:00",
+  "tracked_source_unchanged": true,
+  "source_after_sha256": "5774a1cf2084be1851c307620d8fd81628ecdafb1f00eacffe6e672beb5af794",
+  "streams": {
+    "stdout.txt": {
+      "sha256": "8dd916902f61c16283e30fd786c0e15cbb93748495853fef78676d2080f1f8cb",
+      "bytes": 548
+    },
+    "stderr.txt": {
+      "sha256": "04ced4db938cd8bee0226ae183ff34260c0723088261e5e66623533068dbee1b",
+      "bytes": 3638
+    }
+  },
+  "test_summary": [
+    "test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 3562 filtered out; finished in 0.00s"
+  ],
+  "test_rows": [
+    [
+      "sign_in::tests::code_delivery::a_queued_sign_in_code_is_not_repeated_by_the_pending_start",
+      "FAILED"
+    ],
+    [
+      "sign_in::tests::code_delivery::a_sign_in_code_is_delivered_once_and_repeated_only_on_request",
+      "FAILED"
+    ]
+  ],
+  "stage": "tests",
+  "artifact": {
+    "compiled_path": "/private/tmp/tests-codex-small-native-20261022/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+    "saved_path": "/private/tmp/tests-codex-sign-in-code-once-evidence-20261023/first-focused-20261023T015735.786135Z/lamp-voice-tests",
+    "bytes": 114668632,
+    "sha256": "46ff72213c46b64bab98f639d3d5ba67fd496fed94f3cb70554c81a77c75dae3",
+    "file": "/private/tmp/tests-codex-sign-in-code-once-evidence-20261023/first-focused-20261023T015735.786135Z/lamp-voice-tests: Mach-O 64-bit executable x86_64",
+    "lipo": "Non-fat file: /private/tmp/tests-codex-sign-in-code-once-evidence-20261023/first-focused-20261023T015735.786135Z/lamp-voice-tests is architecture: x86_64"
+  }
+}

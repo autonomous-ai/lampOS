@@ -1,0 +1,6 @@
+{
+  "encoding": "utf-8",
+  "original_bytes": 447,
+  "original_sha256": "22d5b1c79025cb8ae647b750279085266e655cf9533d5c79833a442033aaf2a2",
+  "text": "\nrunning 2 tests\ntest sign_in::tests::code_delivery::a_queued_sign_in_code_is_not_repeated_by_the_pending_start ... FAILED\ntest sign_in::tests::code_delivery::a_sign_in_code_is_delivered_once_and_repeated_only_on_request ... ok\n\nfailures:\n\nfailures:\n    sign_in::tests::code_delivery::a_queued_sign_in_code_is_not_repeated_by_the_pending_start\n\ntest result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 3562 filtered out; finished in 0.86s\n\n"
+}

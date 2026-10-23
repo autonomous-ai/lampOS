@@ -1,5 +1,30 @@
 # Tests work log
 
+## 2026-10-23 09:37 +0700 — sign-in overlap reproduced; shared-owner scope proposed
+
+Ready for lamp-voice: no (product scope pending for #2839).
+
+The [sign-in delivery receipt](verification/sign-in-code-once-20261023/)
+retains both frozen executions. Corrected Mac focused tests give **one pass,
+one failure**: queued news and a pending START supply **two initial code
+payloads instead of one**. The earlier invalid subscriber-name fixture is
+separate, with zero product scenarios reached. All original product bytes
+and tests remain unchanged; no acoustic or lamp result is claimed.
+
+The concrete proposal arbitrates initial delivery in the existing Tasks
+owner, because coordinator news and provider tools run in separate processes.
+It preserves explicit heard repeats, one-build-apart refusal, expiry and
+cancellation. Its remaining queued-repeat revocation limit is stated for the
+scope decision. No product edit is made without that decision.
+
+The completed Mac boot-clock controls retain baseline **34 passes, 51 named
+failures and one abort**, followed by **86/86** candidate passes. The stale-
+audio negative fails the original 640-versus-320 assertion. Full default-
+parallel Voice is **3,828/1/14 before** and **3,823/6/14 after**: the same
+light-call failure plus five candidate library failures remain unclassified.
+Reader/build gates continue. The next phone-news event slice is prepared,
+with controls unexecuted and no overlapping compilation.
+
 ## 2026-10-23 09:11 +0700 — unchanged ARM fixture classified; next phone-news setup claimed
 
 Ready for lamp-voice: no (phone-news fixture preparation).
