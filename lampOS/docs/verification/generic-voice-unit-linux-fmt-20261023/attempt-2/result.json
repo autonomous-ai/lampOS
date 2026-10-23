@@ -1,0 +1,19 @@
+{
+  "source_kind": "exact_git_commit",
+  "source": "7c3693e6640a0e144355a1cbdcdf4b0ddd88c9ad",
+  "candidate_commit": "7c3693e6640a0e144355a1cbdcdf4b0ddd88c9ad",
+  "declared_overlays": [],
+  "format_container_exit": 0,
+  "timed_out": false,
+  "container_elapsed_seconds": 16.493456309195608,
+  "timing_boundary": "Entire container command including setup, extraction, rustfmt and source hashing.",
+  "formatting_success": true,
+  "source_archive_unchanged": true,
+  "git_identity_unchanged": true,
+  "snapshots_unchanged": true,
+  "compilation": false,
+  "tests": false,
+  "ARM_build": false,
+  "source_edits": false,
+  "evidence_directory": "/private/tmp/tests-3260-linux-fmt-recovery-20261023/run-20261023T103929.045348Z"
+}

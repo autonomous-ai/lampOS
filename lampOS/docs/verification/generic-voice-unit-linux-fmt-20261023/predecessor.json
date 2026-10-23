@@ -1,0 +1,74 @@
+{
+  "root": "/private/tmp/tests-3260-linux-fmt-20261023",
+  "run": "/private/tmp/tests-3260-linux-fmt-20261023/run-20261023T103152.412942Z",
+  "plan_sha256": "0c5fd0768d8df96c203e9f18fb235b3c32538791ddf14eb04fe798a413796df0",
+  "runner_sha256": "511416d0861b72b9a6e046a887b64f70fad12cadd66a337439f80ed2ebcc4c88",
+  "commands_sha256": "e171d811dfed6c984dede07fa1794ffac735d63eae72412b4125f33c01a8330a",
+  "native_session": 87609,
+  "native_terminal_exit": 1,
+  "archive_observation": {
+    "name": "archive",
+    "command": [
+      "git",
+      "archive",
+      "--format=tar",
+      "--output=/private/tmp/tests-3260-linux-fmt-20261023/run-20261023T103152.412942Z/source-lampOS.tar",
+      "7c3693e6640a0e144355a1cbdcdf4b0ddd88c9ad",
+      "lampOS"
+    ],
+    "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier",
+    "started_utc": "2026-10-23T10:31:53.556315+00:00",
+    "finished_utc": "2026-10-23T10:34:53.765472+00:00",
+    "elapsed_seconds": 180.1675492678769,
+    "exit_code": null,
+    "timed_out": true,
+    "timeout_seconds": 180,
+    "stdout_bytes": 0,
+    "stderr_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "partial_archive": {
+    "bytes": 175882240,
+    "sha256": "79e50ef6b2924d273de5fe520af8230158ff79d6cc7998ea60a2ba6a3a7bb33d",
+    "global_pax_headers": {
+      "comment": "7c3693e6640a0e144355a1cbdcdf4b0ddd88c9ad"
+    },
+    "apparent_entries": 6373,
+    "complete_regular_files": 5461,
+    "complete_payload_bytes": 171101605,
+    "incomplete_entries": [
+      {
+        "path": "lampOS/docs/verification/transport-probes-20261016/local/after-voice-files.json",
+        "kind": "file",
+        "size": 19754,
+        "header_offset": 175870976,
+        "data_offset": 175871488,
+        "end_offset": 175891456,
+        "body_present": false
+      }
+    ],
+    "reader_failure": {
+      "type": "ReadError",
+      "message": "unexpected end of data"
+    }
+  },
+  "expected_blob_bytes": 205926152,
+  "diagnosis_files": {
+    "partial-tar.json": {
+      "path": "/private/tmp/tests-3260-linux-fmt-20261023/diagnosis/partial-tar.json",
+      "sha256": "ef5c36778ecf28f9285b674e5d0e9921aaf168e9431258a8f78aa57ff81f334d"
+    },
+    "export-settings.json": {
+      "path": "/private/tmp/tests-3260-linux-fmt-20261023/diagnosis/export-settings.json",
+      "sha256": "74de5422f847eb50b80c5b1c615c4228307433b24d96c362e16842aa24438416"
+    },
+    "commands.json": {
+      "path": "/private/tmp/tests-3260-linux-fmt-20261023/diagnosis/commands.json",
+      "sha256": "3b267c02c9bea2a98d1620e3ef169c829765b8a0df287fbeb0a60e8e5b724c0f"
+    }
+  },
+  "formatter_executed": false,
+  "classification": "Source-export preparation timeout; not a formatting result. Exact cause is unestablished.",
+  "correction": "Only archive timeout changed 180 to 600 seconds; original attempt is preserved and formatter remains bounded at 300 seconds."
+}

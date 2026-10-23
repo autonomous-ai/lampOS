@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "exact_PR_head_tree_parent_bound": true,
+  "both_preparation_attempts_retained": true,
+  "only_archive_budget_changed": true,
+  "single_format_invocation": true,
+  "format_exit_zero_and_sentinel_observed": true,
+  "all_Git_blob_and_mode_identities_verified": 6680,
+  "source_fingerprints_equal": true,
+  "Linux_x86_toolchain_confirmed": true,
+  "lossless_raw_streams_verified": 20,
+  "image_configuration_and_GitHub_account_metadata_omitted_from_portable_raw": true,
+  "scripts_binaries_archives_not_copied": true
+}

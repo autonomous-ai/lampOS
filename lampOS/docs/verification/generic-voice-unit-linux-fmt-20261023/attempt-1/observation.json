@@ -1,0 +1,13 @@
+{
+  "native_session": 87609,
+  "native_terminal_exit": 1,
+  "failed_stage": "Git source archive preparation",
+  "archive_exit_code": null,
+  "archive_timed_out": true,
+  "archive_elapsed_seconds": 180.1675492678769,
+  "format_command_ran": false,
+  "Cargo_format_result": null,
+  "raw_streams_retained": true,
+  "partial_archive_retained": true,
+  "classification": "Preparation timeout; neither a formatting pass nor a Rust formatting failure."
+}

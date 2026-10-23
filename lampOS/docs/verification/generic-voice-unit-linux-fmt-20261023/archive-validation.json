@@ -1,0 +1,26 @@
+{
+  "verified_at": "2026-10-23T10:42:51.173858+00:00",
+  "source": {
+    "commit": "7c3693e6640a0e144355a1cbdcdf4b0ddd88c9ad",
+    "root_tree": "504e732f861a6596aad800a5344c8e539050a019",
+    "parents": [
+      "b5a1993689d6fdac76742a60836025d8e36f2c76"
+    ],
+    "workspace_tree": "1d5dd368be2162984c13f827760ce07fd6c60156"
+  },
+  "archive_bytes": 211804160,
+  "archive_sha256": "12b50c63946a8d931da0c4abcb0d20984f6098ae04568a60232d38d23a957098",
+  "archive_PAX_commit": "7c3693e6640a0e144355a1cbdcdf4b0ddd88c9ad",
+  "tracked_entries_verified": 6680,
+  "payload_bytes": 205926152,
+  "Git_modes": {
+    "100644": 6596,
+    "100755": 84
+  },
+  "all_paths_present_once": true,
+  "all_git_blob_object_hashes_equal": true,
+  "all_Git_modes_equal": true,
+  "source_tree_inventory_sha256": "35d1856c2420e7d9881d614b8de17f95bf147b999928e80ccf30b27b442befde",
+  "scope": "All tracked lampOS files from this immutable commit; repository paths outside lampOS are not required by this formatting-only command.",
+  "method": "Read every regular-file body and symlink target from the completed tar; compare its Git blob object hash and executable/symlink mode to the immutable ls-tree inventory."
+}

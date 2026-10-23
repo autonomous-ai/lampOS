@@ -1,0 +1,122 @@
+[
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-20261023/run-20261023T103152.412942Z/image-inspect.stdout",
+    "bytes": 7701,
+    "sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74",
+    "reason": "Complete cached-image configuration stays external; portable image.json projects only identity, OS, architecture and user."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-20261023/run.py",
+    "bytes": 9359,
+    "sha256": "511416d0861b72b9a6e046a887b64f70fad12cadd66a337439f80ed2ebcc4c88",
+    "reason": "External measuring script, full source inventory or preparation manifest; not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-20261023/source-tree.json",
+    "bytes": 1203300,
+    "sha256": "35d1856c2420e7d9881d614b8de17f95bf147b999928e80ccf30b27b442befde",
+    "reason": "External measuring script, full source inventory or preparation manifest; not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-20261023/SHA256SUMS",
+    "bytes": 555,
+    "sha256": "9d4bf0770aa6d9d49d2b63669abfa5e83285f5a398c4c9b9b0defc5631c10a18",
+    "reason": "External measuring script, full source inventory or preparation manifest; not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-recovery-20261023/run-20261023T103929.045348Z/image-inspect.stdout",
+    "bytes": 7701,
+    "sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74",
+    "reason": "Complete cached-image configuration stays external; portable image.json projects only identity, OS, architecture and user."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-recovery-20261023/run.py",
+    "bytes": 9359,
+    "sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40",
+    "reason": "External measuring script, full source inventory or preparation manifest; not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-recovery-20261023/source-tree.json",
+    "bytes": 1203300,
+    "sha256": "35d1856c2420e7d9881d614b8de17f95bf147b999928e80ccf30b27b442befde",
+    "reason": "External measuring script, full source inventory or preparation manifest; not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-recovery-20261023/SHA256SUMS",
+    "bytes": 724,
+    "sha256": "2e362b54efddfd53fe0f2c6a9b12009240f3e1ebe3c6d014a579b2293374ee7b",
+    "reason": "External measuring script, full source inventory or preparation manifest; not copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-20261023/diagnosis/partial-tar.json",
+    "bytes": 4421,
+    "sha256": "ef5c36778ecf28f9285b674e5d0e9921aaf168e9431258a8f78aa57ff81f334d",
+    "reason": "Complete diagnostic/preparation record remains external and hash-bound."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-20261023/diagnosis/partial-tar-entries.json",
+    "bytes": 1569715,
+    "sha256": "79dcec267514727a09e7ed1ebfba4d1ca18a1b7e4deb19ff11a04725c3f51297",
+    "reason": "Complete diagnostic/preparation record remains external and hash-bound."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-20261023/diagnosis/export-settings.json",
+    "bytes": 7391,
+    "sha256": "74de5422f847eb50b80c5b1c615c4228307433b24d96c362e16842aa24438416",
+    "reason": "Complete diagnostic/preparation record remains external and hash-bound."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-20261023/diagnosis/source-tree-sizes.json",
+    "bytes": 1423477,
+    "sha256": "dcc77faa2bc90d5dc585217b399a3dfd47a8a22f36b8c6b114295c4cc0efca28",
+    "reason": "Complete diagnostic/preparation record remains external and hash-bound."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-20261023/diagnosis/commands.json",
+    "bytes": 4066,
+    "sha256": "3b267c02c9bea2a98d1620e3ef169c829765b8a0df287fbeb0a60e8e5b724c0f",
+    "reason": "Complete diagnostic/preparation record remains external and hash-bound."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-recovery-20261023/runner-change.patch",
+    "bytes": 678,
+    "sha256": "71d397f9ae35eaed67d6db908f0231cedc3d043d8a1fbb8ceb83b4a0035ee9da",
+    "reason": "Complete diagnostic/preparation record remains external and hash-bound."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-recovery-20261023/run-20261023T103929.045348Z/manifest.json",
+    "bytes": 2340,
+    "sha256": "963effb172805692e9dbb070715d583934ac45b307e5f45fd204e6aa853dac6d",
+    "reason": "Complete diagnostic/preparation record remains external and hash-bound."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-20261023/run-20261023T103152.412942Z/source-lampOS.tar",
+    "bytes": 175882240,
+    "sha256": "79e50ef6b2924d273de5fe520af8230158ff79d6cc7998ea60a2ba6a3a7bb33d",
+    "reason": "Incomplete first-attempt tar retained externally; digest computed during the read-only timeout diagnosis."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-recovery-20261023/run-20261023T103929.045348Z/source-lampOS.tar",
+    "bytes": 211804160,
+    "sha256": "12b50c63946a8d931da0c4abcb0d20984f6098ae04568a60232d38d23a957098",
+    "reason": "Complete exact-source tar retained externally; runner and packaging both verified its hash, and packaging checked every Git blob/mode."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-20261023/request-6362719670.json",
+    "bytes": 2364,
+    "sha256": "bdc83e3e2cbef25fc91328296edc9fec9363c7a19959abb1568b02b5cf23a29b",
+    "reason": "Complete GitHub API response remains external; publication omits account/actor metadata."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-20261023/request-6362775785.json",
+    "bytes": 1950,
+    "sha256": "206cef59d3f3814a8c015bce1a4880087dc4ad92582e6875a274575eea7686ac",
+    "reason": "Complete GitHub API response remains external; publication omits account/actor metadata."
+  },
+  {
+    "path": "/private/tmp/tests-3260-linux-fmt-20261023/pr.json",
+    "bytes": 19155,
+    "sha256": "f3a9df03b5f0ad68196d3957dfb6b43b058e5aa21386d207c2ab68bfa66b87fc",
+    "reason": "Complete GitHub PR API response remains external; publication projects exact source identity and URL only."
+  }
+]

@@ -1,0 +1,24 @@
+{
+  "prepared_at": "2026-10-23T10:39:07.426700+00:00",
+  "source": {
+    "commit": "7c3693e6640a0e144355a1cbdcdf4b0ddd88c9ad",
+    "root_tree": "504e732f861a6596aad800a5344c8e539050a019",
+    "parents": [
+      "b5a1993689d6fdac76742a60836025d8e36f2c76"
+    ],
+    "workspace_tree": "1d5dd368be2162984c13f827760ce07fd6c60156"
+  },
+  "tracked_lampOS_entries": 6680,
+  "source_tree_sha256": "35d1856c2420e7d9881d614b8de17f95bf147b999928e80ccf30b27b442befde",
+  "runner_sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40",
+  "plan_sha256": "c7d325bbfc5d2efa2e502a9303a99ea70ce4350ff01b209f98eb36079ee636f6",
+  "runner_diff_sha256": "71d397f9ae35eaed67d6db908f0231cedc3d043d8a1fbb8ceb83b4a0035ee9da",
+  "predecessor_sha256": "8cb138c677cbc51d3c36484fbf7d4dfd1a29831bdaa13f130f368935a31b5753",
+  "runner_AST": "passed",
+  "prepare_only_exit": 0,
+  "change_verified": "One exact archive timeout replacement only; source/input checks and container command/budget unchanged.",
+  "Cargo_calls": 0,
+  "container_calls": 0,
+  "target_access": false,
+  "source_edits": false
+}

@@ -1,5 +1,25 @@
 # Tests work log
 
+## 2026-10-23 17:42 +0700 — generic voice unit Linux formatting
+
+Ready for lamp-voice: no (support receipt for #3260; its builder owns readiness).
+
+Exact head `7c3693e66` passed Linux `cargo fmt --all --check` in the
+isolated source-only formatter. The complete 6,680-input archive, Git identity
+and input hashes remained unchanged. The container command took 16.493 s,
+including extraction and hashing; no build or tests ran.
+
+The first archive preparation exceeded its 180-second limit before any
+formatter ran. The retained recovery changes only that preparation limit to
+600 seconds, with the formatting command and its limit unchanged. The partial
+archive and complete Git tree sizes support the preparation adjustment; no
+specific cause of the slow export is established. Both attempts are retained
+in the [receipt](verification/generic-voice-unit-linux-fmt-20261023/).
+
+#3218's full reader gate continues with both observed Expression runtime
+failures retained. The clean-base Voice comparison follows the complete gate.
+#3255 remains ready for First's next train; #3190's execution HOLD remains.
+
 ## 2026-10-23 17:18 +0700 — relay read complete and next-train handoff
 
 Ready for lamp-voice: yes (#3255; First's latest-base train).

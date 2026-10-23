@@ -1,0 +1,70 @@
+{
+  "partial_archive": {
+    "bytes": 175882240,
+    "sha256": "79e50ef6b2924d273de5fe520af8230158ff79d6cc7998ea60a2ba6a3a7bb33d",
+    "global_pax_headers": {
+      "comment": "7c3693e6640a0e144355a1cbdcdf4b0ddd88c9ad"
+    },
+    "apparent_entries": 6373,
+    "complete_regular_files": 5461,
+    "complete_payload_bytes": 171101605,
+    "incomplete_entries": [
+      {
+        "path": "lampOS/docs/verification/transport-probes-20261016/local/after-voice-files.json",
+        "kind": "file",
+        "size": 19754,
+        "header_offset": 175870976,
+        "data_offset": 175871488,
+        "end_offset": 175891456,
+        "body_present": false
+      }
+    ],
+    "reader_failure": {
+      "type": "ReadError",
+      "message": "unexpected end of data"
+    }
+  },
+  "expected_entries": 6680,
+  "expected_blob_bytes": 205926152,
+  "export_attributes": "No export-ignore or export-subst rules; root .gitattributes applies Git LFS only to robots/lamp hardware outside this archive.",
+  "export_related_config": [
+    {
+      "key": "core.attributesFile",
+      "present": false,
+      "value_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "key": "core.compression",
+      "present": false,
+      "value_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "key": "extensions.partialClone",
+      "present": false,
+      "value_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "key": "remote.origin.promisor",
+      "present": false,
+      "value_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "key": "remote.origin.partialclonefilter",
+      "present": false,
+      "value_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "key_group": "tar.*",
+      "present": false,
+      "bytes": 0,
+      "value_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "values_not_disclosed": true
+    }
+  ],
+  "local_info_attributes": {
+    "exists": false
+  },
+  "cause": "Not established. A substantial partial export exists; the recovery increased only its preparation budget.",
+  "recovery_change": "Archive timeout 180 to 600 seconds; container formatting bound remains 300 seconds; exact source and all input checks unchanged.",
+  "runner_diff_external_sha256": "71d397f9ae35eaed67d6db908f0231cedc3d043d8a1fbb8ceb83b4a0035ee9da"
+}

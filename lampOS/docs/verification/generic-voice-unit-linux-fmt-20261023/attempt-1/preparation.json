@@ -1,0 +1,29 @@
+{
+  "prepared_at": "2026-10-23T10:31:27.154759+00:00",
+  "source": {
+    "commit": "7c3693e6640a0e144355a1cbdcdf4b0ddd88c9ad",
+    "root_tree": "504e732f861a6596aad800a5344c8e539050a019",
+    "parents": [
+      "b5a1993689d6fdac76742a60836025d8e36f2c76"
+    ],
+    "workspace_tree": "1d5dd368be2162984c13f827760ce07fd6c60156"
+  },
+  "remote_tracking_head": "7c3693e6640a0e144355a1cbdcdf4b0ddd88c9ad",
+  "PR_head_from_snapshot": "7c3693e6640a0e144355a1cbdcdf4b0ddd88c9ad",
+  "tracked_lampOS_entries": 6680,
+  "symlink_entries": 0,
+  "source_tree_sha256": "35d1856c2420e7d9881d614b8de17f95bf147b999928e80ccf30b27b442befde",
+  "runner_sha256": "511416d0861b72b9a6e046a887b64f70fad12cadd66a337439f80ed2ebcc4c88",
+  "plan_sha256": "0c5fd0768d8df96c203e9f18fb235b3c32538791ddf14eb04fe798a413796df0",
+  "runner_AST": "passed",
+  "prepare_only_exit": 0,
+  "Cargo_calls": 0,
+  "container_calls": 0,
+  "target_access": false,
+  "source_edits": false,
+  "method": "Byte-identical approved source-only formatter; archive timeout 180 seconds, container timeout 300 seconds, one-shot sentinel.",
+  "requests": [
+    "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6362719670",
+    "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6362775785"
+  ]
+}

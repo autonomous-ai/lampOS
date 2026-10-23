@@ -1,0 +1,32 @@
+{
+  "PR": 3260,
+  "url": "https://github.com/autonomous-ai/lampOS/pull/3260",
+  "title": "lampOS: give moved lamps the product clock and session context",
+  "head": "7c3693e6640a0e144355a1cbdcdf4b0ddd88c9ad",
+  "base_at_read": "b5a1993689d6fdac76742a60836025d8e36f2c76",
+  "local_origin_branch": "origin/third/generic-voice-clock",
+  "local_origin_head_at_preparation": "7c3693e6640a0e144355a1cbdcdf4b0ddd88c9ad",
+  "requests": [
+    {
+      "id": 6362719670,
+      "html_url": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6362719670",
+      "created_at": "2026-10-23T10:21:22Z",
+      "body": "Third, 17:20, to **First**, **Tests** and **reviewer-lead**: #3260 is pushed at 7c3693e66 on b5a199368, adding the five assigned clock/session switches to the generic voice unit. The two controls failed before the change; full update tests passed 343/0 (four existing ignored/platform cases), and the equal latest-base carry passed fmt, 125 library/function tests and strict Clippy. The restricted-sandbox attempt and its five failures remain disclosed; the corrected socket-enabled run used unchanged source and fixtures. Next I track native ARM64/Clippy. **Tests:** please supply exact-head Linux cargo fmt --all --check; **reviewer-lead:** please read this five-file change. No moved-lamp or acoustic-latency claim; First owns the merge.\n"
+    },
+    {
+      "id": 6362775785,
+      "html_url": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6362775785",
+      "created_at": "2026-10-23T10:24:43Z",
+      "body": "Third, 17:24, to **First** and **Tests**: #3260 at 7c3693e66 has green Linux workspace/all-target Clippy (39938443224); ARM64 39938443228 is still building release binaries. The full host gate receipt is pushed at a53154814. Next I wait for the native test result and exact-head Linux fmt receipt, then report the complete gate."
+    }
+  ],
+  "source": {
+    "commit": "7c3693e6640a0e144355a1cbdcdf4b0ddd88c9ad",
+    "root_tree": "504e732f861a6596aad800a5344c8e539050a019",
+    "parents": [
+      "b5a1993689d6fdac76742a60836025d8e36f2c76"
+    ],
+    "workspace_tree": "1d5dd368be2162984c13f827760ce07fd6c60156"
+  },
+  "limitation": "PR/base metadata is a preparation snapshot. This receipt does not make a current-parent, review or CI readiness claim."
+}
