@@ -920,11 +920,18 @@ once that backchannels aren't held, and nothing changes. On lamp-52e6 on 22 Octo
   an answer and commits, as today. The resume wait (400 ms of stillness) then resumes the
   answer, and the candidate is suppressed, so no turn starts. A backchannel
   commits only if its speech reaches 400 ms, a sentence.
-- **Anything else commits at once**, empty words included; no words commit
-  at the bound, and the journal says so ("a yield's words had not come
-  after its commit was held 200 ms: committed"), since words that come
-  after are dropped with the yield. A stop phrase ("wait" is one) and a forced `stop/heard` are
-  never held.
+- **Anything else commits at once**, empty words included.
+- **No words resume the answer.** A yield whose words never come, by the
+  bound or before the yield ends, resumes the reply as a backchannel does:
+  no turn, no cut (lamp-52e6 on #3200: 2.3 s into a story a wordless yield,
+  room sound or the lamp's own echo, was held 390 ms and then cut the story
+  for good). The journal says so ("a yield's words had not come after its
+  commit was held 200 ms: the answer goes on"). Words that come after are
+  dropped with the yield: a slow speech-to-text starts no second answer and
+  leaves nothing yielding; a person who goes on talking yields the lamp
+  again. Only speech reaching 400 ms, a sentence, commits without words
+  ("... committed"). A stop phrase ("wait" is one) and a forced
+  `stop/heard` are never held.
 - **With `heard-always`** (#2939, lamp-52e6 at 09:44 on 23 October: 5 of
   5 backchannels cut a story with `heard-always`, where the hold was inert),
   the one stream that hears the whole reply also tells the yield its words
@@ -944,8 +951,8 @@ once that backchannels aren't held, and nothing changes. On lamp-52e6 on 22 Octo
   thread classified
   before the yield's mark reached it decides nothing; on Flux only an
   `EndOfTurn` is final; a result with no account of its finality decides
-  nothing. Each errs toward no decision, so the yield then commits as a
-  turn at the bound, as with the switch off (reviewer-two on #3200). A stop
+  nothing. Each errs toward no decision, so the yield then resumes at the
+  bound, as with no words (reviewer-two on #3200; lamp-52e6 on #3200). A stop
   phrase among them is told as no stop: it stops the lamp as a hand Stop
   does, as without the switch. A face turned to the lamp plays no part:
   the duplex rule decides the hold, and "its answer is played: someone is

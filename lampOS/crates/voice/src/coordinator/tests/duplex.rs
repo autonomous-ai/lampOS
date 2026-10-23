@@ -1140,9 +1140,10 @@ fn with_backchannel_holds_and_heard_always_only_the_yields_own_final_words_decid
     assert_eq!(event["backchannel"], true);
     let (at, committed, _) = results_heard_always(held, Word::Plain, false);
     assert_eq!((at, committed), (71, true), "off");
-    // No final of its own: held to the bound, then committed with no words.
+    // No final of its own: held to the bound, then resumed with no words.
     let (_, committed, event) = results_heard_always(&[("Okay.", false)], Word::Plain, true);
-    assert!(committed);
+    assert!(!committed);
+    assert_eq!(event["kind"], "duplex_resume");
     assert_eq!(event["backchannel"], Value::Null);
 }
 
@@ -1332,18 +1333,191 @@ fn with_backchannel_holds_anything_else_commits() {
     // tenth still block (the quiet rule: 2 + 29 + 60, held from the
     // fortieth), or at the yield's deadline, 110 blocks from it, if sooner
     // (the speech rule: held from the sixth block of speech, 37), so the
-    // request is never kept past it.
+    // request is never kept past it; and the reply resumes, a wordless
+    // yield ending no answer.
     let (at, _, committed, event) = a_short_word(None, Word::Plain, true, false);
-    assert_eq!((at, committed), (2 + 29 + 60, true));
+    assert_eq!((at, committed), (2 + 29 + 60, false));
     assert_eq!(event["held_ms"], 200);
     assert_eq!(event["backchannel"], Value::Null);
     let (at, _, committed, event) = a_short_word(None, Word::Speech, true, false);
-    assert_eq!((at, committed), (110, true));
+    assert_eq!((at, committed), (110, false));
     assert_eq!(event["held_ms"], 730);
     // The switch off: no words commit as today.
     let (at, _, committed, event) = a_short_word(None, Word::Speech, false, false);
     assert_eq!((at, committed), (37, true));
     assert_eq!(event["held_ms"], 0);
+}
+
+/// lamp-52e6 on #3200, `heard-always` and the switch on: 2.3 s into a
+/// story a yield came with no words, room sound or the lamp's own echo; its
+/// commit was held 390 ms for them and then cut the story. A wordless yield
+/// now resumes the story, on either rule, with no turn and no cut: when the
+/// hold's wait runs out, and when the yield ends before its words came.
+/// The switch off: each commits as before.
+#[test]
+fn with_backchannel_holds_a_wordless_yield_resumes_the_reply() {
+    let wordless = |word: Word, holds: bool| {
+        let stop_words = crate::stop_words::StopWords::always_counted(
+            Box::new(AlwaysEars {
+                words: None,
+                flushed: false,
+            }),
+            None,
+        )
+        .with_backchannel_holds(holds);
+        a_short_word_heard_by(stop_words, "", word, holds)
+    };
+    // The hold's wait runs out: the speech rule, held to the deadline.
+    let (at, committed, event) = wordless(Word::Speech, true);
+    assert_eq!((at, committed), (110, false));
+    assert_eq!(event["kind"], "duplex_resume");
+    assert_eq!(event["held_ms"], 730);
+    assert_eq!(event["backchannel"], Value::Null);
+    // The quiet rule, held 500 ms past the ask.
+    let (at, committed, event) = wordless(Word::Plain, true);
+    assert_eq!((at, committed), (2 + 29 + 60, false));
+    assert_eq!(event["kind"], "duplex_resume");
+    assert_eq!(event["held_ms"], 200);
+    // The switch off: committed as before.
+    let (at, committed, _) = wordless(Word::Speech, false);
+    assert_eq!((at, committed), (37, true));
+    let (at, committed, _) = wordless(Word::Plain, false);
+    assert_eq!((at, committed), (71, true));
+}
+
+/// lamp-52e6 on #3200: "a yield ended before its words came". With the
+/// switch on the yield it ends is resumed, not committed, and the words
+/// said to be missing are recorded; with `heard` too.
+#[test]
+fn with_backchannel_holds_a_yield_that_ends_before_its_words_resumes_the_reply() {
+    let mut h = Harness::new(TurnTaking::Duplex, 400);
+    h.stop_words = Some(
+        crate::stop_words::StopWords::always_counted(
+            Box::new(AlwaysEars {
+                words: None,
+                flushed: false,
+            }),
+            None,
+        )
+        .with_backchannel_holds(true),
+    );
+    h.mask.hold_backchannels();
+    let old = h.old();
+    h.blocks(20, 0.99, Some(evidence(0, OWN)));
+    h.blocks(ONSET + 2, 0.9, Some(evidence(0, Some((10, 0)))));
+    for quiet in 1..=29 {
+        h.block(0.1, Some(evidence(quiet, None)));
+    }
+    h.blocks(80, 0.1, Some(evidence(40, None)));
+    let unheard: Vec<_> = h
+        .events("stop_words")
+        .into_iter()
+        .filter(|event| event["words"].is_null())
+        .collect();
+    assert_eq!(unheard.len(), 1, "the yield's missing words were not said");
+    assert_eq!(h.events("duplex_resume").len(), 1);
+    assert!(h.events("duplex_commit").is_empty());
+    assert!(h.events("turn_finished").is_empty());
+    assert_eq!(h.old(), old);
+    assert!(!h.admission.owns_stream());
+    assert!(!h.mask.yield_in_force());
+    // With `heard`, no words at all: resumed at the hold's end.
+    let (at, _, committed, event) = a_short_word(None, Word::Plain, true, false);
+    assert_eq!(
+        (at, committed, event["kind"].clone()),
+        (2 + 29 + 60, false, json!("duplex_resume"))
+    );
+}
+
+/// `heard-always` ears whose words come 80 result reads (blocks) after the
+/// first flush, once: a speech-to-text slower than the hold. `given`: they
+/// came.
+struct LateEars {
+    words: &'static str,
+    wait: Option<usize>,
+    given: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl crate::stop_words::Ears for LateEars {
+    fn ready(&mut self) {}
+    fn hear(&mut self, _: u64, _: &[i16]) {}
+    fn finalize(&mut self) {}
+    fn flush(&mut self) {
+        self.wait.get_or_insert(80);
+    }
+    fn words(&mut self) -> Option<String> {
+        let wait = self.wait.as_mut()?;
+        if *wait > 0 {
+            *wait -= 1;
+            return None;
+        }
+        self.wait = Some(usize::MAX);
+        self.given.store(true, std::sync::atomic::Ordering::Relaxed);
+        Some(self.words.to_owned())
+    }
+    fn forget(&mut self) {
+        panic!("a stream heard always is never forgotten in a yield");
+    }
+    fn rest(&mut self) {}
+}
+
+/// The lamp-52e6 finding on #3200, a slow speech-to-text: words that come
+/// after the hold resumed the reply are not the yield's. They start no
+/// turn and cut nothing, and nothing is left yielding; the lamp goes on.
+#[test]
+fn with_backchannel_holds_words_after_a_wordless_resume_start_nothing() {
+    let given = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mut h = Harness::new(TurnTaking::Duplex, 400);
+    h.stop_words = Some(
+        crate::stop_words::StopWords::always_counted(
+            Box::new(LateEars {
+                words: "What was that?",
+                wait: None,
+                given: std::sync::Arc::clone(&given),
+            }),
+            None,
+        )
+        .with_backchannel_holds(true),
+    );
+    h.mask.hold_backchannels();
+    let old = h.old();
+    h.blocks(20, 0.99, Some(evidence(0, OWN)));
+    h.blocks(ONSET + 2, 0.9, Some(evidence(0, Some((10, 0)))));
+    for quiet in 1..=29 {
+        h.block(0.1, Some(evidence(quiet, None)));
+    }
+    while h.events("duplex_resume").is_empty() {
+        assert!(h.events("duplex_commit").is_empty());
+        h.block(0.1, Some(evidence(40, None)));
+    }
+    assert!(!given.load(std::sync::atomic::Ordering::Relaxed));
+    h.blocks(150, 0.99, Some(evidence(0, OWN)));
+    assert!(given.load(std::sync::atomic::Ordering::Relaxed));
+    assert!(
+        h.events("stop_words")
+            .iter()
+            .all(|event| event["words"].is_null()),
+        "late words were told as the yield's"
+    );
+    assert_eq!(h.events("duplex_yield").len(), 1);
+    assert!(h.events("duplex_commit").is_empty());
+    assert!(h.events("turn_finished").is_empty());
+    assert_eq!(h.old(), old);
+    assert!(!h.admission.owns_stream());
+    assert!(!h.mask.yield_in_force());
+}
+
+/// lamp-52e6 on #3200: with the switch on, a yield whose words come and
+/// are no backchannel still commits as a turn, on either rule.
+#[test]
+fn with_backchannel_holds_a_yields_real_words_still_commit_a_turn() {
+    for word in [Word::Plain, Word::Speech] {
+        let (_, committed, event) =
+            a_short_word_heard_always("Can you turn the light down?", word, true);
+        assert!(committed, "{word:?}");
+        assert_eq!(event["kind"], "duplex_commit");
+        assert_eq!(event["backchannel"], false);
+    }
 }
 
 /// #2939: two backchannels the reply went on after are a person, not the
