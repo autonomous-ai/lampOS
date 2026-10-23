@@ -30,6 +30,11 @@ Environment=LAMP_CLOUD=on
 # holds): the lamp's record shows it gone about 30 s after a stop and within about 2 min of a
 # power cut, not 5 to 8 min later (#2636, docs/cloud.md).
 Environment=LAMP_CLOUD_OFFLINE_WILL=on
+# Shared with Eyes and Voice; the photo folder is private boot tmpfiles state,
+# not a unit-owned runtime directory that disappears on a part restart (#2856).
+Environment=LAMP_PHOTO_FACES=on
+Environment=LAMP_EYES_PHOTO_DIR=/run/lampos-photos
+Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
 # The eyes' known file: beside it, their `tellable`, read just before guard mode's named text
 # goes to the broker, so a yes taken back while it waited names nobody (#2562). Read only, as
 # lampos, under ProtectSystem=strict (/run/lampos-eyes is 0755, `tellable` the eyes' 0600 file

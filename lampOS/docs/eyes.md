@@ -922,6 +922,57 @@ this room" until someone asks to be recognised.
   The voice reads it as it reads `known`, so whatever access a deploy gives
   the voice to `known` it needs to `known-face` too (the voice runs as root
   on lamp-4ace and in the product unit).
+- **Explicit speaker observation** (#3014): with the same tracking switches,
+  `known-speaker` beside `known` publishes one atomic JSON record. A positive
+  record has `state: "seen"`, `name`, optional `id`, the actual faces-publisher
+  `boot`, passing `face`, a random 32-hex `publisher` lifecycle and a nonzero
+  `generation`. A successful empty detection may publish `state: "absent"`
+  with only boot, publisher and generation. It carries no new identity and
+  can only continue a request that Voice already pinned from a positive record.
+  A detected return after absence, even with the same passing face ID, or a
+  changed visible track first publishes identity-free `state: "checking"`.
+  Recognition runs immediately for that candidate, before the ordinary 2 s
+  refresh is due; an unchanged unmatched candidate then keeps that ordinary
+  cadence. Checking grants no personal output and is not ordinary absence.
+  Voice may pause only an already pinned v2 request for that exact epoch and
+  person. A completed positive match for the same name, optional stable ID,
+  boot, publisher and generation returns that request to Ready, even with a
+  new passing face ID, resuming held work without duplicate delivery. Its
+  original grant and audio-end-plus-30-second maximum deadline do not change;
+  the source still expires after 3 s. Initial/legacy Checking never grants or
+  pauses authority. Missing/stale source, another epoch/person, hard revocation,
+  forget, privacy or an error is terminal, not a resumable wait. A fresh proved
+  ask may use a later positive observation.
+  Disappearance before recognition completes advances the generation before
+  another absence is published, so a reader cannot miss the unresolved return.
+  Visible unaligned/unmatched faces and model/decode/camera errors hard-revoke,
+  not ordinary absence. A `revoked` record advances the generation before
+  forgetting, privacy loss, store mutation or teardown; a later `seen` keeps
+  that generation. A new publisher lifecycle cannot continue an old request.
+  Generation exhaustion or publication failure disables the source.
+  The file stays in the existing volatile `/run` folder, mode 0600 and owned
+  by the Eyes writer. Linux checks the canonical parent is on tmpfs, owned by
+  that writer and not group/other writable. An existing legacy `known` must
+  also be a regular 0600 file owned by the writer; its ordinary removal does
+  not prevent an explicit absence record. Persistent custom locations cannot
+  enable this source. Publication uses an exclusive temporary file and atomic
+  rename. Startup and orderly exit invalidate it; abrupt death leaves no fresh
+  look and the source expires. No heartbeat invents a successful camera look.
+  A skipped empty-room inference cannot refresh the record. The active source
+  must ask for a real detection at its recognition refresh cadence instead of
+  turning the empty-room optimization into either fabricated absence or a
+  routine revocation; this work stays in the independent Eyes process.
+  Readers require the opened record's own freshness (3 s), with metadata and
+  content from the same bounded FD. Wall time is sampled after open metadata;
+  monotonic expiry remains anchored before I/O. Future/stale/missing/invalid
+  records refuse, never imply absence. Legacy `known` and `known-face` stay
+  compatible. Legacy positive-only source records grant no absence continuation.
+  Voice requires request-owned positive speaking evidence and an exact initial
+  face/person match. Neither the file nor a geometric passing ID proves
+  physical identity, acoustic authentication or liveness. No frame, print,
+  audio, durable history, extra model tool or RPC is added. This source change
+  does not activate the product's second-route name switch; #3014 and its
+  physical owner checks remain separate. The Live route is unchanged.
 - **Named in Who was here, only with their yes** (#1997, the lead's yes on
   20 Oct; nothing asks it until the voice's question is built):
   - `{"visits_yes":NAME}` keeps a remembered person's yes to being named to
@@ -1463,8 +1514,18 @@ looking.
 
 ### A face from a photo (`--photo-dir`, faces from a photo)
 
+This is an unmerged integration candidate. Current Eyes keeps its switched
+`face` wire and forced post-answer look; this candidate does not activate
+`LAMP_PHOTO_SPEAKER`. The original-capture proof decision, fresh combined
+gates and lamp acceptance remain pending. Current generic speaker evidence
+and historical source-specific receipts do not qualify strict Photo consent
+provenance or this carried source.
+
 Off unless `lamp-eyes --photo-dir ABSOLUTE_PATH` is given, which needs the
-recogniser (`--recogniser`, `--people`, `--who-socket`). On a lamp the
+recogniser (`--recogniser`, `--people`, `--who-socket`). The unmerged product unit candidate
+supplies `--photo-dir /run/lampos-photos` with those existing
+prerequisites (#2856); Voice and Cloud enable the photo route and share
+Eyes' `/run/lampos-eyes/who.sock`. On a lamp the
 folder is `/run/lampos-photos` (`lampos`'s, 0700), made at boot by the
 product's tmpfiles and belonging to neither the eyes' unit nor lamp-cloud's
 (cloud.md, "A face from the app's photo"); the eyes make it at 0700 if they
@@ -1480,11 +1541,13 @@ photo there (`faces.add_photo`), then asks on the
 asking** (the first builder on #1968, 22:12). So a face from a photo is
 kept **unconfirmed**, until its person says yes at the lamp:
 
-- **Read once, then gone:** the file is read (a regular file, not a link,
-  checked to be the entry it opened; at most 8 MiB) and **removed whatever
-  follows**: a refusal, a bad name, a picture with no face. A link is
-  removed, not what it names. No picture is kept, only the print
-  (`photo::take`).
+- **Read once, then cleanup attempted:** the file is read (a regular file,
+  not a link, checked to be the entry it opened; at most 8 MiB). Once a
+  plain file name is admitted, `photo::take` attempts unlink after its read
+  validation, whether accepted or refused. A link's entry is targeted,
+  never its referent. Unlink
+  errors are ignored and a crash can interrupt cleanup. This is not an
+  instant-deletion guarantee on cancellation.
 - **Its one face:** decoded at the detector's size as a camera frame is,
   its faces found, and the largest taken. It must be at least `NEAR_ENOUGH`
   (0.10) of the picture's height, with no other face half its size or more
@@ -1592,25 +1655,43 @@ socket; `crates/voice/src/photo_faces.rs`):
   voice follows the eyes' own mark, which they save: a name the eyes say was
   not asked is a new face under it and is asked again, and a face they say
   was asked isn't asked again, even after the voice restarts. The
-  voice then says, once, as its own written turn (`photo_face_ask`): "Someone
-  added your face from a photo, as NAME. Shall I remember you?" It doesn't
-  use the name as theirs unless they agree.
-- **Their spoken answer** calls `photo_face_yes` or `photo_face_no`. These
-  run in the provider's worker, a process apart from the coordinator that
-  asked, so they take the face from the eyes, the unconfirmed one
-  `photo_here` names now, and tell the eyes `photo_yes` or `photo_no` for it.
-  The eyes take a yes only for that face once it was asked (`not_asked`
-  otherwise), so no name has to cross processes (the reviewer on #1977,
-  22:50). Like the other
-  face functions, these are taken only from words heard at the lamp, never
-  a written or typed request. A yes for a face that has gone is
-  `not_here`, and the model is told nothing changed.
+  voice then asks once, as its own written turn (`photo_face_ask`),
+  explicitly whether it may remember the face added from the photo. It
+  identifies the name as the photo sender's unverified label, quoted as
+  data rather than an instruction. It does not use the name as theirs
+  unless they agree. Cloud accepts only a trimmed label of at most 40
+  Unicode letters, ASCII spaces, hyphens and apostrophes, with at least
+  one letter.
+- **Their spoken answer** uses the existing `remember_my_face` or
+  `forget_my_face` function with `photo_reply: true` (#2856). With the photo
+  switch on, their schema adds this explicit discriminator and allows the
+  photo reply to omit `name`; it adds no function names. The photo reply
+  carries no name, replacement or apart instruction: the worker reads the
+  actual pending face and saved asked mark from Eyes, then sends
+  `photo_yes` or `photo_no` for that face. A missing or no-longer-present
+  pending face refuses the reply; it never falls back to live capture or a
+  broader face forget. Eyes accepts a yes only after asking (`not_asked`
+  otherwise). These replies require words heard at the lamp, not a typed
+  request. A yes also requires the active request owner's sealed positive
+  microphone speaker proof to match the pending subject's exact Eyes boot
+  and passing face. Voice rechecks it after lookup and before RPC bytes;
+  Eyes rechecks the same identity, asked mark and live presence. An unscoped
+  legacy yes has no such proof and fails closed. Once a heard, admitted
+  reply has resolved that pending print,
+  revocation before the send blocks a yes but still lets a no delete that
+  print. It cannot delete a known face. A held-gap request can only refuse
+  the pending photo; it cannot
+  grant consent or run an ordinary forget. With the photo switch off, the
+  existing two function schemas are unchanged. Without `photo_reply: true`,
+  the ordinary path still requires the name and preserves its existing
+  replacement/apart rules.
 - No answer is the eyes' to let go, at the meeting's end.
 
 **From the app:** lamp-cloud's `faces.add_photo` writes the app's photo into
 `--photo-dir` as a new 0600 file and sends the ask, only over the lamp's own
-account channel, and removes the file afterwards ([cloud.md](cloud.md), "A
-face from the app's photo"). The eyes make the folder theirs at 0700 when
+account channel, and attempts to unlink the file afterwards on normal
+completion or timeout ([cloud.md](cloud.md), "A face from the app's photo").
+The eyes make the folder theirs at 0700 when
 they start, and refuse one open to others (`photo::ready`).
 
 Tests (`photo.rs`):
@@ -2075,6 +2156,15 @@ with the known face's id the eyes keep beside the known file
   350 ms on the 10 fps camera (`main.rs`), so 2 s holds 5 to 8 looks. With
   `--steady-rate` a still face is looked at 500 to 600 ms apart, 4 looks a
   window, under the 5 the score needs, so in practice `unknown` (below).
+- **Lamp-4ace source preparation (#3064):** the repository units enable
+  `LAMP_EYES_SPEAKING=on` in Eyes and Voice, with `--steady-rate off` for
+  the regular speaking window. The exact retained Eyes pin accepts all
+  16 unit flags, including this argument's on/off syntax
+  ([receipt](verification/common-checking-20261023/README.md)). Its extra
+  detector work, CPU, temperature and voice-latency cost are unmeasured here. Compatible qualified Voice/Eyes
+  artifact pins, installation and a new known-person lamp run remain owed.
+  The source choice changes neither the classifier's thresholds nor the
+  historical measurements below, and is not a physical qualification.
 - **How fast it answers** (looks every 250 to 350 ms): `yes` on the first
   look after talking starts (0.06 to 0.18 s), and held 1.3 to 1.8 s after
   it stops, the 2 s window emptying.

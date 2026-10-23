@@ -1,0 +1,1182 @@
+{
+  "current_carry": {
+    "base_common": "00c79072298c583c88ac92a0cad42d2f9155520c",
+    "status": "Source-specific host results before corrected census supplement; later exact-head qualification is in PR #2988",
+    "scope": [
+      "Voice photo consent routing and current face wire",
+      "Cloud neutral receipt and bounded startup cleanup",
+      "Product unit proposal plus typed Pending compatibility seams and three authored controls"
+    ],
+    "retained_records": "All other top-level and nested counts/censuses/heads/statuses are historical exact-source records; none qualifies this carry.",
+    "historical_top_status": "Current-target integration scoped44/0/0, fmt, strict workspace Clippy and workspace build pass; fresh native/full host/Mobile acceptance remain open",
+    "original_capture_approval": "pending; generic proof/heard marker does not classify all replayed or unheard inputs",
+    "Eyes_actual_integration_and_lamp_acceptance": "pending",
+    "LAMP_PHOTO_SPEAKER_enabled": false,
+    "new_controls_executed": true,
+    "current_gate_or_pass_claim": false,
+    "recorded_utc": "2026-10-23T14:02:16.282882+00:00",
+    "new_controls": {
+      "tests": 3,
+      "cases": 7,
+      "both_hosts": "pass",
+      "boundary": "real HTTP + test adapter + default guard; not an external Net scheduling claim"
+    },
+    "revision2": {
+      "tree": "bd269b7b18027713f2a147ee385deec77e3ea0b0",
+      "each_host": {
+        "passed": 285,
+        "failed": 1,
+        "ignored": 2,
+        "fmt": "pass",
+        "strict_workspace_clippy": "pass",
+        "voice": "63/0",
+        "cloud": "209/0/2 ignored",
+        "functions": "5/1; stale expected Second list; explicit off/on not reached",
+        "installed_units": "6/0",
+        "scratch_census": "2/0",
+        "workspace_build": "pass"
+      },
+      "source_index_modes_mtimes_unchanged": true,
+      "cleanup_confirmed": true
+    },
+    "census_correction": {
+      "code_tree_before_docs": "4e869dc774d119e0461014dbc926b5fd8fd30af4",
+      "change": "existing LOOK_CALL appended and actual lengths printed",
+      "assertions_and_case_loops_preserved": true,
+      "supplement_at_recording": "not yet executed"
+    },
+    "strict_photo_proof_integration": "pending origin contract and route wiring; separate helper is not production route proof",
+    "transport_samples_us": {
+      "boundary": "helper entry to return under controlled sockets",
+      "mac_before_cancel": 401076,
+      "mac_before_peer_close_ms": 400,
+      "mac_current_cancel": 20558,
+      "linux_current_cancel": 20546,
+      "original_drip_budget_ms": 100,
+      "mac_before_drip": 1893113,
+      "mac_current_drip": 100432,
+      "linux_current_drip": 100277,
+      "hardware_or_provider_measurement": false
+    }
+  },
+  "task": 2856,
+  "status": "Held Common00c carry; revision2 results and failed census retained; later exact-head gates are in the PR record",
+  "prior_candidate": {
+    "task": 2856,
+    "kind": "unit activation plus existing consent-surface reuse, no new function names or admission policy",
+    "source_commit_before_evidence": "369316d72b8a0383155f4bca25bf8a1b4b9b65e1",
+    "authored_parent_at_scoped_gate": "06478cdc2533bdf0323b21318fe949e1741bdae5",
+    "source_sha256": {
+      "lampOS/crates/cloud/tests/it/switch.rs": "70a3209d4f8f0852b50a336752003586a57e41a32dd6648997c51c5eea81bf76",
+      "lampOS/crates/update/tests/functions.rs": "ed69c6151c8b75305e7b581248672060ddb7f07395ea3643efe3a43edc6a6a74",
+      "lampOS/crates/voice/src/known_faces.rs": "736ba70940047fb35982d9e5ad1180916caf5d1afcd789b2ccaec2e8b573ed5d",
+      "lampOS/crates/voice/src/photo_faces.rs": "67c64050cf3b0201aa7b756607ef8c3ba362972e82e58dc2462582c0514b09b9",
+      "lampOS/crates/voice/src/photo_faces/replies.rs": "37213157a576bd41a0f2badb26163517c9651567bf97f9aa15b206921c0547d1",
+      "lampOS/crates/voice/src/second_provider.rs": "8b53c20f7c82671d355c48a23fa68256259b81874d1b830c21e260453a6b146f",
+      "lampOS/crates/voice/src/second_provider/net/chat.rs": "4c25a6223dadaa0eedfe86145586d43d82d90eb2ae4ce08372a56730d39e3a74",
+      "lampOS/crates/voice/src/second_provider/net/chat/photo_replies.rs": "2774eff444c405fda01014ba7bbe0c7447b33d70eba4723785dafec4181b4e7a",
+      "lampOS/crates/voice/src/second_provider/services.rs": "610c4f4b819952f79e759ff7b07674f129387975b6fb9d204e5c32cbe300d85e",
+      "lampOS/crates/voice/src/second_provider/tests.rs": "1c943732bc95a743f74e75405e78de23735568a431f158d5d530778d6e0d6c91",
+      "lampOS/crates/voice/src/second_provider/tests/photo_replies.rs": "73f6bf7f5cb7f81e3ac587674b98c91e8d77f000e9a46867c1eb5a2c2f43b3ec",
+      "lampOS/crates/voice/src/second_provider/worker.rs": "22ad0f5f030bafac0d1a7a959e1d1d70d42ba06d27604d65a34bd58bf5896a90",
+      "lampOS/crates/voice/src/tools.rs": "ac8b6a0e4d6fbb99165fb845feefe68469e0015e4f3c82a6d83d26bdbfcb3f26",
+      "lampOS/crates/voice/src/tools/photo_replies.rs": "3ff9388d3967f18f68fabd90c4e4985c2ce9bd1e498ecd924252e42d0c34923b",
+      "lampOS/deploy/product/lamp-cloud.service": "1c94ccea9080ed39ae045eab375cfbb0d76cec7bd5040daa3843d5341a0cf942",
+      "lampOS/deploy/product/lamp-eyes.service": "3666b25d8cca660e6b859f1059825c6ca7004a3d683ce4f6a0c17463b016f403",
+      "lampOS/deploy/product/lamp-voice.service": "ff987792289e10953c51ab59b4357c7fa0a354f7ecd5cc35a5326c54853be275",
+      "lampOS/docs/cloud.md": "f18b0f51c7fae1a42325ade6e8bcde8d4916841fcf303d26a5ec18ca0a77927a",
+      "lampOS/docs/eyes.md": "01ffc3152d575cf852dc227dc1334d836381755b42e0313deb352a7667a30578",
+      "lampOS/docs/install.md": "65f8de46581d4f06986d9cf08d2b44cce0dff9378f5258c533dda3957af02623",
+      "lampOS/docs/switches.md": "9b55e9731a1daf073a02387e671090cb3cd2973bb9b6b86cac18fcd426b7c281"
+    },
+    "scoped_gate": {
+      "validation_kind": "Pre-publication scoped gate; full serial affected-consumer gate follows separately",
+      "base": "26fb5cf893be4b69e662cdf06f3acaa718e185c9",
+      "host": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+      "started_utc": "2026-10-22T09:31:19.086652+00:00",
+      "commands": [
+        {
+          "stage": "fmt",
+          "command": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 25.855,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "stage": "clippy",
+          "command": [
+            "cargo",
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 105.655,
+          "log_sha256": "db555544395cf0b60ea07ce32e26d01975e0bdf766616f25d3edfb26b973d16e"
+        },
+        {
+          "stage": "photo-replies",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "photo_repl",
+            "--",
+            "--nocapture"
+          ],
+          "exit": 0,
+          "seconds": 152.165,
+          "log_sha256": "69ade71512f2552168e5e071f8763a96a81c69bb238c5ef8fd35e18a9773b67f",
+          "counts": {
+            "passed": 9,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "legacy-photo",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "photo_faces::tests::"
+          ],
+          "exit": 0,
+          "seconds": 3.235,
+          "log_sha256": "ceff53adf0907819aaaf683e82bda64c2f8fcd0bd300661a96b8ade8ac0d4fdf",
+          "counts": {
+            "passed": 8,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "photo-question",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room"
+          ],
+          "exit": 0,
+          "seconds": 0.471,
+          "log_sha256": "2aec6926d27204800b8bd7f67049e6d70250755b337ee524ac448c2bc0faee33",
+          "counts": {
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "census",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "switch_census_tests"
+          ],
+          "exit": 0,
+          "seconds": 7.697,
+          "log_sha256": "dee466507d55f8c8ce945c236962cbc4f78763cbf5c0f9e6b727e399072795a4",
+          "counts": {
+            "passed": 5,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "product-functions",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-update",
+            "--test",
+            "functions"
+          ],
+          "exit": 0,
+          "seconds": 53.207,
+          "log_sha256": "36595d08220c979a592f6684ed0b5fbd0d232bf27d1557062d334b8d4af159a6",
+          "counts": {
+            "passed": 5,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "cross-unit",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-cloud",
+            "--test",
+            "it",
+            "switch::the_photo_folder_the_unit_may_write_is_the_one_made_at_boot"
+          ],
+          "exit": 0,
+          "seconds": 71.477,
+          "log_sha256": "ed5607dc65861d79d63db4e56b9e2f1c9edcf532be32942a64db3c89935c03d9",
+          "counts": {
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "workspace-build",
+          "command": [
+            "cargo",
+            "build",
+            "--workspace"
+          ],
+          "exit": 0,
+          "seconds": 106.948,
+          "log_sha256": "1d4bd700492c9828e6f78bc8367da75c8749da8e530fc82943cac4455fdd3656"
+        }
+      ],
+      "serial_tests": "RUST_TEST_THREADS=1, no test selection or nextest configuration changed",
+      "finished_utc": "2026-10-22T09:40:05.887756+00:00"
+    },
+    "scoped_unique_counts": {
+      "passed": 29,
+      "failed": 0,
+      "ignored": 0
+    },
+    "counting": "9 new Voice +8 legacy photo +1 existing busy-room question +5 switch census +5 product functions +1 cross-unit contract; repeats/negative controls are not added.",
+    "latency": {
+      "boundary": "Immediately before routed tool call through pending lookup and mutation over two controlled Unix-socket exchanges, ending at call return",
+      "host_fast_target_us": 50000,
+      "observations": [
+        {
+          "route": "legacy",
+          "action": "yes",
+          "repetition": 0,
+          "elapsed_us": 4597
+        },
+        {
+          "route": "legacy",
+          "action": "yes",
+          "repetition": 1,
+          "elapsed_us": 4937
+        },
+        {
+          "route": "shared",
+          "action": "yes",
+          "repetition": 0,
+          "elapsed_us": 3075
+        },
+        {
+          "route": "shared",
+          "action": "yes",
+          "repetition": 1,
+          "elapsed_us": 2717
+        },
+        {
+          "route": "legacy",
+          "action": "no",
+          "repetition": 0,
+          "elapsed_us": 2780
+        },
+        {
+          "route": "legacy",
+          "action": "no",
+          "repetition": 1,
+          "elapsed_us": 2324
+        },
+        {
+          "route": "shared",
+          "action": "no",
+          "repetition": 0,
+          "elapsed_us": 4892
+        },
+        {
+          "route": "shared",
+          "action": "no",
+          "repetition": 1,
+          "elapsed_us": 2482
+        }
+      ],
+      "pending_timeout_us": 300297,
+      "lookup_bound_us": 300000,
+      "existing_mutation_bound_us": 6000000,
+      "provider_acoustic_device_proof": false
+    },
+    "legacy_authority_negative_control": {
+      "old_source": "Both legacy yes/no emitted one mutation after request revocation; shared replies emitted none",
+      "corrected_source": "All four shared/legacy variants:1 lookup,0 mutations after revocation",
+      "raw": "/private/tmp/fourth-photo-product-activation-checks-20261022/voice/legacy-authority-p2",
+      "counts_not_added": true
+    },
+    "initial_full_gate": "Intentionally interrupted during Update to fix legacy authority P2; completed fmt/Clippy/photo9/Cloud187 remain attributed to old source. Not a complete gate or a test failure.",
+    "initial_interruption_receipt": "/private/tmp/fourth-photo-product-activation-checks-20261022/host-initial-interrupted/interruption.json",
+    "complete_host_consumer_gate": "Pending; runs separately after draft publication; no full package total inferred from focused controls",
+    "native": "Pending exact published-head ARM64 and Linux Clippy; draft until required gates and review",
+    "device": "No Fourth device access; Mobile authorised full-update0c89 selfie/question/yes acceptance pending",
+    "limits": [
+      "No actual Engine-to-Eyes-store combined transaction in the new layer controls",
+      "Normal unlink/error/crash/durable-deletion failure paths not newly qualified",
+      "Watcher cancellation does not instantly erase pending data",
+      "App/backend retention outside these Rust sources unverified",
+      "Installable-skill migration separate from2856"
+    ],
+    "raw_root": "/private/tmp/fourth-photo-product-activation-checks-20261022",
+    "scoped_tested_commit": "26fb5cf893be4b69e662cdf06f3acaa718e185c9",
+    "publication_rebase": {
+      "base": "ef1eb0cf2350971fb110938fb07c12dd593fcc66",
+      "source_bytes_equal_to_scoped_gate": {
+        "lampOS/crates/cloud/tests/it/switch.rs": true,
+        "lampOS/crates/update/tests/functions.rs": true,
+        "lampOS/crates/voice/src/known_faces.rs": true,
+        "lampOS/crates/voice/src/photo_faces.rs": true,
+        "lampOS/crates/voice/src/photo_faces/replies.rs": true,
+        "lampOS/crates/voice/src/second_provider.rs": true,
+        "lampOS/crates/voice/src/second_provider/net/chat.rs": true,
+        "lampOS/crates/voice/src/second_provider/net/chat/photo_replies.rs": true,
+        "lampOS/crates/voice/src/second_provider/services.rs": true,
+        "lampOS/crates/voice/src/second_provider/tests.rs": true,
+        "lampOS/crates/voice/src/second_provider/tests/photo_replies.rs": true,
+        "lampOS/crates/voice/src/second_provider/worker.rs": true,
+        "lampOS/crates/voice/src/tools.rs": true,
+        "lampOS/crates/voice/src/tools/photo_replies.rs": true,
+        "lampOS/deploy/product/lamp-cloud.service": true,
+        "lampOS/deploy/product/lamp-eyes.service": true,
+        "lampOS/deploy/product/lamp-voice.service": true
+      },
+      "upstream_changes": "Memory retry tests already qualified in109; factory shell and documentation only. No upstream Rust production or product-unit drift after scoped gate.",
+      "test_results_attribution": "29 scoped gates and build retain26fb/06478 attribution; publication native and complete host gates follow separately."
+    }
+  },
+  "review_corrections": {
+    "source_review_comment": 6338178907,
+    "first_required_decision": 6338200991,
+    "superseded_published_head": "8ee3f50e958d4fb41ad71882f105ddac00bcc6a2",
+    "old_native_run": 39757954474,
+    "old_native_counts": {
+      "passed": 10389,
+      "failed": 0,
+      "skipped": 67
+    },
+    "old_host_completed": {
+      "voice": [
+        3575,
+        0,
+        14
+      ],
+      "cloud": [
+        187,
+        0,
+        2
+      ],
+      "memory": [
+        290,
+        0,
+        6
+      ],
+      "keeper": [
+        37,
+        0,
+        1
+      ],
+      "skills": [
+        488,
+        0,
+        1
+      ],
+      "setup": [
+        162,
+        0,
+        1
+      ]
+    },
+    "old_host_partial_not_passed": [
+      "voice-eval",
+      "update"
+    ],
+    "new_source_gates": "Scoped complete; native/full host follow on evidence-only published amendment",
+    "revocation_negative_control": {
+      "prior_gate": {
+        "kind": "Required-no control with previous unconditional postlookup gate restored temporarily",
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "revocation_stops_a_photo_yes_but_still_sends_its_narrow_no",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 101,
+        "seconds": 121.00171227008104,
+        "log_sha256": "8c99092fa751b3d7eabaebfca37fec10b3bfac90fe8295d475fa2f8c96ee8b77",
+        "corrected_source_sha256": {
+          "lampOS/crates/voice/src/photo_faces.rs": "37652472f33d7b93326123f5235c5ed9b0ff062e4e9d0cf6dbfeb87df76f8cbd",
+          "lampOS/crates/voice/src/photo_faces/replies.rs": "7f42fde34f088e4ed31bd3c93928d8a7248cb65f04c7500adbbddb648ae5bf73"
+        }
+      },
+      "corrected": {
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "revocation_stops_a_photo_yes_but_still_sends_its_narrow_no",
+          "--",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "seconds": 124.85062840394676,
+        "log_sha256": "06e35d0178ecaa850dcdfb1f25ea8bf9f8ec6181320bccf1e0dd42a978de0bc5"
+      },
+      "observed_after_lookup_revocation": {
+        "shared-yes": [
+          1,
+          0
+        ],
+        "legacy-yes": [
+          1,
+          0
+        ],
+        "shared-no": [
+          2,
+          1
+        ],
+        "legacy-no": [
+          2,
+          1
+        ]
+      },
+      "counts_boundary": "[lookup plus mutation requests, mutation requests]; wrapper response remains unavailable for revoked scope"
+    },
+    "corrected_source_before_gate": {
+      "lampOS/crates/cloud/Cargo.toml": "252d82ed7ae4feacac70b1980d3efe912675902de03b395e975e0019d7265d60",
+      "lampOS/Cargo.lock": "b5869eb796f9dee458b08bc945615269e041b3417064cf3ab1cc4deae4850678",
+      "lampOS/crates/cloud/src/main.rs": "f8684608daab8cb69bbfe32b40e7de51c3ffc051fc6f01aa80dadc4427a9db4a",
+      "lampOS/crates/cloud/src/photos.rs": "a582c0624355561a748216e9253b82986a34cccd1721a550fabf7381386a0e9d",
+      "lampOS/crates/cloud/src/photos/sweep.rs": "d130f4d9499f9996b8f1e6c0468b6f74278e9dd43876e80cad38d414f1e5e937",
+      "lampOS/crates/cloud/tests/it/switch.rs": "41224f460000066f264937c2a8acb02882c1f7f01e7fd9f66cb1a295300b4b0e",
+      "lampOS/crates/voice/src/photo_faces.rs": "37652472f33d7b93326123f5235c5ed9b0ff062e4e9d0cf6dbfeb87df76f8cbd",
+      "lampOS/crates/voice/src/photo_faces/replies.rs": "7f42fde34f088e4ed31bd3c93928d8a7248cb65f04c7500adbbddb648ae5bf73",
+      "lampOS/crates/voice/src/tools/photo_replies.rs": "66e5b6e660812843481b8dfef4815d47fae33bed27cb631e3ae614b9ab24a46d"
+    },
+    "scoped_before_route48_replay": {
+      "validation_kind": "Required-review correction scoped gate; complete consumer suites remain separate",
+      "base": "2dd35a042db1776b62e48fddb19942d99956c6fe",
+      "host": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+      "started_utc": "2026-10-22T10:25:19.791558+00:00",
+      "commands": [
+        {
+          "stage": "fmt",
+          "command": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 12.841,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "stage": "clippy",
+          "command": [
+            "cargo",
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 87.595,
+          "log_sha256": "f3e685221d4a4bf447edacc9fe7110a19b4db80a201d67eb71069ef267c4eddc"
+        },
+        {
+          "stage": "photo-replies",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "photo_repl",
+            "--",
+            "--nocapture"
+          ],
+          "exit": 0,
+          "seconds": 177.011,
+          "log_sha256": "b0367748ea66cdd8d369298d5b403a3ef05809f609440a237c7f409ef6eecfc7",
+          "counts": {
+            "passed": 9,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "photo-notes-legacy",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "photo_faces::tests::"
+          ],
+          "exit": 0,
+          "seconds": 3.051,
+          "log_sha256": "4f59fb9bf6fa958442b27959f0bbf4ab8d8381c4dc88b0a61050d30d22a47505",
+          "counts": {
+            "passed": 9,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "cloud-photos",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-cloud",
+            "--lib",
+            "photos::",
+            "--",
+            "--nocapture"
+          ],
+          "exit": 0,
+          "seconds": 56.721,
+          "log_sha256": "9892f758671c41bac2beba7467cb978c9453892614723ea3b0eda2f86b43fc95",
+          "counts": {
+            "passed": 12,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "cloud-startup",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-cloud",
+            "--test",
+            "it",
+            "photo_cleanup_"
+          ],
+          "exit": 0,
+          "seconds": 7.955,
+          "log_sha256": "f5440174b83a69375c66d224fe7c238f8621a91e7efafe21a885a5aaf3cc219c",
+          "counts": {
+            "passed": 2,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "photo-question",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room"
+          ],
+          "exit": 0,
+          "seconds": 0.446,
+          "log_sha256": "77eb70d3aaa92cedd6c8095c73571cddaf63bb86b01bddf544d683ea56c1ad3d",
+          "counts": {
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "census",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "switch_census_tests"
+          ],
+          "exit": 0,
+          "seconds": 7.224,
+          "log_sha256": "d346c2aad568aebf4d1b52e2c0c7f08b89bd3eda173335b295b95000ba9f52ce",
+          "counts": {
+            "passed": 5,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "product-functions",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-update",
+            "--test",
+            "functions"
+          ],
+          "exit": 0,
+          "seconds": 55.455,
+          "log_sha256": "17a9d20a394e51f8073e82a89b8a6f81c495b42827ed4fa1f5cbc6736c45e78a",
+          "counts": {
+            "passed": 5,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "cross-unit",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-cloud",
+            "--test",
+            "it",
+            "switch::the_photo_folder_the_unit_may_write_is_the_one_made_at_boot"
+          ],
+          "exit": 0,
+          "seconds": 0.448,
+          "log_sha256": "caa0414d10b0f2bf8dfb3ee85abc2def4d3ca89afc7487f43342329188b93e95",
+          "counts": {
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "workspace-build",
+          "command": [
+            "cargo",
+            "build",
+            "--workspace"
+          ],
+          "exit": 0,
+          "seconds": 66.775,
+          "log_sha256": "0b252463b2666191fa16a2957b59fe83aa569dc47ca364ed69a1bf6bfad0ade7"
+        }
+      ],
+      "serial_tests": "RUST_TEST_THREADS=1, no test selection or nextest configuration changed",
+      "finished_utc": "2026-10-22T10:33:15.315751+00:00"
+    },
+    "route48_integration": {
+      "parent": "a0705aee3e2476780f253bc6850b8e6bd0e01643",
+      "first_change": "#2961 carried as#2982",
+      "plain_replay": "2dd35a042 = 304a76c70",
+      "own_followup": "Only added photo census expectations changed from Second32/cut fetch to Second33/web_search+fetch/empty stderr. Existing First48 route and reports/dance tests preserved.",
+      "new_source_gates": "pending"
+    },
+    "startup_latency_before_route48": {
+      "boundary": "photos::sweep::startup entry through successful return; synthetic host privatefolder",
+      "files": 35,
+      "first_ms": 2.91,
+      "empty_repeat_ms": 0.181,
+      "target_ms": 50,
+      "device": false
+    },
+    "scoped_after_route48_replay": {
+      "validation_kind": "Required-review correction scoped gate; complete consumer suites remain separate",
+      "base": "6cd960a99011a6985ff8af048448cf5102f5f23e",
+      "host": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+      "started_utc": "2026-10-22T10:35:03.113541+00:00",
+      "commands": [
+        {
+          "stage": "fmt",
+          "command": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 20.283,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "stage": "clippy",
+          "command": [
+            "cargo",
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 82.173,
+          "log_sha256": "f79e3a467c1891e78be3dd15422a5fe4e13a2bf823c640fdc88e49e5583f8a5d"
+        },
+        {
+          "stage": "photo-replies",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "photo_repl",
+            "--",
+            "--nocapture"
+          ],
+          "exit": 0,
+          "seconds": 104.772,
+          "log_sha256": "e73711fe627b3245b36210b34c2954e2f382aa19d1613d679827da181b7efbf6",
+          "counts": {
+            "passed": 9,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "photo-notes-legacy",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "photo_faces::tests::"
+          ],
+          "exit": 0,
+          "seconds": 2.568,
+          "log_sha256": "300462b6974db6b84edc5f1996519b64a6f12845ce0708d4ccd7b9929d7f8c41",
+          "counts": {
+            "passed": 9,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "cloud-photos",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-cloud",
+            "--lib",
+            "photos::",
+            "--",
+            "--nocapture"
+          ],
+          "exit": 0,
+          "seconds": 58.574,
+          "log_sha256": "c4ace3e543b64b85e71f9f02658b49a0fd9270b73effd0710d34f3469478fe9d",
+          "counts": {
+            "passed": 12,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "cloud-startup",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-cloud",
+            "--test",
+            "it",
+            "photo_cleanup_"
+          ],
+          "exit": 0,
+          "seconds": 7.186,
+          "log_sha256": "8fc630f7af37a28227cee7a6fddd432409f0141d83f0de4ff815861cdfa1ca2f",
+          "counts": {
+            "passed": 2,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "photo-question",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room"
+          ],
+          "exit": 0,
+          "seconds": 0.407,
+          "log_sha256": "11ae477287f11c7e82fd2ad2f4150059e7339c93a0bd79627d80c050be098d97",
+          "counts": {
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "census",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "switch_census_tests"
+          ],
+          "exit": 0,
+          "seconds": 7.083,
+          "log_sha256": "6aa092e2fa04766bcf16ddf0ac6aded6b2d226caa5f5818ac3d7b519f779a855",
+          "counts": {
+            "passed": 5,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "product-functions",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-update",
+            "--test",
+            "functions"
+          ],
+          "exit": 0,
+          "seconds": 45.761,
+          "log_sha256": "20759d74748f9d323bef7cded88b000f5f680f76ee93c353021a6b06054a5637",
+          "counts": {
+            "passed": 5,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "cross-unit",
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "lamp-cloud",
+            "--test",
+            "it",
+            "switch::the_photo_folder_the_unit_may_write_is_the_one_made_at_boot"
+          ],
+          "exit": 0,
+          "seconds": 0.37,
+          "log_sha256": "ddb12abae1da1f427a350793e3f54226e7eb74a024f51e06d082691a38fa2623",
+          "counts": {
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "stage": "workspace-build",
+          "command": [
+            "cargo",
+            "build",
+            "--workspace"
+          ],
+          "exit": 0,
+          "seconds": 65.685,
+          "log_sha256": "543e54928505de6c21f129587dbc4f0487151a1c55f3060b777f5e3e251e2a6e"
+        }
+      ],
+      "serial_tests": "RUST_TEST_THREADS=1, no test selection or nextest configuration changed",
+      "finished_utc": "2026-10-22T10:41:37.974398+00:00"
+    },
+    "authored_parent": "a0705aee3e2476780f253bc6850b8e6bd0e01643",
+    "tested_source_commit": "6cd960a99011a6985ff8af048448cf5102f5f23e",
+    "published_source_sha256": {
+      "lampOS/Cargo.lock": "b5869eb796f9dee458b08bc945615269e041b3417064cf3ab1cc4deae4850678",
+      "lampOS/crates/cloud/Cargo.toml": "252d82ed7ae4feacac70b1980d3efe912675902de03b395e975e0019d7265d60",
+      "lampOS/crates/cloud/src/main.rs": "f8684608daab8cb69bbfe32b40e7de51c3ffc051fc6f01aa80dadc4427a9db4a",
+      "lampOS/crates/cloud/src/photos.rs": "a582c0624355561a748216e9253b82986a34cccd1721a550fabf7381386a0e9d",
+      "lampOS/crates/cloud/src/photos/sweep.rs": "d130f4d9499f9996b8f1e6c0468b6f74278e9dd43876e80cad38d414f1e5e937",
+      "lampOS/crates/cloud/tests/it/switch.rs": "41224f460000066f264937c2a8acb02882c1f7f01e7fd9f66cb1a295300b4b0e",
+      "lampOS/crates/update/tests/functions.rs": "76069ff2424e3be3aaa14ff47f850120ab04a3df9ef4c6c2366d6868c55abada",
+      "lampOS/crates/voice/src/known_faces.rs": "736ba70940047fb35982d9e5ad1180916caf5d1afcd789b2ccaec2e8b573ed5d",
+      "lampOS/crates/voice/src/photo_faces.rs": "37652472f33d7b93326123f5235c5ed9b0ff062e4e9d0cf6dbfeb87df76f8cbd",
+      "lampOS/crates/voice/src/photo_faces/replies.rs": "7f42fde34f088e4ed31bd3c93928d8a7248cb65f04c7500adbbddb648ae5bf73",
+      "lampOS/crates/voice/src/second_provider.rs": "7e9f7bc10dc219eb5df934decdf90c73e73a00d8b368b84d9462301244d05aec",
+      "lampOS/crates/voice/src/second_provider/net/chat.rs": "4c25a6223dadaa0eedfe86145586d43d82d90eb2ae4ce08372a56730d39e3a74",
+      "lampOS/crates/voice/src/second_provider/net/chat/photo_replies.rs": "2774eff444c405fda01014ba7bbe0c7447b33d70eba4723785dafec4181b4e7a",
+      "lampOS/crates/voice/src/second_provider/services.rs": "610c4f4b819952f79e759ff7b07674f129387975b6fb9d204e5c32cbe300d85e",
+      "lampOS/crates/voice/src/second_provider/tests.rs": "1c943732bc95a743f74e75405e78de23735568a431f158d5d530778d6e0d6c91",
+      "lampOS/crates/voice/src/second_provider/tests/photo_replies.rs": "73f6bf7f5cb7f81e3ac587674b98c91e8d77f000e9a46867c1eb5a2c2f43b3ec",
+      "lampOS/crates/voice/src/second_provider/worker.rs": "504e2a8574b6bcad295307f7f7ed16db7838076e9fb1c08a9c77f09e14239a6c",
+      "lampOS/crates/voice/src/tools.rs": "07491d7f88b0d134303a23433e6f356d092e9a2737dc4266746c34eb62552aac",
+      "lampOS/crates/voice/src/tools/photo_replies.rs": "66e5b6e660812843481b8dfef4815d47fae33bed27cb631e3ae614b9ab24a46d",
+      "lampOS/deploy/product/lamp-cloud.service": "1c94ccea9080ed39ae045eab375cfbb0d76cec7bd5040daa3843d5341a0cf942",
+      "lampOS/deploy/product/lamp-eyes.service": "3666b25d8cca660e6b859f1059825c6ca7004a3d683ce4f6a0c17463b016f403",
+      "lampOS/deploy/product/lamp-voice.service": "bc6665cbcda7a2e22107ede4f45658be8316067bb5bd2f9652081aa9d0f5e002"
+    },
+    "startup_latency_final_scoped": {
+      "files": 35,
+      "first_us": 2421,
+      "empty_repeat_us": 171,
+      "target_us": 50000,
+      "boundary": "sweep::startup entry to successful return, synthetic host only"
+    },
+    "target_integration": {
+      "tested_source": "b3aef2b2f660a8625e5432c9427b64a338b3dd02",
+      "parents": [
+        "d52d21d80b77351abc346ff491956dac5ace001d",
+        "e9b0a46fbeedb3d2ce10a9671f1b1e679402ef4d"
+      ],
+      "target": "e9b0a46fbeedb3d2ce10a9671f1b1e679402ef4d",
+      "reason": "A real appended-test conflict blocked PR workflows; own-branch integration allows a fast-forward push after the server refused force-push.",
+      "conflict": "Kept upstream speech-tag test; moved photo_replies module beside existing photo fixture instead of EOF. All other target changes auto-merged.",
+      "scoped": {
+        "validation_kind": "Required-review correction scoped gate; complete consumer suites remain separate",
+        "base": "b3aef2b2f660a8625e5432c9427b64a338b3dd02",
+        "host": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+        "started_utc": "2026-10-22T10:47:53.644144+00:00",
+        "commands": [
+          {
+            "stage": "fmt",
+            "command": [
+              "cargo",
+              "fmt",
+              "--all",
+              "--check"
+            ],
+            "exit": 0,
+            "seconds": 11.093,
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "stage": "clippy",
+            "command": [
+              "cargo",
+              "clippy",
+              "--workspace",
+              "--all-targets",
+              "--",
+              "-D",
+              "warnings"
+            ],
+            "exit": 0,
+            "seconds": 75.884,
+            "log_sha256": "52a825ddcde72b242751e961fbe29faefe3caf68765d6d76d98c12ba2fdec810"
+          },
+          {
+            "stage": "photo-replies",
+            "command": [
+              "cargo",
+              "test",
+              "-p",
+              "lamp-voice",
+              "--lib",
+              "photo_repl",
+              "--",
+              "--nocapture"
+            ],
+            "exit": 0,
+            "seconds": 99.103,
+            "log_sha256": "7226aa2586cd75062a881003885b6f6a47324dfce6fa9b852242dac9015e3493",
+            "counts": {
+              "passed": 9,
+              "failed": 0,
+              "ignored": 0
+            }
+          },
+          {
+            "stage": "photo-notes-legacy",
+            "command": [
+              "cargo",
+              "test",
+              "-p",
+              "lamp-voice",
+              "--lib",
+              "photo_faces::tests::"
+            ],
+            "exit": 0,
+            "seconds": 2.511,
+            "log_sha256": "5163e7a458afbca8ee4aa954769aa1b35fea27e54618431905407b51f798f141",
+            "counts": {
+              "passed": 9,
+              "failed": 0,
+              "ignored": 0
+            }
+          },
+          {
+            "stage": "cloud-photos",
+            "command": [
+              "cargo",
+              "test",
+              "-p",
+              "lamp-cloud",
+              "--lib",
+              "photos::",
+              "--",
+              "--nocapture"
+            ],
+            "exit": 0,
+            "seconds": 52.529,
+            "log_sha256": "3a0a53475fb060d7f95ed378bc6bd3dc3d8a182b3ad5449abe2144495a1ac769",
+            "counts": {
+              "passed": 12,
+              "failed": 0,
+              "ignored": 0
+            }
+          },
+          {
+            "stage": "cloud-startup",
+            "command": [
+              "cargo",
+              "test",
+              "-p",
+              "lamp-cloud",
+              "--test",
+              "it",
+              "photo_cleanup_"
+            ],
+            "exit": 0,
+            "seconds": 7.058,
+            "log_sha256": "f777e154e5044259e7a173ce5ffae20e8fd2e31cb9eb9495090943350b0b9c03",
+            "counts": {
+              "passed": 2,
+              "failed": 0,
+              "ignored": 0
+            }
+          },
+          {
+            "stage": "photo-question",
+            "command": [
+              "cargo",
+              "test",
+              "-p",
+              "lamp-voice",
+              "--lib",
+              "a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room"
+            ],
+            "exit": 0,
+            "seconds": 0.415,
+            "log_sha256": "4b87c3ea863bc9e9d55530bea73567cd63a14f14697d206447d9039116f101f0",
+            "counts": {
+              "passed": 1,
+              "failed": 0,
+              "ignored": 0
+            }
+          },
+          {
+            "stage": "census",
+            "command": [
+              "cargo",
+              "test",
+              "-p",
+              "lamp-voice",
+              "--lib",
+              "switch_census_tests"
+            ],
+            "exit": 0,
+            "seconds": 7.204,
+            "log_sha256": "750f028e999e32ebb39e8a5eda3223885b0c5b2e0dcc1f5b4f686ccca6ee47ca",
+            "counts": {
+              "passed": 5,
+              "failed": 0,
+              "ignored": 0
+            }
+          },
+          {
+            "stage": "product-functions",
+            "command": [
+              "cargo",
+              "test",
+              "-p",
+              "lamp-update",
+              "--test",
+              "functions"
+            ],
+            "exit": 0,
+            "seconds": 42.381,
+            "log_sha256": "7ed4f4aafcacef6b7b31366f75a9dcee306da04797db520f59a8097e4bc3a951",
+            "counts": {
+              "passed": 5,
+              "failed": 0,
+              "ignored": 0
+            }
+          },
+          {
+            "stage": "cross-unit",
+            "command": [
+              "cargo",
+              "test",
+              "-p",
+              "lamp-cloud",
+              "--test",
+              "it",
+              "switch::the_photo_folder_the_unit_may_write_is_the_one_made_at_boot"
+            ],
+            "exit": 0,
+            "seconds": 0.375,
+            "log_sha256": "ddb12abae1da1f427a350793e3f54226e7eb74a024f51e06d082691a38fa2623",
+            "counts": {
+              "passed": 1,
+              "failed": 0,
+              "ignored": 0
+            }
+          },
+          {
+            "stage": "workspace-build",
+            "command": [
+              "cargo",
+              "build",
+              "--workspace"
+            ],
+            "exit": 0,
+            "seconds": 90.111,
+            "log_sha256": "525bf2f9c1e44b2d999f26b014f49f4b2bcadd2da5c48188591964fa65a9613a"
+          }
+        ],
+        "serial_tests": "RUST_TEST_THREADS=1, no test selection or nextest configuration changed",
+        "finished_utc": "2026-10-22T10:54:22.333306+00:00"
+      },
+      "published_source_sha256": {
+        "lampOS/Cargo.lock": "b5869eb796f9dee458b08bc945615269e041b3417064cf3ab1cc4deae4850678",
+        "lampOS/crates/cloud/Cargo.toml": "252d82ed7ae4feacac70b1980d3efe912675902de03b395e975e0019d7265d60",
+        "lampOS/crates/cloud/src/main.rs": "f8684608daab8cb69bbfe32b40e7de51c3ffc051fc6f01aa80dadc4427a9db4a",
+        "lampOS/crates/cloud/src/photos.rs": "a582c0624355561a748216e9253b82986a34cccd1721a550fabf7381386a0e9d",
+        "lampOS/crates/cloud/src/photos/sweep.rs": "d130f4d9499f9996b8f1e6c0468b6f74278e9dd43876e80cad38d414f1e5e937",
+        "lampOS/crates/cloud/tests/it/switch.rs": "41224f460000066f264937c2a8acb02882c1f7f01e7fd9f66cb1a295300b4b0e",
+        "lampOS/crates/update/tests/functions.rs": "76069ff2424e3be3aaa14ff47f850120ab04a3df9ef4c6c2366d6868c55abada",
+        "lampOS/crates/voice/src/known_faces.rs": "736ba70940047fb35982d9e5ad1180916caf5d1afcd789b2ccaec2e8b573ed5d",
+        "lampOS/crates/voice/src/photo_faces.rs": "37652472f33d7b93326123f5235c5ed9b0ff062e4e9d0cf6dbfeb87df76f8cbd",
+        "lampOS/crates/voice/src/photo_faces/replies.rs": "7f42fde34f088e4ed31bd3c93928d8a7248cb65f04c7500adbbddb648ae5bf73",
+        "lampOS/crates/voice/src/second_provider.rs": "bd28dcf80796e641043f65d3fd2fe1535121b75d00b194624c77c4bef1216125",
+        "lampOS/crates/voice/src/second_provider/net/chat.rs": "4c25a6223dadaa0eedfe86145586d43d82d90eb2ae4ce08372a56730d39e3a74",
+        "lampOS/crates/voice/src/second_provider/net/chat/photo_replies.rs": "2774eff444c405fda01014ba7bbe0c7447b33d70eba4723785dafec4181b4e7a",
+        "lampOS/crates/voice/src/second_provider/services.rs": "d3a7a3a78c3f6b6ec05a1dab44241ffd45b8e87dc5f7d64fb41dc2c5d28d7431",
+        "lampOS/crates/voice/src/second_provider/tests.rs": "805d7dc9a8ec39cc7e479fd72ddacabc915aa3cfef6719677c63d541aecf4af2",
+        "lampOS/crates/voice/src/second_provider/tests/photo_replies.rs": "73f6bf7f5cb7f81e3ac587674b98c91e8d77f000e9a46867c1eb5a2c2f43b3ec",
+        "lampOS/crates/voice/src/second_provider/worker.rs": "b306be8d8ced6ca620c13f20d052356ca12f6e5ac3f0611cf2476938472aa4c7",
+        "lampOS/crates/voice/src/tools.rs": "07491d7f88b0d134303a23433e6f356d092e9a2737dc4266746c34eb62552aac",
+        "lampOS/crates/voice/src/tools/photo_replies.rs": "66e5b6e660812843481b8dfef4815d47fae33bed27cb631e3ae614b9ab24a46d",
+        "lampOS/deploy/product/lamp-cloud.service": "1c94ccea9080ed39ae045eab375cfbb0d76cec7bd5040daa3843d5341a0cf942",
+        "lampOS/deploy/product/lamp-eyes.service": "3666b25d8cca660e6b859f1059825c6ca7004a3d683ce4f6a0c17463b016f403",
+        "lampOS/deploy/product/lamp-voice.service": "bc6665cbcda7a2e22107ede4f45658be8316067bb5bd2f9652081aa9d0f5e002"
+      },
+      "native_and_complete_host": "pending on evidence-only amendment"
+    }
+  }
+}

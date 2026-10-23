@@ -173,27 +173,119 @@ fn lamp_4aces_cloud_on_writes_the_units_whole_drop_in() {
     );
 }
 
-/// Reviewer-lead's P3 on #2273: the photo folder lamp-cloud's unit may
-/// write is the one the product's tmpfiles makes at boot, `lampos`'s at
-/// 0700 as the eyes require, and no unit's own runtime folder.
+/// #2856: resolve the product's actual environment through the same parser
+/// as updates, then use Cloud's real photo activation parser. The three
+/// units must agree on the private shared folder and Eyes' request socket.
 #[test]
 fn the_photo_folder_the_unit_may_write_is_the_one_made_at_boot() {
+    use lamp_cloud::photos::{self, Place};
+    use lamp_update::unit::environment;
+
+    const EYES: &str = include_str!("../../../../deploy/product/lamp-eyes.service");
+    const VOICE: &str = include_str!("../../../../deploy/product/lamp-voice.service");
+    let place = Place::from(|name| environment(UNIT, name))
+        .expect("the product Cloud unit activates its real photo configuration");
+    assert_eq!(place.dir, Path::new("/run/lampos-photos"));
+    assert_eq!(place.socket, Path::new("/run/lampos-eyes/who.sock"));
+    assert!(place.dir.is_absolute() && place.socket.is_absolute());
+    assert_eq!(
+        environment(VOICE, photos::ENVIRONMENT).as_deref(),
+        Some("on")
+    );
+    assert_eq!(
+        environment(VOICE, photos::SOCKET_ENVIRONMENT).as_deref(),
+        place.socket.to_str()
+    );
+
+    let field = |unit: &str, key: &str| {
+        let prefix = format!("{key}=");
+        let values: Vec<String> = unit
+            .lines()
+            .map(str::trim)
+            .filter_map(|line| line.strip_prefix(prefix.as_str()).map(str::to_owned))
+            .collect();
+        assert_eq!(values.len(), 1, "one {key} in unit: {values:?}");
+        values.into_iter().next().unwrap()
+    };
+    let command = field(EYES, "ExecStart");
+    let arguments: Vec<&str> = command.split_whitespace().collect();
+    let argument = |name| {
+        let values: Vec<&str> = arguments
+            .windows(2)
+            .filter(|pair| pair[0] == name)
+            .map(|pair| pair[1])
+            .collect();
+        assert_eq!(values.len(), 1, "one {name}: {values:?}");
+        values[0]
+    };
+    assert_eq!(Path::new(argument("--photo-dir")), place.dir);
+    assert_eq!(Path::new(argument("--who-socket")), place.socket);
+    for prerequisite in ["--recogniser", "--people"] {
+        assert!(Path::new(argument(prerequisite)).is_absolute());
+    }
+    assert_eq!(
+        argument("--recogniser"),
+        "/opt/lampOS/eyes/models/face_recognition_sface_2021dec.onnx"
+    );
+    assert_eq!(argument("--people"), "/var/lib/lampos-eyes/people.json");
+    assert_eq!(field(EYES, "RuntimeDirectory"), "lampos-eyes");
+    assert_eq!(place.socket.parent(), Some(Path::new("/run/lampos-eyes")));
+
     let writable: Vec<&str> = UNIT
         .lines()
         .filter_map(|line| line.strip_prefix("ReadWritePaths="))
         .flat_map(str::split_whitespace)
         .collect();
-    assert!(writable.contains(&"-/run/lampos-photos"), "{writable:?}");
+    assert!(
+        writable
+            .iter()
+            .any(|path| Path::new(path.trim_start_matches('-')) == place.dir),
+        "{writable:?}"
+    );
+    assert_eq!(field(UNIT, "ProtectSystem"), "strict");
+    for condition in [
+        "/etc/lampOS/setup/backend.json",
+        "/etc/lampOS/voice/credential",
+        "/var/lib/lampos-update/state.json",
+    ] {
+        assert!(
+            UNIT.lines()
+                .map(str::trim)
+                .any(|line| { line.strip_prefix("ConditionPathExists=") == Some(condition) })
+        );
+    }
+    for unit in [UNIT, EYES] {
+        assert_eq!(field(unit, "User"), "lampos");
+        assert_eq!(field(unit, "Group"), "lampos");
+    }
     let made: Vec<Vec<&str>> = TMPFILES
         .lines()
         .map(|line| line.split_whitespace().collect::<Vec<_>>())
-        .filter(|fields| fields.get(1) == Some(&"/run/lampos-photos"))
+        .filter(|fields| fields.get(1).copied() == place.dir.to_str())
         .collect();
     assert_eq!(
         made,
         [["d", "/run/lampos-photos", "0700", "lampos", "lampos", "-"]]
     );
-    assert!(!UNIT.contains("RuntimeDirectory=lampos-photos"));
+    for unit in [UNIT, EYES, VOICE] {
+        assert!(
+            unit.lines()
+                .map(str::trim)
+                .any(|line| { line == "ConditionPathExists=/var/lib/lampos-setup/done" })
+        );
+        for line in unit.lines().map(str::trim) {
+            if let Some(directories) = line
+                .strip_prefix("RuntimeDirectory=")
+                .or_else(|| line.strip_prefix("StateDirectory="))
+            {
+                assert!(
+                    !directories
+                        .split_whitespace()
+                        .any(|dir| dir == "lampos-photos")
+                );
+            }
+        }
+    }
 }
 
 /// #2562: lamp-cloud's unit may reach lamp-skills' call socket, for guard
@@ -211,6 +303,133 @@ fn the_unit_may_reach_lamp_skills_call_socket_where_lamp_skills_makes_it() {
     assert!(SKILLS.contains("RuntimeDirectory=lampos-skills\n"));
     assert!(SKILLS.contains("--tools-dir /run/lampos-skills "));
     assert_eq!(lamp_cloud::guard::SOCKET, "/run/lampos-skills/call.sock");
+}
+
+/// Startup cleanup runs even when no account can be loaded afterwards.
+#[test]
+fn photo_cleanup_precedes_missing_credentials_exit() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+    let root = PathBuf::from(format!("/tmp/lcw-{}-photo-order", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("photos")).unwrap();
+    let root = root.canonicalize().unwrap();
+    let photos = root.join("photos");
+    std::fs::set_permissions(&photos, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let outside = root.join("outside-sentinel");
+    std::fs::write(&outside, b"outside stays").unwrap();
+    std::fs::write(photos.join("arbitrary-leftover"), b"old upload").unwrap();
+    std::fs::write(photos.join("app-1.jpg"), b"another upload").unwrap();
+    symlink(&outside, photos.join("old-link")).unwrap();
+    let mut command = Command::new(BIN);
+    for (name, _) in std::env::vars_os() {
+        if name.to_string_lossy().starts_with("LAMP_") {
+            command.env_remove(name);
+        }
+    }
+    let child = command
+        .env_remove("CREDENTIALS_DIRECTORY")
+        .env_remove("STATE_DIRECTORY")
+        .env("LAMP_CLOUD", "on")
+        .env("LAMP_PHOTO_FACES", "on")
+        .env("LAMP_EYES_PHOTO_DIR", &photos)
+        .env("LAMP_EYES_WHO_SOCKET", root.join("unused.sock"))
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let (status, said) = finish(child, Duration::from_secs(10));
+    assert_eq!(status.and_then(|status| status.code()), Some(2), "{said}");
+    assert_eq!(std::fs::read_dir(&photos).unwrap().count(), 0);
+    assert_eq!(std::fs::read(&outside).unwrap(), b"outside stays");
+    let cleanup = "lamp-cloud: photo cleanup: scanned=3 removed_files=2 removed_links=1";
+    let missing = "lamp-cloud: no CREDENTIALS_DIRECTORY: run it from its unit";
+    assert!(
+        said.find(cleanup).unwrap() < said.find(missing).unwrap(),
+        "{said}"
+    );
+    let cleanup_lines: Vec<_> = said
+        .lines()
+        .filter(|line| line.contains("photo cleanup"))
+        .collect();
+    assert_eq!(cleanup_lines, [cleanup]);
+    for private in [
+        photos.to_str().unwrap(),
+        "arbitrary-leftover",
+        "app-1.jpg",
+        "old-link",
+        "outside-sentinel",
+    ] {
+        assert!(
+            !said.contains(private),
+            "startup disclosed {private:?}: {said}"
+        );
+    }
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+/// A refused cleanup disables uploads while the core broker client still starts.
+#[test]
+fn photo_cleanup_failure_keeps_core_cloud_online() {
+    use std::os::unix::fs::PermissionsExt;
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let root = credentials("photo-failure", listener.local_addr().unwrap().port())
+        .canonicalize()
+        .unwrap();
+    let photos = root.join("photos");
+    std::fs::create_dir_all(photos.join("unexpected-directory")).unwrap();
+    std::fs::set_permissions(&photos, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let nested = photos.join("unexpected-directory/nested-sentinel");
+    let outside = root.join("outside-sentinel");
+    std::fs::write(&nested, b"nested stays").unwrap();
+    std::fs::write(&outside, b"outside stays").unwrap();
+    let mut command = Command::new(BIN);
+    for (name, _) in std::env::vars_os() {
+        if name.to_string_lossy().starts_with("LAMP_") {
+            command.env_remove(name);
+        }
+    }
+    let child = command
+        .env_remove("STATE_DIRECTORY")
+        .env("CREDENTIALS_DIRECTORY", &root)
+        .env("LAMP_CLOUD", "on")
+        .env("LAMP_PHOTO_FACES", "on")
+        .env("LAMP_EYES_PHOTO_DIR", &photos)
+        .env("LAMP_EYES_WHO_SOCKET", root.join("unused.sock"))
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let reached = connected(&listener, Duration::from_secs(10));
+    let (status, said) = finish(child, Duration::ZERO);
+    assert!(reached, "core Cloud never connected: {said}");
+    assert!(status.is_none(), "core Cloud ended ({status:?}): {said}");
+    assert_eq!(std::fs::read(&nested).unwrap(), b"nested stays");
+    assert_eq!(std::fs::read(&outside).unwrap(), b"outside stays");
+    let cleanup_lines: Vec<_> = said
+        .lines()
+        .filter(|line| line.contains("photo "))
+        .collect();
+    assert_eq!(
+        cleanup_lines,
+        ["lamp-cloud: photo uploads disabled: startup cleanup failed"]
+    );
+    for private in [
+        photos.to_str().unwrap(),
+        "unexpected-directory",
+        "nested-sentinel",
+        "outside-sentinel",
+        "made-up-pw",
+        "made-up-key",
+    ] {
+        assert!(
+            !said.contains(private),
+            "startup disclosed {private:?}: {said}"
+        );
+    }
+    std::fs::remove_dir_all(root).unwrap();
 }
 
 /// #2813: lamp-cloud's unit may reach lamp-voice's app-make socket, in the

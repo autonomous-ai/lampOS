@@ -457,8 +457,18 @@ impl Chat {
 
     /// [`Self::body_only`], never declaring the tools named in `without`.
     fn body_without(&self, messages: &[Message], only: Option<&[&str]>, without: &[&str]) -> Value {
+        self.body_scoped(messages, only, without, false)
+    }
+
+    fn body_scoped(
+        &self,
+        messages: &[Message],
+        only: Option<&[&str]>,
+        without: &[&str],
+        photo_refusal: bool,
+    ) -> Value {
         let mut body = json!({"model": self.model, "stream": true, "messages": messages});
-        let mut declared = self.declared(messages, only, without);
+        let mut declared = self.declared_scoped(messages, only, without, photo_refusal);
         let forced = only
             .is_none()
             .then(|| self.force.get().and_then(|force| force(messages)))
@@ -496,8 +506,28 @@ impl Chat {
         only: Option<&[&str]>,
         without: &[&str],
     ) -> Vec<lamp_gemini::Tool> {
-        let mut declared = (self.declare)();
-        declared.retain(|tool| !without.contains(&tool.name.as_str()));
+        self.declared_scoped(messages, only, without, false)
+    }
+
+    fn declared_scoped(
+        &self,
+        messages: &[Message],
+        only: Option<&[&str]>,
+        without: &[&str],
+        photo_refusal: bool,
+    ) -> Vec<lamp_gemini::Tool> {
+        let mut declared: Vec<_> = (self.declare)()
+            .into_iter()
+            .filter_map(|tool| {
+                if without.contains(&tool.name.as_str()) {
+                    photo_refusal
+                        .then(|| crate::photo_faces::held_refusal(&tool))
+                        .flatten()
+                } else {
+                    Some(tool)
+                }
+            })
+            .collect();
         if let Some(only) = only {
             declared.retain(|tool| only.contains(&tool.name.as_str()));
         } else if let Some(narrow) = self.narrow.get() {
@@ -541,7 +571,17 @@ impl Chat {
         only: Option<&[&str]>,
         without: &[&str],
     ) -> Result<ChatStream> {
-        let body = self.body_without(messages, only, without);
+        self.send_body(self.body_without(messages, only, without))
+            .await
+    }
+
+    /// A held line retains only the pending-photo refusal form of forget.
+    pub async fn send_held(&self, messages: &[Message], without: &[&str]) -> Result<ChatStream> {
+        self.send_body(self.body_scoped(messages, None, without, true))
+            .await
+    }
+
+    async fn send_body(&self, body: Value) -> Result<ChatStream> {
         let asked = std::time::Instant::now();
         let before = self
             .last_sent
@@ -1705,3 +1745,6 @@ data: [DONE]
         assert!(!request.contains("\"tools\""));
     }
 }
+
+#[cfg(test)]
+mod photo_replies;

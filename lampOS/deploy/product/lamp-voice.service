@@ -202,6 +202,8 @@ Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
 Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
+# App photo faces wait for the person's existing spoken face consent (#2856).
+Environment=LAMP_PHOTO_FACES=on
 # The name typed at setup (lamp-setup writes it; a reset wipes it), told to the model with its character
 # so Welcome back can greet by it when no face is known (docs/setup.md, #806). No file, no name.
 Environment=LAMP_PERSON_NAME=/etc/lampOS/person/name

@@ -123,6 +123,28 @@ fn main() -> ExitCode {
         say("off: LAMP_CLOUD is not on");
         return ExitCode::SUCCESS;
     }
+    // Recover interrupted photo uploads before any account traffic can be
+    // accepted. A photo-only failure leaves core Cloud available, with
+    // uploads disabled for this invocation and no false cleanup claim.
+    let photos = lamp_cloud::photos::Place::from_environment().and_then(|place| {
+        match lamp_cloud::photos::sweep::startup(&place) {
+            Ok(summary) => {
+                if summary.missing {
+                    say("photo cleanup: folder missing; no startup sweep needed");
+                } else {
+                    say(&format!(
+                        "photo cleanup: scanned={} removed_files={} removed_links={}",
+                        summary.scanned, summary.removed_files, summary.removed_links
+                    ));
+                }
+                Some(place)
+            }
+            Err(_) => {
+                say("photo uploads disabled: startup cleanup failed");
+                None
+            }
+        }
+    });
     let Some(credentials) = std::env::var_os("CREDENTIALS_DIRECTORY").map(PathBuf::from) else {
         say("no CREDENTIALS_DIRECTORY: run it from its unit");
         return ExitCode::from(2);
@@ -188,7 +210,7 @@ fn main() -> ExitCode {
             )
         }),
         // A face from the app's photo (#1968): only with LAMP_PHOTO_FACES=on.
-        photos: lamp_cloud::photos::Place::from_environment(),
+        photos,
         // The faces it knows, and removing one (#2192): only with LAMP_FACES_PAGE=on.
         faces: lamp_cloud::faces::Eyes::from_environment(),
         // The lamp's timers and reminders for the app (#2195): only with LAMP_APP_SCHEDULE=on.

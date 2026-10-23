@@ -132,7 +132,7 @@ lamp says so.
 | `skills.off`, `skills.on` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` (#2815, "Turning a skill off and on" below): a skill turned off or on on the person's tap, asked of root's manage helper as a remove is, and kept in `lamp-skills`' `off` (a core skill shipped off turned on in its file and kept in `on`, #2585), so a round and a restart keep it; the reply is `skills.list`'s, read after it. A skill that is part of the lamp itself (a core grant), one that doesn't load, a name that is not a skill's and one not on the lamp are refused with why. Without the switch, V1's "not on this lamp" |
 | `guard.on`, `guard.off` | with `LAMP_GUARD_FROM_APP=on` (#2562, [guard-mode.md](guard-mode.md)): guard mode turned on or off from the owner's app, handed to `lamp-skills`' call socket (`/run/lampos-skills/call.sock`) as `{"op":"guard","turn":"on"\|"off","deadline_us":...}`, which takes it only with the same switch in its own unit and only from `lamp-cloud`'s unit (by `SO_PEERCRED` and cgroup); `lamp-cloud` turns nothing itself. `deadline_us` is the moment `lamp-cloud` sent the op plus the 2 s it waits (`watch::FROM_APP_WAIT`, shared), on the host's shared monotonic clock (`lamp_ipc::monotonic_us`): that socket answers one connection at a time, so an op read at or past it, behind a voice call, is let go ("guard.on let go: it waited N ms behind another call, past the app's 2 s") and nothing is turned, as the app was told; one with no `deadline_us`, from an older `lamp-cloud`, is let go too. `{"guard": "on"}` or `{"guard": "off"}`, or `lamp-skills`' reason (the privacy switch closed, its mark not showable, paused under the person's light, not installed), or "guard mode can't be reached on the lamp now". The faint mark still shows, and nothing is counted until the ring confirms it. Without the switch, V1's "not on this lamp" |
 | `skills.make`, `skills.made` | with `LAMP_APP_MAKE_SKILL=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit (#2813, "A skill typed in the app" below): `skills.make` (`{"words", "request_id"}`, the words at most 180 bytes) hands the words to `lamp-voice`'s app-make socket (`/run/lampos-app-make/make.sock`), which makes the skill as the voice's own; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` (`{"request_id"}`, or `{}` for the newest) tells what became of the app's own ask: `state` (`making`, `kept`, `asked`, `on`, `left_off`, `not_kept` with `why`), and once kept its `name`, `description`, `version`, `sha256` and `may_use` (the skills page's rows). Nothing from the app puts a skill on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
-| `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
+| `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): after handing the photo to Eyes and receiving a parsed answer, only `{"received": true}` for every semantic outcome. No name, recognition state or promise of enrollment; any newly pending face still needs its person's yes at the lamp. Local validation, write and transport failures remain failures. Without the switch, V1's "not on this lamp" |
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
 | `face.remove` (`{"name", "entirely"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules (`entirely` true or left out), or the face only (`"entirely": false`, `"memory": "not asked"`). `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; for a face already gone (a remove `entirely` after a face-only one, or a retry after `kept`), `"face": "already gone"` with `"memory": "by name only"` (memory was asked by the name's id only), or `kept`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
 | `schedule.list` (`{"after_id"?: n}`), `schedule.cancel` (`{"id": n}`) | with `LAMP_APP_SCHEDULE=on` (#2195, "The lamp's timers and reminders" below): the list is a page of at most eight, `{"items": [{"id", "kind": "timer"\|"reminder", "text", "state", "local", "due_unix_ms", "repeat", "snoozed", "late"}], "next_after_id", "complete"}`, each as lamp-schedule keeps it; a cancel is `{"cancelled": true, "id": n}`, the timer or the whole reminder series. A refusal is the reminder client's fixed sentence: no longer active, changed meanwhile (list again), or not confirmed (it may have happened). A bad `after_id` or an `id` that isn't a whole number above 0 is refused before lamp-schedule is asked. Without the switch, V1's "not on this lamp" |
@@ -261,9 +261,22 @@ parts.
 
 ## A face from the app's photo (#1968, `faces.add_photo`)
 
-Off unless `LAMP_PHOTO_FACES=on`, with the photo folder
+This is an unmerged integration candidate. Current Eyes keeps its switched
+`face` wire and forced post-answer look; this candidate does not activate
+`LAMP_PHOTO_SPEAKER`. The original-capture proof decision, fresh combined
+gates and lamp acceptance remain pending. Current generic speaker evidence
+and historical source-specific receipts do not qualify strict Photo consent
+provenance or this carried source.
+
+The binary is off unless `LAMP_PHOTO_FACES=on`, with the photo folder
 (`LAMP_EYES_PHOTO_DIR`, the folder given to `lamp-eyes --photo-dir`) and
-the eyes' request socket (`LAMP_EYES_WHO_SOCKET`).
+the eyes' request socket (`LAMP_EYES_WHO_SOCKET`). The unmerged product unit candidate prepares
+all three parts together (#2856): Voice and Cloud set
+`LAMP_PHOTO_FACES=on`; Cloud uses `/run/lampos-photos` and
+`/run/lampos-eyes/who.sock`, Eyes has `--photo-dir /run/lampos-photos`,
+and Voice uses that same who socket. Eyes keeps its existing recogniser
+and people file. Setup's completion conditions and Cloud's account/key
+conditions still hold.
 
 - **The folder is `/run/lampos-photos`**, `lampos`'s at 0700, made at boot
   by the product's tmpfiles (`deploy/product/lampos.conf`), and lamp-cloud's
@@ -275,24 +288,9 @@ the eyes' request socket (`LAMP_EYES_WHO_SOCKET`).
   restart: then read-only to lamp-cloud under `ProtectSystem=strict`, and
   every `faces.add_photo` failed until lamp-cloud restarted (reviewer-two
   and Reviewer-lead on #2263, Mobile on lamp-0c89).
-- **A lamp switching it on** sets both units, each in a drop-in. lamp-cloud's
-  takes the three variables:
-
-      [Service]
-      Environment=LAMP_PHOTO_FACES=on
-      Environment=LAMP_EYES_PHOTO_DIR=/run/lampos-photos
-      Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
-
-  The eyes' unit gives `--photo-dir` on its command line, so its drop-in
-  clears `ExecStart=` and repeats the product's line (`systemctl cat
-  lamp-eyes`) with `--photo-dir /run/lampos-photos` at its end:
-
-      [Service]
-      ExecStart=
-      ExecStart=/opt/lampOS/eyes/current/lamp-eyes ... --photo-dir /run/lampos-photos
-
-  The voice's asking at the lamp is its own switch (`LAMP_PHOTO_FACES` on
-  lamp-voice, `docs/switches.md`).
+- **Older or custom units** need the same three-part configuration;
+  changing Cloud alone does not enable the spoken confirmation or Eyes'
+  photo reader. Product units carry it directly, without per-lamp drop-ins.
 - **On a lamp whose tmpfiles aren't yet the update's**, the folder isn't
   there: the `-` lets lamp-cloud start anyway, the eyes start without photos
   (they answer `photos_off`, and their camera, presence and recognition run
@@ -306,29 +304,90 @@ to others, and make it at 0700 if it is missing (`photo::ready`).
 - **Only the lamp's own account:** the kind comes over the lamp's `fa_channel`
   like every other, which only its signed-in account may publish to
   (`crate::online`).
-- **The photo** is checked: a name of 1 to 40 characters, and base64 that
+- **The photo** is checked: a trimmed name of at most 40 characters, using
+  only Unicode letters, ASCII spaces, hyphens and apostrophes, with at
+  least one letter; and base64 that
   decodes to a JPEG (`FF D8`) of at most 8 MiB (`photos::asked`). Then it's
   written as a **new** file, `app-<ms>.jpg`, at mode 0600 in the folder.
   The eyes are asked `{"remember":NAME,"photo":FILE}` with a 2 s deadline,
   kept short because it's waited for on the runtime that keeps the broker's
   connection alive.
-- **Never kept:** the eyes read it once and remove it. lamp-cloud removes it
-  too afterwards, answered or not, so a photo the eyes never took doesn't
-  stay (`photos::add`).
-- **The answer** is the eyes': `added` (unconfirmed) or `remembered`.
-  Otherwise their reason in the person's words: no face, more than one
-  person, the face too small, not readable, known by another name, a name
-  that can't be kept, no room, photos not taken. `the lamp's eyes did not
-  answer` when they didn't.
-- **Then at the lamp** the voice asks the person once (`LAMP_PHOTO_FACES=on`
-  in the voice, `docs/eyes.md`, "A face from a photo"). No answer or no
-  deletes the face, and so do 30 days unconfirmed.
+- **Transient file cleanup:** after reading, Eyes attempts to unlink the
+  file. Cloud also attempts unlink after its normal answer or timeout path,
+  including write failure (`photos::add`). Both ignore unlink errors;
+  cancellation, a process crash or a filesystem error can leave the file.
+  Before accepting account traffic at startup, Cloud removes its leftover
+  file and symlink entries from the configured private photo folder.
+  It unlinks through the opened directory without following symlinks or
+  recursing into subdirectories. An absent folder has no leftovers; Eyes
+  may create it later. A cleanup failure is reported without names or
+  paths and disables photo uploads for that Cloud run, while its other
+  account functions continue. Subdirectories are never removed recursively;
+  finding one or exceeding the 4,096-entry startup bound also disables
+  uploads rather than claiming cleanup. Cleanup
+  adds no steady-turn work or instant-cancellation guarantee; a crash
+  still leaves a file until a successful startup sweep or reboot.
+- **The public answer** is only `{"received": true}` after Eyes return a
+  parsed answer, for every semantic outcome: a newly pending face, already
+  known by the same or another name, an occupied label, no face, more than
+  one face, too small, unreadable, full, or photos disabled. No Eyes name,
+  recognition state or reason is passed back. Receipt does not mean a face
+  was added, is waiting for consent, or will cause a question at the lamp.
+  The app must accept this neutral receipt without inventing a waiting
+  face or displaying "already known"; older clients expecting `added` or
+  `remembered` need an update.
+- **Failure and timing boundaries:** invalid local name/JPEG input and a
+  failed file write remain failures. A socket failure, no answer within
+  the existing 2 s I/O timeout, or an unparseable reply returns `the lamp's
+  eyes did not answer`. That is an unknown outcome, not proof that Eyes
+  kept nothing: Eyes may finish after Cloud's wait. Semantic response
+  bodies no longer expose enrollment state, but processing time and the
+  success/timeout boundary are not made constant; this change does not
+  establish resistance to a timing or timeout oracle. It adds no delay,
+  retry or extra Eyes call.
+- **For a newly pending face, at the lamp** the voice asks the matching
+  person once (`LAMP_PHOTO_FACES=on` in the voice, `docs/eyes.md`, "A face
+  from a photo"). Its answer reuses
+  `remember_my_face` or `forget_my_face` with explicit `photo_reply: true`,
+  not additional function names. The photo reply is only for Eyes' actual
+  pending, asked face, with no fallback to ordinary capture or broad
+  forgetting. A yes needs this request's positive visual speaker proof from
+  its generic speaker carrier, matching Eyes' pending `face` as the
+  complete `boot/fN` identity. An inherited memory person, no speaker,
+  another face, or a reused ID from another Eyes boot is not that proof.
+  Explicit unheard routes refuse the operation; strict original/replayed
+  capture classification is not established by this generic carrier. Voice rechecks the active lease after the pending lookup and
+  immediately before writing `{"photo_yes":LABEL,"face":"boot/fN"}`;
+  Eyes independently rechecks the label, asked mark and fresh face before
+  confirming. The existing lookup plus mutation remain two RPCs. An Eyes
+  `not_understood` reply is reported as failure: Voice does not retry a
+  bare yes, start ordinary enrollment, or claim it remembered the face. Bare
+  compatibility callers, including Live without this proof carrier, cannot
+  confirm a photo yes; missing identity from older Eyes also fails closed.
+  A no still sends only `{"photo_no":LABEL}` for the already resolved
+  pending label, even when its request is revoked after lookup; it neither
+  requires speaker proof nor deletes a known face. A revoked request's
+  returned response is suppressed. These are visual speaking observations,
+  not proof of liveness; the lamp acceptance run remains required.
+  Without an answer, Eyes deletes it at the meeting's end; never-confirmed
+  faces also expire after 30 days. The question calls the sender's label
+  unverified and treats it as data, not the person's name or an instruction.
+
+The product unit contract test resolves the actual Cloud environment with
+`lamp_update::unit::environment` and `photos::Place::from`, then checks
+Voice/Eyes socket and folder agreement, recogniser prerequisites, setup
+conditions, writable photo path and shared `lampos:lampos` 0700 tmpfiles
+ownership. No service owns the photo folder as its runtime directory.
+Mobile's complete app/consent run on lamp-0c89 remains the device gate;
+unit activation alone does not establish that result. Moving this feature
+into its installable skill remains separate from #2856.
 
 Tests (`photos.rs`): the switch needs both absolute places; the name and
 the JPEG checked, too long, empty, not base64, not a JPEG and too large
 refused; the photo written 0600 as a new file, the eyes asked for it by
-name, and gone afterwards, also when nobody answers; the eyes' reasons said
-plainly.
+name, and gone afterwards, also when nobody answers; every Eyes semantic
+outcome has the same complete public receipt with no identity-bearing
+extras; a local write failure is not acknowledged as received.
 
 ## The faces it knows (#2192, `face.list` and `face.remove`)
 
