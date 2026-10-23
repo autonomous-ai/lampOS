@@ -1424,6 +1424,41 @@ fn welcome_back_says_each_dropped_chance_once_with_its_gate() {
     );
 }
 
+/// #2825, lamp-52e6 at 02:37: a face greeted at its arrival, gone for
+/// 20 min, then back with a glimpse of 2 s lost past its gap before it
+/// settles. The glimpse is shorter than `for`, so it is no visit: the
+/// away clock still runs from when they left, and they are greeted once.
+/// A look away past the gap within one visit is no leaving: no hello again.
+#[test]
+fn welcome_back_counts_away_from_the_last_visit_not_a_glimpse() {
+    let root = private_root();
+    let mut engine = Engine::new(vec![welcome_back(root.path())], true);
+    let face = |second: u64| {
+        [(600, 899), (906, 1199), (2400, 2401), (2406, 2600)]
+            .iter()
+            .any(|(from, to)| (*from..=*to).contains(&second))
+    };
+    let mut greeted = Vec::new();
+    for second in 0..=2600 {
+        let now = second * 1_000_000;
+        engine.observe("voice/state", now, br#"{"state":"resting"}"#, None);
+        let runs = engine.observe(
+            Faces::TOPIC,
+            now,
+            if face(second) { FACE } else { EMPTY },
+            None,
+        );
+        if runs.iter().any(|run| !run.calls.is_empty()) {
+            greeted.push(second);
+        }
+    }
+    assert_eq!(greeted, [603, 2409]);
+    assert_eq!(
+        engine.take_dropped(),
+        ["welcome-back not run: away 7 s, under its 300 s"]
+    );
+}
+
 /// #2602: a daily trigger's day already claimed, and a trigger spoken to
 /// since its window opened, each say why their chance was not run.
 #[test]

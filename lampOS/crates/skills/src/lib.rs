@@ -4398,8 +4398,13 @@ struct Watch {
     last_held_us: Option<u64>,
     /// Since when it has held, through dropouts shorter than the gap.
     since_us: Option<u64>,
-    /// How long it had not held before that.
+    /// How long it had not held before that: since [`Watch::visited_us`].
     away_us: u64,
+    /// When it last held in a hold that lasted its `for`: what `away_us` is
+    /// counted from. A hold shorter than `for` (a face glimpsed, lost past
+    /// the `gap`, then back) is no visit, so the visit after it is not
+    /// "away 3 s" (lamp-52e6, #2825).
+    visited_us: Option<u64>,
     /// This time it holds has had its chance.
     spent: bool,
     /// Since when this time's chance has waited for the trigger's
@@ -6009,7 +6014,7 @@ impl Engine {
                     }
                     ends(watch, skill, &mut runs);
                     watch.since_us = Some(now_us);
-                    watch.away_us = now_us - watch.last_held_us.unwrap_or(started);
+                    watch.away_us = now_us - watch.visited_us.unwrap_or(started);
                     watch.spent = false;
                     watch.waiting_us = None;
                     watch.yielded_us = None;
@@ -6019,6 +6024,7 @@ impl Engine {
                 if held_us < trigger.for_us {
                     continue;
                 }
+                watch.visited_us = Some(now_us);
                 // Once each time it holds: a chance held back now waits for
                 // the next time.
                 let once = trigger.when == When::Appears || trigger.rearm;
