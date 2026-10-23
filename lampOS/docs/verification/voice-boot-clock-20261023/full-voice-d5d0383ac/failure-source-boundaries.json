@@ -1,0 +1,31 @@
+{
+  "asserting_files": [
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/held_consent.rs",
+      "base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+      "head": "d5d0383accafac8aa54c352eba65b1b0d5a44d9d",
+      "bytes_equal": true,
+      "sha256": "33ab552425c2f28d98f6c2d052b10d66fde94cdef28e0ba7c7259f0892731ee5"
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+      "head": "d5d0383accafac8aa54c352eba65b1b0d5a44d9d",
+      "bytes_equal": true,
+      "sha256": "b50767957067efee6a502e372605a7bcc2b16e23097da1ddca85153cf966993a"
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/light_call.rs",
+      "base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+      "head": "d5d0383accafac8aa54c352eba65b1b0d5a44d9d",
+      "bytes_equal": true,
+      "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8"
+    }
+  ],
+  "limits": [
+    "Equal source bytes do not imply equal compiled artifacts, scheduling or causal exclusion.",
+    "The held-consent state-publication-before-lock ordering is a possible mechanism; no captured timestamp proves expiry.",
+    "Integration fixtures use the normal library without cfg(test) fixture clocks or LoadingChild, but source reasoning does not diagnose their unscheduled failures.",
+    "The matched full clean-base observation is not yet executed in this receipt."
+  ]
+}

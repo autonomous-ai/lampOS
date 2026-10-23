@@ -1,0 +1,243 @@
+{
+  "head": "d5d0383accafac8aa54c352eba65b1b0d5a44d9d",
+  "base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+  "tree": "278baa2eace61124fe255386404dc84410b446a8",
+  "tracked_repository_paths": 10026,
+  "tracked_lampOS_paths": 6680,
+  "source_aggregate_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b",
+  "final_source_aggregate_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b",
+  "source_unchanged": true,
+  "source_hash_algorithm": "Sorted path + NUL + Git mode + NUL + u64 big-endian length + exact bytes; symlinks use literal target bytes.",
+  "full_source_map": {
+    "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/source-map.json",
+    "bytes": 2139488,
+    "sha256": "2087f163996e82388b7462220b2c1493d5c8abf5db28b0a5b155cbde606bf39b"
+  },
+  "relevant_source_records": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/second.rs",
+      "git_mode": "100644",
+      "bytes": 76253,
+      "sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf"
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "git_mode": "100644",
+      "bytes": 133195,
+      "sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1"
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "git_mode": "100644",
+      "bytes": 109424,
+      "sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf"
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/held_consent.rs",
+      "git_mode": "100644",
+      "bytes": 12640,
+      "sha256": "33ab552425c2f28d98f6c2d052b10d66fde94cdef28e0ba7c7259f0892731ee5"
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "git_mode": "100644",
+      "bytes": 80770,
+      "sha256": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f"
+    },
+    {
+      "path": "lampOS/crates/voice/src/scenario_clock.rs",
+      "git_mode": "100644",
+      "bytes": 19561,
+      "sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2"
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "git_mode": "100644",
+      "bytes": 771430,
+      "sha256": "c8fd3cf2298b965b1652bcfb8357ea0038fb88d33a2f9a97647b15ba4af2f645"
+    },
+    {
+      "path": "lampOS/crates/voice/src/stop_words.rs",
+      "git_mode": "100644",
+      "bytes": 141412,
+      "sha256": "76ebdc2ec1dd27e564f253cf97b2f72ec1451f03409d4b92cfaba8b4b43c1a53"
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "git_mode": "100644",
+      "bytes": 44428,
+      "sha256": "b50767957067efee6a502e372605a7bcc2b16e23097da1ddca85153cf966993a"
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/light_call.rs",
+      "git_mode": "100644",
+      "bytes": 3214,
+      "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8"
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "git_mode": "100644",
+      "bytes": 32508,
+      "sha256": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c"
+    }
+  ],
+  "freshness": {
+    "tracked_paths": 10026,
+    "mtime_ns": 1792749435309958000,
+    "before_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b",
+    "after_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b",
+    "identical_bytes_and_modes": true
+  },
+  "carry": {
+    "old_head": "0c2cb3df2672d08f580f0c6ccad9781f054bdbf9",
+    "old_base": "6b52c916a3cfcc26a2c97670b1a9ebab4c84d174",
+    "new_base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+    "branch": "tests/1569-boot-clock-current",
+    "authored_paths": [
+      "lampOS/crates/voice/src/coordinator/second.rs",
+      "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "lampOS/crates/voice/src/scenario_clock.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/stop_words.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "authored_file_before_sha256": {
+      "lampOS/crates/voice/src/coordinator/second.rs": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+      "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+      "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+      "lampOS/crates/voice/src/scenario_clock.rs": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "lampOS/crates/voice/src/second_provider/worker.rs": "c8fd3cf2298b965b1652bcfb8357ea0038fb88d33a2f9a97647b15ba4af2f645",
+      "lampOS/crates/voice/src/stop_words.rs": "5524521c56061be6af4b8ee95d52ecc3b9b1d3c3ee4a2344db4fa75dbf4f9a0f",
+      "lampOS/docs/voice-test-fixtures.md": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c"
+    },
+    "old_patch_sha256": "22f69f486efb5a0b8442d0137faac51eba2dfd966d612549cb128d210bc447c8",
+    "clean_before": true,
+    "head": "d5d0383accafac8aa54c352eba65b1b0d5a44d9d",
+    "base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+    "tree": "278baa2eace61124fe255386404dc84410b446a8",
+    "range_diff": "1:  0c2cb3df26 = 1:  d5d0383acc lampOS: give voice fixtures a shared clock and observed child startup\n",
+    "new_patch_sha256": "4dfc4d6f6ff9082cceb4d51390255becfe1f069bc6c69ceb5d2bbeae55ca8df4",
+    "authored_file_after_sha256": {
+      "lampOS/crates/voice/src/coordinator/second.rs": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+      "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+      "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+      "lampOS/crates/voice/src/scenario_clock.rs": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "lampOS/crates/voice/src/second_provider/worker.rs": "c8fd3cf2298b965b1652bcfb8357ea0038fb88d33a2f9a97647b15ba4af2f645",
+      "lampOS/crates/voice/src/stop_words.rs": "76ebdc2ec1dd27e564f253cf97b2f72ec1451f03409d4b92cfaba8b4b43c1a53",
+      "lampOS/docs/voice-test-fixtures.md": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c"
+    },
+    "whole_file_changes_from_upstream": [
+      "lampOS/crates/voice/src/stop_words.rs"
+    ],
+    "authored_patch_equal_by_range_diff": true,
+    "conflicts": false,
+    "diff_check_exit": 0,
+    "clean_after": true,
+    "qualification": "No Cargo or new tests; all previous observations remain bound to their original source heads. Current-base gates pending."
+  },
+  "assertions": {
+    "head": "d5d0383accafac8aa54c352eba65b1b0d5a44d9d",
+    "base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+    "rows": [
+      {
+        "path": "lampOS/crates/voice/src/coordinator/second.rs",
+        "base_sha256": "428701e0e25869675634954b80356b9dfb18e4268f14a82683a7a4e1e4c1c984",
+        "head_sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+        "original_assertion_macro_count": 108,
+        "all_original_assertion_bodies_byte_identical": true
+      },
+      {
+        "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+        "base_sha256": "805d7f55a0351c097d43e1f7c8f03c09bb7f1c116176545783be00a28f963128",
+        "head_sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+        "original_assertion_macro_count": 305,
+        "all_original_assertion_bodies_byte_identical": true
+      },
+      {
+        "path": "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+        "base_sha256": "47075418dac7fc54591976ca2557e3be698590b94e8cdbd49a8f4f5c379da0c8",
+        "head_sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+        "original_assertion_macro_count": 296,
+        "all_original_assertion_bodies_byte_identical": true
+      },
+      {
+        "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+        "base_sha256": "2fb8205fb7ebd46161f13f7403e4de713675b4c64c0438f34c4f01e2b6dfae26",
+        "head_sha256": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+        "original_assertion_macro_count": 79,
+        "all_original_assertion_bodies_byte_identical": true
+      },
+      {
+        "path": "lampOS/crates/voice/src/scenario_clock.rs",
+        "base_sha256": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80",
+        "head_sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+        "original_assertion_macro_count": 43,
+        "all_original_assertion_bodies_byte_identical": true
+      },
+      {
+        "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+        "base_sha256": "4e3b891fd552bd5af867f32bed015fc2a89f0b352cf69e14d76ca80da1a4f89b",
+        "head_sha256": "c8fd3cf2298b965b1652bcfb8357ea0038fb88d33a2f9a97647b15ba4af2f645",
+        "original_assertion_macro_count": 867,
+        "all_original_assertion_bodies_byte_identical": true
+      },
+      {
+        "path": "lampOS/crates/voice/src/stop_words.rs",
+        "base_sha256": "ba9c24c705a8cee2f615383e75cfe28a07f0ba5481f160e5f4a09aa2c0a8405a",
+        "head_sha256": "76ebdc2ec1dd27e564f253cf97b2f72ec1451f03409d4b92cfaba8b4b43c1a53",
+        "original_assertion_macro_count": 136,
+        "all_original_assertion_bodies_byte_identical": true
+      }
+    ],
+    "total_original_assertions": 1834,
+    "scanner": "Balanced assertion macro bodies after masking strings/comments; lexical byte equality, not compiler or runtime qualification.",
+    "only_whole_authored_file_upstream_change": "stop_words.rs; all original current-base assertion bodies preserved.",
+    "Cargo_executed": false
+  },
+  "runner": {
+    "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/run.py",
+    "bytes": 13370,
+    "sha256": "ebc2e7c62910e4d38f1cd344985286d4f90a58980ff8a5d1a3b04ef63c671bd9"
+  },
+  "support": {
+    "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/support.py",
+    "bytes": 3285,
+    "sha256": "6ec612d0d37f6d92ea4ba0ed80d45160565164c2f627a1052a823f728bead964"
+  },
+  "census_parser": {
+    "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/census.py",
+    "bytes": 12378,
+    "sha256": "dd391e4c2e056eee18eca7c3c311b644d3a0e65a8d2203ad8b42b28bfd082ea1"
+  },
+  "frozen_plan": {
+    "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/PLAN.md",
+    "bytes": 3085,
+    "sha256": "83dd8aee5c46acb6c7ebb82576c5b7b6a32601daa61c1b06551212efc59c9ce9"
+  },
+  "prepared_identity": {
+    "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/prepared.json",
+    "bytes": 2210,
+    "sha256": "655af775083a4b96fbaa1d3ea2f3ac6d5ce7e3eeaed75b625770b022f60f5986"
+  },
+  "execution_marker": {
+    "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/execution-start.json",
+    "bytes": 2262,
+    "sha256": "189bd74f2e672104f86db15ca96e94fbb198f1577720b735c9212ea84857c6c5"
+  },
+  "original_prepared_manifest": {
+    "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/SHA256SUMS",
+    "bytes": 1584,
+    "sha256": "101625b6c382b0802e4cb744fd1e0631ff578bc69666dde5eb7fb2b11625515b"
+  },
+  "source_deltas": {
+    "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/source-deltas.json",
+    "bytes": 25057,
+    "sha256": "f6c63f430b85e8fe80771c5010eac4407087debc69865012761a0559ff7091cc"
+  },
+  "no_target_or_source_reads_during_packaging": true,
+  "limitation": "Full source maps, Cargo machine streams and external verifier scripts remain external at the recorded paths/hashes; public copies here contain the relevant source identities, aggregate proofs and complete human output. No exact-base execution has yet been performed for this run."
+}

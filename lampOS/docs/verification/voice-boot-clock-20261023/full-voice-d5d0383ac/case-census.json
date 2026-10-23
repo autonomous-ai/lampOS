@@ -1,0 +1,148 @@
+{
+  "current_compiled_case_count": 3939,
+  "compiled_inventory_is_execution": false,
+  "actual_execution_binding": "Every launched target and its actual/ignored rows matched these current lists exactly. The full raw output and complete inventories are preserved in the human stream envelope.",
+  "targets": [
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "render_line_second",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/examples/render_line_second.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f",
+      "sha256": "41d473b15e98d62b255f225830a2f5d2ce5f0daecb05889df3bd8ce9f7c5b9a5",
+      "compiled_case_count": 4,
+      "ignored_case_count": 0,
+      "custom_entrypoint": false,
+      "executed_tests_in_this_census": 0,
+      "raw_inventory_stream": "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/all/stdout",
+      "raw_ignored_stream": "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/ignored/stdout",
+      "ordered_case_names_sha256": "7c257809e9e4753a5a20f80a5279116fb4de36b82bae5b722b5036ec899484f0",
+      "ordered_ignored_names_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+      "sha256": "b07344646e719ceed6456ae165a5d8939e7a31e3d21e86a1dec9bbaf2cdced17",
+      "compiled_case_count": 1,
+      "ignored_case_count": 0,
+      "custom_entrypoint": false,
+      "executed_tests_in_this_census": 0,
+      "raw_inventory_stream": "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/all/stdout",
+      "raw_ignored_stream": "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/ignored/stdout",
+      "ordered_case_names_sha256": "df08c98b34b73be55e6a8044054f13f6d428dc64cbcb451776815503ff5f8e9e",
+      "ordered_ignored_names_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "stop_words_stt_replay",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+      "sha256": "2afb091ddbe7980373a6e31f72391c1e935b74fec4adeb242558c89d8cecf1b5",
+      "compiled_case_count": 6,
+      "ignored_case_count": 0,
+      "custom_entrypoint": false,
+      "executed_tests_in_this_census": 0,
+      "raw_inventory_stream": "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-2afb091ddb/all/stdout",
+      "raw_ignored_stream": "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-2afb091ddb/ignored/stdout",
+      "ordered_case_names_sha256": "e6a6420596a53dfcf8e721403a581fabea83f9c5199f07d4fa63e550c5583b7d",
+      "ordered_ignored_names_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+      "sha256": "7077c08c29c8be105faa07ce98ebd8d92bc6374d6b4d16939951d31de066b8db",
+      "compiled_case_count": 270,
+      "ignored_case_count": 0,
+      "custom_entrypoint": false,
+      "executed_tests_in_this_census": 0,
+      "raw_inventory_stream": "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/all/stdout",
+      "raw_ignored_stream": "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/ignored/stdout",
+      "ordered_case_names_sha256": "c014cfbe211e1dcae34eb54ad684cbbaaa8fcfe343966893d6efa5968b1dce8c",
+      "ordered_ignored_names_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "sha256": "cb2d49285fab6d79043d2ff41c3942932391cdf06190946bb9654a833342d37b",
+      "compiled_case_count": 3658,
+      "ignored_case_count": 15,
+      "custom_entrypoint": false,
+      "executed_tests_in_this_census": 0,
+      "raw_inventory_stream": "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-cb2d49285f/all/stdout",
+      "raw_ignored_stream": "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-cb2d49285f/ignored/stdout",
+      "ordered_case_names_sha256": "ac77e24cfa2d68646c2819659becd371d6d4dcd595f871ca03b9868abea90e65",
+      "ordered_ignored_names_sha256": "7900605ffbe779cbef0d9c4e0a7df0927cfd4bc349697418085e9634c85c772f"
+    }
+  ],
+  "captured_census": {
+    "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/run-2026-10-23T095715.170385Z/voice-default-parallel/compiled-census.json",
+    "bytes": 379874,
+    "sha256": "46cf5a29571ba139260befe9057fb35ed01e8d27a02c776e216330edd6ce70ee"
+  },
+  "inventory_storage": "Each complete inventory is retained once as its original human stdout in human-streams.txt.json, indexed by raw-index.json. Parse lines ending exactly : test; strip that suffix, sort names, and hash UTF-8 newline-joined names (one final newline for nonempty lists). No duplicated name arrays are embedded here."
+}

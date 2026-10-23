@@ -1,0 +1,37 @@
+{
+  "head": "d5d0383accafac8aa54c352eba65b1b0d5a44d9d",
+  "source_stdout_sha256": "e5ec84c053f3c41fe94e2871b47b61cfe4cf690fd5269de2715313d7344fc9a8",
+  "failures": [
+    {
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "provider_worker::tests::held_consent::asked_about_reports_after_a_held_stop_it_says_who_and_when",
+      "source_stdout": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/run-2026-10-23T095715.170385Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+      "source_stdout_sha256": "e5ec84c053f3c41fe94e2871b47b61cfe4cf690fd5269de2715313d7344fc9a8",
+      "offset": 622404,
+      "bytes": 639,
+      "sha256": "235197a8ebe72a7018314f81eeec08d5214944da9e95f478c75d82da4d85e760",
+      "raw": "---- provider_worker::tests::held_consent::asked_about_reports_after_a_held_stop_it_says_who_and_when stdout ----\nlamp-voice provider: request 1: its answer is played: the room is not known to be busy\nlamp-voice provider: request 1: the model asked about reports; told whether they are sent\n\nthread 'provider_worker::tests::held_consent::asked_about_reports_after_a_held_stop_it_says_who_and_when' (708959110) panicked at crates/voice/src/provider_worker/tests/held_consent.rs:326:5:\nassertion `left == right` failed: {\"error\":\"The part of me that sends reports is not running, so nothing is being sent now.\"}\n  left: Null\n right: false\n\n\n"
+    },
+    {
+      "target": "lamp-voice:test:it",
+      "name": "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+      "source_stdout": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/run-2026-10-23T095715.170385Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+      "source_stdout_sha256": "e5ec84c053f3c41fe94e2871b47b61cfe4cf690fd5269de2715313d7344fc9a8",
+      "offset": 647934,
+      "bytes": 399,
+      "sha256": "09cb5d0fcc64dcec3ac077a715c56b6de3d95ecff296fcb4427d5d9dab9515a3",
+      "raw": "---- fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying stdout ----\n\nthread 'fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying' (708978925) panicked at crates/voice/tests/it/fixture_provider.rs:691:5:\nassertion failed: sink.scan(&trace, AT).is_some()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n"
+    },
+    {
+      "target": "lamp-voice:test:it",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "source_stdout": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/run-2026-10-23T095715.170385Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+      "source_stdout_sha256": "e5ec84c053f3c41fe94e2871b47b61cfe4cf690fd5269de2715313d7344fc9a8",
+      "offset": 648333,
+      "bytes": 806,
+      "sha256": "8f756a0a4aceb75d7587a2c50f47213376464db5080297d69f8e677def20e4de",
+      "raw": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [3.044029ms, 3.047415ms, 3.314035ms, 3.388932ms, 3.455321ms, 4.036383ms, 38.28977ms, 39.231148ms, 55.041972ms, 56.388703ms, 57.810245ms, 74.702675ms, 75.016271ms, 75.758554ms, 76.556337ms, 77.804511ms, 87.387288ms, 102.389285ms, 111.339913ms, 129.124054ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (708978927) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[3.044029ms, 3.047415ms, 3.314035ms, 3.388932ms, 3.455321ms, 4.036383ms, 38.28977ms, 39.231148ms, 55.041972ms, 56.388703ms, 57.810245ms, 74.702675ms, 75.016271ms, 75.758554ms, 76.556337ms, 77.804511ms, 87.387288ms, 102.389285ms, 111.339913ms, 129.124054ms]\n\n\n"
+    }
+  ],
+  "no_causal_classification": true
+}

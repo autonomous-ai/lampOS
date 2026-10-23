@@ -1,5 +1,22 @@
 # Tests work log
 
+## 2026-10-23 17:15 +0700 — complete current Voice failure receipt published
+
+Ready for lamp-voice: no (#3190 execution HOLD remains).
+
+The [d5 full Voice receipt](verification/voice-boot-clock-20261023/full-voice-d5d0383ac/)
+binds all 3,939 identities across six targets to **3,921 / 3 / 15**. All 87
+selected clock/child outcomes pass. Root checked all 38 human-output stream
+projections against original bytes; all three exact diagnostics remain.
+Formatting and strict Voice Clippy passed; no candidate run was repeated.
+
+Held-consent saw no reports state, peer-loss did not observe a fault on its
+first scan, and light-call upper-middle latency was 57.810245 ms against
+25 ms. The three asserting files and direct paths are unchanged; this does
+not establish their causes. The source audit and its limits are in the
+receipt. The matched clean-base full suite remains prepared work, not a
+result. Phone's full current gate is running on the exclusive target.
+
 ## 2026-10-23 17:09 +0700 — latest Voice native gates and retained parallel failures
 
 Ready for lamp-voice: no (#3190 and #3218 remain draft).

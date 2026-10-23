@@ -1,0 +1,26 @@
+{
+  "all19_command_records_and38_raw_stream_hashes_verified": true,
+  "all_retained_decoded_offsets_verified": true,
+  "all_omitted_bytes_are_complete_Cargo_machine_records": true,
+  "retained_and_omitted_ranges_cover_original_streams_exactly": true,
+  "all3_failure_extractions_match_original_stdout_offsets": true,
+  "all3939_case_identities_bind_to_actual_rows": true,
+  "all87_selected_cases_actually_passed": true,
+  "source_unchanged": true,
+  "no_extra_tests_or_Cargo": true,
+  "receipt_ready_for_parent_review": true,
+  "note": "Full qualification remains FAILED. All original human bytes and inventories are present once as indexed raw streams; only complete Cargo machine records are external.",
+  "json_links_and_generated_whitespace_checked": true,
+  "default_staged_git_diff_check": {
+    "exit_code": 0,
+    "command": [
+      "git",
+      "diff",
+      "--cached",
+      "--check"
+    ],
+    "whitespace_overrides": false,
+    "external_evidence": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/publication-validation"
+  },
+  "asserting_files_verified_equal_against_exact_git_objects": true
+}

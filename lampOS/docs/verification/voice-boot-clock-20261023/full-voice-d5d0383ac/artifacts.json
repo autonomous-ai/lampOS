@@ -1,0 +1,516 @@
+{
+  "scope": "Captured hashes only; shared target was released and is not reread for this package. Compilation is not execution. Full Voice produced13 executable artifacts;5 test executables were launched plus doctests.",
+  "bindings": {
+    "clippy": {
+      "captured_record": {
+        "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/run-2026-10-23T095715.170385Z/clippy/compiled-artifacts.json",
+        "bytes": 3,
+        "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+      },
+      "records": []
+    },
+    "voice-default-parallel": {
+      "captured_record": {
+        "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/run-2026-10-23T095715.170385Z/voice-default-parallel/compiled-artifacts.json",
+        "bytes": 18274,
+        "sha256": "080d03e0613086f9449f7d79f26fdc4f0cb91c17959a389a9beccf30ec1b459d"
+      },
+      "records": [
+        {
+          "executable": "/private/tmp/tests-codex-1569-target/debug/examples/duplex_lab",
+          "sha256": "aa4bfea1e2f127ee2fc4d9efaf467aa8d8083139cb4210e0b6e30bbfae6ec440",
+          "bytes": 2898832,
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+            "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+            "target": {
+              "kind": [
+                "example"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "duplex_lab",
+              "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/examples/duplex_lab.rs",
+              "edition": "2024",
+              "doc": false,
+              "doctest": false,
+              "test": false
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 0,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": false
+            },
+            "features": [],
+            "filenames": [
+              "/private/tmp/tests-codex-1569-target/debug/examples/duplex_lab"
+            ],
+            "executable": "/private/tmp/tests-codex-1569-target/debug/examples/duplex_lab",
+            "fresh": false
+          },
+          "source_aggregate_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b"
+        },
+        {
+          "executable": "/private/tmp/tests-codex-1569-target/debug/examples/probe_handover",
+          "sha256": "15f927c4031013055030567903eced3331e131b8f397d075ce933bef7dd55a3e",
+          "bytes": 12629592,
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+            "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+            "target": {
+              "kind": [
+                "example"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "probe_handover",
+              "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/examples/probe_handover.rs",
+              "edition": "2024",
+              "doc": false,
+              "doctest": false,
+              "test": false
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 0,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": false
+            },
+            "features": [],
+            "filenames": [
+              "/private/tmp/tests-codex-1569-target/debug/examples/probe_handover"
+            ],
+            "executable": "/private/tmp/tests-codex-1569-target/debug/examples/probe_handover",
+            "fresh": false
+          },
+          "source_aggregate_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b"
+        },
+        {
+          "executable": "/private/tmp/tests-codex-1569-target/debug/examples/hearing_replay",
+          "sha256": "e32e405fffa76920472ab5115f544f59350fc3f8cacfdeb54607c4d02bfefdf8",
+          "bytes": 1608336,
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+            "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+            "target": {
+              "kind": [
+                "example"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "hearing_replay",
+              "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/examples/hearing_replay.rs",
+              "edition": "2024",
+              "doc": false,
+              "doctest": false,
+              "test": false
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 0,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": false
+            },
+            "features": [],
+            "filenames": [
+              "/private/tmp/tests-codex-1569-target/debug/examples/hearing_replay"
+            ],
+            "executable": "/private/tmp/tests-codex-1569-target/debug/examples/hearing_replay",
+            "fresh": false
+          },
+          "source_aggregate_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b"
+        },
+        {
+          "executable": "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f",
+          "sha256": "41d473b15e98d62b255f225830a2f5d2ce5f0daecb05889df3bd8ce9f7c5b9a5",
+          "bytes": 1435672,
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+            "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+            "target": {
+              "kind": [
+                "example"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "render_line_second",
+              "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/examples/render_line_second.rs",
+              "edition": "2024",
+              "doc": false,
+              "doctest": false,
+              "test": true
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 0,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": true
+            },
+            "features": [],
+            "filenames": [
+              "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f"
+            ],
+            "executable": "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f",
+            "fresh": false
+          },
+          "source_aggregate_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b"
+        },
+        {
+          "executable": "/private/tmp/tests-codex-1569-target/debug/examples/ring_process_probe",
+          "sha256": "e1d97d4eba0adeb0732178aba49fa0acfd373ae8ff41f5d5331aee276f281c9a",
+          "bytes": 5617312,
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+            "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+            "target": {
+              "kind": [
+                "example"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "ring_process_probe",
+              "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/examples/ring_process_probe.rs",
+              "edition": "2024",
+              "doc": false,
+              "doctest": false,
+              "test": false
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 0,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": false
+            },
+            "features": [],
+            "filenames": [
+              "/private/tmp/tests-codex-1569-target/debug/examples/ring_process_probe"
+            ],
+            "executable": "/private/tmp/tests-codex-1569-target/debug/examples/ring_process_probe",
+            "fresh": false
+          },
+          "source_aggregate_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b"
+        },
+        {
+          "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+          "sha256": "b07344646e719ceed6456ae165a5d8939e7a31e3d21e86a1dec9bbaf2cdced17",
+          "bytes": 1119920,
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+            "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+            "target": {
+              "kind": [
+                "bin"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "lamp-voice",
+              "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/src/main.rs",
+              "edition": "2024",
+              "doc": true,
+              "doctest": false,
+              "test": true
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 0,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": true
+            },
+            "features": [],
+            "filenames": [
+              "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0"
+            ],
+            "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+            "fresh": false
+          },
+          "source_aggregate_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b"
+        },
+        {
+          "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-voice",
+          "sha256": "070e97ef8065e0f65fd90409b78004a06b50af1cada459d9ca7eaa4b624d1e85",
+          "bytes": 40030904,
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+            "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+            "target": {
+              "kind": [
+                "bin"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "lamp-voice",
+              "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/src/main.rs",
+              "edition": "2024",
+              "doc": true,
+              "doctest": false,
+              "test": true
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 0,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": false
+            },
+            "features": [],
+            "filenames": [
+              "/private/tmp/tests-codex-1569-target/debug/lamp-voice"
+            ],
+            "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-voice",
+            "fresh": false
+          },
+          "source_aggregate_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b"
+        },
+        {
+          "executable": "/private/tmp/tests-codex-1569-target/debug/examples/admission_latency",
+          "sha256": "9d64d9015d43c39a71f6a99712ee9ef8459df208572a87382d9617f16bd38eb9",
+          "bytes": 895832,
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+            "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+            "target": {
+              "kind": [
+                "example"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "admission_latency",
+              "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/examples/admission_latency.rs",
+              "edition": "2024",
+              "doc": false,
+              "doctest": false,
+              "test": false
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 0,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": false
+            },
+            "features": [],
+            "filenames": [
+              "/private/tmp/tests-codex-1569-target/debug/examples/admission_latency"
+            ],
+            "executable": "/private/tmp/tests-codex-1569-target/debug/examples/admission_latency",
+            "fresh": false
+          },
+          "source_aggregate_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b"
+        },
+        {
+          "executable": "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+          "sha256": "2afb091ddbe7980373a6e31f72391c1e935b74fec4adeb242558c89d8cecf1b5",
+          "bytes": 2716008,
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+            "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+            "target": {
+              "kind": [
+                "example"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "stop_words_stt_replay",
+              "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+              "edition": "2024",
+              "doc": false,
+              "doctest": false,
+              "test": true
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 0,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": true
+            },
+            "features": [],
+            "filenames": [
+              "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff"
+            ],
+            "executable": "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+            "fresh": false
+          },
+          "source_aggregate_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b"
+        },
+        {
+          "executable": "/private/tmp/tests-codex-1569-target/debug/examples/head_qualification_operator",
+          "sha256": "9f936e643faa2449bf137e50e42097c3a0664b7918ff541f3848aea52fcd24f1",
+          "bytes": 1410432,
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+            "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+            "target": {
+              "kind": [
+                "example"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "head_qualification_operator",
+              "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/examples/head_qualification_operator.rs",
+              "edition": "2024",
+              "doc": false,
+              "doctest": false,
+              "test": false
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 0,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": false
+            },
+            "features": [],
+            "filenames": [
+              "/private/tmp/tests-codex-1569-target/debug/examples/head_qualification_operator"
+            ],
+            "executable": "/private/tmp/tests-codex-1569-target/debug/examples/head_qualification_operator",
+            "fresh": false
+          },
+          "source_aggregate_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b"
+        },
+        {
+          "executable": "/private/tmp/tests-codex-1569-target/debug/examples/reference_pace",
+          "sha256": "0befd4232e58f40f836207effcfa8b63670d7a85f19207c8349c4629c42b171f",
+          "bytes": 3775264,
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+            "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+            "target": {
+              "kind": [
+                "example"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "reference_pace",
+              "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/examples/reference_pace.rs",
+              "edition": "2024",
+              "doc": false,
+              "doctest": false,
+              "test": false
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 0,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": false
+            },
+            "features": [],
+            "filenames": [
+              "/private/tmp/tests-codex-1569-target/debug/examples/reference_pace"
+            ],
+            "executable": "/private/tmp/tests-codex-1569-target/debug/examples/reference_pace",
+            "fresh": false
+          },
+          "source_aggregate_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b"
+        },
+        {
+          "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+          "sha256": "7077c08c29c8be105faa07ce98ebd8d92bc6374d6b4d16939951d31de066b8db",
+          "bytes": 94193660,
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+            "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+            "target": {
+              "kind": [
+                "test"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "it",
+              "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/tests/it/main.rs",
+              "edition": "2024",
+              "doc": false,
+              "doctest": false,
+              "test": true
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 0,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": true
+            },
+            "features": [],
+            "filenames": [
+              "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428"
+            ],
+            "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+            "fresh": false
+          },
+          "source_aggregate_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b"
+        },
+        {
+          "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+          "sha256": "cb2d49285fab6d79043d2ff41c3942932391cdf06190946bb9654a833342d37b",
+          "bytes": 113249736,
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+            "manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/Cargo.toml",
+            "target": {
+              "kind": [
+                "lib"
+              ],
+              "crate_types": [
+                "lib"
+              ],
+              "name": "lamp_voice",
+              "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/src/lib.rs",
+              "edition": "2024",
+              "doc": true,
+              "doctest": true,
+              "test": true
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 0,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": true
+            },
+            "features": [],
+            "filenames": [
+              "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+            ],
+            "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+            "fresh": false
+          },
+          "source_aggregate_sha256": "688c434f7b2bde1c21313c601e990c279d49da4f66fbce4e78e8c48b15b67d6b"
+        }
+      ]
+    }
+  }
+}
