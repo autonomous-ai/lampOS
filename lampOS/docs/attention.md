@@ -976,10 +976,18 @@ for the face, the head, the room or the voice's state. Each tap writes a
 - `listening_not_ready`, `reply_owed` (a look it was asked for);
 - `hummed_recently`: at most one in 30 s; the tap is still a call.
 
-Its level is -35 dBFS RMS while it sounds: the lamp's speech taken as about
--20 dBFS, less 15 dB, not yet measured against a lamp's own speech.
+Its default level is -20 dBFS RMS while it sounds, raised from -35 after
+Thirteen's tap-hum comparison on lamp-c0a4 at product speaker level:
+-30 dBFS was ear-only, -25 faint, and -20 clear. First approved -20 at
+11:40; the [#3275 carry instruction](https://github.com/autonomous-ai/lampOS/pull/3275#issuecomment-6368135260)
+records that choice.
 `LAMP_HEAD_TAP_CUE_DBFS` (from -60 to -20) sets it for tuning by ear; a value
-outside that refuses the voice's start. The trace's
+outside that refuses the voice's start. The shared default also sets the
+wake hum, the hand-sleep breath, and the unclear and misheard hums in the
+coordinator when this override is absent. `say`'s `Cue::Hum` uses the same
+default directly, without reading the override. The c0a4 level comparison
+covered the tap hum only: it does not qualify those other sound paths by
+ear, or measure physical hand-to-first-speaker latency. The trace's
 `head_tap_cue_attempted`, `head_tap_cue_first_write` (ALSA accepted) and
 `head_tap_cue_final_sample_retired` follow it to the speaker.
 
