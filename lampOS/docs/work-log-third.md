@@ -5,6 +5,24 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 16:58 — current Body carry retains a stationary-hand failure
+
+Ready for lamp-voice: no (#3248 held; generic clock work is in progress).
+
+- Re-read the current integration protocol and all Queue comments through
+  16:56. #3207 has landed in train #3216. #2948 is now non-draft under
+  First's ownership; its carry and settings transition are under review.
+- Exact #3248 `07f5cc665` passes five of six unchanged hand controls on
+  the Intel Mac. Stationary pressure easing from 300 to 130 fails all
+  95 late observations. The [receipt](verification/body-resting-push-20261023/carry-07f.md)
+  records the commands and interaction with the landed full-bound renewal.
+  The HOLD is posted on #3248; El owns the repair, First the merge.
+- Claimed First's generic voice clock assignment on the Queue before code.
+  Both new tests failed on missing switches before the template change.
+  Five existing product switches now have a generic census and a function
+  declaration/context test; full update tests and lint are running.
+  No lamp action, acoustic-latency or end-to-end time answer is claimed.
+
 ## 2026-10-23 11:44 — Linux fmt verified; exact Body head still fails
 
 Ready for lamp-voice: yes (#3207); #3204 has landed, while the #3196 review remains held.
