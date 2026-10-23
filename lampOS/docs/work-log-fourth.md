@@ -7974,3 +7974,51 @@ yes to prevent passing-id takeover; its Voice-side contract review is
 active on #2856. The assigned #3233 relay-route PR merged while this
 session was unavailable; no Fourth review completion is claimed.
 No lamp access, installed build, physical proof or row-score increase.
+
+## 2026-10-23 17:29 +07: current carries, full-suite failure and Photo fences
+
+Ready for lamp-voice: no
+
+Peek's frozen cf462adb0 carry, staged tree a30330f86, completed Linux
+formatting, strict workspace Clippy and workspace build. Reader: 12/0/1
+ignored; ServiceTrace: 7/0; SessionState: 2/0; census: 6/0; Records:
+187/0/2 ignored; Peek: 26/0. Four focused privacy controls passed and
+repeated through the same hashed binary; its dropped-identity permission
+control passed 1/0. Source and container cleanup were verified. Groups
+overlap and are not summed. Mac waits for its exclusive target. Receipt:
+/private/tmp/fourth-peek-train42-linux-checks-20261023/attempt1/.
+
+Common's frozen cf462adb0 carry, staged tree 71a4e71af, passed Mac
+formatting, strict workspace Clippy, private-context 28/0 and each of five
+priority event/permission controls 1/0. The full Voice library then failed
+3757/1/15 ignored; its other targets passed 281/0. The failure is
+pending_note_transport_waits_before_connect_without_sending_and_resumes_once:
+read_line returned WouldBlock at remember.rs:8762. The accepted-stream
+mode was verified by a standalone Rust probe: this Mac inherits
+O_NONBLOCK and returns errno 35 immediately despite the read timeout;
+explicit blocking waits for the writer. A test-only helper correction
+is prepared. The earlier focused pass does not clear this full-suite failure. Remaining suites continue. Receipt:
+/private/tmp/fourth-common-train42-gates-20261023/mac/attempt1/.
+
+Common's first Linux attempt was deliberately interrupted before tests
+(exit 130), with source and process/container cleanup verified: a reused
+/src mount and older source mtimes risked reusing Peek artifacts. That
+attempt is not qualification. The new runner uses /src-fourth-common-train42
+with the same frozen source, forcing distinct Cargo source identity.
+Skills, a direct reverse consumer, has a separate full-suite supplement
+queued after each platform releases its target.
+
+The Eyes Photo read at 137c5c230 remains HOLD: a closed caller is not
+checked before promotion, and missing/Unknown capture timestamps become
+dequeue time, allowing a frame captured before Yes to pass afterward.
+Replacement generation and final observed privacy/deadline checks are
+wired correctly. The review and required real-stream/frame-conversion
+controls are on #3257. No Eyes runtime test was run by this builder.
+
+The Voice original-capture audit found held/replayed input indistinguishable
+from direct input on the current strict wire. A narrow optional private
+origin channel is proposed on #2856 for the first builder's protocol
+decision; independent strict proof and cancellable exchange work continues.
+The current coordination tree and AGENTS.md match b5a199368. All Queue
+and own-PR comments through 17:20:57 were read. No lamp access, installed
+build, played proof or row-score increase is claimed.
