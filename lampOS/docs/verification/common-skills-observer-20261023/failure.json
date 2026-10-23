@@ -1,0 +1,134 @@
+{
+  "source_base": "b5a1993689d6fdac76742a60836025d8e36f2c76",
+  "source_tree": "2e7a1f08bf458738f87dbb9871adcc0012560a4a",
+  "tested_commit": "78a04cc70e2d59c29c08dc5ba99d11303b4da2f2",
+  "package_result": {
+    "passed": 514,
+    "failed": 1,
+    "ignored": 1,
+    "cargo_exit": 101
+  },
+  "integration_result": {
+    "passed": 303,
+    "failed": 1,
+    "ignored": 1
+  },
+  "command": [
+    "cargo",
+    "test",
+    "--offline",
+    "-q",
+    "--locked",
+    "--no-fail-fast",
+    "-p",
+    "lamp-skills"
+  ],
+  "environment": {
+    "platform": "Linux x86_64 disposable container",
+    "user": "1000:1000",
+    "network": "none",
+    "rust_test_threads": 1,
+    "cargo_build_jobs": 1,
+    "cargo_incremental": 0,
+    "image_id": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c"
+  },
+  "test": "addon::says_the_judge_dropped_do_not_spend_the_hour",
+  "assertion": "crates/skills/tests/it/addon.rs:657",
+  "phase": "waiting for first four completion receipts, before judge-drop decisions",
+  "observer_done": [
+    "says-a",
+    "says-b",
+    "says-c"
+  ],
+  "missing_done": [
+    "says-d"
+  ],
+  "journal_done": [
+    "says-a",
+    "says-b",
+    "says-c",
+    "says-d"
+  ],
+  "observer_statistics_available": false,
+  "sequence_information_available": false,
+  "publisher_drop_count_available": false,
+  "full_package_log_sha256": "c6b6eefc669adfbc5d4bce73d9dff520741922b3a40242626cc04959ab8427a0",
+  "failure_observation": "thread 'addon::says_the_judge_dropped_do_not_spend_the_hour' (425) panicked at crates/skills/tests/it/addon.rs:657:13:\nwaiting for the first four proposals: child None, completions [SkillEvent { skill: \"says-a\", stage: Done, why: \"proposed say as 1069743409297 on addon/proposal\", allowed: None }, SkillEvent { skill: \"says-b\", stage: Done, why: \"proposed say as 1069743409602 on addon/proposal\", allowed: None }, SkillEvent { skill: \"says-c\", stage: Done, why: \"proposed say as 1069743409807 on addon/proposal\", allowed: None }]",
+  "complete_failure_journal_segment": "lamp-skills: skills from /tmp/adGGMdep/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back\nlamp-skills: loaded [\"says-a\", \"says-b\", \"says-c\", \"says-d\", \"says-e\"]\nlamp-skills: says-a Triggered: voice/state has held for 0 s\nlamp-skills: says-a Answered: an add-on: its proposals go to the judge on addon/proposal\nlamp-skills: says-b Triggered: voice/state has held for 0 s\nlamp-skills: says-b Answered: an add-on: its proposals go to the judge on addon/proposal\nlamp-skills: says-c Triggered: voice/state has held for 0 s\nlamp-skills: says-c Answered: an add-on: its proposals go to the judge on addon/proposal\nlamp-skills: says-d Triggered: voice/state has held for 0 s\nlamp-skills: says-d Answered: an add-on: its proposals go to the judge on addon/proposal\nlamp-skills: says-a Done: proposed say as 1069743409297 on addon/proposal\nlamp-skills: says-b Done: proposed say as 1069743409602 on addon/proposal\nlamp-skills: says-c Done: proposed say as 1069743409807 on addon/proposal\nlamp-skills: says-d Done: proposed say as 1069743410119 on addon/proposal",
+  "failure_segment_sha256": "f30f95befd49103874f4fb7a4b7157badcb2139f0c52b418d92b20592318928e",
+  "source_parity": [
+    {
+      "path": "lampOS/crates/skills/Cargo.toml",
+      "sha256": "8588ef3204b62820ca39258ce078a6feb84f8282dc99aca0ca7a071004a7130b",
+      "same_as_base": true
+    },
+    {
+      "path": "lampOS/crates/skills/tests/it/addon.rs",
+      "sha256": "3c866284cc865f76077999c47718ed9cec2997f6c429bb5f36304893818a2d07",
+      "same_as_base": true
+    },
+    {
+      "path": "lampOS/crates/skills/src/addon.rs",
+      "sha256": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af",
+      "same_as_base": true
+    },
+    {
+      "path": "lampOS/crates/skills/src/lib.rs",
+      "sha256": "baab40bb5c9c4fb95335368ea308362690e6c2403ed2670678c739ffb95468a8",
+      "same_as_base": true
+    },
+    {
+      "path": "lampOS/crates/skills/src/main.rs",
+      "sha256": "a4bb122ca5326280e1626f5e1f9c94dde4a26bf9f5a93910ae364e2339b63777",
+      "same_as_base": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/publish.rs",
+      "sha256": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+      "same_as_base": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/subscribe.rs",
+      "sha256": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+      "same_as_base": true
+    },
+    {
+      "path": "lampOS/crates/bus/tests/it/bus.rs",
+      "sha256": "7040765d6d856c9e228a1211da736b8a891680a5bf90d4b0a3a6ced064a1f76a",
+      "same_as_base": true
+    },
+    {
+      "path": "lampOS/crates/msgs/src/skills.rs",
+      "sha256": "e762c1da88b1b5583e2ce3ef33faa23e88a07e20d0283d71a2fddcf79cc1bb60",
+      "same_as_base": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/skill_words.rs",
+      "sha256": "8d27772166de0e2dbe2990c87271a8f8a793f64487b8c5bdd9a6f20c6e811f61",
+      "same_as_base": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/onboarding/skill.rs",
+      "sha256": "b1b67cebb55138e9ed706a91c0356be15ee7adfcd8c2d382eb4e53377406cd1f",
+      "same_as_base": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/requested_audio.rs",
+      "sha256": "d3f7da187e6209773daa5faf270b5b9175aa5598092fbc71af3f7fd4b7fa4f20",
+      "same_as_base": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/say.rs",
+      "sha256": "1dd867a3bec764d1a5478ed47aefe602fa7f1b491e9b82f660b66cccbf4cfa9c",
+      "same_as_base": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/made_skill.rs",
+      "sha256": "00e76e868c362d72869d29d90df68e73798737e3f20bbf6372bf3f02da57b69e",
+      "same_as_base": true
+    }
+  ],
+  "cause_limit": "The exact failed run did not record publisher delivery/drop counts or queue capacity; source proves the fixture relies on lossy events, not the specific loss mechanism for this run.",
+  "diagnostic_or_retry_executed": false,
+  "local_full_log": "/private/tmp/fourth-common-train43-gates-20261023/linux/attempt1/full-skills.log"
+}

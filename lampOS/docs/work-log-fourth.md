@@ -8070,3 +8070,28 @@ unknown capture timestamps were fenced. Voice's original-capture channel
 decision remains with the first builder on #2856. Independent proof,
 retention, cancellation and neutral Cloud receipt controls are prepared,
 unrun. No product activation, lamp access or row-score increase is claimed.
+
+## 2026-10-23 18:56 +07: retained observer failure and current carries
+
+Ready for lamp-voice: no
+
+Common's tested tree2e7a1f08b is committed at78a04cc70. Linux completed
+32 stages: changed privacy controls, full Eyes312/0/5 ignored, strict
+Clippy and workspace build pass; Skills514/1/1 remains failed. The exact
+observer receipt is in verification/common-skills-observer-20261023/.
+Update first failed117/3/2 because the container omitted robots/lamp;
+with the unchanged249 tracked fixtures mounted, it passed120/0/2.
+Common is rebased onto3e75cc3cb at71275b221, preserving both Photo consent
+and private-source production; its current-head carry gates are running.
+
+Peek3b1d83545 native39944780877 failed9795/1/69, with one leaky pass and
+1234 selected tests not run after fail-fast. The metadata basis list named
+an obsolete greeting, which the unchanged source census correctly rejects.
+A one-entry removal is under host gates on the current base; both privacy
+reads on3b remain recorded, but no native acceptance or ready claim stands.
+
+Photo's actual pre-fix helpers reproduced5/7/0 on Mac. The corrected
+Linux helpers pass25/0, original scope34/0 and speaking14/0, with formatting
+and unchanged source. Two unused-method warnings remain because runtime
+route integration awaits the original-capture contract; no strict Clippy,
+route, physical consent or product activation claim is made.
