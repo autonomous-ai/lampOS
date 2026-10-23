@@ -141,7 +141,9 @@ side talk. About 7 minutes a scene, TRIALS scenes an arm (default 2).
 
 ```sh
 export LAMP_HOST=<your lamp's address>
+# On a shared lamp (<lamp> = lamp-52e6, lamp-75c9), under its lease; the kit takes none itself:
 ARMS="off:LAMP_X=off on:LAMP_X=on,LAMP_Y=500" BASE="LAMP_SPOKEN_TO=on" \
+  lampOS/tools/lamp-lock.sh <lamp> run <holder> <session> "desk kit d1500" -- \
   lampOS/tools/played/desk-kit.sh d1500
 ARMS="off:LAMP_X=off" lampOS/tools/played/desk-kit.sh --dry [SCENARIO ...]
 ```
@@ -186,7 +188,9 @@ ARMS="off:LAMP_X=off" lampOS/tools/played/desk-kit.sh --dry [SCENARIO ...]
   lamp-voice for the run. It refuses to start when any `/run` drop-in is
   on lamp-voice (`zz-desk-kit.conf` included: another run's, or one left
   behind, to be removed by hand) or its face is already shown, and stops
-  on an HTTP 429 from the relay. On any exit it closes the face, and
+  on an HTTP 429 from the relay in the voice's journal since that arm
+  began (by the lamp's clock, so not an earlier arm's or run's). On any
+  exit it closes the face, and
   removes the drop-in and restarts the voice only when this run wrote it.
   The file's first line names this run. Under one lock on the lamp
   (`flock /run/lock/desk-kit.lock`), the first arm writes it only if none
@@ -201,7 +205,12 @@ ARMS="off:LAMP_X=off" lampOS/tools/played/desk-kit.sh --dry [SCENARIO ...]
   shown.
 - **Who holds the lamp**: a line `HH:MM LOAN_NAME: ...` goes to `LOANS` on
   the lamp at the start and the end (default `~/loans.txt` and this Mac's
-  user; `LOANS=` writes none). If your team keeps a lamp lock, run under it.
+  user; `LOANS=` writes none). The loan line is a note, not a lock: the
+  kit takes no lamp lock or lease. Its `flock /run/lock/desk-kit.lock`
+  only orders its own drop-in writes. On a shared lamp, run the whole kit
+  under the lamp's lease with `lamp-lock.sh <lamp> run` (as above; see
+  `docs/joining.md`, "Sharing a lamp"), which renews it while the kit
+  runs and stops the kit if the lease is lost.
 
 What it scores, per arm (`desk_kit.py score`, printed and appended to
 `$PLAYED_OUT/scenarios/desk-kit.tsv`; each scene's `.plan` beside it says

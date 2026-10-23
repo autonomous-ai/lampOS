@@ -165,6 +165,7 @@ arm() { # arm NAME:ENV=v,...
   # The drop-in goes to a staging file first (a cut-off send leaves no empty drop-in), then, under the lock, onto the
   # fixed name: on the first arm only if none is there, on a later arm only while the file is still this run's.
   # Otherwise nothing is written and the kit stops (exit 3), leaving the file and the voice as they are.
+  ARM_START=$(lamp "date +%s")  # the lamp's clock: the 429 check reads only from here, not another arm's or run's
   local may="[ ! -e $DROPIN ]"; [[ -n $OWNED ]] && may=$ours
   OWNED=yes
   { echo "$TOKEN"; dropin "$1" "$exec_line"; } | "$LAMP_SSH" "t=\$(mktemp) && cat > \$t && head -1 \$t | grep -qxF '$TOKEN' || { rm -f \$t; exit 4; }
@@ -212,6 +213,6 @@ fi
 
 for a in $ARMS; do
   arm "$a"
-  if lamp "sudo -n journalctl -u lamp-voice --since -10min --no-pager | grep -q 'HTTP 429'"; then echo "HTTP 429 from the relay: stopping" | tee -a "$LOG"; exit 5; fi
+  if lamp "sudo -n journalctl -u lamp-voice --since @$ARM_START --no-pager | grep -q 'HTTP 429'"; then echo "HTTP 429 from the relay: stopping" | tee -a "$LOG"; exit 5; fi
 done
 echo "done $(date +%H:%M:%S); scores in $OUT/desk-kit.tsv" | tee -a "$LOG"
