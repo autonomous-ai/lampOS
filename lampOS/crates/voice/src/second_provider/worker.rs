@@ -3195,7 +3195,7 @@ pub fn serve(
         // nonblocking cache. Aborting the refresh prevents any later poll.
         let refresh = scope_file.map(|path| {
             tokio::spawn(async move {
-                let mut interval = tokio::time::interval(Duration::from_millis(200));
+                let mut interval = tokio::time::interval(crate::memory_scope::REFRESH_EVERY);
                 interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
                 loop {
                     interval.tick().await;
