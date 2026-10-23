@@ -1,0 +1,5 @@
+BOOT_CLOCK_CONTROL mode=near500ms pid=48785 raw_ns=3247396354533000 mapped_ns=500000000
+
+thread 'coordinator::second::tests::a_ready_after_the_hold_leaves_the_line_to_the_second_route' (704744672) panicked at crates/voice/src/coordinator/second.rs:1923:42:
+attempt to subtract with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

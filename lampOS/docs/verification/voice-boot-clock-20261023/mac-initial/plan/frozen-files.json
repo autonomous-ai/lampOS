@@ -1,0 +1,50 @@
+{
+  "PLAN.md": {
+    "bytes": 8164,
+    "sha256": "abfd8081d49fe992c5b044f4f68eeb6b89c245f0dace06d0c46d913b70d30c06"
+  },
+  "candidate.patch": {
+    "bytes": 17767,
+    "sha256": "40004d7f4e26102b20b6efd23bf769a39255c5d50406a0d6bca07eef29623a32"
+  },
+  "inventory.json": {
+    "bytes": 29120,
+    "sha256": "acda19cc6ce3ccd38f0536dcdfefccaa5f407c9c91bb5fb2e7eb30e27cc4d636"
+  },
+  "local-dependencies.json": {
+    "bytes": 6611,
+    "sha256": "113b7f74061fe0cc4c822d67b572b170ab2f3905a59e8bd60bfa997c04454ccc"
+  },
+  "mod240.patch": {
+    "bytes": 1893,
+    "sha256": "4d4e063757c9bf450837d7cffa97d9805f805f92e3b2e0fe21f70e0641032d4c"
+  },
+  "near500ms.patch": {
+    "bytes": 1824,
+    "sha256": "268df0971f2649005bdcf007ba61b54c7050621f4aaae4c6b982cc130c5b654b"
+  },
+  "preparation-validation.json": {
+    "bytes": 846,
+    "sha256": "4e9ef4fc6109d6d5ec266ddecbd8d0c36e87829aff61e8ca5e11bf8b342e4505"
+  },
+  "prepared.json": {
+    "bytes": 3397,
+    "sha256": "0a2c6011cfdb759ff5e240da1408180d200b0279a1d6adf054c490a55707e72c"
+  },
+  "reader-gates.diff": {
+    "bytes": 18547,
+    "sha256": "8c28ceefdb268f5337c821397ee81846222f8f5b58a95ae3504dcee78c16ed04"
+  },
+  "stale-accepted.patch": {
+    "bytes": 424,
+    "sha256": "44083a66cec03c1ae86d4579683ba3921615249e8fb799f2a62441c507187c09"
+  },
+  "superseded-preparation.json": {
+    "bytes": 2036,
+    "sha256": "232bb302f0236d335efa3f6e369a04f9647a72c8b6d1a066e7e19b02830b6107"
+  },
+  "verify_boot_clock.py": {
+    "bytes": 28373,
+    "sha256": "e28de088626dab9a252fb16566e45ad05c655ce08787e625d44510d4df22211a"
+  }
+}

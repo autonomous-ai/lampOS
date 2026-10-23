@@ -1,0 +1,57 @@
+{
+  "previous_candidate": "b5f2e39d2a1d561364c754c1ff904ca588c63c29",
+  "candidate": "da595851f239cd6456cc1fb4565d3fc272675702",
+  "base": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+  "previous_directory": "/private/tmp/tests-codex-boot-clock-mac-20261023",
+  "previous_execution_marker_present": false,
+  "previous_files": {
+    "PLAN.md": {
+      "bytes": 5276,
+      "sha256": "80d5f434789eb14f0938d3f07ec36b5f276c1914c45619275fcd29ff09354236"
+    },
+    "candidate.patch": {
+      "bytes": 16322,
+      "sha256": "efde982b3bf3fb5876d222ed3bf93f2500b7eb9e661dc4408ce2caa2a5c1e18a"
+    },
+    "frozen-files.json": {
+      "bytes": 1025,
+      "sha256": "469ab47e40bfeeb2343da525585da6eff5fcd0479bd6651e66633e307aa0b9a8"
+    },
+    "inventory.json": {
+      "bytes": 28665,
+      "sha256": "e842e699ff693eb3992640f589cb8e6bf4c2f3bd66ff7a51c25cc3a13a55a557"
+    },
+    "mod240.patch": {
+      "bytes": 1893,
+      "sha256": "4d4e063757c9bf450837d7cffa97d9805f805f92e3b2e0fe21f70e0641032d4c"
+    },
+    "near500ms.patch": {
+      "bytes": 1824,
+      "sha256": "268df0971f2649005bdcf007ba61b54c7050621f4aaae4c6b982cc130c5b654b"
+    },
+    "prepared.json": {
+      "bytes": 3272,
+      "sha256": "f6b69929a047d6195a76adbc5143c459aacbd61e56e3cbc00c333a156596ddfa"
+    },
+    "stale-accepted.patch": {
+      "bytes": 424,
+      "sha256": "44083a66cec03c1ae86d4579683ba3921615249e8fb799f2a62441c507187c09"
+    },
+    "verify_boot_clock.py": {
+      "bytes": 24428,
+      "sha256": "5fa0553d013d1a2fbd5f6a322cad98a32309428d14590f6dc65db8666003c45b"
+    }
+  },
+  "semantics_changed": [
+    "candidate Git identity",
+    "corrected source-derived inventory identity",
+    "new independent evidence directory and exclusive execution marker"
+  ],
+  "semantics_unchanged": [
+    "86 ordered exact names",
+    "IPC shim bytes and negative-control mutation",
+    "full before/after default-parallel package observations",
+    "format/Clippy/workspace gates",
+    "watchdogs, actual Cargo artifact bindings, source restoration and no retries"
+  ]
+}

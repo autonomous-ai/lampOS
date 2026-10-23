@@ -1,0 +1,32 @@
+{
+  "base": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+  "candidate": "da595851f239cd6456cc1fb4565d3fc272675702",
+  "python_ast": "passed",
+  "json_parse": "passed",
+  "prior_revision_exact": true,
+  "unchanged_control_functions": [
+    "shim",
+    "exact",
+    "classify",
+    "command",
+    "install",
+    "freshen",
+    "source",
+    "main"
+  ],
+  "control_and_candidate_patch_bytes_unchanged": true,
+  "new_reader_packages": [
+    "lamp-skills",
+    "lamp-voice-eval",
+    "lamp-memory",
+    "lamp-update",
+    "lamp-cloud"
+  ],
+  "reader_parser_synthetic_checks": [
+    "pass/fail/ignored/zero-test/doctest target outcomes",
+    "mismatched target inventory rejected"
+  ],
+  "cargo_executed": false,
+  "execution_marker_absent": true,
+  "prior_patch_apply_checks_preserved_at": "revisions/before-reader-gates/preparation-validation.json"
+}

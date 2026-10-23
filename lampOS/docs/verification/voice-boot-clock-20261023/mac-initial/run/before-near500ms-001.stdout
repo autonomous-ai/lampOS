@@ -1,0 +1,11 @@
+
+running 1 test
+test coordinator::second::tests::a_ready_after_the_hold_leaves_the_line_to_the_second_route ... FAILED
+
+failures:
+
+failures:
+    coordinator::second::tests::a_ready_after_the_hold_leaves_the_line_to_the_second_route
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3561 filtered out; finished in 0.03s
+

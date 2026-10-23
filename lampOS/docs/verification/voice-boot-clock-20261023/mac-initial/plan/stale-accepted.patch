@@ -1,0 +1,11 @@
+--- a/lampOS/crates/voice/src/stop_words.rs
++++ b/lampOS/crates/voice/src/stop_words.rs
+@@ -1123,7 +1123,7 @@
+         let clock = || self.fixture_now_us();
+         let number = self.number();
+         *number == of
+-            && clock().saturating_sub(captured_at_us) <= MOST_AGE_US
++            && clock().saturating_sub(captured_at_us) <= MOST_AGE_US + 2_000_000
+             && stream.send(samples).is_ok()
+     }
+ }

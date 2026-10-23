@@ -1,0 +1,11 @@
+
+running 1 test
+test coordinator::second::tests::a_ready_lost_in_the_same_drain_holds_the_next_request_for_the_reconnect ... FAILED
+
+failures:
+
+failures:
+    coordinator::second::tests::a_ready_lost_in_the_same_drain_holds_the_next_request_for_the_reconnect
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3561 filtered out; finished in 0.04s
+

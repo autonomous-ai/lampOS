@@ -1,0 +1,5 @@
+BOOT_CLOCK_CONTROL mode=near500ms pid=49568 raw_ns=3247399283219000 mapped_ns=500000000
+
+thread 'coordinator::tests::hand_controls::a_privacy_worker_failing_in_a_ridden_gap_marks_its_end' (704745617) panicked at crates/voice/src/coordinator/tests/hand_controls.rs:2358:60:
+attempt to subtract with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

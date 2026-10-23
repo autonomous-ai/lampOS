@@ -1,0 +1,5 @@
+BOOT_CLOCK_CONTROL mode=near500ms pid=48973 raw_ns=3247396949202000 mapped_ns=500000000
+
+thread 'coordinator::tests::hand_controls::a_closed_switch_read_in_a_ridden_gap_is_the_mute' (704744916) panicked at crates/voice/src/coordinator/tests/hand_controls.rs:2358:60:
+attempt to subtract with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

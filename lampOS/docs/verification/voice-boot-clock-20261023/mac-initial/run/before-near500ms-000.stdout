@@ -1,0 +1,11 @@
+
+running 1 test
+test coordinator::second::tests::a_line_given_to_gemini_at_the_end_of_the_hold_is_never_too_old ... FAILED
+
+failures:
+
+failures:
+    coordinator::second::tests::a_line_given_to_gemini_at_the_end_of_the_hold_is_never_too_old
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3561 filtered out; finished in 0.04s
+

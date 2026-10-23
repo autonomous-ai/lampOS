@@ -1,0 +1,5 @@
+{
+  "raw_before_ns": 3247152116713000,
+  "wait_seconds": 0,
+  "reason": "One sample only; reserve45s for30s watchdog plus cleanup without wrapping."
+}

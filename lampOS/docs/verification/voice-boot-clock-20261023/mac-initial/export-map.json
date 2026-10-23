@@ -1,0 +1,700 @@
+{
+  "files": [
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/after-mod240-000-modulo-window.json",
+      "destination": "run/after-mod240-000-modulo-window.json",
+      "sha256": "3f5d57b3b9a88cfb4f3459b2a8637c74995203291be0406153efa065b0a92bfc",
+      "bytes": 151
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/after-mod240-000.stderr",
+      "destination": "run/after-mod240-000.stderr",
+      "sha256": "662b672cc1acf072ba1d5bf5d84f4397ff3e869d75290373b19f8dd90eec478f",
+      "bytes": 1514
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/after-mod240-000.stdout",
+      "destination": "run/after-mod240-000.stdout",
+      "sha256": "bf3f0feabbd36e550662a13c9d0b06fbc44af96eb3341be9504f255055982cf5",
+      "bytes": 228
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/after-mod240-artifact-0-file.stderr",
+      "destination": "run/after-mod240-artifact-0-file.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/after-mod240-artifact-0-file.stdout",
+      "destination": "run/after-mod240-artifact-0-file.stdout",
+      "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4",
+      "bytes": 109
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/after-mod240-artifact-0-list.stderr",
+      "destination": "run/after-mod240-artifact-0-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/after-mod240-artifact-0-list.stdout",
+      "destination": "run/after-mod240-artifact-0-list.stdout",
+      "sha256": "393f13a2976eaaea232f481f47bf55a31919f30b38fa64ed30c6bca1d7ba6f45",
+      "bytes": 331235
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/after-mod240-artifacts.json",
+      "destination": "run/after-mod240-artifacts.json",
+      "sha256": "e8b36706f85de9e85ac6f2d7e65f1bab281049a263672f80cb60d118a7cc520d",
+      "bytes": 345044
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/after-mod240-compile.stderr",
+      "destination": "run/after-mod240-compile.stderr",
+      "sha256": "698663b04a1499ae6c348e64cbe4d4be4c13786a2ec2c4c05ad044353323013e",
+      "bytes": 3821
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/after-mod240-compile.stdout",
+      "destination": "run/after-mod240-compile.stdout",
+      "sha256": "2f0972188b55c4ea14636bbdab4b3a0ed64428b9c409555cf3e980b0a6b80590",
+      "bytes": 252572
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/after-mod240-freshness.json",
+      "destination": "run/after-mod240-freshness.json",
+      "sha256": "ea94fd7579eb052082778a7392fc980e20eedb6744f2f57b2bba6b3ca015a24a",
+      "bytes": 3192
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/after-mod240-restoration.json",
+      "destination": "run/after-mod240-restoration.json",
+      "sha256": "007bfbddfb49c0d992c2309da0122fb92ba545e2fb20dc4c15b39ab99b7cd638",
+      "bytes": 1595
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/archive-base.stderr",
+      "destination": "run/archive-base.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/archive-base.stdout",
+      "destination": "run/archive-base.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-0-file.stderr",
+      "destination": "run/before-full-artifact-0-file.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-0-file.stdout",
+      "destination": "run/before-full-artifact-0-file.stdout",
+      "sha256": "7acec4f4eea5570cda847dadb10df910daa5487e2eb3c42288d2b80251ac8d18",
+      "bytes": 109
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-0-list.stderr",
+      "destination": "run/before-full-artifact-0-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-0-list.stdout",
+      "destination": "run/before-full-artifact-0-list.stdout",
+      "sha256": "c3e94ba6c76e70602a8b7ed7ef2c9666846770b9f1d1a8d86cdb8b8db8711252",
+      "bytes": 103
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-1-file.stderr",
+      "destination": "run/before-full-artifact-1-file.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-1-file.stdout",
+      "destination": "run/before-full-artifact-1-file.stdout",
+      "sha256": "f2d2f57ca3c4700e3cd53cf5290c10a1e35b0b669bc413ff0770c929346546e4",
+      "bytes": 124
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-1-list.stderr",
+      "destination": "run/before-full-artifact-1-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-1-list.stdout",
+      "destination": "run/before-full-artifact-1-list.stdout",
+      "sha256": "43ffb0b5bf8ff7fb8feb2037c135808516f66552be2d9d0217d279aa285fa18c",
+      "bytes": 376
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-2-file.stderr",
+      "destination": "run/before-full-artifact-2-file.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-2-file.stdout",
+      "destination": "run/before-full-artifact-2-file.stdout",
+      "sha256": "8818cae6fd13a952438433c2b8170ac8664b0886abd068f5dad75f58dcfcfff4",
+      "bytes": 121
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-2-list.stderr",
+      "destination": "run/before-full-artifact-2-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-2-list.stdout",
+      "destination": "run/before-full-artifact-2-list.stdout",
+      "sha256": "77ecc834179fda7a2ef77341422cc660ed348e7cc941a40bbfdb35dd08123941",
+      "bytes": 258
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-3-file.stderr",
+      "destination": "run/before-full-artifact-3-file.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-3-file.stdout",
+      "destination": "run/before-full-artifact-3-file.stdout",
+      "sha256": "ffe6eb73f9fc834c3983a3dea33371d221dcb847ea31a79bb8cd0e054b104763",
+      "bytes": 101
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-3-list.stderr",
+      "destination": "run/before-full-artifact-3-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-3-list.stdout",
+      "destination": "run/before-full-artifact-3-list.stdout",
+      "sha256": "be620c859d7f014e00f3945b8b4c54f89cbb2e5783e9025af0a9713278e683df",
+      "bytes": 22841
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-4-file.stderr",
+      "destination": "run/before-full-artifact-4-file.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-4-file.stdout",
+      "destination": "run/before-full-artifact-4-file.stdout",
+      "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4",
+      "bytes": 109
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-4-list.stderr",
+      "destination": "run/before-full-artifact-4-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-4-list.stdout",
+      "destination": "run/before-full-artifact-4-list.stdout",
+      "sha256": "393f13a2976eaaea232f481f47bf55a31919f30b38fa64ed30c6bca1d7ba6f45",
+      "bytes": 331235
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifacts.json",
+      "destination": "run/before-full-artifacts.json",
+      "sha256": "b2a4ea36571bb4f0d0c803878853e43fe41acbf68de8d792b037124b8e9d9f75",
+      "bytes": 382083
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-compile.stderr",
+      "destination": "run/before-full-compile.stderr",
+      "sha256": "70f1705de117495907c60a87eb0a40d95b2e644dee02845da90e290aa4692273",
+      "bytes": 3821
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-compile.stdout",
+      "destination": "run/before-full-compile.stdout",
+      "sha256": "befd0144c8aed2bfc696fe6252b32ec0b3f0b0a228d6f8cd23e0711ababba640",
+      "bytes": 264568
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-freshness.json",
+      "destination": "run/before-full-freshness.json",
+      "sha256": "00c9a87607e115d0fa2470ac50e9f31e6dc864c80663f1f8afea93b27a75921c",
+      "bytes": 3192
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-tests.stderr",
+      "destination": "run/before-full-tests.stderr",
+      "sha256": "aac29ff345adb948f678af7fa774fc9c74b822694b544e12010782c8334daed0",
+      "bytes": 818
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-tests.stdout",
+      "destination": "run/before-full-tests.stdout",
+      "sha256": "07ae6a05ceb8ce102b7d28efc3e32250f76ad7771a84c9cdd1823cdd2bd4ac8f",
+      "bytes": 380371
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-mod240-000-modulo-window.json",
+      "destination": "run/before-mod240-000-modulo-window.json",
+      "sha256": "a803f2e5ea096dd0ebd31bb0bfc1a415c86fea6d590a2c8b3a9a3e8d27fe1681",
+      "bytes": 151
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-mod240-000.stderr",
+      "destination": "run/before-mod240-000.stderr",
+      "sha256": "27b9725add9c72b2094b431ac212f0406b7b09f2da29c1783c93898cd47b8e1b",
+      "bytes": 387
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-mod240-000.stdout",
+      "destination": "run/before-mod240-000.stdout",
+      "sha256": "18e3ed5f68dea0716a40d03bf592320b29f3434329a53529c7a955524769e336",
+      "bytes": 363
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-mod240-artifact-0-file.stderr",
+      "destination": "run/before-mod240-artifact-0-file.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-mod240-artifact-0-file.stdout",
+      "destination": "run/before-mod240-artifact-0-file.stdout",
+      "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4",
+      "bytes": 109
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-mod240-artifact-0-list.stderr",
+      "destination": "run/before-mod240-artifact-0-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-mod240-artifact-0-list.stdout",
+      "destination": "run/before-mod240-artifact-0-list.stdout",
+      "sha256": "393f13a2976eaaea232f481f47bf55a31919f30b38fa64ed30c6bca1d7ba6f45",
+      "bytes": 331235
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-mod240-artifacts.json",
+      "destination": "run/before-mod240-artifacts.json",
+      "sha256": "c48c87065e6474ee9d51fbcd16f30b8973e2de9ebf53946bb64762cca0fbde93",
+      "bytes": 345044
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-mod240-compile.stderr",
+      "destination": "run/before-mod240-compile.stderr",
+      "sha256": "0a1d1fda79d84ca93e452fe903b0af73a1c73af3fd81208b460447b50a7e1b6f",
+      "bytes": 3821
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-mod240-compile.stdout",
+      "destination": "run/before-mod240-compile.stdout",
+      "sha256": "324056a6c635d1e5ebf70449555c78e6a03c9ee311c97ebeeeb339e803100c88",
+      "bytes": 252572
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-mod240-freshness.json",
+      "destination": "run/before-mod240-freshness.json",
+      "sha256": "8557de0188165ef17fccbe1d208e8957390ac03c472edcb472e619e1fc29fab4",
+      "bytes": 3192
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-mod240-restoration.json",
+      "destination": "run/before-mod240-restoration.json",
+      "sha256": "007bfbddfb49c0d992c2309da0122fb92ba545e2fb20dc4c15b39ab99b7cd638",
+      "bytes": 1595
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-000.stderr",
+      "destination": "run/before-near500ms-000.stderr",
+      "sha256": "1ffb2b526f9bc4dd45fc732b8351df33199d6010847b36e6065bb0d6d273549a",
+      "bytes": 373
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-000.stdout",
+      "destination": "run/before-near500ms-000.stdout",
+      "sha256": "3a94405b4de0bc4a149c5389fe082bca3a1b4b39a7c0444e0f0e67b2e112d573",
+      "bytes": 343
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-001.stderr",
+      "destination": "run/before-near500ms-001.stderr",
+      "sha256": "32d44f349b1bddb1746c360c5666a8bba6ac899bc26757e1a4c538cd9647fc59",
+      "bytes": 369
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-001.stdout",
+      "destination": "run/before-near500ms-001.stdout",
+      "sha256": "0df917cd1cf408e43dc0d4729503d01c045152a17d0a762ce39baf0a1eaeaa34",
+      "bytes": 335
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-002.stderr",
+      "destination": "run/before-near500ms-002.stderr",
+      "sha256": "5035231bc2eaff7be7c6ed8d0e583c08b6884c7c68c3af7e357c31134b2ab4f9",
+      "bytes": 382
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-002.stdout",
+      "destination": "run/before-near500ms-002.stdout",
+      "sha256": "544fc7f4d5e31c86577119170111cf41159ca760fe791f09e616b91be5a971ed",
+      "bytes": 361
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-003.stderr",
+      "destination": "run/before-near500ms-003.stderr",
+      "sha256": "08f3cb9eed340827c01e3955c87925647518d603a60cc99b3933decd6c6e7af9",
+      "bytes": 379
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-003.stdout",
+      "destination": "run/before-near500ms-003.stdout",
+      "sha256": "3f3ccd8674bbc8da75cf0a3998d88661f1dbaa652f5a42804f42388500af64e3",
+      "bytes": 329
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-004.stderr",
+      "destination": "run/before-near500ms-004.stderr",
+      "sha256": "c439196f3731cc834a2a74c8e8bfe3b625cb5bbfc9a63303700e3fe2ad81c031",
+      "bytes": 88
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-004.stdout",
+      "destination": "run/before-near500ms-004.stdout",
+      "sha256": "c547cac689c6cc38461bf8040cf43528a986e9d252f5141075967ae3b9e0a8aa",
+      "bytes": 213
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-005.stderr",
+      "destination": "run/before-near500ms-005.stderr",
+      "sha256": "49ec9ed3e79eded39cd187fb1849ffd82e4f169ef2fa6b9c245c4beeec6e1b00",
+      "bytes": 379
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-005.stdout",
+      "destination": "run/before-near500ms-005.stdout",
+      "sha256": "f193040591348ebaadfaeeb514198cd673ce6f3af3cc8bf80b062a7c3d26f862",
+      "bytes": 367
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-006.stderr",
+      "destination": "run/before-near500ms-006.stderr",
+      "sha256": "bd313dd6d8d482468110c9654191263eeff68824e2e7be49766dfd72a685c1ad",
+      "bytes": 364
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-006.stdout",
+      "destination": "run/before-near500ms-006.stdout",
+      "sha256": "e03680f584c3bd22c027bd2f045d32c7caa06daea89444fb172c033d630c44eb",
+      "bytes": 337
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-007.stderr",
+      "destination": "run/before-near500ms-007.stderr",
+      "sha256": "be3697f7d6d7416ff8317ccac8634c8702c3e60bb9b98981293aea8637034879",
+      "bytes": 374
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-007.stdout",
+      "destination": "run/before-near500ms-007.stdout",
+      "sha256": "d511643862f3a89d5078cb81f936ab826a5319592c128cc999f8a564bc6b034f",
+      "bytes": 357
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-008.stderr",
+      "destination": "run/before-near500ms-008.stderr",
+      "sha256": "5a480bb46ce68591f8ef7820332dbeec0a62afb5718726a190d19c3abb0a9c5b",
+      "bytes": 365
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-008.stdout",
+      "destination": "run/before-near500ms-008.stdout",
+      "sha256": "cc9dedaf7147d1668b99a0953694e7669310bfb87a958fa9bf1799239f2da126",
+      "bytes": 337
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-009.stderr",
+      "destination": "run/before-near500ms-009.stderr",
+      "sha256": "919cd1f50654089cec53cf3e767c00d7a96650d94ee6bd968d32e502b2c3d299",
+      "bytes": 371
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-009.stdout",
+      "destination": "run/before-near500ms-009.stdout",
+      "sha256": "bb2970c6487a2ce1a2cf6ac0d827c4495224caf0b5284cc391f37024e4061d67",
+      "bytes": 349
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-010.stderr",
+      "destination": "run/before-near500ms-010.stderr",
+      "sha256": "da499d68583c6db7ea5a1d4ccd163200ace00bd62f95103f9aba55ce709b2960",
+      "bytes": 88
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-010.stdout",
+      "destination": "run/before-near500ms-010.stdout",
+      "sha256": "2b4192ad82fbf3135ed6dae65c963584d7fc2eb8554857817f20709d194fc6ae",
+      "bytes": 245
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-011.stderr",
+      "destination": "run/before-near500ms-011.stderr",
+      "sha256": "9c27d4f47a8d11dac8edd44131a8e74d3fb579e3e5e62fecbcc5d30db19d5149",
+      "bytes": 385
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-011.stdout",
+      "destination": "run/before-near500ms-011.stdout",
+      "sha256": "f843fefb2f76e0311f524653be922f5b15cfd0fcd539e2ba717fbf8f6a67e133",
+      "bytes": 341
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-012.stderr",
+      "destination": "run/before-near500ms-012.stderr",
+      "sha256": "20a2837118e2033ad2a3b0085c9fb64a57b750cea82a1ff5d7647717de4f16ed",
+      "bytes": 88
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-012.stdout",
+      "destination": "run/before-near500ms-012.stdout",
+      "sha256": "86fe1a3518ef71447feb310eee8422e100f9ade005e608ddfe046742d4dc4a23",
+      "bytes": 213
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-013.stderr",
+      "destination": "run/before-near500ms-013.stderr",
+      "sha256": "f3c4d5ae62e9c140a8c62d1926e40bcb76f57ca409fba092ab86441485437b7e",
+      "bytes": 768
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-013.stdout",
+      "destination": "run/before-near500ms-013.stdout",
+      "sha256": "daf071121a9ffe32bbce44190e37a068c96d08bff63fd7b660dd95b77d786dca",
+      "bytes": 16
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-artifact-0-file.stderr",
+      "destination": "run/before-near500ms-artifact-0-file.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-artifact-0-file.stdout",
+      "destination": "run/before-near500ms-artifact-0-file.stdout",
+      "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4",
+      "bytes": 109
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-artifact-0-list.stderr",
+      "destination": "run/before-near500ms-artifact-0-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-artifact-0-list.stdout",
+      "destination": "run/before-near500ms-artifact-0-list.stdout",
+      "sha256": "393f13a2976eaaea232f481f47bf55a31919f30b38fa64ed30c6bca1d7ba6f45",
+      "bytes": 331235
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-artifacts.json",
+      "destination": "run/before-near500ms-artifacts.json",
+      "sha256": "770c131c36b191cbe7c5f2bd109ac44679961af68cccc5011b47811080845e89",
+      "bytes": 345044
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-compile.stderr",
+      "destination": "run/before-near500ms-compile.stderr",
+      "sha256": "df750ecf21d73bcadfda51d056849202ff83737d0d09f54ae5babe4c1f42e52a",
+      "bytes": 3821
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-compile.stdout",
+      "destination": "run/before-near500ms-compile.stdout",
+      "sha256": "fe0f2a67d45154e79a38f0ca6a43b945daf74aa61b81141e910271b69945ad13",
+      "bytes": 252572
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-freshness.json",
+      "destination": "run/before-near500ms-freshness.json",
+      "sha256": "ba7adf2e1a66a94ed298a7fbb3a3417078b4ef23d531a58ca9c42b5e58c9e292",
+      "bytes": 3192
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/commands.json",
+      "destination": "run/commands.json",
+      "sha256": "0e5c271e6ecb976e0e4a00a7799fe121f828c85ef92b9741d9d379d045561833",
+      "bytes": 46596
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/environment.json",
+      "destination": "run/environment.json",
+      "sha256": "a1eae3aed732d867662f89f9cb38e832de98e1399fea3d7ff88d5c381b98aa14",
+      "bytes": 555
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/extract-base.stderr",
+      "destination": "run/extract-base.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/extract-base.stdout",
+      "destination": "run/extract-base.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/failure.json",
+      "destination": "run/failure.json",
+      "sha256": "ecb07dc307e1ff70ef855cfa99600ea6f7ab449efe230117225a0780c986479e",
+      "bytes": 1052
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/final-restoration.json",
+      "destination": "run/final-restoration.json",
+      "sha256": "224953a1da9f4e810c164309bb2e2971649266957cea6ace050bec998e966201",
+      "bytes": 1634
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/host-uname.stderr",
+      "destination": "run/host-uname.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/host-uname.stdout",
+      "destination": "run/host-uname.stdout",
+      "sha256": "204a83e2b8636953a75868a7fe8e89acf55106ebad3f52c033cd94f377dcf868",
+      "bytes": 129
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/manifest.json",
+      "destination": "run/manifest.json",
+      "sha256": "e1968186155573eb62ef80b57b3800131c7ef7d5452b381960904bedf948d5d0",
+      "bytes": 14194
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/observations.json",
+      "destination": "run/observations.json",
+      "sha256": "7ef2f34c3fee006188d2394d1d951b20a652449762d000cfd0e8104fa277cb6a",
+      "bytes": 8849
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/rustc-version.stderr",
+      "destination": "run/rustc-version.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/rustc-version.stdout",
+      "destination": "run/rustc-version.stdout",
+      "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+      "bytes": 191
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source-provenance.json",
+      "destination": "run/source-provenance.json",
+      "sha256": "4cd47c2ff1878049d0d2953733592a8ece38580a9b80f94bca74216258eabaf8",
+      "bytes": 6917
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/PLAN.md",
+      "destination": "plan/PLAN.md",
+      "sha256": "abfd8081d49fe992c5b044f4f68eeb6b89c245f0dace06d0c46d913b70d30c06",
+      "bytes": 8164
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/execution-started.json",
+      "destination": "plan/execution-started.json",
+      "sha256": "9e931e375f0e99bde0a609b9be5bd4e4f5d8add8ef42a76efbbebe355108d329",
+      "bytes": 506
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/frozen-files.json",
+      "destination": "plan/frozen-files.json",
+      "sha256": "df8d8d8e7b7b9ba4481e8e1882cda65d88dfed717be42bf0dca9b83cb9314f5b",
+      "bytes": 1571
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/inventory.json",
+      "destination": "plan/inventory.json",
+      "sha256": "acda19cc6ce3ccd38f0536dcdfefccaa5f407c9c91bb5fb2e7eb30e27cc4d636",
+      "bytes": 29120
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/local-dependencies.json",
+      "destination": "plan/local-dependencies.json",
+      "sha256": "113b7f74061fe0cc4c822d67b572b170ab2f3905a59e8bd60bfa997c04454ccc",
+      "bytes": 6611
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/preparation-validation.json",
+      "destination": "plan/preparation-validation.json",
+      "sha256": "4e9ef4fc6109d6d5ec266ddecbd8d0c36e87829aff61e8ca5e11bf8b342e4505",
+      "bytes": 846
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/prepared.json",
+      "destination": "plan/prepared.json",
+      "sha256": "0a2c6011cfdb759ff5e240da1408180d200b0279a1d6adf054c490a55707e72c",
+      "bytes": 3397
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/verify_boot_clock.py",
+      "destination": "plan/verify_boot_clock.py.txt",
+      "sha256": "e28de088626dab9a252fb16566e45ad05c655ce08787e625d44510d4df22211a",
+      "bytes": 28373
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/candidate.patch",
+      "destination": "plan/candidate.patch",
+      "sha256": "40004d7f4e26102b20b6efd23bf769a39255c5d50406a0d6bca07eef29623a32",
+      "bytes": 17767
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/mod240.patch",
+      "destination": "plan/mod240.patch",
+      "sha256": "4d4e063757c9bf450837d7cffa97d9805f805f92e3b2e0fe21f70e0641032d4c",
+      "bytes": 1893
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/near500ms.patch",
+      "destination": "plan/near500ms.patch",
+      "sha256": "268df0971f2649005bdcf007ba61b54c7050621f4aaae4c6b982cc130c5b654b",
+      "bytes": 1824
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/stale-accepted.patch",
+      "destination": "plan/stale-accepted.patch",
+      "sha256": "44083a66cec03c1ae86d4579683ba3921615249e8fb799f2a62441c507187c09",
+      "bytes": 424
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/reader-gates.diff",
+      "destination": "plan/reader-gates.diff",
+      "sha256": "8c28ceefdb268f5337c821397ee81846222f8f5b58a95ae3504dcee78c16ed04",
+      "bytes": 18547
+    },
+    {
+      "source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/superseded-preparation.json",
+      "destination": "plan/superseded-preparation.json",
+      "sha256": "232bb302f0236d335efa3f6e369a04f9647a72c8b6d1a066e7e19b02830b6107",
+      "bytes": 2036
+    }
+  ],
+  "omitted_binary_archive": {
+    "bytes": 209100800,
+    "sha256": "cb8cf475da9da48ddd2887bf5a999da8e2e4678c1461a21a0f3f6b6f53e32b1b"
+  },
+  "omitted_source_directory": "source/",
+  "note": "All original terminal run records and raw streams are byte-identical. Source archive and compiled binaries stay external; their hashes are retained. The runner is a text attachment, not a runtime dependency."
+}

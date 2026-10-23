@@ -1,0 +1,13 @@
+{
+  "started_utc": "2026-10-23T01:33:29.268305+00:00",
+  "pid": 72707,
+  "base": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+  "candidate": "da595851f239cd6456cc1fb4565d3fc272675702",
+  "runner_sha256": "e28de088626dab9a252fb16566e45ad05c655ce08787e625d44510d4df22211a",
+  "prepared_sha256": "0a2c6011cfdb759ff5e240da1408180d200b0279a1d6adf054c490a55707e72c",
+  "argv": [
+    "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/verify_boot_clock.py",
+    "--run",
+    "--main-target-granted"
+  ]
+}

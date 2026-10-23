@@ -1,0 +1,11 @@
+
+running 1 test
+test second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy ... FAILED
+
+failures:
+
+failures:
+    second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3561 filtered out; finished in 0.00s
+

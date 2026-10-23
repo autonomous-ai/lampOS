@@ -1,0 +1,179 @@
+--- before-reader-gates/verify_boot_clock.py
++++ current/verify_boot_clock.py
+@@ -22,6 +22,7 @@
+ STOP = 'lampOS/crates/voice/src/stop_words.rs'
+ HELD = 'second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy'
+ STALE = 'stop_words::tests::audio_queued_for_a_yield_never_goes_once_it_is_forgotten_rested_or_dropped'
++READERS = ('lamp-skills', 'lamp-voice-eval', 'lamp-memory', 'lamp-update', 'lamp-cloud')
+ MODULUS = 240_000_000_000
+ SUMMARY = re.compile(r'test result: (ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out;')
+ 
+@@ -99,6 +100,7 @@
+                   candidate_tree=git('rev-parse', AFTER + ':lampOS').decode().strip(),
+                   selected_sha256={c: {p: sha(blob(c, p)) for p in changed + [IPC]} for c in (BASE, AFTER)},
+                   inventory_sha256=sha(inventory_bytes), exact_cases=len(names),
++                  reader_packages=list(READERS),
+                   shim_sha256={m: sha(shim(blob(BASE, IPC), m)) for m in ('mod240', 'near500ms')},
+                   negative_sha256=sha(negative), runner_sha256=file_sha(__file__))
+     save(E / 'prepared.json', frozen)
+@@ -217,9 +219,10 @@
+         assert before == after
+         return after
+ 
+-    def compile(self, label, full=False):
++    def compile(self, label, full=False, packages=('lamp-voice',)):
+         source = self.freshen(label)
+-        args = ['cargo', 'test', '-p', 'lamp-voice', '--offline', '--no-run', '--message-format=json']
++        args = ['cargo', 'test'] + [arg for p in packages for arg in ('-p', p)]
++        args += ['--offline', '--no-run', '--message-format=json']
+         if not full:
+             args += ['--lib']
+         self.good(self.command(label + '-compile', args, 1800))
+@@ -232,11 +235,13 @@
+             if target['name'] == 'lamp_ipc' and not item['fresh']:
+                 ipc_rebuilt = True
+             executable = item.get('executable')
+-            if not executable or not item['profile']['test'] or '/crates/voice/' not in target['src_path']:
++            owners = [p for p in packages if '/crates/' + p.removeprefix('lamp-') + '/' in target['src_path']]
++            if not executable or not item['profile']['test'] or not owners:
+                 continue
++            assert len(owners) == 1
+             assert not item['fresh'], 'frozen local inputs were not recompiled'
+             binary = Path(executable)
+-            entry = dict(path=executable, bytes=binary.stat().st_size, sha256=file_sha(binary),
++            entry = dict(package=owners[0], path=executable, bytes=binary.stat().st_size, sha256=file_sha(binary),
+                          cargo=item, source=source)
+             tag = label + '-artifact-' + str(len(artifacts))
+             self.good(self.command(tag + '-file', ['file', executable], 30))
+@@ -247,6 +252,12 @@
+             entry['inventory_sha256'] = sha('\n'.join(sorted(entry['names'])).encode())
+             artifacts[executable] = entry
+         assert artifacts and ipc_rebuilt, 'missing test artifact or rebuilt IPC evidence'
++        assert {a['package'] for a in artifacts.values()} == set(packages)
++        if packages != ('lamp-voice',):
++            assert full, 'reader gates must cover full package targets'
++            self.save(label + '-artifacts.json', list(artifacts.values()))
++            assert self.source() == source, 'source changed during compile/list'
++            return None, list(artifacts.values())
+         library = [a for a in artifacts.values() if 'lib' in a['cargo']['target']['kind']]
+         assert len(library) == 1
+         library = library[0]
+@@ -306,16 +317,59 @@
+             assert diagnostic in self.text(label), 'wrong negative-control diagnostic'
+         return row
+ 
+-    def full(self, label):
+-        _, artifacts = self.compile(label, full=True)
++    def target_outcomes(self, label, artifacts):
++        # Cargo executes these targets sequentially; each stderr launch has one
++        # corresponding libtest summary in stdout, including zero-test targets.
++        launches = []
++        by_path = {a['path']: a for a in artifacts}
++        for line in (self.run_dir / (label + '.stderr')).read_text().splitlines():
++            match = re.match(r'^\s*Running (.+) \(([^)]+)\)\s*$', line)
++            if match:
++                assert match[2] in by_path, 'Cargo launched an uninventoried target: ' + line
++                artifact = by_path[match[2]]
++                launches.append(dict(kind='executable', package=artifact['package'],
++                                     target=artifact['cargo']['target'], path=match[2],
++                                     binary_sha256=artifact['sha256'], names=artifact['names']))
++            else:
++                match = re.match(r'^\s*Doc-tests ([\w-]+)\s*$', line)
++                if match:
++                    launches.append(dict(kind='doctests', package=match[1]))
++        stdout = (self.run_dir / (label + '.stdout')).read_text()
++        summaries = list(SUMMARY.finditer(stdout))
++        assert len(launches) == len(summaries), 'launch/result count mismatch'
++        assert {r['path'] for r in launches if r['kind'] == 'executable'} == set(by_path)
++        previous = 0
++        for target, summary in zip(launches, summaries):
++            segment = stdout[previous:summary.start()]
++            rows = re.findall(r'^test (.+) \.\.\. (ok|FAILED|ignored(?:, [^\n]*)?)$', segment, re.MULTILINE)
++            previous = summary.end()
++            counts = dict(zip(('passed', 'failed', 'ignored', 'measured', 'filtered'), map(int, summary.groups()[1:])))
++            assert counts['filtered'] == counts['measured'] == 0
++            assert len(rows) == sum(counts[k] for k in ('passed', 'failed', 'ignored'))
++            assert sum(status == 'ok' for _, status in rows) == counts['passed']
++            assert sum(status == 'FAILED' for _, status in rows) == counts['failed']
++            assert sum(status.startswith('ignored') for _, status in rows) == counts['ignored']
++            if target['kind'] == 'executable':
++                assert sorted(name for name, _ in rows) == sorted(target.pop('names')), 'target identity mismatch'
++            target.update(result=summary[1], counts=counts, test_rows=rows)
++        self.save(label + '-target-outcomes.json', launches)
++
++    def full(self, label, packages=('lamp-voice',), serial=False):
++        _, artifacts = self.compile(label, full=True, packages=packages)
+         for artifact in artifacts:
+             assert file_sha(artifact['path']) == artifact['sha256']
+-        row = self.command(label + '-tests', ['cargo', 'test', '-p', 'lamp-voice', '--offline', '--no-fail-fast'], 2400)
++        args = ['cargo', 'test'] + [arg for p in packages for arg in ('-p', p)]
++        args += ['--offline', '--no-fail-fast']
++        if serial:
++            args += ['--', '--test-threads=1']
++        row = self.command(label + '-tests', args, 2400)
+         summaries = self.classify(row)
+         assert all(s['filtered'] == 0 for s in summaries)
+         assert sum(s['passed'] + s['failed'] + s['ignored'] + s['measured'] for s in summaries) >= sum(len(a['names']) for a in artifacts)
+         for artifact in artifacts:
+             assert file_sha(artifact['path']) == artifact['sha256'], 'Cargo changed the inventoried artifact'
++        if serial:
++            self.target_outcomes(label + '-tests', artifacts)
+         return row
+ 
+     def execute(self):
+@@ -367,15 +421,20 @@
+             self.freshen('gate-final')
+             self.good(self.command('gate-clippy', ['cargo', 'clippy', '-p', 'lamp-voice', '--all-targets', '--offline', '--', '-D', 'warnings'], 1800))
+             after_full = self.full('after-full')
++            reader_args = [arg for p in READERS for arg in ('-p', p)]
++            self.good(self.command('gate-readers-clippy', ['cargo', 'clippy', *reader_args,
++                                                          '--all-targets', '--offline', '--', '-D', 'warnings'], 1800))
++            readers_full = self.full('readers-full', packages=READERS, serial=True)
+             self.good(self.command('gate-build', ['cargo', 'build', '--workspace', '--offline'], 2400))
+             self.good(self.command('gate-diff', ['git', 'diff', '--check', BASE, AFTER], 60, REPO))
+             assert self.source() == self.final_source, 'unmutated final source drift'
+             result = dict(planned_work_complete=True, baseline_full_exit=before_full['exit_code'],
+-                          candidate_full_exit=after_full['exit_code'], candidate_gates_passed=after_full['exit_code'] == 0,
++                          candidate_full_exit=after_full['exit_code'], readers_full_exit=readers_full['exit_code'],
++                          candidate_gates_passed=after_full['exit_code'] == readers_full['exit_code'] == 0,
+                           exact_observations=len(self.observations), final_source=self.source(),
+                           baseline_failures_preserved=True, retries=0)
+             self.save('result.json', result)
+-            return 0 if after_full['exit_code'] == 0 else 1
++            return 0 if result['candidate_gates_passed'] else 1
+         finally:
+             self.install('after')
+             restored = self.source()
+--- before-reader-gates/PLAN.md
++++ current/PLAN.md
+@@ -2,7 +2,7 @@
+ 
+ Frozen baseline: `f477d6c49732dbd5cba84cbe18ea568692c056e6`. Candidate: `da595851f239cd6456cc1fb4565d3fc272675702`, its direct child, changing only the seven Voice files in `prepared.json`. The 86 names in `inventory.json` are source-derived until each compiled library's `--list` confirms them. Existing assertion bodies remain untouched by the controls. Policy and the ignored Host latency probe are outside this runner.
+ 
+-This replaces only the unexecuted Mac preparation for `b5f2e39d2a1d561364c754c1ff904ca588c63c29`. That earlier directory and its hashes remain unchanged. Its Linux candidate observation failed case 10 because the synthetic provider fault preceded the 600-second clock scope; the corrected source enters the scope after every real child readiness barrier but before the first runtime send or OptionalCamera timestamp. The original Linux failure is retained in its original evidence directory. The 86 selected names, exact controls, watchdogs, and gate sequence are unchanged.
++This replaces only the unexecuted Mac preparation for `b5f2e39d2a1d561364c754c1ff904ca588c63c29`. That earlier directory and its hashes remain unchanged. Its Linux candidate observation failed case 10 because the synthetic provider fault preceded the 600-second clock scope; the corrected source enters the scope after every real child readiness barrier but before the first runtime send or OptionalCamera timestamp. The original Linux failure is retained in its original evidence directory. The 86 selected names, exact controls and watchdogs are unchanged. The later reader-gate revision below adds the five mandatory dependent-package gates.
+ 
+ No authored worktree is modified. Execution exports the baseline's complete tracked `lampOS` tree to one private source path, overlays the candidate's exact seven Git blobs for the after arms, and uses that same path throughout. Every arm refreshes all tracked source mtimes with whole-content hash invariance. The original and controlled IPC bytes, seven changed-file hashes, full source aggregates, Git trees, archive hash, Cargo artifact messages, actual executable paths/hashes/architectures and complete libtest inventories are retained. Every control restores exact candidate bytes; the outer `finally` also restores them on failure. The committed candidate remains immutable throughout.
+ 
+@@ -12,9 +12,11 @@
+ 2. Literal modulo-240-second IPC clock: the held-lines case once before and once after. The before case must fail at subtraction overflow; the corrected case must pass.
+ 3. Continuous 0.5-second IPC epoch plus real elapsed host time, initialized once per test process: all 86 named library cases once before and once after, each in its own exact-test process. Baseline well-formed passes and failures are observations, not assumed reproductions. Corrected cases must pass.
+ 4. One corrected near-boot stale-audio negative control. Only `Live::hand`'s age guard is relaxed from three to five seconds, allowing the existing four-second-old block through. The unchanged `assert_eq!(service.audio(), 320)` must fail with 640 versus 320 at that original assertion. No other negative controls are added.
+-5. Fully restored candidate: `cargo fmt --all --check`; strict all-target Voice Clippy; one full default-parallel Voice package run; workspace build; committed range diff check.
++5. Fully restored candidate: `cargo fmt --all --check`; strict all-target Voice Clippy; one full default-parallel Voice package run.
++6. Separately run strict all-target Clippy for `lamp-skills`, `lamp-voice-eval`, `lamp-memory`, `lamp-update` and `lamp-cloud`, then one full serial test command for those five packages with `--no-fail-fast -- --test-threads=1`. Compile them first with Cargo JSON, retain every actual test artifact/hash/full inventory, and bind each execution target and its complete result rows to that inventory. Doctest outcomes are recorded separately. No baseline reader run is added.
++7. Independently run the workspace build and committed range diff check. A well-formed failed Voice or reader test observation remains a failed gate, and neither prevents that independent build.
+ 
+-Both full observations use `cargo test -p lamp-voice --offline --no-fail-fast`, with `RUST_TEST_THREADS` unset. `--no-fail-fast` lets later package targets run after a library failure; it changes no test scheduling and is not a retry. Full executable identity sets must match before/after. Their complete raw stdout/stderr and libtest counts are retained. Well-formed full-run failures remain failures and the independent workspace build still runs. Unexpected control failures, malformed results, crashes, timeouts, orphaned process groups or compile/lint failures stop the runner; none are retried. A final failed package gate returns nonzero even if the build passes.
++Both full observations use `cargo test -p lamp-voice --offline --no-fail-fast`, with `RUST_TEST_THREADS` unset. `--no-fail-fast` lets later package targets run after a library failure; it changes no test scheduling and is not a retry. Full executable identity sets must match before/after. Their complete raw stdout/stderr and libtest counts are retained. Well-formed full-run Voice and reader failures remain failures and the independent workspace build still runs. Unexpected control failures, malformed results, crashes, timeouts, orphaned process groups or compile/lint failures stop the runner; none are retried. Either failed candidate Voice or reader package gate returns nonzero even if the build passes.
+ 
+ First's `% 240 seconds` request is implemented at **`monotonic_ns()`**, literally `raw_ns % 240_000_000_000`; existing `monotonic_us()` remains `monotonic_ns()/1000`. This keeps both units coherent. The smaller-history arm returns `500_000_000 + (raw_ns - first_raw_ns)` from a process-wide `OnceLock`, never restarting it per call or per fixture thread. Both exact sources receive identical shim bytes. Neither shim changes `std::Instant` or its watchdogs. Each process logs its initial raw/mapped clock when IPC first reads it; an entirely explicit corrected fixture may never read IPC, which is recorded as no marker rather than invented clock evidence.
+ 
+@@ -30,4 +32,6 @@
+ 
+ MAIN target: `/private/tmp/tests-codex-1569-target`; native x86_64 Apple Rust toolchain; four Cargo jobs; dev/test debug zero; incremental off; Cargo offline. Rust flags/build target overrides and `RUST_TEST_THREADS` are unset. Compiler and executable ISA are recorded without inferring physical hardware or translation. No ARM compilation, network, publication, commits or pushes are performed. Default invocation only prepares external patch/identity files and invokes no Cargo command.
+ 
+-Local dependency scope is recorded from the pinned 46 workspace-member manifests in `local-dependencies.json`, without Cargo execution. Voice has 16 normal local dependency edges and six development edges (21 distinct packages, with Gemini in both). Its direct readers are Skills and Voice-eval as normal dependencies, plus Memory, Update and Cloud as development dependencies. The full Voice package run exercises Voice's own integration tests against its development readers (including Expression, Policy and Tasks), and compiles its dependencies. It does not run those dependencies' independent suites. The seven changes are confined to Voice test modules or cfg(test); downstream packages link unchanged non-test Voice. The workspace build checks production consumers. The declared plan therefore stays at full Voice tests and workspace compilation, with no claim that downstream test suites ran.
++Local dependency scope is recorded from the pinned 46 workspace-member manifests in `local-dependencies.json`, without Cargo execution. Voice has 16 normal local dependency edges and six development edges (21 distinct packages, with Gemini in both). Its direct readers are Skills and Voice-eval as normal dependencies, plus Memory, Update and Cloud as development dependencies. The full Voice package run exercises Voice's own integration tests against its development readers (including Expression, Policy and Tasks), and compiles its dependencies. It does not run those dependencies' independent suites. The seven changes are confined to Voice test modules or cfg(test); downstream packages link unchanged non-test Voice. The workspace build checks production consumers. The five direct readers are nevertheless required gates under `lampOS/docs/joining.md:196–203`, as root directed. This revision adds their separate strict Clippy and full serial test command; it does not add a baseline reader run or a test that mirrors the implementation. Their complete test outcomes will be preserved. Transitive dependents beyond the five direct readers receive workspace build coverage only, not a claimed local test run.
++
++The exact preceding unexecuted corrected preparation is preserved under `revisions/before-reader-gates/`, including its runner, plan, prepared hashes and manifest. `reader-gates.diff` records the current runner/plan change. The superseded b5f2 preparation remains untouched. Both plans remain unexecuted until root grants MAIN and CPU.

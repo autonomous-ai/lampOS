@@ -1,0 +1,9 @@
+BOOT_CLOCK_CONTROL mode=near500ms pid=49692 raw_ns=3247399834929000 mapped_ns=500000000
+
+thread 'coordinator::tests::hand_controls::a_ridden_gap_gives_the_camera_and_the_eyes_nothing_until_it_reopens' (704745761) panicked at crates/voice/src/coordinator/tests/hand_controls.rs:2358:60:
+attempt to subtract with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'coordinator::tests::hand_controls::a_ridden_gap_gives_the_camera_and_the_eyes_nothing_until_it_reopens' (704745761) panicked at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/thread/local.rs:428:25:
+cannot access a Thread Local Storage value during or after destruction: AccessError
+fatal runtime error: thread local panicked on drop, aborting

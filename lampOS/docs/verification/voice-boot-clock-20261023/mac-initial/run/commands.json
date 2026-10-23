@@ -1,0 +1,1375 @@
+[
+  {
+    "label": "archive-base",
+    "argv": [
+      "git",
+      "archive",
+      "--format=tar",
+      "--output=/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/base-lampOS.tar",
+      "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+      "lampOS"
+    ],
+    "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier",
+    "started_utc": "2026-10-23T01:33:30.454354+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3246618805017000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 3.4130014507099986,
+    "finished_utc": "2026-10-23T01:33:33.867304+00:00",
+    "host_monotonic_after_ns": 3246622218012000,
+    "stdout": {
+      "path": "archive-base.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stderr": {
+      "path": "archive-base.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "extract-base",
+    "argv": [
+      "tar",
+      "-xf",
+      "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/base-lampOS.tar",
+      "-C",
+      "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source"
+    ],
+    "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier",
+    "started_utc": "2026-10-23T01:33:33.868276+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3246622218950000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 3.3786531961522996,
+    "finished_utc": "2026-10-23T01:33:37.246885+00:00",
+    "host_monotonic_after_ns": 3246625597592000,
+    "stdout": {
+      "path": "extract-base.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stderr": {
+      "path": "extract-base.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "rustc-version",
+    "argv": [
+      "rustc",
+      "-vV"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:33:39.531572+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3246627882228000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.08174144709482789,
+    "finished_utc": "2026-10-23T01:33:39.613321+00:00",
+    "host_monotonic_after_ns": 3246627964026000,
+    "stdout": {
+      "path": "rustc-version.stdout",
+      "bytes": 191,
+      "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+    },
+    "stderr": {
+      "path": "rustc-version.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "host-uname",
+    "argv": [
+      "uname",
+      "-a"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:33:39.614256+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3246627964920000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.0083537008613348,
+    "finished_utc": "2026-10-23T01:33:39.622638+00:00",
+    "host_monotonic_after_ns": 3246627973340000,
+    "stdout": {
+      "path": "host-uname.stdout",
+      "bytes": 129,
+      "sha256": "204a83e2b8636953a75868a7fe8e89acf55106ebad3f52c033cd94f377dcf868"
+    },
+    "stderr": {
+      "path": "host-uname.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "before-full-compile",
+    "argv": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--offline",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:33:41.824438+00:00",
+    "timeout_seconds": 1800,
+    "host_monotonic_before_ns": 3246630175082000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 129.40288461511955,
+    "finished_utc": "2026-10-23T01:35:51.287131+00:00",
+    "host_monotonic_after_ns": 3246759576385000,
+    "stdout": {
+      "path": "before-full-compile.stdout",
+      "bytes": 264568,
+      "sha256": "befd0144c8aed2bfc696fe6252b32ec0b3f0b0a228d6f8cd23e0711ababba640"
+    },
+    "stderr": {
+      "path": "before-full-compile.stderr",
+      "bytes": 3821,
+      "sha256": "70f1705de117495907c60a87eb0a40d95b2e644dee02845da90e290aa4692273"
+    }
+  },
+  {
+    "label": "before-full-artifact-0-file",
+    "argv": [
+      "file",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:35:51.296020+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3246759585220000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.016099538188427687,
+    "finished_utc": "2026-10-23T01:35:51.312159+00:00",
+    "host_monotonic_after_ns": 3246759601415000,
+    "stdout": {
+      "path": "before-full-artifact-0-file.stdout",
+      "bytes": 109,
+      "sha256": "7acec4f4eea5570cda847dadb10df910daa5487e2eb3c42288d2b80251ac8d18"
+    },
+    "stderr": {
+      "path": "before-full-artifact-0-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "before-full-artifact-0-list",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+      "--list"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:35:51.313135+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3246759602336000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.6275811051018536,
+    "finished_utc": "2026-10-23T01:35:51.940715+00:00",
+    "host_monotonic_after_ns": 3246760229969000,
+    "stdout": {
+      "path": "before-full-artifact-0-list.stdout",
+      "bytes": 103,
+      "sha256": "c3e94ba6c76e70602a8b7ed7ef2c9666846770b9f1d1a8d86cdb8b8db8711252"
+    },
+    "stderr": {
+      "path": "before-full-artifact-0-list.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "before-full-artifact-1-file",
+    "argv": [
+      "file",
+      "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:35:51.948151+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3246760237345000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.013045119121670723,
+    "finished_utc": "2026-10-23T01:35:51.961204+00:00",
+    "host_monotonic_after_ns": 3246760250458000,
+    "stdout": {
+      "path": "before-full-artifact-1-file.stdout",
+      "bytes": 124,
+      "sha256": "f2d2f57ca3c4700e3cd53cf5290c10a1e35b0b669bc413ff0770c929346546e4"
+    },
+    "stderr": {
+      "path": "before-full-artifact-1-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "before-full-artifact-1-list",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+      "--list"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:35:51.962129+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3246760251340000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.6081335567869246,
+    "finished_utc": "2026-10-23T01:35:52.570290+00:00",
+    "host_monotonic_after_ns": 3246760859549000,
+    "stdout": {
+      "path": "before-full-artifact-1-list.stdout",
+      "bytes": 376,
+      "sha256": "43ffb0b5bf8ff7fb8feb2037c135808516f66552be2d9d0217d279aa285fa18c"
+    },
+    "stderr": {
+      "path": "before-full-artifact-1-list.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "before-full-artifact-2-file",
+    "argv": [
+      "file",
+      "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:35:52.577176+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3246760866350000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.014825813006609678,
+    "finished_utc": "2026-10-23T01:35:52.591992+00:00",
+    "host_monotonic_after_ns": 3246760881265000,
+    "stdout": {
+      "path": "before-full-artifact-2-file.stdout",
+      "bytes": 121,
+      "sha256": "8818cae6fd13a952438433c2b8170ac8664b0886abd068f5dad75f58dcfcfff4"
+    },
+    "stderr": {
+      "path": "before-full-artifact-2-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "before-full-artifact-2-list",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f",
+      "--list"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:35:52.593516+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3246760882720000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.6017754953354597,
+    "finished_utc": "2026-10-23T01:35:53.195306+00:00",
+    "host_monotonic_after_ns": 3246761484564000,
+    "stdout": {
+      "path": "before-full-artifact-2-list.stdout",
+      "bytes": 258,
+      "sha256": "77ecc834179fda7a2ef77341422cc660ed348e7cc941a40bbfdb35dd08123941"
+    },
+    "stderr": {
+      "path": "before-full-artifact-2-list.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "before-full-artifact-3-file",
+    "argv": [
+      "file",
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:35:53.426282+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3246761715450000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.015185929834842682,
+    "finished_utc": "2026-10-23T01:35:53.441458+00:00",
+    "host_monotonic_after_ns": 3246761730733000,
+    "stdout": {
+      "path": "before-full-artifact-3-file.stdout",
+      "bytes": 101,
+      "sha256": "ffe6eb73f9fc834c3983a3dea33371d221dcb847ea31a79bb8cd0e054b104763"
+    },
+    "stderr": {
+      "path": "before-full-artifact-3-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "before-full-artifact-3-list",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+      "--list"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:35:53.443075+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3246761732278000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 1.7958652381785214,
+    "finished_utc": "2026-10-23T01:35:55.238931+00:00",
+    "host_monotonic_after_ns": 3246763528182000,
+    "stdout": {
+      "path": "before-full-artifact-3-list.stdout",
+      "bytes": 22841,
+      "sha256": "be620c859d7f014e00f3945b8b4c54f89cbb2e5783e9025af0a9713278e683df"
+    },
+    "stderr": {
+      "path": "before-full-artifact-3-list.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "before-full-artifact-4-file",
+    "argv": [
+      "file",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:35:55.445918+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3246763735105000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.008551910985261202,
+    "finished_utc": "2026-10-23T01:35:55.454493+00:00",
+    "host_monotonic_after_ns": 3246763743746000,
+    "stdout": {
+      "path": "before-full-artifact-4-file.stdout",
+      "bytes": 109,
+      "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4"
+    },
+    "stderr": {
+      "path": "before-full-artifact-4-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "before-full-artifact-4-list",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:35:55.455867+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3246763745073000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 2.0196205587126315,
+    "finished_utc": "2026-10-23T01:35:57.475486+00:00",
+    "host_monotonic_after_ns": 3246765764745000,
+    "stdout": {
+      "path": "before-full-artifact-4-list.stdout",
+      "bytes": 331235,
+      "sha256": "393f13a2976eaaea232f481f47bf55a31919f30b38fa64ed30c6bca1d7ba6f45"
+    },
+    "stderr": {
+      "path": "before-full-artifact-4-list.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "before-full-tests",
+    "argv": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--offline",
+      "--no-fail-fast"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:36:00.402444+00:00",
+    "timeout_seconds": 2400,
+    "host_monotonic_before_ns": 3246768691632000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 101,
+    "elapsed_seconds": 260.902504960075,
+    "finished_utc": "2026-10-23T01:40:21.301616+00:00",
+    "host_monotonic_after_ns": 3247029590876000,
+    "stdout": {
+      "path": "before-full-tests.stdout",
+      "bytes": 380371,
+      "sha256": "07ae6a05ceb8ce102b7d28efc3e32250f76ad7771a84c9cdd1823cdd2bd4ac8f"
+    },
+    "stderr": {
+      "path": "before-full-tests.stderr",
+      "bytes": 818,
+      "sha256": "aac29ff345adb948f678af7fa774fc9c74b822694b544e12010782c8334daed0"
+    },
+    "summaries": [
+      {
+        "result": "ok",
+        "passed": 3548,
+        "failed": 0,
+        "ignored": 14,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "result": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "result": "FAILED",
+        "passed": 269,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "result": "ok",
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "result": "ok",
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "result": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      }
+    ]
+  },
+  {
+    "label": "before-mod240-compile",
+    "argv": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--offline",
+      "--no-run",
+      "--message-format=json",
+      "--lib"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:40:27.580565+00:00",
+    "timeout_seconds": 1800,
+    "host_monotonic_before_ns": 3247035869764000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 109.75788669101894,
+    "finished_utc": "2026-10-23T01:42:17.337054+00:00",
+    "host_monotonic_after_ns": 3247145626308000,
+    "stdout": {
+      "path": "before-mod240-compile.stdout",
+      "bytes": 252572,
+      "sha256": "324056a6c635d1e5ebf70449555c78e6a03c9ee311c97ebeeeb339e803100c88"
+    },
+    "stderr": {
+      "path": "before-mod240-compile.stderr",
+      "bytes": 3821,
+      "sha256": "0a1d1fda79d84ca93e452fe903b0af73a1c73af3fd81208b460447b50a7e1b6f"
+    }
+  },
+  {
+    "label": "before-mod240-artifact-0-file",
+    "argv": [
+      "file",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:42:17.539751+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3247145828942000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.01398769998922944,
+    "finished_utc": "2026-10-23T01:42:17.553753+00:00",
+    "host_monotonic_after_ns": 3247145843012000,
+    "stdout": {
+      "path": "before-mod240-artifact-0-file.stdout",
+      "bytes": 109,
+      "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4"
+    },
+    "stderr": {
+      "path": "before-mod240-artifact-0-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "before-mod240-artifact-0-list",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:42:17.554802+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3247145844013000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 3.178039352875203,
+    "finished_utc": "2026-10-23T01:42:20.732812+00:00",
+    "host_monotonic_after_ns": 3247149022067000,
+    "stdout": {
+      "path": "before-mod240-artifact-0-list.stdout",
+      "bytes": 331235,
+      "sha256": "393f13a2976eaaea232f481f47bf55a31919f30b38fa64ed30c6bca1d7ba6f45"
+    },
+    "stderr": {
+      "path": "before-mod240-artifact-0-list.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "before-mod240-000",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:42:23.827881+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3247152117085000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 101,
+    "elapsed_seconds": 0.03252421598881483,
+    "finished_utc": "2026-10-23T01:42:23.860430+00:00",
+    "host_monotonic_after_ns": 3247152149681000,
+    "stdout": {
+      "path": "before-mod240-000.stdout",
+      "bytes": 363,
+      "sha256": "18e3ed5f68dea0716a40d03bf592320b29f3434329a53529c7a955524769e336"
+    },
+    "stderr": {
+      "path": "before-mod240-000.stderr",
+      "bytes": 387,
+      "sha256": "27b9725add9c72b2094b431ac212f0406b7b09f2da29c1783c93898cd47b8e1b"
+    },
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ]
+  },
+  {
+    "label": "after-mod240-compile",
+    "argv": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--offline",
+      "--no-run",
+      "--message-format=json",
+      "--lib"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:42:27.248873+00:00",
+    "timeout_seconds": 1800,
+    "host_monotonic_before_ns": 3247155538080000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 104.45617874339223,
+    "finished_utc": "2026-10-23T01:44:11.703717+00:00",
+    "host_monotonic_after_ns": 3247259992968000,
+    "stdout": {
+      "path": "after-mod240-compile.stdout",
+      "bytes": 252572,
+      "sha256": "2f0972188b55c4ea14636bbdab4b3a0ed64428b9c409555cf3e980b0a6b80590"
+    },
+    "stderr": {
+      "path": "after-mod240-compile.stderr",
+      "bytes": 3821,
+      "sha256": "698663b04a1499ae6c348e64cbe4d4be4c13786a2ec2c4c05ad044353323013e"
+    }
+  },
+  {
+    "label": "after-mod240-artifact-0-file",
+    "argv": [
+      "file",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:44:11.908226+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3247260197413000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.015449828002601862,
+    "finished_utc": "2026-10-23T01:44:11.923682+00:00",
+    "host_monotonic_after_ns": 3247260212940000,
+    "stdout": {
+      "path": "after-mod240-artifact-0-file.stdout",
+      "bytes": 109,
+      "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4"
+    },
+    "stderr": {
+      "path": "after-mod240-artifact-0-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "after-mod240-artifact-0-list",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:44:11.925106+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3247260214310000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 2.0210292460396886,
+    "finished_utc": "2026-10-23T01:44:13.946119+00:00",
+    "host_monotonic_after_ns": 3247262235372000,
+    "stdout": {
+      "path": "after-mod240-artifact-0-list.stdout",
+      "bytes": 331235,
+      "sha256": "393f13a2976eaaea232f481f47bf55a31919f30b38fa64ed30c6bca1d7ba6f45"
+    },
+    "stderr": {
+      "path": "after-mod240-artifact-0-list.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "after-mod240-000",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:44:15.199210+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3247263488417000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.034756998997181654,
+    "finished_utc": "2026-10-23T01:44:15.233982+00:00",
+    "host_monotonic_after_ns": 3247263523235000,
+    "stdout": {
+      "path": "after-mod240-000.stdout",
+      "bytes": 228,
+      "sha256": "bf3f0feabbd36e550662a13c9d0b06fbc44af96eb3341be9504f255055982cf5"
+    },
+    "stderr": {
+      "path": "after-mod240-000.stderr",
+      "bytes": 1514,
+      "sha256": "662b672cc1acf072ba1d5bf5d84f4397ff3e869d75290373b19f8dd90eec478f"
+    },
+    "summaries": [
+      {
+        "result": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ]
+  },
+  {
+    "label": "before-near500ms-compile",
+    "argv": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-voice",
+      "--offline",
+      "--no-run",
+      "--message-format=json",
+      "--lib"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:44:18.935710+00:00",
+    "timeout_seconds": 1800,
+    "host_monotonic_before_ns": 3247267224919000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 125.38188536185771,
+    "finished_utc": "2026-10-23T01:46:24.316002+00:00",
+    "host_monotonic_after_ns": 3247392605254000,
+    "stdout": {
+      "path": "before-near500ms-compile.stdout",
+      "bytes": 252572,
+      "sha256": "fe0f2a67d45154e79a38f0ca6a43b945daf74aa61b81141e910271b69945ad13"
+    },
+    "stderr": {
+      "path": "before-near500ms-compile.stderr",
+      "bytes": 3821,
+      "sha256": "df750ecf21d73bcadfda51d056849202ff83737d0d09f54ae5babe4c1f42e52a"
+    }
+  },
+  {
+    "label": "before-near500ms-artifact-0-file",
+    "argv": [
+      "file",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:24.521139+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3247392810326000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.01408020593225956,
+    "finished_utc": "2026-10-23T01:46:24.535209+00:00",
+    "host_monotonic_after_ns": 3247392824460000,
+    "stdout": {
+      "path": "before-near500ms-artifact-0-file.stdout",
+      "bytes": 109,
+      "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4"
+    },
+    "stderr": {
+      "path": "before-near500ms-artifact-0-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "before-near500ms-artifact-0-list",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:24.536186+00:00",
+    "timeout_seconds": 30,
+    "host_monotonic_before_ns": 3247392825397000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 1.9682781742885709,
+    "finished_utc": "2026-10-23T01:46:26.504451+00:00",
+    "host_monotonic_after_ns": 3247394794569000,
+    "stdout": {
+      "path": "before-near500ms-artifact-0-list.stdout",
+      "bytes": 331235,
+      "sha256": "393f13a2976eaaea232f481f47bf55a31919f30b38fa64ed30c6bca1d7ba6f45"
+    },
+    "stderr": {
+      "path": "before-near500ms-artifact-0-list.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "label": "before-near500ms-000",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::second::tests::a_line_given_to_gemini_at_the_end_of_the_hold_is_never_too_old",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:27.715367+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3247396004552000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 101,
+    "elapsed_seconds": 0.09440213814377785,
+    "finished_utc": "2026-10-23T01:46:27.809769+00:00",
+    "host_monotonic_after_ns": 3247396099036000,
+    "stdout": {
+      "path": "before-near500ms-000.stdout",
+      "bytes": 343,
+      "sha256": "3a94405b4de0bc4a149c5389fe082bca3a1b4b39a7c0444e0f0e67b2e112d573"
+    },
+    "stderr": {
+      "path": "before-near500ms-000.stderr",
+      "bytes": 373,
+      "sha256": "1ffb2b526f9bc4dd45fc732b8351df33199d6010847b36e6065bb0d6d273549a"
+    },
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ]
+  },
+  {
+    "label": "before-near500ms-001",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::second::tests::a_ready_after_the_hold_leaves_the_line_to_the_second_route",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:28.010326+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3247396299514000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 101,
+    "elapsed_seconds": 0.09750423906370997,
+    "finished_utc": "2026-10-23T01:46:28.107819+00:00",
+    "host_monotonic_after_ns": 3247396397073000,
+    "stdout": {
+      "path": "before-near500ms-001.stdout",
+      "bytes": 335,
+      "sha256": "0df917cd1cf408e43dc0d4729503d01c045152a17d0a762ce39baf0a1eaeaa34"
+    },
+    "stderr": {
+      "path": "before-near500ms-001.stderr",
+      "bytes": 369,
+      "sha256": "32d44f349b1bddb1746c360c5666a8bba6ac899bc26757e1a4c538cd9647fc59"
+    },
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ]
+  },
+  {
+    "label": "before-near500ms-002",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::second::tests::a_ready_lost_in_the_same_drain_holds_the_next_request_for_the_reconnect",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:28.307873+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3247396597062000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 101,
+    "elapsed_seconds": 0.09942164784297347,
+    "finished_utc": "2026-10-23T01:46:28.407298+00:00",
+    "host_monotonic_after_ns": 3247396696558000,
+    "stdout": {
+      "path": "before-near500ms-002.stdout",
+      "bytes": 361,
+      "sha256": "544fc7f4d5e31c86577119170111cf41159ca760fe791f09e616b91be5a971ed"
+    },
+    "stderr": {
+      "path": "before-near500ms-002.stderr",
+      "bytes": 382,
+      "sha256": "5035231bc2eaff7be7c6ed8d0e583c08b6884c7c68c3af7e357c31134b2ab4f9"
+    },
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ]
+  },
+  {
+    "label": "before-near500ms-003",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::hand_controls::a_closed_switch_read_in_a_ridden_gap_is_the_mute",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:28.609338+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3247396898509000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 101,
+    "elapsed_seconds": 0.09455271903425455,
+    "finished_utc": "2026-10-23T01:46:28.703860+00:00",
+    "host_monotonic_after_ns": 3247396993113000,
+    "stdout": {
+      "path": "before-near500ms-003.stdout",
+      "bytes": 329,
+      "sha256": "3f3ccd8674bbc8da75cf0a3998d88661f1dbaa652f5a42804f42388500af64e3"
+    },
+    "stderr": {
+      "path": "before-near500ms-003.stderr",
+      "bytes": 379,
+      "sha256": "08f3cb9eed340827c01e3955c87925647518d603a60cc99b3933decd6c6e7af9"
+    },
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ]
+  },
+  {
+    "label": "before-near500ms-004",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::hand_controls::a_frame_the_conversation_reads_marks_the_run_heard",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:28.906699+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3247397195888000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.2718896050937474,
+    "finished_utc": "2026-10-23T01:46:29.178613+00:00",
+    "host_monotonic_after_ns": 3247397467883000,
+    "stdout": {
+      "path": "before-near500ms-004.stdout",
+      "bytes": 213,
+      "sha256": "c547cac689c6cc38461bf8040cf43528a986e9d252f5141075967ae3b9e0a8aa"
+    },
+    "stderr": {
+      "path": "before-near500ms-004.stderr",
+      "bytes": 88,
+      "sha256": "c439196f3731cc834a2a74c8e8bfe3b625cb5bbfc9a63303700e3fe2ad81c031"
+    },
+    "summaries": [
+      {
+        "result": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ]
+  },
+  {
+    "label": "before-near500ms-005",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::hand_controls::a_hand_kept_on_the_head_sighs_in_its_last_second_and_sleeps_on_time",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:29.379866+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3247397669054000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 101,
+    "elapsed_seconds": 0.057681101839989424,
+    "finished_utc": "2026-10-23T01:46:29.437568+00:00",
+    "host_monotonic_after_ns": 3247397726831000,
+    "stdout": {
+      "path": "before-near500ms-005.stdout",
+      "bytes": 367,
+      "sha256": "f193040591348ebaadfaeeb514198cd673ce6f3af3cc8bf80b062a7c3d26f862"
+    },
+    "stderr": {
+      "path": "before-near500ms-005.stderr",
+      "bytes": 379,
+      "sha256": "49ec9ed3e79eded39cd187fb1849ffd82e4f169ef2fa6b9c245c4beeec6e1b00"
+    },
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ]
+  },
+  {
+    "label": "before-near500ms-006",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::hand_controls::a_hand_lifted_after_its_breath_sighs_and_stays_awake",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:29.637039+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3247397926228000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 101,
+    "elapsed_seconds": 0.05600471096113324,
+    "finished_utc": "2026-10-23T01:46:29.693051+00:00",
+    "host_monotonic_after_ns": 3247397982305000,
+    "stdout": {
+      "path": "before-near500ms-006.stdout",
+      "bytes": 337,
+      "sha256": "e03680f584c3bd22c027bd2f045d32c7caa06daea89444fb172c033d630c44eb"
+    },
+    "stderr": {
+      "path": "before-near500ms-006.stderr",
+      "bytes": 364,
+      "sha256": "bd313dd6d8d482468110c9654191263eeff68824e2e7be49766dfd72a685c1ad"
+    },
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ]
+  },
+  {
+    "label": "before-near500ms-007",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::hand_controls::a_hand_seen_late_in_the_hold_gets_no_breath_and_sleeps_on_time",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:29.892118+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3247398181308000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 101,
+    "elapsed_seconds": 0.0562614849768579,
+    "finished_utc": "2026-10-23T01:46:29.948385+00:00",
+    "host_monotonic_after_ns": 3247398237670000,
+    "stdout": {
+      "path": "before-near500ms-007.stdout",
+      "bytes": 357,
+      "sha256": "d511643862f3a89d5078cb81f936ab826a5319592c128cc999f8a564bc6b034f"
+    },
+    "stderr": {
+      "path": "before-near500ms-007.stderr",
+      "bytes": 374,
+      "sha256": "be3697f7d6d7416ff8317ccac8634c8702c3e60bb9b98981293aea8637034879"
+    },
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ]
+  },
+  {
+    "label": "before-near500ms-008",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::hand_controls::a_head_touch_stops_the_lamp_while_it_says_its_answer",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:30.147464+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3247398436651000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 101,
+    "elapsed_seconds": 0.049020213074982166,
+    "finished_utc": "2026-10-23T01:46:30.196486+00:00",
+    "host_monotonic_after_ns": 3247398485744000,
+    "stdout": {
+      "path": "before-near500ms-008.stdout",
+      "bytes": 337,
+      "sha256": "cc9dedaf7147d1668b99a0953694e7669310bfb87a958fa9bf1799239f2da126"
+    },
+    "stderr": {
+      "path": "before-near500ms-008.stderr",
+      "bytes": 365,
+      "sha256": "5a480bb46ce68591f8ef7820332dbeec0a62afb5718726a190d19c3abb0a9c5b"
+    },
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ]
+  },
+  {
+    "label": "before-near500ms-009",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::hand_controls::a_head_touch_while_the_lamp_is_still_thinking_asks_nothing",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:30.397153+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3247398686340000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 101,
+    "elapsed_seconds": 0.058712676633149385,
+    "finished_utc": "2026-10-23T01:46:30.455865+00:00",
+    "host_monotonic_after_ns": 3247398745117000,
+    "stdout": {
+      "path": "before-near500ms-009.stdout",
+      "bytes": 349,
+      "sha256": "bb2970c6487a2ce1a2cf6ac0d827c4495224caf0b5284cc391f37024e4061d67"
+    },
+    "stderr": {
+      "path": "before-near500ms-009.stderr",
+      "bytes": 371,
+      "sha256": "919cd1f50654089cec53cf3e767c00d7a96650d94ee6bd968d32e502b2c3d299"
+    },
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ]
+  },
+  {
+    "label": "before-near500ms-010",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::hand_controls::a_lamp_put_to_sleep_from_the_head_ends_its_conversation_as_a_mute_named_head_sleep",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:30.657854+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3247398947041000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.09424475999549031,
+    "finished_utc": "2026-10-23T01:46:30.752083+00:00",
+    "host_monotonic_after_ns": 3247399041335000,
+    "stdout": {
+      "path": "before-near500ms-010.stdout",
+      "bytes": 245,
+      "sha256": "2b4192ad82fbf3135ed6dae65c963584d7fc2eb8554857817f20709d194fc6ae"
+    },
+    "stderr": {
+      "path": "before-near500ms-010.stderr",
+      "bytes": 88,
+      "sha256": "da499d68583c6db7ea5a1d4ccd163200ace00bd62f95103f9aba55ce709b2960"
+    },
+    "summaries": [
+      {
+        "result": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ]
+  },
+  {
+    "label": "before-near500ms-011",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::hand_controls::a_privacy_worker_failing_in_a_ridden_gap_marks_its_end",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:30.951646+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3247399240823000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 101,
+    "elapsed_seconds": 0.0602308320812881,
+    "finished_utc": "2026-10-23T01:46:31.011871+00:00",
+    "host_monotonic_after_ns": 3247399301123000,
+    "stdout": {
+      "path": "before-near500ms-011.stdout",
+      "bytes": 341,
+      "sha256": "f843fefb2f76e0311f524653be922f5b15cfd0fcd539e2ba717fbf8f6a67e133"
+    },
+    "stderr": {
+      "path": "before-near500ms-011.stderr",
+      "bytes": 385,
+      "sha256": "9c27d4f47a8d11dac8edd44131a8e74d3fb579e3e5e62fecbcc5d30db19d5149"
+    },
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ]
+  },
+  {
+    "label": "before-near500ms-012",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::hand_controls::a_privacy_worker_fault_reports_a_pending_wake_once",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:31.211684+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3247399500873000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": 0,
+    "elapsed_seconds": 0.09019750310108066,
+    "finished_utc": "2026-10-23T01:46:31.301875+00:00",
+    "host_monotonic_after_ns": 3247399591126000,
+    "stdout": {
+      "path": "before-near500ms-012.stdout",
+      "bytes": 213,
+      "sha256": "86fe1a3518ef71447feb310eee8422e100f9ade005e608ddfe046742d4dc4a23"
+    },
+    "stderr": {
+      "path": "before-near500ms-012.stderr",
+      "bytes": 88,
+      "sha256": "20a2837118e2033ad2a3b0085c9fb64a57b750cea82a1ff5d7647717de4f16ed"
+    },
+    "summaries": [
+      {
+        "result": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ]
+  },
+  {
+    "label": "before-near500ms-013",
+    "argv": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::hand_controls::a_ridden_gap_gives_the_camera_and_the_eyes_nothing_until_it_reopens",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T01:46:31.500684+00:00",
+    "timeout_seconds": 120,
+    "host_monotonic_before_ns": 3247399789872000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": -4,
+    "elapsed_seconds": 0.09596081404015422,
+    "finished_utc": "2026-10-23T01:46:31.596635+00:00",
+    "host_monotonic_after_ns": 3247399885890000,
+    "stdout": {
+      "path": "before-near500ms-013.stdout",
+      "bytes": 16,
+      "sha256": "daf071121a9ffe32bbce44190e37a068c96d08bff63fd7b660dd95b77d786dca"
+    },
+    "stderr": {
+      "path": "before-near500ms-013.stderr",
+      "bytes": 768,
+      "sha256": "f3c4d5ae62e9c140a8c62d1926e40bcb76f57ca409fba092ab86441485437b7e"
+    }
+  }
+]

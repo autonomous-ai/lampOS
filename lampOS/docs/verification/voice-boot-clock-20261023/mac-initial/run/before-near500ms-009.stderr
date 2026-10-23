@@ -1,0 +1,5 @@
+BOOT_CLOCK_CONTROL mode=near500ms pid=49430 raw_ns=3247398726002000 mapped_ns=500000000
+
+thread 'coordinator::tests::hand_controls::a_head_touch_while_the_lamp_is_still_thinking_asks_nothing' (704745449) panicked at crates/voice/src/hand_controls.rs:2173:44:
+attempt to subtract with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

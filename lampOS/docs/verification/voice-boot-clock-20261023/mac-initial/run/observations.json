@@ -1,0 +1,370 @@
+[
+  {
+    "label": "before-mod240-000",
+    "name": "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+    "clock": "mod240",
+    "markers": [
+      [
+        "mod240",
+        "34598",
+        "3247152145253000",
+        "192145253000"
+      ]
+    ],
+    "exit_code": 101,
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ],
+    "binary_sha256": "a08920e3322c4d184d7c7dcb98c06682862021dd632a4b53dab6de0a45377b7e"
+  },
+  {
+    "label": "after-mod240-000",
+    "name": "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+    "clock": "mod240",
+    "markers": [],
+    "exit_code": 0,
+    "summaries": [
+      {
+        "result": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ],
+    "binary_sha256": "23047c70aa2dab9121b5f6ec7dae720f87795f7276ab60dbc9ff18ad665a118a"
+  },
+  {
+    "label": "before-near500ms-000",
+    "name": "coordinator::second::tests::a_line_given_to_gemini_at_the_end_of_the_hold_is_never_too_old",
+    "clock": "near500ms",
+    "markers": [
+      [
+        "near500ms",
+        "48709",
+        "3247396060744000",
+        "500000000"
+      ]
+    ],
+    "exit_code": 101,
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ],
+    "binary_sha256": "d53e756933edc3d1ba9a09c34ebf84eb477bffd93d35e7b99ba0f52cde530a84"
+  },
+  {
+    "label": "before-near500ms-001",
+    "name": "coordinator::second::tests::a_ready_after_the_hold_leaves_the_line_to_the_second_route",
+    "clock": "near500ms",
+    "markers": [
+      [
+        "near500ms",
+        "48785",
+        "3247396354533000",
+        "500000000"
+      ]
+    ],
+    "exit_code": 101,
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ],
+    "binary_sha256": "d53e756933edc3d1ba9a09c34ebf84eb477bffd93d35e7b99ba0f52cde530a84"
+  },
+  {
+    "label": "before-near500ms-002",
+    "name": "coordinator::second::tests::a_ready_lost_in_the_same_drain_holds_the_next_request_for_the_reconnect",
+    "clock": "near500ms",
+    "markers": [
+      [
+        "near500ms",
+        "48868",
+        "3247396654051000",
+        "500000000"
+      ]
+    ],
+    "exit_code": 101,
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ],
+    "binary_sha256": "d53e756933edc3d1ba9a09c34ebf84eb477bffd93d35e7b99ba0f52cde530a84"
+  },
+  {
+    "label": "before-near500ms-003",
+    "name": "coordinator::tests::hand_controls::a_closed_switch_read_in_a_ridden_gap_is_the_mute",
+    "clock": "near500ms",
+    "markers": [
+      [
+        "near500ms",
+        "48973",
+        "3247396949202000",
+        "500000000"
+      ]
+    ],
+    "exit_code": 101,
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ],
+    "binary_sha256": "d53e756933edc3d1ba9a09c34ebf84eb477bffd93d35e7b99ba0f52cde530a84"
+  },
+  {
+    "label": "before-near500ms-004",
+    "name": "coordinator::tests::hand_controls::a_frame_the_conversation_reads_marks_the_run_heard",
+    "clock": "near500ms",
+    "markers": [
+      [
+        "near500ms",
+        "49047",
+        "3247397221461000",
+        "500000000"
+      ]
+    ],
+    "exit_code": 0,
+    "summaries": [
+      {
+        "result": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ],
+    "binary_sha256": "d53e756933edc3d1ba9a09c34ebf84eb477bffd93d35e7b99ba0f52cde530a84"
+  },
+  {
+    "label": "before-near500ms-005",
+    "name": "coordinator::tests::hand_controls::a_hand_kept_on_the_head_sighs_in_its_last_second_and_sleeps_on_time",
+    "clock": "near500ms",
+    "markers": [
+      [
+        "near500ms",
+        "49171",
+        "3247397710625000",
+        "500000000"
+      ]
+    ],
+    "exit_code": 101,
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ],
+    "binary_sha256": "d53e756933edc3d1ba9a09c34ebf84eb477bffd93d35e7b99ba0f52cde530a84"
+  },
+  {
+    "label": "before-near500ms-006",
+    "name": "coordinator::tests::hand_controls::a_hand_lifted_after_its_breath_sighs_and_stays_awake",
+    "clock": "near500ms",
+    "markers": [
+      [
+        "near500ms",
+        "49233",
+        "3247397968039000",
+        "500000000"
+      ]
+    ],
+    "exit_code": 101,
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ],
+    "binary_sha256": "d53e756933edc3d1ba9a09c34ebf84eb477bffd93d35e7b99ba0f52cde530a84"
+  },
+  {
+    "label": "before-near500ms-007",
+    "name": "coordinator::tests::hand_controls::a_hand_seen_late_in_the_hold_gets_no_breath_and_sleeps_on_time",
+    "clock": "near500ms",
+    "markers": [
+      [
+        "near500ms",
+        "49294",
+        "3247398222963000",
+        "500000000"
+      ]
+    ],
+    "exit_code": 101,
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ],
+    "binary_sha256": "d53e756933edc3d1ba9a09c34ebf84eb477bffd93d35e7b99ba0f52cde530a84"
+  },
+  {
+    "label": "before-near500ms-008",
+    "name": "coordinator::tests::hand_controls::a_head_touch_stops_the_lamp_while_it_says_its_answer",
+    "clock": "near500ms",
+    "markers": [
+      [
+        "near500ms",
+        "49356",
+        "3247398476655000",
+        "500000000"
+      ]
+    ],
+    "exit_code": 101,
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ],
+    "binary_sha256": "d53e756933edc3d1ba9a09c34ebf84eb477bffd93d35e7b99ba0f52cde530a84"
+  },
+  {
+    "label": "before-near500ms-009",
+    "name": "coordinator::tests::hand_controls::a_head_touch_while_the_lamp_is_still_thinking_asks_nothing",
+    "clock": "near500ms",
+    "markers": [
+      [
+        "near500ms",
+        "49430",
+        "3247398726002000",
+        "500000000"
+      ]
+    ],
+    "exit_code": 101,
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ],
+    "binary_sha256": "d53e756933edc3d1ba9a09c34ebf84eb477bffd93d35e7b99ba0f52cde530a84"
+  },
+  {
+    "label": "before-near500ms-010",
+    "name": "coordinator::tests::hand_controls::a_lamp_put_to_sleep_from_the_head_ends_its_conversation_as_a_mute_named_head_sleep",
+    "clock": "near500ms",
+    "markers": [
+      [
+        "near500ms",
+        "49507",
+        "3247398989542000",
+        "500000000"
+      ]
+    ],
+    "exit_code": 0,
+    "summaries": [
+      {
+        "result": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ],
+    "binary_sha256": "d53e756933edc3d1ba9a09c34ebf84eb477bffd93d35e7b99ba0f52cde530a84"
+  },
+  {
+    "label": "before-near500ms-011",
+    "name": "coordinator::tests::hand_controls::a_privacy_worker_failing_in_a_ridden_gap_marks_its_end",
+    "clock": "near500ms",
+    "markers": [
+      [
+        "near500ms",
+        "49568",
+        "3247399283219000",
+        "500000000"
+      ]
+    ],
+    "exit_code": 101,
+    "summaries": [
+      {
+        "result": "FAILED",
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ],
+    "binary_sha256": "d53e756933edc3d1ba9a09c34ebf84eb477bffd93d35e7b99ba0f52cde530a84"
+  },
+  {
+    "label": "before-near500ms-012",
+    "name": "coordinator::tests::hand_controls::a_privacy_worker_fault_reports_a_pending_wake_once",
+    "clock": "near500ms",
+    "markers": [
+      [
+        "near500ms",
+        "49630",
+        "3247399542046000",
+        "500000000"
+      ]
+    ],
+    "exit_code": 0,
+    "summaries": [
+      {
+        "result": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 3561
+      }
+    ],
+    "binary_sha256": "d53e756933edc3d1ba9a09c34ebf84eb477bffd93d35e7b99ba0f52cde530a84"
+  }
+]

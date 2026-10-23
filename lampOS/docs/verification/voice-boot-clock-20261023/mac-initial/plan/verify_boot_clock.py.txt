@@ -1,0 +1,476 @@
+#!/usr/bin/env python3
+"""Prepare only by default. --run requires the root agent's MAIN-target grant."""
+from pathlib import Path
+import argparse
+import datetime as dt
+import difflib
+import hashlib
+import json
+import os
+import re
+import signal
+import subprocess
+import sys
+import time
+
+E = Path(__file__).resolve().parent
+REPO = Path('/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier')
+BASE = 'f477d6c49732dbd5cba84cbe18ea568692c056e6'
+AFTER = 'da595851f239cd6456cc1fb4565d3fc272675702'
+INVENTORY = Path('/private/tmp/tests-codex-boot-clock-case-inventory-20261023-corrected.json')
+IPC = 'lampOS/crates/ipc/src/lib.rs'
+STOP = 'lampOS/crates/voice/src/stop_words.rs'
+HELD = 'second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy'
+STALE = 'stop_words::tests::audio_queued_for_a_yield_never_goes_once_it_is_forgotten_rested_or_dropped'
+READERS = ('lamp-skills', 'lamp-voice-eval', 'lamp-memory', 'lamp-update', 'lamp-cloud')
+MODULUS = 240_000_000_000
+SUMMARY = re.compile(r'test result: (ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out;')
+
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+def file_sha(path):
+    with Path(path).open('rb') as stream:
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+def save(path, value):
+    Path(path).write_text(json.dumps(value, indent=2) + '\n')
+
+def git(*args):
+    return subprocess.check_output(['git', *args], cwd=REPO)
+
+def blob(commit, path):
+    return git('show', f'{commit}:{path}')
+
+def replace_once(data, old, new):
+    assert data.count(old) == 1, (old, data.count(old))
+    return data.replace(old, new, 1)
+
+def patch(path, before, after):
+    return ''.join(difflib.unified_diff(before.decode().splitlines(True), after.decode().splitlines(True),
+                                      fromfile='a/' + path, tofile='b/' + path))
+
+def shim(data, mode):
+    begin = data.index(b'pub fn monotonic_ns() -> u64 {')
+    end = data.index(b'\n}\n', begin) + 2
+    original = data[begin:end]
+    nested = '\n'.join('    ' + line for line in original.decode().replace(
+        'pub fn monotonic_ns()', 'fn raw_clock_ns()', 1).splitlines())
+    expression = ('raw_ns % 240_000_000_000' if mode == 'mod240' else
+                  '500_000_000_u64.checked_add(raw_ns - first).expect("bounded near-boot control")')
+    initial = 'raw_ns % 240_000_000_000' if mode == 'mod240' else '500_000_000_u64'
+    check = ('    assert_eq!(raw_ns / 240_000_000_000, first / 240_000_000_000,\n'
+             '               "BOOT_CLOCK_CONTROL modulo wrap");\n') if mode == 'mod240' else ''
+    body = ('pub fn monotonic_ns() -> u64 {\n' + nested + '\n'
+            '    // Scratch diagnostic only; identical on both immutable sources.\n'
+            '    static FIRST: std::sync::OnceLock<u64> = std::sync::OnceLock::new();\n'
+            '    let first = *FIRST.get_or_init(|| {\n'
+            '        let raw_ns = raw_clock_ns();\n'
+            f'        eprintln!("BOOT_CLOCK_CONTROL mode={mode} pid={{}} raw_ns={{}} mapped_ns={{}}",\n'
+            f'                  std::process::id(), raw_ns, {initial});\n'
+            '        raw_ns\n'
+            '    });\n'
+            '    let raw_ns = raw_clock_ns();\n'
+            '    assert!(raw_ns >= first, "BOOT_CLOCK_CONTROL raw clock regressed");\n' + check +
+            f'    {expression}\n' + '}')
+    return data[:begin] + body.encode() + data[end:]
+
+def prepare():
+    assert not (E / 'execution-started.json').exists(), 'fixed plan already started; preparation is frozen'
+    inventory_bytes = INVENTORY.read_bytes()
+    inventory = json.loads(inventory_bytes)
+    names = [row['name'] for row in inventory['affected_tests']]
+    assert len(names) == len(set(names)) == 86
+    changed = git('diff', '--name-only', BASE, AFTER).decode().splitlines()
+    assert set(changed) == set(inventory['source_sha256']) and len(changed) == 7
+    assert git('rev-parse', AFTER + '^').decode().strip() == BASE
+    assert blob(BASE, IPC) == blob(AFTER, IPC)
+    for path in changed:
+        assert sha(blob(AFTER, path)) == inventory['source_sha256'][path], path
+    (E / 'inventory.json').write_bytes(inventory_bytes)
+    (E / 'candidate.patch').write_bytes(git('diff', '--binary', BASE, AFTER))
+    for mode in ('mod240', 'near500ms'):
+        (E / (mode + '.patch')).write_text(patch(IPC, blob(BASE, IPC), shim(blob(BASE, IPC), mode)))
+    old = b'&& clock().saturating_sub(captured_at_us) <= MOST_AGE_US'
+    new = b'&& clock().saturating_sub(captured_at_us) <= MOST_AGE_US + 2_000_000'
+    negative = replace_once(blob(AFTER, STOP), old, new)
+    (E / 'stale-accepted.patch').write_text(patch(STOP, blob(AFTER, STOP), negative))
+    frozen = dict(base=BASE, candidate=AFTER, changed_paths=changed,
+                  base_tree=git('rev-parse', BASE + ':lampOS').decode().strip(),
+                  candidate_tree=git('rev-parse', AFTER + ':lampOS').decode().strip(),
+                  selected_sha256={c: {p: sha(blob(c, p)) for p in changed + [IPC]} for c in (BASE, AFTER)},
+                  inventory_sha256=sha(inventory_bytes), exact_cases=len(names),
+                  reader_packages=list(READERS),
+                  shim_sha256={m: sha(shim(blob(BASE, IPC), m)) for m in ('mod240', 'near500ms')},
+                  negative_sha256=sha(negative), runner_sha256=file_sha(__file__))
+    save(E / 'prepared.json', frozen)
+    print('Prepared only; no Cargo or source mutation: ' + str(E), flush=True)
+
+class Runner:
+    def __init__(self):
+        self.frozen = json.loads((E / 'prepared.json').read_text())
+        assert self.frozen['runner_sha256'] == file_sha(__file__), 'runner changed after preparation'
+        assert self.frozen['inventory_sha256'] == file_sha(E / 'inventory.json')
+        self.names = [r['name'] for r in json.loads((E / 'inventory.json').read_text())['affected_tests']]
+        self.run_dir = E / ('run-' + dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ'))
+        self.run_dir.mkdir()
+        self.root = self.run_dir / 'source'
+        self.root.mkdir()
+        self.records, self.observations = [], []
+        self.library_names, self.full_identities = None, None
+        self.env = os.environ.copy()
+        self.env['PATH'] = str(Path.home() / '.cargo/bin') + os.pathsep + self.env.get('PATH', '')
+        self.env.update(CARGO_TARGET_DIR='/private/tmp/tests-codex-1569-target', CARGO_BUILD_JOBS='4',
+                        CARGO_PROFILE_DEV_DEBUG='0', CARGO_PROFILE_TEST_DEBUG='0', CARGO_INCREMENTAL='0',
+                        CARGO_NET_OFFLINE='true')
+        for key in ('RUST_TEST_THREADS', 'RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS', 'CARGO_BUILD_TARGET', 'RUSTUP_TOOLCHAIN'):
+            self.env.pop(key, None)
+        raw_paths = git('ls-tree', '-r', '-z', BASE, 'lampOS').split(b'\0')
+        self.paths = []
+        for row in filter(None, raw_paths):
+            info, path = row.split(b'\t', 1)
+            assert info.split()[0] in (b'100644', b'100755'), 'unexpected nonregular archive entry'
+            self.paths.append(path.decode())
+        self.paths.sort()
+        self.changed = self.frozen['changed_paths']
+        self.original = {p: blob(BASE, p) for p in self.changed + [IPC]}
+        self.candidate = {p: blob(AFTER, p) for p in self.changed + [IPC]}
+        self.final_source = None
+
+    def save(self, name, value):
+        save(self.run_dir / name, value)
+
+    def command(self, label, argv, timeout=120, cwd=None):
+        before_clock = time.clock_gettime_ns(time.CLOCK_MONOTONIC)
+        began = time.monotonic()
+        row = dict(label=label, argv=list(map(str, argv)), cwd=str(cwd or self.root / 'lampOS'),
+                   started_utc=dt.datetime.now(dt.timezone.utc).isoformat(), timeout_seconds=timeout,
+                   host_monotonic_before_ns=before_clock, timed_out=False, leftover_process_group=False)
+        with (self.run_dir / (label + '.stdout')).open('wb') as out, (self.run_dir / (label + '.stderr')).open('wb') as err:
+            child = subprocess.Popen(argv, cwd=cwd or self.root / 'lampOS', env=self.env,
+                                     stdout=out, stderr=err, start_new_session=True)
+            try:
+                code = child.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                row['timed_out'] = True
+                os.killpg(child.pid, signal.SIGTERM)
+                try:
+                    code = child.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    os.killpg(child.pid, signal.SIGKILL)
+                    code = child.wait(timeout=5)
+            try:
+                os.killpg(child.pid, 0)
+                row['leftover_process_group'] = True
+                os.killpg(child.pid, signal.SIGTERM)
+                time.sleep(0.2)
+                try:
+                    os.killpg(child.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            except ProcessLookupError:
+                pass
+        row.update(exit_code=code, elapsed_seconds=time.monotonic() - began,
+                   finished_utc=dt.datetime.now(dt.timezone.utc).isoformat(),
+                   host_monotonic_after_ns=time.clock_gettime_ns(time.CLOCK_MONOTONIC))
+        for kind in ('stdout', 'stderr'):
+            path = self.run_dir / (label + '.' + kind)
+            row[kind] = dict(path=path.name, bytes=path.stat().st_size, sha256=file_sha(path))
+        self.records.append(row)
+        self.save('commands.json', self.records)
+        print(json.dumps({k: row[k] for k in ('label', 'exit_code', 'elapsed_seconds', 'timed_out')}), flush=True)
+        return row
+
+    def good(self, row):
+        assert row['exit_code'] == 0 and not row['timed_out'] and not row['leftover_process_group'], row
+
+    def text(self, label):
+        return ''.join((self.run_dir / (label + '.' + k)).read_text(errors='replace') for k in ('stdout', 'stderr'))
+
+    def source(self):
+        rows = [(p, (self.root / p).stat().st_size, file_sha(self.root / p)) for p in self.paths]
+        selected = set(self.changed + [IPC, 'lampOS/Cargo.toml', 'lampOS/Cargo.lock',
+                                      'lampOS/rust-toolchain.toml', 'lampOS/crates/voice/Cargo.toml'])
+        return dict(files=len(rows), bytes=sum(r[1] for r in rows),
+                    sha256=sha(''.join(f'{p}\0{n}\0{h}\n' for p, n, h in rows).encode()),
+                    selected={p: h for p, _, h in rows if p in selected})
+
+    def install(self, arm, mode=None, negative=False):
+        for path, data in (self.original if arm == 'before' else self.candidate).items():
+            (self.root / path).write_bytes(data)
+        if mode:
+            data = shim(self.original[IPC], mode)
+            assert sha(data) == self.frozen['shim_sha256'][mode]
+            (self.root / IPC).write_bytes(data)
+        if negative:
+            path = self.root / STOP
+            data = replace_once(path.read_bytes(), b'<= MOST_AGE_US\n            && stream.send(samples)',
+                                b'<= MOST_AGE_US + 2_000_000\n            && stream.send(samples)')
+            assert sha(data) == self.frozen['negative_sha256']
+            path.write_bytes(data)
+
+    def freshen(self, label):
+        before = self.source()
+        stamp = time.time_ns()
+        for path in self.paths:
+            os.utime(self.root / path, ns=(stamp, stamp))
+        after = self.source()
+        self.save(label + '-freshness.json', dict(before=before, after=after, files_touched=len(self.paths), mtime_ns=stamp))
+        assert before == after
+        return after
+
+    def compile(self, label, full=False, packages=('lamp-voice',)):
+        source = self.freshen(label)
+        args = ['cargo', 'test'] + [arg for p in packages for arg in ('-p', p)]
+        args += ['--offline', '--no-run', '--message-format=json']
+        if not full:
+            args += ['--lib']
+        self.good(self.command(label + '-compile', args, 1800))
+        messages = [json.loads(line) for line in (self.run_dir / (label + '-compile.stdout')).read_text().splitlines() if line]
+        artifacts, ipc_rebuilt = {}, False
+        for item in messages:
+            if item.get('reason') != 'compiler-artifact':
+                continue
+            target = item['target']
+            if target['name'] == 'lamp_ipc' and not item['fresh']:
+                ipc_rebuilt = True
+            executable = item.get('executable')
+            owners = [p for p in packages if '/crates/' + p.removeprefix('lamp-') + '/' in target['src_path']]
+            if not executable or not item['profile']['test'] or not owners:
+                continue
+            assert len(owners) == 1
+            assert not item['fresh'], 'frozen local inputs were not recompiled'
+            binary = Path(executable)
+            entry = dict(package=owners[0], path=executable, bytes=binary.stat().st_size, sha256=file_sha(binary),
+                         cargo=item, source=source)
+            tag = label + '-artifact-' + str(len(artifacts))
+            self.good(self.command(tag + '-file', ['file', executable], 30))
+            self.good(self.command(tag + '-list', [executable, '--list'], 30))
+            listing = (self.run_dir / (tag + '-list.stdout')).read_text()
+            entry['names'] = [line[:-6] for line in listing.splitlines() if line.endswith(': test')]
+            assert len(entry['names']) == len(set(entry['names']))
+            entry['inventory_sha256'] = sha('\n'.join(sorted(entry['names'])).encode())
+            artifacts[executable] = entry
+        assert artifacts and ipc_rebuilt, 'missing test artifact or rebuilt IPC evidence'
+        assert {a['package'] for a in artifacts.values()} == set(packages)
+        if packages != ('lamp-voice',):
+            assert full, 'reader gates must cover full package targets'
+            self.save(label + '-artifacts.json', list(artifacts.values()))
+            assert self.source() == source, 'source changed during compile/list'
+            return None, list(artifacts.values())
+        library = [a for a in artifacts.values() if 'lib' in a['cargo']['target']['kind']]
+        assert len(library) == 1
+        library = library[0]
+        assert all(library['names'].count(name) == 1 for name in self.names), 'source inventory not in compiled library'
+        if self.library_names is None:
+            self.library_names = sorted(library['names'])
+        assert sorted(library['names']) == self.library_names, 'library identity set drift'
+        if full:
+            identities = {str(a['cargo']['target']['kind']) + ':' + a['cargo']['target']['name']: sorted(a['names']) for a in artifacts.values()}
+            if self.full_identities is None:
+                self.full_identities = identities
+            assert identities == self.full_identities, 'full package identity set drift'
+        self.save(label + '-artifacts.json', list(artifacts.values()))
+        assert self.source() == source, 'source changed during compile/list'
+        return library, list(artifacts.values())
+
+    def classify(self, row):
+        assert not row['timed_out'] and not row['leftover_process_group'] and row['exit_code'] in (0, 101), row
+        summaries = [dict(result=m[0], **dict(zip(('passed', 'failed', 'ignored', 'measured', 'filtered'), map(int, m[1:])))) for m in SUMMARY.findall(self.text(row['label']))]
+        assert summaries, 'missing libtest result'
+        failed = sum(s['failed'] for s in summaries)
+        assert (row['exit_code'] == 0) == (failed == 0), 'exit/result inconsistency'
+        row['summaries'] = summaries
+        self.save('commands.json', self.records)
+        return summaries
+
+    def exact(self, label, binary, name, mode, expect=None, diagnostic=None):
+        assert file_sha(binary['path']) == binary['sha256'], 'compiled binary changed'
+        if mode == 'mod240':
+            raw = time.clock_gettime_ns(time.CLOCK_MONOTONIC)
+            remaining = MODULUS - raw % MODULUS
+            delay = (remaining / 1e9 + 0.02) if remaining < 45_000_000_000 else 0
+            self.save(label + '-modulo-window.json', dict(raw_before_ns=raw, wait_seconds=delay,
+                                                         reason='One sample only; reserve45s for30s watchdog plus cleanup without wrapping.'))
+            if delay:
+                time.sleep(delay)
+        row = self.command(label, [binary['path'], '--exact', name, '--nocapture'], 30 if mode == 'mod240' else 120)
+        summaries = self.classify(row)
+        assert len(summaries) == 1
+        s = summaries[0]
+        assert s['passed'] + s['failed'] == 1 and s['ignored'] == s['measured'] == 0
+        assert s['filtered'] == len(binary['names']) - 1
+        markers = re.findall(r'BOOT_CLOCK_CONTROL mode=(\w+) pid=(\d+) raw_ns=(\d+) mapped_ns=(\d+)', self.text(label))
+        assert len(markers) <= 1
+        for got_mode, _, raw, mapped in markers:
+            assert got_mode == mode and row['host_monotonic_before_ns'] <= int(raw) <= row['host_monotonic_after_ns']
+            assert int(mapped) == (int(raw) % MODULUS if mode == 'mod240' else 500_000_000)
+        if mode == 'mod240':
+            assert row['host_monotonic_before_ns'] // MODULUS == row['host_monotonic_after_ns'] // MODULUS, 'modulo wrap invalidates observation'
+        observation = dict(label=label, name=name, clock=mode, markers=markers, exit_code=row['exit_code'],
+                           summaries=summaries, binary_sha256=binary['sha256'])
+        self.observations.append(observation)
+        self.save('observations.json', self.observations)
+        if expect is not None:
+            assert row['exit_code'] == expect, observation
+        if diagnostic:
+            assert diagnostic in self.text(label), 'wrong negative-control diagnostic'
+        return row
+
+    def target_outcomes(self, label, artifacts):
+        # Cargo executes these targets sequentially; each stderr launch has one
+        # corresponding libtest summary in stdout, including zero-test targets.
+        launches = []
+        by_path = {a['path']: a for a in artifacts}
+        for line in (self.run_dir / (label + '.stderr')).read_text().splitlines():
+            match = re.match(r'^\s*Running (.+) \(([^)]+)\)\s*$', line)
+            if match:
+                assert match[2] in by_path, 'Cargo launched an uninventoried target: ' + line
+                artifact = by_path[match[2]]
+                launches.append(dict(kind='executable', package=artifact['package'],
+                                     target=artifact['cargo']['target'], path=match[2],
+                                     binary_sha256=artifact['sha256'], names=artifact['names']))
+            else:
+                match = re.match(r'^\s*Doc-tests ([\w-]+)\s*$', line)
+                if match:
+                    launches.append(dict(kind='doctests', package=match[1]))
+        stdout = (self.run_dir / (label + '.stdout')).read_text()
+        summaries = list(SUMMARY.finditer(stdout))
+        assert len(launches) == len(summaries), 'launch/result count mismatch'
+        assert {r['path'] for r in launches if r['kind'] == 'executable'} == set(by_path)
+        previous = 0
+        for target, summary in zip(launches, summaries):
+            segment = stdout[previous:summary.start()]
+            rows = re.findall(r'^test (.+) \.\.\. (ok|FAILED|ignored(?:, [^\n]*)?)$', segment, re.MULTILINE)
+            previous = summary.end()
+            counts = dict(zip(('passed', 'failed', 'ignored', 'measured', 'filtered'), map(int, summary.groups()[1:])))
+            assert counts['filtered'] == counts['measured'] == 0
+            assert len(rows) == sum(counts[k] for k in ('passed', 'failed', 'ignored'))
+            assert sum(status == 'ok' for _, status in rows) == counts['passed']
+            assert sum(status == 'FAILED' for _, status in rows) == counts['failed']
+            assert sum(status.startswith('ignored') for _, status in rows) == counts['ignored']
+            if target['kind'] == 'executable':
+                assert sorted(name for name, _ in rows) == sorted(target.pop('names')), 'target identity mismatch'
+            target.update(result=summary[1], counts=counts, test_rows=rows)
+        self.save(label + '-target-outcomes.json', launches)
+
+    def full(self, label, packages=('lamp-voice',), serial=False):
+        _, artifacts = self.compile(label, full=True, packages=packages)
+        for artifact in artifacts:
+            assert file_sha(artifact['path']) == artifact['sha256']
+        args = ['cargo', 'test'] + [arg for p in packages for arg in ('-p', p)]
+        args += ['--offline', '--no-fail-fast']
+        if serial:
+            args += ['--', '--test-threads=1']
+        row = self.command(label + '-tests', args, 2400)
+        summaries = self.classify(row)
+        assert all(s['filtered'] == 0 for s in summaries)
+        assert sum(s['passed'] + s['failed'] + s['ignored'] + s['measured'] for s in summaries) >= sum(len(a['names']) for a in artifacts)
+        for artifact in artifacts:
+            assert file_sha(artifact['path']) == artifact['sha256'], 'Cargo changed the inventoried artifact'
+        if serial:
+            self.target_outcomes(label + '-tests', artifacts)
+        return row
+
+    def execute(self):
+        archive = self.run_dir / 'base-lampOS.tar'
+        self.good(self.command('archive-base', ['git', 'archive', '--format=tar', '--output=' + str(archive), BASE, 'lampOS'], 120, REPO))
+        self.good(self.command('extract-base', ['tar', '-xf', str(archive), '-C', str(self.root)], 120, REPO))
+        initial = self.source()
+        self.install('after')
+        self.final_source = self.source()
+        self.save('source-provenance.json', dict(frozen=self.frozen, base=initial, candidate=self.final_source,
+                                                archive_sha256=file_sha(archive), archive_bytes=archive.stat().st_size,
+                                                source_root=str(self.root), authored_worktree_modified=False))
+        self.save('environment.json', dict(env={k: self.env[k] for k in ('CARGO_TARGET_DIR', 'CARGO_BUILD_JOBS', 'CARGO_PROFILE_DEV_DEBUG', 'CARGO_PROFILE_TEST_DEBUG', 'CARGO_INCREMENTAL', 'CARGO_NET_OFFLINE')},
+                                          RUST_TEST_THREADS='unset', RUSTFLAGS='unset', CARGO_BUILD_TARGET='unset',
+                                          target_ownership='MAIN explicitly granted before --run; no host-isolation claim',
+                                          architecture_limit='Rust target and file output identify compiler/binary ISA; physical hardware or translation not inferred.'))
+        try:
+            self.good(self.command('rustc-version', ['rustc', '-vV'], 30))
+            assert 'host: x86_64-apple-darwin' in self.text('rustc-version'), 'not assigned Mac x86 toolchain'
+            self.good(self.command('host-uname', ['uname', '-a'], 30))
+            self.install('before')
+            before_full = self.full('before-full')
+            for mode in ('mod240', 'near500ms'):
+                for arm in ('before', 'after'):
+                    label = arm + '-' + mode
+                    self.install(arm, mode)
+                    binary, _ = self.compile(label)
+                    cases = [HELD] if mode == 'mod240' else self.names
+                    for index, name in enumerate(cases):
+                        expected = 0 if arm == 'after' else (101 if mode == 'mod240' else None)
+                        diagnostic = 'attempt to subtract with overflow' if arm == 'before' and mode == 'mod240' else None
+                        self.exact(label + '-' + str(index).zfill(3), binary, name, mode, expected, diagnostic)
+                    self.install('after')
+                    restored = self.source()
+                    self.save(label + '-restoration.json', dict(source=restored, exact_candidate=restored == self.final_source))
+                    assert restored == self.final_source
+            self.install('after', 'near500ms', negative=True)
+            binary, _ = self.compile('stale-accepted')
+            result = self.exact('stale-accepted-test', binary, STALE, 'near500ms', 101, 'assertion `left == right` failed')
+            output = self.text(result['label'])
+            assert re.search(r'left:\s*640\s+right:\s*320', output), 'stale audio did not reach original320-byte assertion'
+            body = (self.root / STOP).read_text()
+            start = body.index('fn audio_queued_for_a_yield_never_goes_once_it_is_forgotten_rested_or_dropped()')
+            line = body[:body.index('assert_eq!(service.audio(), 320);', start)].count('\n') + 1
+            assert f'stop_words.rs:{line}:' in output, 'different assertion failed'
+            self.install('after')
+            assert self.source() == self.final_source
+            self.good(self.command('gate-fmt', ['cargo', 'fmt', '--all', '--check'], 300))
+            self.freshen('gate-final')
+            self.good(self.command('gate-clippy', ['cargo', 'clippy', '-p', 'lamp-voice', '--all-targets', '--offline', '--', '-D', 'warnings'], 1800))
+            after_full = self.full('after-full')
+            reader_args = [arg for p in READERS for arg in ('-p', p)]
+            self.good(self.command('gate-readers-clippy', ['cargo', 'clippy', *reader_args,
+                                                          '--all-targets', '--offline', '--', '-D', 'warnings'], 1800))
+            readers_full = self.full('readers-full', packages=READERS, serial=True)
+            self.good(self.command('gate-build', ['cargo', 'build', '--workspace', '--offline'], 2400))
+            self.good(self.command('gate-diff', ['git', 'diff', '--check', BASE, AFTER], 60, REPO))
+            assert self.source() == self.final_source, 'unmutated final source drift'
+            result = dict(planned_work_complete=True, baseline_full_exit=before_full['exit_code'],
+                          candidate_full_exit=after_full['exit_code'], readers_full_exit=readers_full['exit_code'],
+                          candidate_gates_passed=after_full['exit_code'] == readers_full['exit_code'] == 0,
+                          exact_observations=len(self.observations), final_source=self.source(),
+                          baseline_failures_preserved=True, retries=0)
+            self.save('result.json', result)
+            return 0 if result['candidate_gates_passed'] else 1
+        finally:
+            self.install('after')
+            restored = self.source()
+            self.save('final-restoration.json', dict(source=restored, exact_candidate=restored == self.final_source,
+                                                     authored_worktree_modified=False))
+            assert restored == self.final_source, 'scratch restoration failed'
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--run', action='store_true')
+    parser.add_argument('--main-target-granted', action='store_true')
+    args = parser.parse_args()
+    if not args.run:
+        prepare()
+        return 0
+    assert args.main_target_granted, 'Root must explicitly grant MAIN before execution'
+    frozen = json.loads((E / 'prepared.json').read_text())
+    assert frozen['runner_sha256'] == file_sha(__file__), 'runner changed after preparation'
+    # Kept after success or failure: a second invocation never repeats this plan.
+    with (E / 'execution-started.json').open('x') as marker:
+        json.dump(dict(started_utc=dt.datetime.now(dt.timezone.utc).isoformat(), pid=os.getpid(),
+                       base=BASE, candidate=AFTER, runner_sha256=file_sha(__file__),
+                       prepared_sha256=file_sha(E / 'prepared.json'), argv=sys.argv), marker, indent=2)
+        marker.write('\n')
+        marker.flush()
+        os.fsync(marker.fileno())
+    runner = Runner()
+    try:
+        return runner.execute()
+    except BaseException as error:
+        runner.save('failure.json', dict(type=type(error).__name__, error=str(error), commands_completed=len(runner.records)))
+        raise
+    finally:
+        files = {p.name: dict(bytes=p.stat().st_size, sha256=file_sha(p)) for p in sorted(runner.run_dir.iterdir()) if p.is_file()}
+        runner.save('manifest.json', files)
+        print('Evidence: ' + str(runner.run_dir), flush=True)
+
+if __name__ == '__main__':
+    raise SystemExit(main())

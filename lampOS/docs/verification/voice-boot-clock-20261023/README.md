@@ -47,6 +47,18 @@ The native x86 compile took 143.555 s; `cargo fmt --all --check` took
 -p lamp-voice --all-targets -- -D warnings` took 133.593 s. All exited zero.
 The final 6,523-file source check passed. No baseline test was repeated.
 
+## Initial Mac observation
+
+`mac-initial/` preserves the first Mac execution. Full unchanged-base Voice
+was **3,828/1/14**, including library **3,548/0/14** and one original
+light-call latency failure. The modulo clock control failed before and
+passed after. The base near-boot sweep stopped with **3 passes, 10 ordinary
+failures and 1 abort**, leaving 72 cases unrun: an overflow in the ridden-gap
+fixture was followed by a TLS destructor abort, with no libtest result.
+The corrected candidate and original IPC source were restored exactly.
+The failed execution and marker remain immutable; any continuation runs
+only previously unrun cases and reports the abort separately.
+
 ## What was not shown
 
 Mac before/after full-package and direct-consumer gates, stricter near-boot

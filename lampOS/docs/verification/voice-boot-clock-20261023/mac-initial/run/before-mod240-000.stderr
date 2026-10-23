@@ -1,0 +1,5 @@
+BOOT_CLOCK_CONTROL mode=mod240 pid=34598 raw_ns=3247152145253000 mapped_ns=192145253000
+
+thread 'second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy' (704704341) panicked at crates/voice/src/second_provider/worker.rs:8341:25:
+attempt to subtract with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

@@ -1,0 +1,23 @@
+{
+  "source": {
+    "files": 6523,
+    "bytes": 203361607,
+    "sha256": "47551982f2a0f34789d2c0284e2df5c1bf9223221a28cb2bbbe0f210254e0388",
+    "selected": {
+      "lampOS/Cargo.lock": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c",
+      "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+      "lampOS/crates/ipc/src/lib.rs": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+      "lampOS/crates/voice/Cargo.toml": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+      "lampOS/crates/voice/src/coordinator/second.rs": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+      "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+      "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "65af6a4a052ef808e094284373f4c155bf4f09250a09c2c090b9b225c77cda6e",
+      "lampOS/crates/voice/src/scenario_clock.rs": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "lampOS/crates/voice/src/second_provider/worker.rs": "983d30959d6322c97be81be053f00596796d15e52eb8eb8d35ffaad8d276b9c7",
+      "lampOS/crates/voice/src/stop_words.rs": "5524521c56061be6af4b8ee95d52ecc3b9b1d3c3ee4a2344db4fa75dbf4f9a0f",
+      "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+    }
+  },
+  "exact_candidate": true,
+  "authored_worktree_modified": false
+}

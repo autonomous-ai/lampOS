@@ -1,5 +1,27 @@
 # Tests work log
 
+## 2026-10-23 09:00 +0700 — original Mac control stop preserved
+
+Ready for lamp-voice: no (boot-clock correction).
+
+The [complete initial Mac receipt](verification/voice-boot-clock-20261023/mac-initial/)
+retains full unchanged-base Voice **3,828/1/14**, library **3,548/0/14**,
+and the original light-call latency failure. The modulo control fails before
+and passes after. Near-boot base observations are **3 passes, 10 failures,
+1 abort and 72 unrun**: the ridden-gap fixture overflowed before a TLS
+destructor abort. No libtest count is invented for the aborted process.
+A separate continuation is being prepared without repeating completed
+cases. Candidate full Voice, direct readers and workspace build remain unrun.
+
+Train 26 merged #3023 and #3165 into `e6b88eac2`, with the same commits.
+Their historical local observations remain recorded; the proposed separate
+#3023 Mac comparison was never started. Current AGENTS `71ecf9471` was read,
+including one-build-apart compatibility; no direct merge is taken while a
+train is open. #2839's first two-case execution is running on the separate
+small target. The original #2964 ARM failure is being classified from its
+first attempt, separately from its later successful rerun. No product or
+device change has been made.
+
 ## 2026-10-23 08:36 +0700 — corrected Linux boot-clock gate passes
 
 Corrected `da595851f` on `f477d6c49` passes all **86** selected cases once

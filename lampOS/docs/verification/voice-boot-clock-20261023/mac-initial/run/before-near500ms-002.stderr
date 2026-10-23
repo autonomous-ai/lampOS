@@ -1,0 +1,5 @@
+BOOT_CLOCK_CONTROL mode=near500ms pid=48868 raw_ns=3247396654051000 mapped_ns=500000000
+
+thread 'coordinator::second::tests::a_ready_lost_in_the_same_drain_holds_the_next_request_for_the_reconnect' (704744777) panicked at crates/voice/src/coordinator/second.rs:1990:42:
+attempt to subtract with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

@@ -1,0 +1,5 @@
+{
+  "type": "AssertionError",
+  "error": "{'label': 'before-near500ms-013', 'argv': ['/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d', '--exact', 'coordinator::tests::hand_controls::a_ridden_gap_gives_the_camera_and_the_eyes_nothing_until_it_reopens', '--nocapture'], 'cwd': '/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS', 'started_utc': '2026-10-23T01:46:31.500684+00:00', 'timeout_seconds': 120, 'host_monotonic_before_ns': 3247399789872000, 'timed_out': False, 'leftover_process_group': False, 'exit_code': -4, 'elapsed_seconds': 0.09596081404015422, 'finished_utc': '2026-10-23T01:46:31.596635+00:00', 'host_monotonic_after_ns': 3247399885890000, 'stdout': {'path': 'before-near500ms-013.stdout', 'bytes': 16, 'sha256': 'daf071121a9ffe32bbce44190e37a068c96d08bff63fd7b660dd95b77d786dca'}, 'stderr': {'path': 'before-near500ms-013.stderr', 'bytes': 768, 'sha256': 'f3c4d5ae62e9c140a8c62d1926e40bcb76f57ca409fba092ab86441485437b7e'}}",
+  "commands_completed": 41
+}

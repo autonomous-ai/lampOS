@@ -1,0 +1,222 @@
+{
+  "source": "da595851f239cd6456cc1fb4565d3fc272675702",
+  "method": "Read pinned workspace-member Cargo.toml Git blobs with Python tomllib; no Cargo metadata or execution. All dependency kinds and target tables included; historical manifests in docs/verification are excluded. This is a manifest graph, not a resolved feature graph.",
+  "manifest_count": 47,
+  "workspace_package_count": 46,
+  "relevant_manifest_sha256": {
+    "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+    "lampOS/crates/cloud/Cargo.toml": "57a154cf64d7adc8b5e21be9338f57d6da62b1ed01497647ace3a7aa495009d8",
+    "lampOS/crates/memory/Cargo.toml": "aef3519411f1e2fed21a93d645fc26a617a66ccda5733a10d8d2a69f683b3553",
+    "lampOS/crates/skills/Cargo.toml": "8588ef3204b62820ca39258ce078a6feb84f8282dc99aca0ca7a071004a7130b",
+    "lampOS/crates/update/Cargo.toml": "2e791c3e5eb8fc99f4ade7a0a6c484c60a0f988a5bf25c37a25176c6bf7a7792",
+    "lampOS/crates/voice-eval/Cargo.toml": "eeb211074c1d8a2813ebb0c73422f20385fc56922480163d0303df43e3e59cb7",
+    "lampOS/crates/voice/Cargo.toml": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776"
+  },
+  "voice_direct_local_edges": [
+    {
+      "from": "lamp-voice",
+      "to": "lamp-turn-owner",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-ipc",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-audio",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-camera",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-ring",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-body",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-gemini",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-turn-end-wire",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-bus",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-msgs",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-near-call",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-voice-processes",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-controls",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-schedule",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-local-time",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-health",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-actions",
+      "kind": "dev-dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-ears",
+      "kind": "dev-dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-gemini",
+      "kind": "dev-dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-expression",
+      "kind": "dev-dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-policy",
+      "kind": "dev-dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "from": "lamp-voice",
+      "to": "lamp-tasks",
+      "kind": "dev-dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice/Cargo.toml"
+    }
+  ],
+  "direct_reverse_edges": [
+    {
+      "from": "lamp-voice-eval",
+      "to": "lamp-voice",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/voice-eval/Cargo.toml"
+    },
+    {
+      "from": "lamp-memory",
+      "to": "lamp-voice",
+      "kind": "dev-dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/memory/Cargo.toml"
+    },
+    {
+      "from": "lamp-update",
+      "to": "lamp-voice",
+      "kind": "dev-dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/update/Cargo.toml"
+    },
+    {
+      "from": "lamp-skills",
+      "to": "lamp-voice",
+      "kind": "dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/skills/Cargo.toml"
+    },
+    {
+      "from": "lamp-cloud",
+      "to": "lamp-voice",
+      "kind": "dev-dependencies",
+      "target": null,
+      "manifest": "lampOS/crates/cloud/Cargo.toml"
+    }
+  ],
+  "transitive_reverse_package_names_including_dev_and_build": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice-eval"
+  ],
+  "coverage": "Full Voice package tests plus separate strict all-target Clippy and one serial full test command for the five direct reverse readers (Skills, Voice-eval, Memory, Update, Cloud), required by joining.md196\u2013203/root direction. Every local production consumer also receives workspace build coverage. No baseline reader suite or separate local tests of further transitive dependents are included."
+}

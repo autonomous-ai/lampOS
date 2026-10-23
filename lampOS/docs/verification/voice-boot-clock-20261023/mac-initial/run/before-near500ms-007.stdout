@@ -1,0 +1,11 @@
+
+running 1 test
+test coordinator::tests::hand_controls::a_hand_seen_late_in_the_hold_gets_no_breath_and_sleeps_on_time ... FAILED
+
+failures:
+
+failures:
+    coordinator::tests::hand_controls::a_hand_seen_late_in_the_hold_gets_no_breath_and_sleeps_on_time
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3561 filtered out; finished in 0.02s
+

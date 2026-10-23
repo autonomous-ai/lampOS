@@ -1,0 +1,11 @@
+
+running 1 test
+test coordinator::tests::hand_controls::a_head_touch_stops_the_lamp_while_it_says_its_answer ... FAILED
+
+failures:
+
+failures:
+    coordinator::tests::hand_controls::a_head_touch_stops_the_lamp_while_it_says_its_answer
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3561 filtered out; finished in 0.02s
+

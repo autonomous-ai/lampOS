@@ -1,0 +1,5 @@
+BOOT_CLOCK_CONTROL mode=near500ms pid=48709 raw_ns=3247396060744000 mapped_ns=500000000
+
+thread 'coordinator::second::tests::a_line_given_to_gemini_at_the_end_of_the_hold_is_never_too_old' (704744574) panicked at crates/voice/src/coordinator/second.rs:1874:21:
+attempt to subtract with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

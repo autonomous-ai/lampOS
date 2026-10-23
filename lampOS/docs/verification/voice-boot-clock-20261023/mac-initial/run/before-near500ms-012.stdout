@@ -1,0 +1,6 @@
+
+running 1 test
+test coordinator::tests::hand_controls::a_privacy_worker_fault_reports_a_pending_wake_once ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3561 filtered out; finished in 0.03s
+

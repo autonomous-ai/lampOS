@@ -1,0 +1,11 @@
+
+running 1 test
+test coordinator::tests::hand_controls::a_hand_lifted_after_its_breath_sighs_and_stays_awake ... FAILED
+
+failures:
+
+failures:
+    coordinator::tests::hand_controls::a_hand_lifted_after_its_breath_sighs_and_stays_awake
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3561 filtered out; finished in 0.02s
+
