@@ -1,0 +1,56 @@
+{
+  "scope": "Every included payload other than this manifest.",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 4851,
+      "sha256": "384c493063e4000a1e99a87a9d7a078ef9d27510acd00596eee55eb3ee6bcdd6"
+    },
+    {
+      "path": "changed-case-bindings.json",
+      "bytes": 56084,
+      "sha256": "5b0fae4f9f1fda4ba317495dc2db174c87a150ac3f01bbc805b968ec41551302"
+    },
+    {
+      "path": "checked-source.json",
+      "bytes": 1884,
+      "sha256": "605d73ff476f6839c74794c04f72ee08c872ea98a6eb5cf25242d58f6cdfd513"
+    },
+    {
+      "path": "collection-commands.json",
+      "bytes": 6618,
+      "sha256": "44983310e36a01e40ed7cec32d98175fb2d78549c2ee7096978e9c070eaaac9f"
+    },
+    {
+      "path": "external-raw-files.json",
+      "bytes": 4334,
+      "sha256": "42aa5ad0b1b12bac3728445f8dfa6e35d8da532cbfc3ad4384135fa19dda3c30"
+    },
+    {
+      "path": "outcomes.json",
+      "bytes": 17680,
+      "sha256": "10ee7b128ae62e4ea580adadbce9de476bf35afda8632266cb508a91c0e22976"
+    },
+    {
+      "path": "primary-case-row-schema.json",
+      "bytes": 680,
+      "sha256": "48cafe827bbbde55d95bdafa1deabf047702781f5a23ed205a8db1213eff7c9f"
+    },
+    {
+      "path": "primary-case-rows.json",
+      "bytes": 937968,
+      "sha256": "59f844643d72af190da7149ced8b9d7bddc2df3217ed5d04574080dbacfa3b40"
+    },
+    {
+      "path": "selected-raw-logs.json",
+      "bytes": 83595,
+      "sha256": "ee2e00c6107265da9ee528f8c5ce726bce9ccf226708a90397116e34c2fa69ce"
+    },
+    {
+      "path": "terminal-metadata.json",
+      "bytes": 13759,
+      "sha256": "31eab242593ff6a079f931c1552da288a56a74777846cc33742887d0fade4795"
+    }
+  ],
+  "total_payload_bytes": 1127453
+}

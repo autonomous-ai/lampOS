@@ -1,0 +1,96 @@
+{
+  "files": {
+    "arm64": {
+      "run-final.json": {
+        "external_path": "/private/tmp/tests-3190-combined-ci-20261023/arm64/run-final.json",
+        "bytes": 12733,
+        "sha256": "5045feb5be3eb30145cc36f5baf24a3d083a789d4a33122953b1c534c66f0254"
+      },
+      "jobs-final.json": {
+        "external_path": "/private/tmp/tests-3190-combined-ci-20261023/arm64/jobs-final.json",
+        "bytes": 7021,
+        "sha256": "6ac96f3c0029fd65c5e99fde13d310e1d8607cb71563ac790f04f257cb619b21"
+      },
+      "full-log.txt": {
+        "external_path": "/private/tmp/tests-3190-combined-ci-20261023/arm64/full-log.txt",
+        "bytes": 1802055,
+        "sha256": "e0406fbeff22de95383f5bed10c34543958f29726e80676a836a6e19fe83ff3b"
+      },
+      "full-log.txt.stderr": {
+        "external_path": "/private/tmp/tests-3190-combined-ci-20261023/arm64/full-log.txt.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "native-watch.txt": {
+        "external_path": "/private/tmp/tests-3190-combined-ci-20261023/arm64/native-watch.txt",
+        "bytes": 12618,
+        "sha256": "523d76f9b58e99bc488cde88cfff6e384a24da0dd11db6e04d65a50752bd32c0"
+      },
+      "native-watch.txt.stderr": {
+        "external_path": "/private/tmp/tests-3190-combined-ci-20261023/arm64/native-watch.txt.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "result.json": {
+        "external_path": "/private/tmp/tests-3190-combined-ci-20261023/arm64/result.json",
+        "bytes": 2230,
+        "sha256": "5a94c143c5d7f1080de62a45d5aee4ade17ac0db172e0d95818aea6d2db5dc1f"
+      }
+    },
+    "clippy": {
+      "run-final.json": {
+        "external_path": "/private/tmp/tests-3190-combined-ci-20261023/clippy/run-final.json",
+        "bytes": 12732,
+        "sha256": "92756e62a3d7c6fde6850a34a44de9990bb3d7eef4f36c6fdac62060b8d6531c"
+      },
+      "jobs-final.json": {
+        "external_path": "/private/tmp/tests-3190-combined-ci-20261023/clippy/jobs-final.json",
+        "bytes": 2635,
+        "sha256": "920a35878b4188cb0f27c15607253f21fbcc75e01655458ef498bc4260c2df0a"
+      },
+      "full-log.txt": {
+        "external_path": "/private/tmp/tests-3190-combined-ci-20261023/clippy/full-log.txt",
+        "bytes": 75838,
+        "sha256": "47181186fa63ef59af04bf11575484e5783f8941370f93fc6c98b12add9d9d36"
+      },
+      "full-log.txt.stderr": {
+        "external_path": "/private/tmp/tests-3190-combined-ci-20261023/clippy/full-log.txt.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "native-watch.txt": {
+        "external_path": "/private/tmp/tests-3190-combined-ci-20261023/clippy/native-watch.txt",
+        "bytes": 69,
+        "sha256": "bfb93907e6ba6aad5866a985e6b8b53b28ec6f7e98e746df104c17e8db0cba25"
+      },
+      "native-watch.txt.stderr": {
+        "external_path": "/private/tmp/tests-3190-combined-ci-20261023/clippy/native-watch.txt.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "result.json": {
+        "external_path": "/private/tmp/tests-3190-combined-ci-20261023/clippy/result.json",
+        "bytes": 1798,
+        "sha256": "60371c61c99967ff6292cdb964f6a71a593bedf5640b0cb717c0647fd55fb14e"
+      }
+    }
+  },
+  "primary_rows_external": {
+    "external_path": "/private/tmp/tests-3190-combined-ci-20261023/primary-rows.json",
+    "bytes": 1708058,
+    "sha256": "96a1e22ad66c2e469fce171237f6b4e08f0550a87a098cb86bc336e314dae08b"
+  },
+  "complete_API_responses": {
+    "merge-api.json": {
+      "external_path": "/private/tmp/tests-3190-combined-ci-20261023/merge-api.json",
+      "bytes": 2603,
+      "sha256": "621573258969173aa402e3248fcc2a944a536189bf49793aa3ab556da90639da"
+    },
+    "artifacts-api.json": {
+      "external_path": "/private/tmp/tests-3190-combined-ci-20261023/artifacts-api.json",
+      "bytes": 781,
+      "sha256": "e42695e70ca7ea6474dfbc6d5aaaa3d6bc0f0a102082ba69e967680a542ee2c3"
+    }
+  },
+  "availability_limit": "Original complete logs/API/native watch records remain external; local paths do not promise remote availability. Included raw excerpts and case rows are fully hash-bound."
+}

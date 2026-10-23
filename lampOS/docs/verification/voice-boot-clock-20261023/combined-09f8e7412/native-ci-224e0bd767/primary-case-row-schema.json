@@ -1,0 +1,19 @@
+{
+  "columns": [
+    "raw_log_line",
+    "outcome",
+    "seconds",
+    "execution_index",
+    "selected_total",
+    "binary_id",
+    "display_name"
+  ],
+  "row_count": 7265,
+  "raw_log": {
+    "external_path": "/private/tmp/tests-3190-combined-ci-20261023/arm64/full-log.txt",
+    "bytes": 1802055,
+    "sha256": "e0406fbeff22de95383f5bed10c34543958f29726e80676a836a6e19fe83ff3b"
+  },
+  "rule": "Only unique indexed result rows before the first nextest Summary; later repeated result/output blocks are not added again. Display names remain exactly as printed.",
+  "binary_id_limit": "Nextest binary identifiers are not executable byte hashes. No test ELF downloaded or hashed."
+}

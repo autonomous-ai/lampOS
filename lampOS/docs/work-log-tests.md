@@ -1,5 +1,23 @@
 # Tests work log
 
+## 2026-10-23 23:12 +0700 — combined head native checks green
+
+Ready for lamp-voice: no; green native checks do not waive the failed local gate.
+
+The [terminal native receipt](verification/voice-boot-clock-20261023/combined-09f8e7412/native-ci-224e0bd767/)
+binds #3190 at 224e0bd76 to ARM64 run 39981474823 and Clippy 39981474869,
+both successful. Their checked merge has the same tree as the authored head.
+Selected parallel PR execution passed 7,265 tests total, including one LEAK,
+with zero failures, 33 skipped and none selected-unrun. Nextest reports 62
+selected binaries; 58 have result rows. All 88 selected clock/child/peer cases
+passed. This selected 12-package run is not a full-workspace serial gate.
+
+Root independently matched all 7,265 rows to the retained full log, all raw
+excerpts, five configuration sources and all selected source bindings. Separate
+doctests passed four; relay reported ok; the own process harness passed twelve.
+No ARM build ran locally and no CI retry was dispatched. The local 7,184/9/32
+and separate light 269/1/0 remain failed, with draft/HOLD unchanged.
+
 ## 2026-10-23 23:04 +0700 — one light-call phase observation complete
 
 Ready for lamp-voice: no; the original strict latency assertion still fails.

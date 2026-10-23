@@ -1,0 +1,173 @@
+{
+  "native_session": 93209,
+  "terminal_exit": 0,
+  "watcher": {
+    "external_path": "/private/tmp/tests-3190-combined-ci-20261023/watch.py",
+    "bytes": 4057,
+    "sha256": "239206fa90de958adcb0704a43dd88fc3bb03fcfd12e679f87c838dcf33dec8e"
+  },
+  "plan": {
+    "head": "224e0bd767e23e6d420f29830de9a4f55c3b0c3b",
+    "runs": {
+      "arm64": 39981474823,
+      "clippy": 39981474869
+    },
+    "method": "one native gh run watch per existing run, interval45s,90minute outer bound; actual final run+job metadata and one full log download; no workflow mutations",
+    "runner_sha256": "239206fa90de958adcb0704a43dd88fc3bb03fcfd12e679f87c838dcf33dec8e"
+  },
+  "commands": {
+    "arm64": {
+      "native-watch.txt.command.json": {
+        "command": [
+          "gh",
+          "run",
+          "watch",
+          "39981474823",
+          "--repo",
+          "autonomous-ai/lampOS",
+          "--interval",
+          "45",
+          "--exit-status"
+        ],
+        "exit": 0,
+        "timeout": false,
+        "wall_seconds": 378.9831191119738,
+        "stdout": "/private/tmp/tests-3190-combined-ci-20261023/arm64/native-watch.txt",
+        "stderr": "/private/tmp/tests-3190-combined-ci-20261023/arm64/native-watch.txt.stderr",
+        "stdout_bytes": 12618,
+        "stdout_sha256": "523d76f9b58e99bc488cde88cfff6e384a24da0dd11db6e04d65a50752bd32c0",
+        "stderr_bytes": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "run-final.json.command.json": {
+        "command": [
+          "gh",
+          "api",
+          "repos/autonomous-ai/lampOS/actions/runs/39981474823"
+        ],
+        "exit": 0,
+        "timeout": false,
+        "wall_seconds": 0.6961058969609439,
+        "stdout": "/private/tmp/tests-3190-combined-ci-20261023/arm64/run-final.json",
+        "stderr": "/private/tmp/tests-3190-combined-ci-20261023/arm64/run-final.json.stderr",
+        "stdout_bytes": 12733,
+        "stdout_sha256": "5045feb5be3eb30145cc36f5baf24a3d083a789d4a33122953b1c534c66f0254",
+        "stderr_bytes": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "jobs-final.json.command.json": {
+        "command": [
+          "gh",
+          "api",
+          "repos/autonomous-ai/lampOS/actions/runs/39981474823/jobs?per_page=100"
+        ],
+        "exit": 0,
+        "timeout": false,
+        "wall_seconds": 0.7961710477247834,
+        "stdout": "/private/tmp/tests-3190-combined-ci-20261023/arm64/jobs-final.json",
+        "stderr": "/private/tmp/tests-3190-combined-ci-20261023/arm64/jobs-final.json.stderr",
+        "stdout_bytes": 7021,
+        "stdout_sha256": "6ac96f3c0029fd65c5e99fde13d310e1d8607cb71563ac790f04f257cb619b21",
+        "stderr_bytes": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "full-log.txt.command.json": {
+        "command": [
+          "gh",
+          "run",
+          "view",
+          "39981474823",
+          "--repo",
+          "autonomous-ai/lampOS",
+          "--log"
+        ],
+        "exit": 0,
+        "timeout": false,
+        "wall_seconds": 8.10041640419513,
+        "stdout": "/private/tmp/tests-3190-combined-ci-20261023/arm64/full-log.txt",
+        "stderr": "/private/tmp/tests-3190-combined-ci-20261023/arm64/full-log.txt.stderr",
+        "stdout_bytes": 1802055,
+        "stdout_sha256": "e0406fbeff22de95383f5bed10c34543958f29726e80676a836a6e19fe83ff3b",
+        "stderr_bytes": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "clippy": {
+      "native-watch.txt.command.json": {
+        "command": [
+          "gh",
+          "run",
+          "watch",
+          "39981474869",
+          "--repo",
+          "autonomous-ai/lampOS",
+          "--interval",
+          "45",
+          "--exit-status"
+        ],
+        "exit": 0,
+        "timeout": false,
+        "wall_seconds": 1.133047650102526,
+        "stdout": "/private/tmp/tests-3190-combined-ci-20261023/clippy/native-watch.txt",
+        "stderr": "/private/tmp/tests-3190-combined-ci-20261023/clippy/native-watch.txt.stderr",
+        "stdout_bytes": 69,
+        "stdout_sha256": "bfb93907e6ba6aad5866a985e6b8b53b28ec6f7e98e746df104c17e8db0cba25",
+        "stderr_bytes": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "run-final.json.command.json": {
+        "command": [
+          "gh",
+          "api",
+          "repos/autonomous-ai/lampOS/actions/runs/39981474869"
+        ],
+        "exit": 0,
+        "timeout": false,
+        "wall_seconds": 1.1839412529952824,
+        "stdout": "/private/tmp/tests-3190-combined-ci-20261023/clippy/run-final.json",
+        "stderr": "/private/tmp/tests-3190-combined-ci-20261023/clippy/run-final.json.stderr",
+        "stdout_bytes": 12732,
+        "stdout_sha256": "92756e62a3d7c6fde6850a34a44de9990bb3d7eef4f36c6fdac62060b8d6531c",
+        "stderr_bytes": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "jobs-final.json.command.json": {
+        "command": [
+          "gh",
+          "api",
+          "repos/autonomous-ai/lampOS/actions/runs/39981474869/jobs?per_page=100"
+        ],
+        "exit": 0,
+        "timeout": false,
+        "wall_seconds": 0.6651543499901891,
+        "stdout": "/private/tmp/tests-3190-combined-ci-20261023/clippy/jobs-final.json",
+        "stderr": "/private/tmp/tests-3190-combined-ci-20261023/clippy/jobs-final.json.stderr",
+        "stdout_bytes": 2635,
+        "stdout_sha256": "920a35878b4188cb0f27c15607253f21fbcc75e01655458ef498bc4260c2df0a",
+        "stderr_bytes": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "full-log.txt.command.json": {
+        "command": [
+          "gh",
+          "run",
+          "view",
+          "39981474869",
+          "--repo",
+          "autonomous-ai/lampOS",
+          "--log"
+        ],
+        "exit": 0,
+        "timeout": false,
+        "wall_seconds": 3.07947852415964,
+        "stdout": "/private/tmp/tests-3190-combined-ci-20261023/clippy/full-log.txt",
+        "stderr": "/private/tmp/tests-3190-combined-ci-20261023/clippy/full-log.txt.stderr",
+        "stdout_bytes": 75838,
+        "stdout_sha256": "47181186fa63ef59af04bf11575484e5783f8941370f93fc6c98b12add9d9d36",
+        "stderr_bytes": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  },
+  "no_rerun_or_dispatch": true
+}
