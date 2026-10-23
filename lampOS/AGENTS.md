@@ -88,6 +88,12 @@ It replaces the three-agent `harness send` route of 12 October.
   processes. Optional camera, light or sensor failure must not terminate healthy
   voice. Inhibit failed outputs before bounded teardown, verify old-worker exit
   before replacement, and retain truthful readiness and cleanup evidence.
+- A change to what one part says to another (the bus, sockets, memory's
+  protocol, tool calls between crates) works with the previous build on the
+  other side, both ways: an update switches parts one at a time, so the two
+  builds do meet. An old reader ignores new fields; a new reader refused by
+  an old server acts safely and says so. See
+  [updates](docs/updates.md#what-parts-say-to-each-other-one-build-apart).
 - One interaction owner coordinates voice, head, body and ring. Validate
   ownership, freshness, privacy and cancellation at the final output boundary.
   Keep exactly one writer for each actuator bus.
