@@ -53,6 +53,7 @@ fn old_product(settings: bool) -> Lamp {
     assert_eq!(pins.head_pads.len(), 4);
     assert!(!head_voice(&lamp));
     assert!(!head_expression(&lamp));
+    assert!(!head_body(&lamp));
     lamp.config.settings = settings;
     let (root, key) = (lamp.root.clone(), lamp.config.key);
     lamp.systemd.applier = Some(Box::new(move || {
@@ -86,6 +87,15 @@ fn head_expression(lamp: &Lamp) -> bool {
             line.starts_with("ExecStart=")
                 && line.split_whitespace().any(|word| word == "--head-touch")
         })
+}
+
+fn head_body(lamp: &Lamp) -> bool {
+    unit::environment(
+        &lamp.read("/etc/systemd/system/lamp-body.service"),
+        "LAMP_HEAD_TOUCH",
+    )
+    .as_deref()
+        == Some("on")
 }
 
 fn publish_carry(lamp: &mut Lamp) {
@@ -173,7 +183,10 @@ fn reader_unit(name: &str, head: bool, mute: bool) -> String {
     let old = OLD_UNITS.iter().find(|(unit, _)| *unit == name).unwrap().1;
     let mut text = String::new();
     for line in old.lines() {
-        if line.starts_with("ExecStart=") && name == "lamp-voice.service" && head {
+        if line.starts_with("ExecStart=")
+            && matches!(name, "lamp-voice.service" | "lamp-body.service")
+            && head
+        {
             text.push_str("Environment=LAMP_HEAD_TOUCH=on\n");
         }
         text.push_str(line);
@@ -201,6 +214,10 @@ fn publish_readers(lamp: &mut Lamp, voice: bool, expression: bool, mute: bool) -
         (
             "lamp-expression.service",
             reader_unit("lamp-expression.service", expression, false),
+        ),
+        (
+            "lamp-body.service",
+            reader_unit("lamp-body.service", voice, false),
         ),
     ] {
         let unit = Unit {
@@ -246,6 +263,7 @@ fn paired_head_readers_disable_legacy_even_when_signed_pins_enable_it() {
     assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
     assert!(head_voice(&lamp));
     assert!(head_expression(&lamp));
+    assert!(head_body(&lamp));
     let pins = TouchPinsConfig::load(&lamp.root.join(PINS.trim_start_matches('/'))).unwrap();
     assert!(
         !pins.legacy_head,
@@ -298,6 +316,7 @@ fn custom_head_wiring_is_kept_or_the_reader_transition_is_refused() {
         Outcome::Switched(2) => {
             assert!(head_voice(&lamp));
             assert!(head_expression(&lamp));
+            assert!(head_body(&lamp));
             let pins =
                 TouchPinsConfig::load(&lamp.root.join(PINS.trim_start_matches('/'))).unwrap();
             assert!(!pins.legacy_head);
@@ -342,6 +361,7 @@ fn failed_head_reader_candidate_restores_exact_old_pins_and_units() {
     assert_eq!(lamp.state()["settings"], settings);
     assert!(!head_voice(&lamp));
     assert!(!head_expression(&lamp));
+    assert!(!head_body(&lamp));
 }
 
 #[test]
@@ -364,6 +384,7 @@ fn old_apply_helper_pins_mismatch_is_put_back_before_readers_restart() {
                     call == "restart lamp-voice.service"
                         || call == "restart lamp-expression.service"
                         || call == "restart lamp-controls.service"
+                        || call == "restart lamp-body.service"
                 }),
                 "unsafe reader units restarted before pins mismatch was put back: {:?}",
                 calls.borrow(),
@@ -672,6 +693,7 @@ fn matching_explicit_or_default_head_bus_roots_allow_the_paired_transition() {
             "lamp-voice.service",
             "lamp-expression.service",
             "lamp-controls.service",
+            "lamp-body.service",
         ] {
             let text = if name == "lamp-controls.service" {
                 OLD_UNITS
@@ -686,7 +708,12 @@ fn matching_explicit_or_default_head_bus_roots_allow_the_paired_transition() {
             let text = text.replace(" --bus-root /run/lampos-bus", "");
             // Voice's privacy consumer uses LAMP_BUS_ROOT independently of
             // the head consumer's CLI override, so both must see this bus.
-            let text = if name == "lamp-voice.service" {
+            let text = if name == "lamp-body.service" && explicit {
+                text.replace(
+                    "ExecStart=",
+                    "Environment=LAMP_BUS_ROOT=/run/shared-head-controls\nExecStart=",
+                )
+            } else if name == "lamp-voice.service" {
                 if explicit {
                     text.replace(
                         "Environment=LAMP_BUS_ROOT=/run/lampos-bus",
@@ -698,7 +725,7 @@ fn matching_explicit_or_default_head_bus_roots_allow_the_paired_transition() {
             } else {
                 text
             };
-            let suffix = if !explicit {
+            let suffix = if !explicit || name == "lamp-body.service" {
                 ""
             } else if name == "lamp-voice.service" {
                 " --controls-bus-root /run/shared-head-controls"
@@ -737,14 +764,18 @@ fn active_build_pins(lamp: &mut Lamp, text: &str) -> String {
 
 fn installed_reader_pair(lamp: &mut Lamp, enabled: bool) {
     if enabled {
-        for name in ["lamp-voice.service", "lamp-expression.service"] {
+        for name in [
+            "lamp-voice.service",
+            "lamp-expression.service",
+            "lamp-body.service",
+        ] {
             let text = reader_unit(name, true, name == "lamp-voice.service");
             fs::write(lamp.root.join("etc/systemd/system").join(name), text).unwrap();
             lamp.systemd.start(name);
         }
-        assert!(head_voice(lamp) && head_expression(lamp));
+        assert!(head_voice(lamp) && head_expression(lamp) && head_body(lamp));
     } else {
-        assert!(!head_voice(lamp) && !head_expression(lamp));
+        assert!(!head_voice(lamp) && !head_expression(lamp) && !head_body(lamp));
     }
 }
 
@@ -771,6 +802,7 @@ fn absent_unused_product_pins_do_not_block_active_build_pins_updates() {
             assert_eq!(lamp.read(&active), active_pins);
             assert_eq!(head_voice(&lamp), enabled);
             assert_eq!(head_expression(&lamp), enabled);
+            assert_eq!(head_body(&lamp), enabled);
         }
     }
 }
@@ -801,6 +833,7 @@ fn stale_unused_product_pins_do_not_block_active_build_pins_updates() {
                 assert_eq!(lamp.read(&active), active_pins);
                 assert_eq!(head_voice(&lamp), enabled);
                 assert_eq!(head_expression(&lamp), enabled);
+                assert_eq!(head_body(&lamp), enabled);
                 // A build-owned unused file may follow its signed settings
                 // with apply on; a custom stale file must still be kept.
                 if !settings || stale != OLD_PINS {
@@ -907,6 +940,7 @@ fn paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus() {
         "lamp-voice.service",
         "lamp-expression.service",
         "lamp-controls.service",
+        "lamp-body.service",
     ] {
         let text = if name == "lamp-controls.service" {
             OLD_UNITS
@@ -925,6 +959,11 @@ fn paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus() {
             );
             // Leave the independent privacy consumer on the product bus.
             with_exec_suffix(&text, " --controls-bus-root /run/shared-head-controls")
+        } else if name == "lamp-body.service" {
+            text.replace(
+                "ExecStart=",
+                "Environment=LAMP_BUS_ROOT=/run/shared-head-controls\nExecStart=",
+            )
         } else {
             text.replace(
                 "--bus-root /run/lampos-bus",
@@ -990,6 +1029,10 @@ fn third_review_binary_update_checks_active_build_local_head_pins() {
             "lamp-expression.service",
             reader_unit("lamp-expression.service", true, false),
         ),
+        (
+            "lamp-body.service",
+            reader_unit("lamp-body.service", true, false),
+        ),
     ] {
         fs::write(lamp.root.join("etc/systemd/system").join(name), text).unwrap();
         lamp.systemd.start(name);
@@ -1028,7 +1071,7 @@ fn third_review_binary_update_checks_active_build_local_head_pins() {
     )
     .unwrap();
     lamp.systemd.start("lamp-controls.service");
-    assert!(head_voice(&lamp) && head_expression(&lamp));
+    assert!(head_voice(&lamp) && head_expression(&lamp) && head_body(&lamp));
     assert!(
         !TouchPinsConfig::load(&lamp.root.join(active_pins_path.trim_start_matches('/')))
             .unwrap()
@@ -1051,7 +1094,7 @@ fn third_review_binary_update_checks_active_build_local_head_pins() {
     assert_eq!(lamp.read(&new_pins_path), active_pins);
     assert_eq!(lamp.read(&new_config_path), active_config);
     assert_eq!(lamp.read(PINS), OLD_PINS);
-    assert!(head_voice(&lamp) && head_expression(&lamp));
+    assert!(head_voice(&lamp) && head_expression(&lamp) && head_body(&lamp));
     assert!(
         !lamp
             .calls()
@@ -1181,5 +1224,124 @@ fn malformed_environment_quotes_are_not_reader_evidence() {
         replace_carried_unit(&mut lamp, &mut build, "lamp-voice.service", voice);
         needing(&mut lamp, build, manifest::SETTINGS_UPDATER);
         refused_without_writes(&mut lamp);
+    }
+}
+
+#[test]
+fn body_head_requires_an_enabled_carried_or_installed_sleep_reader() {
+    for mode in ["off", "unset", "installed"] {
+        let mut lamp = old_product(true);
+        let mut build = publish_readers(&mut lamp, true, true, true);
+        if mode == "installed" {
+            // No carried replacement: the installed pre-head Body is off.
+            build.units.retain(|unit| unit.unit != "lamp-body.service");
+        } else {
+            let body = reader_unit("lamp-body.service", true, false);
+            let body = if mode == "off" {
+                body.replace("LAMP_HEAD_TOUCH=on", "LAMP_HEAD_TOUCH=off")
+            } else {
+                body.replace("Environment=LAMP_HEAD_TOUCH=on\n", "")
+            };
+            replace_carried_unit(&mut lamp, &mut build, "lamp-body.service", body);
+        }
+        needing(&mut lamp, build, manifest::SETTINGS_UPDATER);
+        refused_without_writes(&mut lamp);
+    }
+}
+
+#[test]
+fn body_head_mode_and_bus_dropins_are_refused_before_writes() {
+    for assignment in ["LAMP_HEAD_TOUCH=off", "LAMP_BUS_ROOT=/run/isolated-body"] {
+        let mut lamp = old_product(true);
+        publish_readers(&mut lamp, true, true, true);
+        let folder = lamp.root.join("etc/systemd/system/lamp-body.service.d");
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(
+            folder.join("30-local.conf"),
+            format!("[Service]\nEnvironment={assignment}\n"),
+        )
+        .unwrap();
+        refused_without_writes(&mut lamp);
+    }
+}
+
+#[test]
+fn body_head_on_an_isolated_bus_is_refused_before_writes() {
+    let mut lamp = old_product(true);
+    let mut build = publish_readers(&mut lamp, true, true, true);
+    let body = reader_unit("lamp-body.service", true, false).replace(
+        "ExecStart=",
+        "Environment=LAMP_BUS_ROOT=/run/isolated-body\nExecStart=",
+    );
+    replace_carried_unit(&mut lamp, &mut build, "lamp-body.service", body);
+    needing(&mut lamp, build, manifest::SETTINGS_UPDATER);
+    refused_without_writes(&mut lamp);
+}
+
+#[test]
+fn body_head_repeated_exec_start_is_refused_before_writes() {
+    let mut lamp = old_product(true);
+    let mut build = publish_readers(&mut lamp, true, true, true);
+    let body = reader_unit("lamp-body.service", true, false)
+        .lines()
+        .map(|line| {
+            if line.starts_with("ExecStart=") {
+                format!("{line}\n{line}\n")
+            } else {
+                format!("{line}\n")
+            }
+        })
+        .collect();
+    replace_carried_unit(&mut lamp, &mut build, "lamp-body.service", body);
+    needing(&mut lamp, build, manifest::SETTINGS_UPDATER);
+    refused_without_writes(&mut lamp);
+}
+
+#[test]
+fn body_head_calibration_cannot_override_the_sleep_reader() {
+    for assignment in ["LAMP_HEAD_TOUCH=off", "LAMP_BUS_ROOT=/run/isolated-body"] {
+        let mut lamp = old_product(true);
+        let path = lamp.root.join("etc/lampOS/body/lamp.env");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            path,
+            format!("BODY_POSES=\"--home 2048,2048,2048\"\n{assignment}\n"),
+        )
+        .unwrap();
+        // This is an existing local calibration, not a carried setting:
+        // manifests cannot write Body's calibration environment files.
+        publish_readers(&mut lamp, true, true, true);
+        refused_without_writes(&mut lamp);
+    }
+}
+
+#[test]
+fn body_head_complete_bundle_preserves_literal_factory_calibration() {
+    for environment_file in [
+        "/etc/lampOS/body/lamp.env",
+        "-/var/lib/lampos-body/measured.env",
+    ] {
+        let mut lamp = old_product(true);
+        let path = environment_file.trim_start_matches('-');
+        let calibration = "# Fixture poses, not a hardware qualification.\nBODY_POSES=\"--home 2048,2048,2048 --torque on\"\n";
+        let on_lamp = lamp.root.join(path.trim_start_matches('/'));
+        fs::create_dir_all(on_lamp.parent().unwrap()).unwrap();
+        fs::write(&on_lamp, calibration).unwrap();
+        let mut build = publish_readers(&mut lamp, true, true, true);
+        let body = reader_unit("lamp-body.service", true, false).replace(
+            "EnvironmentFile=/etc/lampOS/body/lamp.env",
+            &format!("EnvironmentFile={environment_file}"),
+        );
+        assert!(body.contains("--unit-id %H") && body.contains("$BODY_POSES"));
+        replace_carried_unit(&mut lamp, &mut build, "lamp-body.service", body);
+        needing(&mut lamp, build, manifest::SETTINGS_UPDATER);
+        assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+        assert!(head_voice(&lamp) && head_expression(&lamp) && head_body(&lamp));
+        assert_eq!(lamp.read(path), calibration);
+        let installed_body = lamp.read("/etc/systemd/system/lamp-body.service");
+        assert!(installed_body.contains(&format!("EnvironmentFile={environment_file}")));
+        assert!(installed_body.contains("--unit-id %H") && installed_body.contains("$BODY_POSES"));
+        let pins = TouchPinsConfig::load(&lamp.root.join(PINS.trim_start_matches('/'))).unwrap();
+        assert!(!pins.legacy_head);
     }
 }

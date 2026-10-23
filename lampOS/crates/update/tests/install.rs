@@ -4433,6 +4433,14 @@ fn install_review_head_pair_refusal_precedes_state_and_host_mutation() {
             "/usr/local/lib/systemd/system/lamp-voice.service.d/30-local.conf",
             "[Service]\nEnvironment=LAMP_HEAD_TOUCH=off\n",
         ),
+        (
+            "/etc/systemd/system/lamp-body.service.d/30-local.conf",
+            "[Service]\nEnvironment=LAMP_HEAD_TOUCH=off\n",
+        ),
+        (
+            "/usr/local/lib/systemd/system/lamp-body.service.d/30-local.conf",
+            "[Service]\nEnvironment=LAMP_BUS_ROOT=/run/isolated\n",
+        ),
     ] {
         let mut lamp = Lamp::new(188, &[]);
         fs::create_dir_all(lamp.on(path).parent().unwrap()).unwrap();
@@ -4492,4 +4500,80 @@ fn install_review_head_pair_retry_keeps_calibration_and_is_idempotent() {
     assert!(again.changed.is_empty(), "{:?}", again.changed);
     assert_eq!(tree(&lamp.root), installed);
     assert_eq!(lamp.host.calls.len(), calls);
+}
+
+#[test]
+fn second_review_body_head_off_refuses_before_bundle_mutation() {
+    const DROP_IN: &str = "/etc/systemd/system/lamp-body.service.d/30-local.conf";
+    const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
+    let mut lamp = Lamp::new(188, &[]);
+    fs::create_dir_all(lamp.on(DROP_IN).parent().unwrap()).unwrap();
+    let drop_in = "[Service]\nEnvironment=LAMP_HEAD_TOUCH=off\n";
+    fs::write(lamp.on(DROP_IN), drop_in).unwrap();
+    let result = lamp.install();
+    let pins = fs::read_to_string(lamp.on(PINS)).ok();
+    let voice =
+        fs::read_to_string(lamp.on("/etc/systemd/system/lamp-voice.service")).unwrap_or_default();
+    let expression = fs::read_to_string(lamp.on("/etc/systemd/system/lamp-expression.service"))
+        .unwrap_or_default();
+    eprintln!(
+        "install_ok={}, kept_body_off={}, voice_head_on={}, expression_head_on={}, pins_written={}",
+        result.is_ok(),
+        fs::read_to_string(lamp.on(DROP_IN)).unwrap() == drop_in,
+        voice
+            .lines()
+            .any(|line| line == "Environment=LAMP_HEAD_TOUCH=on"),
+        expression.lines().any(|line| line.starts_with("ExecStart=")
+            && line.split_whitespace().any(|word| word == "--head-touch")),
+        pins.is_some()
+    );
+    assert!(
+        result.is_err(),
+        "install admitted the new head bundle beside a preserved Body head-off override"
+    );
+    assert!(pins.is_none(), "refusal must precede product pins creation");
+}
+
+#[test]
+fn install_head_body_keeps_factory_calibration() {
+    let mut lamp = Lamp::new(188, &[]);
+    let path = lamp.on("/etc/lampOS/body/lamp.env");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let calibration = "# Measured on this lamp.\nBODY_POSES=\"--home 1772,2057,2034 --folded-arm 2050,2059 --stand 1772,2057,2034,2657,2602 --gaze 782,557 --pitch-window 1670,1995 --torque on\"\n";
+    fs::write(&path, calibration).unwrap();
+    lamp.install().unwrap();
+    assert_eq!(fs::read_to_string(&path).unwrap(), calibration);
+    let body = fs::read_to_string(lamp.on("/etc/systemd/system/lamp-body.service")).unwrap();
+    assert_eq!(
+        body,
+        PRODUCT
+            .iter()
+            .find(|(name, _)| *name == "lamp-body.service")
+            .unwrap()
+            .1
+    );
+    assert!(body.contains("Environment=LAMP_HEAD_TOUCH=on"));
+    assert!(body.contains("EnvironmentFile=/etc/lampOS/body/lamp.env"));
+}
+
+#[test]
+fn install_head_body_refuses_calibration_environment_overrides_before_mutation() {
+    for calibration in [
+        "BODY_POSES=\"--home 1772,2057,2034\"\nLAMP_HEAD_TOUCH=off\n",
+        "BODY_POSES=\"--home 1772,2057,2034\"\nLAMP_BUS_ROOT=/run/isolated\n",
+        "BODY_POSES=\"--home 1772,2057,2034\\\n\"\n",
+        "BODY_POSES=\"--home 1772,2057,2034\nLAMP_HEAD_TOUCH=off\"\n",
+    ] {
+        let mut lamp = Lamp::new(188, &[]);
+        let path = lamp.on("/etc/lampOS/body/lamp.env");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, calibration).unwrap();
+        let records = Records::new(lamp.on(&lamp.config.records));
+        drop(records.lock().unwrap());
+        let before = tree(&lamp.root);
+        let error = lamp.install().unwrap_err();
+        assert!(error.contains("Body calibration"), "{error}");
+        assert_eq!(tree(&lamp.root), before);
+        assert!(lamp.host.calls.is_empty(), "{:?}", lamp.host.calls);
+    }
 }
