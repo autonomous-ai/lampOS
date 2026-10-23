@@ -3937,7 +3937,12 @@ const NOISE: &[&str] = &[
 
 /// Whether the switch is on in this process's environment.
 pub fn hits_on() -> bool {
-    std::env::var(HITS_ENVIRONMENT).ok().as_deref() == Some("on")
+    hits_switch(std::env::var(HITS_ENVIRONMENT).ok().as_deref())
+}
+
+/// Whether a value of [`HITS_ENVIRONMENT`] turns the hits on: `on` only.
+fn hits_switch(value: Option<&str>) -> bool {
+    value == Some("on")
 }
 
 /// What memory holds that may fit `heard`, for one spoken turn: the kept
@@ -3956,7 +3961,27 @@ pub fn hits_note(
     now_unix_ms: u64,
     zone: Option<&LocalTime>,
 ) -> Option<String> {
-    if content_words(heard).is_empty() {
+    hits_note_counted(socket, person, heard, now_unix_ms, zone).map(|(note, _)| note)
+}
+
+/// What a turn's hits told, for its journal line ([`hits_journal_line`],
+/// #2510 take 1 c): how many kept things, and the bytes of their text as
+/// told (each cut to [`HIT_CHARS`]). Counts only, never the text.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct HitsCount {
+    pub told: usize,
+    pub bytes: usize,
+}
+
+/// [`hits_note`], with what it told counted ([`HitsCount`]).
+pub fn hits_note_counted(
+    socket: &Path,
+    person: Option<&str>,
+    heard: &str,
+    now_unix_ms: u64,
+    zone: Option<&LocalTime>,
+) -> Option<(String, HitsCount)> {
+    if hit_words(heard).is_empty() {
         return None;
     }
     let request = for_person(json!({"op":"kept","max_bytes":HITS_KEPT_BYTES}), person);
@@ -3965,7 +3990,7 @@ pub fn hits_note(
         .get()
         .and_then(Option::as_ref)
         .filter(|client| client.socket == socket && client.replaces.load(Ordering::Acquire));
-    let (told, shown) = hits_told(&answer, heard, now_unix_ms, zone, ids.is_some())?;
+    let (told, shown, count) = hits_told(&answer, heard, now_unix_ms, zone, ids.is_some())?;
     // Told by id, so shown: one of them may be corrected (#2510).
     if let Some(client) = ids
         && let Ok(mut context) = client.context.lock()
@@ -3975,10 +4000,34 @@ pub fn hits_note(
             context.shown_as(person, id, &text);
         }
     }
-    Some(match person {
+    let note = match person {
         Some(_) => told,
         None => format!("{told}\n{HITS_ROOM_NOTE}"),
-    })
+    };
+    Some((note, count))
+}
+
+/// A turn's hits journal line: whether memory told anything, how long it
+/// took, whose, and what it told as counts ([`HitsCount`], #2510 take 1 c),
+/// so a day's disclosure can be added up from the journal. No words.
+pub fn hits_journal_line(
+    request: u64,
+    told: Option<HitsCount>,
+    millis: u128,
+    theirs: bool,
+) -> String {
+    let count = told.unwrap_or_default();
+    format!(
+        "request {request}: memory {} in {millis} ms ({}) hits_told={} bytes_told={}",
+        if told.is_some() {
+            "told"
+        } else {
+            "had nothing told"
+        },
+        if theirs { "theirs" } else { "the room's" },
+        count.told,
+        count.bytes
+    )
 }
 
 /// Small words a line about anything has, which match nothing.
@@ -4020,6 +4069,88 @@ fn plural_off(word: &str) -> &str {
     word.strip_suffix('s')
         .filter(|stem| stem.chars().count() >= 3)
         .unwrap_or(word)
+}
+
+/// The memory's common words (`lamp_memory::search::COMMON`, #2282),
+/// mirrored, as the voice does not link the memory crate (the memory's
+/// tests link the voice): a test reads the memory's source and holds the
+/// two lists equal (`search_common_is_the_memorys_own_list`). Kept in the
+/// memory's form, accents kept; [`hit_words`] leaves them out with or
+/// without their accents ([`hit_stop_words`]), and `remember::heard` with
+/// its own few more, accents kept.
+pub(crate) const SEARCH_COMMON: &[&str] = &[
+    "the", "and", "or", "but", "of", "to", "in", "on", "at", "for", "with", "from", "by", "about",
+    "as", "is", "are", "was", "were", "be", "been", "am", "it", "its", "my", "me", "mine", "you",
+    "your", "yours", "we", "our", "us", "he", "him", "his", "she", "her", "they", "them", "their",
+    "what", "which", "who", "when", "where", "why", "how", "that", "this", "these", "those", "do",
+    "does", "did", "have", "has", "had", "can", "could", "would", "should", "will", "any", "some",
+    "not", "no", "so", "if", "there", "tell", "told", "remember", "please", "của", "là", "tôi",
+    "và", "có", "không", "này", "đó", "thì", "mà", "những", "các", "một", "cho", "với", "được",
+    "gì", "nào",
+];
+
+/// [`SMALL_WORDS`] and [`SEARCH_COMMON`] folded once, twice over: in
+/// [`search_text`]'s form with their accents kept ("của"), and without
+/// them ([`about_fold`]: "cua"), as [`hit_words`] compares a word heard
+/// with or without its accents.
+fn hit_stop_words() -> &'static (
+    std::collections::HashSet<String>,
+    std::collections::HashSet<String>,
+) {
+    static FOLDED: OnceLock<(
+        std::collections::HashSet<String>,
+        std::collections::HashSet<String>,
+    )> = OnceLock::new();
+    FOLDED.get_or_init(|| {
+        let words = || SMALL_WORDS.iter().chain(SEARCH_COMMON);
+        (
+            words().map(|word| search_text(word)).collect(),
+            words().map(|word| about_fold(word)).collect(),
+        )
+    })
+}
+
+/// The words a turn's hits match by, on both sides (#2510 take 1 b):
+/// [`content_words`]' rules on the text folded as the memory's search folds
+/// it ([`search_text`]: NFC, lower case, `đ` as `d`), then without accents
+/// ([`about_fold`], as `forget {about}` matches), so "màu" heard as "mau"
+/// is the same word. [`SMALL_WORDS`] and the memory's [`SEARCH_COMMON`] are
+/// left out by one rule (Fourteen's P2 on #3177): a word heard with accents
+/// is left out when it is one of them with those accents ("của"), a word
+/// heard without any when it is one of them without theirs ("cua", "la",
+/// "va"). So Vietnamese function words ("là", "của", "và") match nothing
+/// however they are heard, while an accented word that only folds to one
+/// stays: "cửa" (a door) is a hit word, as "chó" (a dog) is, though
+/// "của" (of) and "cho" (for) are not. Its limit: "cua" heard for "cửa"
+/// without its accents is taken as "của" and matches nothing. A word of
+/// two letters ("đỏ") is still too short, as in English.
+fn hit_words(text: &str) -> Vec<String> {
+    let (accented, bare) = hit_stop_words();
+    let mut words: Vec<String> = search_text(text)
+        .replace('\u{2019}', "'")
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .map(|word| word.trim_matches('\''))
+        .map(|word| word.strip_suffix("'s").unwrap_or(word))
+        .filter(|word| !accented.contains(*word))
+        // Already in search_text's form: only its accents to take off.
+        .map(|word| {
+            (
+                word.nfd()
+                    .filter(|c| !unicode_normalization::char::is_combining_mark(*c))
+                    .nfc()
+                    .collect::<String>(),
+                word,
+            )
+        })
+        // Heard without accents: a stop word's bare form is that stop word.
+        .filter(|(folded, heard)| folded != heard || !bare.contains(folded))
+        .map(|(folded, _)| folded)
+        .filter(|word| word.chars().count() >= 3)
+        .map(|word| plural_off(&word).to_owned())
+        .collect();
+    words.sort();
+    words.dedup();
+    words
 }
 
 /// Whether the lamp's own reply `said` asks about a follow-up whose key
@@ -4202,11 +4333,11 @@ fn hits_told(
     now_unix_ms: u64,
     zone: Option<&LocalTime>,
     ids: bool,
-) -> Option<(String, Vec<u64>)> {
+) -> Option<(String, Vec<u64>, HitsCount)> {
     if answer.get("ok") != Some(&json!(true)) {
         return None;
     }
-    let wanted = content_words(heard);
+    let wanted = hit_words(heard);
     let today = local_day(now_unix_ms, zone);
     let mut found: Vec<(usize, u64, String, Option<u64>)> = answer
         .get("entries")?
@@ -4216,7 +4347,7 @@ fn hits_told(
             let text = entry.get("text")?.as_str()?.trim();
             let at = entry.get("at_unix_ms")?.as_u64()?;
             let id = entry.get("id").and_then(Value::as_u64);
-            let shared = content_words(text)
+            let shared = hit_words(text)
                 .iter()
                 .filter(|word| wanted.contains(word))
                 .count();
@@ -4225,10 +4356,13 @@ fn hits_told(
         .collect();
     found.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
     let mut shown = vec![];
+    let mut count = HitsCount::default();
     let lines: Vec<String> = found
         .into_iter()
         .take(HITS)
         .map(|(_, at, text, id)| {
+            count.told += 1;
+            count.bytes += text.len();
             let when = when(today - local_day(at, zone));
             match id.filter(|_| ids) {
                 Some(id) => {
@@ -4239,7 +4373,7 @@ fn hits_told(
             }
         })
         .collect();
-    (!lines.is_empty()).then(|| (format!("{HITS_NOTE}\n{}", lines.join("\n")), shown))
+    (!lines.is_empty()).then(|| (format!("{HITS_NOTE}\n{}", lines.join("\n")), shown, count))
 }
 
 /// The texts of a kept list's entries with these ids, as a hit line tells
@@ -12070,6 +12204,238 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
+    /// #2510 take 1 (b): a kept thing in Vietnamese is found by what was
+    /// heard as speech to text writes it, with or without its accents,
+    /// both sides folded as the memory's search folds them. Made-up texts.
+    #[test]
+    fn a_vietnamese_kept_thing_is_found_with_or_without_its_accents() {
+        const NOW: u64 = 1_792_000_000_000;
+        let (socket, served) = memory("hits-vi", 3, |_| {
+            json!({"ok":true,"entries":[
+                {"id":1,"at_unix_ms":NOW,"text":"Màu yêu thích là xanh."},
+                {"id":2,"at_unix_ms":NOW,"text":"Their sister lives in Hue."}
+            ]})
+        });
+        for heard in ["mau yeu thich", "Màu yêu thích của tôi là gì?"] {
+            let told = hits_note(&socket, Some("p-1"), heard, NOW, None).unwrap();
+            assert!(told.contains("- Màu yêu thích là xanh. (today)"), "{told}");
+            assert!(!told.contains("sister"), "{told}");
+        }
+        let đ = hits_note(&socket, Some("p-1"), "ĐƯỢC YÊU", NOW, None).unwrap();
+        assert!(đ.contains("xanh"), "upper case and đ fold: {đ}");
+        served.join().unwrap();
+        let _ = std::fs::remove_file(&socket);
+        assert_eq!(hit_words("Màu YÊU thích"), ["mau", "thich", "yeu"]);
+        assert_eq!(hit_words("Đen"), ["den"]);
+    }
+
+    /// #2510 take 1 (b): English words match as they did, with the memory's
+    /// common words ("been", "should", "told") now left out too.
+    #[test]
+    fn english_hit_words_are_as_before_but_the_memorys_common_words() {
+        for line in [
+            "What's my name?",
+            "how is my sister's job?",
+            "They take their coffee black, no sugar.",
+            "Names of the cats: Pim and Pom.",
+            "the wedding",
+        ] {
+            assert_eq!(hit_words(line), content_words(line), "{line}");
+        }
+        assert_eq!(
+            content_words("I told you, it's been raining"),
+            ["been", "raining", "told"]
+        );
+        assert_eq!(hit_words("I told you, it's been raining"), ["raining"]);
+    }
+
+    /// The reviewer-lead's P3 on #3177: [`SEARCH_COMMON`] is
+    /// `lamp_memory::search::COMMON`, word for word and in its order, read
+    /// from the memory's own source, so a word added there and not here
+    /// fails here.
+    #[test]
+    fn search_common_is_the_memorys_own_list() {
+        let source = include_str!("../../memory/src/search.rs");
+        let start = source
+            .find("const COMMON: &[&str] = &[")
+            .expect("the memory's COMMON");
+        let list = &source[start..];
+        let list = &list[..list.find("];").expect("COMMON's end")];
+        let theirs: Vec<&str> = list.split('"').skip(1).step_by(2).collect();
+        assert_eq!(theirs, SEARCH_COMMON);
+    }
+
+    /// reviewer-two's three cases on #3177, heard without accents against a
+    /// kept thing with them: a function word ("cua", "toi") is now never a
+    /// hit word, so "la cua va" no longer finds "Cửa nhà màu đỏ" nor "toi"
+    /// "Tối nay đi xem phim". "ban co khoe khong" still finds "Bạn thân tên
+    /// Lan" by "ban": "bạn" is not one of the memory's common words, and a
+    /// content word heard without its accents matching is (b)'s point, as
+    /// "mau yeu thich" finds "Màu yêu thích".
+    #[test]
+    fn unaccented_function_words_find_no_accented_kept_thing() {
+        let shared = |heard: &str, kept: &str| -> Vec<String> {
+            let kept = hit_words(kept);
+            hit_words(heard)
+                .into_iter()
+                .filter(|word| kept.contains(word))
+                .collect()
+        };
+        assert!(shared("la cua va", "Cửa nhà màu đỏ").is_empty());
+        assert!(shared("toi", "Tối nay đi xem phim").is_empty());
+        assert_eq!(shared("ban co khoe khong", "Bạn thân tên Lan"), ["ban"]);
+        assert_eq!(
+            shared("mau yeu thich", "Màu yêu thích là xanh."),
+            ["mau", "thich", "yeu"]
+        );
+        assert_eq!(shared("cái cửa", "Cửa nhà màu đỏ"), ["cua"]);
+        assert!(shared("của tôi", "Cửa nhà của tôi").is_empty());
+    }
+
+    /// #2510 take 1 (b): Vietnamese function words alone ("là", "của",
+    /// "và", with their accents or as heard without: "la cua va") match
+    /// nothing and ask nothing (Fourteen's P2 on #3177); an accented word
+    /// that only folds to one stays: "chó" (a dog) is not "cho" (for), and
+    /// "cửa" (a door) not "của" (of).
+    #[test]
+    fn vietnamese_function_words_alone_are_never_a_hit() {
+        const NOW: u64 = 1_792_000_000_000;
+        assert!(hit_words("là của và").is_empty());
+        assert!(hit_words("la cua va").is_empty());
+        assert!(hit_words("LA CUA VA khong co gi").is_empty());
+        assert!(hit_words("Đó là của tôi, và không có gì").is_empty());
+        assert!(hit_words("của tôi").is_empty());
+        assert!(hit_words("cua toi").is_empty());
+        assert_eq!(hit_words("cái cửa"), ["cai", "cua"]);
+        assert_eq!(hit_words("con chó cho tôi"), ["cho", "con"]);
+        let (socket, served) = memory("hits-vi-small", 1, |_| {
+            json!({"ok":true,"entries":[
+                {"id":1,"at_unix_ms":NOW,"text":"Cái này là của tôi và của anh."}
+            ]})
+        });
+        assert_eq!(
+            hits_note(&socket, None, "là của và", NOW, None),
+            None,
+            "not asked"
+        );
+        assert_eq!(
+            hits_note(&socket, None, "la cua va", NOW, None),
+            None,
+            "heard without accents, not asked"
+        );
+        assert_eq!(
+            hits_note(&socket, None, "của nhà", NOW, None),
+            None,
+            "asked, nothing shared"
+        );
+        served.join().unwrap();
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// #2510 take 1 (c): a turn's journal line counts what its hits told,
+    /// how many and how many bytes of kept text, and never says the text.
+    #[test]
+    fn the_journal_line_counts_what_was_told_and_never_says_it() {
+        const NOW: u64 = 1_792_000_000_000;
+        let (socket, served) = memory("hits-counts", 2, |_| {
+            json!({"ok":true,"entries":[
+                {"id":1,"at_unix_ms":NOW,"text":"Màu yêu thích là xanh."},
+                {"id":2,"at_unix_ms":NOW,"text":"Their name is Ossa."}
+            ]})
+        });
+        let (note, count) =
+            hits_note_counted(&socket, Some("p-1"), "màu yêu thích", NOW, None).unwrap();
+        assert!(note.contains("xanh"));
+        assert_eq!(
+            count,
+            HitsCount {
+                told: 1,
+                bytes: "Màu yêu thích là xanh.".len()
+            }
+        );
+        let line = hits_journal_line(7, Some(count), 3, true);
+        assert_eq!(
+            line,
+            "request 7: memory told in 3 ms (theirs) hits_told=1 bytes_told=26"
+        );
+        for word in ["xanh", "Màu", "mau", "Ossa"] {
+            assert!(!line.contains(word), "{line}");
+        }
+        assert_eq!(
+            hits_journal_line(8, None, 1, false),
+            "request 8: memory had nothing told in 1 ms (the room's) hits_told=0 bytes_told=0"
+        );
+        assert_eq!(
+            hits_note_counted(&socket, None, "what is the weather", NOW, None),
+            None
+        );
+        served.join().unwrap();
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// Off unless exactly `on`: with the switch off the worker asks no hits
+    /// and writes no hits line, as before.
+    #[test]
+    fn the_hits_switch_is_off_unless_exactly_on() {
+        for value in [
+            None,
+            Some(""),
+            Some("off"),
+            Some("1"),
+            Some("ON"),
+            Some("true"),
+        ] {
+            assert!(!hits_switch(value), "{value:?}");
+        }
+        assert!(hits_switch(Some("on")));
+        assert!(!hits_on(), "unset in the tests");
+    }
+
+    /// #2510 take 1: `hits_note`'s time on this machine, 200 calls on a
+    /// 200-entry kept list, half Vietnamese. Run by hand with `--ignored
+    /// --nocapture`; its p95 must stay inside `HITS_WITHIN`.
+    #[test]
+    #[ignore = "a measurement, run by hand"]
+    fn hits_note_latency_on_a_200_entry_kept_list() {
+        const NOW: u64 = 1_792_000_000_000;
+        const CALLS: usize = 200;
+        let (socket, served) = memory("hits-bench", CALLS, |_| {
+            let entries: Vec<Value> = (0..200u64)
+                .map(|id| {
+                    let text = if id % 2 == 0 {
+                        format!("Kept thing {id}: their favourite garden tool is the small rake number {id}, bought last spring.")
+                    } else {
+                        format!("Điều {id}: món ăn yêu thích của họ là phở bò tái, ăn ở quán gần nhà số {id}.")
+                    };
+                    json!({"id":id,"at_unix_ms":NOW - id,"text":text})
+                })
+                .collect();
+            json!({"ok":true,"entries":entries})
+        });
+        let mut took = Vec::with_capacity(CALLS);
+        for call in 0..CALLS {
+            let heard = if call % 2 == 0 {
+                "what's my favourite garden tool?"
+            } else {
+                "món ăn yêu thích của tôi là gì?"
+            };
+            let started = Instant::now();
+            assert!(hits_note(&socket, Some("p-1"), heard, NOW, None).is_some());
+            took.push(started.elapsed());
+        }
+        served.join().unwrap();
+        let _ = std::fs::remove_file(&socket);
+        took.sort();
+        let at = |q: usize| took[(CALLS * q / 100).min(CALLS - 1)];
+        eprintln!(
+            "hits_note over {CALLS} calls, 200 kept: p50 {:?} p95 {:?} max {:?}",
+            at(50),
+            at(95),
+            took[CALLS - 1]
+        );
+        assert!(at(95) < HITS_WITHIN, "{:?}", at(95));
+    }
+
     fn memory(
         name: &str,
         requests: usize,
@@ -14916,13 +15282,13 @@ mod tests {
         let answer = json!({"ok":true,"entries":[
             {"id":4,"at_unix_ms":NOW,"text":"Her favourite colour is violet."}
         ]});
-        let (off, none) = hits_told(&answer, "my favourite colour", NOW, None, false).unwrap();
+        let (off, none, _) = hits_told(&answer, "my favourite colour", NOW, None, false).unwrap();
         assert_eq!(
             off,
             format!("{HITS_NOTE}\n- Her favourite colour is violet. (today)")
         );
         assert!(none.is_empty());
-        let (on, shown) = hits_told(&answer, "my favourite colour", NOW, None, true).unwrap();
+        let (on, shown, _) = hits_told(&answer, "my favourite colour", NOW, None, true).unwrap();
         assert_eq!(
             on,
             format!("{HITS_NOTE}\n- Her favourite colour is violet. (today, source_id 4)")
