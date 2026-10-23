@@ -3895,6 +3895,8 @@ mod tests {
             "--force".into(),
             "x".repeat(MAX_PROMPT_BYTES + 1),
             "é".repeat(MAX_PROMPT_BYTES / 2 + 1),
+            // Escaped to 6 bytes each, past the request line (P3 on #3239).
+            "\u{1}".repeat(MAX_PROMPT_BYTES),
         ] {
             assert_eq!(
                 engine
@@ -3912,6 +3914,18 @@ mod tests {
                 &clock(0),
                 false,
             )
+            .unwrap();
+        // 2,000 bytes escaped to 4,000 are taken, and the widest such
+        // prepare still fits one request line.
+        let escaped = "\"\n".repeat(MAX_PROMPT_BYTES / 2);
+        let mut widest = preparation(&engine, &escaped);
+        if let Request::Prepare { guard, target, .. } = &mut widest {
+            guard.request_id = "r".repeat(64);
+            *target = "t".repeat(64);
+        }
+        assert!(serde_json::to_string(&widest).unwrap().len() <= crate::protocol::MAX_LINE_BYTES);
+        engine
+            .handle(&preparation(&engine, &escaped), &clock(0), false)
             .unwrap();
         let mut request = preparation(&engine, "safe text");
         if let Request::Prepare { target, .. } = &mut request {
