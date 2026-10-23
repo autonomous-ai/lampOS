@@ -1,0 +1,31 @@
+
+running 3 tests
+lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)
+lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)
+lamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true
+lamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true
+lamp-voice provider: a bare forget after a follow-up forgets entry 3
+lamp-voice provider: Days memory is answering
+lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+lamp-voice provider: a bare forget after a follow-up forgets entry 3
+lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+lamp-memory: conversation_end named 2 source(s) it no longer has; ended with the rest
+lamp-voice provider: memory conversation end was not acknowledged; no retry
+lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)
+lamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true
+lamp-voice provider: a bare forget after a follow-up forgets entry 2
+lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)
+.lamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true
+lamp-voice provider: Days memory is answering
+lamp-voice provider: a bare forget after a follow-up forgets entry 2
+lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+lamp-memory: conversation_end named 2 source(s) it no longer has; ended with the rest
+lamp-voice provider: memory conversation end was not acknowledged; no retry
+.lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)
+lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)
+lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+.
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 2.36s
+

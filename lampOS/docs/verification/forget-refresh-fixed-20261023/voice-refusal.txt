@@ -1,0 +1,19 @@
+
+running 2 tests
+lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)
+lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)
+lamp-voice provider: a bare forget after a follow-up forgets entry 12
+lamp-voice provider: a bare forget after a follow-up forgets entry 12
+lamp-voice provider: a bare forget after a follow-up forgets entry 12
+lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+.lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)
+lamp-voice provider: a bare forget after a follow-up forgets entry 12
+lamp-voice provider: a bare forget after a follow-up forgets entry 12
+lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)
+lamp-voice provider: a bare forget after a follow-up forgets entry 12
+lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+.
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3569 filtered out; finished in 0.02s
+

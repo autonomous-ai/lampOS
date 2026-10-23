@@ -1,0 +1,10 @@
+
+running 1 test
+lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)
+lamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true
+lamp-voice provider: a bare forget after a follow-up forgets entry 3
+lamp-voice provider: a bare forget after a follow-up forgets entry 3
+lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 158 filtered out; finished in 0.55s
+
