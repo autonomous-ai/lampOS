@@ -1973,19 +1973,32 @@ pub fn serve(
     };
     // A line whose own words ask one of the staff by name to do something
     // is handed over: its first round must call start_agent_task (#1722).
-    let net = match tools
+    let named = tools
         .tasks
         .clone()
         .filter(|_| crate::agent_tasks::named_ask_on())
-    {
-        Some(place) => {
+        .map(|place| {
             eprintln!(
                 "lamp-voice second: a line that asks one of the staff by name to do something is handed over: its first round must call {} ({})",
                 crate::agent_tasks::START,
                 crate::agent_tasks::NAMED_ASK_ENVIRONMENT
             );
-            net.forcing(named_asks(place))
-        }
+            named_asks(place)
+        });
+    // A line that asks the lamp to remember the person's face, with their
+    // name, must call remember_my_face: only with the eyes' faces and names
+    // checked, so a name not in their words is still refused.
+    let remember = (crate::known_faces::asked_on() && tools.who.is_some() && tools.names_checked)
+        .then(|| {
+            eprintln!(
+                "lamp-voice second: a line that asks the lamp to remember their face and gives their name, or gives it after such an ask, must call {} in its first round ({})",
+                crate::known_faces::REMEMBER,
+                crate::known_faces::ASKED_ENVIRONMENT
+            );
+            remember_asks()
+        });
+    let net = match first_force(named, remember) {
+        Some(force) => net.forcing(force),
         None => net,
     };
     let thread = files.thread;
@@ -3523,6 +3536,57 @@ pub(crate) fn named_asks(place: crate::agent_tasks::Place) -> crate::second_prov
             }),
         }
     })
+}
+
+/// What makes a spoken turn's first round call `remember_my_face`, with
+/// `LAMP_SECOND_REMEMBER_ASKED=on` and names checked: the last message is
+/// the person's, and its words give their name
+/// ([`crate::known_faces::gives_a_name`]) and ask the lamp to remember their
+/// face or who they are ([`crate::known_faces::asks_to_remember`]); or they
+/// give or spell it ([`crate::known_faces::spells_a_name`]) right after a
+/// line of theirs that asked. A round after a call ends with the call's
+/// result, and is asked as before.
+///
+/// On lamp-4ace on 23 Oct at 18:30 (the owner's own try), "Lamp, remember my
+/// face, I'm …" was given every function, and its round 1 called
+/// take_a_look; when the name was spelled after it, the lamp said it knew
+/// the face now, and the eyes held no one. The name is still checked
+/// (`LAMP_NAMES=checked`): one not in their words is refused, and the model
+/// is told to ask them to spell it.
+pub(crate) fn remember_asks() -> crate::second_provider::net::Force {
+    use crate::known_faces::{asks_to_remember, gives_a_name, spells_a_name};
+    Arc::new(|messages: &[Message]| {
+        let (last, before) = messages.split_last()?;
+        let words = last.words().filter(|_| last.role == "user")?;
+        let asked_now = || gives_a_name(words) && asks_to_remember(words);
+        let asked_before = || {
+            (gives_a_name(words) || spells_a_name(words))
+                && before
+                    .iter()
+                    .rev()
+                    .find(|message| message.role == "user")
+                    .and_then(Message::words)
+                    .is_some_and(asks_to_remember)
+        };
+        (asked_now() || asked_before()).then_some(crate::second_provider::net::Forced {
+            name: crate::known_faces::REMEMBER,
+            only: None,
+        })
+    })
+}
+
+/// One force of two, the first that names a function for the messages: a
+/// chat takes only one ([`crate::second_provider::net::Chat::forcing`]).
+pub(crate) fn first_force(
+    first: Option<crate::second_provider::net::Force>,
+    second: Option<crate::second_provider::net::Force>,
+) -> Option<crate::second_provider::net::Force> {
+    match (first, second) {
+        (Some(first), Some(second)) => Some(Arc::new(move |messages: &[Message]| {
+            first(messages).or_else(|| second(messages))
+        })),
+        (first, second) => first.or(second),
+    }
 }
 
 /// Whether a system or user message the turn carries names the function
@@ -18968,6 +19032,123 @@ mod memory_observer {
             assert_eq!(plain.wire(messages).2, forcing.wire(messages).2);
         }
         crate::agent_tasks::tests::forget_staff();
+    }
+
+    /// `LAMP_SECOND_REMEMBER_ASKED`: on lamp-4ace on 23 Oct at 18:30, the
+    /// owner's "Lamp, remember my face, I'm …" called take_a_look, and the
+    /// spelled name after it no function, while the lamp said it knew the
+    /// face. Forced, both call remember_my_face in round 1. An ask with no
+    /// name, a name with no ask, a question whether the lamp knows them, a
+    /// taken-back ask, someone else's face, a round after a call and a chat
+    /// without the face functions are asked as before, with no `tool_choice`.
+    #[test]
+    fn an_ask_to_remember_a_face_with_a_name_makes_the_first_round_call_remember_my_face() {
+        use super::super::net::{Chat, Message};
+        let look = lamp_gemini::Tool {
+            name: crate::second_provider::LOOK_CALL.into(),
+            description: "Look.".into(),
+            parameters: None,
+            silent: false,
+        };
+        let faces: Vec<_> = crate::known_faces::tools_checked(true)
+            .into_iter()
+            .chain([look.clone()])
+            .collect();
+        let declare: super::super::net::Declare = Arc::new(move || faces.clone());
+        let plain = Chat::deepseek("deepseek-chat", "k", declare.clone(), false).unwrap();
+        let forcing = Chat::deepseek("deepseek-chat", "k", declare, false).unwrap();
+        forcing.forcing(crate::second_provider::worker::remember_asks());
+        let unseeing = Chat::deepseek(
+            "deepseek-chat",
+            "k",
+            Arc::new(move || vec![look.clone()]),
+            false,
+        )
+        .unwrap();
+        unseeing.forcing(crate::second_provider::worker::remember_asks());
+        let turn = |lines: &[(&'static str, &str)]| -> Vec<Message> {
+            std::iter::once(Message::system("You are a lamp."))
+                .chain(lines.iter().map(|(role, words)| match *role {
+                    "user" => Message::user(*words),
+                    _ => Message::assistant(*words),
+                }))
+                .collect()
+        };
+        let choice =
+            |chat: &Chat, messages: &[Message]| chat.wire(messages).2.get("tool_choice").cloned();
+        let remember =
+            Some(serde_json::json!({"type": "function", "function": {"name": "remember_my_face"}}));
+        let asked = turn(&[("user", "Lamp, remember my face, I'm Kess.")]);
+        let told_after = turn(&[
+            ("user", "Can you remember my face?"),
+            ("assistant", "Sure. What's your name?"),
+            ("user", "I'm Kess."),
+        ]);
+        let spelled_after = turn(&[
+            ("user", "Lamp, remember my face, I'm Kess."),
+            ("assistant", "Could you spell that for me?"),
+            ("user", "K, E, S, S."),
+        ]);
+        for messages in [&asked, &told_after, &spelled_after] {
+            assert_eq!(choice(&forcing, messages), remember, "{messages:?}");
+            assert_eq!(choice(&plain, messages), None);
+            assert_eq!(choice(&unseeing, messages), None);
+        }
+        let mut after_a_call = asked.clone();
+        after_a_call.push(Message::tool("1", "{\"remembered\": true}"));
+        for messages in [
+            turn(&[("user", "Lamp, remember my face.")]),
+            turn(&[("user", "I'm Kess.")]),
+            turn(&[("user", "K, E, S, S.")]),
+            turn(&[("user", "Do you remember me? I'm Kess.")]),
+            turn(&[("user", "Don't remember my face, I'm Kess.")]),
+            turn(&[("user", "Remember her face, she's Kess.")]),
+            turn(&[
+                ("user", "What's the weather?"),
+                ("assistant", "Sunny."),
+                ("user", "I'm Kess."),
+            ]),
+            after_a_call,
+        ] {
+            assert_eq!(choice(&forcing, &messages), None, "{messages:?}");
+            assert_eq!(plain.wire(&messages).2, forcing.wire(&messages).2);
+        }
+    }
+
+    /// Both forces at once: each line is forced to its own function, the
+    /// named ask's first, as one chat takes only one force.
+    #[test]
+    fn the_first_force_that_names_a_function_is_the_one_kept() {
+        use super::super::net::{Force, Forced, Message};
+        let naming = |word: &'static str, name: &'static str| -> Force {
+            Arc::new(move |messages: &[Message]| {
+                messages
+                    .last()
+                    .and_then(Message::words)
+                    .is_some_and(|words| words.contains(word))
+                    .then_some(Forced { name, only: None })
+            })
+        };
+        let both = crate::second_provider::worker::first_force(
+            Some(naming("ask", "start_agent_task")),
+            Some(naming("face", "remember_my_face")),
+        )
+        .unwrap();
+        let named = |words: &str| both(&[Message::user(words)]).map(|forced| forced.name);
+        assert_eq!(named("ask Codex"), Some("start_agent_task"));
+        assert_eq!(named("my face"), Some("remember_my_face"));
+        assert_eq!(named("ask about my face"), Some("start_agent_task"));
+        assert_eq!(named("hello"), None);
+        assert!(crate::second_provider::worker::first_force(None, None).is_none());
+        let one = crate::second_provider::worker::first_force(
+            None,
+            Some(naming("face", "remember_my_face")),
+        )
+        .unwrap();
+        assert_eq!(
+            one(&[Message::user("my face")]).map(|forced| forced.name),
+            Some("remember_my_face")
+        );
     }
 
     /// b0701 on lamp-4ace (#1722, 07:19): "can you ask Claude Code on my

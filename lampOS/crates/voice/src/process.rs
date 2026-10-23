@@ -1512,6 +1512,9 @@ fn second_route_worker_environment(
         crate::speaking_faces::ENVIRONMENT,
         crate::speaking_faces::EYES_ENVIRONMENT,
         crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
+        // A line asking to remember the person's face, with their name,
+        // calls remember_my_face (the owner's try on lamp-4ace, 23 Oct).
+        crate::known_faces::ASKED_ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_config::OWN_KEYS_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
@@ -1594,6 +1597,7 @@ mod tests {
             crate::speaking_faces::ENVIRONMENT,
             crate::speaking_faces::EYES_ENVIRONMENT,
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
+            crate::known_faces::ASKED_ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
             assert_eq!(
@@ -2182,6 +2186,7 @@ mod tests {
                     || name == crate::speaking_faces::ENVIRONMENT
                     || name == crate::speaking_faces::EYES_ENVIRONMENT
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
+                    || name == crate::known_faces::ASKED_ENVIRONMENT
                     || name == crate::second_config::OWN_KEYS_ENV
                 {
                     "on"
@@ -2314,6 +2319,7 @@ mod tests {
                     "LAMP_SECOND_OWN_ECHO=on",
                     "LAMP_SECOND_PREPARED=on",
                     "LAMP_SECOND_QUIET_HELD=on",
+                    "LAMP_SECOND_REMEMBER_ASKED=on",
                     "LAMP_SECOND_SAID_ONCE=on",
                     "LAMP_SECOND_SCOPED_CONTEXT=on",
                     "LAMP_SECOND_SKILL_LOOK=on",
