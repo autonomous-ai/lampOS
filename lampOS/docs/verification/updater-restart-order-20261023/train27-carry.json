@@ -1,0 +1,61 @@
+{
+  "pr": 3173,
+  "reviewed_head": "ef85204dd5653602f31ce41ed1c66df1135144ca",
+  "train_pr": 3176,
+  "train_head": "02597ec8e8cb3c9192eab905e0acc3ac839ffa77",
+  "train_base": "e6b88eac27096cd395e1a7c8555a13cbd6b68cf5",
+  "carried_commit": "71ace0101b331246450a6133803100d5d6d7b1db",
+  "stable_patch_id": "34f05e877024e21b11a1c3eb0152d4822ad3a4ea",
+  "authored_patch_matches": true,
+  "files": [
+    {
+      "path": "lampOS/crates/update/src/round.rs",
+      "identical": true,
+      "reviewed_sha256": "93db10767a4eb6aeb0821fd108d5bb81893f2229c9bea43fda95dfbf4199cbd0",
+      "train_sha256": "93db10767a4eb6aeb0821fd108d5bb81893f2229c9bea43fda95dfbf4199cbd0"
+    },
+    {
+      "path": "lampOS/crates/update/src/unit.rs",
+      "identical": true,
+      "reviewed_sha256": "49e49a02a7481fbbf02c20a38e9b591eede69c760f12e94cb99223cc7e3b5a60",
+      "train_sha256": "49e49a02a7481fbbf02c20a38e9b591eede69c760f12e94cb99223cc7e3b5a60"
+    },
+    {
+      "path": "lampOS/crates/update/src/unit/restart_order.rs",
+      "identical": true,
+      "reviewed_sha256": "c3a9ebfc49f6f8297d761c0bcae16d905823416054b67d3df749204c80fc0bb6",
+      "train_sha256": "c3a9ebfc49f6f8297d761c0bcae16d905823416054b67d3df749204c80fc0bb6"
+    },
+    {
+      "path": "lampOS/crates/update/tests/round.rs",
+      "identical": true,
+      "reviewed_sha256": "4bcec0291665c3804e2a33bd35e7119ebb4ada9288e321b6be4c56c68dfc7141",
+      "train_sha256": "4bcec0291665c3804e2a33bd35e7119ebb4ada9288e321b6be4c56c68dfc7141"
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/restart_order.rs",
+      "identical": true,
+      "reviewed_sha256": "85dcdd77e8620b2b905ab14959a9d5a8666453c6de9bf898a688c68d760d470d",
+      "train_sha256": "85dcdd77e8620b2b905ab14959a9d5a8666453c6de9bf898a688c68d760d470d"
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/restart_quiet.rs",
+      "identical": true,
+      "reviewed_sha256": "29b5404b6b61cfa8b44199dc06a7781bd18748d756e7b5a253d5c943993e9c73",
+      "train_sha256": "29b5404b6b61cfa8b44199dc06a7781bd18748d756e7b5a253d5c943993e9c73"
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "identical": false,
+      "reviewed_sha256": "63df68789c565676f6b8a911c4323417bfdbe34cdc5de25bce5b7a63f46e720c",
+      "train_sha256": "780639d8dda55bf0c25a4dd34952e45df77f04bcdc4ed4a14cb300bbec7f8d81"
+    },
+    {
+      "path": "lampOS/docs/verification/updater-restart-order-20261023/README.md",
+      "identical": true,
+      "reviewed_sha256": "c2691f0c049352d41f221cbeef319e3dd472f1a3543e4df1cc26cfdbcda3275e",
+      "train_sha256": "c2691f0c049352d41f221cbeef319e3dd472f1a3543e4df1cc26cfdbcda3275e"
+    }
+  ],
+  "limits": "Source carry verification only. The 325/0/4 Mac carry ran the same six runtime/test files on train26 base, not the complete train. Native train jobs remain the composition gate. Updates prose follow-up is separate."
+}

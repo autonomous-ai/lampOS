@@ -121,3 +121,22 @@ and the two job text files. This is historical evidence for that head,
 not the subsequent carry onto train 26. Nine and Reviewer-lead both posted
 READ-OK with no P1/P2; the saved rollback-order recovery P3 is tracked for
 a separate correction.
+
+## Train 26 base and train 27 carry
+
+The isolated carry on `e6b88eac2` passes the required Mac gate again:
+formatting, strict all-target Update Clippy, and **325 passed / 0 failed /
+4 ignored**. All **6,648** bound files stayed unchanged across each command
+and the subsequent local commit `4df51b492`. `mac-train26/` retains the full
+logs, file hashes and reconstructible local patch. Its runtime/test files
+are byte-identical to the originally reviewed head; its docs fix the
+intervening compatibility section and explain the 3600-second mixed-build
+window in both directions.
+
+Train 27 (#3176) had already frozen public `ef85204dd`, so that source
+branch was not rewritten. The new prose goes with the saved-order follow-up.
+`train27-carry.json` verifies the train's `71ace0101` has the same stable
+patch ID as the reviewed commit and all six complete runtime/test files
+match. Train head `02597ec8e` includes `e6b88eac2`. This scoped source
+comparison and isolated crate gate are not a test of the complete train;
+its official ARM64 and Clippy jobs provide that composition gate.

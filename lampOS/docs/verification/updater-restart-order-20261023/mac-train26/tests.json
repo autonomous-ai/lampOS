@@ -1,0 +1,32 @@
+{
+  "host": "Darwin arm64; Rust 1.96.0",
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-update",
+    "--no-fail-fast",
+    "--",
+    "--test-threads=2"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 283.304,
+  "bound_files": 6648,
+  "inputs_unchanged": true,
+  "log_sha256": "28de91710bebbd507b85630970f1292f5ce422f00573864149add7f1bac1eb61",
+  "result_lines": [
+    "test result: ok. 119 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 2.84s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+    "test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 107.39s",
+    "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s",
+    "test result: ok. 116 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 141.32s",
+    "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+    "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ]
+}
