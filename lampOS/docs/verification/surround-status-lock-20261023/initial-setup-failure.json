@@ -1,0 +1,23 @@
+{
+  "failure": {
+    "type": "FileNotFoundError",
+    "error": "[Errno 2] No such file or directory: 'rustc'",
+    "completed_commands": 0
+  },
+  "attempt": {
+    "tool_session": 55873,
+    "tool_exit": 1,
+    "failed_command": [
+      "rustc",
+      "-vV"
+    ],
+    "cwd": "/private/tmp/tests-codex-surround-status-lock-20261023/lampOS",
+    "error": "FileNotFoundError: [Errno 2] No such file or directory: rustc",
+    "initial_script_sha256": "9dca03fcc883dc370804c68c5c0b754de122688bccdf33ab0213b4d37c043c23",
+    "cargo_commands_executed": 0,
+    "tests_executed": 0,
+    "reason": "Runner inherited PATH without the installed Rust tool directory; failure.json and source-restoration proof are preserved."
+  },
+  "source_matches_frozen_candidate": true,
+  "source_sha256": "fab7ada43be805a54592b8881772907c17fa973594716d412edcdd56ca145d48"
+}

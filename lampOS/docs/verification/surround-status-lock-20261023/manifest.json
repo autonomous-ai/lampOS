@@ -1,0 +1,77 @@
+[
+  {
+    "path": "README.md",
+    "bytes": 5625,
+    "sha256": "468a0d69ca535424c20c9dd657c3cc73755f8c4e0e8bbb027124ff44aad1e112"
+  },
+  {
+    "path": "artifacts.json",
+    "bytes": 4971,
+    "sha256": "179069bec535345957b758f9d9e73f8ea9e64cf401af9ab2fd637d84da277ad4"
+  },
+  {
+    "path": "commands.json",
+    "bytes": 17170,
+    "sha256": "d61f634668c5f88977891836ecb08a7cfc37a7096aee88588386d00a20339b94"
+  },
+  {
+    "path": "controls/after-host-stall.patch",
+    "bytes": 365,
+    "sha256": "50fb15a50ba1e0249cf044904d2c0014bb41c5f2869ca0eb6a2b9410464d6a27"
+  },
+  {
+    "path": "controls/before-host-stall.patch",
+    "bytes": 393,
+    "sha256": "f555e4b6b6064cc07a15ffb9f3c7bd1ae01f23124f355ab294fa1e057c3c904a"
+  },
+  {
+    "path": "controls/held-poll-lock.patch",
+    "bytes": 722,
+    "sha256": "c31b848756746960fbc6addc56e939272acb1eacf534ef9c13c7a3269ff45399"
+  },
+  {
+    "path": "controls/missing-deadline.patch",
+    "bytes": 590,
+    "sha256": "86e921c2dcbde87ec98bed0f47cd9165cf49c89bfdfc5337436d1a4333141f08"
+  },
+  {
+    "path": "environment.json",
+    "bytes": 1778,
+    "sha256": "3cdecdd14c38ca2a26bb0c6fbd44d6f2b83e0655fa00fe7ec74998cb865e31f8"
+  },
+  {
+    "path": "external-index.json",
+    "bytes": 7417,
+    "sha256": "7e6b8fcfb62edf4f2059c6be612223850481bff2a1f739097364210955aa8362"
+  },
+  {
+    "path": "initial-setup-failure.json",
+    "bytes": 848,
+    "sha256": "3c3ff13cb6876e2afb5182e62fb381c8c0e34132410522aa03d3e4dc2be3bc9b"
+  },
+  {
+    "path": "raw/controls.txt",
+    "bytes": 3589,
+    "sha256": "51dc9b9e23a025cd7418b75823fa3ca734a0d672ca6112435b070cd1f517e740"
+  },
+  {
+    "path": "raw/linux-fmt.txt",
+    "bytes": 484,
+    "sha256": "590d9e9cfd7a438aceb3539c4797173ce2a38fc4685e24baa29e0e7b69b0e4d4"
+  },
+  {
+    "path": "raw/native-gates.txt",
+    "bytes": 33970,
+    "sha256": "c81075e60377a86f742e1ab7957d01762b8f3dcb242c2b9a424728622c289673"
+  },
+  {
+    "path": "raw/toolchain.txt",
+    "bytes": 792,
+    "sha256": "f0f9927be202b0e2e181a58ffa26051a85b8a7ccc41681505b677ab7a54ea476"
+  },
+  {
+    "path": "source-proof.json",
+    "bytes": 7227,
+    "sha256": "8ef9c4b825fd879fa376b3b204d38ed8672b119e0b28f9e0584d6222d909b9be"
+  }
+]

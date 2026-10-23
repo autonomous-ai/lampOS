@@ -1,0 +1,78 @@
+--- BEGIN before-host-stall-test.stdout; 314 bytes; sha256 8982f15a8f1787c351c84e2cb18a96a06a69961720a2e190d9f8faf15b2953cf ---
+
+running 1 test
+test worker::slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline ... FAILED
+
+failures:
+
+failures:
+    worker::slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 262 filtered out; finished in 0.59s
+
+
+--- END before-host-stall-test.stdout ---
+--- BEGIN before-host-stall-test.stderr; 293 bytes; sha256 ae2f7f8160b8631e08f73c778aef199e6718204de851b786465e17bb60be6754 ---
+
+thread 'worker::slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline' (703875815) panicked at crates/surround/tests/it/worker.rs:720:5:
+assertion failed: start.elapsed() < Duration::from_millis(20)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+--- END before-host-stall-test.stderr ---
+--- BEGIN after-host-stall-test.stdout; 203 bytes; sha256 fe1607e6f768a9156ce9065536e6f71ef32948ed5f5081a033feada48e4ae870 ---
+
+running 1 test
+test worker::slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 262 filtered out; finished in 0.66s
+
+
+--- END after-host-stall-test.stdout ---
+--- BEGIN after-host-stall-test.stderr; 0 bytes; sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ---
+
+--- END after-host-stall-test.stderr ---
+--- BEGIN held-poll-lock-test.stdout; 314 bytes; sha256 7a199e355c92307258e57b4f38795ede3ff99e8c2180eec78257fc2caf352d68 ---
+
+running 1 test
+test worker::slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline ... FAILED
+
+failures:
+
+failures:
+    worker::slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 262 filtered out; finished in 0.30s
+
+
+--- END held-poll-lock-test.stdout ---
+--- BEGIN held-poll-lock-test.stderr; 516 bytes; sha256 27180041e65f7aabe88b5eab5b79fc3802a3a6a46725307a70b12467f1993ba0 ---
+
+thread 'worker::slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline' (703881345) panicked at crates/surround/tests/it/worker.rs:694:14:
+status lock held while the network is pending: "WouldBlock"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'worker::slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline' (703881345) panicked at crates/surround/tests/it/worker.rs:733:10:
+network adapter stopped before its pending observation: RecvError(())
+
+--- END held-poll-lock-test.stderr ---
+--- BEGIN missing-deadline-test.stdout; 314 bytes; sha256 f0844ef7420748ca5bdd4046944d4bc03176920672a586055e4b114160938fe7 ---
+
+running 1 test
+test worker::slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline ... FAILED
+
+failures:
+
+failures:
+    worker::slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 262 filtered out; finished in 1.19s
+
+
+--- END missing-deadline-test.stdout ---
+--- BEGIN missing-deadline-test.stderr; 289 bytes; sha256 d121bac6e811cb525c7faa2108e07317779b6f586b09b2b9d9fd645951da30cb ---
+
+thread 'worker::slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline' (703885387) panicked at crates/surround/tests/it/worker.rs:745:10:
+called `Result::unwrap()` on an `Err` value: Elapsed(())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+--- END missing-deadline-test.stderr ---

@@ -1,0 +1,16 @@
+--- a/lampOS/crates/surround/src/worker.rs
++++ b/lampOS/crates/surround/src/worker.rs
+@@ -881,7 +881,12 @@
+                 if now >= deadline_us {
+                     return Err(ErrorCode::Unavailable);
+                 }
+-                if let Some(completion) = self.network.poll() {
++                let completion = {
++                    let shared = self.shared.clone();
++                    let _status = shared.view.write().unwrap();
++                    self.network.poll()
++                };
++                if let Some(completion) = completion {
+                     self.network_inflight = false;
+                     if completion.id != id {
+                         return Err(ErrorCode::OwnerRefused);

@@ -1,0 +1,13 @@
+--- a/lampOS/crates/surround/src/worker.rs
++++ b/lampOS/crates/surround/src/worker.rs
+@@ -878,9 +878,7 @@
+         let waited = tokio::time::timeout(NETWORK_CALL, async {
+             loop {
+                 let now = self.now()?;
+-                if now >= deadline_us {
+-                    return Err(ErrorCode::Unavailable);
+-                }
++                // Diagnostic control: ignore the logical operation deadline.
+                 if let Some(completion) = self.network.poll() {
+                     self.network_inflight = false;
+                     if completion.id != id {

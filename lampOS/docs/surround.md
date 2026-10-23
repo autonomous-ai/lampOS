@@ -159,6 +159,13 @@ fetch or expired display lease, preserves the last address as historical
 information, disables changes and rejects late responses from old sessions.
 `Inhibited` is healthy but explicitly not listening.
 
+The pending-network worker fixture checks status-lock availability inside the
+adapter's first poll and between polls. It waits for that observation with a
+ten-second fixture watchdog instead of measuring a status read against a
+20 ms host scheduling limit. The adapter stays pending; advancing the existing
+injected clock by 46 seconds must still fail the join within the original
+one-second fixture watchdog. The 45-second product join deadline is unchanged.
+
 ## Startup and first setup
 
 The planner considers Body, Eyes, Voice and configured optional parts without
