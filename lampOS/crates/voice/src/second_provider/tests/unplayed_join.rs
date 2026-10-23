@@ -593,3 +593,225 @@ async fn a_piece_dropped_by_the_caps_keeps_its_exchange() {
     );
     assert!(asked.contains(&Message::assistant(ANSWER)), "{asked:?}");
 }
+
+/// The first builder on #3126 (23 Oct 08:15), lamp-4ace's r12 on build G:
+/// request 22 was joined (21's unplayed answer unsaid), 23 cut it and was
+/// not joined, so 22's words were let go and 23 was answered and played;
+/// the follow-up 25 was held in a busy room as "the line began 37 s after
+/// the lamp's words ended". The journal's times showed it did begin 37 s
+/// after 23's words (the kit waited too long, 08:53), so the hold was
+/// right; this pins the let-go path. Here, each line judged by the
+/// worker's own rule (`LAMP_NAME_OR_FOLLOW_UP`): request 1 calls the lamp and its answer is a
+/// search never finished, request 2 is joined to it (1 unsaid) and cut
+/// before its speech played, request 3 is not joined (two voices) and is
+/// answered and played. The call is then 40 s old and the room busy, and
+/// request 4 begins just after 3's words: request 3's played answer is the
+/// lamp's words, in the thread and in their end, so 4 is in the
+/// conversation going on.
+#[tokio::test]
+async fn a_played_answer_after_words_let_go_keeps_the_conversation_going() {
+    use super::worker::Heeding;
+    use crate::room_told::Room;
+    let _one = crate::provider_worker::tests::one_thread();
+    const CALL: &str = "Lamp, what time is it in London right now?";
+    const RAIN: &str = "Will it rain tomorrow?";
+    const SECOND: &str = "Eight and two.";
+    const PLAYED: &str = "Light rain later.";
+    const AFTER: &str = "And the day after?";
+    let s = Duration::from_secs;
+    *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    // The lamp's words before the call: 44 s ago.
+    {
+        let mut thread = Thread::new();
+        let before = std::time::Instant::now() - s(44);
+        thread.person("Lamp, what's the weather today?", true, before);
+        thread.lamp(100, "Sunny and warm today.", before);
+        *crate::thread::THREAD.lock().unwrap() = thread;
+    }
+    let heeding = Arc::new(Mutex::new(Heeding::new(false, false, None, None)));
+    {
+        let mut heeding = heeding.lock().unwrap();
+        heeding.as_the_only_voice(false, true, false);
+        heeding.needing_name_or_follow_up();
+    }
+    let (release, hold) = tokio::sync::oneshot::channel();
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok(CALL.to_owned()),
+                Ok(SAIGON.to_owned()),
+                Ok(RAIN.to_owned()),
+                Ok(AFTER.to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![text(SECOND), Ok(ChatEvent::Done)],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "web_search",
+                        json!({"query": "time in London"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text(PLAYED), Ok(ChatEvent::Done)],
+                vec![text("Sunny again."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        speech_hold: Mutex::new(Some((SECOND, hold))),
+        ..Script::default()
+    });
+    let (searching, searched) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+        let searching = searching.clone();
+        Box::pin(async move {
+            let _ = searching.send(());
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            json!({"results": []})
+        })
+    });
+    let system: System = Arc::new(|| "SYSTEM".to_owned().into());
+    let now = Arc::new(Mutex::new(Instant::now()));
+    let clock = now.clone();
+    let judged = heeding.clone();
+    let did = heeding.clone();
+    type Verdicts = Mutex<Vec<(u64, Option<&'static str>)>>;
+    let verdicts: Arc<Verdicts> = Arc::default();
+    let told = verdicts.clone();
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        system,
+        runner,
+        Arc::new(move || *clock.lock().unwrap()),
+    )
+    .announcing(false)
+    // Each line a second long, ended now, as the microphone would read it.
+    .heeding(Arc::new(move |request, _, heard, from| {
+        let now_us = monotonic_us();
+        let held = judged
+            .lock()
+            .unwrap()
+            .heed(request, (now_us - 1_000_000, now_us), heard, from);
+        told.lock().unwrap().push((request, held));
+        held
+    }))
+    .telling_what_it_did(Arc::new(move |what| did.lock().unwrap().lamp_did(what)))
+    .joining_cut_words(Arc::new(|_, request| {
+        if request == 2 {
+            Joined::Same("the same voice said both")
+        } else {
+            Joined::Not("two voices (cosine 0.12)".to_owned())
+        }
+    }))
+    .unsaying_joined(Arc::new(crate::thread::unsay));
+    // What the worker keeps of each output (`worker::keep_scoped`).
+    let keep = |event: &ProviderOutput| {
+        let at = std::time::Instant::now();
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        match event {
+            ProviderOutput::Transcript {
+                request: None,
+                text,
+                finished,
+            } => thread.person(text, *finished, at),
+            ProviderOutput::Transcript {
+                request: Some(request),
+                text,
+                ..
+            } if !text.is_empty() => {
+                thread.lamp(*request, &format!("{} ", text.trim_start()), at);
+            }
+            _ => {}
+        }
+    };
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("request 1's text comes");
+        keep(&event);
+        if matches!(&event, ProviderOutput::Transcript { request: Some(1), text, .. } if text.trim() == SECOND)
+        {
+            break;
+        }
+    }
+    while let Ok(event) = tokio::time::timeout(Duration::from_millis(100), engine.next()).await {
+        keep(&event);
+    }
+    *now.lock().unwrap() += Duration::from_millis(600);
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    while searched.try_recv().is_err() {
+        if let Ok(event) = tokio::time::timeout(Duration::from_millis(20), engine.next()).await {
+            keep(&event);
+        }
+    }
+    *now.lock().unwrap() += Duration::from_millis(1_000);
+    engine.submit(start(3));
+    engine.retire_through(2);
+    engine.submit(audio(3, 1));
+    engine.submit(end(3));
+    let mut played = false;
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("request 3's turn ends");
+        keep(&event);
+        played |= matches!(event, ProviderOutput::Audio { request: 3, .. });
+        if matches!(event, ProviderOutput::TurnComplete { request: 3, .. }) {
+            break;
+        }
+    }
+    assert!(played, "request 3's answer is played: {verdicts:?}");
+    let said = crate::thread::THREAD
+        .lock()
+        .unwrap()
+        .said_last_ago_but(std::time::Instant::now(), &[]);
+    assert!(
+        said.is_some_and(|ago| ago < s(10)),
+        "request 3's played answer is in the thread: {said:?}"
+    );
+    let ended = heeding.lock().unwrap().said_ended_ago(monotonic_us());
+    assert!(
+        ended.is_some_and(|ago| ago < s(10)),
+        "request 3's played answer is the end of the lamp's words: {ended:?}"
+    );
+    // The call 40 s ago, and the room busy.
+    heeding.lock().unwrap().call_older(s(40));
+    {
+        let mut room = crate::room_told::room().lock().unwrap();
+        for other in 901..=903 {
+            room.unanswered(other, monotonic_us());
+        }
+        assert_eq!(room.at(monotonic_us()), Room::Busy);
+    }
+    *now.lock().unwrap() += Duration::from_millis(2_000);
+    engine.submit(start(4));
+    engine.submit(audio(4, 1));
+    engine.submit(end(4));
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("request 4's turn ends");
+        keep(&event);
+        if matches!(event, ProviderOutput::TurnComplete { request: 4, .. }) {
+            break;
+        }
+    }
+    drop(release);
+    let asked = script.asked.lock().unwrap().clone();
+    *crate::thread::THREAD.lock().unwrap() = Thread::new();
+    *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    assert_eq!(
+        asked.last().and_then(|asked| asked.last()),
+        Some(&Message::user(AFTER)),
+        "the follow-up is answered: {verdicts:?} {asked:?}"
+    );
+}

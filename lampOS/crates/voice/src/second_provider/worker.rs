@@ -5417,10 +5417,16 @@ impl Heeding {
         }
     }
 
+    /// The call let out `by` longer ago, as time passes in a test.
+    #[cfg(test)]
+    pub(crate) fn call_older(&mut self, by: Duration) {
+        self.called_at = self.called_at.map(|at| at - by);
+    }
+
     /// How long ago the lamp's words sent were played to their end
     /// ([`crate::second_provider::Did::Said`]), zero while they still play.
     #[cfg(test)]
-    fn said_ended_ago(&self, now_us: u64) -> Option<Duration> {
+    pub(crate) fn said_ended_ago(&self, now_us: u64) -> Option<Duration> {
         ended_ago(self.said_until_us, now_us)
     }
 
