@@ -3066,7 +3066,14 @@ after a take-over, but now for every turn:
   `Heeding::carried_by_the_same_speaker` finds the one it answered: the
   caller's face alone seen speaking it turned to the lamp, or the
   conversation's voice at `same_voice::SAME_FROM` (0.70) or over. Each
-  answer renews the 20 s. It is let out as the conversation going on,
+  answer renews the 20 s, so a chain of carried turns has no overall cap,
+  but each turn needs its own sure sign (the reviewer-lead at 03:40). A line
+  begun within the 8 s while a carry stands is read the same way
+  (reviewer-two at 03:46 on #3296): its sure sign lets it go on, another
+  face seen speaking it ends the carry, and a short print under 0.30 is
+  neither another voice nor leave to go on, so with no sure sign such a
+  line is held and ends nothing; with no low print and no sure sign it goes
+  on or not as any follow-up. It is let out as the conversation going on,
   before `busy_bar`, so a short line that is no question is still held
   (`BUSY_SHORT`). Another face seen speaking it, or a sure other voice
   (under 0.30 from `CARRY_SURE_OTHER_SPEECH_SAMPLES`, 2.5 s of speech, the
@@ -3075,14 +3082,16 @@ after a take-over, but now for every turn:
   new answer; a stop (`Did::Stopped`, from the next line's `after_stop`) and
   a privacy change end it, and a forgetting leaves no words to carry from.
   The caller's own face seen speaking turned away from the lamp is someone
-  talking to a colleague: held, the carry standing (reviewer-two at 03:01).
+  talking to a colleague: held, the carry standing, not ended (reviewer-two
+  at 03:01). The faces read are those seen *speaking* the line.
   A line with no sure sign either way, a print not back, a short print
   under 0.70, no face seen speaking or only before the line, is held and
-  ends nothing. Re-sliced as the code cuts them, that set's short clips of
-  one synthetic voice (three clips of 0.93 to 1.45 s against seven
-  references: 21 correlated pairs) read 0.11 to 0.50 against it, and four
-  clips of another voice (1.43 to 1.45 s) 0.09 to 0.26
-  (`docs/verification/same-voice-early-20261018`, reviewer-two at 03:17):
+  ends nothing. The existing score rows of
+  `docs/verification/same-voice-early-20261018`, selected by their clips'
+  original durations (no audio re-sliced, no CAM++ run again), give one
+  synthetic voice's short clips (three of 0.93 to 1.45 s against seven
+  references: 21 correlated pairs) 0.11 to 0.50 against it, and four
+  clips of another voice (1.43 to 1.45 s) 0.09 to 0.26:
   a reason for caution about a short print's "another voice", not a
   calibration, so the 2.5 s is provisional; every print is asked
   at 1.5 s of speech, so today no voice ends a carry, and with short lines
