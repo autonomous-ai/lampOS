@@ -1,0 +1,628 @@
+{
+  "encoding": "Offsets are UTF-8 bytes of the decoded human-streams.txt.json data string, without an added newline.",
+  "streams": [
+    {
+      "id": "rustc/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/rustc.stdout.txt",
+      "bytes": 191,
+      "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 191,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 103,
+          "bytes": 191,
+          "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "rustc/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/rustc.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 417,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/all/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/all.stdout.txt",
+      "bytes": 22816,
+      "sha256": "a01042c2285c97806fc978b486484e9f84dfcee6cfea224378b477682b2b31ab",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 22816,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 606,
+          "bytes": 22816,
+          "sha256": "a01042c2285c97806fc978b486484e9f84dfcee6cfea224378b477682b2b31ab"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/all/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 23669,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/file/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/file.stdout.txt",
+      "bytes": 101,
+      "sha256": "ffe6eb73f9fc834c3983a3dea33371d221dcb847ea31a79bb8cd0e054b104763",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 101,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 23919,
+          "bytes": 101,
+          "sha256": "ffe6eb73f9fc834c3983a3dea33371d221dcb847ea31a79bb8cd0e054b104763"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/file/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/file.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 24269,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/ignored/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 24521,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/ignored/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 24776,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/all/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/all.stdout.txt",
+      "bytes": 81,
+      "sha256": "06a935bb8d90864f89135737bc24cdf47eebc2877cf4d6fea3636c41aa298f9a",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 81,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 25036,
+          "bytes": 81,
+          "sha256": "06a935bb8d90864f89135737bc24cdf47eebc2877cf4d6fea3636c41aa298f9a"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/all/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 25380,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/file/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/file.stdout.txt",
+      "bytes": 109,
+      "sha256": "7acec4f4eea5570cda847dadb10df910daa5487e2eb3c42288d2b80251ac8d18",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 109,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 25646,
+          "bytes": 109,
+          "sha256": "7acec4f4eea5570cda847dadb10df910daa5487e2eb3c42288d2b80251ac8d18"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/file/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/file.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 26020,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/ignored/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 26288,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/ignored/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 26559,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/all/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/all.stdout.txt",
+      "bytes": 339713,
+      "sha256": "6b0e3d37612ff58f4f84c519f7f436376a12134ab69a2641abfcfaa1385d2927",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 339713,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 26831,
+          "bytes": 339713,
+          "sha256": "6b0e3d37612ff58f4f84c519f7f436376a12134ab69a2641abfcfaa1385d2927"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/all/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 366807,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/file/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/file.stdout.txt",
+      "bytes": 109,
+      "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 109,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 367073,
+          "bytes": 109,
+          "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/file/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/file.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 367447,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/ignored/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/ignored.stdout.txt",
+      "bytes": 1015,
+      "sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 1015,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 367718,
+          "bytes": 1015,
+          "sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/ignored/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 369004,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/all/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/all.stdout.txt",
+      "bytes": 235,
+      "sha256": "b1ee3badf01c038fa473c3e33bad4fcf667022e6141fca493ddd991bca28c774",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 235,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 369281,
+          "bytes": 235,
+          "sha256": "b1ee3badf01c038fa473c3e33bad4fcf667022e6141fca493ddd991bca28c774"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/all/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 369795,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/file/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/file.stdout.txt",
+      "bytes": 121,
+      "sha256": "8818cae6fd13a952438433c2b8170ac8664b0886abd068f5dad75f58dcfcfff4",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 121,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 370077,
+          "bytes": 121,
+          "sha256": "8818cae6fd13a952438433c2b8170ac8664b0886abd068f5dad75f58dcfcfff4"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/file/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/file.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 370479,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/ignored/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 370763,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/ignored/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 371050,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/all/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/all.stdout.txt",
+      "bytes": 353,
+      "sha256": "6a80518e733a17dba4e8f03aa0c1609cc558aa7acf343d72b208f132784a5e28",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 353,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 371338,
+          "bytes": 353,
+          "sha256": "6a80518e733a17dba4e8f03aa0c1609cc558aa7acf343d72b208f132784a5e28"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/all/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 371976,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/file/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/file.stdout.txt",
+      "bytes": 124,
+      "sha256": "f2d2f57ca3c4700e3cd53cf5290c10a1e35b0b669bc413ff0770c929346546e4",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 124,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 372264,
+          "bytes": 124,
+          "sha256": "f2d2f57ca3c4700e3cd53cf5290c10a1e35b0b669bc413ff0770c929346546e4"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/file/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/file.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 372675,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/ignored/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 372965,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/ignored/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 0,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 373258,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    },
+    {
+      "id": "voice-default-parallel/voice-default-parallel/stdout",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+      "bytes": 649570,
+      "sha256": "71867ca07c9382ec84020254358e736ebce6bc35fb4c47f0744efd04fe2ae44b",
+      "retained": [
+        {
+          "source_start": 260084,
+          "source_end": 649570,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 373516,
+          "bytes": 389486,
+          "sha256": "df40bde2b46282655db303b3b87195a6bdff1b33a3412df1c4f9042c40c7309e"
+        }
+      ],
+      "omitted": [
+        {
+          "source_start": 0,
+          "source_end": 260084,
+          "bytes": 260084,
+          "sha256": "5d549a69e4c42605235365885db9d4e06885a27e646dafb98d001f403abf9cd7"
+        }
+      ],
+      "omitted_complete_cargo_record_counts": {
+        "compiler-artifact": 308,
+        "build-script-executed": 32,
+        "build-finished": 1
+      }
+    },
+    {
+      "id": "voice-default-parallel/voice-default-parallel/stderr",
+      "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/voice-default-parallel.stderr.txt",
+      "bytes": 3768,
+      "sha256": "ff5db579dcfeee3f87430027490bad557d9388c3ca83fab4df8d56357271715e",
+      "retained": [
+        {
+          "source_start": 0,
+          "source_end": 3768,
+          "file": "human-streams.txt.json",
+          "decoded_offset": 763208,
+          "bytes": 3768,
+          "sha256": "ff5db579dcfeee3f87430027490bad557d9388c3ca83fab4df8d56357271715e"
+        }
+      ],
+      "omitted": [],
+      "omitted_complete_cargo_record_counts": {}
+    }
+  ]
+}

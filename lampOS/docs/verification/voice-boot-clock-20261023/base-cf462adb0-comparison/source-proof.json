@@ -1,0 +1,171 @@
+{
+  "head": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+  "tree": "4c5c6894939372cd0979c773898a80b5f3904d09",
+  "tracked_repository_paths": 10026,
+  "tracked_lampOS_paths": 6680,
+  "source_aggregate_sha256": "84f9f5274db3fde4e47c376493b6e5eb935f5bf35433b2c86e75c0372643cef4",
+  "final_source_aggregate_sha256": "84f9f5274db3fde4e47c376493b6e5eb935f5bf35433b2c86e75c0372643cef4",
+  "source_unchanged": true,
+  "hash_algorithm": "Sorted path + NUL + Git mode + NUL + u64 big-endian length + exact bytes; symlinks use literal target bytes.",
+  "full_source_map": {
+    "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/source-map.json",
+    "bytes": 2139488,
+    "sha256": "9fe9ef5df3cc3e6c2572a914550534ad01c611121df37613d9e0ded69536d5a0"
+  },
+  "relevant_source_records": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/second.rs",
+      "git_mode": "100644",
+      "bytes": 75893,
+      "sha256": "428701e0e25869675634954b80356b9dfb18e4268f14a82683a7a4e1e4c1c984"
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "git_mode": "100644",
+      "bytes": 132800,
+      "sha256": "805d7f55a0351c097d43e1f7c8f03c09bb7f1c116176545783be00a28f963128"
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "git_mode": "100644",
+      "bytes": 108565,
+      "sha256": "47075418dac7fc54591976ca2557e3be698590b94e8cdbd49a8f4f5c379da0c8"
+    },
+    {
+      "path": "lampOS/crates/voice/src/messages.rs",
+      "git_mode": "100644",
+      "bytes": 51429,
+      "sha256": "1bc28d917159472dcd6de1e2436c07b85f1215f9f67d8b39563e0bd339a62fb5"
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/held_consent.rs",
+      "git_mode": "100644",
+      "bytes": 12640,
+      "sha256": "33ab552425c2f28d98f6c2d052b10d66fde94cdef28e0ba7c7259f0892731ee5"
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "git_mode": "100644",
+      "bytes": 73791,
+      "sha256": "2fb8205fb7ebd46161f13f7403e4de713675b4c64c0438f34c4f01e2b6dfae26"
+    },
+    {
+      "path": "lampOS/crates/voice/src/scenario_clock.rs",
+      "git_mode": "100644",
+      "bytes": 19292,
+      "sha256": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80"
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "git_mode": "100644",
+      "bytes": 770784,
+      "sha256": "4e3b891fd552bd5af867f32bed015fc2a89f0b352cf69e14d76ca80da1a4f89b"
+    },
+    {
+      "path": "lampOS/crates/voice/src/stop_words.rs",
+      "git_mode": "100644",
+      "bytes": 140635,
+      "sha256": "ba9c24c705a8cee2f615383e75cfe28a07f0ba5481f160e5f4a09aa2c0a8405a"
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "git_mode": "100644",
+      "bytes": 44428,
+      "sha256": "b50767957067efee6a502e372605a7bcc2b16e23097da1ddca85153cf966993a"
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/light_call.rs",
+      "git_mode": "100644",
+      "bytes": 3214,
+      "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8"
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "git_mode": "100644",
+      "bytes": 30125,
+      "sha256": "6f96999c5c3dd5182c7c7c958b47f831c25cadd6bb1697a255cc9ea376cbfe14"
+    }
+  ],
+  "freshness": {
+    "tracked_paths": 10026,
+    "mtime_ns": 1792752415332156000,
+    "before_sha256": "84f9f5274db3fde4e47c376493b6e5eb935f5bf35433b2c86e75c0372643cef4",
+    "after_sha256": "84f9f5274db3fde4e47c376493b6e5eb935f5bf35433b2c86e75c0372643cef4",
+    "identical_bytes_and_modes": true
+  },
+  "exact_base_to_d5_delta_paths": [
+    "lampOS/crates/voice/src/coordinator/second.rs",
+    "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+    "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+    "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+    "lampOS/crates/voice/src/scenario_clock.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs",
+    "lampOS/crates/voice/src/stop_words.rs",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "baseline_worktree_independent_verification": {
+    "verified_at": "2026-10-23T10:15:15.703149+00:00",
+    "worktree": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023",
+    "branch": "tests/1569-boot-clock-base-cf462-20261023",
+    "HEAD": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+    "tree": "4c5c6894939372cd0979c773898a80b5f3904d09",
+    "parents": [
+      "4fff5ca1c0034c902406f196bc5abd4ad44f7aff"
+    ],
+    "status_porcelain_empty": true,
+    "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tracked_paths": 10026,
+    "tracked_lampOS_paths": 6680,
+    "creation_receipt": {
+      "path": "/private/tmp/tests-boot-clock-base-cf462-20261023/worktree-add.json",
+      "bytes": 301,
+      "sha256": "f8d066cf58aaf179a880957f766bb17c18821073cb43d9c84c28a6928efe1613"
+    },
+    "new_worktree_or_branch_created_by_this_audit": false,
+    "unused_preflight_only_path": "/private/tmp/tests-codex-voice-base-cf462-20261023",
+    "Cargo_or_target_access": false,
+    "code_edits_or_Git_mutations": false
+  },
+  "source_deltas": {
+    "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/source-deltas.json",
+    "bytes": 5974,
+    "sha256": "2cedcc8a8287080d6473132635d9abe63b0488bef5f8f7e094b94eb07e6e67f7"
+  },
+  "runner": {
+    "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run.py",
+    "bytes": 16374,
+    "sha256": "c2dac1d77d783c50be25b55f7f8596eb31ee2c2cd62890f23a002b09d7017553"
+  },
+  "support": {
+    "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/support.py",
+    "bytes": 3285,
+    "sha256": "6ec612d0d37f6d92ea4ba0ed80d45160565164c2f627a1052a823f728bead964"
+  },
+  "census_parser": {
+    "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/census.py",
+    "bytes": 12378,
+    "sha256": "dd391e4c2e056eee18eca7c3c311b644d3a0e65a8d2203ad8b42b28bfd082ea1"
+  },
+  "frozen_plan": {
+    "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/PLAN.md",
+    "bytes": 3313,
+    "sha256": "73ba933992d78e236918df70f9438e28e4ae307663bfd526cbfa1a371f5cbdc5"
+  },
+  "prepared_identity": {
+    "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/prepared.json",
+    "bytes": 2308,
+    "sha256": "a34de4f14057c0438466c7d5feca0c4649611ad1db30fb23c3bb81e8b0b19fa3"
+  },
+  "execution_marker": {
+    "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/execution-start.json",
+    "bytes": 2360,
+    "sha256": "f90afe925fdb7c8aa5914ac3268edb345523dab27e504f6b2d98fa94d53e1151"
+  },
+  "original_prepared_manifest": {
+    "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/SHA256SUMS",
+    "bytes": 1185,
+    "sha256": "c977c74c06601ea9abc9190d16d00730569c6bdbc18cbbca95594bafaa34e4c3"
+  },
+  "no_target_or_source_reads_during_packaging": true,
+  "portability_limit": "The complete10,026-path map, Cargo machine streams and verifier scripts remain external at declared paths/hashes. Public material retains selected source records, aggregate guards, complete human output and exact raw byte indexes. Their external availability is not guaranteed by this receipt."
+}

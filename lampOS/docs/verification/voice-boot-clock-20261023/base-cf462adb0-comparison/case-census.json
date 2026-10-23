@@ -1,0 +1,267 @@
+{
+  "compiled_inventory_is_execution": false,
+  "complete_identity_count": 3939,
+  "identity_includes_package_target_name_and_ignored_flag": true,
+  "complete_identity_sha256": "46b20554e4c4f4380a43234812a869a4cdc4a69e8b537548ac8d8ce888988fbe",
+  "all_three_complete_censuses_equal": true,
+  "targets": [
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "render_line_second",
+        "src_path": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/voice/examples/render_line_second.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f",
+      "sha256": "41d473b15e98d62b255f225830a2f5d2ce5f0daecb05889df3bd8ce9f7c5b9a5",
+      "compiled_case_count": 4,
+      "ignored_case_count": 0,
+      "custom_entrypoint": false,
+      "executed_tests_in_this_census": 0,
+      "compiled_cases_sha256": "692f1d6971e0f8a97f868a6e1366c5f908aed00e93071d490e9ffd65500a7d2b",
+      "compiled_ignored_cases_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "raw_inventory_source": "Complete --list and --list --ignored stdout are retained in human-streams.txt.json; identify by target/hash via commands.json."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "src_path": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+      "sha256": "b07344646e719ceed6456ae165a5d8939e7a31e3d21e86a1dec9bbaf2cdced17",
+      "compiled_case_count": 1,
+      "ignored_case_count": 0,
+      "custom_entrypoint": false,
+      "executed_tests_in_this_census": 0,
+      "compiled_cases_sha256": "d7b0b36fab2405e472c202a1bb68e18948e2bf1b8e07667de1127f395dd824da",
+      "compiled_ignored_cases_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "raw_inventory_source": "Complete --list and --list --ignored stdout are retained in human-streams.txt.json; identify by target/hash via commands.json."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "stop_words_stt_replay",
+        "src_path": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+      "sha256": "4a9110ad84e45b8d3de8f12f8896513f5d994bee051875a5130ecd8e9812a1c6",
+      "compiled_case_count": 6,
+      "ignored_case_count": 0,
+      "custom_entrypoint": false,
+      "executed_tests_in_this_census": 0,
+      "compiled_cases_sha256": "490fd52ffa26ee26d6b703fb4f82b19dd3f15d7466e288d789558883417c65c2",
+      "compiled_ignored_cases_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "raw_inventory_source": "Complete --list and --list --ignored stdout are retained in human-streams.txt.json; identify by target/hash via commands.json."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+      "sha256": "7077c08c29c8be105faa07ce98ebd8d92bc6374d6b4d16939951d31de066b8db",
+      "compiled_case_count": 270,
+      "ignored_case_count": 0,
+      "custom_entrypoint": false,
+      "executed_tests_in_this_census": 0,
+      "compiled_cases_sha256": "1470d38a9789192a89f011a5306ee3e03b2061a59d5e5a2e98e01cdf037abace",
+      "compiled_ignored_cases_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "raw_inventory_source": "Complete --list and --list --ignored stdout are retained in human-streams.txt.json; identify by target/hash via commands.json."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "sha256": "bedcb8a40698d38f09b3e86a62d39d97c95ec05c27e9966aca7f5627dc8106da",
+      "compiled_case_count": 3658,
+      "ignored_case_count": 15,
+      "custom_entrypoint": false,
+      "executed_tests_in_this_census": 0,
+      "compiled_cases_sha256": "11f43f1c53bb4a476d75ee49707c4e132644dd4688ae0c9dd416ffd6d838fd00",
+      "compiled_ignored_cases_sha256": "8f212489520a5454850ddcd88e07bfed40f4a42a00352ea0f2cd7f8eadef4dd7",
+      "raw_inventory_source": "Complete --list and --list --ignored stdout are retained in human-streams.txt.json; identify by target/hash via commands.json."
+    }
+  ],
+  "selected_names": [
+    "coordinator::second::tests::a_line_given_to_gemini_at_the_end_of_the_hold_is_never_too_old",
+    "coordinator::second::tests::a_ready_after_the_hold_leaves_the_line_to_the_second_route",
+    "coordinator::second::tests::a_ready_lost_in_the_same_drain_holds_the_next_request_for_the_reconnect",
+    "coordinator::tests::hand_controls::a_closed_switch_read_in_a_ridden_gap_is_the_mute",
+    "coordinator::tests::hand_controls::a_frame_the_conversation_reads_marks_the_run_heard",
+    "coordinator::tests::hand_controls::a_hand_kept_on_the_head_sighs_in_its_last_second_and_sleeps_on_time",
+    "coordinator::tests::hand_controls::a_hand_lifted_after_its_breath_sighs_and_stays_awake",
+    "coordinator::tests::hand_controls::a_hand_seen_late_in_the_hold_gets_no_breath_and_sleeps_on_time",
+    "coordinator::tests::hand_controls::a_head_touch_stops_the_lamp_while_it_says_its_answer",
+    "coordinator::tests::hand_controls::a_head_touch_while_the_lamp_is_still_thinking_asks_nothing",
+    "coordinator::tests::hand_controls::a_lamp_put_to_sleep_from_the_head_ends_its_conversation_as_a_mute_named_head_sleep",
+    "coordinator::tests::hand_controls::a_privacy_worker_failing_in_a_ridden_gap_marks_its_end",
+    "coordinator::tests::hand_controls::a_privacy_worker_fault_reports_a_pending_wake_once",
+    "coordinator::tests::hand_controls::a_ridden_gap_gives_the_camera_and_the_eyes_nothing_until_it_reopens",
+    "coordinator::tests::hand_controls::a_short_gap_in_the_switchs_readings_is_ridden_and_the_conversation_goes_on",
+    "coordinator::tests::hand_controls::a_silent_privacy_worker_ends_the_loop_once_its_freshness_has_passed",
+    "coordinator::tests::hand_controls::a_tap_on_a_quiet_lamps_head_plays_its_hm_as_a_turn_of_its_own",
+    "coordinator::tests::hand_controls::a_tap_while_the_lamp_is_still_thinking_keeps_its_answer_and_does_not_hum",
+    "coordinator::tests::hand_controls::a_wake_expires_while_permission_is_unavailable_and_later_open_cannot_revive_it",
+    "coordinator::tests::hand_controls::a_wake_never_speaks_with_privacy_closed_or_closed_while_waiting",
+    "coordinator::tests::hand_controls::a_wake_waits_for_microphone_permission_and_fresh_capture_before_one_hm",
+    "coordinator::tests::hand_controls::a_wake_without_a_hum_leaves_no_cue_record",
+    "coordinator::tests::hand_controls::a_wakes_capture_readiness_must_arrive_before_its_original_deadline",
+    "coordinator::tests::hand_controls::only_the_hums_own_ring_frames_are_marked_listening",
+    "coordinator::tests::hand_controls::returning_to_sleep_cancels_a_wake_waiting_for_permission",
+    "coordinator::tests::hand_controls::the_muted_wait_says_the_switch_cannot_be_read_while_workers_end_at_start",
+    "coordinator::tests::hand_controls::the_muted_waits_own_closures_count_the_slide_for_a_taps_face",
+    "coordinator::tests::hand_controls::the_workers_own_expiry_rides_a_sixty_millisecond_silence_in_one_conversation",
+    "coordinator::tests::hand_controls::without_the_ride_the_workers_own_expiry_still_ends_the_conversation",
+    "coordinator::tests::hand_controls::without_the_switch_a_gap_in_the_readings_ends_the_conversation_as_before",
+    "coordinator::tests::hand_controls::woken_from_a_hands_sleep_the_lamp_says_hm_first",
+    "coordinator::tests::turn_taking::a_follow_up_with_a_pause_loses_only_its_first_piece",
+    "coordinator::tests::turn_taking::a_line_that_cuts_a_reply_is_told_how_much_of_it_was_played",
+    "coordinator::tests::turn_taking::a_line_the_lamp_starts_waits_out_the_rooms_sound_until_it_sounds",
+    "coordinator::tests::turn_taking::a_name_said_late_in_talk_over_the_lamps_own_line_in_a_busy_room_still_stops_it",
+    "coordinator::tests::turn_taking::a_request_begun_soon_after_the_lamps_words_says_so_in_its_start",
+    "coordinator::tests::turn_taking::a_request_over_a_reply_with_sound_says_so_in_its_start",
+    "coordinator::tests::turn_taking::a_sound_begun_as_the_body_moves_is_the_askers_when_about_as_loud",
+    "coordinator::tests::turn_taking::a_sound_heard_without_echo_evidence_does_not_wait",
+    "coordinator::tests::turn_taking::a_sound_held_until_the_own_line_sounds_stays_that_sound_past_its_first_audio",
+    "coordinator::tests::turn_taking::a_sound_let_go_at_its_deadline_stays_that_sound_past_the_own_lines_first_audio",
+    "coordinator::tests::turn_taking::a_sound_with_the_lamps_name_in_it_takes_the_turn",
+    "coordinator::tests::turn_taking::a_stream_for_words_is_kept_ready_only_while_a_sound_may_wait",
+    "coordinator::tests::turn_taking::a_waited_sound_needs_the_memory_the_wait_gives_the_mask",
+    "coordinator::tests::turn_taking::actual_reset_receipt_preserves_old_mask_then_accepts_fresh_successor_epoch",
+    "coordinator::tests::turn_taking::an_input_ended_at_admission_carries_whether_it_cut_in",
+    "coordinator::tests::turn_taking::how_long_the_words_may_take_by_length",
+    "coordinator::tests::turn_taking::independent_speaker_socket_second_drain_catches_first_write_after_empty_check",
+    "coordinator::tests::turn_taking::once_the_answer_sounds_a_waited_sound_is_judged_by_its_pause_then",
+    "coordinator::tests::turn_taking::pre_dispatch_input_can_replace_reply_and_late_old_write_cannot_fault_successor",
+    "coordinator::tests::turn_taking::speaker_control_budget_exhaustion_defers_pending_candidate_and_fault_keeps_priority",
+    "coordinator::tests::turn_taking::talk_over_the_lamps_own_line_in_a_busy_room_is_let_go",
+    "coordinator::tests::turn_taking::the_first_request_after_a_stop_says_so_in_its_start",
+    "coordinator::tests::turn_taking::the_wait_is_only_for_an_answer_to_someone_awaited_a_short_while",
+    "coordinator::tests::turn_taking::v1_baseline_after_reply_starts_fresh_without_suppressed_prefix",
+    "coordinator::tests::turn_taking::v1_baseline_cloud_wait_without_any_write_still_accepts_resume",
+    "coordinator::tests::turn_taking::v1_baseline_delayed_rejection_uses_latest_retained_evidence_without_renewing_deadline",
+    "coordinator::tests::turn_taking::v1_baseline_does_not_suppress_previously_accepted_input_or_owned_outage_drain",
+    "coordinator::tests::turn_taking::v1_baseline_first_write_race_waits_then_discards_original_overlapping_input",
+    "coordinator::tests::turn_taking::v1_baseline_full_reply_echo_never_replaces_owner_or_queues_start",
+    "coordinator::tests::turn_taking::v1_baseline_long_output_gap_reopens_without_completing_reply",
+    "coordinator::tests::turn_taking::v1_baseline_privacy_loss_and_capture_lineage_change_never_reopen_old_candidate",
+    "coordinator::tests::turn_taking::v1_baseline_unresolved_dispatch_expires_without_replacing_reply",
+    "coordinator::tests::turn_taking::vad_only_keeps_existing_experiment_semantics",
+    "coordinator::tests::turn_taking::valid_control_receipts_and_short_read_gap_never_forward_masked_preroll",
+    "coordinator::tests::turn_taking::what_the_wait_lets_go_and_takes_by_length",
+    "coordinator::tests::turn_taking::while_an_answer_waits_a_short_sound_is_let_go_and_the_answer_goes_on",
+    "coordinator::tests::turn_taking::while_an_answer_waits_a_sound_begun_as_the_body_moves_is_its_own",
+    "coordinator::tests::turn_taking::while_an_answer_waits_a_sound_that_goes_on_takes_the_turn_from_its_start",
+    "coordinator::tests::turn_taking::with_words_a_cough_a_filler_or_no_words_in_time_are_let_go",
+    "coordinator::tests::turn_taking::with_words_a_lone_stop_while_an_answer_waits_stops_it_and_is_never_asked",
+    "coordinator::tests::turn_taking::with_words_a_short_no_while_an_answer_waits_takes_the_turn_from_its_start",
+    "coordinator::tests::turn_taking::with_words_a_sound_decided_without_echo_evidence_is_never_held_for_its_words",
+    "coordinator::tests::turn_taking::with_words_a_sound_is_never_held_for_them_past_its_end",
+    "coordinator::tests::turn_taking::with_words_a_stop_just_before_the_answer_sounds_still_stops_it",
+    "coordinator::tests::turn_taking::with_words_a_stop_said_before_the_own_line_sounds_stops_it",
+    "coordinator::tests::turn_taking::with_words_a_stop_the_person_went_on_from_takes_the_turn_and_a_lone_one_stops",
+    "provider_worker::tests::spoken_to::with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds",
+    "second_provider::worker::tests::a_line_4_s_after_an_answer_is_held_by_another_voice_or_goes_on_judged_without_it",
+    "second_provider::worker::tests::a_near_hearing_counts_only_around_the_lines_start",
+    "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going",
+    "second_provider::worker::tests::the_policy_is_told_the_name_a_line_left_unanswered_and_the_lamp_speaking_lately",
+    "second_provider::worker::tests::with_name_or_follow_up_a_follow_up_begun_while_the_answer_plays_goes_on",
+    "second_provider::worker::tests::with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds",
+    "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+    "stop_words::tests::audio_queued_for_a_yield_never_goes_once_it_is_forgotten_rested_or_dropped",
+    "provider_worker::tests::spoken_to::a_child_still_loading_its_model_takes_nothing_from_the_worker"
+  ],
+  "selected_status": "All87 actually passed in each of the three captured full-package observations.",
+  "captures": {
+    "baseline_cf462": {
+      "census": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census.json",
+        "bytes": 379889,
+        "sha256": "a91ee33cebfc81e4dd5d24e0928312ee3100faa013676b6a8ed1914285a9531a"
+      },
+      "actual_outcomes": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/target-outcomes.json",
+        "bytes": 1073892,
+        "sha256": "6e4cc978df8347782a29e0ab77333c0241a8b4e3ecfbd79c34850dcb77ba10d2"
+      }
+    },
+    "boot_d5": {
+      "census": {
+        "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/run-2026-10-23T095715.170385Z/voice-default-parallel/compiled-census.json",
+        "bytes": 379874,
+        "sha256": "46cf5a29571ba139260befe9057fb35ed01e8d27a02c776e216330edd6ce70ee"
+      },
+      "actual_outcomes": {
+        "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/run-2026-10-23T095715.170385Z/voice-default-parallel/target-outcomes.json",
+        "bytes": 1073897,
+        "sha256": "962388f505512f5cf63f275b7e5620fb379a9b82a9cc4f239fd32803554cffb5"
+      }
+    },
+    "phone_4e1": {
+      "census": {
+        "external_path": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/voice-default-parallel/compiled-census.json",
+        "bytes": 379864,
+        "sha256": "bff54a8cb17eb9418ae1bae23a883a644c6152054f5d155a46961171599d9819"
+      },
+      "actual_outcomes": {
+        "external_path": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/voice-default-parallel/target-outcomes.json",
+        "bytes": 1073867,
+        "sha256": "eee27259a3d91f6273acae9599513886a0049ba68f03c0fae511dffbfd0ed2f1"
+      }
+    }
+  }
+}

@@ -1,0 +1,167 @@
+{
+  "scope": "All5 failing observations across the baseline and two completed candidates; raw byte slices are exact, and full candidate streams remain in their pinned published receipts.",
+  "observations": [
+    {
+      "observation": "baseline_cf462",
+      "head": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "source": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "bytes": 649570,
+        "sha256": "71867ca07c9382ec84020254358e736ebce6bc35fb4c47f0744efd04fe2ae44b"
+      },
+      "source_offset": 647504,
+      "bytes": 879,
+      "sha256": "fe2a52a55f71b7eff3211b033addec76b982cacea658f3f9b2dc1933dbd668f9",
+      "raw_utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [2.793304ms, 2.841567ms, 2.929858ms, 3.178485ms, 3.35351ms, 3.822116ms, 21.839699ms, 22.365209ms, 22.752584ms, 39.371512ms, 57.613134ms, 58.276639ms, 58.606489ms, 58.910693ms, 76.263078ms, 78.010448ms, 79.468799ms, 92.765892ms, 115.319948ms, 117.20377ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (709528898) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[2.793304ms, 2.841567ms, 2.929858ms, 3.178485ms, 3.35351ms, 3.822116ms, 21.839699ms, 22.365209ms, 22.752584ms, 39.371512ms, 57.613134ms, 58.276639ms, 58.606489ms, 58.910693ms, 76.263078ms, 78.010448ms, 79.468799ms, 92.765892ms, 115.319948ms, 117.20377ms]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n"
+    },
+    {
+      "observation": "boot_d5",
+      "head": "d5d0383accafac8aa54c352eba65b1b0d5a44d9d",
+      "name": "provider_worker::tests::held_consent::asked_about_reports_after_a_held_stop_it_says_who_and_when",
+      "source": {
+        "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/run-2026-10-23T095715.170385Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "bytes": 650414,
+        "sha256": "e5ec84c053f3c41fe94e2871b47b61cfe4cf690fd5269de2715313d7344fc9a8"
+      },
+      "source_offset": 622404,
+      "bytes": 638,
+      "sha256": "58da20ca720c42191477222920b65752c244401125869ee2a00042d1bef18f2f",
+      "raw_utf8": "---- provider_worker::tests::held_consent::asked_about_reports_after_a_held_stop_it_says_who_and_when stdout ----\nlamp-voice provider: request 1: its answer is played: the room is not known to be busy\nlamp-voice provider: request 1: the model asked about reports; told whether they are sent\n\nthread 'provider_worker::tests::held_consent::asked_about_reports_after_a_held_stop_it_says_who_and_when' (708959110) panicked at crates/voice/src/provider_worker/tests/held_consent.rs:326:5:\nassertion `left == right` failed: {\"error\":\"The part of me that sends reports is not running, so nothing is being sent now.\"}\n  left: Null\n right: false\n\n"
+    },
+    {
+      "observation": "boot_d5",
+      "head": "d5d0383accafac8aa54c352eba65b1b0d5a44d9d",
+      "name": "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+      "source": {
+        "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/run-2026-10-23T095715.170385Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "bytes": 650414,
+        "sha256": "e5ec84c053f3c41fe94e2871b47b61cfe4cf690fd5269de2715313d7344fc9a8"
+      },
+      "source_offset": 647934,
+      "bytes": 398,
+      "sha256": "6d60e4c552fdf3ec1bd6fb093dbe160b897ed5b073913ee9e9a94ca073ec6930",
+      "raw_utf8": "---- fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying stdout ----\n\nthread 'fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying' (708978925) panicked at crates/voice/tests/it/fixture_provider.rs:691:5:\nassertion failed: sink.scan(&trace, AT).is_some()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+    },
+    {
+      "observation": "boot_d5",
+      "head": "d5d0383accafac8aa54c352eba65b1b0d5a44d9d",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "source": {
+        "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/run-2026-10-23T095715.170385Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "bytes": 650414,
+        "sha256": "e5ec84c053f3c41fe94e2871b47b61cfe4cf690fd5269de2715313d7344fc9a8"
+      },
+      "source_offset": 648333,
+      "bytes": 805,
+      "sha256": "83c6aecef39c5c8401d31ce1a5411f869151d374127caf615b2d03be104d0aae",
+      "raw_utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [3.044029ms, 3.047415ms, 3.314035ms, 3.388932ms, 3.455321ms, 4.036383ms, 38.28977ms, 39.231148ms, 55.041972ms, 56.388703ms, 57.810245ms, 74.702675ms, 75.016271ms, 75.758554ms, 76.556337ms, 77.804511ms, 87.387288ms, 102.389285ms, 111.339913ms, 129.124054ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (708978927) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[3.044029ms, 3.047415ms, 3.314035ms, 3.388932ms, 3.455321ms, 4.036383ms, 38.28977ms, 39.231148ms, 55.041972ms, 56.388703ms, 57.810245ms, 74.702675ms, 75.016271ms, 75.758554ms, 76.556337ms, 77.804511ms, 87.387288ms, 102.389285ms, 111.339913ms, 129.124054ms]\n\n"
+    },
+    {
+      "observation": "phone_4e1",
+      "head": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "source": {
+        "external_path": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "bytes": 648976,
+        "sha256": "e4bc16109680db0fe83385881d927fc32fd8146fa5becce99a3c143f26e94c35"
+      },
+      "source_offset": 646914,
+      "bytes": 875,
+      "sha256": "d6898ad8e22903ed0b5322c2de4f08dab370de3e366978b60a05221e6896d912",
+      "raw_utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [2.661714ms, 2.759106ms, 2.81309ms, 3.146748ms, 3.587819ms, 21.975044ms, 34.744692ms, 38.098166ms, 41.126564ms, 45.150838ms, 53.211259ms, 55.66614ms, 57.124649ms, 60.080792ms, 72.885702ms, 77.124708ms, 77.369665ms, 77.68858ms, 92.12409ms, 119.695347ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (709152295) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[2.661714ms, 2.759106ms, 2.81309ms, 3.146748ms, 3.587819ms, 21.975044ms, 34.744692ms, 38.098166ms, 41.126564ms, 45.150838ms, 53.211259ms, 55.66614ms, 57.124649ms, 60.080792ms, 72.885702ms, 77.124708ms, 77.369665ms, 77.68858ms, 92.12409ms, 119.695347ms]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n"
+    }
+  ],
+  "light_call_comparison": [
+    {
+      "observation": "baseline_cf462",
+      "samples_ms": [
+        2.793304,
+        2.841567,
+        2.929858,
+        3.178485,
+        3.35351,
+        3.822116,
+        21.839699,
+        22.365209,
+        22.752584,
+        39.371512,
+        57.613134,
+        58.276639,
+        58.606489,
+        58.910693,
+        76.263078,
+        78.010448,
+        79.468799,
+        92.765892,
+        115.319948,
+        117.20377
+      ],
+      "asserted_index": 10,
+      "asserted_upper_middle_ms": 57.613134,
+      "strict_bound_ms": 25,
+      "source_assertion": "crates/voice/tests/it/light_call.rs:89-90",
+      "failed": true
+    },
+    {
+      "observation": "boot_d5",
+      "samples_ms": [
+        3.044029,
+        3.047415,
+        3.314035,
+        3.388932,
+        3.455321,
+        4.036383,
+        38.28977,
+        39.231148,
+        55.041972,
+        56.388703,
+        57.810245,
+        74.702675,
+        75.016271,
+        75.758554,
+        76.556337,
+        77.804511,
+        87.387288,
+        102.389285,
+        111.339913,
+        129.124054
+      ],
+      "asserted_index": 10,
+      "asserted_upper_middle_ms": 57.810245,
+      "strict_bound_ms": 25,
+      "source_assertion": "crates/voice/tests/it/light_call.rs:89-90",
+      "failed": true
+    },
+    {
+      "observation": "phone_4e1",
+      "samples_ms": [
+        2.661714,
+        2.759106,
+        2.81309,
+        3.146748,
+        3.587819,
+        21.975044,
+        34.744692,
+        38.098166,
+        41.126564,
+        45.150838,
+        53.211259,
+        55.66614,
+        57.124649,
+        60.080792,
+        72.885702,
+        77.124708,
+        77.369665,
+        77.68858,
+        92.12409,
+        119.695347
+      ],
+      "asserted_index": 10,
+      "asserted_upper_middle_ms": 53.211259,
+      "strict_bound_ms": 25,
+      "source_assertion": "crates/voice/tests/it/light_call.rs:89-90",
+      "failed": true
+    }
+  ]
+}

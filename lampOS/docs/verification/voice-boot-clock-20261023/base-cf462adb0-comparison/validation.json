@@ -1,0 +1,16 @@
+{
+  "all17_command_records_and34_stream_hashes_verified": true,
+  "every_retained_decoded_offset_matches_original": true,
+  "every_omitted_range_is_complete_Cargo_machine_records": true,
+  "retained_and_omitted_ranges_cover_original_streams_exactly": true,
+  "all5_failure_raw_extractions_verified": true,
+  "complete3939_target_case_ignored_identities_equal_all3": true,
+  "all87_selected_cases_actually_passed_all3": true,
+  "source_unchanged": true,
+  "all_json_parsed": true,
+  "all_local_links_exist": true,
+  "all_files_have_single_final_newline_and_no_trailing_whitespace": true,
+  "no_Cargo_source_or_target_access_during_packaging": true,
+  "default_staged_diff_check_exit_code": 0,
+  "scratch_index_validation": "/private/tmp/tests-boot-clock-base-cf462-20261023/publication-validation"
+}

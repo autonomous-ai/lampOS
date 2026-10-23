@@ -1,5 +1,26 @@
 # Tests work log
 
+## 2026-10-23 18:00 +0700 — matched clean-base Voice comparison
+
+Ready for lamp-voice: no (#3190 execution HOLD and #3218 draft remain).
+
+The [complete clean-base comparison](verification/voice-boot-clock-20261023/base-cf462adb0-comparison/)
+records one `cf462adb0` full Voice command: **3,923 / 1 / 15** in 409.728 s.
+All 3,939 case identities match both candidates and all 87 clock/child cases
+pass in all three. Light-call failed on every observation: sorted index 10
+was 57.613134 ms on base, 57.810245 ms on boot-clock, and 53.211259 ms on
+phone, against the unchanged 25 ms limit.
+
+Held-consent and peer-loss passed on base and phone but failed on boot-clock.
+Those two candidate-only outcomes remain unresolved. All three integration
+executables are byte-identical; library binaries differ. This narrows compiled
+code differences without proving equal runtime state or the cause of a failure.
+All five exact failing observations and all baseline human output are retained.
+
+The clean-base Expression runtime comparison is now running separately with
+the same eleven package selections and a complete 27-case target. No full
+candidate gate was repeated. Review and latest-base reader qualification remain.
+
 ## 2026-10-23 17:51 +0700 — current phone full gate retained
 
 Ready for lamp-voice: no (#3218 remains draft).

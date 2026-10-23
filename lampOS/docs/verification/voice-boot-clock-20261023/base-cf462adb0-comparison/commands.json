@@ -1,0 +1,598 @@
+{
+  "commands": [
+    {
+      "command": [
+        "rustc",
+        "-vV"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:46:55.116191+00:00",
+      "timeout_seconds": 60,
+      "stdout": "rustc.stdout.txt",
+      "stderr": "rustc.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 59239,
+      "owned_process_group": 59239,
+      "exit_code": 0,
+      "wall_seconds": 0.212714,
+      "finished_at": "2026-10-23T10:46:55.329426+00:00",
+      "stdout_sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+      "stdout_bytes": 191,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "rustc",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/rustc.json",
+        "bytes": 680,
+        "sha256": "13314ef2d8fe05dc5f38c0b0cb83166f81739547c66edf80438f8d2e26fed1fd"
+      },
+      "streams": [
+        "rustc/stdout",
+        "rustc/stderr"
+      ]
+    },
+    {
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:53:57.017647+00:00",
+      "timeout_seconds": 60,
+      "stdout": "all.stdout.txt",
+      "stderr": "all.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 99024,
+      "owned_process_group": 99024,
+      "exit_code": 0,
+      "wall_seconds": 0.043739,
+      "finished_at": "2026-10-23T10:53:57.061750+00:00",
+      "stdout_sha256": "a01042c2285c97806fc978b486484e9f84dfcee6cfea224378b477682b2b31ab",
+      "stdout_bytes": 22816,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/all",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/all.json",
+        "bytes": 772,
+        "sha256": "70be7b58705396d9eded056ab4f4ff777bcb264334c2dd2ac398c78cdfc6de0c"
+      },
+      "streams": [
+        "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/all/stdout",
+        "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/all/stderr"
+      ]
+    },
+    {
+      "command": [
+        "file",
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:53:56.995873+00:00",
+      "timeout_seconds": 60,
+      "stdout": "file.stdout.txt",
+      "stderr": "file.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 99023,
+      "owned_process_group": 99023,
+      "exit_code": 0,
+      "wall_seconds": 0.020529,
+      "finished_at": "2026-10-23T10:53:57.016913+00:00",
+      "stdout_sha256": "ffe6eb73f9fc834c3983a3dea33371d221dcb847ea31a79bb8cd0e054b104763",
+      "stdout_bytes": 101,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/file",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/file.json",
+        "bytes": 741,
+        "sha256": "a260e667c34b9b7ee0645f6b07c0cc3b3d1068a8673d8af46ae21ca0e3b163e6"
+      },
+      "streams": [
+        "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/file/stdout",
+        "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/file/stderr"
+      ]
+    },
+    {
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:53:57.062540+00:00",
+      "timeout_seconds": 60,
+      "stdout": "ignored.stdout.txt",
+      "stderr": "ignored.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 99025,
+      "owned_process_group": 99025,
+      "exit_code": 0,
+      "wall_seconds": 0.043528,
+      "finished_at": "2026-10-23T10:53:57.106483+00:00",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/ignored",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/ignored.json",
+        "bytes": 793,
+        "sha256": "6f3f4a1763183446a7a963e5dab30afa29b0a196094660723370cf6e45a74b82"
+      },
+      "streams": [
+        "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/ignored/stdout",
+        "voice-default-parallel/compiled-census/lamp-voice-it-7077c08c29/ignored/stderr"
+      ]
+    },
+    {
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:53:56.637469+00:00",
+      "timeout_seconds": 60,
+      "stdout": "all.stdout.txt",
+      "stderr": "all.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 99000,
+      "owned_process_group": 99000,
+      "exit_code": 0,
+      "wall_seconds": 0.029373,
+      "finished_at": "2026-10-23T10:53:56.667222+00:00",
+      "stdout_sha256": "06a935bb8d90864f89135737bc24cdf47eebc2877cf4d6fea3636c41aa298f9a",
+      "stdout_bytes": 81,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/all",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/all.json",
+        "bytes": 777,
+        "sha256": "eaaf9265ed0e50ea1396a04a7dada3ca727ea6d4c318e794e67932d73d37e6cb"
+      },
+      "streams": [
+        "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/all/stdout",
+        "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/all/stderr"
+      ]
+    },
+    {
+      "command": [
+        "file",
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:53:56.613537+00:00",
+      "timeout_seconds": 60,
+      "stdout": "file.stdout.txt",
+      "stderr": "file.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 98994,
+      "owned_process_group": 98994,
+      "exit_code": 0,
+      "wall_seconds": 0.022655,
+      "finished_at": "2026-10-23T10:53:56.636620+00:00",
+      "stdout_sha256": "7acec4f4eea5570cda847dadb10df910daa5487e2eb3c42288d2b80251ac8d18",
+      "stdout_bytes": 109,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/file",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/file.json",
+        "bytes": 749,
+        "sha256": "92de0520d582d73e141a191a466fe13884dfaea23de9cda6d9566b1124d19eec"
+      },
+      "streams": [
+        "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/file/stdout",
+        "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/file/stderr"
+      ]
+    },
+    {
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:53:56.668325+00:00",
+      "timeout_seconds": 60,
+      "stdout": "ignored.stdout.txt",
+      "stderr": "ignored.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 99001,
+      "owned_process_group": 99001,
+      "exit_code": 0,
+      "wall_seconds": 0.030564,
+      "finished_at": "2026-10-23T10:53:56.699391+00:00",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/ignored",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/ignored.json",
+        "bytes": 801,
+        "sha256": "4ba5944fbeb9bdb950374123b2eccd01d107c128ff5c63962001c7c623d8f914"
+      },
+      "streams": [
+        "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/ignored/stdout",
+        "voice-default-parallel/compiled-census/lamp-voice-lamp-voice-b07344646e/ignored/stderr"
+      ]
+    },
+    {
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:53:57.412409+00:00",
+      "timeout_seconds": 60,
+      "stdout": "all.stdout.txt",
+      "stderr": "all.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 99048,
+      "owned_process_group": 99048,
+      "exit_code": 0,
+      "wall_seconds": 0.062813,
+      "finished_at": "2026-10-23T10:53:57.475639+00:00",
+      "stdout_sha256": "6b0e3d37612ff58f4f84c519f7f436376a12134ab69a2641abfcfaa1385d2927",
+      "stdout_bytes": 339713,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/all",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/all.json",
+        "bytes": 781,
+        "sha256": "ba9c1a36cb37969cbb2276b64eb045a7a551d591fcd48140629452958150170b"
+      },
+      "streams": [
+        "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/all/stdout",
+        "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/all/stderr"
+      ]
+    },
+    {
+      "command": [
+        "file",
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:53:57.386103+00:00",
+      "timeout_seconds": 60,
+      "stdout": "file.stdout.txt",
+      "stderr": "file.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 99045,
+      "owned_process_group": 99045,
+      "exit_code": 0,
+      "wall_seconds": 0.024465,
+      "finished_at": "2026-10-23T10:53:57.411199+00:00",
+      "stdout_sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4",
+      "stdout_bytes": 109,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/file",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/file.json",
+        "bytes": 749,
+        "sha256": "1e5159cc549c9fe19ad954d4fc86d446d382d2e3a9f0b0f0d737380334773619"
+      },
+      "streams": [
+        "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/file/stdout",
+        "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/file/stderr"
+      ]
+    },
+    {
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:53:57.477192+00:00",
+      "timeout_seconds": 60,
+      "stdout": "ignored.stdout.txt",
+      "stderr": "ignored.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 99049,
+      "owned_process_group": 99049,
+      "exit_code": 0,
+      "wall_seconds": 0.044223,
+      "finished_at": "2026-10-23T10:53:57.521875+00:00",
+      "stdout_sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+      "stdout_bytes": 1015,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/ignored",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/ignored.json",
+        "bytes": 804,
+        "sha256": "e1aaa8e8fe60378d3784a80d652ee965c6c5851901e0f8622356772b01216f6d"
+      },
+      "streams": [
+        "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/ignored/stdout",
+        "voice-default-parallel/compiled-census/lamp-voice-lamp_voice-bedcb8a406/ignored/stderr"
+      ]
+    },
+    {
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:53:56.562038+00:00",
+      "timeout_seconds": 60,
+      "stdout": "all.stdout.txt",
+      "stderr": "all.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 98984,
+      "owned_process_group": 98984,
+      "exit_code": 0,
+      "wall_seconds": 0.022653,
+      "finished_at": "2026-10-23T10:53:56.585108+00:00",
+      "stdout_sha256": "b1ee3badf01c038fa473c3e33bad4fcf667022e6141fca493ddd991bca28c774",
+      "stdout_bytes": 235,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/all",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/all.json",
+        "bytes": 790,
+        "sha256": "79913ac46dc9312be1135ec086124e19166314eb79d2059e2975b442d659a7ba"
+      },
+      "streams": [
+        "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/all/stdout",
+        "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/all/stderr"
+      ]
+    },
+    {
+      "command": [
+        "file",
+        "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:53:56.533951+00:00",
+      "timeout_seconds": 60,
+      "stdout": "file.stdout.txt",
+      "stderr": "file.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 98983,
+      "owned_process_group": 98983,
+      "exit_code": 0,
+      "wall_seconds": 0.024775,
+      "finished_at": "2026-10-23T10:53:56.559989+00:00",
+      "stdout_sha256": "8818cae6fd13a952438433c2b8170ac8664b0886abd068f5dad75f58dcfcfff4",
+      "stdout_bytes": 121,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/file",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/file.json",
+        "bytes": 761,
+        "sha256": "e49ccd5b423a7f052e705a188868cc8eff3ed1f3df30f2b4ae088c381e82cb0c"
+      },
+      "streams": [
+        "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/file/stdout",
+        "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/file/stderr"
+      ]
+    },
+    {
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:53:56.585906+00:00",
+      "timeout_seconds": 60,
+      "stdout": "ignored.stdout.txt",
+      "stderr": "ignored.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 98985,
+      "owned_process_group": 98985,
+      "exit_code": 0,
+      "wall_seconds": 0.022537,
+      "finished_at": "2026-10-23T10:53:56.608869+00:00",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/ignored",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/ignored.json",
+        "bytes": 813,
+        "sha256": "ea1bd32230eb0a46cc519e09bf81302371526adb79354f463200c6c241d9c40b"
+      },
+      "streams": [
+        "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/ignored/stdout",
+        "voice-default-parallel/compiled-census/lamp-voice-render_line_second-41d473b15e/ignored/stderr"
+      ]
+    },
+    {
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:53:56.732135+00:00",
+      "timeout_seconds": 60,
+      "stdout": "all.stdout.txt",
+      "stderr": "all.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 99005,
+      "owned_process_group": 99005,
+      "exit_code": 0,
+      "wall_seconds": 0.022799,
+      "finished_at": "2026-10-23T10:53:56.755583+00:00",
+      "stdout_sha256": "6a80518e733a17dba4e8f03aa0c1609cc558aa7acf343d72b208f132784a5e28",
+      "stdout_bytes": 353,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/all",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/all.json",
+        "bytes": 793,
+        "sha256": "c19a9aaccf2886458248c570ee863efc65bd6c0f39c79f22c3ef132c85a54e16"
+      },
+      "streams": [
+        "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/all/stdout",
+        "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/all/stderr"
+      ]
+    },
+    {
+      "command": [
+        "file",
+        "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:53:56.707522+00:00",
+      "timeout_seconds": 60,
+      "stdout": "file.stdout.txt",
+      "stderr": "file.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 99004,
+      "owned_process_group": 99004,
+      "exit_code": 0,
+      "wall_seconds": 0.022165,
+      "finished_at": "2026-10-23T10:53:56.731163+00:00",
+      "stdout_sha256": "f2d2f57ca3c4700e3cd53cf5290c10a1e35b0b669bc413ff0770c929346546e4",
+      "stdout_bytes": 124,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/file",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/file.json",
+        "bytes": 764,
+        "sha256": "8cec67e40f3121d49a8772125dc7afebcc6f009a63790baf381bd9d2abf48b72"
+      },
+      "streams": [
+        "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/file/stdout",
+        "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/file/stderr"
+      ]
+    },
+    {
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:53:56.756376+00:00",
+      "timeout_seconds": 60,
+      "stdout": "ignored.stdout.txt",
+      "stderr": "ignored.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 99007,
+      "owned_process_group": 99007,
+      "exit_code": 0,
+      "wall_seconds": 0.022577,
+      "finished_at": "2026-10-23T10:53:56.779336+00:00",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "id": "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/ignored",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/ignored.json",
+        "bytes": 816,
+        "sha256": "1af8e33049c1453731ccec0ea083b9d5dd08bd4d32b0a0058dbbc8a42a271bfd"
+      },
+      "streams": [
+        "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/ignored/stdout",
+        "voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-4a9110ad84/ignored/stderr"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--no-fail-fast",
+        "--message-format=json-render-diagnostics"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+      "started_at": "2026-10-23T10:47:01.960050+00:00",
+      "timeout_seconds": 2400,
+      "stdout": "voice-default-parallel.stdout.txt",
+      "stderr": "voice-default-parallel.stderr.txt",
+      "timed_out": false,
+      "timeout_cleanup": [],
+      "owned_pid": 59546,
+      "owned_process_group": 59546,
+      "exit_code": 101,
+      "wall_seconds": 409.728178,
+      "finished_at": "2026-10-23T10:53:51.748498+00:00",
+      "stdout_sha256": "71867ca07c9382ec84020254358e736ebce6bc35fb4c47f0744efd04fe2ae44b",
+      "stdout_bytes": 649570,
+      "stderr_sha256": "ff5db579dcfeee3f87430027490bad557d9388c3ca83fab4df8d56357271715e",
+      "stderr_bytes": 3768,
+      "id": "voice-default-parallel/voice-default-parallel",
+      "captured_record": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/voice-default-parallel.json",
+        "bytes": 858,
+        "sha256": "6667909d859632ea01cdc6c7af965de29740970191f6df613a3ce501d90e0a9b"
+      },
+      "streams": [
+        "voice-default-parallel/voice-default-parallel/stdout",
+        "voice-default-parallel/voice-default-parallel/stderr"
+      ]
+    }
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "0",
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "RUST_TEST_THREADS": null
+  },
+  "path_sha256": "f39beeb8e00b5c7b3785e36e73d927c1329b57e36e90aa2563c7b58ffccebd3a",
+  "local_socket_permission_preflight": "Unix datagram and IPv4 loopback listener passed before Cargo",
+  "declared_toolchain_and_environment_equal_to_d5": true,
+  "architecture_limit": "Captured Rust host/file output establish x86_64-apple-darwin and Mach-O x86_64 binaries. Physical hardware and translation mode were not established.",
+  "scope": "One full default-parallel Voice Cargo observation. Other executable invocations only rustc identity, file inspection and libtest list/ignored inventory, not test reruns."
+}

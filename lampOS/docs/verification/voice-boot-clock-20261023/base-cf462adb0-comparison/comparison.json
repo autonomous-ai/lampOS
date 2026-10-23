@@ -1,0 +1,89 @@
+{
+  "observations": {
+    "baseline_cf462": {
+      "head": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+      "totals": {
+        "passed": 3923,
+        "failed": 1,
+        "ignored": 15,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "complete_case_count": 3939,
+      "published_receipt": null,
+      "captured_outcomes": {
+        "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/target-outcomes.json",
+        "bytes": 1073892,
+        "sha256": "6e4cc978df8347782a29e0ab77333c0241a8b4e3ecfbd79c34850dcb77ba10d2"
+      }
+    },
+    "boot_d5": {
+      "head": "d5d0383accafac8aa54c352eba65b1b0d5a44d9d",
+      "totals": {
+        "passed": 3921,
+        "failed": 3,
+        "ignored": 15,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "complete_case_count": 3939,
+      "published_receipt": "https://github.com/autonomous-ai/lampOS/tree/b13b9eb4ff7c72673b19d143f77c298569788bac/lampOS/docs/verification/voice-boot-clock-20261023/full-voice-d5d0383ac",
+      "captured_outcomes": {
+        "external_path": "/private/tmp/tests-loading-child-full-voice-cf462-20261023/run-2026-10-23T095715.170385Z/voice-default-parallel/target-outcomes.json",
+        "bytes": 1073897,
+        "sha256": "962388f505512f5cf63f275b7e5620fb379a9b82a9cc4f239fd32803554cffb5"
+      }
+    },
+    "phone_4e1": {
+      "head": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e",
+      "totals": {
+        "passed": 3923,
+        "failed": 1,
+        "ignored": 15,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "complete_case_count": 3939,
+      "published_receipt": "https://github.com/autonomous-ai/lampOS/tree/3672f5c9fbb468aaa6252cf0dd0a2d2c1edf274f/lampOS/docs/verification/phone-news-start-20261023/full-gates-4e1e00e52",
+      "captured_outcomes": {
+        "external_path": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/voice-default-parallel/target-outcomes.json",
+        "bytes": 1073867,
+        "sha256": "eee27259a3d91f6273acae9599513886a0049ba68f03c0fae511dffbfd0ed2f1"
+      }
+    }
+  },
+  "all_three_complete_target_case_ignored_censuses_equal": true,
+  "all_cases_that_failed_anywhere": [
+    {
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "provider_worker::tests::held_consent::asked_about_reports_after_a_held_stop_it_says_who_and_when",
+      "baseline_cf462": "ok",
+      "boot_d5": "FAILED",
+      "phone_4e1": "ok"
+    },
+    {
+      "target": "lamp-voice:test:it",
+      "name": "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+      "baseline_cf462": "ok",
+      "boot_d5": "FAILED",
+      "phone_4e1": "ok"
+    },
+    {
+      "target": "lamp-voice:test:it",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "baseline_cf462": "FAILED",
+      "boot_d5": "FAILED",
+      "phone_4e1": "FAILED"
+    }
+  ],
+  "integration_executable_sha256": "7077c08c29c8be105faa07ce98ebd8d92bc6374d6b4d16939951d31de066b8db",
+  "integration_binary_equal_all_three": true,
+  "limits": [
+    "One complete default-parallel observation per source; no failed candidate or baseline retry.",
+    "The common light-call assertion failed in all3 under the same compiled integration binary, but these observations do not identify its timing cause or waive the failures.",
+    "Held-consent and fixture-provider failures were observed only in d5. Their baseline/phone passes do not establish an inherited defect or a cause.",
+    "The fixture-provider compiled integration binary is identical across all3; a source change in that executable cannot explain its different result, while process environment and full-package timing remain unmeasured.",
+    "The library binaries differ across all3. The held-consent source remains identical, but shared unit-test scheduling/fixture contention is not excluded.",
+    "Only Voice is compared here. Phone reader Expression failures and pending runtime-target comparison are separate evidence."
+  ]
+}

@@ -1,0 +1,284 @@
+{
+  "head": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+  "base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+  "tree": "4c5c6894939372cd0979c773898a80b5f3904d09",
+  "status": "FAILED: one actual light-call latency assertion. No waiver or retry.",
+  "command": {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--no-fail-fast",
+      "--message-format=json-render-diagnostics"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS",
+    "started_at": "2026-10-23T10:47:01.960050+00:00",
+    "timeout_seconds": 2400,
+    "stdout": "voice-default-parallel.stdout.txt",
+    "stderr": "voice-default-parallel.stderr.txt",
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "owned_pid": 59546,
+    "owned_process_group": 59546,
+    "exit_code": 101,
+    "wall_seconds": 409.728178,
+    "finished_at": "2026-10-23T10:53:51.748498+00:00",
+    "stdout_sha256": "71867ca07c9382ec84020254358e736ebce6bc35fb4c47f0744efd04fe2ae44b",
+    "stdout_bytes": 649570,
+    "stderr_sha256": "ff5db579dcfeee3f87430027490bad557d9388c3ca83fab4df8d56357271715e",
+    "stderr_bytes": 3768
+  },
+  "counts": {
+    "passed": 3923,
+    "failed": 1,
+    "ignored": 15,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "complete_binding": true,
+  "complete_case_count": 3939,
+  "target_count_including_zero_doctests": 6,
+  "targets": [
+    {
+      "kind": "executable",
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "sha256": "bedcb8a40698d38f09b3e86a62d39d97c95ec05c27e9966aca7f5627dc8106da",
+      "name": "lamp-voice:lib:lamp_voice",
+      "result": "ok",
+      "counts": {
+        "passed": 3643,
+        "failed": 0,
+        "ignored": 15,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "display_annotation_mapping": [
+        {
+          "raw_name": "coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup - should panic",
+          "compiled_identity": "coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup",
+          "display_annotation": " - should panic"
+        },
+        {
+          "raw_name": "coordinator::tests::early_end::fixture_policy_tests::unrequested_task_cancellation_is_rejected - should panic",
+          "compiled_identity": "coordinator::tests::early_end::fixture_policy_tests::unrequested_task_cancellation_is_rejected",
+          "display_annotation": " - should panic"
+        },
+        {
+          "raw_name": "coordinator::tests::endpoint_session::fixture_policy_tests::a_logical_clock_is_rejected_before_the_process_constructor - should panic",
+          "compiled_identity": "coordinator::tests::endpoint_session::fixture_policy_tests::a_logical_clock_is_rejected_before_the_process_constructor",
+          "display_annotation": " - should panic"
+        }
+      ],
+      "actual_rows_count": 3658,
+      "actual_identity_status_sha256": "63bb1a314673fe7d97dfaedf8518c41dcc45f64f2fc4f72c08954747d483cd8a",
+      "failed_cases": [],
+      "ignored_cases": [
+        "coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance",
+        "coordinator::tests::hand_controls::head_tap_cue_decision_to_speaker_dispatch_latency",
+        "coordinator::tests::hand_controls::local_hand_stop_dispatch_latency",
+        "hand_controls::tests::head_touch_bus_to_poll_latency",
+        "provider_worker::tests::sixty_second_answer_follows_output_capacity",
+        "provider_worker::tests::three_minute_answer_follows_output_capacity",
+        "reference::recovery::tests::recentred_the_fixed_margin_carries_an_hour_of_that_lamps_drift",
+        "reference::tests::four_virtual_hours_capture_clocked",
+        "remember::tests::hits_note_latency_on_a_200_entry_kept_list",
+        "reminders::tests::parent_poll_cost",
+        "reminders::transport::tests::poll_cost",
+        "second_provider::tests::policy::measure_the_wait_from_the_call_to_its_run",
+        "task_news::tests::work_whose_agent_never_answers_after_it_was_accepted_is_told",
+        "thread::tests::write_a_thread_fixture",
+        "tools::tests::use_skill_cost"
+      ]
+    },
+    {
+      "kind": "executable",
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "src_path": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+      "sha256": "b07344646e719ceed6456ae165a5d8939e7a31e3d21e86a1dec9bbaf2cdced17",
+      "name": "lamp-voice:bin:lamp-voice",
+      "result": "ok",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "display_annotation_mapping": [],
+      "actual_rows_count": 1,
+      "actual_identity_status_sha256": "ed4efc178e8c4624e2d287102f4c330380cbdef6461559be69c3b86d25739f94",
+      "failed_cases": [],
+      "ignored_cases": []
+    },
+    {
+      "kind": "executable",
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+      "sha256": "7077c08c29c8be105faa07ce98ebd8d92bc6374d6b4d16939951d31de066b8db",
+      "name": "lamp-voice:test:it",
+      "result": "FAILED",
+      "counts": {
+        "passed": 269,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "display_annotation_mapping": [],
+      "actual_rows_count": 270,
+      "actual_identity_status_sha256": "6a18b2e93cfcd8b625e773da72cfbd4129fcaeda04380ffcd73affb7fe78565c",
+      "failed_cases": [
+        "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them"
+      ],
+      "ignored_cases": []
+    },
+    {
+      "kind": "executable",
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "render_line_second",
+        "src_path": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/voice/examples/render_line_second.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f",
+      "sha256": "41d473b15e98d62b255f225830a2f5d2ce5f0daecb05889df3bd8ce9f7c5b9a5",
+      "name": "lamp-voice:example:render_line_second",
+      "result": "ok",
+      "counts": {
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "display_annotation_mapping": [],
+      "actual_rows_count": 4,
+      "actual_identity_status_sha256": "02b331c3ab2cb965fff779fab4d3baf7f716a12fcf0e71fb3a8ee764c8d7e9ac",
+      "failed_cases": [],
+      "ignored_cases": []
+    },
+    {
+      "kind": "executable",
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "stop_words_stt_replay",
+        "src_path": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+      "sha256": "4a9110ad84e45b8d3de8f12f8896513f5d994bee051875a5130ecd8e9812a1c6",
+      "name": "lamp-voice:example:stop_words_stt_replay",
+      "result": "ok",
+      "counts": {
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "display_annotation_mapping": [],
+      "actual_rows_count": 6,
+      "actual_identity_status_sha256": "92a78bf7b33f6803850663f6754716d52f2f195125d39b8cec6dc3af1db30d0f",
+      "failed_cases": [],
+      "ignored_cases": []
+    },
+    {
+      "kind": "doctests",
+      "package": "lamp-voice",
+      "name": "lamp-voice:doctests",
+      "result": "ok",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "display_annotation_mapping": [],
+      "actual_rows_count": 0,
+      "actual_identity_status_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "failed_cases": [],
+      "ignored_cases": []
+    }
+  ],
+  "selected_cases_count": 87,
+  "selected_cases_passed": 87,
+  "source_unchanged": true,
+  "source_aggregate_sha256": "84f9f5274db3fde4e47c376493b6e5eb935f5bf35433b2c86e75c0372643cef4",
+  "unrun_steps": [],
+  "retries": 0,
+  "captured_terminal_result": {
+    "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/results.json",
+    "bytes": 8585,
+    "sha256": "df17001e32b331ffd39df5c20e656d8330556997252a9ddb49a3ac6c585fd76c"
+  },
+  "captured_complete_target_outcomes": {
+    "external_path": "/private/tmp/tests-boot-clock-base-cf462-20261023/run-2026-10-23T104655.112380Z/voice-default-parallel/target-outcomes.json",
+    "bytes": 1073892,
+    "sha256": "6e4cc978df8347782a29e0ab77333c0241a8b4e3ecfbd79c34850dcb77ba10d2"
+  }
+}
