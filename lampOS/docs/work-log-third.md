@@ -5,6 +5,19 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 21:18 — separate install activation gap reproduced
+
+- #2948 `f69bdea64` admits a preserved Voice head-off drop-in beside its
+  newly enabled Expression unit and removes legacy delivery. Independent
+  installer controls give **1 pass / 1 fail** at the intended admission
+  assertion, with production source untouched. [Fixture and receipt](verification/head-touch-install-review-20261023/README.md).
+- The initial wrong-directory invocation failed before tests because the
+  workspace Cargo configuration was not loaded; its raw failure is kept.
+  The corrected run used the pinned Rust 1.96.0 and a fresh target.
+- This adds a separate install P2 to the carry HOLD; #3269's update-round
+  READ-OK stays intact. First owns the carry and repair routing. Continue
+  the Queue/carry watch; no runtime privacy or lamp result is claimed.
+
 ## 2026-10-23 21:01 — corrected updater prerequisite passes independent review
 
 - #3269 `46f5f384a` passes all 28 transition cases on the Intel Mac in a

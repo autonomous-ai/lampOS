@@ -1,0 +1,20 @@
+{
+  "head": "f69bdea6466191f44ad5ec0aeecf50abe38c4a69",
+  "original_test_prefix_bytes": 160725,
+  "original_test_prefix_sha256": "7bcc5e88edb114072496754b5ae24566aa37ec19c01552816b51013b07152771",
+  "test_file_sha256": "d4f361aaf8cd3032ff2ee5a7e1bdb67c9981b4741dd92a8243f4b5d63e1926e0",
+  "appended_fixture_sha256": "08cb58392f2f98db14d8a251a314fe920334ff1e0d813b822ba236c5bd52085a",
+  "changed_files": [
+    "lampOS/crates/update/tests/install.rs"
+  ],
+  "exit_code": 101,
+  "passed": 1,
+  "failed": 1,
+  "test_seconds": 13.44,
+  "files": {
+    "result.txt": "5f0b4cb77acba38fa63062eef917b56eef4c8362bb7b521a4cb3a3063b4b87b7",
+    "toolchain.txt": "c4a2efc1317833c19cf32c0c00f6c535c88097592fc2dc5194d5337c79bf13b5",
+    "preparation-failure.txt": "1a1a38cc11f6a13b392784b7e9d4112b808ef26aea87b91a825e9bfb9c22cc7d",
+    "regression.rs.txt": "08cb58392f2f98db14d8a251a314fe920334ff1e0d813b822ba236c5bd52085a"
+  }
+}
