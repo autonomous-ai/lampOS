@@ -1,5 +1,13 @@
 # Reviewer work log
 
+## 2026-10-24 (reviewer-two conversation evidence preparation at 03:18 +07)
+
+First's read-only journal report6373654933 narrows the initial break to voice verdicts0.27/0.25 on1.80/1.65s prints, with unknown real speaker identity and two faces seen earlier. Later lines miss follow-up window; this is not proof of owner misclassification. Sixth accepted review boundaries at6373798879: policy holds versus real desk talk, same speaker addressing colleague held, return after another speaker needs fresh evidence, old late result cannot undo new classification, onset-based expiry. Root comments6373617120 and6373713575 add these distinctions and note20s cannot cover22s onset without evidence of earlier onset.
+
+Independently reproduced Sixth's historical slice6373853196 from same-voice-early-20261018/pairs-early.tsv and same-voice-20261015/clips.tsv at93cb3f3de. Selection min original duration<1.5s, max>=3s gives21same pairs min0.1073/median0.3409/max0.5018,8below0.30;28different min0.089/median0.19475/max0.2585. Same cohort is only three query clips (cut-q-03 1.45s,cut-q-07 0.93s,cut-q-10 1.18s), one synthetic voice, each against seven references. Different cohort four1.43–1.45s queries against those references. Pairs are correlated, not21independent utterances. Published original clip duration is not measured usable speech in current1.6–1.8s prints. Result supports caution, not new-threshold calibration or attribution of historical speakers. Exact49rows retained locally in conversation-historical-short-pairs.json; no model/audio/provider/device execution. Source same_voice.rs asks at1.8s including0.3s pre-roll; immediate and late-other paths both need consistent unknown handling.
+
+Sixth's conversation PR not open at03:17. #3285 landed through other assigned readers in train57; #3292 Welcome back is assigned reviewer-lead/Fourteen, not duplicated. Qualification tables still absent. Continue assigned review watch; main pr.json unchanged and own merge count ten.
+
 ## 2026-10-24 (reviewer-two conversation P1 preparation at 02:56 +07)
 
 First's Queue6373496532 reassigns the two owner P1s: face memory now Third with reviewer-three/reviewer-lead; five-turn conversation now Sixth with reviewer-lead/reviewer-two. This supersedes the prior Fourteen priority. Posted review scope and baseline findings at6373519333; no PR exists yet. Will read promptly on opening, alongside assigned qualification receipts.
