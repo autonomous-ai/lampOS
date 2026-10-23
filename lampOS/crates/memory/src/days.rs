@@ -418,12 +418,38 @@ impl Days {
         sources: &[u64],
         rules: &[u64],
     ) -> Result<u64> {
+        self.append_ruled_by(person, at, heard, said, sources, rules, None)
+    }
+    /// [`Self::append_ruled`], said by `speaker` (#2849, the voice's
+    /// `LAMP_MEMORY_ROOM_SPEAKER`): the room's line, kept with the id of the
+    /// one known person seen saying it ([`speaker_of`]), for their
+    /// [`Self::forget_said`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn append_ruled_by(
+        &mut self,
+        person: &Person,
+        at: u64,
+        heard: &str,
+        said: &str,
+        sources: &[u64],
+        rules: &[u64],
+        speaker: Option<&str>,
+    ) -> Result<u64> {
+        let speaker = speaker_of(person, speaker)?;
         let heard = store::tidy(heard, store::HEARD_BYTES);
         let said = store::tidy(said, store::SAID_BYTES);
         if heard.is_empty() && said.is_empty() {
             return Err(Error::new("empty", "there is no exchange to remember"));
         }
-        self.add(person, at, &heard, &said, "", sources, rules, None, None)
+        self.add(
+            person,
+            at,
+            (&heard, &said, ""),
+            sources,
+            rules,
+            None,
+            on_said(None, speaker),
+        )
     }
     pub fn remember(&mut self, person: &Person, at: u64, text: &str) -> Result<u64> {
         self.remember_from(person, at, text, &[])
@@ -479,6 +505,25 @@ impl Days {
         once: bool,
         on: Option<&str>,
     ) -> Result<(u64, bool)> {
+        self.remember_on_by(person, at, text, from, once, on, None)
+    }
+
+    /// [`Self::remember_on`], said by `speaker` (#2849): the room's kept
+    /// thing with the id of the one known person seen saying it. A kept
+    /// thing `once` finds is written to by nothing, and so gains no speaker:
+    /// it may first have been someone else's words.
+    #[allow(clippy::too_many_arguments)]
+    pub fn remember_on_by(
+        &mut self,
+        person: &Person,
+        at: u64,
+        text: &str,
+        from: &[u64],
+        once: bool,
+        on: Option<&str>,
+        speaker: Option<&str>,
+    ) -> Result<(u64, bool)> {
+        let speaker = speaker_of(person, speaker)?;
         let on = on.and_then(|on| kept_day(on, at, &self.local));
         let text = self.kept_text(person, text, from)?;
         if once && let Some(id) = self.kept_already(person, &text)? {
@@ -510,8 +555,16 @@ impl Days {
             return Ok((id, true));
         }
         self.kept_room(person)?;
-        self.add(person, at, "", "", &text, from, &[], None, on)
-            .map(|id| (id, false))
+        self.add(
+            person,
+            at,
+            ("", "", &text),
+            from,
+            &[],
+            None,
+            on_said(on, speaker),
+        )
+        .map(|id| (id, false))
     }
 
     /// A correction (#2510, the voice's `LAMP_MEMORY_REPLACES`): `text`
@@ -549,6 +602,26 @@ impl Days {
         shown: &[u64],
         on: Option<&str>,
     ) -> Result<u64> {
+        self.remember_replacing_on_by(person, at, text, from, old, shown, on, None)
+    }
+
+    /// [`Self::remember_replacing_on`], said by `speaker` (#2849): the
+    /// room's correction with the id of the one known person seen saying it.
+    /// It is a version of what it replaces, so their [`Self::forget_said`]
+    /// removes both, as any forget of either does.
+    #[allow(clippy::too_many_arguments)]
+    pub fn remember_replacing_on_by(
+        &mut self,
+        person: &Person,
+        at: u64,
+        text: &str,
+        from: &[u64],
+        old: u64,
+        shown: &[u64],
+        on: Option<&str>,
+        speaker: Option<&str>,
+    ) -> Result<u64> {
+        let speaker = speaker_of(person, speaker)?;
         // Not shown first: an id this session never saw says nothing of
         // what it is, or whether it is.
         if !shown.contains(&old) {
@@ -584,7 +657,15 @@ impl Days {
         let on = on.and_then(|on| kept_day(on, at, &self.local));
         let text = self.kept_text(person, text, from)?;
         self.kept_room(person)?;
-        self.add(person, at, "", "", &text, from, &[], Some(old), on)
+        self.add(
+            person,
+            at,
+            ("", "", &text),
+            from,
+            &[],
+            Some(old),
+            on_said(on, speaker),
+        )
     }
 
     /// A remember's `from`, the person's own exchanges, and its text tidied.
@@ -643,19 +724,18 @@ impl Days {
     }
 
     // The one private writer of an exchange or a kept entry: each argument
-    // is a column or its links.
+    // is a column or its links; `said` is its event day and who said it,
+    // each kept in its side table.
     #[allow(clippy::too_many_arguments)]
     fn add(
         &mut self,
         person: &Person,
         at: u64,
-        heard: &str,
-        said: &str,
-        text: &str,
+        (heard, said, text): (&str, &str, &str),
         sources: &[u64],
         rules: &[u64],
         supersedes: Option<u64>,
-        on: Option<Day>,
+        Said { on, speaker }: Said<'_>,
     ) -> Result<u64> {
         if Day::at(at, &self.local).is_none() {
             return Err(Error::new(
@@ -715,6 +795,13 @@ impl Days {
             tx.execute(
                 "INSERT INTO event_days(rid,day) SELECT rid,?3 FROM entries WHERE person=?1 AND id=?2",
                 params![person.as_str(), id, on.to_string()],
+            )?;
+        }
+        // Who said it (#2849): only ever the room's, checked by `speaker_of`.
+        if let Some(speaker) = speaker {
+            tx.execute(
+                "INSERT INTO speakers(rid,speaker) SELECT rid,?3 FROM entries WHERE person=?1 AND id=?2",
+                params![person.as_str(), id, speaker],
             )?;
         }
         if let Some(scope) = ruled {
@@ -970,6 +1057,51 @@ impl Days {
         }
         let count = erase(&tx)?;
         tx.commit()?;
+        Ok(count)
+    }
+    /// The room's lines `speaker` said (#2849, the voice's
+    /// `LAMP_MEMORY_ROOM_SPEAKER`, after that person's own `forget_all`):
+    /// the room's (`everyone`) exchanges and kept things whose `speakers`
+    /// row is theirs, with their versions but for a version someone else
+    /// was seen saying (a correction of theirs by another, or theirs of
+    /// another's: those words are the other's); and an observation of the
+    /// room's made only from those, every one of its sources among them.
+    /// A kept thing goes only when it is named, here by its own speakers
+    /// row (#3113, Friday's P1 on #3213): one kept in a conversation they
+    /// spoke in, said by someone unseen, stays. One also made from anyone
+    /// else's line stays, and so does that line: the walk never climbs from
+    /// what goes to its other sources, and takes no sibling (the #3127
+    /// shape). Nothing of any person's own scope is reached. How many went.
+    pub fn forget_said(&mut self, speaker: &str) -> Result<u64> {
+        if !lamp_msgs::known::is_person_id(speaker) {
+            return Err(bad("a speaker is the id of one person the eyes know"));
+        }
+        let tx = self.db.transaction()?;
+        tx.execute("DELETE FROM doomed", [])?;
+        tx.execute(
+            "INSERT INTO doomed SELECT e.rid FROM speakers s JOIN entries e ON e.rid=s.rid WHERE s.speaker=?1 AND e.person=?2",
+            params![speaker, Person::EVERYONE],
+        )?;
+        // Their versions, both ways, stopping at one someone else was seen
+        // saying: it stays, and so does what lies past it (Friday's P2 on
+        // #3213).
+        tx.execute(
+            "WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid WHERE NOT EXISTS (SELECT 1 FROM speakers p WHERE p.rid=r.newer AND p.speaker!=?1) UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid WHERE NOT EXISTS (SELECT 1 FROM speakers p WHERE p.rid=r.older AND p.speaker!=?1)) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",
+            [speaker],
+        )?;
+        // One step down from what is named, never up: only what has at
+        // least one source and none outside it, read whole before any of
+        // it joins, so nothing goes for having come from what goes this way.
+        let made: Vec<i64> = tx
+            .prepare("SELECT e.rid FROM entries e WHERE e.person=?2 AND e.kind='observation' AND e.rid NOT IN (SELECT rid FROM doomed) AND EXISTS (SELECT 1 FROM sources s WHERE s.child=e.rid) AND NOT EXISTS (SELECT 1 FROM sources s WHERE s.child=e.rid AND s.parent NOT IN (SELECT rid FROM doomed)) AND NOT EXISTS (SELECT 1 FROM speakers p WHERE p.rid=e.rid AND p.speaker!=?1)")?
+            .query_map(params![speaker, Person::EVERYONE], |r| r.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
+        for rid in made {
+            tx.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid])?;
+        }
+        let count = erase(&tx)?;
+        tx.commit()?;
+        self.forget_set_aside()?;
         Ok(count)
     }
     pub fn forget_last(&mut self, person: &Person, only: Option<Kind>) -> Result<Option<Removed>> {
@@ -1866,6 +1998,12 @@ impl Days {
             "UPDATE follow_up_offers SET person=?1 WHERE rid IN (SELECT rid FROM adopting)",
             [to.as_str()],
         )?;
+        // Who said a room line (#2849) is the room's alone: a line now
+        // someone's own goes with their own forget.
+        tx.execute(
+            "DELETE FROM speakers WHERE rid IN (SELECT rid FROM adopting)",
+            [],
+        )?;
         tx.execute(
             "UPDATE people SET generation=generation+1 WHERE person=?",
             [from.as_str()],
@@ -1879,6 +2017,32 @@ impl Days {
         tx.commit()?;
         Ok(moved)
     }
+}
+
+/// What an entry keeps beside it in side tables ([`Days::add`]): the day
+/// it is about (`event_days`) and who said it (`speakers`, #2849).
+struct Said<'a> {
+    on: Option<Day>,
+    speaker: Option<&'a str>,
+}
+fn on_said(on: Option<Day>, speaker: Option<&str>) -> Said<'_> {
+    Said { on, speaker }
+}
+
+/// A write's `speaker` (#2849), checked before anything is written: only
+/// on the room's lines, and only the id of one person the eyes know
+/// (`lamp_msgs::known::is_person_id`); else `bad_request`.
+fn speaker_of<'a>(person: &Person, speaker: Option<&'a str>) -> Result<Option<&'a str>> {
+    let Some(speaker) = speaker else {
+        return Ok(None);
+    };
+    if person.as_str() != Person::EVERYONE {
+        return Err(bad("a speaker is kept only on the room's lines"));
+    }
+    if !lamp_msgs::known::is_person_id(speaker) {
+        return Err(bad("a speaker is the id of one person the eyes know"));
+    }
+    Ok(Some(speaker))
 }
 
 /// What two kept things are compared by (#2176): NFC, lower case, white
