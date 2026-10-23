@@ -841,6 +841,28 @@ fn time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set() {
     assert!(voice.contains(&"Environment=LAMP_KERNEL_CLOCK=on"));
 }
 
+/// The lead's decision of 23 Oct (#1711): a product lamp corrects a kept thing in
+/// place, keeps what a person said rather than the model's rewording, and
+/// keeps a thing once. Each acts on the `remember` the Days memory gives the
+/// voice, so Days memory must be on beside them.
+#[test]
+fn the_product_corrects_keeps_what_was_said_and_keeps_once() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_DAYS=on",
+        "Environment=LAMP_MEMORY_REPLACES=on",
+        "Environment=LAMP_MEMORY_KEEP_HEARD=on",
+        "Environment=LAMP_MEMORY_REMEMBER_ONCE=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
 /// and the voice reading it, so a full update gives one lamp what the
 /// real-face run had.

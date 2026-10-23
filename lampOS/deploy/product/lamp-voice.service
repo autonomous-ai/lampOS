@@ -141,6 +141,13 @@ Environment=LAMP_NAMES=checked
 Environment=LAMP_STAFF_NOTE=on
 Environment=LAMP_TASK_NEWS_AT_PAUSE=on
 Environment=LAMP_MEMORY_RULES=on
+# The lead's decision of 23 Oct (#1711; docs/memory.md), each with LAMP_MEMORY_DAYS (below): a correction replaces the
+# kept thing it corrects, and recall says since when it holds; a remember of a line heard at the lamp keeps what the
+# line said when the model's text has a word the line did not; and a thing the person already keeps is told as
+# already known, not kept twice.
+Environment=LAMP_MEMORY_REPLACES=on
+Environment=LAMP_MEMORY_KEEP_HEARD=on
+Environment=LAMP_MEMORY_REMEMBER_ONCE=on
 Environment=LAMP_LIGHT_REQUESTS=on
 Environment=LAMP_QUIET_PACE=on
 # A silent service costs no connection and no line waiting on it: the provider file's unset

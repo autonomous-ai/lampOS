@@ -576,7 +576,8 @@ the unchanged legacy client, used unless the new Days client is selected.
   journal: the kept list is the record of that.
 - **What is kept is what was said** (#2176, row 10;
   `LAMP_MEMORY_KEEP_HEARD=on`, both voice routes and both clients; off
-  unless set). The model writes the sentence `remember {text}` keeps, and
+  unless set, and on in the product unit since the lead's decision of 23 Oct,
+  #1711). The model writes the sentence `remember {text}` keeps, and
   nothing checked it: on lamp-06c1 on 20 Oct "please remember that my
   favourite tea is jasmine" and, later, "... my favourite fruit is mango"
   were both kept as "My favorite food is jasmine." With the switch, a
@@ -874,7 +875,8 @@ the unchanged legacy client, used unless the new Days client is selected.
     same answers).
 
 - **Kept once** (#2176, `LAMP_MEMORY_REMEMBER_ONCE=on`, with the Days
-  client only; off unless set; both voice routes). `remember` asks the
+  client only; off unless set, and on in the product unit since the lead's
+  decision of 23 Oct, #1711; both voice routes). `remember` asks the
   store with `"once":true`. A held turn whose words were answered a second
   time called `remember` again with the same text (lamp-06c1, the second
   route, build 4142: kept ids 24 and 25). Now a text the person already
@@ -911,7 +913,8 @@ the unchanged legacy client, used unless the new Days client is selected.
   `remember::tests::without_the_switch_a_remember_in_either_scope_is_as_before`.
 
 - **A correction replaces a kept thing** (#2510, `LAMP_MEMORY_REPLACES=on`,
-  with the Days client only; off unless set; both voice routes).
+  with the Days client only; off unless set, and on in the product unit since
+  the lead's decision of 23 Oct, #1711; both voice routes).
   - **Why:** on lamp-06c1 on 21 Oct "it's green now" after a kept violet
     was answered but never kept; on 20 Oct three versions of the same
     bicycle fact were kept side by side.
