@@ -8268,3 +8268,23 @@ train-50 carry proceeds, while new dependent Photo/Name publication waits
 for Common landing or First's routing. That proposal is Queue 6367461283.
 The completed Name source remains frozen; no source-specific pass is claimed
 on train 50. The memory row stays 0.45 and physical acceptance stays with First.
+
+## 2026-10-23 22:31 +07: Common independent current-base rebase pushed
+
+Ready for lamp-voice: no (fresh native, Mac package and reviewer holds)
+
+Common #3064 is pushed as4d634474e, one commit on be16c3327, with exact
+lease00c790722. Range-diff is equal; all35Common file contents/modes remain
+unchanged. Public parity/range record:
+verification/common-train50-carry-20261023/README.md. The final tree137baf4f7
+adds only the merged build-row table edit to checked runtime tree624aff2b9.
+
+Linux is terminal green: fmt, strict workspace/all-target Clippy, workspace
+build, Update374/0/2 with41required identities and privacy9/0/0. Cleanup
+and source/index/mode/mtime guards pass. Mac fmt/Clippy/build pass; its
+original fullUpdate run is active and not called passed. All28head-touch
+cases have passed; a slow real-install case advanced after a bounded sample
+observed durable file writes. No restart or assertion/fixture change occurred.
+Fresh nativeCI starts in parallel with that long Mac run, keeping acceptance
+held. Current PR/Queue records are6368484522/6368485085. Photo/Name remain
+held for Common-first routing and their stated source/physical limits.

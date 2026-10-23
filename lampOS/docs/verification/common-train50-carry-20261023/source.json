@@ -1,0 +1,21 @@
+{
+  "actual_index_bytes_modes_verified": 10065,
+  "checked_runtime_tree": "624aff2b962c67634512dd6d8f4e136ecf02cd48",
+  "docs_change": "timestamp, overallbuild92.3to92.4,update row0.60to0.65; reviewedupstream",
+  "final_base": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+  "final_prepared_tree": "137baf4f76e4caf0af5bb436c4e102943b4b0721",
+  "gate_status": "At publication: Linux full gate passed; Mac formatting/Clippy/build passed and original full Update run active; fresh native gates pending.",
+  "no_build_rows_reference_found_in": [
+    "lampOS/crates",
+    "lampOS/tools",
+    ".github"
+  ],
+  "only_delta_from_checked_tree": [
+    "lampOS/docs/build-rows.md"
+  ],
+  "own_blobs_modes_exact_00c": true,
+  "own_path_count": 35,
+  "published_head": "4d634474e740bd093430ac5ab62801fa9629f014",
+  "range_diff": "00c790722 = 4d634474e",
+  "runtime_tests_build_inputs_except_unreferenced_table_exact": true
+}
