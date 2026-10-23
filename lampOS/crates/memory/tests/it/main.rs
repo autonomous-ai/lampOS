@@ -19,6 +19,7 @@ pub use health_control::protocol as fixture_protocol;
 mod binary;
 mod days;
 mod days_recall;
+mod days_speakers;
 mod days_timing;
 mod fixture_child;
 #[path = "../../src/fixture_schedule.rs"]
