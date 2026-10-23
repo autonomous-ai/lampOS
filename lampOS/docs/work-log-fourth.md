@@ -7935,3 +7935,42 @@ now match `be698e83a`; Queue and PR comments were read through 12:21:36.
 Mood work is parked under First's 12:13 instruction. Common and Peek are
 the active non-mood pieces; Name and Photo follow merged Common.
 No lamp was accessed and no row score was raised.
+
+
+## 2026-10-23 16:45 +07: resumed current-base checks and photo consent review
+
+Ready for lamp-voice: no
+
+Peek's Linux gate on base be698e83a, staged tree d5ed6edc8,
+finished with exit 0 and unchanged source. Formatting, strict workspace
+Clippy and workspace build pass. Reader tests: 12/0/1 ignored;
+ServiceTrace: 7/0; SessionState: 2/0; census: 6/0; Records: 187/0/2
+ignored; Peek: 26/0. The four new privacy controls each pass 1/0,
+then repeat through the same hashed binary; its separate dropped-identity
+permission check passes 1/0. These groups overlap and are not summed.
+Receipt: /private/tmp/fourth-peek-train35-linux-checks-20261023/attempt1/.
+
+The corrected Mac source f16ad647e passed formatting and strict Clippy,
+private equivalence 1/0 and reader 4/0, then ServiceTrace failed 5/1 on
+writer completion. The exact failed conjunct is not established by that
+log. The reviewed test-only change waits for the actual writer completion
+separately from the immutable bounded finish report; production's 500 ms
+limit is unchanged. That correction and the latest main carry require
+fresh gates, then new native ARM64 and Linux Clippy runs.
+
+Common's real Days-lock regression reproduced the lost event decision on
+the unfixed production f57c68587: 0 passed, 1 failed, Cargo exit 101.
+The test-only source 8fc19f5ae stayed unchanged. Explicit Pending results
+now preserve an unconsumed event across the temporary denial, with no
+retry of a completed decision and the original response ceiling retained.
+The source-reviewed correction is being carried from 6b52c916a onto
+cf462adb0, preserving the later Eyes re-land and upstream test corrections.
+Receipt: /private/tmp/fourth-common-event-pending-red-checks-20261023/.
+
+The latest AGENTS.md was read and the clean coordination branch brought
+to cf462adb0. All Queue and own-PR comments through 16:42:59 were read.
+Sixth's photo consent contract now has a forced fresh print check after
+yes to prevent passing-id takeover; its Voice-side contract review is
+active on #2856. The assigned #3233 relay-route PR merged while this
+session was unavailable; no Fourth review completion is claimed.
+No lamp access, installed build, physical proof or row-score increase.
