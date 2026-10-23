@@ -724,6 +724,11 @@ the unchanged legacy client, used unless the new Days client is selected.
       said on. In this process only, at most 64 people (those of an
       earlier day go first, then the earliest): a restart forgets who
       forgot, and the room's lines reach them again.
+      Remembering them marks the client's context changed, removed nothing
+      included, so a note read begun before, even while the forget was with
+      the store, is never taken and the next is read filtered
+      (reviewer-two's P2 on #3142;
+      `remember::tests::a_note_read_during_a_forget_everything_is_fenced_by_the_room_filter`).
     - **What they don't get, that same local day:** any room-kept thing
       or room exchange about a person, in a new session's note (the
       room's snapshot, its ids with it, so nothing left out is a source)
