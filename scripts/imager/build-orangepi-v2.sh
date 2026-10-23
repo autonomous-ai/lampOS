@@ -37,7 +37,7 @@ DEVICE_BASE_IMG="${DEVICE_BASE_IMG:-/input/lamp/golden-opi-dev.img.xz}"
 MNT="/mnt/opi"
 SRC_IMG="/work/base-lamp-v2.img"
 OUT_DIR="/output/lamp-v2"
-FINAL_IMG="${OUT_DIR}/golden-opi.img"
+FINAL_IMG="${OUT_DIR}/lamp-os-v2.img"
 OUT_IMG="${FINAL_IMG}.building"
 # Where the channel folder sits inside the image while install reads it; removed after.
 CHROOT_CHANNEL="/var/tmp/lampos-channel"
