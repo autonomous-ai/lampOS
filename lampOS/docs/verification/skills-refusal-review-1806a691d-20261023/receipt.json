@@ -1,0 +1,23 @@
+{
+  "head": "1806a691d9dc8f93c61c116793f9c68230448c17",
+  "local_evidence_commit": "f95c6b8854",
+  "payload_hashes_verified": 10,
+  "raw_streams_verified": 79,
+  "census_rows": 514,
+  "counts": {
+    "passed": 513,
+    "failed": 0,
+    "ignored": 1,
+    "filtered": 0
+  },
+  "independent_execution": "source and evidence read only; no Cargo or lamp run",
+  "finding": "No P1/P2 found. The guard attempts kill/wait on unwind; only exit polling has a 20-second cap, not a general bounded-I/O proof.",
+  "native_run": 39987367405,
+  "native_log_sha256": "03de38862953346520d753fc287b6998c03548cc8753e867f626c7a1f8e11d6c",
+  "native_counts": {
+    "passed_including_one_leaky": 7266,
+    "failed": 0,
+    "skipped": 33
+  },
+  "clippy_run": 39987367034
+}

@@ -8388,3 +8388,7 @@ and passed once after its fixture correction, retaining the Mac NotConnected
 half-close outcome as well as BrokenPipe and all refusal/status/file checks.
 Its final package/full Skills gates are running before the standalone PR.
 Fourth still needs that concrete head for the assigned independent read.
+
+## 2026-10-23: Skills early-refusal review
+
+Assigned #3277 read complete on 1806a691d, P1/P2 none. [Source/evidence review](verification/skills-refusal-review-1806a691d-20261023/README.md) verifies the narrow fixture change, preserved assertions and ordering, local census and current native result. No independent Cargo or lamp run. First owns the standalone merge; Common must then carry and qualify again. Photo/Name remain behind Common and their recorded contract/physical decisions.
