@@ -745,6 +745,16 @@ the unchanged legacy client, used unless the new Days client is selected.
       For a recall entry its heard, said and kept words are all checked.
       Careful on purpose, for one day: a household line with "my" in it
       is left out too.
+    - **Their own name** (Reviewer-lead's P2 on #3142): when they said it,
+      the name the eyes know the face at the lamp by is remembered with
+      the day, only if that face is theirs (its memory id is the one
+      forgetting). A room line that names them is then left out too
+      ("Mai likes green tea", "Mai is in Hanoi"), with no pronoun in it
+      (`remember::names_them`): every word of the name, in order, as whole
+      words, NFC and case aside, so "Mai" is not in "Maine" and "Mai Lan"
+      needs both. No common word is passed over, so a household line that
+      has the name in it is held back that day too. With no name known
+      then, only the words above count.
     - **What they still get:** the room's other lines ("the meeting is at
       four"), and everything of the room's the next local day. Someone
       else, who forgot nothing, gets them all. A note already told before
@@ -754,7 +764,9 @@ the unchanged legacy client, used unless the new Days client is selected.
     - Off, the room's reach them as before. Tests:
       `remember::tests::after_forget_everything_the_room_s_lines_about_a_person_are_not_recalled_that_day`,
       `remember::tests::after_forget_everything_the_room_s_lines_about_a_person_are_not_in_their_note_that_day`,
-      `remember::tests::about_someone_is_first_and_third_person_words_and_possessives`.
+      `remember::tests::about_someone_is_first_and_third_person_words_and_possessives`,
+      `remember::tests::after_forget_everything_the_room_s_lines_naming_them_are_left_out_that_day`,
+      `remember::tests::names_them_is_the_whole_name_as_whole_words`.
   - **The conversation it came up in** (#1693, the first builder's 23:57):
     - **What's sent:** at `remember`, the voice sends the exchanges of the
       conversation it's in. That's the person's own, journalled so far,
