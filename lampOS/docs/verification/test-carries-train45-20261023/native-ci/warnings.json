@@ -1,0 +1,194 @@
+[
+  {
+    "pr": 3218,
+    "kind": "arm64",
+    "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL",
+    "source_line": 135
+  },
+  {
+    "pr": 3218,
+    "kind": "arm64",
+    "text": "(node:8617) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+    "source_line": 421
+  },
+  {
+    "pr": 3218,
+    "kind": "arm64",
+    "text": "(node:8617) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+    "source_line": 424
+  },
+  {
+    "pr": 3218,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost",
+    "source_line": 507
+  },
+  {
+    "pr": 3218,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp",
+    "source_line": 512
+  },
+  {
+    "pr": 3218,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost",
+    "source_line": 517
+  },
+  {
+    "pr": 3218,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp",
+    "source_line": 522
+  },
+  {
+    "pr": 3218,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost",
+    "source_line": 665
+  },
+  {
+    "pr": 3218,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp",
+    "source_line": 670
+  },
+  {
+    "pr": 3218,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost",
+    "source_line": 675
+  },
+  {
+    "pr": 3218,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp",
+    "source_line": 680
+  },
+  {
+    "pr": 3218,
+    "kind": "arm64",
+    "text": "(node:43327) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+    "source_line": 8666
+  },
+  {
+    "pr": 3218,
+    "kind": "arm64",
+    "text": "(node:43327) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+    "source_line": 8672
+  },
+  {
+    "pr": 3218,
+    "kind": "clippy",
+    "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL",
+    "source_line": 181
+  },
+  {
+    "pr": 3218,
+    "kind": "clippy",
+    "text": "(node:8161) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+    "source_line": 401
+  },
+  {
+    "pr": 3218,
+    "kind": "clippy",
+    "text": "(node:8161) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+    "source_line": 404
+  },
+  {
+    "pr": 3190,
+    "kind": "arm64",
+    "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL",
+    "source_line": 135
+  },
+  {
+    "pr": 3190,
+    "kind": "arm64",
+    "text": "(node:8734) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+    "source_line": 421
+  },
+  {
+    "pr": 3190,
+    "kind": "arm64",
+    "text": "(node:8734) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+    "source_line": 424
+  },
+  {
+    "pr": 3190,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost",
+    "source_line": 533
+  },
+  {
+    "pr": 3190,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp",
+    "source_line": 538
+  },
+  {
+    "pr": 3190,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost",
+    "source_line": 543
+  },
+  {
+    "pr": 3190,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp",
+    "source_line": 548
+  },
+  {
+    "pr": 3190,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost",
+    "source_line": 691
+  },
+  {
+    "pr": 3190,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp",
+    "source_line": 696
+  },
+  {
+    "pr": 3190,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost",
+    "source_line": 701
+  },
+  {
+    "pr": 3190,
+    "kind": "arm64",
+    "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp",
+    "source_line": 706
+  },
+  {
+    "pr": 3190,
+    "kind": "arm64",
+    "text": "(node:43515) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+    "source_line": 8692
+  },
+  {
+    "pr": 3190,
+    "kind": "arm64",
+    "text": "(node:43515) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+    "source_line": 8698
+  },
+  {
+    "pr": 3190,
+    "kind": "clippy",
+    "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL",
+    "source_line": 181
+  },
+  {
+    "pr": 3190,
+    "kind": "clippy",
+    "text": "(node:8153) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+    "source_line": 382
+  },
+  {
+    "pr": 3190,
+    "kind": "clippy",
+    "text": "(node:8153) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.",
+    "source_line": 385
+  }
+]

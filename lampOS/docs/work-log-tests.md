@@ -1,5 +1,27 @@
 # Tests work log
 
+## 2026-10-23 18:45 +0700 — both carried heads pass native CI
+
+Ready for lamp-voice: no (local qualification and execution HOLDs remain).
+
+The [native CI receipt](verification/test-carries-train45-20261023/native-ci/)
+binds #3190 `4b92b677d` and #3218 `238403b1c` to their exact authored merge
+trees. Each ARM64 run passed **7,221 / 0 / 32**, including one leaky pass,
+across 12/46 selected packages. Required Linux Clippy jobs also passed.
+The parallel PR profile included realtime cases; these were not all-package
+four-shard runs. Four doctests, 12 process cases and the relay marker passed
+separately. Original warnings and conditional skipped jobs remain explicit.
+
+The boot/child selection has 86 literal PASS names and one masked PASS bound
+by its unique source prefix; no 87-literal-name claim is made. Phone, prior
+failure and relay selections passed. Root verified every published raw range
+against the four complete captured logs. Full logs remain externally bound.
+
+The fresh boot-clock Mac Voice run is **3,927 / 1 / 15**, only light-call
+failed; all 87 selected cases passed. Its 11 readers continue. The Expression
+bounded diagnostic and peer-closure fixture preparation are separate work;
+no earlier failure is waived and no candidate retry was started.
+
 ## 2026-10-23 18:30 +0700 — make Expression feature comparison independently checkable
 
 Ready for lamp-voice: no (#3218 execution HOLD remains).

@@ -1,0 +1,33 @@
+{
+  "source_head": "238403b1c5959fe8834aba09cfbbf24f03b6d893",
+  "records": [
+    {
+      "path": ".github/workflows/lampos-arm64.yml",
+      "head": "238403b1c5959fe8834aba09cfbbf24f03b6d893",
+      "base_equal": true,
+      "sha256": "ad1a4cd650db5f2a721b510263ff5c1697b09f872646395fb4cab6173f8757f9",
+      "bytes": 18332
+    },
+    {
+      "path": ".github/workflows/lampos-clippy.yml",
+      "head": "238403b1c5959fe8834aba09cfbbf24f03b6d893",
+      "base_equal": true,
+      "sha256": "2b41648cade7109e94995fd076f638166345867600e38e5e9aa9438a9b18c9ac",
+      "bytes": 4189
+    },
+    {
+      "path": "lampOS/.config/nextest.toml",
+      "head": "238403b1c5959fe8834aba09cfbbf24f03b6d893",
+      "base_equal": true,
+      "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+      "bytes": 5157
+    }
+  ],
+  "default_filter_evidence": "[profile.pr] default-filter = all(); source tree equality binds this config to the checked merges. Older workflow comment/step text claiming the realtime group is omitted is stale.",
+  "exact_command": "cargo nextest run --locked --release --workspace --profile pr --no-tests=pass -j num-cpus --partition hash:1/1 -E \"not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process)) & (PICKED)\"",
+  "separate_commands": [
+    "cargo test --locked --release --workspace --doc -- --test-threads=1",
+    "cargo test --locked --release -p lamp-ipc --test relay_signals",
+    "cargo test --locked --release -p lamp-turn-end-wire --test process"
+  ]
+}

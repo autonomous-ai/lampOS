@@ -1,0 +1,26 @@
+[
+  {
+    "pr": 3190,
+    "head": "4b92b677d379b6ac1dadbd9e306320a04af48672",
+    "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+    "source_sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+    "displayed_name": "coordinator::tests::hand_controls::a_hand_kept_on_the_head_si***",
+    "unique_source_prefix_match": "coordinator::tests::hand_controls::a_hand_kept_on_the_head_sighs_in_its_last_second_and_sleeps_on_time",
+    "matching_source_functions": [
+      "a_hand_kept_on_the_head_sighs_in_its_last_second_and_sleeps_on_time"
+    ],
+    "limit": "One log name is masked by GitHub. This is a unique source-prefix binding, not a literal full-name log observation; raw masked bytes are preserved."
+  },
+  {
+    "pr": 3218,
+    "head": "238403b1c5959fe8834aba09cfbbf24f03b6d893",
+    "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+    "source_sha256": "805d7f55a0351c097d43e1f7c8f03c09bb7f1c116176545783be00a28f963128",
+    "displayed_name": "coordinator::tests::hand_controls::a_hand_kept_on_the_head_si***",
+    "unique_source_prefix_match": "coordinator::tests::hand_controls::a_hand_kept_on_the_head_sighs_in_its_last_second_and_sleeps_on_time",
+    "matching_source_functions": [
+      "a_hand_kept_on_the_head_sighs_in_its_last_second_and_sleeps_on_time"
+    ],
+    "limit": "One log name is masked by GitHub. This is a unique source-prefix binding, not a literal full-name log observation; raw masked bytes are preserved."
+  }
+]

@@ -1,0 +1,40 @@
+[
+  {
+    "pr": 3218,
+    "authored_head": "238403b1c5959fe8834aba09cfbbf24f03b6d893",
+    "authored_tree_from_local_Git_object": "f4017e5b0cfad4c6f4571a5106cb1baf62369faf",
+    "checkout_merge": "bdb0f45b70abaed0ba8678c605d220951416e033",
+    "checked_merge_tree_from_GitHub_commit_API": "f4017e5b0cfad4c6f4571a5106cb1baf62369faf",
+    "checked_merge_parents": [
+      "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+      "238403b1c5959fe8834aba09cfbbf24f03b6d893"
+    ],
+    "tree_equal_to_authored": true,
+    "API_response_sha256": "734495ab8f82eb0053434cd5747f7c7be160c893debde08badd488c6ce80f644",
+    "API_response_bytes": 2603,
+    "command": [
+      "gh",
+      "api",
+      "repos/autonomous-ai/lampOS/git/commits/bdb0f45b70abaed0ba8678c605d220951416e033"
+    ]
+  },
+  {
+    "pr": 3190,
+    "authored_head": "4b92b677d379b6ac1dadbd9e306320a04af48672",
+    "authored_tree_from_local_Git_object": "0f2159c3f4c692e0e267221b0ebc071f5b7a6dc2",
+    "checkout_merge": "0e99149312c92c26486804b52b6b0e1b6b4c6881",
+    "checked_merge_tree_from_GitHub_commit_API": "0f2159c3f4c692e0e267221b0ebc071f5b7a6dc2",
+    "checked_merge_parents": [
+      "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+      "4b92b677d379b6ac1dadbd9e306320a04af48672"
+    ],
+    "tree_equal_to_authored": true,
+    "API_response_sha256": "6f03d21cb2ec1055d3d7a59d7d3534e4cf19ea68aeba1d1f2e07d8f54b99be9e",
+    "API_response_bytes": 2603,
+    "command": [
+      "gh",
+      "api",
+      "repos/autonomous-ai/lampOS/git/commits/0e99149312c92c26486804b52b6b0e1b6b4c6881"
+    ]
+  }
+]

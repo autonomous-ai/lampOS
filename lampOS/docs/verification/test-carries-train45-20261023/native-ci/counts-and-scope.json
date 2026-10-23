@@ -1,0 +1,1066 @@
+[
+  {
+    "pr": 3218,
+    "run_id": 39944571432,
+    "run_number": 6427,
+    "summary_text": "     Summary [ 144.346s] 7221 tests run: 7221 passed (1 leaky), 32 skipped",
+    "starting_text": "    Starting 7221 tests across 62 binaries (32 tests and 106 binaries skipped)",
+    "nextest": {
+      "run": 7221,
+      "passed_including_leaky": 7221,
+      "PASS_rows": 7220,
+      "LEAK_rows": 1,
+      "failed": 0,
+      "skipped_from_summary": 32,
+      "executed_binaries": 62,
+      "excluded_binaries_from_starting_summary": 106,
+      "unique_observed_result_rows": 7221,
+      "observed_row_identity_sha256": "ae611e23d6d11b4b8c97e5d03b9b7de87ab9233b39ae201a6419b26bfc0269bc",
+      "ordinal_span": "Every integer1..7221 observed once; parse ends at first Summary before repeated success-output recap.",
+      "skipped_limit": "Skipped names are not individually listed in this log;32 comes from nextest summary, not an inferred skipped-case census."
+    },
+    "scope": {
+      "selected_packages": [
+        "lamp-body",
+        "lamp-cloud",
+        "lamp-expression",
+        "lamp-keeper",
+        "lamp-lean",
+        "lamp-memory",
+        "lamp-peek",
+        "lamp-setup",
+        "lamp-skills",
+        "lamp-update",
+        "lamp-voice",
+        "lamp-voice-eval"
+      ],
+      "selected_packages_count": 12,
+      "workspace_packages": 46,
+      "profile": "pr",
+      "profile_default_filter": "all()",
+      "parallelism": "num-cpus, observed4cores",
+      "partition": "hash:1/1",
+      "full_dispatch": false,
+      "nextest_binary_exclusions": [
+        "lamp-ipc::relay_signals",
+        "lamp-turn-end-wire::process"
+      ]
+    },
+    "by_binary": {
+      "lamp-body": {
+        "PASS": 436
+      },
+      "lamp-body::it": {
+        "PASS": 125
+      },
+      "lamp-body::bin/lamp-body": {
+        "PASS": 32
+      },
+      "lamp-body::bin/lamp-body-inspect": {
+        "PASS": 2
+      },
+      "lamp-body::bin/lamp-body-measure": {
+        "PASS": 5
+      },
+      "lamp-body::bin/lamp-body-mood": {
+        "PASS": 3
+      },
+      "lamp-body::bin/lamp-body-worker": {
+        "PASS": 1
+      },
+      "lamp-cloud": {
+        "PASS": 166
+      },
+      "lamp-skills::it": {
+        "PASS": 304
+      },
+      "lamp-cloud::it": {
+        "PASS": 30
+      },
+      "lamp-expression": {
+        "PASS": 27
+      },
+      "lamp-expression::it": {
+        "PASS": 280
+      },
+      "lamp-voice": {
+        "PASS": 3666,
+        "LEAK": 1
+      },
+      "lamp-expression::runtime": {
+        "PASS": 27
+      },
+      "lamp-expression::bin/lamp-expression": {
+        "PASS": 4
+      },
+      "lamp-keeper": {
+        "PASS": 40
+      },
+      "lamp-keeper::bin/lamp-keeper": {
+        "PASS": 2
+      },
+      "lamp-lean": {
+        "PASS": 10
+      },
+      "lamp-lean::it": {
+        "PASS": 51
+      },
+      "lamp-memory": {
+        "PASS": 96
+      },
+      "lamp-voice::it": {
+        "PASS": 301
+      },
+      "lamp-memory::forget_person": {
+        "PASS": 3
+      },
+      "lamp-memory::forget_shared_exchange": {
+        "PASS": 4
+      },
+      "lamp-memory::health_control": {
+        "PASS": 23
+      },
+      "lamp-memory::it": {
+        "PASS": 154
+      },
+      "lamp-memory::forgot": {
+        "PASS": 1
+      },
+      "lamp-memory::paraphrase_fixture": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_early_words": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_follows_face": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_forget": {
+        "PASS": 5
+      },
+      "lamp-memory::voice_forget_about": {
+        "PASS": 2
+      },
+      "lamp-memory::voice_forget_named": {
+        "PASS": 2
+      },
+      "lamp-memory::voice_link_used": {
+        "PASS": 2
+      },
+      "lamp-memory::voice_observe": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_since_until": {
+        "PASS": 2
+      },
+      "lamp-memory::bin/lamp-memory": {
+        "PASS": 8
+      },
+      "lamp-memory::bin/lamp-memory-eval": {
+        "PASS": 8
+      },
+      "lamp-peek": {
+        "PASS": 15
+      },
+      "lamp-peek::peek": {
+        "PASS": 11
+      },
+      "lamp-setup": {
+        "PASS": 16
+      },
+      "lamp-setup::it": {
+        "PASS": 156
+      },
+      "lamp-setup::wake": {
+        "PASS": 6
+      },
+      "lamp-skills": {
+        "PASS": 157
+      },
+      "lamp-skills::requested_audio": {
+        "PASS": 31
+      },
+      "lamp-skills::bin/lamp-skills": {
+        "PASS": 23
+      },
+      "lamp-update": {
+        "PASS": 120
+      },
+      "lamp-update::functions": {
+        "PASS": 5
+      },
+      "lamp-update::install": {
+        "PASS": 82
+      },
+      "lamp-update::it": {
+        "PASS": 13
+      },
+      "lamp-update::round": {
+        "PASS": 123
+      },
+      "lamp-update::self-cli-exec": {
+        "PASS": 1
+      },
+      "lamp-update::self-process-cuts": {
+        "PASS": 1
+      },
+      "lamp-voice::bin/lamp-voice": {
+        "PASS": 1
+      },
+      "lamp-voice::example/render_line_second": {
+        "PASS": 4
+      },
+      "lamp-voice::example/stop_words_stt_replay": {
+        "PASS": 6
+      },
+      "lamp-voice-eval": {
+        "PASS": 378
+      },
+      "lamp-voice-eval::it": {
+        "PASS": 238
+      },
+      "lamp-voice-eval::bin/lamp-voice-eval": {
+        "PASS": 7
+      }
+    },
+    "doctests": {
+      "targets": 46,
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "rows": [
+        {
+          "target": "lamp_actions",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_addons",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_air",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_audio",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_body",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_bus",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_camera",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_cloud",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_controls",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_ears",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_environment",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_expression",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_eyes",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_gemini",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_health",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_ipc",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_keeper",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_lean",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_local_time",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_memory",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_mood",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_msgs",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_name",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_near_call",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_observer",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_peek",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_policy",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_records",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_ring",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_same_voice",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_schedule",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_selftest",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_settings",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_setup",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_skills",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_sound_fixtures",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_station",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_surround",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_tasks",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_turn_end",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_turn_end_wire",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_turn_owner",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_update",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_voice",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_voice_eval",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_voice_processes",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    "own_harness": {
+      "relay_signals": "relay_signals: ok; no numeric case count claimed",
+      "turn_end_wire_process": {
+        "passed": 12,
+        "failed": 0
+      }
+    },
+    "selected": {
+      "boot_clock_and_child": 87,
+      "boot_selected_literal_name_passes": 86,
+      "boot_selected_masked_source_prefix_passes": 1,
+      "phone_passed": true,
+      "all5_prior_failure_cases_passed": true,
+      "relay_hardening_passed": 7
+    },
+    "leaky_case": {
+      "status": "LEAK",
+      "duration": "0.227s",
+      "ordinal": 5090,
+      "total": 7221,
+      "binary": "lamp-voice",
+      "name": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+    }
+  },
+  {
+    "pr": 3190,
+    "run_id": 39944605487,
+    "run_number": 6428,
+    "summary_text": "     Summary [ 142.695s] 7221 tests run: 7221 passed (1 leaky), 32 skipped",
+    "starting_text": "    Starting 7221 tests across 62 binaries (32 tests and 106 binaries skipped)",
+    "nextest": {
+      "run": 7221,
+      "passed_including_leaky": 7221,
+      "PASS_rows": 7220,
+      "LEAK_rows": 1,
+      "failed": 0,
+      "skipped_from_summary": 32,
+      "executed_binaries": 62,
+      "excluded_binaries_from_starting_summary": 106,
+      "unique_observed_result_rows": 7221,
+      "observed_row_identity_sha256": "ae611e23d6d11b4b8c97e5d03b9b7de87ab9233b39ae201a6419b26bfc0269bc",
+      "ordinal_span": "Every integer1..7221 observed once; parse ends at first Summary before repeated success-output recap.",
+      "skipped_limit": "Skipped names are not individually listed in this log;32 comes from nextest summary, not an inferred skipped-case census."
+    },
+    "scope": {
+      "selected_packages": [
+        "lamp-body",
+        "lamp-cloud",
+        "lamp-expression",
+        "lamp-keeper",
+        "lamp-lean",
+        "lamp-memory",
+        "lamp-peek",
+        "lamp-setup",
+        "lamp-skills",
+        "lamp-update",
+        "lamp-voice",
+        "lamp-voice-eval"
+      ],
+      "selected_packages_count": 12,
+      "workspace_packages": 46,
+      "profile": "pr",
+      "profile_default_filter": "all()",
+      "parallelism": "num-cpus, observed4cores",
+      "partition": "hash:1/1",
+      "full_dispatch": false,
+      "nextest_binary_exclusions": [
+        "lamp-ipc::relay_signals",
+        "lamp-turn-end-wire::process"
+      ]
+    },
+    "by_binary": {
+      "lamp-body": {
+        "PASS": 436
+      },
+      "lamp-body::it": {
+        "PASS": 125
+      },
+      "lamp-body::bin/lamp-body": {
+        "PASS": 32
+      },
+      "lamp-body::bin/lamp-body-inspect": {
+        "PASS": 2
+      },
+      "lamp-body::bin/lamp-body-measure": {
+        "PASS": 5
+      },
+      "lamp-body::bin/lamp-body-mood": {
+        "PASS": 3
+      },
+      "lamp-body::bin/lamp-body-worker": {
+        "PASS": 1
+      },
+      "lamp-cloud": {
+        "PASS": 166
+      },
+      "lamp-skills::it": {
+        "PASS": 304
+      },
+      "lamp-cloud::it": {
+        "PASS": 30
+      },
+      "lamp-expression": {
+        "PASS": 27
+      },
+      "lamp-expression::it": {
+        "PASS": 280
+      },
+      "lamp-voice": {
+        "PASS": 3666,
+        "LEAK": 1
+      },
+      "lamp-expression::runtime": {
+        "PASS": 27
+      },
+      "lamp-expression::bin/lamp-expression": {
+        "PASS": 4
+      },
+      "lamp-keeper": {
+        "PASS": 40
+      },
+      "lamp-keeper::bin/lamp-keeper": {
+        "PASS": 2
+      },
+      "lamp-lean": {
+        "PASS": 10
+      },
+      "lamp-lean::it": {
+        "PASS": 51
+      },
+      "lamp-memory": {
+        "PASS": 96
+      },
+      "lamp-voice::it": {
+        "PASS": 301
+      },
+      "lamp-memory::forget_person": {
+        "PASS": 3
+      },
+      "lamp-memory::forget_shared_exchange": {
+        "PASS": 4
+      },
+      "lamp-memory::health_control": {
+        "PASS": 23
+      },
+      "lamp-memory::it": {
+        "PASS": 154
+      },
+      "lamp-memory::forgot": {
+        "PASS": 1
+      },
+      "lamp-memory::paraphrase_fixture": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_early_words": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_follows_face": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_forget": {
+        "PASS": 5
+      },
+      "lamp-memory::voice_forget_about": {
+        "PASS": 2
+      },
+      "lamp-memory::voice_forget_named": {
+        "PASS": 2
+      },
+      "lamp-memory::voice_link_used": {
+        "PASS": 2
+      },
+      "lamp-memory::voice_observe": {
+        "PASS": 1
+      },
+      "lamp-memory::voice_since_until": {
+        "PASS": 2
+      },
+      "lamp-memory::bin/lamp-memory": {
+        "PASS": 8
+      },
+      "lamp-memory::bin/lamp-memory-eval": {
+        "PASS": 8
+      },
+      "lamp-peek": {
+        "PASS": 15
+      },
+      "lamp-peek::peek": {
+        "PASS": 11
+      },
+      "lamp-setup": {
+        "PASS": 16
+      },
+      "lamp-setup::it": {
+        "PASS": 156
+      },
+      "lamp-setup::wake": {
+        "PASS": 6
+      },
+      "lamp-skills": {
+        "PASS": 157
+      },
+      "lamp-skills::requested_audio": {
+        "PASS": 31
+      },
+      "lamp-skills::bin/lamp-skills": {
+        "PASS": 23
+      },
+      "lamp-update": {
+        "PASS": 120
+      },
+      "lamp-update::functions": {
+        "PASS": 5
+      },
+      "lamp-update::install": {
+        "PASS": 82
+      },
+      "lamp-update::it": {
+        "PASS": 13
+      },
+      "lamp-update::round": {
+        "PASS": 123
+      },
+      "lamp-update::self-cli-exec": {
+        "PASS": 1
+      },
+      "lamp-update::self-process-cuts": {
+        "PASS": 1
+      },
+      "lamp-voice::bin/lamp-voice": {
+        "PASS": 1
+      },
+      "lamp-voice::example/render_line_second": {
+        "PASS": 4
+      },
+      "lamp-voice::example/stop_words_stt_replay": {
+        "PASS": 6
+      },
+      "lamp-voice-eval": {
+        "PASS": 378
+      },
+      "lamp-voice-eval::it": {
+        "PASS": 238
+      },
+      "lamp-voice-eval::bin/lamp-voice-eval": {
+        "PASS": 7
+      }
+    },
+    "doctests": {
+      "targets": 46,
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "rows": [
+        {
+          "target": "lamp_actions",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_addons",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_air",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_audio",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_body",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_bus",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_camera",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_cloud",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_controls",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_ears",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_environment",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_expression",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_eyes",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_gemini",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_health",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_ipc",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_keeper",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_lean",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_local_time",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_memory",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_mood",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_msgs",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_name",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_near_call",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_observer",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_peek",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_policy",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_records",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_ring",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_same_voice",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_schedule",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_selftest",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_settings",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_setup",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_skills",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_sound_fixtures",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_station",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_surround",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_tasks",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_turn_end",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_turn_end_wire",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_turn_owner",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_update",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_voice",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_voice_eval",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "lamp_voice_processes",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    "own_harness": {
+      "relay_signals": "relay_signals: ok; no numeric case count claimed",
+      "turn_end_wire_process": {
+        "passed": 12,
+        "failed": 0
+      }
+    },
+    "selected": {
+      "boot_clock_and_child": 87,
+      "boot_selected_literal_name_passes": 86,
+      "boot_selected_masked_source_prefix_passes": 1,
+      "phone_passed": true,
+      "all5_prior_failure_cases_passed": true,
+      "relay_hardening_passed": 7
+    },
+    "leaky_case": {
+      "status": "LEAK",
+      "duration": "0.222s",
+      "ordinal": 5090,
+      "total": 7221,
+      "binary": "lamp-voice",
+      "name": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+    }
+  }
+]

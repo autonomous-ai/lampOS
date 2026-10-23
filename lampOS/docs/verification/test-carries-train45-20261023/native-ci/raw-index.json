@@ -1,0 +1,1436 @@
+{
+  "scope": "Selected raw checkout/toolchain/command/warning/summary/owned-case/doctest/own-harness and complete Clippy-command sections. Full terminal logs remain external, bound by SHA/bytes and immutable Actions run links. No claim that this selection includes every full-log byte.",
+  "offset_unit": "UTF-8 bytes in decoded raw-selected.txt.json data without an added newline.",
+  "segments": [
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 18790,
+      "source_end": 19494,
+      "decoded_offset": 111,
+      "bytes": 704,
+      "sha256": "1703484632844ba3a42a10c2c0015d7f30f38900136819d7ab14681318867077"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 39327,
+      "source_end": 39894,
+      "decoded_offset": 944,
+      "bytes": 567,
+      "sha256": "3a1f084a6df36aada65356ff281169895050550a617733ec10bb4e44dd34a076"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 49292,
+      "source_end": 49554,
+      "decoded_offset": 1640,
+      "bytes": 262,
+      "sha256": "ecf2488025d6caa6c947f8673d29f25db5751c3d682e18a3877451a7f7f62f9c"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 58319,
+      "source_end": 59829,
+      "decoded_offset": 2031,
+      "bytes": 1510,
+      "sha256": "cc39f2c3e1fd3542eb39c61714500ca1f4ee06b48c5da3dc63a41adb8a7fd8dd"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 69266,
+      "source_end": 69477,
+      "decoded_offset": 3670,
+      "bytes": 211,
+      "sha256": "3d4f05ca0e9a1a1733c85e131f8f14f044debfe4366887e82572937e328425c8"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 70706,
+      "source_end": 74878,
+      "decoded_offset": 4010,
+      "bytes": 4172,
+      "sha256": "cf158f129a4b854f6d8e17179f200fa3a63820103cb31a5f3b3f83a7f9a2e0f8"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 92639,
+      "source_end": 98844,
+      "decoded_offset": 8311,
+      "bytes": 6205,
+      "sha256": "c323a5cbf2ade6b78c2d0ee7367aea279ac35cef047d9da70860479cf22124d1"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 101574,
+      "source_end": 101742,
+      "decoded_offset": 14647,
+      "bytes": 168,
+      "sha256": "fa98f9e7bd7691b7313052f27ab0cc3541d1b55e819645749d38d87bf793c7ca"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 340932,
+      "source_end": 341146,
+      "decoded_offset": 14946,
+      "bytes": 214,
+      "sha256": "88c06fa78fb485195f8352924aca1c0c2312e94e89b671325bf745b53e54f877"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 341767,
+      "source_end": 341996,
+      "decoded_offset": 15291,
+      "bytes": 229,
+      "sha256": "269783bc39c9c4983bc827b8648fa13d897a2a25e613cfbbc51e3429edf79169"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 759547,
+      "source_end": 759775,
+      "decoded_offset": 15651,
+      "bytes": 228,
+      "sha256": "76744daec0451410f17cada3f9126c625938067d63caf47031d2b5b14efb14f1"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 761107,
+      "source_end": 761568,
+      "decoded_offset": 16010,
+      "bytes": 461,
+      "sha256": "b9977885abac6835bdaab9f548b4b738de4499ca792d075a4a984cf3f6193470"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 808765,
+      "source_end": 809411,
+      "decoded_offset": 16602,
+      "bytes": 646,
+      "sha256": "346598ca197a8012e942b46061069f1b7dd061516a27815bb4c2c83bfd5ccbcb"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 809658,
+      "source_end": 809883,
+      "decoded_offset": 17379,
+      "bytes": 225,
+      "sha256": "c58da379bcda699fab7189c2177e43ea43c964e99f09d5d4bd09bada7d6aa9a6"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 810106,
+      "source_end": 811279,
+      "decoded_offset": 17735,
+      "bytes": 1173,
+      "sha256": "941854695455f913c7d63b12ddbbb58ff320c365902622d01103e5a52bc83c2f"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 811517,
+      "source_end": 811740,
+      "decoded_offset": 19039,
+      "bytes": 223,
+      "sha256": "a0168ffa70ffe6b5b1dc15712accc67b687456f793dd66f837704670b804015a"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 811966,
+      "source_end": 812440,
+      "decoded_offset": 19393,
+      "bytes": 474,
+      "sha256": "a107421814b51444c2b40d068a4a23c2eb598c99c1b9d33c0f73baa6ae723f12"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 812656,
+      "source_end": 814096,
+      "decoded_offset": 19998,
+      "bytes": 1440,
+      "sha256": "6a160c7631e1ed51e51d698944bcf9f95a1c1aeba58879334ac955a53ce798b2"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 814831,
+      "source_end": 815067,
+      "decoded_offset": 21569,
+      "bytes": 236,
+      "sha256": "bdb19207a1b489c1214033f4495a663375aea85d165f5b98b7b4e69de17d7293"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 816297,
+      "source_end": 816749,
+      "decoded_offset": 21936,
+      "bytes": 452,
+      "sha256": "c5acb8a75a88990fa09d91d1d3211eabda3364c963f8640f6d220f3ac373544e"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 816995,
+      "source_end": 817467,
+      "decoded_offset": 22519,
+      "bytes": 472,
+      "sha256": "0d98891a8b6122af5b6e60296e52eeaf1df36c83b656f5b9a605d211a0e4346d"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 817939,
+      "source_end": 818673,
+      "decoded_offset": 23122,
+      "bytes": 734,
+      "sha256": "a93432abf2ecf703b405b59b620baf2501725b37dcd7a7c752cbb1b86a22848b"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 819391,
+      "source_end": 819856,
+      "decoded_offset": 23987,
+      "bytes": 465,
+      "sha256": "849cf88b3cac788a4806ebf184597f248503252d7fe2de014b9e5f0dad222ae1"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 893275,
+      "source_end": 898406,
+      "decoded_offset": 24583,
+      "bytes": 5131,
+      "sha256": "853539092703dde19979a3f5c9f0227361c1a596749f9c940e82c49b770ddb5f"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 898613,
+      "source_end": 904294,
+      "decoded_offset": 29845,
+      "bytes": 5681,
+      "sha256": "ec0bfe52e400eb87ab756a239c069ee31eca5af18e775a1df916e8aae373ef0d"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 986772,
+      "source_end": 986971,
+      "decoded_offset": 35657,
+      "bytes": 199,
+      "sha256": "65db75a6fc936ab9a33c3233215a8d57d4a2bc46c0374a853e751a61135b74d9"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1050195,
+      "source_end": 1050429,
+      "decoded_offset": 35989,
+      "bytes": 234,
+      "sha256": "7d43de2eb36cfce9a19baecd48b68dd3be9fce189f608290323e6374fd4aab10"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1079306,
+      "source_end": 1079540,
+      "decoded_offset": 36356,
+      "bytes": 234,
+      "sha256": "4f70d0d7df1b43706405f41db87936fa5747bf4b65ba0d97d956336146b7e8bd"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1085102,
+      "source_end": 1085336,
+      "decoded_offset": 36723,
+      "bytes": 234,
+      "sha256": "13b4f0e62c8fdb0226f8d7fe96914e6e833f2025ef63ad8d33ad612bc25e6256"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1213241,
+      "source_end": 1213445,
+      "decoded_offset": 37090,
+      "bytes": 204,
+      "sha256": "df7dd82b91d918dd245df5a080994da0d9319c195fd3410417e490a71e480131"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1364821,
+      "source_end": 1365071,
+      "decoded_offset": 37427,
+      "bytes": 250,
+      "sha256": "5a7880e03c95aed103de6d6ce2a9f37ceb17cd3cc8e11f7f670bc9db6a7836f8"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1367814,
+      "source_end": 1368033,
+      "decoded_offset": 37810,
+      "bytes": 219,
+      "sha256": "270e5fa5dad32b79cb720ed4cb5f4a6b84efc8ba9f67d9ccc6bdc7390ec79c1a"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1383805,
+      "source_end": 1384031,
+      "decoded_offset": 38162,
+      "bytes": 226,
+      "sha256": "193c7ec8a36b0adfc21125c06b844210912d8cbdaea61aa963c877d4bbf3c64b"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1385164,
+      "source_end": 1385413,
+      "decoded_offset": 38521,
+      "bytes": 249,
+      "sha256": "8a164908145efa433d821c84844b77de04195e47cf840102f73ea1baf745a9fa"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1392353,
+      "source_end": 1392825,
+      "decoded_offset": 38903,
+      "bytes": 472,
+      "sha256": "e8bf4e3b8e942d0a2ee024e859fc973440caad6423b8d61ff7480a0be5f3d531"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1393303,
+      "source_end": 1393541,
+      "decoded_offset": 39508,
+      "bytes": 238,
+      "sha256": "b8be70307b1673fe5b11b0461bda24fed3623c98a18741be353ff56ef67fb14d"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1429870,
+      "source_end": 1430101,
+      "decoded_offset": 39879,
+      "bytes": 231,
+      "sha256": "d696321057ee65320fe56f7be3de1f6848c8a8602ca8388d87b729dec59f6d57"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1514043,
+      "source_end": 1514269,
+      "decoded_offset": 40243,
+      "bytes": 226,
+      "sha256": "1e259a32fc41ba49ac719dc96a707a302647b44c4d750ca0df29661b4508caf7"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1514503,
+      "source_end": 1514726,
+      "decoded_offset": 40602,
+      "bytes": 223,
+      "sha256": "0de9e3b49ec049f0000de8a2310e43d6c4700d49caff99efdc29daf74bc56278"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1676113,
+      "source_end": 1676558,
+      "decoded_offset": 40958,
+      "bytes": 445,
+      "sha256": "0f8e61d3484dd586a5872eee6d0aaef6704334a7d3ea8247167b79daeb4cc6f7"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1676773,
+      "source_end": 1676994,
+      "decoded_offset": 41536,
+      "bytes": 221,
+      "sha256": "b669db5d838f4ebc2dc8f5aad4b17bf4206d723e7ce062a2bf093e265c16d99a"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1677218,
+      "source_end": 1677441,
+      "decoded_offset": 41890,
+      "bytes": 223,
+      "sha256": "7cf4415794d6354773f03e0315a10d75cc4f9c2f2cbac150766b8964f72f5ed2"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1677671,
+      "source_end": 1677896,
+      "decoded_offset": 42246,
+      "bytes": 225,
+      "sha256": "bb1fefb3c6d0477b064c254f291554551b3524420be785afaee0cc46b1ba4fea"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1678580,
+      "source_end": 1678801,
+      "decoded_offset": 42604,
+      "bytes": 221,
+      "sha256": "97d5302116418b575f41331029e97c5b63d1bf6f7522e98610c217fb69bedeaa"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1682786,
+      "source_end": 1683019,
+      "decoded_offset": 42958,
+      "bytes": 233,
+      "sha256": "d464227d061bf079584ab9bc67360eb128ad2fc72b666163b673a5a54ddadaa5"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1692688,
+      "source_end": 1692978,
+      "decoded_offset": 43324,
+      "bytes": 290,
+      "sha256": "500c78b1c439bc6622bfd3cfa72b77859dff0e4514f88054be3f43ac00f692fc"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1750033,
+      "source_end": 1786009,
+      "decoded_offset": 43747,
+      "bytes": 35976,
+      "sha256": "9611645a52c61c96504f7d301f59adaaecc5cdfe714cb17cfd95c4c2385014e7"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1788230,
+      "source_end": 1788984,
+      "decoded_offset": 79856,
+      "bytes": 754,
+      "sha256": "fa3ed84ea62a12eae092bf3e3eb1f0710c8f01f88ff090bd334fdc22acc5aa27"
+    },
+    {
+      "label": "pr3218-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-arm64-39944571432/full-terminal-log.stdout.txt",
+        "bytes": 1795187,
+        "sha256": "13048cc9b30ebc6c604e5baec089723fbcadd24c773949a1d714fe34f02a47f9"
+      },
+      "source_start": 1789126,
+      "source_end": 1789892,
+      "decoded_offset": 80743,
+      "bytes": 766,
+      "sha256": "058885c0cc08800797625de2eb47d0d0cbb80776e1e615453b13268582fbba77"
+    },
+    {
+      "label": "pr3218-clippy",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-clippy-39944571522/full-terminal-log.stdout.txt",
+        "bytes": 74535,
+        "sha256": "e0040565d68e5921c8acdb6e9fa1851c1826b731522e09a7af80d719b3da3569"
+      },
+      "source_start": 26391,
+      "source_end": 27144,
+      "decoded_offset": 81639,
+      "bytes": 753,
+      "sha256": "fb52ee2d21cdad283b2ae1a452ce92bd2f8de7de7043234f0594e6e9b99f00ae"
+    },
+    {
+      "label": "pr3218-clippy",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-clippy-39944571522/full-terminal-log.stdout.txt",
+        "bytes": 74535,
+        "sha256": "e0040565d68e5921c8acdb6e9fa1851c1826b731522e09a7af80d719b3da3569"
+      },
+      "source_start": 49302,
+      "source_end": 49941,
+      "decoded_offset": 82523,
+      "bytes": 639,
+      "sha256": "e2ac50a93900b9307bfe16b3b09a6f53d00ffe071a2a0e8d8fd30d11bbb5e363"
+    },
+    {
+      "label": "pr3218-clippy",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-clippy-39944571522/full-terminal-log.stdout.txt",
+        "bytes": 74535,
+        "sha256": "e0040565d68e5921c8acdb6e9fa1851c1826b731522e09a7af80d719b3da3569"
+      },
+      "source_start": 52195,
+      "source_end": 52468,
+      "decoded_offset": 83293,
+      "bytes": 273,
+      "sha256": "b48b9211cb2911e3bbc6500bd706c9e8d140db03fc98fea25ee41bb09fa8edcd"
+    },
+    {
+      "label": "pr3218-clippy",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-clippy-39944571522/full-terminal-log.stdout.txt",
+        "bytes": 74535,
+        "sha256": "e0040565d68e5921c8acdb6e9fa1851c1826b731522e09a7af80d719b3da3569"
+      },
+      "source_start": 58184,
+      "source_end": 59738,
+      "decoded_offset": 83697,
+      "bytes": 1554,
+      "sha256": "5e7fbecef76b8da6277a8ae501de020fffe7445dec2e8af9b50986c5f5c86efa"
+    },
+    {
+      "label": "pr3218-clippy",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3218-clippy-39944571522/full-terminal-log.stdout.txt",
+        "bytes": 74535,
+        "sha256": "e0040565d68e5921c8acdb6e9fa1851c1826b731522e09a7af80d719b3da3569"
+      },
+      "source_start": 62585,
+      "source_end": 71158,
+      "decoded_offset": 85382,
+      "bytes": 8573,
+      "sha256": "971ba40ff3464ca59afcc548f0ff40f6818a89c03f717b94e7ac227703005b21"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 18783,
+      "source_end": 19487,
+      "decoded_offset": 94085,
+      "bytes": 704,
+      "sha256": "1e83a18f00b4230547225f93e299bf92ca721bcb27e3653426550967d9ec9220"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 39320,
+      "source_end": 39887,
+      "decoded_offset": 94918,
+      "bytes": 567,
+      "sha256": "94b97d8f404efedc6130c508bb67c1368de0da1b6784f3ab0abdc458639c940e"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 49285,
+      "source_end": 49547,
+      "decoded_offset": 95614,
+      "bytes": 262,
+      "sha256": "ff33834623c3096136e02e59483141318bdc4591bcc63e27fab573397fa75239"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 58312,
+      "source_end": 59816,
+      "decoded_offset": 96005,
+      "bytes": 1504,
+      "sha256": "789f1d184dfb6d613f3d4dc32de5b94953d55d44d19453ac8b882de4a7ff210f"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 72992,
+      "source_end": 73203,
+      "decoded_offset": 97638,
+      "bytes": 211,
+      "sha256": "da5e3b7304907f14d451f45206458bb5f04652bf5dd526af28720d39978f3752"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 74432,
+      "source_end": 78604,
+      "decoded_offset": 97978,
+      "bytes": 4172,
+      "sha256": "5418c6b69db6025d1e80180e432cce585795203b255d075e3f1a3c6ec524e01b"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 96365,
+      "source_end": 102570,
+      "decoded_offset": 102280,
+      "bytes": 6205,
+      "sha256": "0df167727156a309370d2fa59216b50a78cfd297e8d2c0448bf5de3761fcb2f1"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 105300,
+      "source_end": 105468,
+      "decoded_offset": 108616,
+      "bytes": 168,
+      "sha256": "005528fcc434fb5c309a4ffd1e6d23479e1726bf23a9f12bdaa40c80be893732"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 344658,
+      "source_end": 344872,
+      "decoded_offset": 108915,
+      "bytes": 214,
+      "sha256": "dce60a04b25e08bfed15f741a2ad983c23d04953f2fc737d6881c3411227bf7f"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 345493,
+      "source_end": 345722,
+      "decoded_offset": 109260,
+      "bytes": 229,
+      "sha256": "a0cfa11723809ad7d07607bfaff380f8a898e1d5742db89deb7eb99c6e97d9e7"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 763273,
+      "source_end": 763501,
+      "decoded_offset": 109620,
+      "bytes": 228,
+      "sha256": "0d209166f23d7b2c28395aca634eddba3db56f09b9c36f9ed70f642d51d6b76f"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 764833,
+      "source_end": 765294,
+      "decoded_offset": 109979,
+      "bytes": 461,
+      "sha256": "f020a9172a5396367c1014c922950f13380539631ac6eaaa4cef2c201c7406fd"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 812491,
+      "source_end": 813137,
+      "decoded_offset": 110571,
+      "bytes": 646,
+      "sha256": "dd9f166e2ff55a41dd013cae351eaa03714ce5b98e5e0e325a87cfe6a9140af2"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 813384,
+      "source_end": 813609,
+      "decoded_offset": 111348,
+      "bytes": 225,
+      "sha256": "2d2272ef6b0b11ada2108edf1608d11a25a1b34269ffa2014883412bfccbea1a"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 813832,
+      "source_end": 814067,
+      "decoded_offset": 111704,
+      "bytes": 235,
+      "sha256": "d7bd8c572cab5a85713735fe0daa0c2f45c390dbe86f47624f83b046bbd5a037"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 814293,
+      "source_end": 815004,
+      "decoded_offset": 112070,
+      "bytes": 711,
+      "sha256": "eb653a180ee12488ef30a42151a6852e85e844b9ffcf305d73c7bcc9c921e315"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 815242,
+      "source_end": 816166,
+      "decoded_offset": 112912,
+      "bytes": 924,
+      "sha256": "e40bc4b4f0007317f2aaf1fb9ec1bc1e56aacdd4339e2e4ac43fa106e16db1e1"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 816382,
+      "source_end": 817608,
+      "decoded_offset": 113967,
+      "bytes": 1226,
+      "sha256": "4992e8346ec617f3cd8e88aba84dc815b6eff038992b5a5a309ba342f9d09cbd"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 817864,
+      "source_end": 818078,
+      "decoded_offset": 115324,
+      "bytes": 214,
+      "sha256": "7de05a29e5ad810e587a498b262bbf19a668b42b02f94e0ef458d846319c4c0b"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 818806,
+      "source_end": 819042,
+      "decoded_offset": 115669,
+      "bytes": 236,
+      "sha256": "471c6bc2c31a6bfc17b924ded9710166eed760bd30d997d06ef2b14bfdac7ab5"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 820023,
+      "source_end": 820475,
+      "decoded_offset": 116036,
+      "bytes": 452,
+      "sha256": "890d8d8cd2be7c091cbddf444b97b1e822dfc374b3e81ae118aa09cb958efb88"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 820721,
+      "source_end": 821193,
+      "decoded_offset": 116619,
+      "bytes": 472,
+      "sha256": "4627a159a852d5e08f0ce99f230e49caf3bc286a3692c2e4c827e592774e7ffb"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 821665,
+      "source_end": 822399,
+      "decoded_offset": 117222,
+      "bytes": 734,
+      "sha256": "4c4d5a41d450a0be77db8fe6479fa8fffc41e6d0ba51cc508008ab1c027d7f92"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 823117,
+      "source_end": 823582,
+      "decoded_offset": 118087,
+      "bytes": 465,
+      "sha256": "d37b0c5f6ff257a097ce7d7c603d20275c2ac5a6b84573ddd3c1d2f4953884a7"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 896769,
+      "source_end": 897455,
+      "decoded_offset": 118683,
+      "bytes": 686,
+      "sha256": "a97ff24beef3ffdff000562279ec47331f4947a55e501d5eba97e5a2c9857af8"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 897687,
+      "source_end": 902132,
+      "decoded_offset": 119500,
+      "bytes": 4445,
+      "sha256": "a0b350a46156074d60898d4f0342949cffb3a67206370b08b122a741fc18340a"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 902339,
+      "source_end": 906838,
+      "decoded_offset": 124076,
+      "bytes": 4499,
+      "sha256": "fed2d325e1febe2364171e93b019389298995dd0cce0fc20ef2736eb1f8eef61"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 907071,
+      "source_end": 908253,
+      "decoded_offset": 128706,
+      "bytes": 1182,
+      "sha256": "0c7dda31c5238de585e6cd38dee42be2bd88c4bef750daa2902a5145abb38a3f"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 991519,
+      "source_end": 991718,
+      "decoded_offset": 130019,
+      "bytes": 199,
+      "sha256": "477066bb4ef336ce80c0a64d516610699850793fed210f728924b49841f705b5"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1053921,
+      "source_end": 1054155,
+      "decoded_offset": 130351,
+      "bytes": 234,
+      "sha256": "4346c96fbcd45383e87ac507158625094331ab7508213de5109f0aa79f3ea908"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1083032,
+      "source_end": 1083266,
+      "decoded_offset": 130718,
+      "bytes": 234,
+      "sha256": "8879e9ce34748d570192b02915d0ebec2d7737bff8d6181657a07fb46e5ddad9"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1088828,
+      "source_end": 1089062,
+      "decoded_offset": 131085,
+      "bytes": 234,
+      "sha256": "dec110094e2e3b1c8447d2aa955276392780c669ddd26a5ec1140ee7d48f1bd5"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1216967,
+      "source_end": 1217171,
+      "decoded_offset": 131452,
+      "bytes": 204,
+      "sha256": "f49f3c25bd05be3ced0626a5759eb1b5529d838125b70db6593281c927befb00"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1368547,
+      "source_end": 1368797,
+      "decoded_offset": 131789,
+      "bytes": 250,
+      "sha256": "8913da7af2ca3634b99320b28048a316d53d91d0ba9544a4d81c02003d8bdd58"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1371540,
+      "source_end": 1371759,
+      "decoded_offset": 132172,
+      "bytes": 219,
+      "sha256": "3740f0b842f78e6b640bbb9e3529ea21abeff131f39a468729f96b20b0f81dd0"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1387531,
+      "source_end": 1387757,
+      "decoded_offset": 132524,
+      "bytes": 226,
+      "sha256": "bb35300643e78f07aaf4955c38949b9d04f3991d7398396d8f65d8c8f8cf7f47"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1388890,
+      "source_end": 1389139,
+      "decoded_offset": 132883,
+      "bytes": 249,
+      "sha256": "30f3b71eb41d11a6d27b2d03a5b7705f52517063c157e6aa8f5c3824fad23d82"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1396079,
+      "source_end": 1396551,
+      "decoded_offset": 133265,
+      "bytes": 472,
+      "sha256": "7f1f81cfbfa21abe896f707fd0059713c1025b953dc1ae94c0d12ce74fc9896a"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1397029,
+      "source_end": 1397267,
+      "decoded_offset": 133870,
+      "bytes": 238,
+      "sha256": "b028010811869f0068f5ec24e5cce5a26e8c7d8f8a6dfb6622c162cfdcf56eea"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1433596,
+      "source_end": 1433827,
+      "decoded_offset": 134241,
+      "bytes": 231,
+      "sha256": "50124d8fe8784fffe8adc61550b255a23ba6ad72458086291f09c85b9469e450"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1517769,
+      "source_end": 1517995,
+      "decoded_offset": 134605,
+      "bytes": 226,
+      "sha256": "1ada02cb5a019b14eafa4d3c5fc902275c4bda44ae1a6f02d3b7a0b08981d03f"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1518229,
+      "source_end": 1518452,
+      "decoded_offset": 134964,
+      "bytes": 223,
+      "sha256": "eceebde39c0a3593ef39241e80ca3f29f8297586adcd3980b39b4f8b8fb70991"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1679813,
+      "source_end": 1680017,
+      "decoded_offset": 135320,
+      "bytes": 204,
+      "sha256": "340ee250a5c33bf9576461aaa33f352c79516bd0626bba10c9d34c6ad55f8a30"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1680241,
+      "source_end": 1680926,
+      "decoded_offset": 135657,
+      "bytes": 685,
+      "sha256": "fcf568f13d06124b0be3d90502af71c0e20385d36d05604f7c3d7bea1cd716c4"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1681167,
+      "source_end": 1681388,
+      "decoded_offset": 136475,
+      "bytes": 221,
+      "sha256": "6a48d8ad4d2e6c8ef8e36a38fe117750ee0adf563f7cd377550eef5aa72018f1"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1681618,
+      "source_end": 1681843,
+      "decoded_offset": 136829,
+      "bytes": 225,
+      "sha256": "718d0e9fcc92453984b9aa1555b2c0e45231f8e11f6384fb546a99616507cd40"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1688430,
+      "source_end": 1688663,
+      "decoded_offset": 137187,
+      "bytes": 233,
+      "sha256": "6c13dc9b0d3b5659a2d372808e0ceed6282e0b294cfcaf70e93c30ab9fcf5dcd"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1696414,
+      "source_end": 1696704,
+      "decoded_offset": 137553,
+      "bytes": 290,
+      "sha256": "774fd6d8e430877c57d3581d4748af8c43aab02ca3d2e9982b8ae9a93031287d"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1753759,
+      "source_end": 1789735,
+      "decoded_offset": 137976,
+      "bytes": 35976,
+      "sha256": "35589d604939360d0aa2a967156b9b540b66fe8a99f9a2667aa916455be83e26"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1791956,
+      "source_end": 1792710,
+      "decoded_offset": 174085,
+      "bytes": 754,
+      "sha256": "b10b2a5b955f3911b6d6dc10d0064bd9491cd8706bed3523ade0f364d4c2bb6d"
+    },
+    {
+      "label": "pr3190-arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-arm64-39944605487/full-terminal-log.stdout.txt",
+        "bytes": 1798913,
+        "sha256": "d916efb8a0841472f1ee7332c7ddd912324f77d233cc9e7dd887a02650f45c3b"
+      },
+      "source_start": 1792852,
+      "source_end": 1793618,
+      "decoded_offset": 174972,
+      "bytes": 766,
+      "sha256": "bab70859e7c4a8a4f11783d88a6fad3d110868621996adcd41d90ca411ef20f5"
+    },
+    {
+      "label": "pr3190-clippy",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-clippy-39944605196/full-terminal-log.stdout.txt",
+        "bytes": 72954,
+        "sha256": "cd95559a7de9e30fd8df157229b05b63389f4c88e8aba457fffa82a1f9d9209c"
+      },
+      "source_start": 26394,
+      "source_end": 27147,
+      "decoded_offset": 175868,
+      "bytes": 753,
+      "sha256": "bb71de685df4272f95487a8cdedfe89789f546829a9a74601d5658a3beaef2b3"
+    },
+    {
+      "label": "pr3190-clippy",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-clippy-39944605196/full-terminal-log.stdout.txt",
+        "bytes": 72954,
+        "sha256": "cd95559a7de9e30fd8df157229b05b63389f4c88e8aba457fffa82a1f9d9209c"
+      },
+      "source_start": 46617,
+      "source_end": 47256,
+      "decoded_offset": 176752,
+      "bytes": 639,
+      "sha256": "c191832672d8932417d6eaebec70e18a973104f480bafc09ef7e0351b6a2540c"
+    },
+    {
+      "label": "pr3190-clippy",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-clippy-39944605196/full-terminal-log.stdout.txt",
+        "bytes": 72954,
+        "sha256": "cd95559a7de9e30fd8df157229b05b63389f4c88e8aba457fffa82a1f9d9209c"
+      },
+      "source_start": 49510,
+      "source_end": 49783,
+      "decoded_offset": 177522,
+      "bytes": 273,
+      "sha256": "8ebe9b94816c31932aa29b541f51e1dc908ded9db7a9a8306a01834d52bcb704"
+    },
+    {
+      "label": "pr3190-clippy",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-clippy-39944605196/full-terminal-log.stdout.txt",
+        "bytes": 72954,
+        "sha256": "cd95559a7de9e30fd8df157229b05b63389f4c88e8aba457fffa82a1f9d9209c"
+      },
+      "source_start": 55499,
+      "source_end": 57052,
+      "decoded_offset": 177926,
+      "bytes": 1553,
+      "sha256": "5eed00c1503e0eae16e34b5de91612d45a62a32de0c73b155da1cf1296f3b0ae"
+    },
+    {
+      "label": "pr3190-clippy",
+      "source": {
+        "external_path": "/private/tmp/tests-train45-carry-ci-20261023/pr-3190-clippy-39944605196/full-terminal-log.stdout.txt",
+        "bytes": 72954,
+        "sha256": "cd95559a7de9e30fd8df157229b05b63389f4c88e8aba457fffa82a1f9d9209c"
+      },
+      "source_start": 61004,
+      "source_end": 69577,
+      "decoded_offset": 179610,
+      "bytes": 8573,
+      "sha256": "37c78b6b6766c5c1090a0ab9194797da28fdfab9d290eb9199b111d707250406"
+    }
+  ]
+}
