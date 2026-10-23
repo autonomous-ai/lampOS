@@ -1,5 +1,30 @@
 # Tests work log
 
+## 2026-10-23 23:35 +0700 — standalone Skills early-refusal repair pushed
+
+Ready for lamp-voice: no; #3277 awaits native CI and assigned reads.
+
+[PR #3277](https://github.com/autonomous-ai/lampOS/pull/3277) is pushed at
+1806a691d on unchanged latest base be16c3327. Exactly the private Skills
+integration fixture and its documentation change. A rejected peer's write
+outcome is retained until the original refusal, failed status and preserved
+file are checked; authorized writes and callback ordering stay strict. An
+owned-child guard reaps on error, and the permanent control waits for its
+exact child's exit before writing.
+
+The [bound local receipt](verification/skills-early-refusal-20261023/) retains
+the single controlled old failure and corrected pass, both observed BrokenPipe
+with exited children; the corrected Mac also observed paired NotConnected.
+Uninstrumented package cases passed 23/0/0; full Skills passed 513/0/1, all
+514 compiled identities accounted for. Mac/Linux formatting, strict Skills
+Clippy and workspace build passed. Root verified ten payloads, all native
+raw envelopes, the full census/outcome multiset, control cleanup and committed
+source hashes. This proves a failure mode, not the earlier remote schedule.
+
+Fourth and reviewer-two own the assigned read. Required ARM64 and Linux Clippy
+runs are active under one bounded watcher. No local ARM build, product change,
+stacked PR or repeated control was used. Other held failures remain unchanged.
+
 ## 2026-10-23 23:16 +0700 — privacy and search controls prepared, unrun
 
 Ready for lamp-voice: no; proposal only, with execution pending review.

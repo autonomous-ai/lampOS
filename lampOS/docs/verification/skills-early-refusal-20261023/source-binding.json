@@ -1,0 +1,196 @@
+{
+  "commit": {
+    "head": "1806a691d9dc8f93c61c116793f9c68230448c17",
+    "tree": "ea6582efaa91c4495f8236c456cabcce11fe7bbc",
+    "parent": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+    "workspace_tree": "ee6e65d88c8b9cd4b5715a7a7e5c528860569a4e",
+    "subject": "lampOS: collect early Skills helper refusals",
+    "branch": "tests/1685-skills-early-refusal",
+    "clean": true,
+    "authored_files": [
+      "lampOS/crates/skills/tests/it/package.rs",
+      "lampOS/docs/skills.md"
+    ],
+    "source_sha256": {
+      "lampOS/crates/skills/tests/it/package.rs": "de93a329a4f4e4ffc455a8a4b38a29ab33277f905ca61468d631396690d060bc",
+      "lampOS/docs/skills.md": "6b49bd6edb46d86599beff4cca13769f095f85fa960f407a473f90a3a9369e55"
+    },
+    "tracked_source_entries": 10055,
+    "all_executed_bytes_modes_bound_to_commit": true,
+    "tested_base_equal_latest_precommit_fetch": true
+  },
+  "base": {
+    "base": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+    "branch": "tests/1685-skills-early-refusal",
+    "worktree": "/private/tmp/tests-codex-skills-early-refusal-20261023",
+    "created_at": "2026-10-23T16:12:10.947243+00:00",
+    "source": {
+      "lampOS/crates/skills/tests/it/package.rs": "6d7befb391d0f175a3ebfd9a961d97b86dbcae3109bff323debbd4c3731ed19e",
+      "lampOS/docs/skills.md": "b4e70403d61446e52c323491c5ded7fa1a4f219b9713a04afcfaac3e37d9b9a8",
+      "lampOS/crates/skills/src/main.rs": "a4bb122ca5326280e1626f5e1f9c94dde4a26bf9f5a93910ae364e2339b63777",
+      "lampOS/crates/skills/src/package.rs": "55ab91d8ef5ba6193173b5e711a8053797b8e5c7d6929d4886b63eac8b44a0b4"
+    }
+  },
+  "precommit_latest_base_audit": {
+    "time": "2026-10-23T16:27:14.510118+00:00",
+    "tested_base": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+    "latest_origin": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+    "equal": true,
+    "status": " M lampOS/crates/skills/tests/it/package.rs\n M lampOS/docs/skills.md\n",
+    "base_drift_stat": ""
+  },
+  "preservation": {
+    "source_paths": [
+      "lampOS/crates/skills/tests/it/package.rs",
+      "lampOS/docs/skills.md"
+    ],
+    "production_sources_unchanged": true,
+    "authorized_order": [
+      "write_all",
+      "write.as_ref().unwrap",
+      "shutdown(Write)",
+      "half_close.as_ref().unwrap",
+      "meanwhile(child)"
+    ],
+    "held_folder_test_body_identical": true,
+    "unchanged_refusal_status_assertions": [
+      "assert!(!ok, \"{answer}\");",
+      "assert_eq!(answer, serde_json::json!({\"refused\": package::NOT_AN_ASKER}));"
+    ],
+    "file_predicate": "Identical skills.join(\"desk-tutor\").join(\"skill.toml\").is_file() is evaluated once into preserved before the assertions; assert!(preserved) retains the predicate.",
+    "control_barrier_source_sha256": "e8d67f316c278fdbd57ca989159965f4923c26075c3486260fd5e5e86ebd693d",
+    "control_barrier_identical": true,
+    "git_diff_check": 0
+  },
+  "candidate_patch": {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/candidate.patch",
+    "bytes": 6994,
+    "sha256": "ecfd47d4233ba51276500974e2155bdba0a90511ac4363f3cd1eceeaa42bc5cb",
+    "encoding": "UTF-8",
+    "text": "diff --git a/lampOS/crates/skills/tests/it/package.rs b/lampOS/crates/skills/tests/it/package.rs\nindex 7f8c383e04..b84325694f 100644\n--- a/lampOS/crates/skills/tests/it/package.rs\n+++ b/lampOS/crates/skills/tests/it/package.rs\n@@ -975,35 +975,65 @@ fn ask_helper_while(\n     line: &[u8],\n     meanwhile: impl FnOnce(&mut std::process::Child),\n ) -> (serde_json::Value, bool, String) {\n-    ask_helper_as(skills, line, true, meanwhile)\n+    let (answer, ok, journal, _) = ask_helper_as(skills, line, true, |_| {}, meanwhile);\n+    (answer, ok, journal)\n+}\n+\n+struct RequestOutcome {\n+    write: std::io::Result<()>,\n+    half_close: std::io::Result<()>,\n+}\n+\n+/// Reap the exact helper even if a fixture check or callback panics.\n+struct HelperChild(std::process::Child);\n+\n+impl Drop for HelperChild {\n+    fn drop(&mut self) {\n+        let _ = self.0.kill();\n+        let _ = self.0.wait();\n+    }\n }\n \n /// [`ask_helper_while`], the peer let through by the helper's test switch\n-/// (`package::ANY_ASKER`) only when `any_asker`.\n+/// (`package::ANY_ASKER`) only when `any_asker`. The early-refusal control\n+/// can observe the child's exit before the request is written.\n fn ask_helper_as(\n     skills: &Path,\n     line: &[u8],\n     any_asker: bool,\n+    before_request: impl FnOnce(&mut std::process::Child),\n     meanwhile: impl FnOnce(&mut std::process::Child),\n-) -> (serde_json::Value, bool, String) {\n+) -> (serde_json::Value, bool, String, RequestOutcome) {\n     use std::io::{BufRead, Read, Write};\n     use std::os::unix::net::UnixStream;\n     use std::process::{Command, Stdio};\n     let (mut ours, theirs) = UnixStream::pair().unwrap();\n-    let mut child = Command::new(env!(\"CARGO_BIN_EXE_lamp-skills\"))\n-        .args([\"asked\", \"--dir\"])\n-        .env(package::ANY_ASKER, if any_asker { \"on\" } else { \"\" })\n-        .arg(skills)\n-        .stdin(Stdio::from(std::os::fd::OwnedFd::from(\n-            theirs.try_clone().unwrap(),\n-        )))\n-        .stdout(Stdio::from(std::os::fd::OwnedFd::from(theirs)))\n-        .stderr(Stdio::piped())\n-        .spawn()\n-        .unwrap();\n-    ours.write_all(line).unwrap();\n-    ours.shutdown(std::net::Shutdown::Write).unwrap();\n-    meanwhile(&mut child);\n+    let mut child = HelperChild(\n+        Command::new(env!(\"CARGO_BIN_EXE_lamp-skills\"))\n+            .args([\"asked\", \"--dir\"])\n+            .env(package::ANY_ASKER, if any_asker { \"on\" } else { \"\" })\n+            .arg(skills)\n+            .stdin(Stdio::from(std::os::fd::OwnedFd::from(\n+                theirs.try_clone().unwrap(),\n+            )))\n+            .stdout(Stdio::from(std::os::fd::OwnedFd::from(theirs)))\n+            .stderr(Stdio::piped())\n+            .spawn()\n+            .unwrap(),\n+    );\n+    let child = &mut child.0;\n+    before_request(child);\n+    let write = ours.write_all(line);\n+    if any_asker {\n+        // Authorized requests must still be delivered before the callback.\n+        write.as_ref().unwrap();\n+    }\n+    let half_close = ours.shutdown(std::net::Shutdown::Write);\n+    if any_asker {\n+        half_close.as_ref().unwrap();\n+    }\n+    let request = RequestOutcome { write, half_close };\n+    meanwhile(child);\n     let mut answer = String::new();\n     std::io::BufReader::new(&ours)\n         .read_line(&mut answer)\n@@ -1020,6 +1050,7 @@ fn ask_helper_as(\n         serde_json::from_str(&answer).unwrap(),\n         status.success(),\n         journal,\n+        request,\n     )\n }\n \n@@ -1028,17 +1059,76 @@ fn ask_helper_as(\n /// stays (the reviewer's P3 on #2429).\n #[test]\n fn a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed() {\n+    check_non_asker_refusal(false);\n+}\n+\n+/// Make the early refusal precede the write, without a scheduling guess.\n+#[test]\n+fn a_peer_refused_before_its_request_is_written_still_leaves_the_skill_in_place() {\n+    check_non_asker_refusal(true);\n+}\n+\n+fn check_non_asker_refusal(after_exit: bool) {\n     let dir = tempfile::tempdir().unwrap();\n     let skills = dir.path().join(\"skills\");\n     fs::create_dir_all(&skills).unwrap();\n     tutor(&skills, \"1.0.0\");\n-    let (answer, ok, _) = ask_helper_as(&skills, b\"{\\\"remove\\\": \\\"desk-tutor\\\"}\\n\", false, |_| {});\n+    let (answer, ok, journal, request) = ask_helper_as(\n+        &skills,\n+        b\"{\\\"remove\\\": \\\"desk-tutor\\\"}\\n\",\n+        false,\n+        |child| {\n+            if after_exit {\n+                wait_for_helper_exit(child);\n+            }\n+        },\n+        |_| {},\n+    );\n+    // Collect all three product observations before judging the write.\n+    let preserved = skills.join(\"desk-tutor\").join(\"skill.toml\").is_file();\n     assert!(!ok, \"{answer}\");\n     assert_eq!(\n         answer,\n         serde_json::json!({\"refused\": package::NOT_AN_ASKER})\n     );\n-    assert!(skills.join(\"desk-tutor\").join(\"skill.toml\").is_file());\n+    assert!(preserved);\n+    let broken_pipe = request\n+        .write\n+        .as_ref()\n+        .is_err_and(|error| error.kind() == std::io::ErrorKind::BrokenPipe);\n+    assert!(\n+        request.write.is_ok() || broken_pipe,\n+        \"request write: {:?}; {answer}; {journal}\",\n+        request.write\n+    );\n+    assert!(\n+        request.half_close.is_ok()\n+            || (broken_pipe\n+                && request\n+                    .half_close\n+                    .as_ref()\n+                    .is_err_and(|error| error.kind() == std::io::ErrorKind::NotConnected)),\n+        \"request half-close: {:?}; {answer}; {journal}\",\n+        request.half_close\n+    );\n+    if after_exit {\n+        assert!(\n+            broken_pipe,\n+            \"the exited helper must refuse the request write\"\n+        );\n+    }\n+}\n+\n+fn wait_for_helper_exit(child: &mut std::process::Child) {\n+    use std::time::{Duration, Instant};\n+    let started = Instant::now();\n+    while child.try_wait().unwrap().is_none() {\n+        assert!(\n+            started.elapsed() < Duration::from_secs(20),\n+            \"the helper did not exit before the request write\"\n+        );\n+        std::thread::sleep(Duration::from_millis(10));\n+    }\n }\n \n /// While another run holds the skills folder, the helper waits at most\ndiff --git a/lampOS/docs/skills.md b/lampOS/docs/skills.md\nindex b42d2f2680..164c51e0d6 100644\n--- a/lampOS/docs/skills.md\n+++ b/lampOS/docs/skills.md\n@@ -1254,6 +1254,10 @@ for it.\n   `LAMP_SKILLS_ANY_ASKER=on` in the helper's environment, which no unit\n   sets, and the helper says so in the journal each time it lets a peer\n   through (`a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed`).\n+  The non-asker fixture also waits for the real helper to exit before writing:\n+  a `BrokenPipe` still has to accompany the original refusal, failed status\n+  and preserved skill. It collects those observations and reaps the child;\n+  authorized requests still require their write and half-close to succeed.\n - **It checks each request itself,** whoever connected. Five are taken,\n   each exactly one key:\n   - `{\"remove\": NAME}`, a string: it runs `remove` above, which refuses a\n"
+  },
+  "plan": {
+    "base": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+    "worktree": "/private/tmp/tests-codex-skills-early-refusal-20261023",
+    "target": "/private/tmp/tests-codex-1569-target",
+    "source_paths": [
+      "lampOS/crates/skills/tests/it/package.rs",
+      "lampOS/docs/skills.md"
+    ],
+    "source_map_sha256": "e9f521ede9fba74958c521dbfd13d7cb1a49232f414e314c597b52a02a77da67",
+    "source_sha256": {
+      "lampOS/crates/skills/tests/it/package.rs": "de93a329a4f4e4ffc455a8a4b38a29ab33277f905ca61468d631396690d060bc",
+      "lampOS/docs/skills.md": "6b49bd6edb46d86599beff4cca13769f095f85fa960f407a473f90a3a9369e55"
+    },
+    "variants": [
+      {
+        "mode": "before",
+        "worktree": "/private/tmp/tests-codex-skills-refusal-before-20261023",
+        "source_file": "/private/tmp/tests-skills-early-refusal-20261023/controls/before/package.rs",
+        "source_sha256": "1f16ab673335359c4bb3c468bad0d208d594cf053c5b8d24198c5c4f1e10772d",
+        "docs_file": "/private/tmp/tests-skills-early-refusal-20261023/controls/before/skills.md",
+        "docs_sha256": "b4e70403d61446e52c323491c5ded7fa1a4f219b9713a04afcfaac3e37d9b9a8",
+        "test": "package::a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed",
+        "expected_exit": 101
+      },
+      {
+        "mode": "after",
+        "worktree": "/private/tmp/tests-codex-skills-refusal-after-20261023",
+        "source_file": "/private/tmp/tests-skills-early-refusal-20261023/controls/after/package.rs",
+        "source_sha256": "1f473fbaf698e6d8f99994ba5d15b6a3918a530dd052024e15997d022e6da369",
+        "docs_file": "/private/tmp/tests-skills-early-refusal-20261023/controls/after/skills.md",
+        "docs_sha256": "6b49bd6edb46d86599beff4cca13769f095f85fa960f407a473f90a3a9369e55",
+        "test": "package::a_peer_refused_before_its_request_is_written_still_leaves_the_skill_in_place",
+        "expected_exit": 0
+      }
+    ],
+    "timeouts": {
+      "compile": 1200,
+      "control": 45,
+      "package": 240,
+      "full": 900,
+      "fmt": 120,
+      "clippy": 900,
+      "build": 900
+    },
+    "transport_boundary": "Baseline and candidate use byte-identical child-exit polling, with20-second watchdog and10ms polling; baseline retains old unconditional write unwrap. Candidate additionally asserts observed BrokenPipe after all original product predicates. No fixed completion delay.",
+    "commands": {
+      "compile_controls": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--offline",
+        "--locked",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "compile_candidate": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--offline",
+        "--locked",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "full": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--offline",
+        "--locked",
+        "--no-fail-fast"
+      ],
+      "fmt": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "clippy": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--offline",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "build": [
+        "cargo",
+        "build",
+        "--workspace",
+        "--offline",
+        "--locked"
+      ]
+    },
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "RUST_TEST_THREADS": null,
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null
+    },
+    "reader_scope": "Private integration helper and documentation only. Full Skills target census plus strict Skills all-targets/workspace build; root approved no12-package runtime expansion.",
+    "executions": "Exactly once per control, one focused package selection, one full Skills default-parallel gate; no retries."
+  },
+  "runner_sha256": "a033fd4cd1e9ea051bf50ae8d8b8f386918f248607edf740c037d8f415d7dfca",
+  "source_map": {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/source-map.json",
+    "sha256": "e9f521ede9fba74958c521dbfd13d7cb1a49232f414e314c597b52a02a77da67",
+    "entries": 10055
+  },
+  "production_source_scope": "No product code or manifest changed in the candidate or either control. The controls only alter the integration fixture and candidate documentation snapshot.",
+  "publication_scope": "No Python, executable, whole-source export, Cargo compiler-message JSON, or API actor metadata is bundled."
+}

@@ -1,0 +1,1486 @@
+{
+  "native": [
+    {
+      "name": "candidate-source-before-head",
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:21:00.218579+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 24159,
+      "sampled_process_group": 24159,
+      "finished_utc": "2026-10-23T16:21:00.261606+00:00",
+      "elapsed_seconds": 0.04307601088657975,
+      "stdout": {
+        "path": "candidate-source-before-head.stdout",
+        "bytes": 41,
+        "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259"
+      },
+      "stderr": {
+        "path": "candidate-source-before-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "rustc",
+      "command": [
+        "rustc",
+        "-vV"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:21:01.943769+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 24198,
+      "sampled_process_group": 24198,
+      "finished_utc": "2026-10-23T16:21:02.085324+00:00",
+      "elapsed_seconds": 0.1416094950400293,
+      "stdout": {
+        "path": "rustc.stdout",
+        "bytes": 191,
+        "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+      },
+      "stderr": {
+        "path": "rustc.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "disk",
+      "command": [
+        "df",
+        "-Pk",
+        "/private/tmp"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:21:02.086827+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 24199,
+      "sampled_process_group": 24199,
+      "finished_utc": "2026-10-23T16:21:02.098904+00:00",
+      "elapsed_seconds": 0.012123512104153633,
+      "stdout": {
+        "path": "disk.stdout",
+        "bytes": 142,
+        "sha256": "145fabbeeeba11cdc87000c41102bb8495105a183f03b1e8cc06bac986169616"
+      },
+      "stderr": {
+        "path": "disk.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "before-before-head",
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-before-20261023/lampOS",
+      "started_utc": "2026-10-23T16:21:02.105747+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 24200,
+      "sampled_process_group": 24200,
+      "finished_utc": "2026-10-23T16:21:02.152133+00:00",
+      "elapsed_seconds": 0.04642721265554428,
+      "stdout": {
+        "path": "before-before-head.stdout",
+        "bytes": 41,
+        "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259"
+      },
+      "stderr": {
+        "path": "before-before-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "before-compile",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--offline",
+        "--locked",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-before-20261023/lampOS",
+      "started_utc": "2026-10-23T16:21:04.053038+00:00",
+      "timeout_seconds": 1200,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 24234,
+      "sampled_process_group": 24234,
+      "finished_utc": "2026-10-23T16:21:51.215346+00:00",
+      "elapsed_seconds": 47.16338422102854,
+      "stdout": {
+        "path": "before-compile.stdout",
+        "bytes": 182728,
+        "sha256": "ead034d52ecc6059510fbbc9c2e4c34b37a5dabf5bc8131dc1a81604c85a2de7"
+      },
+      "stderr": {
+        "path": "before-compile.stderr",
+        "bytes": 2736,
+        "sha256": "8392496dca2dcf854fff4906cca244fd222d7f4d725cbb3112252ebca7831ba2"
+      }
+    },
+    {
+      "name": "before-it-test-list",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-before-20261023/lampOS",
+      "started_utc": "2026-10-23T16:21:51.296701+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 27330,
+      "sampled_process_group": 27330,
+      "finished_utc": "2026-10-23T16:21:52.137240+00:00",
+      "elapsed_seconds": 0.8406322100199759,
+      "stdout": {
+        "path": "before-it-test-list.stdout",
+        "bytes": 23145,
+        "sha256": "860349c8ce330105ef4d0aa0068a368fb2cbba8e88c1933da1bb5853ae68a292"
+      },
+      "stderr": {
+        "path": "before-it-test-list.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "before-it-test-ignored",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5",
+        "--list",
+        "--ignored",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-before-20261023/lampOS",
+      "started_utc": "2026-10-23T16:21:52.139092+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 27361,
+      "sampled_process_group": 27361,
+      "finished_utc": "2026-10-23T16:21:52.164958+00:00",
+      "elapsed_seconds": 0.025933803990483284,
+      "stdout": {
+        "path": "before-it-test-ignored.stdout",
+        "bytes": 35,
+        "sha256": "163d33ee43b30a5a7645433ba3a13e9da5256f58bd03c729b798fc95ae23396c"
+      },
+      "stderr": {
+        "path": "before-it-test-ignored.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "before-architecture",
+      "command": [
+        "lipo",
+        "-archs",
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-before-20261023/lampOS",
+      "started_utc": "2026-10-23T16:21:52.167526+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 27362,
+      "sampled_process_group": 27362,
+      "finished_utc": "2026-10-23T16:21:52.220370+00:00",
+      "elapsed_seconds": 0.052890302147716284,
+      "stdout": {
+        "path": "before-architecture.stdout",
+        "bytes": 7,
+        "sha256": "aaf631698ae5160ceb04a97681a14887fdcab47cd6e0f163c87485b3b1340b62"
+      },
+      "stderr": {
+        "path": "before-architecture.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "before-file",
+      "command": [
+        "file",
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-before-20261023/lampOS",
+      "started_utc": "2026-10-23T16:21:52.221626+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 27363,
+      "sampled_process_group": 27363,
+      "finished_utc": "2026-10-23T16:21:52.235357+00:00",
+      "elapsed_seconds": 0.013765544630587101,
+      "stdout": {
+        "path": "before-file.stdout",
+        "bytes": 101,
+        "sha256": "4157fbbf6b324f57b9920d52907e0e4e5335bf71ee1e863d0c1d18550bc9e469"
+      },
+      "stderr": {
+        "path": "before-file.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "before-frozen-head",
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-before-20261023/lampOS",
+      "started_utc": "2026-10-23T16:21:52.236952+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 27364,
+      "sampled_process_group": 27364,
+      "finished_utc": "2026-10-23T16:21:52.283536+00:00",
+      "elapsed_seconds": 0.046642587054520845,
+      "stdout": {
+        "path": "before-frozen-head.stdout",
+        "bytes": 41,
+        "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259"
+      },
+      "stderr": {
+        "path": "before-frozen-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "before-control",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5",
+        "package::a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed",
+        "--exact",
+        "--show-output"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-before-20261023/lampOS",
+      "started_utc": "2026-10-23T16:21:53.965969+00:00",
+      "timeout_seconds": 45,
+      "timed_out": false,
+      "exit_code": 101,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 27408,
+      "sampled_process_group": 27408,
+      "finished_utc": "2026-10-23T16:21:54.802903+00:00",
+      "elapsed_seconds": 0.8370122378692031,
+      "stdout": {
+        "path": "before-control.stdout",
+        "bytes": 819,
+        "sha256": "7e9ea38ff638220ff159e204c5a7bc550f5a48e0425dca6b0d582f6b33f57ff8"
+      },
+      "stderr": {
+        "path": "before-control.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "before-after-head",
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-before-20261023/lampOS",
+      "started_utc": "2026-10-23T16:21:54.845215+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 27420,
+      "sampled_process_group": 27420,
+      "finished_utc": "2026-10-23T16:21:54.891633+00:00",
+      "elapsed_seconds": 0.04649878619238734,
+      "stdout": {
+        "path": "before-after-head.stdout",
+        "bytes": 41,
+        "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259"
+      },
+      "stderr": {
+        "path": "before-after-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "after-before-head",
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-after-20261023/lampOS",
+      "started_utc": "2026-10-23T16:21:56.576664+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 27450,
+      "sampled_process_group": 27450,
+      "finished_utc": "2026-10-23T16:21:56.621469+00:00",
+      "elapsed_seconds": 0.04486183915287256,
+      "stdout": {
+        "path": "after-before-head.stdout",
+        "bytes": 41,
+        "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259"
+      },
+      "stderr": {
+        "path": "after-before-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "after-compile",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--offline",
+        "--locked",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-after-20261023/lampOS",
+      "started_utc": "2026-10-23T16:21:58.555004+00:00",
+      "timeout_seconds": 1200,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 27506,
+      "sampled_process_group": 27506,
+      "finished_utc": "2026-10-23T16:22:45.050142+00:00",
+      "elapsed_seconds": 46.49620784493163,
+      "stdout": {
+        "path": "after-compile.stdout",
+        "bytes": 182646,
+        "sha256": "6a1470d5965e98c0016395ec93aefda6c47a22eaef3c40662211853b7d398072"
+      },
+      "stderr": {
+        "path": "after-compile.stderr",
+        "bytes": 2630,
+        "sha256": "e017630e4dc25ecd08dbce624db25c2f0af2ec762610ed811ad7f5b55204bb86"
+      }
+    },
+    {
+      "name": "after-it-test-list",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-after-20261023/lampOS",
+      "started_utc": "2026-10-23T16:22:45.130915+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 32254,
+      "sampled_process_group": 32254,
+      "finished_utc": "2026-10-23T16:22:45.979306+00:00",
+      "elapsed_seconds": 0.8484826511703432,
+      "stdout": {
+        "path": "after-it-test-list.stdout",
+        "bytes": 23237,
+        "sha256": "3f5211f9e8338c2ad0de9332dcf2700a12298f967dc01c5e4c0928f4a3193301"
+      },
+      "stderr": {
+        "path": "after-it-test-list.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "after-it-test-ignored",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5",
+        "--list",
+        "--ignored",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-after-20261023/lampOS",
+      "started_utc": "2026-10-23T16:22:45.981766+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 32266,
+      "sampled_process_group": 32266,
+      "finished_utc": "2026-10-23T16:22:46.008690+00:00",
+      "elapsed_seconds": 0.026978127658367157,
+      "stdout": {
+        "path": "after-it-test-ignored.stdout",
+        "bytes": 35,
+        "sha256": "163d33ee43b30a5a7645433ba3a13e9da5256f58bd03c729b798fc95ae23396c"
+      },
+      "stderr": {
+        "path": "after-it-test-ignored.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "after-architecture",
+      "command": [
+        "lipo",
+        "-archs",
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-after-20261023/lampOS",
+      "started_utc": "2026-10-23T16:22:46.010832+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 32267,
+      "sampled_process_group": 32267,
+      "finished_utc": "2026-10-23T16:22:46.038458+00:00",
+      "elapsed_seconds": 0.027667235117405653,
+      "stdout": {
+        "path": "after-architecture.stdout",
+        "bytes": 7,
+        "sha256": "aaf631698ae5160ceb04a97681a14887fdcab47cd6e0f163c87485b3b1340b62"
+      },
+      "stderr": {
+        "path": "after-architecture.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "after-file",
+      "command": [
+        "file",
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-after-20261023/lampOS",
+      "started_utc": "2026-10-23T16:22:46.040251+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 32268,
+      "sampled_process_group": 32268,
+      "finished_utc": "2026-10-23T16:22:46.057671+00:00",
+      "elapsed_seconds": 0.017464034259319305,
+      "stdout": {
+        "path": "after-file.stdout",
+        "bytes": 101,
+        "sha256": "4157fbbf6b324f57b9920d52907e0e4e5335bf71ee1e863d0c1d18550bc9e469"
+      },
+      "stderr": {
+        "path": "after-file.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "after-frozen-head",
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-after-20261023/lampOS",
+      "started_utc": "2026-10-23T16:22:46.059589+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 32270,
+      "sampled_process_group": 32270,
+      "finished_utc": "2026-10-23T16:22:46.105812+00:00",
+      "elapsed_seconds": 0.04627165477722883,
+      "stdout": {
+        "path": "after-frozen-head.stdout",
+        "bytes": 41,
+        "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259"
+      },
+      "stderr": {
+        "path": "after-frozen-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "after-control",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5",
+        "package::a_peer_refused_before_its_request_is_written_still_leaves_the_skill_in_place",
+        "--exact",
+        "--show-output"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-after-20261023/lampOS",
+      "started_utc": "2026-10-23T16:22:47.818082+00:00",
+      "timeout_seconds": 45,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 32343,
+      "sampled_process_group": 32343,
+      "finished_utc": "2026-10-23T16:22:48.436643+00:00",
+      "elapsed_seconds": 0.6186237558722496,
+      "stdout": {
+        "path": "after-control.stdout",
+        "bytes": 894,
+        "sha256": "156daf25b3bfcb88e7fd6147db4e21424ccd80c4503a6d12a9e21d54bc9e3e95"
+      },
+      "stderr": {
+        "path": "after-control.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "after-after-head",
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-refusal-after-20261023/lampOS",
+      "started_utc": "2026-10-23T16:22:48.476888+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 32353,
+      "sampled_process_group": 32353,
+      "finished_utc": "2026-10-23T16:22:48.528408+00:00",
+      "elapsed_seconds": 0.05160277709364891,
+      "stdout": {
+        "path": "after-after-head.stdout",
+        "bytes": 41,
+        "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259"
+      },
+      "stderr": {
+        "path": "after-after-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "candidate-before-head",
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:22:50.226525+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 32387,
+      "sampled_process_group": 32387,
+      "finished_utc": "2026-10-23T16:22:50.275436+00:00",
+      "elapsed_seconds": 0.04896533116698265,
+      "stdout": {
+        "path": "candidate-before-head.stdout",
+        "bytes": 41,
+        "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259"
+      },
+      "stderr": {
+        "path": "candidate-before-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "candidate-compile",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--offline",
+        "--locked",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:22:52.397870+00:00",
+      "timeout_seconds": 1200,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 33086,
+      "sampled_process_group": 33086,
+      "finished_utc": "2026-10-23T16:23:41.232431+00:00",
+      "elapsed_seconds": 48.83569038612768,
+      "stdout": {
+        "path": "candidate-compile.stdout",
+        "bytes": 185892,
+        "sha256": "b073f423f92f441d073952266710b56efcfc0bffd58eccbda43881543b0eb523"
+      },
+      "stderr": {
+        "path": "candidate-compile.stderr",
+        "bytes": 2630,
+        "sha256": "3347cc8d4032568d2b00abd71eccfbea26f7c9c583fc2d06cd0d7682681701df"
+      }
+    },
+    {
+      "name": "candidate-requested_audio-test-list",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/requested_audio-019db324b83a9807",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:23:41.261795+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 34480,
+      "sampled_process_group": 34480,
+      "finished_utc": "2026-10-23T16:23:41.992378+00:00",
+      "elapsed_seconds": 0.7306748209521174,
+      "stdout": {
+        "path": "candidate-requested_audio-test-list.stdout",
+        "bytes": 2099,
+        "sha256": "776d471b3008d3d5429b0a7c738dfff7d036ab9972b872199d16b1c870f378fa"
+      },
+      "stderr": {
+        "path": "candidate-requested_audio-test-list.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "candidate-requested_audio-test-ignored",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/requested_audio-019db324b83a9807",
+        "--list",
+        "--ignored",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:23:41.994947+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 34504,
+      "sampled_process_group": 34504,
+      "finished_utc": "2026-10-23T16:23:42.016038+00:00",
+      "elapsed_seconds": 0.02113886410370469,
+      "stdout": {
+        "path": "candidate-requested_audio-test-ignored.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "candidate-requested_audio-test-ignored.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "candidate-lamp-skills-bin-list",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-a718b2a0214b6903",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:23:42.044226+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 34505,
+      "sampled_process_group": 34505,
+      "finished_utc": "2026-10-23T16:23:42.783146+00:00",
+      "elapsed_seconds": 0.7389930970966816,
+      "stdout": {
+        "path": "candidate-lamp-skills-bin-list.stdout",
+        "bytes": 1406,
+        "sha256": "068898e2448ab71f7375db9a79d2cffab7b5ea923d6b27776e4ffb5670d3f45b"
+      },
+      "stderr": {
+        "path": "candidate-lamp-skills-bin-list.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "candidate-lamp-skills-bin-ignored",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-a718b2a0214b6903",
+        "--list",
+        "--ignored",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:23:42.784832+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 34530,
+      "sampled_process_group": 34530,
+      "finished_utc": "2026-10-23T16:23:42.812009+00:00",
+      "elapsed_seconds": 0.027236673049628735,
+      "stdout": {
+        "path": "candidate-lamp-skills-bin-ignored.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "candidate-lamp-skills-bin-ignored.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "candidate-lamp_skills-lib-list",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-c6f44302f3b2c78f",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:23:42.882387+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 34532,
+      "sampled_process_group": 34532,
+      "finished_utc": "2026-10-23T16:23:43.609119+00:00",
+      "elapsed_seconds": 0.7268258132971823,
+      "stdout": {
+        "path": "candidate-lamp_skills-lib-list.stdout",
+        "bytes": 12253,
+        "sha256": "42ec6d2276d6dca2b3df1444b38a68a1787d0171a08a4d867f3df284b550a10e"
+      },
+      "stderr": {
+        "path": "candidate-lamp_skills-lib-list.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "candidate-lamp_skills-lib-ignored",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-c6f44302f3b2c78f",
+        "--list",
+        "--ignored",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:23:43.611735+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 34533,
+      "sampled_process_group": 34533,
+      "finished_utc": "2026-10-23T16:23:43.634774+00:00",
+      "elapsed_seconds": 0.023087823763489723,
+      "stdout": {
+        "path": "candidate-lamp_skills-lib-ignored.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "candidate-lamp_skills-lib-ignored.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "candidate-it-test-list",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:23:43.675360+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 34534,
+      "sampled_process_group": 34534,
+      "finished_utc": "2026-10-23T16:23:44.470742+00:00",
+      "elapsed_seconds": 0.7954597962088883,
+      "stdout": {
+        "path": "candidate-it-test-list.stdout",
+        "bytes": 23237,
+        "sha256": "3f5211f9e8338c2ad0de9332dcf2700a12298f967dc01c5e4c0928f4a3193301"
+      },
+      "stderr": {
+        "path": "candidate-it-test-list.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "candidate-it-test-ignored",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5",
+        "--list",
+        "--ignored",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:23:44.472605+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 34555,
+      "sampled_process_group": 34555,
+      "finished_utc": "2026-10-23T16:23:44.499148+00:00",
+      "elapsed_seconds": 0.026591161265969276,
+      "stdout": {
+        "path": "candidate-it-test-ignored.stdout",
+        "bytes": 35,
+        "sha256": "163d33ee43b30a5a7645433ba3a13e9da5256f58bd03c729b798fc95ae23396c"
+      },
+      "stderr": {
+        "path": "candidate-it-test-ignored.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "candidate-architecture",
+      "command": [
+        "lipo",
+        "-archs",
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:23:44.501017+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 34556,
+      "sampled_process_group": 34556,
+      "finished_utc": "2026-10-23T16:23:44.528868+00:00",
+      "elapsed_seconds": 0.027892182115465403,
+      "stdout": {
+        "path": "candidate-architecture.stdout",
+        "bytes": 7,
+        "sha256": "aaf631698ae5160ceb04a97681a14887fdcab47cd6e0f163c87485b3b1340b62"
+      },
+      "stderr": {
+        "path": "candidate-architecture.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "candidate-file",
+      "command": [
+        "file",
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:23:44.530350+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 34557,
+      "sampled_process_group": 34557,
+      "finished_utc": "2026-10-23T16:23:44.544107+00:00",
+      "elapsed_seconds": 0.01379322400316596,
+      "stdout": {
+        "path": "candidate-file.stdout",
+        "bytes": 101,
+        "sha256": "4157fbbf6b324f57b9920d52907e0e4e5335bf71ee1e863d0c1d18550bc9e469"
+      },
+      "stderr": {
+        "path": "candidate-file.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "candidate-frozen-head",
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:23:44.546136+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 34558,
+      "sampled_process_group": 34558,
+      "finished_utc": "2026-10-23T16:23:44.578261+00:00",
+      "elapsed_seconds": 0.032165495213121176,
+      "stdout": {
+        "path": "candidate-frozen-head.stdout",
+        "bytes": 41,
+        "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259"
+      },
+      "stderr": {
+        "path": "candidate-frozen-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "focused",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5",
+        "package::",
+        "--show-output"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:23:46.277007+00:00",
+      "timeout_seconds": 240,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 34593,
+      "sampled_process_group": 34593,
+      "finished_utc": "2026-10-23T16:23:47.400049+00:00",
+      "elapsed_seconds": 1.1231226781383157,
+      "stdout": {
+        "path": "focused.stdout",
+        "bytes": 4910,
+        "sha256": "89672b4e8c65efee37beda80fb5a1ad18e135e4d9817106570ab453983d12edb"
+      },
+      "stderr": {
+        "path": "focused.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:23:47.405653+00:00",
+      "timeout_seconds": 120,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 34690,
+      "sampled_process_group": 34690,
+      "finished_utc": "2026-10-23T16:23:59.308207+00:00",
+      "elapsed_seconds": 11.902859612833709,
+      "stdout": {
+        "path": "fmt.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "fmt.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--offline",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:23:59.310087+00:00",
+      "timeout_seconds": 900,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 35599,
+      "sampled_process_group": 35599,
+      "finished_utc": "2026-10-23T16:24:38.201302+00:00",
+      "elapsed_seconds": 38.89211442600936,
+      "stdout": {
+        "path": "clippy.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "clippy.stderr",
+        "bytes": 2712,
+        "sha256": "7dd3260e152c50ce62cd99be17677b79eaf65c64cf06d1122bfcc078d3327ec2"
+      }
+    },
+    {
+      "name": "full",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--offline",
+        "--locked",
+        "--no-fail-fast"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:24:38.204232+00:00",
+      "timeout_seconds": 900,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 37783,
+      "sampled_process_group": 37783,
+      "finished_utc": "2026-10-23T16:25:42.985398+00:00",
+      "elapsed_seconds": 64.78262555086985,
+      "stdout": {
+        "path": "full.stdout",
+        "bytes": 42680,
+        "sha256": "3e203e1e22cf89cb62b6f84533e4e0e91233c393f57f1427e768bf92d909e26d"
+      },
+      "stderr": {
+        "path": "full.stderr",
+        "bytes": 50398,
+        "sha256": "a704b905265dd32f929f47f64ebfaff0693a88e582b82009ea143f38c82904ad"
+      }
+    },
+    {
+      "name": "build",
+      "command": [
+        "cargo",
+        "build",
+        "--workspace",
+        "--offline",
+        "--locked"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:25:42.992016+00:00",
+      "timeout_seconds": 900,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 42394,
+      "sampled_process_group": 42394,
+      "finished_utc": "2026-10-23T16:26:43.603594+00:00",
+      "elapsed_seconds": 60.61294495919719,
+      "stdout": {
+        "path": "build.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "build.stderr",
+        "bytes": 5281,
+        "sha256": "f4b62e29dd8afb4069757e8507d5ab9180a08b0fe3c73958c11fc9aa4817fe5c"
+      }
+    },
+    {
+      "name": "final-diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:26:43.622953+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 45689,
+      "sampled_process_group": 45689,
+      "finished_utc": "2026-10-23T16:26:47.854821+00:00",
+      "elapsed_seconds": 4.2320220451802015,
+      "stdout": {
+        "path": "final-diff-check.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "final-diff-check.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "candidate-source-after-head",
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/tmp/tests-codex-skills-early-refusal-20261023/lampOS",
+      "started_utc": "2026-10-23T16:26:47.860630+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 45775,
+      "sampled_process_group": 45775,
+      "finished_utc": "2026-10-23T16:26:47.912459+00:00",
+      "elapsed_seconds": 0.05189157323911786,
+      "stdout": {
+        "path": "candidate-source-after-head.stdout",
+        "bytes": 41,
+        "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259"
+      },
+      "stderr": {
+        "path": "candidate-source-after-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "linux": [
+    {
+      "name": "source-identity",
+      "command": [
+        "git",
+        "show",
+        "-s",
+        "--format=%H%n%T%n%P",
+        "1806a691d9dc8f93c61c116793f9c68230448c17"
+      ],
+      "cwd": "<shared-repository>",
+      "started_utc": "2026-10-23T16:28:19.290257+00:00",
+      "finished_utc": "2026-10-23T16:28:19.320348+00:00",
+      "elapsed_seconds": 0.03011302836239338,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 60,
+      "stdout_bytes": 123,
+      "stderr_bytes": 0,
+      "stdout_sha256": "07c49b0510cfd40c3bdabdbf66c8e720732702108ad32e8ca0b3c4a37bb3cf4a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "workspace-tree",
+      "command": [
+        "git",
+        "rev-parse",
+        "1806a691d9dc8f93c61c116793f9c68230448c17:lampOS"
+      ],
+      "cwd": "<shared-repository>",
+      "started_utc": "2026-10-23T16:28:19.320669+00:00",
+      "finished_utc": "2026-10-23T16:28:19.347238+00:00",
+      "elapsed_seconds": 0.02659196173772216,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 60,
+      "stdout_bytes": 41,
+      "stderr_bytes": 0,
+      "stdout_sha256": "707b30357c9b8ec654217e858a15ff3c8dfa2bca6a988a1d16f1cbdb4cd2948b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "image-inspect",
+      "command": [
+        "podman",
+        "image",
+        "inspect",
+        "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c"
+      ],
+      "cwd": null,
+      "started_utc": "2026-10-23T16:28:19.347553+00:00",
+      "finished_utc": "2026-10-23T16:28:19.621594+00:00",
+      "elapsed_seconds": 0.2740709176287055,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 60,
+      "stdout_bytes": 7701,
+      "stderr_bytes": 0,
+      "stdout_sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "archive",
+      "command": [
+        "git",
+        "archive",
+        "--format=tar",
+        "--output=/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/source-lampOS.tar",
+        "1806a691d9dc8f93c61c116793f9c68230448c17",
+        "lampOS"
+      ],
+      "cwd": "<shared-repository>",
+      "started_utc": "2026-10-23T16:28:19.622076+00:00",
+      "finished_utc": "2026-10-23T16:28:20.635803+00:00",
+      "elapsed_seconds": 1.0137901538982987,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 600,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "archive-commit",
+      "command": [
+        "git",
+        "get-tar-commit-id"
+      ],
+      "cwd": null,
+      "started_utc": "2026-10-23T16:28:20.636261+00:00",
+      "finished_utc": "2026-10-23T16:28:20.658345+00:00",
+      "elapsed_seconds": 0.022107913624495268,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 60,
+      "stdout_bytes": 41,
+      "stderr_bytes": 0,
+      "stdout_sha256": "25c74847aa7fe17d3ea75b67d5eac7e0cbe06b6fa19a4d32136222121b7c2b8e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "format",
+      "command": [
+        "podman",
+        "run",
+        "--rm",
+        "--pull=never",
+        "--network=none",
+        "--read-only",
+        "--tmpfs",
+        "/tmp:rw,size=1g,mode=1777",
+        "--workdir",
+        "/tmp",
+        "--env",
+        "CARGO_NET_OFFLINE=true",
+        "--env",
+        "CARGO_TARGET_DIR=/tmp/format-target",
+        "--entrypoint",
+        "/bin/sh",
+        "--name",
+        "tests-skills-1806a691d-fmt-50506",
+        "-i",
+        "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+        "-ec",
+        "set -eu\nuname -a\ncargo --version\nrustfmt --version\nrustc -vV\nrustc -vV | grep -Fx 'host: x86_64-unknown-linux-gnu'\ncargo --version | grep -F 'cargo 1.96.0 '\nrustfmt --version | grep -F 'rustfmt 1.9.0-stable '\nmkdir /tmp/source\ntar -xf - -C /tmp/source\ncd /tmp/source\nsource_fingerprint() {\n  find lampOS -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum\n  find lampOS -type l -printf '%p -> %l\\n' | LC_ALL=C sort\n}\nsource_fingerprint > /tmp/source-before.sha256\nprintf 'source-before-manifest '\nsha256sum /tmp/source-before.sha256\ncd lampOS\nset +e\ncargo fmt --all --check\nformat_status=$?\nset -e\ncd ..\nsource_fingerprint > /tmp/source-after.sha256\nprintf 'source-after-manifest '\nsha256sum /tmp/source-after.sha256\nif ! cmp -s /tmp/source-before.sha256 /tmp/source-after.sha256; then\n  diff -u /tmp/source-before.sha256 /tmp/source-after.sha256 >&2 || true\n  printf 'source changed during formatting check\\n' >&2\n  exit 125\nfi\nprintf 'cargo_fmt_exit=%s\\n' \"$format_status\"\nexit \"$format_status\"\n"
+      ],
+      "cwd": null,
+      "started_utc": "2026-10-23T16:28:21.418035+00:00",
+      "finished_utc": "2026-10-23T16:28:35.941709+00:00",
+      "elapsed_seconds": 14.524014183785766,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 300,
+      "stdout_bytes": 746,
+      "stderr_bytes": 0,
+      "stdout_sha256": "3138ce658ee6c0cec5bf10e8d30d536a5ba113d3bd52cf70ba4bee73a1a8ecf7",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "final-source-identity",
+      "command": [
+        "git",
+        "show",
+        "-s",
+        "--format=%H%n%T%n%P",
+        "1806a691d9dc8f93c61c116793f9c68230448c17"
+      ],
+      "cwd": "<shared-repository>",
+      "started_utc": "2026-10-23T16:28:35.942233+00:00",
+      "finished_utc": "2026-10-23T16:28:35.974664+00:00",
+      "elapsed_seconds": 0.032454018015414476,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 60,
+      "stdout_bytes": 123,
+      "stderr_bytes": 0,
+      "stdout_sha256": "07c49b0510cfd40c3bdabdbf66c8e720732702108ad32e8ca0b3c4a37bb3cf4a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "projection": "Linux repository cwd is replaced with <shared-repository>. Native inherited PATH was never published. Full original command records remain external and hash-bound in external-raw-index.json."
+}

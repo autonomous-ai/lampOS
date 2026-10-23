@@ -1,0 +1,19 @@
+{
+  "all_raw_manifest_hashes_verified": true,
+  "all_native_streams_lossless_utf8": true,
+  "linux_hostname_projection_explicit": true,
+  "full_census_and_ignored_names_exact": true,
+  "compiled_targets": 4,
+  "compiled_cases": 514,
+  "full_terminal_counts": {
+    "passed": 513,
+    "failed": 0,
+    "ignored": 1,
+    "filtered": 0
+  },
+  "source_restoration_and_owned_cleanup": true,
+  "json_parsed": true,
+  "local_readme_links_valid": true,
+  "default_whitespace_checks_passed": true,
+  "raw_cargo_json_scripts_binaries_source_exports_excluded": true
+}

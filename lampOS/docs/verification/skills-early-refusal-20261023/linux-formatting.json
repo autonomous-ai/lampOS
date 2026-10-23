@@ -1,0 +1,149 @@
+{
+  "result": {
+    "source_kind": "exact_git_commit",
+    "source": "1806a691d9dc8f93c61c116793f9c68230448c17",
+    "candidate_commit": "1806a691d9dc8f93c61c116793f9c68230448c17",
+    "declared_overlays": [],
+    "format_container_exit": 0,
+    "timed_out": false,
+    "container_elapsed_seconds": 14.524014183785766,
+    "timing_boundary": "Entire container command including setup, extraction, rustfmt and source hashing.",
+    "formatting_success": true,
+    "source_archive_unchanged": true,
+    "git_identity_unchanged": true,
+    "snapshots_unchanged": true,
+    "compilation": false,
+    "tests": false,
+    "ARM_build": false,
+    "source_edits": false,
+    "evidence_directory": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z"
+  },
+  "source": {
+    "label": "skills-1806a691d",
+    "kind": "exact_git_commit",
+    "pr": null,
+    "source": {
+      "commit": "1806a691d9dc8f93c61c116793f9c68230448c17",
+      "root_tree": "ea6582efaa91c4495f8236c456cabcce11fe7bbc",
+      "parents": [
+        "be16c3327524ccef8a1908a3b8ebf40c16efba8a"
+      ],
+      "workspace_tree": "ee6e65d88c8b9cd4b5715a7a7e5c528860569a4e"
+    },
+    "expected_parent": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+    "overlays": [],
+    "image": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+    "status": "One authorized exact-head source-only Linux formatting run, no network pulls/build/tests/target access; archive600s/container300s.",
+    "base_archive_sha256": "0a7b2d1bfa4b07c46b3a671359b3befa5bbe793720f5bfe3769b195b6656320c",
+    "archive_file": "source-lampOS.tar",
+    "archive_bytes": 212172800,
+    "archive_sha256": "0a7b2d1bfa4b07c46b3a671359b3befa5bbe793720f5bfe3769b195b6656320c",
+    "input_scope": "All tracked lampOS files; exact Git commit or declared frozen two-file overlay only.",
+    "overlay_all_lampOS_bytes_and_modes_verified": false,
+    "runner_sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40"
+  },
+  "raw_streams": {
+    "archive-commit.stderr": {
+      "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/archive-commit.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "encoding": "UTF-8",
+      "text": ""
+    },
+    "archive-commit.stdout": {
+      "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/archive-commit.stdout",
+      "bytes": 41,
+      "sha256": "25c74847aa7fe17d3ea75b67d5eac7e0cbe06b6fa19a4d32136222121b7c2b8e",
+      "encoding": "UTF-8",
+      "text": "1806a691d9dc8f93c61c116793f9c68230448c17\n"
+    },
+    "archive.stderr": {
+      "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/archive.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "encoding": "UTF-8",
+      "text": ""
+    },
+    "archive.stdout": {
+      "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/archive.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "encoding": "UTF-8",
+      "text": ""
+    },
+    "final-source-identity.stderr": {
+      "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/final-source-identity.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "encoding": "UTF-8",
+      "text": ""
+    },
+    "final-source-identity.stdout": {
+      "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/final-source-identity.stdout",
+      "bytes": 123,
+      "sha256": "07c49b0510cfd40c3bdabdbf66c8e720732702108ad32e8ca0b3c4a37bb3cf4a",
+      "encoding": "UTF-8",
+      "text": "1806a691d9dc8f93c61c116793f9c68230448c17\nea6582efaa91c4495f8236c456cabcce11fe7bbc\nbe16c3327524ccef8a1908a3b8ebf40c16efba8a\n"
+    },
+    "format.stderr": {
+      "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/format.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "encoding": "UTF-8",
+      "text": ""
+    },
+    "image-inspect.stderr": {
+      "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/image-inspect.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "encoding": "UTF-8",
+      "text": ""
+    },
+    "source-identity.stderr": {
+      "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/source-identity.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "encoding": "UTF-8",
+      "text": ""
+    },
+    "source-identity.stdout": {
+      "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/source-identity.stdout",
+      "bytes": 123,
+      "sha256": "07c49b0510cfd40c3bdabdbf66c8e720732702108ad32e8ca0b3c4a37bb3cf4a",
+      "encoding": "UTF-8",
+      "text": "1806a691d9dc8f93c61c116793f9c68230448c17\nea6582efaa91c4495f8236c456cabcce11fe7bbc\nbe16c3327524ccef8a1908a3b8ebf40c16efba8a\n"
+    },
+    "workspace-tree.stderr": {
+      "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/workspace-tree.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "encoding": "UTF-8",
+      "text": ""
+    },
+    "workspace-tree.stdout": {
+      "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/workspace-tree.stdout",
+      "bytes": 41,
+      "sha256": "707b30357c9b8ec654217e858a15ff3c8dfa2bca6a988a1d16f1cbdb4cd2948b",
+      "encoding": "UTF-8",
+      "text": "ee6e65d88c8b9cd4b5715a7a7e5c528860569a4e\n"
+    },
+    "format.stdout": {
+      "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/format.stdout",
+      "bytes": 746,
+      "sha256": "3138ce658ee6c0cec5bf10e8d30d536a5ba113d3bd52cf70ba4bee73a1a8ecf7",
+      "encoding": "UTF-8",
+      "text": "Linux <container-host> 6.12.13-200.fc41.x86_64 #1 SMP PREEMPT_DYNAMIC Sat Feb  8 20:05:26 UTC 2025 x86_64 GNU/Linux\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nrustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.96.0\nLLVM version: 22.1.2\nhost: x86_64-unknown-linux-gnu\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nsource-before-manifest 4b8148a33f8b4063c4b23ddc79f5580212336c5c97dde8678a032c065bd41169  /tmp/source-before.sha256\nsource-after-manifest 4b8148a33f8b4063c4b23ddc79f5580212336c5c97dde8678a032c065bd41169  /tmp/source-after.sha256\ncargo_fmt_exit=0\n",
+      "published_text_is_projection": true,
+      "redactions": [
+        {
+          "original_byte_offset": 6,
+          "original_bytes": 12,
+          "replacement": "<container-host>",
+          "reason": "Ephemeral container hostname omitted; exact original stream remains external."
+        }
+      ]
+    }
+  },
+  "image_inspect": "Raw image metadata remains external; the runner checked exact image ID, Linux/amd64 and rootless user1000:1000.",
+  "artifact_or_target_access": false
+}

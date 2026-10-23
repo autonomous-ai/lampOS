@@ -1,0 +1,788 @@
+[
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-after-head.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-after-head.stdout",
+    "bytes": 41,
+    "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-after.json",
+    "bytes": 206,
+    "sha256": "9352e02af396b033bf6e790e03b1579ed7302a64e20fa27f441ac535a570a85c",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-architecture.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-architecture.stdout",
+    "bytes": 7,
+    "sha256": "aaf631698ae5160ceb04a97681a14887fdcab47cd6e0f163c87485b3b1340b62",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-artifacts.json",
+    "bytes": 26762,
+    "sha256": "697aaafdba757d13ba52c1b06d4c3dfd5de2161e6ade4b81093867a5b246a01c",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-before-head.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-before-head.stdout",
+    "bytes": 41,
+    "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-before.json",
+    "bytes": 206,
+    "sha256": "9352e02af396b033bf6e790e03b1579ed7302a64e20fa27f441ac535a570a85c",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-child-cleanup.json",
+    "bytes": 161,
+    "sha256": "2c55e45a2535d97b3b042aaf863132fabc8cc3b2c652298a420e114dc05b187c",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-compile.stderr",
+    "bytes": 2630,
+    "sha256": "e017630e4dc25ecd08dbce624db25c2f0af2ec762610ed811ad7f5b55204bb86",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-compile.stdout",
+    "bytes": 182646,
+    "sha256": "6a1470d5965e98c0016395ec93aefda6c47a22eaef3c40662211853b7d398072",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-control-outcome.json",
+    "bytes": 624,
+    "sha256": "0d74813cbd22e639bfbbff6c4d0d5621a2c62b8ad097a203415aa209ff42f113",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-control.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-control.stdout",
+    "bytes": 894,
+    "sha256": "156daf25b3bfcb88e7fd6147db4e21424ccd80c4503a6d12a9e21d54bc9e3e95",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-execution-freeze.json",
+    "bytes": 569,
+    "sha256": "21a30b6e339bc0ddffa4ecd96e7c5f64a17344fcfc4be06be1dd0637836a11c0",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-file.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-file.stdout",
+    "bytes": 101,
+    "sha256": "4157fbbf6b324f57b9920d52907e0e4e5335bf71ee1e863d0c1d18550bc9e469",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-freshness.json",
+    "bytes": 209,
+    "sha256": "d6f3acfc111ef3aa19cc96890ce6c29bbf3f09384e455d6287ad1b1b4221faea",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-frozen-head.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-frozen-head.stdout",
+    "bytes": 41,
+    "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-frozen.json",
+    "bytes": 206,
+    "sha256": "9352e02af396b033bf6e790e03b1579ed7302a64e20fa27f441ac535a570a85c",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-it-test-ignored.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-it-test-ignored.stdout",
+    "bytes": 35,
+    "sha256": "163d33ee43b30a5a7645433ba3a13e9da5256f58bd03c729b798fc95ae23396c",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-it-test-list.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/after-it-test-list.stdout",
+    "bytes": 23237,
+    "sha256": "3f5211f9e8338c2ad0de9332dcf2700a12298f967dc01c5e4c0928f4a3193301",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-after-head.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-after-head.stdout",
+    "bytes": 41,
+    "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-after.json",
+    "bytes": 206,
+    "sha256": "b9fb90aaba45cbaab019c97c0fd449df8bac71674e499ddaacb452c1819339bd",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-architecture.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-architecture.stdout",
+    "bytes": 7,
+    "sha256": "aaf631698ae5160ceb04a97681a14887fdcab47cd6e0f163c87485b3b1340b62",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-artifacts.json",
+    "bytes": 26673,
+    "sha256": "9088300a3ea69395a2d950509ad139932e90588ad0c5a43322de2f3554654bd3",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-before-head.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-before-head.stdout",
+    "bytes": 41,
+    "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-before.json",
+    "bytes": 206,
+    "sha256": "b9fb90aaba45cbaab019c97c0fd449df8bac71674e499ddaacb452c1819339bd",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-child-cleanup.json",
+    "bytes": 161,
+    "sha256": "4133947f86ef57aad2dc1c831427104b8750c5bd9b198c9846495963b944b8d2",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-compile.stderr",
+    "bytes": 2736,
+    "sha256": "8392496dca2dcf854fff4906cca244fd222d7f4d725cbb3112252ebca7831ba2",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-compile.stdout",
+    "bytes": 182728,
+    "sha256": "ead034d52ecc6059510fbbc9c2e4c34b37a5dabf5bc8131dc1a81604c85a2de7",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-control-outcome.json",
+    "bytes": 623,
+    "sha256": "587eb0e9e83d6939721141a2f9058a36a46f1ebf433642066e9d7ded4b7e5c14",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-control.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-control.stdout",
+    "bytes": 819,
+    "sha256": "7e9ea38ff638220ff159e204c5a7bc550f5a48e0425dca6b0d582f6b33f57ff8",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-execution-freeze.json",
+    "bytes": 541,
+    "sha256": "ffa0aebf915a05685527414dd3fd5edf51e9cec10a5422262f0decf1f64f70a6",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-file.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-file.stdout",
+    "bytes": 101,
+    "sha256": "4157fbbf6b324f57b9920d52907e0e4e5335bf71ee1e863d0c1d18550bc9e469",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-freshness.json",
+    "bytes": 209,
+    "sha256": "b699253cc373c7dde1eabe41824c3b85451fb7d6766056b56f481a3a286f7cf9",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-frozen-head.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-frozen-head.stdout",
+    "bytes": 41,
+    "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-frozen.json",
+    "bytes": 206,
+    "sha256": "b9fb90aaba45cbaab019c97c0fd449df8bac71674e499ddaacb452c1819339bd",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-it-test-ignored.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-it-test-ignored.stdout",
+    "bytes": 35,
+    "sha256": "163d33ee43b30a5a7645433ba3a13e9da5256f58bd03c729b798fc95ae23396c",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-it-test-list.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/before-it-test-list.stdout",
+    "bytes": 23145,
+    "sha256": "860349c8ce330105ef4d0aa0068a368fb2cbba8e88c1933da1bb5853ae68a292",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/build.stderr",
+    "bytes": 5281,
+    "sha256": "f4b62e29dd8afb4069757e8507d5ab9180a08b0fe3c73958c11fc9aa4817fe5c",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/build.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-architecture.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-architecture.stdout",
+    "bytes": 7,
+    "sha256": "aaf631698ae5160ceb04a97681a14887fdcab47cd6e0f163c87485b3b1340b62",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-artifacts.json",
+    "bytes": 48559,
+    "sha256": "36f4f8716a6e87718277b7380c15e87fb1e1869b9aa29f83d45ad82a52296891",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-before-head.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-before-head.stdout",
+    "bytes": 41,
+    "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-before.json",
+    "bytes": 206,
+    "sha256": "259994df39596f9683b1498e9b3d4a77c94412fa0c0d0c5425460a4a8514f441",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-compile.stderr",
+    "bytes": 2630,
+    "sha256": "3347cc8d4032568d2b00abd71eccfbea26f7c9c583fc2d06cd0d7682681701df",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-compile.stdout",
+    "bytes": 185892,
+    "sha256": "b073f423f92f441d073952266710b56efcfc0bffd58eccbda43881543b0eb523",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-file.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-file.stdout",
+    "bytes": 101,
+    "sha256": "4157fbbf6b324f57b9920d52907e0e4e5335bf71ee1e863d0c1d18550bc9e469",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-freshness.json",
+    "bytes": 209,
+    "sha256": "cf2b4e17355d67bf3127279fa585345fa3ff1455671dfcaed7cf2f32cc58974d",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-frozen-head.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-frozen-head.stdout",
+    "bytes": 41,
+    "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-frozen.json",
+    "bytes": 206,
+    "sha256": "259994df39596f9683b1498e9b3d4a77c94412fa0c0d0c5425460a4a8514f441",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-it-test-ignored.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-it-test-ignored.stdout",
+    "bytes": 35,
+    "sha256": "163d33ee43b30a5a7645433ba3a13e9da5256f58bd03c729b798fc95ae23396c",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-it-test-list.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-it-test-list.stdout",
+    "bytes": 23237,
+    "sha256": "3f5211f9e8338c2ad0de9332dcf2700a12298f967dc01c5e4c0928f4a3193301",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-lamp-skills-bin-ignored.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-lamp-skills-bin-ignored.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-lamp-skills-bin-list.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-lamp-skills-bin-list.stdout",
+    "bytes": 1406,
+    "sha256": "068898e2448ab71f7375db9a79d2cffab7b5ea923d6b27776e4ffb5670d3f45b",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-lamp_skills-lib-ignored.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-lamp_skills-lib-ignored.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-lamp_skills-lib-list.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-lamp_skills-lib-list.stdout",
+    "bytes": 12253,
+    "sha256": "42ec6d2276d6dca2b3df1444b38a68a1787d0171a08a4d867f3df284b550a10e",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-requested_audio-test-ignored.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-requested_audio-test-ignored.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-requested_audio-test-list.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-requested_audio-test-list.stdout",
+    "bytes": 2099,
+    "sha256": "776d471b3008d3d5429b0a7c738dfff7d036ab9972b872199d16b1c870f378fa",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-source-after-head.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-source-after-head.stdout",
+    "bytes": 41,
+    "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-source-after.json",
+    "bytes": 206,
+    "sha256": "259994df39596f9683b1498e9b3d4a77c94412fa0c0d0c5425460a4a8514f441",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-source-before-head.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-source-before-head.stdout",
+    "bytes": 41,
+    "sha256": "437ed57126c67df6e277695b99c423e575210115e060f3fd71fe6650ec280259",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/candidate-source-before.json",
+    "bytes": 206,
+    "sha256": "259994df39596f9683b1498e9b3d4a77c94412fa0c0d0c5425460a4a8514f441",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/clippy.stderr",
+    "bytes": 2712,
+    "sha256": "7dd3260e152c50ce62cd99be17677b79eaf65c64cf06d1122bfcc078d3327ec2",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/clippy.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/commands.json",
+    "bytes": 39863,
+    "sha256": "6abbcecf5bae24b7b016aaea0e1303463812a638625a9e69f4fa8f8998dbd01b",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/disk.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/disk.stdout",
+    "bytes": 142,
+    "sha256": "145fabbeeeba11cdc87000c41102bb8495105a183f03b1e8cc06bac986169616",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/final-diff-check.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/final-diff-check.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/fmt.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/fmt.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/focused-execution-freeze.json",
+    "bytes": 2177,
+    "sha256": "62b1fdd2ee1fd2f99e30e701ab5d0d44f6f1fe77fcc225931636e35a9a776f75",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/focused-outcome.json",
+    "bytes": 3401,
+    "sha256": "4d310e7bf8a754898761dd74144c4393bea334f965ab716f4d9fff9396267e0d",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/focused.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/focused.stdout",
+    "bytes": 4910,
+    "sha256": "89672b4e8c65efee37beda80fb5a1ad18e135e4d9817106570ab453983d12edb",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/full-execution-freeze.json",
+    "bytes": 39817,
+    "sha256": "f9b0d7747b8d1f3a67d6be17a5436901714759ae59d90444fb943c2fdafe2536",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/full-outcome.json",
+    "bytes": 63712,
+    "sha256": "60113e38a1082abc488d356519f8358c973324c82645b17a0aefb67490f53b86",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/full.stderr",
+    "bytes": 50398,
+    "sha256": "a704b905265dd32f929f47f64ebfaff0693a88e582b82009ea143f38c82904ad",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/full.stdout",
+    "bytes": 42680,
+    "sha256": "3e203e1e22cf89cb62b6f84533e4e0e91233c393f57f1427e768bf92d909e26d",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/manifest.json",
+    "bytes": 15058,
+    "sha256": "f013402fd6a2287696a6a69a7a9e7b52ac7ddae1c62cbe46c9a17f0fd2dc4059",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/result.json",
+    "bytes": 117049,
+    "sha256": "7b16b6c732654a6bc9f738a7eb3f2f6c8e2ee88da71bd72714dc6f3765aeae6e",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/rustc.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/rustc.stdout",
+    "bytes": 191,
+    "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-early-refusal-20261023/run-20261023T162100.217331Z/socket-preflight.json",
+    "bytes": 176,
+    "sha256": "2e41134ef8cb2c8a51e5b8d37b1bfde3869d325a196ead7b7b9a4664ac6846c0",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/archive-commit.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/archive-commit.stdout",
+    "bytes": 41,
+    "sha256": "25c74847aa7fe17d3ea75b67d5eac7e0cbe06b6fa19a4d32136222121b7c2b8e",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/archive.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/archive.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/commands.json",
+    "bytes": 6225,
+    "sha256": "59f6e5cab5a46b1bb5d3b8d4b6d78cf03acf262968e70a7280265f66b9e7ab67",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/final-source-identity.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/final-source-identity.stdout",
+    "bytes": 123,
+    "sha256": "07c49b0510cfd40c3bdabdbf66c8e720732702108ad32e8ca0b3c4a37bb3cf4a",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/format.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/format.stdout",
+    "bytes": 746,
+    "sha256": "3138ce658ee6c0cec5bf10e8d30d536a5ba113d3bd52cf70ba4bee73a1a8ecf7",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/image-inspect.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/image-inspect.stdout",
+    "bytes": 7701,
+    "sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/manifest.json",
+    "bytes": 2340,
+    "sha256": "7fcbf8e384b556a2d60338c9d20b630e4a3bf0554b6092bd38b3a460fa14bb28",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/result.json",
+    "bytes": 728,
+    "sha256": "04672f921e3feb57d41986836804c84bfe2792e5cabccf906bd5ad17d09060db",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/source-identity.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/source-identity.stdout",
+    "bytes": 123,
+    "sha256": "07c49b0510cfd40c3bdabdbf66c8e720732702108ad32e8ca0b3c4a37bb3cf4a",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/source-lampOS.tar",
+    "bytes": 212172800,
+    "sha256": "0a7b2d1bfa4b07c46b3a671359b3befa5bbe793720f5bfe3769b195b6656320c",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/source.json",
+    "bytes": 1160,
+    "sha256": "69adfb5d64b2b77381251bd3aa7187aaf0c2f8d7df1bb6dfb33355257f0eacca",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/workspace-tree.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  },
+  {
+    "external_path": "/private/tmp/tests-skills-1806a691d-linux-fmt-20261023/run-20261023T162819.289380Z/workspace-tree.stdout",
+    "bytes": 41,
+    "sha256": "707b30357c9b8ec654217e858a15ff3c8dfa2bca6a988a1d16f1cbdb4cd2948b",
+    "availability": "Retained in the external task evidence directory; not an assurance of permanent external availability."
+  }
+]

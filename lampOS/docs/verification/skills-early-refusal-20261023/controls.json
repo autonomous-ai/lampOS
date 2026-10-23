@@ -1,0 +1,150 @@
+{
+  "before": {
+    "outcome": {
+      "actual_exit": 101,
+      "counts": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "filtered": 304
+      },
+      "rows": [
+        {
+          "name": "package::a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed",
+          "status": "FAILED"
+        }
+      ],
+      "summaries": [
+        {
+          "status": "FAILED",
+          "passed": 0,
+          "failed": 1,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 304,
+          "seconds": 0.78,
+          "raw": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 304 filtered out; finished in 0.78s"
+        }
+      ],
+      "missing": [],
+      "extra": [],
+      "valid": true,
+      "errors": []
+    },
+    "frozen_execution": {
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5",
+        "package::a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed",
+        "--exact",
+        "--show-output"
+      ],
+      "artifact_sha256": "501d554b4da52e5561c5667d57b0eaf35c6e3785642cd8e0f60acad89f9181aa",
+      "selected_names": [
+        "package::a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed"
+      ],
+      "source_sha256": "1f16ab673335359c4bb3c468bad0d208d594cf053c5b8d24198c5c4f1e10772d",
+      "expected_exit": 101,
+      "watchdog_seconds": 45
+    },
+    "cleanup": {
+      "pid": 27409,
+      "positive_exit_marker": true,
+      "absent_after_control": true,
+      "no_signal_sent": true,
+      "pid_reuse_if_present_cannot_be_excluded": false
+    },
+    "source_before": {
+      "head": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+      "tracked_paths": 10055,
+      "all_bytes_modes_match": true,
+      "aggregate_sha256": "2a97d3d50d1279196b6f34b160b1a78315e89137e772ea2b508af36e180b4495"
+    },
+    "source_after": {
+      "head": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+      "tracked_paths": 10055,
+      "all_bytes_modes_match": true,
+      "aggregate_sha256": "2a97d3d50d1279196b6f34b160b1a78315e89137e772ea2b508af36e180b4495"
+    },
+    "patch": {
+      "external_path": "/private/tmp/tests-skills-early-refusal-20261023/controls/before/fixture.patch",
+      "bytes": 1968,
+      "sha256": "cac0fdf0031b66e0dc88596031320445e8e07302d7dc41da2f4e6397a6db43a3",
+      "encoding": "UTF-8",
+      "text": "--- a/lampOS/crates/skills/tests/it/package.rs\n+++ b/lampOS/crates/skills/tests/it/package.rs\n@@ -978,6 +978,28 @@\n     ask_helper_as(skills, line, true, meanwhile)\n }\n \n+/// Reap the exact helper even if a fixture check or callback panics.\n+struct HelperChild(std::process::Child);\n+\n+impl Drop for HelperChild {\n+    fn drop(&mut self) {\n+        let _ = self.0.kill();\n+        let _ = self.0.wait();\n+    }\n+}\n+\n+fn wait_for_helper_exit(child: &mut std::process::Child) {\n+    use std::time::{Duration, Instant};\n+    let started = Instant::now();\n+    while child.try_wait().unwrap().is_none() {\n+        assert!(\n+            started.elapsed() < Duration::from_secs(20),\n+            \"the helper did not exit before the request write\"\n+        );\n+        std::thread::sleep(Duration::from_millis(10));\n+    }\n+}\n+\n /// [`ask_helper_while`], the peer let through by the helper's test switch\n /// (`package::ANY_ASKER`) only when `any_asker`.\n fn ask_helper_as(\n@@ -990,7 +1012,7 @@\n     use std::os::unix::net::UnixStream;\n     use std::process::{Command, Stdio};\n     let (mut ours, theirs) = UnixStream::pair().unwrap();\n-    let mut child = Command::new(env!(\"CARGO_BIN_EXE_lamp-skills\"))\n+    let child = Command::new(env!(\"CARGO_BIN_EXE_lamp-skills\"))\n         .args([\"asked\", \"--dir\"])\n         .env(package::ANY_ASKER, if any_asker { \"on\" } else { \"\" })\n         .arg(skills)\n@@ -1001,9 +1023,15 @@\n         .stderr(Stdio::piped())\n         .spawn()\n         .unwrap();\n+    let mut owner = HelperChild(child);\n+    let child = &mut owner.0;\n+    if !any_asker {\n+        wait_for_helper_exit(child);\n+        eprintln!(\"early-refusal: child={} exited={:?}\", child.id(), child.try_wait().unwrap());\n+    }\n     ours.write_all(line).unwrap();\n     ours.shutdown(std::net::Shutdown::Write).unwrap();\n-    meanwhile(&mut child);\n+    meanwhile(child);\n     let mut answer = String::new();\n     std::io::BufReader::new(&ours)\n         .read_line(&mut answer)\n"
+    }
+  },
+  "after": {
+    "outcome": {
+      "actual_exit": 0,
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 305
+      },
+      "rows": [
+        {
+          "name": "package::a_peer_refused_before_its_request_is_written_still_leaves_the_skill_in_place",
+          "status": "ok"
+        }
+      ],
+      "summaries": [
+        {
+          "status": "ok",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 305,
+          "seconds": 0.54,
+          "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 305 filtered out; finished in 0.54s"
+        }
+      ],
+      "missing": [],
+      "extra": [],
+      "valid": true,
+      "errors": []
+    },
+    "frozen_execution": {
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-46363ab9699809b5",
+        "package::a_peer_refused_before_its_request_is_written_still_leaves_the_skill_in_place",
+        "--exact",
+        "--show-output"
+      ],
+      "artifact_sha256": "da4335f7329bb5d3c13d1a018f7f82c12bdb07a49a8679ebcc02a187136bbb92",
+      "selected_names": [
+        "package::a_peer_refused_before_its_request_is_written_still_leaves_the_skill_in_place"
+      ],
+      "source_sha256": "1f473fbaf698e6d8f99994ba5d15b6a3918a530dd052024e15997d022e6da369",
+      "expected_exit": 0,
+      "watchdog_seconds": 45
+    },
+    "cleanup": {
+      "pid": 32344,
+      "positive_exit_marker": true,
+      "absent_after_control": true,
+      "no_signal_sent": true,
+      "pid_reuse_if_present_cannot_be_excluded": false
+    },
+    "source_before": {
+      "head": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+      "tracked_paths": 10055,
+      "all_bytes_modes_match": true,
+      "aggregate_sha256": "ed390ec360887755dc05b7c6ae5887c45b9e0abd94d0ad2d97980d1cb919bd67"
+    },
+    "source_after": {
+      "head": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+      "tracked_paths": 10055,
+      "all_bytes_modes_match": true,
+      "aggregate_sha256": "ed390ec360887755dc05b7c6ae5887c45b9e0abd94d0ad2d97980d1cb919bd67"
+    },
+    "patch": {
+      "external_path": "/private/tmp/tests-skills-early-refusal-20261023/controls/after/fixture.patch",
+      "bytes": 6235,
+      "sha256": "06a66395cc213cd64f0798f83d52348737552a249bed85fe4c338ab029ea405b",
+      "encoding": "UTF-8",
+      "text": "--- a/lampOS/crates/skills/tests/it/package.rs\n+++ b/lampOS/crates/skills/tests/it/package.rs\n@@ -975,35 +975,68 @@\n     line: &[u8],\n     meanwhile: impl FnOnce(&mut std::process::Child),\n ) -> (serde_json::Value, bool, String) {\n-    ask_helper_as(skills, line, true, meanwhile)\n+    let (answer, ok, journal, _) = ask_helper_as(skills, line, true, |_| {}, meanwhile);\n+    (answer, ok, journal)\n+}\n+\n+struct RequestOutcome {\n+    write: std::io::Result<()>,\n+    half_close: std::io::Result<()>,\n+}\n+\n+/// Reap the exact helper even if a fixture check or callback panics.\n+struct HelperChild(std::process::Child);\n+\n+impl Drop for HelperChild {\n+    fn drop(&mut self) {\n+        let _ = self.0.kill();\n+        let _ = self.0.wait();\n+    }\n }\n \n /// [`ask_helper_while`], the peer let through by the helper's test switch\n-/// (`package::ANY_ASKER`) only when `any_asker`.\n+/// (`package::ANY_ASKER`) only when `any_asker`. The early-refusal control\n+/// can observe the child's exit before the request is written.\n fn ask_helper_as(\n     skills: &Path,\n     line: &[u8],\n     any_asker: bool,\n+    before_request: impl FnOnce(&mut std::process::Child),\n     meanwhile: impl FnOnce(&mut std::process::Child),\n-) -> (serde_json::Value, bool, String) {\n+) -> (serde_json::Value, bool, String, RequestOutcome) {\n     use std::io::{BufRead, Read, Write};\n     use std::os::unix::net::UnixStream;\n     use std::process::{Command, Stdio};\n     let (mut ours, theirs) = UnixStream::pair().unwrap();\n-    let mut child = Command::new(env!(\"CARGO_BIN_EXE_lamp-skills\"))\n-        .args([\"asked\", \"--dir\"])\n-        .env(package::ANY_ASKER, if any_asker { \"on\" } else { \"\" })\n-        .arg(skills)\n-        .stdin(Stdio::from(std::os::fd::OwnedFd::from(\n-            theirs.try_clone().unwrap(),\n-        )))\n-        .stdout(Stdio::from(std::os::fd::OwnedFd::from(theirs)))\n-        .stderr(Stdio::piped())\n-        .spawn()\n-        .unwrap();\n-    ours.write_all(line).unwrap();\n-    ours.shutdown(std::net::Shutdown::Write).unwrap();\n-    meanwhile(&mut child);\n+    let mut child = HelperChild(\n+        Command::new(env!(\"CARGO_BIN_EXE_lamp-skills\"))\n+            .args([\"asked\", \"--dir\"])\n+            .env(package::ANY_ASKER, if any_asker { \"on\" } else { \"\" })\n+            .arg(skills)\n+            .stdin(Stdio::from(std::os::fd::OwnedFd::from(\n+                theirs.try_clone().unwrap(),\n+            )))\n+            .stdout(Stdio::from(std::os::fd::OwnedFd::from(theirs)))\n+            .stderr(Stdio::piped())\n+            .spawn()\n+            .unwrap(),\n+    );\n+    let child = &mut child.0;\n+    before_request(child);\n+    if !any_asker {\n+        eprintln!(\"early-refusal: child={} exited={:?}\", child.id(), child.try_wait().unwrap());\n+    }\n+    let write = ours.write_all(line);\n+    if any_asker {\n+        // Authorized requests must still be delivered before the callback.\n+        write.as_ref().unwrap();\n+    }\n+    let half_close = ours.shutdown(std::net::Shutdown::Write);\n+    if any_asker {\n+        half_close.as_ref().unwrap();\n+    }\n+    let request = RequestOutcome { write, half_close };\n+    meanwhile(child);\n     let mut answer = String::new();\n     std::io::BufReader::new(&ours)\n         .read_line(&mut answer)\n@@ -1020,6 +1053,7 @@\n         serde_json::from_str(&answer).unwrap(),\n         status.success(),\n         journal,\n+        request,\n     )\n }\n \n@@ -1028,17 +1062,77 @@\n /// stays (the reviewer's P3 on #2429).\n #[test]\n fn a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed() {\n+    check_non_asker_refusal(false);\n+}\n+\n+/// Make the early refusal precede the write, without a scheduling guess.\n+#[test]\n+fn a_peer_refused_before_its_request_is_written_still_leaves_the_skill_in_place() {\n+    check_non_asker_refusal(true);\n+}\n+\n+fn check_non_asker_refusal(after_exit: bool) {\n     let dir = tempfile::tempdir().unwrap();\n     let skills = dir.path().join(\"skills\");\n     fs::create_dir_all(&skills).unwrap();\n     tutor(&skills, \"1.0.0\");\n-    let (answer, ok, _) = ask_helper_as(&skills, b\"{\\\"remove\\\": \\\"desk-tutor\\\"}\\n\", false, |_| {});\n+    let (answer, ok, journal, request) = ask_helper_as(\n+        &skills,\n+        b\"{\\\"remove\\\": \\\"desk-tutor\\\"}\\n\",\n+        false,\n+        |child| {\n+            if after_exit {\n+                wait_for_helper_exit(child);\n+            }\n+        },\n+        |_| {},\n+    );\n+    // Collect all three product observations before judging the write.\n+    let preserved = skills.join(\"desk-tutor\").join(\"skill.toml\").is_file();\n+    eprintln!(\"early-refusal: after_exit={after_exit} write={:?} half_close={:?} status_ok={ok} answer={answer} preserved={preserved}; journal={journal}\", request.write, request.half_close);\n     assert!(!ok, \"{answer}\");\n     assert_eq!(\n         answer,\n         serde_json::json!({\"refused\": package::NOT_AN_ASKER})\n     );\n-    assert!(skills.join(\"desk-tutor\").join(\"skill.toml\").is_file());\n+    assert!(preserved);\n+    let broken_pipe = request\n+        .write\n+        .as_ref()\n+        .is_err_and(|error| error.kind() == std::io::ErrorKind::BrokenPipe);\n+    assert!(\n+        request.write.is_ok() || broken_pipe,\n+        \"request write: {:?}; {answer}; {journal}\",\n+        request.write\n+    );\n+    assert!(\n+        request.half_close.is_ok()\n+            || (broken_pipe\n+                && request\n+                    .half_close\n+                    .as_ref()\n+                    .is_err_and(|error| error.kind() == std::io::ErrorKind::NotConnected)),\n+        \"request half-close: {:?}; {answer}; {journal}\",\n+        request.half_close\n+    );\n+    if after_exit {\n+        assert!(\n+            broken_pipe,\n+            \"the exited helper must refuse the request write\"\n+        );\n+    }\n+}\n+\n+fn wait_for_helper_exit(child: &mut std::process::Child) {\n+    use std::time::{Duration, Instant};\n+    let started = Instant::now();\n+    while child.try_wait().unwrap().is_none() {\n+        assert!(\n+            started.elapsed() < Duration::from_secs(20),\n+            \"the helper did not exit before the request write\"\n+        );\n+        std::thread::sleep(Duration::from_millis(10));\n+    }\n }\n \n /// While another run holds the skills folder, the helper waits at most\n"
+    }
+  }
+}
