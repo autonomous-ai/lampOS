@@ -55,7 +55,7 @@
     }
   ],
   "light_call_checked_statistic": {
-    "scope": "One completed full Voice observation; no causal waiver and no retry. Reader gate still independent and running.",
+    "scope": "Recorded at full Voice completion, when the independent reader gate was still running. The reader gate subsequently completed with 3,227 passed, 2 failed and 17 ignored; command-results.json and census-and-outcomes.json contain its terminal result. No causal waiver and no retry.",
     "head": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e",
     "base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
     "test": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",

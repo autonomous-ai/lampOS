@@ -39,8 +39,8 @@
     },
     {
       "path": "failures.json",
-      "bytes": 9998,
-      "sha256": "7624ce02624a22bd2236a7b56326c81f78e401071cc0a7f65290425e73b70498"
+      "bytes": 10166,
+      "sha256": "6562d13f533af267f9c52d63d1a372d6ca2b27cd1e55931085dfaa860b835148"
     },
     {
       "path": "gate-plan.json",
@@ -73,5 +73,5 @@
       "sha256": "1b8b5e3aa765792aedd0163e32e907d0fe1bd2c7d2b3f537788c95f170f9e18e"
     }
   ],
-  "total_payload_bytes": 2260813
+  "total_payload_bytes": 2260981
 }

@@ -1,5 +1,16 @@
 # Tests work log
 
+## 2026-10-23 18:03 +0700 — clarify phone receipt timing metadata
+
+Ready for lamp-voice: no (#3218 execution HOLD remains).
+
+Reviewer-two found no integrity/source-binding P1/P2 in the current phone
+receipt. Its nested light-call summary captured the moment before the reader
+gate completed. That scope note now explicitly separates capture time from
+the later terminal **3,227 / 2 / 17** reader result. All original failure
+bytes, counts and source/artifact bindings remain unchanged; only the scope
+note and its manifest digest changed. The original publication remains pinned.
+
 ## 2026-10-23 18:00 +0700 — matched clean-base Voice comparison
 
 Ready for lamp-voice: no (#3190 execution HOLD and #3218 draft remain).
