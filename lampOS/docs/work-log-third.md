@@ -5,6 +5,17 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 23:34 — acceptance trace boundaries checked
+
+- Source-read #3275 `92088b7ea`'s tap, wake and sleep-breath decision,
+  dispatch, first-write and retirement records. Added their exact event
+  names to the [unexecuted trial sheet](verification/head-touch-acceptance-20261023/run-sheet.md),
+  with turn/sequence association and the already-ready quiet-tap case.
+- Main checkout and the PR remain clean on current `be16c3327`; automated
+  gates remain green. Second owns the units/update read, First the
+  exact-head decision and merge, and First/lead routes the physical trial.
+  This was a source read, with no new runtime test or lamp action.
+
 ## 2026-10-23 23:24 — final native gates pass
 
 - #3275 `92088b7ea`: ARM64 **11,072/0/69 skipped**, one reported Voice

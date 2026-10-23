@@ -42,6 +42,26 @@ source intervals are distinct from the physical and acoustic intervals.
 ALSA's first accepted write is not acoustic onset; the listening face alone
 is not proof of retained capture.
 
+Use the cue's own trace events, as checked in `coordinator.rs` and
+`coordinator/notices.rs` at #3275 `92088b7ea`:
+
+| Action | Decision | First accepted speaker write |
+|---|---|---|
+| Quiet tap | `head_tap_cue` (`began_us`, `acquired_at_us`, `plays`, `why`) | `head_tap_cue_first_write` |
+| Wake from hand sleep | `head_wake_cue` (`acquired_at_us`, `plays`, `why`) | `head_wake_cue_first_write` |
+| Last-second sleep sigh | `head_sleep_breath` (`held_us`, `plays`, `why`) | `head_sleep_breath_first_write` |
+
+Each sound also has its own `_attempted` and `_final_sample_retired` events.
+Keep the sound turn's owner and playback sequence when associating its writes
+and retirement; do not select the next unrelated `speaker_first_write`.
+An attempt is dispatch evidence, and a decision with `plays: false` has no
+sound latency to report. The trace timestamps are software observations,
+not a replacement for physical contact and acoustic onset in the recording.
+A quiet tap starts with listening already ready: retain that initial state
+and the subsequent captured words rather than requiring a new
+`listening_ready` transition for every tap. Wake and fault recovery do need
+their own readiness and retained-input evidence.
+
 For physical tap-to-listening readiness, record how the audio/video clock
 was aligned to the lamp's monotonic trace and the alignment uncertainty.
 Without that evidence, report physical-to-sound and acquisition-to-readiness
