@@ -16,17 +16,42 @@
 # lamp-tasks always gets a store of its own for the run ($PLAYED_REMOTE/store, in place of --dir): the real one is
 # never touched.
 #   PLAYED_REMOTE     the stand-in's folder (default /usr/local/lib/played-stand-in; /run may be noexec)
-# and, for stand-in-test.sh, PLAYED_UNITS (where the drop-ins go, default /run/systemd/system) and SYSTEMCTL.
+#   PLAYED_GUARD_S    how long the lamp's guard waits, whole seconds (default 3600)
+# and, for stand-in-test.sh, PLAYED_UNITS (where the drop-ins go, default /run/systemd/system), SYSTEMCTL and
+# SYSTEMD_RUN.
+# The lamp's guard: before the drop-ins are written, `in` arms a systemd-run timer (zz-played-stand-in-guard) that
+# puts back as `out` does, unaided, PLAYED_GUARD_S after; `out` stops it, as does a setup that fails after arming it,
+# and the next run's `in` replaces it. So a Mac that sleeps or drops off mid-run, and never runs `out`, leaves the
+# lamp changed for at most that long, not overnight (lamp-0c89, 22 Oct, with full-look-row.sh, #3195). A skill a
+# make-skill.sh run put on is not the guard's: that run removes it itself.
 REMOTE=${PLAYED_REMOTE:-/usr/local/lib/played-stand-in}
 UNITS=${PLAYED_UNITS:-/run/systemd/system}
 SYSTEMCTL=${SYSTEMCTL:-systemctl}
+SYSTEMD_RUN=${SYSTEMD_RUN:-systemd-run}
+GUARD=zz-played-stand-in-guard
+GUARD_S=${PLAYED_GUARD_S:-3600}
 DROP=zz-played-stand-in.conf
 TASKS_DROP=$UNITS/lamp-tasks.service.d/$DROP
 VOICE_DROP=$UNITS/lamp-voice.service.d/$DROP
 fail() { echo "stand-in setup: $1" >&2; exit 1; }
+unguard() { $SYSTEMCTL stop $GUARD.timer 2>/dev/null; $SYSTEMCTL reset-failed $GUARD.timer $GUARD.service 2>/dev/null; true; }
 
 case "${1:-}" in
 in)
+  case "$GUARD_S" in '' | *[!0-9]*) fail "PLAYED_GUARD_S=$GUARD_S is not whole seconds";; esac
+  # The guard's command is split and run by /bin/sh as root, `rm -rf` included: its folders must be plain absolute
+  # paths, letters, digits and . _ - / only, not / and with no .. (blue's P2 on #3231: a space would split
+  # PLAYED_REMOTE into another folder to remove).
+  for place in "PLAYED_REMOTE=$REMOTE" "PLAYED_UNITS=$UNITS"; do
+    path=${place#*=}
+    case "$path" in
+      /*/* | /?*) ;;
+      *) fail "${place%%=*}=$path is not an absolute path below /";;
+    esac
+    case "$path" in
+      *[!A-Za-z0-9._/-]* | */../* | */.. ) fail "${place%%=*}=$path holds more than letters, digits and . _ - /, or a ..";;
+    esac
+  done
   [ -x "$REMOTE/harness-fixture" ] || fail "no stand-in at $REMOTE/harness-fixture"
   # lamp-tasks' own ExecStart, and the lamp-tasks to run: the unit's own, or PLAYED_TASKS for this run only. It
   # must know --sign-in-by-code (#1676): lamp-4ace's lamp-tasks didn't, and crash-looped on the flag (22 Oct 03:1x).
@@ -81,18 +106,25 @@ in)
   # Its --harness swapped for the stand-in, with --sign-in-by-code.
   exec_line=$(printf '%s\n' "$exec_line" | sed -E "s#--harness [^ ]+#--harness $REMOTE/harness#")
   case "$exec_line" in *--sign-in-by-code*) ;; *) exec_line="$exec_line --sign-in-by-code";; esac
-  mkdir -p "$UNITS/lamp-tasks.service.d" "$UNITS/lamp-voice.service.d" || fail "mkdir of the drop-in folders failed"
-  printf '[Service]\nExecStart=\nExecStart=%s\n' "$exec_line" > "$TASKS_DROP" || fail "writing lamp-tasks' drop-in failed"
+  # The guard first (above), so nothing is written that it would not take out. Its command has no $, which systemd
+  # would expand in the unit's command line.
+  unguard
+  $SYSTEMD_RUN --unit=$GUARD --on-active="${GUARD_S}s" /bin/sh -c \
+    "rm -f $TASKS_DROP $VOICE_DROP; systemctl daemon-reload; systemctl restart lamp-tasks lamp-voice; rm -rf $REMOTE" \
+    >/dev/null || fail "arming the lamp's guard (systemd-run) failed"
+  mkdir -p "$UNITS/lamp-tasks.service.d" "$UNITS/lamp-voice.service.d" || { unguard; fail "mkdir of the drop-in folders failed"; }
+  printf '[Service]\nExecStart=\nExecStart=%s\n' "$exec_line" > "$TASKS_DROP" || { unguard; fail "writing lamp-tasks' drop-in failed"; }
   { printf '[Service]\nEnvironment=LAMP_TASKS_SIGN_IN=on\n'
     for setting in ${PLAYED_VOICE_ENV:-}; do printf 'Environment=%s\n' "$setting"; done
   } > "$VOICE_DROP" || {
-    rm -f "$TASKS_DROP"; fail "writing the voice's drop-in failed"; }
+    rm -f "$TASKS_DROP"; unguard; fail "writing the voice's drop-in failed"; }
   $SYSTEMCTL daemon-reload && $SYSTEMCTL restart lamp-tasks lamp-voice || {
-    rm -f "$TASKS_DROP" "$VOICE_DROP"; $SYSTEMCTL daemon-reload; $SYSTEMCTL restart lamp-tasks lamp-voice
+    rm -f "$TASKS_DROP" "$VOICE_DROP"; $SYSTEMCTL daemon-reload; $SYSTEMCTL restart lamp-tasks lamp-voice; unguard
     fail "restarting with the stand-in failed; put back"; }
   echo "stand-in in: lamp-tasks $tasks as $user:$group, its Harness $REMOTE/harness, its store $store"
   ;;
 out)
+  unguard
   rm -f "$TASKS_DROP" "$VOICE_DROP"
   $SYSTEMCTL daemon-reload
   $SYSTEMCTL restart lamp-tasks lamp-voice

@@ -12,6 +12,9 @@
 #   drop-in's --dir is the run's (case 1); a unit with no --dir is refused (case 7).
 #   6. calendar.sh's settings: a plan of its own, a targets file for the run with the voice's own alias (0600,
 #      lamp-tasks' user's, in place of --targets), and LAMP_TASKS_ACCOUNTS=on in the voice's drop-in.
+#   The lamp's guard (cases 1 and 8 to 11): `in` arms a systemd-run timer before the drop-ins are written, which puts
+#   back as `out` does if the Mac never comes back; `out`, and a setup that fails after arming it, stop it; a setup
+#   refused before any write arms none.
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
@@ -26,21 +29,30 @@ case "$1" in
 show) case "$*" in *lamp-voice*) cat "$STAND_IN/voice_env" ;; *) cat "$STAND_IN/show" ;; esac ;;
 cat) cat "$STAND_IN/unit" ;;
 is-active) echo active ;;
+restart) [ -z "${FAIL_RESTART:-}" ] || exit 1 ;;
 esac
 EOF
 chmod 0755 "$root/systemctl"
+# The stand-in systemd-run: its call kept among systemctl's, and its arguments one to a line.
+cat > "$root/systemd-run" <<'EOF'
+#!/bin/sh
+echo "systemd-run $*" >> "$STAND_IN/calls"
+printf '%s\n' "$@" > "$STAND_IN/guard"
+EOF
+chmod 0755 "$root/systemd-run"
 # Two lamp-tasks, with no --help as the real one: one has --sign-in-by-code in it, one older doesn't.
 printf '#!/bin/sh\n# flags: --harness --sign-in-by-code\necho "expected serve or request" >&2; exit 1\n' > "$root/new-tasks"
 printf '#!/bin/sh\n# flags: --harness\necho "expected serve or request" >&2; exit 1\n' > "$root/old-tasks"
 chmod 0755 "$root/new-tasks" "$root/old-tasks"
 run() {  # USER EXECSTART MODE [TASKS]: the setup against the stand-in; its output in $root/out
-  rm -rf "$root/remote" "$root/units" "$root/calls"
+  rm -rf "$root/remote" "$root/units" "$root/calls" "$root/guard"
   mkdir -p "$root/remote"
   printf '#!/bin/sh\n' > "$root/remote/harness-fixture"
   chmod 0755 "$root/remote/harness-fixture"
   printf 'Group=%s\nUser=%s\n' "$(id -gn)" "$1" > "$root/show"
   printf '[Service]\nUser=%s\nExecStart=%s\n' "$1" "$2" > "$root/unit"
-  STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl PLAYED_TASKS=${4:-} \
+  STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl \
+    SYSTEMD_RUN=$root/systemd-run PLAYED_TASKS=${4:-} PLAYED_GUARD_S=${guard_s:-} \
     PLAYED_TARGET=${target:-} PLAYED_VOICE_ENV=${voice_env:-} PLAYED_PLAN=${plan:-} \
     sh "$here/stand-in.sh" "$3" > "$root/out" 2>&1
 }
@@ -64,8 +76,17 @@ check "1. --harness is the stand-in, --harness-as-person kept" \
 check "1. the voice's switch on" 'grep -qx "Environment=LAMP_TASKS_SIGN_IN=on" "$voice_drop"'
 check "1. the wrapper runs the fixture with its own HOME" 'grep -q "HOME=$root/remote/home exec $root/remote/harness-fixture" "$root/remote/harness"'
 check "1. both restarted" 'grep -qx "restart lamp-tasks lamp-voice" "$root/calls"'
+check "1. the guard is armed for an hour, before the first daemon-reload" \
+  'grep -qx -- "--unit=zz-played-stand-in-guard" "$root/guard" && grep -qx -- "--on-active=3600s" "$root/guard" &&
+   [ "$(grep -n "^systemd-run" "$root/calls" | cut -d: -f1)" -lt "$(grep -n "^daemon-reload" "$root/calls" | head -1 | cut -d: -f1)" ]'
+check "1. the guard puts back as out does: both drop-ins, a reload, both restarted, the folder" \
+  'grep -qx "rm -f $tasks_drop $voice_drop; systemctl daemon-reload; systemctl restart lamp-tasks lamp-voice; rm -rf $root/remote" "$root/guard"'
+check "1. its command carries no \$ for systemd to expand" '[ -s "$root/guard" ] && ! tail -n 1 "$root/guard" | grep -qF "\$"'
+mv "$root/calls" "$root/calls.in"  # out's own calls only: in stops any guard before it arms its own
 STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl \
   sh "$here/stand-in.sh" out > "$root/out" 2>&1
+mv "$root/calls" "$root/calls.out"
+check "1. out stops the guard" 'grep -qx "stop zz-played-stand-in-guard.timer" "$root/calls.out"'
 check "1. out takes both drop-ins and the folder out" '[ ! -e "$tasks_drop" ] && [ ! -e "$voice_drop" ] && [ ! -e "$root/remote" ]'
 check "1. the real store's file is byte-for-byte as before" '[ "$(cksum < "$root/real-store/tasks.sqlite3")" = "$real_sum" ]'
 
@@ -73,6 +94,7 @@ run no-such-user-played "$line" in; code=$?
 check "2. an unknown user fails" '[ $code -ne 0 ]'
 check "2. it says the chown failed" 'grep -q "chown no-such-user-played" "$root/out"'
 check "2. no drop-in written, nothing restarted" '[ ! -e "$tasks_drop" ] && [ ! -e "$voice_drop" ] && ! grep -q restart "$root/calls"'
+check "2. no guard armed" '! grep -q "^systemd-run" "$root/calls"'
 
 run "$(id -un)" "$root/new-tasks serve --enable --dir $root/real-store" in; code=$?
 check "3. no --harness fails" '[ $code -ne 0 ]'
@@ -108,5 +130,38 @@ run "$(id -un)" "$root/new-tasks serve --enable --harness /usr/local/bin/harness
 check "7. no --dir fails" '[ $code -ne 0 ]'
 check "7. it says so" 'grep -q "has no --dir" "$root/out"'
 check "7. no drop-in written, nothing restarted" '[ ! -e "$tasks_drop" ] && [ ! -e "$voice_drop" ] && ! grep -q restart "$root/calls"'
+
+guard_s=900
+run "$(id -un)" "$line" in; code=$?
+unset guard_s
+check "8. PLAYED_GUARD_S sets the guard's wait" '[ $code -eq 0 ] && grep -qx -- "--on-active=900s" "$root/guard"'
+
+guard_s=soon
+run "$(id -un)" "$line" in; code=$?
+unset guard_s
+check "9. a PLAYED_GUARD_S that isn't whole seconds fails before any write" \
+  '[ $code -ne 0 ] && grep -q "PLAYED_GUARD_S" "$root/out" && [ ! -e "$tasks_drop" ] && ! grep -qs "^systemd-run" "$root/calls"'
+
+export FAIL_RESTART=1
+run "$(id -un)" "$line" in; code=$?
+unset FAIL_RESTART
+check "10. a restart that fails puts back and stops the guard it armed" \
+  '[ $code -ne 0 ] && [ ! -e "$tasks_drop" ] && [ ! -e "$voice_drop" ] &&
+   sed -n "/^systemd-run/,\$p" "$root/calls" | grep -qx "stop zz-played-stand-in-guard.timer"'
+
+# The guard's command is run by /bin/sh as root: a folder it would split, or one that isn't plainly absolute, is
+# refused before anything is armed or written (blue's P2 on #3231).
+for bad in "$root/played stand-in" "remote" "/" "$root/../remote" "$root/it's"; do
+  rm -rf "$root/units" "$root/calls" "$root/guard"
+  STAND_IN=$root PLAYED_REMOTE=$bad PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl SYSTEMD_RUN=$root/systemd-run \
+    sh "$here/stand-in.sh" in > "$root/out" 2>&1; code=$?
+  check "11. PLAYED_REMOTE='$bad' is refused before anything is armed or written" \
+    '[ $code -ne 0 ] && grep -q "PLAYED_REMOTE" "$root/out" && [ ! -e "$root/units" ] && ! grep -qs "^systemd-run" "$root/calls"'
+done
+rm -rf "$root/calls"
+STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS="$root/my units" SYSTEMCTL=$root/systemctl SYSTEMD_RUN=$root/systemd-run \
+  sh "$here/stand-in.sh" in > "$root/out" 2>&1; code=$?
+check "11. a PLAYED_UNITS with a space is refused too" \
+  '[ $code -ne 0 ] && grep -q "PLAYED_UNITS" "$root/out" && [ ! -e "$root/my units" ] && ! grep -qs "^systemd-run" "$root/calls"'
 
 exit $failed

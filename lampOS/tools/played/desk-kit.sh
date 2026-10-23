@@ -19,6 +19,10 @@
 # into $PLAYED_OUT and checked against DESK_KIT_SHA256 before use; DESK_KIT_TAR=none uses what is on this Mac.
 # It plays sound in the room: the Mac about 1 m from the lamp, where a person sits, its volume 50. About 7 minutes a
 # scene, 1.5 minutes a restart and 70 s of quiet between scenes. Not between 12:00 and 14:00 on weekdays.
+# With each arm's drop-in the lamp arms its own guard, a systemd-run timer (zz-desk-kit-guard) that takes this run's
+# drop-in off and restarts the voice unaided 10 minutes after the arm is due to end; the put-back stops it. So a Mac
+# that sleeps or drops off mid-arm, and never runs its exit trap, leaves the lamp changed for at most that long, not
+# overnight (lamp-0c89, 22 Oct, with full-look-row.sh, #3195). Its stand-in test is desk-kit-test.sh.
 set -uo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -107,11 +111,18 @@ TOKEN="# desk kit run $(hostname -s | tr -cd "A-Za-z0-9.-") pid $$ $(date +%s)"
 LOCK=/run/lock/desk-kit.lock
 OWNED= LOANED=
 ours="head -1 $DROPIN 2>/dev/null | grep -qxF '$TOKEN'"
+# The lamp's guard (above): it removes the drop-in under the same lock, only while it is still this run's, and restarts
+# the voice only then. Its command has no $, which systemd would expand in the unit's command line. It waits one arm
+# (TRIALS scenes of about 8 minutes and 3 for the restart and the level, the kit's own reckoning) and 10 minutes more.
+GUARD=zz-desk-kit-guard
+guard_after=$(((TRIALS * 8 + 3) * 60 + 600))
+unguard="sudo -n systemctl stop $GUARD.timer 2>/dev/null; sudo -n systemctl reset-failed $GUARD.timer $GUARD.service 2>/dev/null"
+guard="{ $unguard; true; } && sudo -n systemd-run --unit=$GUARD --on-active=${guard_after}s /bin/sh -c 'flock $LOCK sh -c \"head -1 $DROPIN 2>/dev/null | grep -qxF \\\"$TOKEN\\\" && rm -f $DROPIN\" && systemctl daemon-reload && systemctl restart lamp-voice'"
 put_back() {
   trap '' INT TERM; trap - EXIT
   hide_face
   osascript -e "set volume output volume 50"
-  [[ -n $OWNED ]] && lamp "if sudo -n flock $LOCK sh -c \"$ours && rm -f $DROPIN\"; then sudo -n systemctl daemon-reload; sudo -n systemctl restart lamp-voice; fi; systemctl is-active lamp-voice"
+  [[ -n $OWNED ]] && lamp "$unguard; if sudo -n flock $LOCK sh -c \"$ours && rm -f $DROPIN\"; then sudo -n systemctl daemon-reload; sudo -n systemctl restart lamp-voice; fi; systemctl is-active lamp-voice"
   [[ -n $LOANED ]] && loan "desk kit $LABEL done${OWNED:+, lamp-voice back without its $DROPIN}, face closed; loan ended"
   true
 }
@@ -169,6 +180,7 @@ arm() { # arm NAME:ENV=v,...
   local may="[ ! -e $DROPIN ]"; [[ -n $OWNED ]] && may=$ours
   OWNED=yes
   { echo "$TOKEN"; dropin "$1" "$exec_line"; } | "$LAMP_SSH" "t=\$(mktemp) && cat > \$t && head -1 \$t | grep -qxF '$TOKEN' || { rm -f \$t; exit 4; }
+    $guard || { rm -f \$t; exit 4; }
     sudo -n mkdir -p ${DROPIN%/*} && sudo -n flock $LOCK sh -c \"$may || exit 3; cat \$t > $DROPIN\"; r=\$?; rm -f \$t; [ \$r = 0 ] || exit \$r
     sudo -n systemctl daemon-reload && sudo -n systemctl restart lamp-voice"
   case $? in
