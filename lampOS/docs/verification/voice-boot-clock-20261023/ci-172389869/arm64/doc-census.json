@@ -1,0 +1,324 @@
+[
+  {
+    "crate": "lamp_actions",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8258
+  },
+  {
+    "crate": "lamp_addons",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8264
+  },
+  {
+    "crate": "lamp_air",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8270
+  },
+  {
+    "crate": "lamp_body",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8277
+  },
+  {
+    "crate": "lamp_body",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8282
+  },
+  {
+    "crate": "lamp_bus",
+    "passed": 2,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8290
+  },
+  {
+    "crate": "lamp_camera",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8297
+  },
+  {
+    "crate": "lamp_cloud",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8303
+  },
+  {
+    "crate": "lamp_controls",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8309
+  },
+  {
+    "crate": "lamp_ears",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8315
+  },
+  {
+    "crate": "lamp_environment",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8321
+  },
+  {
+    "crate": "lamp_expression",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8327
+  },
+  {
+    "crate": "lamp_eyes",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8333
+  },
+  {
+    "crate": "lamp_gemini",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8339
+  },
+  {
+    "crate": "lamp_health",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8345
+  },
+  {
+    "crate": "lamp_ipc",
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8352
+  },
+  {
+    "crate": "lamp_keeper",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8359
+  },
+  {
+    "crate": "lamp_lean",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8365
+  },
+  {
+    "crate": "lamp_local_time",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8371
+  },
+  {
+    "crate": "lamp_memory",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8377
+  },
+  {
+    "crate": "lamp_mood",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8383
+  },
+  {
+    "crate": "lamp_msgs",
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8390
+  },
+  {
+    "crate": "lamp_name",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8397
+  },
+  {
+    "crate": "lamp_near_call",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8403
+  },
+  {
+    "crate": "lamp_observer",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8409
+  },
+  {
+    "crate": "lamp_peek",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8415
+  },
+  {
+    "crate": "lamp_policy",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8421
+  },
+  {
+    "crate": "lamp_records",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8427
+  },
+  {
+    "crate": "lamp_ring",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8433
+  },
+  {
+    "crate": "lamp_same_voice",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8439
+  },
+  {
+    "crate": "lamp_schedule",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8445
+  },
+  {
+    "crate": "lamp_settings",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8452
+  },
+  {
+    "crate": "lamp_settings",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8457
+  },
+  {
+    "crate": "lamp_setup",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8463
+  },
+  {
+    "crate": "lamp_skills",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8469
+  },
+  {
+    "crate": "lamp_sound_fixtures",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8475
+  },
+  {
+    "crate": "lamp_station",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8481
+  },
+  {
+    "crate": "lamp_tasks",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8488
+  },
+  {
+    "crate": "lamp_tasks",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8493
+  },
+  {
+    "crate": "lamp_turn_end",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8499
+  },
+  {
+    "crate": "lamp_turn_end_wire",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8505
+  },
+  {
+    "crate": "lamp_turn_owner",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8511
+  },
+  {
+    "crate": "lamp_update",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8517
+  },
+  {
+    "crate": "lamp_voice",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8523
+  },
+  {
+    "crate": "lamp_voice_eval",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8529
+  },
+  {
+    "crate": "lamp_voice_processes",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "raw_line": 8535
+  }
+]

@@ -1,5 +1,23 @@
 # Tests work log
 
+## 2026-10-23 10:38 +0700 — prior-head ARM64 and Clippy census preserved
+
+Ready for lamp-voice: no (#3190, current gate and review hold remain).
+
+The [native CI receipt](verification/voice-boot-clock-20261023/ci-172389869/)
+binds both workflows to the exact earlier head `172389869` and merge
+`286466bc4`, whose complete trees match. ARM64 ran **7,122 passed, zero
+failed, 31 skipped**, including one passing leaky case; the separate steps
+passed four doctests and 12 process-harness cases and reported relay success.
+All 86 affected cases passed: 85 literal names and one uniquely matched
+masked console name, explicitly recorded. Linux Clippy passed. The effective
+PR filter includes realtime; this is selected-package coverage, not the
+entire workspace's test census. Raw logs and minimal provenance are pinned.
+
+The new head `0f2e6439e` has separate checks, and its fixed Mac baseline is
+running on the complete `e5cd73aca` tree. None of these results waives the
+five earlier candidate-only Mac failures. No ARM build ran on the Mac.
+
 ## 2026-10-23 10:29 +0700 — boot-clock carry preserves the patch on train 29
 
 Ready for lamp-voice: no (#3190).

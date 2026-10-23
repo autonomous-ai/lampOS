@@ -1,0 +1,89 @@
+{
+  "doc_targets": 46,
+  "doc_passed": 4,
+  "doc_failed": 0,
+  "doc_ignored": 0,
+  "relay_signals": {
+    "result": "ok",
+    "raw_line": 8539,
+    "limitation": "Custom harness prints relay_signals: ok without a numeric case count; do not invent one."
+  },
+  "process": {
+    "passed": 12,
+    "failed": 0,
+    "cases": [
+      {
+        "name": "an_idle_worker_stays_ready_across_a_long_quiet",
+        "status": "PASS",
+        "milliseconds": 2008,
+        "raw_line": 8543
+      },
+      {
+        "name": "a_worker_reporting_another_model_is_refused_before_any_request",
+        "status": "PASS",
+        "milliseconds": 2,
+        "raw_line": 8544
+      },
+      {
+        "name": "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way",
+        "status": "PASS",
+        "milliseconds": 4,
+        "raw_line": 8545
+      },
+      {
+        "name": "verdict_carries_identity_and_one_request_at_a_time",
+        "status": "PASS",
+        "milliseconds": 56,
+        "raw_line": 8546
+      },
+      {
+        "name": "missing_model_is_final_and_never_restarted",
+        "status": "PASS",
+        "milliseconds": 162,
+        "raw_line": 8547
+      },
+      {
+        "name": "missing_executable_fails_at_once",
+        "status": "PASS",
+        "milliseconds": 2,
+        "raw_line": 8548
+      },
+      {
+        "name": "startup_failures_are_final",
+        "status": "PASS",
+        "milliseconds": 411,
+        "raw_line": 8549
+      },
+      {
+        "name": "serving_failures_are_replaced_within_budget",
+        "status": "PASS",
+        "milliseconds": 514,
+        "raw_line": 8550
+      },
+      {
+        "name": "protocol_violations_are_replaced",
+        "status": "PASS",
+        "milliseconds": 177,
+        "raw_line": 8551
+      },
+      {
+        "name": "cancelled_answers_are_never_delivered",
+        "status": "PASS",
+        "milliseconds": 155,
+        "raw_line": 8552
+      },
+      {
+        "name": "close_during_inference_never_waits",
+        "status": "PASS",
+        "milliseconds": 233,
+        "raw_line": 8553
+      },
+      {
+        "name": "sustained_requests_stay_bounded",
+        "status": "PASS",
+        "milliseconds": 690,
+        "raw_line": 8555
+      }
+    ]
+  }
+}

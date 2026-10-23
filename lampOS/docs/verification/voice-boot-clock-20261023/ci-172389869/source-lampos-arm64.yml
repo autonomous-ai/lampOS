@@ -1,0 +1,331 @@
+name: lampOS on ARM64
+
+# Builds and tests lampOS natively on Linux ARM64 for every pull request into
+# lamp-voice and every push to lamp-voice, on Ubuntu 22.04 (glibc 2.35), so the binaries also run on the
+# lamps' Debian 12 (glibc 2.36). Not in a container: tests that take a
+# permission away must not run as root. The binaries are kept
+# as an artifact for a week, with their SHA-256, so the first builder can put
+# a builder's work on a lamp without building it again. See
+# lampOS/docs/joining.md.
+#
+# The tests are split across four runners (cargo-nextest partitions), each
+# still running one test at a time, as on a lamp's few cores: one serial run
+# took about 20 of the job's 30 minutes. Doc tests, the two tests with their
+# own harness and the binaries' artifact come from the first runner only.
+#
+# The realtime group (tests that wait on the real clock, 977 s of the 1,191 s
+# of test time on 2026-10-15; nextest group `realtime` in
+# lampOS/.config/nextest.toml) runs only in the full run: every night, started
+# from main by .github/workflows/lampos-nightly.yml as a manual run of this
+# workflow on lamp-voice with `full`. A failed full run opens an issue. See
+# lampOS/docs/realtime-tests.md.
+#
+#            | runners | profile   | tests at once | realtime | crates tested
+# pull req.  | 1       | `pr`      | one per core  | skipped  | its own, their users, three readers (below)
+# lamp-voice | 1       | `pr`      | one per core  | skipped  | all (binaries for updates.md)
+# full       | 4       | `default` | one           | run      | all
+#
+# A pull request tests only the crates its diff changes, every crate that
+# depends on them, and lamp-cloud, lamp-voice-eval and lamp-update, whose
+# tests read other crates' files (the project lead's proposal, 19 Oct 2026,
+# #1711; .github/scripts/lampos-pr-crates.py). Cargo.lock, any Cargo.toml,
+# crates/msgs, bus and ipc, deploy/, skills/, the docs tests read, .config/,
+# the script, this workflow and any other path run every crate. The run's
+# summary says what was tested and why.
+#
+# Every binary and every test binary is still built for the whole workspace,
+# so dependencies are built with one set of features and come from the cache;
+# a pull request picks its crates' tests with a nextest filter (`package(...)`),
+# not `-p`, which resolved other features and rebuilt 73 dependencies in
+# 39531799004. Only what changed is built again:
+# .github/scripts/lampos-source-times.py gives each source file whose content
+# the cached build had its time back, so cargo rebuilds only changed crates and
+# the crates built from them, not all of lampOS on every checkout (#1806; the
+# first builder's ask of 21 Oct 2026 for runs of about ten minutes, against 11
+# to 28 and 19 at the median: 3.9 to 4.4 minutes in the probe runs there).
+# Publication-eligible pushes are the exception: they restore neither target
+# nor source times, and record fresh checkout times in an empty target before
+# building. Their signed binaries do not depend on cache freshness. PRs and
+# publication-disabled runs keep the ordinary cached path below.
+#
+# The cache is lamp-voice's newest build: each of lamp-voice's own runs saves
+# it under a key with its commit, even when a test failed, and pull requests
+# restore it and don't save. No lamp-voice run is cancelled while it waits
+# (the concurrency below), so each commit's build is saved. A key on
+# Cargo.lock alone was saved once and never renewed, and each pull request's own 1 GB cache, which
+# no other run could use, pushed the repository past GitHub's 10 GB, so
+# lamp-voice's was thrown out and 6 of 30 pull requests built cold (#1806; the
+# lead, 21 Oct 2026). Until #1712 lands, a pull request onto its branch saves
+# when it found nothing to restore, as before: nothing else saves a cache it
+# may read (its own, its base's or main's; the reviewer on #2454).
+#
+# Without the realtime group the tests take about 4 minutes of test time,
+# mostly quick unit tests, so one runner runs them as many at once as it has
+# cores. Each runner compiles every test binary again (about 5 of its 10
+# minutes on 2026-10-15), so more runners would only cost more. The full run
+# keeps four, one test at a time, for the realtime tests.
+
+# Not on every push to every builder's branch: with nine builders and four
+# runners a run, that queued eleven runs behind eight on 2026-10-15, lamp-voice's
+# own among them. A builder's work is run when its pull request is opened or
+# pushed to, or by hand (Actions, "Run workflow", on its branch).
+on:
+  push:
+    branches: ['lamp-voice']
+    paths: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/scripts/lampos-pr-crates.py', '.github/scripts/lampos-source-times.py', '.github/scripts/lampos-publish*.py']
+  # A pull request that changes only docs a build never reads skips this run (the
+  # project lead, 19 Oct 2026, #1711): the docs' and the role files' Markdown. The
+  # docs that code or tests read are named again below, so a change to one still
+  # runs. lampOS/crates/update/tests/it/ci_paths.rs fails when a crate reads one that
+  # isn't (#1791's guard). A
+  # skill's SKILL.md is part of the skill, so lampOS/skills/** always runs. The
+  # push to lamp-voice keeps every run: its artifact is what lamps install.
+  # Such a PR merges without ARM64 once the reviewer has read it
+  # (builders/reviewer.md).
+  # #1712's branch too while the second route is built on it: a pull request
+  # onto it gets its run on open and on each push (19 Oct 21:1x). Back to
+  # lamp-voice alone once #1712 lands.
+  pull_request:
+    branches: ['lamp-voice', 'first/voice-cascade-gemini']
+    paths:
+      - 'lampOS/**'
+      - '!lampOS/docs/**/*.md'
+      - '!lampOS/builders/**'
+      - 'lampOS/docs/attention.md'
+      - 'lampOS/docs/brain-build.md'
+      - 'lampOS/docs/endpoint-detection.md'
+      - 'lampOS/docs/endpoint-pilot.md'
+      - 'lampOS/docs/install.md'
+      - 'lampOS/docs/memory.md'
+      - 'lampOS/docs/switches.md'
+      - '.github/workflows/lampos-arm64.yml'
+      - '.github/scripts/lampos-pr-crates.py'
+      - '.github/scripts/lampos-source-times.py'
+      - '.github/scripts/lampos-publish*.py'
+  workflow_dispatch:
+    inputs:
+      full:
+        description: 'Full run: every test including the realtime group, four runners, one test at a time (the nightly run)'
+        type: boolean
+        default: false
+
+concurrency:
+  # A full run has its own group, so a merge never cancels the nightly run.
+  # Each of lamp-voice's runs has a group of its own commit, so none is
+  # cancelled: a group keeps one run waiting, and a newer merge replaced it.
+  # On 21 Oct 7 of 15 lamp-voice runs were cancelled that way, each one a
+  # commit with no binaries for the lamps and the cache not renewed
+  # (devops007-P2 on #1806). Runs of commits close together now run side by
+  # side, one runner each.
+  group: lampos-arm64-${{ inputs.full && 'full-' || '' }}${{ github.event.pull_request.number || (github.ref == 'refs/heads/lamp-voice' && github.sha) || github.ref }}
+  # A newer push to a pull request makes the running one moot: it is cancelled.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/lamp-voice' }}
+
+jobs:
+  arm64:
+    name: lampOS — build and test on Linux ARM64 (${{ matrix.shard }}/${{ strategy.job-total }})
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        # Four for a full run (every test, one at a time), otherwise one.
+        shard: ${{ fromJSON(inputs.full && '[1, 2, 3, 4]' || '[1]') }}
+    steps:
+      - name: system packages
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev procps file
+      - uses: actions/checkout@v4
+        with:
+          # A pull request's merge commit and its first parent (lamp-voice), for the crates it changes.
+          fetch-depth: 2
+      - name: publication failure tests (offline, no signing secret)
+        run: python3 -I .github/scripts/lampos-publish-test.py
+      - name: Rust 1.96.0
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: artifact provenance regression (offline, disposable Cargo workspace)
+        if: matrix.shard == 1
+        run: python3 -B -I .github/scripts/lampos-publish-artifact-test.py
+      - name: restore the cache
+        id: cache
+        # Match publish's eligibility exactly, so signing candidates build cold.
+        if: >-
+          ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'
+          && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on') }}
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            lampOS/target
+          key: lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
+            lampos-arm64-u2204-
+      - name: unchanged source files get the cached build's times back
+        if: >-
+          ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'
+          && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on') }}
+        run: python3 -I .github/scripts/lampos-source-times.py
+      - name: record fresh source times for a cold publication build
+        if: >-
+          github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'
+          && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on'
+        # With no target/record, this only records checkout times for the cache
+        # saved after the run. Any unexpected pre-existing target fails closed.
+        run: |
+          if [ -e lampOS/target ] || [ -L lampOS/target ]; then
+            echo 'cold publication build requires an absent lampOS/target' >&2
+            exit 1
+          fi
+          python3 -I .github/scripts/lampos-source-times.py
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: build (release, the lamps' binaries)
+        working-directory: lampOS
+        # Keep Cargo's current-target records outside the restored target cache.
+        run: cargo build --locked --release --workspace --bins --examples --message-format=json-render-diagnostics > arm64-build.jsonl
+      - name: every built lamp-* binary is classified for the lamp-os package
+        working-directory: lampOS
+        run: bash tools/package-binaries-test.sh && bash tools/package-binaries.sh deploy/package-binaries.json target/release
+      - name: build the two selected artifact examples without filename collisions
+        if: matrix.shard == 1
+        working-directory: lampOS
+        # Both controls and expression have replay_cost. Export expression's
+        # planner tool from a separate target directory; the workspace gate
+        # above still builds every example from both packages.
+        run: |
+          cargo build --locked --release -p lamp-schedule --example schedule_check \
+            --target-dir target/lampos-artifact-examples --message-format=json-render-diagnostics > arm64-schedule-example.jsonl
+          cargo build --locked --release -p lamp-expression --example replay_cost \
+            --target-dir target/lampos-artifact-examples --message-format=json-render-diagnostics > arm64-expression-example.jsonl
+      - name: publication CLI rehearsal (local test key and simulated GitHub only)
+        if: matrix.shard == 1
+        run: python3 -I .github/scripts/lampos-publish-cli-test.py --updater lampOS/target/release/lamp-update
+      - name: which crates a pull request tests
+        id: scope
+        if: github.event_name == 'pull_request'
+        run: python3 -I .github/scripts/lampos-pr-crates.py
+      - name: test (full run, every test one at a time; otherwise without the realtime group, in parallel)
+        working-directory: lampOS
+        # The two tests with their own harness (harness = false) cannot be listed by nextest; the first runner runs them below.
+        # Profile `pr` skips the realtime group (lampOS/.config/nextest.toml); the -E below is intersected with it.
+        # A full run uses `default`: every test, one at a time. A pull request's picked crates narrow the -E.
+        env:
+          PICKED: ${{ steps.scope.outputs.filter }}
+        run: |
+          echo "cores: $(nproc)"
+          filter='not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))'
+          if [ -n "$PICKED" ]; then filter="$filter & ($PICKED)"; fi
+          cargo nextest run --locked --release --workspace \
+            --profile ${{ inputs.full && 'default' || 'pr' }} \
+            --no-tests=pass -j ${{ inputs.full && '1' || 'num-cpus' }} \
+            --partition hash:${{ matrix.shard }}/${{ strategy.job-total }} \
+            -E "$filter"
+      - name: doc tests and the own-harness tests (nextest runs neither)
+        if: matrix.shard == 1
+        working-directory: lampOS
+        run: |
+          cargo test --locked --release --workspace --doc -- --test-threads=1
+          cargo test --locked --release -p lamp-ipc --test relay_signals
+          cargo test --locked --release -p lamp-turn-end-wire --test process
+      - name: export only current Cargo targets and their SHA-256
+        if: matrix.shard == 1
+        run: >-
+          python3 -B -I .github/scripts/lampos-publish-artifact.py --workspace lampOS
+          --build-log lampOS/arm64-build.jsonl
+          --build-log lampOS/arm64-schedule-example.jsonl
+          --build-log lampOS/arm64-expression-example.jsonl
+          --out lampOS/arm64-out
+      - uses: actions/upload-artifact@v4
+        if: matrix.shard == 1
+        with:
+          # A pull request runs on its merge with lamp-voice; the name is its own head commit.
+          name: lampos-arm64-${{ github.event.pull_request.head.sha || github.sha }}
+          path: lampOS/arm64-out/
+          retention-days: 7
+      # lamp-voice's own, and one onto #1712's that found none (see the top). Not
+      # a run by hand on another branch: no pull request reads its cache (the
+      # reviewer on #2465).
+      - name: discard the isolated example target before saving the cache
+        if: >-
+          ${{ !cancelled() && matrix.shard == 1 && (github.ref == 'refs/heads/lamp-voice'
+          || (github.base_ref == 'first/voice-cascade-gemini' && steps.cache.outputs.cache-matched-key == '')) }}
+        # The CI artifact has independent, checksummed copies of both examples.
+        run: rm -rf -- lampOS/target/lampos-artifact-examples
+      - name: save the cache
+        if: >-
+          ${{ !cancelled() && matrix.shard == 1 && (github.ref == 'refs/heads/lamp-voice'
+          || (github.base_ref == 'first/voice-cascade-gemini' && steps.cache.outputs.cache-matched-key == '')) }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            lampOS/target
+          # A cold publication build skipped restore, so it has no cache outputs.
+          key: ${{ steps.cache.outputs.cache-primary-key || format('lampos-arm64-u2204-{0}-{1}', hashFiles('lampOS/Cargo.lock'), github.sha) }}
+
+  publish:
+    name: lampOS — sign and publish the tested lamp-voice artifact
+    needs: arm64
+    # Off until the owner explicitly activates publication. Manual runs and PRs
+    # never enter this job; download-artifact defaults to this successful run.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice' && github.repository == 'autonomous-ai/lampOS' && vars.LAMPOS_UPDATE_PUBLISH == 'on'
+    # The owner must configure branch-only lamp-voice protection before storing
+    # the signing key here; naming an environment does not create its rules.
+    environment: lampos-update-publish
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    concurrency:
+      group: lampos-publish-lamp-voice
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: lampos-arm64-${{ github.sha }}
+          path: build
+      - name: verify, sign, upload, then promote the channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LAMPOS_UPDATE_PUBLISH: ${{ vars.LAMPOS_UPDATE_PUBLISH }}
+          LAMPOS_UPDATE_BOOTSTRAP: ${{ vars.LAMPOS_UPDATE_BOOTSTRAP }}
+          # Use the branch-restricted environment secret, with no repository or
+          # organization copy. Only this step references it in this workflow.
+          # Cleanup removes its 0600 file on normal failure;
+          # forced runner termination still relies on ephemeral-runner disposal.
+          LAMPOS_UPDATE_KEY: ${{ secrets.LAMPOS_UPDATE_KEY }}
+        run: python3 -I .github/scripts/lampos-publish.py --artifact build --source .
+
+  # A full run that fails opens an issue (or comments on the open one), so a
+  # realtime test broken by a merge is not left unseen: no other run has it.
+  report-full-run-failure:
+    needs: arm64
+    if: failure() && inputs.full
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TITLE: 'lampOS: the full ARM64 run failed'
+      BODY: >-
+        The full ARM64 run (realtime tests included) failed on ${{ github.ref_name }} at
+        ${{ github.sha }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}.
+        Pull requests and merges skip the realtime group (lampOS/docs/realtime-tests.md),
+        so the change that broke it may have passed its own run.
+    steps:
+      - run: |
+          n=$(gh issue list --state open --search "\"$TITLE\" in:title" --json number -q '.[0].number')
+          if [ -n "$n" ]; then gh issue comment "$n" --body "$BODY"; else gh issue create --title "$TITLE" --body "$BODY"; fi

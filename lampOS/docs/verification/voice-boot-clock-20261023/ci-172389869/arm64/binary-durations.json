@@ -1,0 +1,2579 @@
+{
+  "method": "Sum the rounded nextest terminal case durations once per binary/name; repeated final-output rows are excluded. Durations overlap across parallel cases, include their individual process setup, and are not binary or workflow wall time. Compilation and shared job startup are excluded.",
+  "binaries": [
+    {
+      "binary": "lamp-voice",
+      "terminal_cases": 3595,
+      "passed": 3595,
+      "leaky": 1,
+      "summed_case_seconds": 240.712,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 5.439,
+          "ordinal": 5804,
+          "total": 7122,
+          "binary": "lamp-voice",
+          "name": "second_provider::worker::tests::a_close_face_turned_over_the_line_counts_for_a_first_word_through_the_eyes",
+          "raw_line": 6510
+        },
+        {
+          "status": "PASS",
+          "seconds": 5.167,
+          "ordinal": 4494,
+          "total": 7122,
+          "binary": "lamp-voice",
+          "name": "provider_worker::tests::person_name::the_owners_face_is_told_once_a_session_and_no_look_or_the_switch_off_never",
+          "raw_line": 5200
+        },
+        {
+          "status": "PASS",
+          "seconds": 4.014,
+          "ordinal": 5814,
+          "total": 7122,
+          "binary": "lamp-voice",
+          "name": "second_provider::worker::tests::the_lamps_name_carries_only_on_a_sign_of_one_speaker",
+          "raw_line": 6520
+        },
+        {
+          "status": "PASS",
+          "seconds": 3.841,
+          "ordinal": 5823,
+          "total": 7122,
+          "binary": "lamp-voice",
+          "name": "second_provider::worker::tests::with_addressed_a_line_said_close_and_facing_is_let_out_in_a_busy_room",
+          "raw_line": 6529
+        },
+        {
+          "status": "PASS",
+          "seconds": 3.724,
+          "ordinal": 4428,
+          "total": 7122,
+          "binary": "lamp-voice",
+          "name": "provider_worker::tests::person_name::an_unknown_face_after_the_owner_was_told_speaks_into_a_fresh_session",
+          "raw_line": 5134
+        }
+      ]
+    },
+    {
+      "binary": "lamp-skills::it",
+      "terminal_cases": 304,
+      "passed": 304,
+      "leaky": 0,
+      "summed_case_seconds": 97.883,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 5.216,
+          "ordinal": 2037,
+          "total": 7122,
+          "binary": "lamp-skills::it",
+          "name": "night_sleep::a_lamp_nobody_saw_all_day_keeps_its_head_down_into_the_next_night",
+          "raw_line": 2743
+        },
+        {
+          "status": "PASS",
+          "seconds": 4.763,
+          "ordinal": 1991,
+          "total": 7122,
+          "binary": "lamp-skills::it",
+          "name": "addon::only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted",
+          "raw_line": 2697
+        },
+        {
+          "status": "PASS",
+          "seconds": 4.518,
+          "ordinal": 723,
+          "total": 7122,
+          "binary": "lamp-skills::it",
+          "name": "skills::asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait",
+          "raw_line": 1429
+        },
+        {
+          "status": "PASS",
+          "seconds": 4.293,
+          "ordinal": 2207,
+          "total": 7122,
+          "binary": "lamp-skills::it",
+          "name": "skills::guard_mode_from_the_app_is_the_owners_alone_and_the_switch_closed_ends_it",
+          "raw_line": 2913
+        },
+        {
+          "status": "PASS",
+          "seconds": 3.622,
+          "ordinal": 633,
+          "total": 7122,
+          "binary": "lamp-skills::it",
+          "name": "skills::a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go",
+          "raw_line": 1339
+        }
+      ]
+    },
+    {
+      "binary": "lamp-voice::it",
+      "terminal_cases": 301,
+      "passed": 301,
+      "leaky": 0,
+      "summed_case_seconds": 49.313,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 7.914,
+          "ordinal": 2072,
+          "total": 7122,
+          "binary": "lamp-voice::it",
+          "name": "capture_hold_worker::stop_words_blocks_carry_what_was_asked_only_when_asked",
+          "raw_line": 2778
+        },
+        {
+          "status": "PASS",
+          "seconds": 3.508,
+          "ordinal": 2000,
+          "total": 7122,
+          "binary": "lamp-voice::it",
+          "name": "capture_hold_worker::stalls_in_a_row_each_reopen_the_microphone_while_the_reference_goes_on",
+          "raw_line": 2706
+        },
+        {
+          "status": "PASS",
+          "seconds": 2.81,
+          "ordinal": 1709,
+          "total": 7122,
+          "binary": "lamp-voice::it",
+          "name": "capture_hold_worker::another_microphone_is_handed_on_at_once_and_its_early_sound_is_not_accounted_for",
+          "raw_line": 2415
+        },
+        {
+          "status": "PASS",
+          "seconds": 2.81,
+          "ordinal": 1763,
+          "total": 7122,
+          "binary": "lamp-voice::it",
+          "name": "capture_hold_worker::mic1_frames_wait_four_blocks_with_their_own_times_and_a_stop_drops_what_is_held",
+          "raw_line": 2469
+        },
+        {
+          "status": "PASS",
+          "seconds": 2.511,
+          "ordinal": 2108,
+          "total": 7122,
+          "binary": "lamp-voice::it",
+          "name": "capture_hold_worker::with_the_render_5_ms_after_each_block_all_but_a_few_blocks_are_read_within_a_ms",
+          "raw_line": 2814
+        }
+      ]
+    },
+    {
+      "binary": "lamp-cloud",
+      "terminal_cases": 166,
+      "passed": 166,
+      "leaky": 0,
+      "summed_case_seconds": 37.048,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 11.025,
+          "ordinal": 1275,
+          "total": 7122,
+          "binary": "lamp-cloud",
+          "name": "settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks",
+          "raw_line": 1981
+        },
+        {
+          "status": "PASS",
+          "seconds": 3.705,
+          "ordinal": 886,
+          "total": 7122,
+          "binary": "lamp-cloud",
+          "name": "settings::tests::p3_a_confirm_1_s_before_the_helpers_deadline_is_success_only",
+          "raw_line": 1592
+        },
+        {
+          "status": "PASS",
+          "seconds": 3.219,
+          "ordinal": 722,
+          "total": 7122,
+          "binary": "lamp-cloud",
+          "name": "online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset",
+          "raw_line": 1428
+        },
+        {
+          "status": "PASS",
+          "seconds": 2.215,
+          "ordinal": 733,
+          "total": 7122,
+          "binary": "lamp-cloud",
+          "name": "settings::tests::p3_a_confirm_1_s_after_the_helpers_deadline_is_failure_only",
+          "raw_line": 1439
+        },
+        {
+          "status": "PASS",
+          "seconds": 2.016,
+          "ordinal": 732,
+          "total": 7122,
+          "binary": "lamp-cloud",
+          "name": "settings::tests::followup_5_a_confirm_for_another_request_id_is_refused",
+          "raw_line": 1438
+        }
+      ]
+    },
+    {
+      "binary": "lamp-voice-eval::it",
+      "terminal_cases": 238,
+      "passed": 238,
+      "leaky": 0,
+      "summed_case_seconds": 19.562,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 1.319,
+          "ordinal": 7122,
+          "total": 7122,
+          "binary": "lamp-voice-eval::it",
+          "name": "serve_session::stale_duplicate_reordered_foreign_and_lost_cues_end_the_conversation",
+          "raw_line": 7828
+        },
+        {
+          "status": "PASS",
+          "seconds": 1.314,
+          "ordinal": 7121,
+          "total": 7122,
+          "binary": "lamp-voice-eval::it",
+          "name": "serve_session::normal_eight_turn_conversation_in_one_serve_session",
+          "raw_line": 7827
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.889,
+          "ordinal": 7100,
+          "total": 7122,
+          "binary": "lamp-voice-eval::it",
+          "name": "serve_session::a_runtime_stop_mute_or_ignored_sigterm_is_retained_and_reaped",
+          "raw_line": 7806
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.852,
+          "ordinal": 6979,
+          "total": 7122,
+          "binary": "lamp-voice-eval::it",
+          "name": "final_dispatch::an_unobserved_event_in_the_final_drain_requires_revalidation",
+          "raw_line": 7685
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.851,
+          "ordinal": 6976,
+          "total": 7122,
+          "binary": "lamp-voice-eval::it",
+          "name": "final_dispatch::an_invalid_cue_first_seen_in_the_final_drain_withholds",
+          "raw_line": 7682
+        }
+      ]
+    },
+    {
+      "binary": "lamp-update::round",
+      "terminal_cases": 116,
+      "passed": 116,
+      "leaky": 0,
+      "summed_case_seconds": 19.367,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 1.539,
+          "ordinal": 2606,
+          "total": 7122,
+          "binary": "lamp-update::round",
+          "name": "self_recovery::an_unchanged_or_refused_updater_needs_no_recovery_query",
+          "raw_line": 3312
+        },
+        {
+          "status": "PASS",
+          "seconds": 1.488,
+          "ordinal": 2602,
+          "total": 7122,
+          "binary": "lamp-update::round",
+          "name": "self_recovery::an_absent_or_unrunnable_fallback_keeps_the_completed_parts_and_old_updater",
+          "raw_line": 3308
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.958,
+          "ordinal": 2588,
+          "total": 7122,
+          "binary": "lamp-update::round",
+          "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+          "raw_line": 3294
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.814,
+          "ordinal": 2586,
+          "total": 7122,
+          "binary": "lamp-update::round",
+          "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+          "raw_line": 3292
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.766,
+          "ordinal": 2593,
+          "total": 7122,
+          "binary": "lamp-update::round",
+          "name": "self_recovery::unavailable_recovery_keeps_the_parts_and_can_be_retried_when_armed",
+          "raw_line": 3299
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::it",
+      "terminal_cases": 149,
+      "passed": 149,
+      "leaky": 0,
+      "summed_case_seconds": 13.899,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 2.048,
+          "ordinal": 1527,
+          "total": 7122,
+          "binary": "lamp-memory::it",
+          "name": "voice::a_timed_out_mutation_may_commit_but_cannot_seed_unlinked_journal_history",
+          "raw_line": 2233
+        },
+        {
+          "status": "PASS",
+          "seconds": 1.83,
+          "ordinal": 1513,
+          "total": 7122,
+          "binary": "lamp-memory::it",
+          "name": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+          "raw_line": 2219
+        },
+        {
+          "status": "PASS",
+          "seconds": 1.526,
+          "ordinal": 1541,
+          "total": 7122,
+          "binary": "lamp-memory::it",
+          "name": "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+          "raw_line": 2247
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.879,
+          "ordinal": 1503,
+          "total": 7122,
+          "binary": "lamp-memory::it",
+          "name": "server::a_client_that_says_nothing_or_half_a_request_is_dropped_and_the_next_is_served",
+          "raw_line": 2209
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.545,
+          "ordinal": 1499,
+          "total": 7122,
+          "binary": "lamp-memory::it",
+          "name": "health::a_store_that_cannot_open_never_claims_readiness_and_any_delivered_report_is_warn",
+          "raw_line": 2205
+        }
+      ]
+    },
+    {
+      "binary": "lamp-update::install",
+      "terminal_cases": 78,
+      "passed": 78,
+      "leaky": 0,
+      "summed_case_seconds": 12.782,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 1.133,
+          "ordinal": 2433,
+          "total": 7122,
+          "binary": "lamp-update::install",
+          "name": "a_failing_step_keeps_the_record_and_a_later_run_finishes",
+          "raw_line": 3139
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.78,
+          "ordinal": 2450,
+          "total": 7122,
+          "binary": "lamp-update::install",
+          "name": "harness_is_set_to_start_at_boot_once_when_it_is_there",
+          "raw_line": 3156
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.774,
+          "ordinal": 2455,
+          "total": 7122,
+          "binary": "lamp-update::install",
+          "name": "harness_on_updates_its_own_older_harness_and_says_one_too_old",
+          "raw_line": 3161
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.414,
+          "ordinal": 2419,
+          "total": 7122,
+          "binary": "lamp-update::install",
+          "name": "a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest",
+          "raw_line": 3125
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.413,
+          "ordinal": 2423,
+          "total": 7122,
+          "binary": "lamp-update::install",
+          "name": "a_lamps_own_pins_on_the_old_guess_get_every_head_line",
+          "raw_line": 3129
+        }
+      ]
+    },
+    {
+      "binary": "lamp-setup::it",
+      "terminal_cases": 156,
+      "passed": 156,
+      "leaky": 0,
+      "summed_case_seconds": 12.06,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 2.404,
+          "ordinal": 1840,
+          "total": 7122,
+          "binary": "lamp-setup::it",
+          "name": "wifi_change::p3_a_confirm_1_s_after_the_helpers_window_is_no_confirmation",
+          "raw_line": 2546
+        },
+        {
+          "status": "PASS",
+          "seconds": 1.405,
+          "ordinal": 1761,
+          "total": 7122,
+          "binary": "lamp-setup::it",
+          "name": "wifi_change::p2_the_window_starts_when_lamp_cloud_is_online_again_and_a_confirm_1_s_before_its_end_keeps_the_network",
+          "raw_line": 2467
+        },
+        {
+          "status": "PASS",
+          "seconds": 1.252,
+          "ordinal": 1667,
+          "total": 7122,
+          "binary": "lamp-setup::it",
+          "name": "reset::the_watcher_acts_once_on_a_real_bus_and_only_logs_with_the_switch_off",
+          "raw_line": 2373
+        },
+        {
+          "status": "PASS",
+          "seconds": 1.249,
+          "ordinal": 1666,
+          "total": 7122,
+          "binary": "lamp-setup::it",
+          "name": "reset::the_watcher_of_a_refused_plan_tells_each_reset_and_keeps_watching",
+          "raw_line": 2372
+        },
+        {
+          "status": "PASS",
+          "seconds": 1.106,
+          "ordinal": 1747,
+          "total": 7122,
+          "binary": "lamp-setup::it",
+          "name": "wifi::p3_6_a_command_whose_child_keeps_its_output_open_is_not_waited_on",
+          "raw_line": 2453
+        }
+      ]
+    },
+    {
+      "binary": "lamp-body",
+      "terminal_cases": 432,
+      "passed": 432,
+      "leaky": 0,
+      "summed_case_seconds": 11.092,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 3.309,
+          "ordinal": 654,
+          "total": 7122,
+          "binary": "lamp-body",
+          "name": "first_stand::tests::a_stopped_body_is_waited_for_while_it_folds",
+          "raw_line": 1360
+        },
+        {
+          "status": "PASS",
+          "seconds": 1.365,
+          "ordinal": 637,
+          "total": 7122,
+          "binary": "lamp-body",
+          "name": "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+          "raw_line": 1343
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.813,
+          "ordinal": 406,
+          "total": 7122,
+          "binary": "lamp-body",
+          "name": "first_stand::tests::a_body_that_never_ends_is_killed_past_its_bound",
+          "raw_line": 1112
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.438,
+          "ordinal": 226,
+          "total": 7122,
+          "binary": "lamp-body",
+          "name": "body::tests::it_shifts_over_expressions_rest_stream_and_not_while_held_still_or_paused",
+          "raw_line": 932
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.371,
+          "ordinal": 230,
+          "total": 7122,
+          "binary": "lamp-body",
+          "name": "body::tests::no_shift_starts_within_thirty_seconds_of_a_drift",
+          "raw_line": 936
+        }
+      ]
+    },
+    {
+      "binary": "lamp-skills::bin/lamp-skills",
+      "terminal_cases": 23,
+      "passed": 23,
+      "leaky": 0,
+      "summed_case_seconds": 7.909,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 2.109,
+          "ordinal": 2404,
+          "total": 7122,
+          "binary": "lamp-skills::bin/lamp-skills",
+          "name": "tests::an_already_awake_morning_stretches_then_hums",
+          "raw_line": 3110
+        },
+        {
+          "status": "PASS",
+          "seconds": 2.019,
+          "ordinal": 2397,
+          "total": 7122,
+          "binary": "lamp-skills::bin/lamp-skills",
+          "name": "tests::never_mind_says_its_line_before_the_cancel_that_moves_the_body",
+          "raw_line": 3103
+        },
+        {
+          "status": "PASS",
+          "seconds": 2.009,
+          "ordinal": 2399,
+          "total": 7122,
+          "binary": "lamp-skills::bin/lamp-skills",
+          "name": "tests::the_timeout_fires_once_and_never_from_failed",
+          "raw_line": 3105
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.605,
+          "ordinal": 2275,
+          "total": 7122,
+          "binary": "lamp-skills::bin/lamp-skills",
+          "name": "tests::a_late_hang_up_waits_out_only_the_rest_of_the_wait",
+          "raw_line": 2981
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.529,
+          "ordinal": 2271,
+          "total": 7122,
+          "binary": "lamp-skills::bin/lamp-skills",
+          "name": "tests::a_failure_after_the_cancel_says_it_needs_checking",
+          "raw_line": 2977
+        }
+      ]
+    },
+    {
+      "binary": "lamp-peek::peek",
+      "terminal_cases": 11,
+      "passed": 11,
+      "leaky": 0,
+      "summed_case_seconds": 4.75,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 3.038,
+          "ordinal": 1704,
+          "total": 7122,
+          "binary": "lamp-peek::peek",
+          "name": "the_stream_reports_denied_sessions_and_recovers_without_words_or_paths",
+          "raw_line": 2410
+        },
+        {
+          "status": "PASS",
+          "seconds": 1.03,
+          "ordinal": 1621,
+          "total": 7122,
+          "binary": "lamp-peek::peek",
+          "name": "the_one_page_streams_each_section_and_never_a_word",
+          "raw_line": 2327
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.327,
+          "ordinal": 1581,
+          "total": 7122,
+          "binary": "lamp-peek::peek",
+          "name": "the_units_are_read_once_however_many_ask_at_once",
+          "raw_line": 2287
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.086,
+          "ordinal": 1583,
+          "total": 7122,
+          "binary": "lamp-peek::peek",
+          "name": "with_the_camera_closed_no_box_is_drawn",
+          "raw_line": 2289
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.046,
+          "ordinal": 1575,
+          "total": 7122,
+          "binary": "lamp-peek::peek",
+          "name": "a_word_heard_never_reaches_any_view",
+          "raw_line": 2281
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory",
+      "terminal_cases": 96,
+      "passed": 96,
+      "leaky": 0,
+      "summed_case_seconds": 3.85,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 1.005,
+          "ordinal": 1274,
+          "total": 7122,
+          "binary": "lamp-memory",
+          "name": "health::tests::a_hung_handler_is_visible_while_the_socket_owner_cannot_finish",
+          "raw_line": 1980
+        },
+        {
+          "status": "PASS",
+          "seconds": 1.004,
+          "ordinal": 1279,
+          "total": 7122,
+          "binary": "lamp-memory",
+          "name": "health::tests::extra_thread_wakes_do_not_burst_reports",
+          "raw_line": 1985
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.115,
+          "ordinal": 1290,
+          "total": 7122,
+          "binary": "lamp-memory",
+          "name": "health_counts::tests::legacy_counts_readable_records_after_capped_replacement_and_forgetting",
+          "raw_line": 1996
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.106,
+          "ordinal": 1276,
+          "total": 7122,
+          "binary": "lamp-memory",
+          "name": "health::tests::held_publication_cannot_block_a_real_socket_or_bounded_shutdown",
+          "raw_line": 1982
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.105,
+          "ordinal": 1268,
+          "total": 7122,
+          "binary": "lamp-memory",
+          "name": "health::schedule_tests::stopping_a_held_publication_keeps_the_host_bound_without_false_completion",
+          "raw_line": 1974
+        }
+      ]
+    },
+    {
+      "binary": "lamp-expression::it",
+      "terminal_cases": 280,
+      "passed": 280,
+      "leaky": 0,
+      "summed_case_seconds": 3.738,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 1.019,
+          "ordinal": 943,
+          "total": 7122,
+          "binary": "lamp-expression::it",
+          "name": "alive_replay::serving_a_catalogue_with_sleep_needs_the_local_time",
+          "raw_line": 1649
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.218,
+          "ordinal": 1056,
+          "total": 7122,
+          "binary": "lamp-expression::it",
+          "name": "rest_replay::every_authored_fixture_has_exact_counts_and_only_its_declared_refusals",
+          "raw_line": 1762
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.171,
+          "ordinal": 884,
+          "total": 7122,
+          "binary": "lamp-expression::it",
+          "name": "alive_replay::a_stretch_longer_than_ten_minutes_replays_only_when_asked_for_as_long",
+          "raw_line": 1590
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.113,
+          "ordinal": 1053,
+          "total": 7122,
+          "binary": "lamp-expression::it",
+          "name": "rest_replay::quiet_rest_is_finite_small_pitch_only_and_waits_ninety_seconds_after_completion",
+          "raw_line": 1759
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.112,
+          "ordinal": 1021,
+          "total": 7122,
+          "binary": "lamp-expression::it",
+          "name": "replay::huge_lines_blank_line_floods_and_record_floods_are_bounded",
+          "raw_line": 1727
+        }
+      ]
+    },
+    {
+      "binary": "lamp-update::self-process-cuts",
+      "terminal_cases": 1,
+      "passed": 1,
+      "leaky": 0,
+      "summed_case_seconds": 3.638,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 3.638,
+          "ordinal": 2978,
+          "total": 7122,
+          "binary": "lamp-update::self-process-cuts",
+          "name": "persisted_self_switches_survive_sigkill",
+          "raw_line": 3684
+        }
+      ]
+    },
+    {
+      "binary": "lamp-voice-eval",
+      "terminal_cases": 378,
+      "passed": 378,
+      "leaky": 0,
+      "summed_case_seconds": 3.49,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.326,
+          "ordinal": 6806,
+          "total": 7122,
+          "binary": "lamp-voice-eval",
+          "name": "physical::mac::backend_clock_tests::post_end_drain_and_transport_reap_finish_with_a_frozen_clock",
+          "raw_line": 7512
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.256,
+          "ordinal": 6852,
+          "total": 7122,
+          "binary": "lamp-voice-eval",
+          "name": "physical::mac::relay_reader_tests::reading_stops_with_an_error_above_the_session_byte_bound",
+          "raw_line": 7558
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.106,
+          "ordinal": 6831,
+          "total": 7122,
+          "binary": "lamp-voice-eval",
+          "name": "physical::serve_fixture_driver::slow_transport_tests::terminal_delay_without_a_fresh_relay_hello_cannot_start_or_advance",
+          "raw_line": 7537
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.079,
+          "ordinal": 6781,
+          "total": 7122,
+          "binary": "lamp-voice-eval",
+          "name": "physical::mac::recorder_backend_tests::startup_reads_the_real_receipt_and_shares_the_original_fifteen_second_bound",
+          "raw_line": 7487
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.049,
+          "ordinal": 6529,
+          "total": 7122,
+          "binary": "lamp-voice-eval",
+          "name": "answer_gaps::tests::answer_gaps_limits_bound_lines_and_records_and_preserve_partial_evidence",
+          "raw_line": 7235
+        }
+      ]
+    },
+    {
+      "binary": "lamp-expression::runtime",
+      "terminal_cases": 27,
+      "passed": 27,
+      "leaky": 0,
+      "summed_case_seconds": 3.107,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 1.109,
+          "ordinal": 1125,
+          "total": 7122,
+          "binary": "lamp-expression::runtime",
+          "name": "paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed",
+          "raw_line": 1831
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.699,
+          "ordinal": 1122,
+          "total": 7122,
+          "binary": "lamp-expression::runtime",
+          "name": "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+          "raw_line": 1828
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.293,
+          "ordinal": 1127,
+          "total": 7122,
+          "binary": "lamp-expression::runtime",
+          "name": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+          "raw_line": 1833
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.285,
+          "ordinal": 1128,
+          "total": 7122,
+          "binary": "lamp-expression::runtime",
+          "name": "sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus",
+          "raw_line": 1834
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.245,
+          "ordinal": 1120,
+          "total": 7122,
+          "binary": "lamp-expression::runtime",
+          "name": "sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had",
+          "raw_line": 1826
+        }
+      ]
+    },
+    {
+      "binary": "lamp-skills",
+      "terminal_cases": 157,
+      "passed": 157,
+      "leaky": 0,
+      "summed_case_seconds": 1.989,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.305,
+          "ordinal": 1796,
+          "total": 7122,
+          "binary": "lamp-skills",
+          "name": "glow::tests::a_light_is_asked_from_the_skill_asked_again_while_kept_and_given_back",
+          "raw_line": 2502
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.244,
+          "ordinal": 1792,
+          "total": 7122,
+          "binary": "lamp-skills",
+          "name": "clock::tests::without_a_test_driving_it_a_wait_takes_its_whole_time",
+          "raw_line": 2498
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.237,
+          "ordinal": 1827,
+          "total": 7122,
+          "binary": "lamp-skills",
+          "name": "glow::tests::a_pattern_is_asked_with_the_light_and_a_second_pulse_is_said_not_played",
+          "raw_line": 2533
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.125,
+          "ordinal": 1794,
+          "total": 7122,
+          "binary": "lamp-skills",
+          "name": "glow::tests::a_light_outranked_is_said_at_the_give_back_by_what",
+          "raw_line": 2500
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.055,
+          "ordinal": 1839,
+          "total": 7122,
+          "binary": "lamp-skills",
+          "name": "routine::tests::a_rest_a_sound_ended_settles_again_at_most_three_times_a_night",
+          "raw_line": 2545
+        }
+      ]
+    },
+    {
+      "binary": "lamp-setup::wake",
+      "terminal_cases": 6,
+      "passed": 6,
+      "leaky": 0,
+      "summed_case_seconds": 1.791,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.506,
+          "ordinal": 1764,
+          "total": 7122,
+          "binary": "lamp-setup::wake",
+          "name": "it_lights_at_once_and_the_voice_finds_the_ring_free_once_answered",
+          "raw_line": 2470
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.456,
+          "ordinal": 1758,
+          "total": 7122,
+          "binary": "lamp-setup::wake",
+          "name": "a_ring_that_is_not_there_yet_is_tried_again_and_shown",
+          "raw_line": 2464
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.306,
+          "ordinal": 1771,
+          "total": 7122,
+          "binary": "lamp-setup::wake",
+          "name": "the_privacy_ring_has_it_within_100_ms_of_asking",
+          "raw_line": 2477
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.213,
+          "ordinal": 1759,
+          "total": 7122,
+          "binary": "lamp-setup::wake",
+          "name": "a_waking_face_that_never_answers_cannot_keep_the_privacy_ring_dark",
+          "raw_line": 2465
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.206,
+          "ordinal": 1762,
+          "total": 7122,
+          "binary": "lamp-setup::wake",
+          "name": "something_that_is_not_the_voices_ask_leaves_the_ring_lit",
+          "raw_line": 2468
+        }
+      ]
+    },
+    {
+      "binary": "lamp-update",
+      "terminal_cases": 119,
+      "passed": 119,
+      "leaky": 0,
+      "summed_case_seconds": 1.724,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.81,
+          "ordinal": 2405,
+          "total": 7122,
+          "binary": "lamp-update",
+          "name": "world::tests::the_bus_hears_the_voice_and_not_an_old_state",
+          "raw_line": 3111
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.255,
+          "ordinal": 2373,
+          "total": 7122,
+          "binary": "lamp-update",
+          "name": "status::tests::a_restart_keeps_the_last_result_each_end_is_said_and_it_is_said_again",
+          "raw_line": 3079
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.059,
+          "ordinal": 2313,
+          "total": 7122,
+          "binary": "lamp-update",
+          "name": "fetch::tests::a_name_lookup_that_hangs_is_given_up_and_no_round_starts_another_until_it_ends",
+          "raw_line": 3019
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.016,
+          "ordinal": 2294,
+          "total": 7122,
+          "binary": "lamp-update",
+          "name": "apply::tests::the_apply_path_never_restarts_or_signals_journald",
+          "raw_line": 3000
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.014,
+          "ordinal": 2283,
+          "total": 7122,
+          "binary": "lamp-update",
+          "name": "apply::tests::a_reload_that_fails_fails_the_apply_and_a_speaker_that_fails_is_said",
+          "raw_line": 2989
+        }
+      ]
+    },
+    {
+      "binary": "lamp-cloud::it",
+      "terminal_cases": 30,
+      "passed": 30,
+      "leaky": 0,
+      "summed_case_seconds": 1.025,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.387,
+          "ordinal": 793,
+          "total": 7122,
+          "binary": "lamp-cloud::it",
+          "name": "switch::without_the_switch_it_says_so_and_connects_nowhere",
+          "raw_line": 1499
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.327,
+          "ordinal": 784,
+          "total": 7122,
+          "binary": "lamp-cloud::it",
+          "name": "skills_contract::a_skill_from_a_package_is_listed_with_its_sha256_and_version",
+          "raw_line": 1490
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.061,
+          "ordinal": 785,
+          "total": 7122,
+          "binary": "lamp-cloud::it",
+          "name": "skills_contract::removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope",
+          "raw_line": 1491
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.027,
+          "ordinal": 776,
+          "total": 7122,
+          "binary": "lamp-cloud::it",
+          "name": "report_contract::a_lamp_without_the_armed_way_back_says_lamp_update_waits",
+          "raw_line": 1482
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.026,
+          "ordinal": 792,
+          "total": 7122,
+          "binary": "lamp-cloud::it",
+          "name": "switch::with_the_switch_on_it_connects_to_the_accounts_broker",
+          "raw_line": 1498
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::voice_forget",
+      "terminal_cases": 5,
+      "passed": 5,
+      "leaky": 0,
+      "summed_case_seconds": 0.963,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.44,
+          "ordinal": 1531,
+          "total": 7122,
+          "binary": "lamp-memory::voice_forget",
+          "name": "after_forgetting_the_next_thing_remembered_is_kept",
+          "raw_line": 2237
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.234,
+          "ordinal": 1534,
+          "total": 7122,
+          "binary": "lamp-memory::voice_forget",
+          "name": "forget_that_removes_the_conversation_a_kept_thing_came_up_in",
+          "raw_line": 2240
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.233,
+          "ordinal": 1529,
+          "total": 7122,
+          "binary": "lamp-memory::voice_forget",
+          "name": "forget_my_favourite_colour_leaves_the_wedding_kept_in_the_same_conversation",
+          "raw_line": 2235
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.03,
+          "ordinal": 1528,
+          "total": 7122,
+          "binary": "lamp-memory::voice_forget",
+          "name": "forget_everything_removes_all_of_someone_known_and_never_the_room_s",
+          "raw_line": 2234
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.026,
+          "ordinal": 1532,
+          "total": 7122,
+          "binary": "lamp-memory::voice_forget",
+          "name": "forget_that_removes_what_recall_gave_and_nothing_else",
+          "raw_line": 2238
+        }
+      ]
+    },
+    {
+      "binary": "lamp-skills::requested_audio",
+      "terminal_cases": 31,
+      "passed": 31,
+      "leaky": 0,
+      "summed_case_seconds": 0.796,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.568,
+          "ordinal": 2262,
+          "total": 7122,
+          "binary": "lamp-skills::requested_audio",
+          "name": "sixteen_maximum_recordings_report_full_content_scan_costs",
+          "raw_line": 2968
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.04,
+          "ordinal": 2245,
+          "total": 7122,
+          "binary": "lamp-skills::requested_audio",
+          "name": "refused_cap_reload_keeps_audio_generation_but_asset_scan_still_revokes_it",
+          "raw_line": 2951
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.028,
+          "ordinal": 2238,
+          "total": 7122,
+          "binary": "lamp-skills::requested_audio",
+          "name": "real_call_socket_keeps_legacy_tools_and_requires_private_spoken_context",
+          "raw_line": 2944
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.016,
+          "ordinal": 2237,
+          "total": 7122,
+          "binary": "lamp-skills::requested_audio",
+          "name": "real_service_switch_off_hides_and_refuses_media_with_valid_context",
+          "raw_line": 2943
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 2228,
+          "total": 7122,
+          "binary": "lamp-skills::requested_audio",
+          "name": "byte_identical_file_edits_remain_accepted_with_full_content_reads",
+          "raw_line": 2934
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::forget_person",
+      "terminal_cases": 3,
+      "passed": 3,
+      "leaky": 0,
+      "summed_case_seconds": 0.765,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.382,
+          "ordinal": 1357,
+          "total": 7122,
+          "binary": "lamp-memory::forget_person",
+          "name": "forget_person_leaves_nothing_of_one_person_in_days_and_nobody_elses_is_touched",
+          "raw_line": 2063
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.324,
+          "ordinal": 1348,
+          "total": 7122,
+          "binary": "lamp-memory::forget_person",
+          "name": "forget_person_leaves_nothing_of_one_person_in_the_legacy_store_and_nobody_elses_is_touched",
+          "raw_line": 2054
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.059,
+          "ordinal": 1343,
+          "total": 7122,
+          "binary": "lamp-memory::forget_person",
+          "name": "the_narrow_socket_takes_forget_person_only_and_refuses_the_rest_untouched",
+          "raw_line": 2049
+        }
+      ]
+    },
+    {
+      "binary": "lamp-update::it",
+      "terminal_cases": 8,
+      "passed": 8,
+      "leaky": 0,
+      "summed_case_seconds": 0.573,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.315,
+          "ordinal": 2498,
+          "total": 7122,
+          "binary": "lamp-update::it",
+          "name": "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+          "raw_line": 3204
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.119,
+          "ordinal": 2489,
+          "total": 7122,
+          "binary": "lamp-update::it",
+          "name": "image_journal::systemd_reads_it_last_beside_another_drop_in",
+          "raw_line": 3195
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.111,
+          "ordinal": 2497,
+          "total": 7122,
+          "binary": "lamp-update::it",
+          "name": "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+          "raw_line": 3203
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.012,
+          "ordinal": 2487,
+          "total": 7122,
+          "binary": "lamp-update::it",
+          "name": "image_ramlog::the_copy_back_leaves_the_journal_alone",
+          "raw_line": 3193
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 2482,
+          "total": 7122,
+          "binary": "lamp-update::it",
+          "name": "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+          "raw_line": 3188
+        }
+      ]
+    },
+    {
+      "binary": "lamp-body::it",
+      "terminal_cases": 125,
+      "passed": 125,
+      "leaky": 0,
+      "summed_case_seconds": 0.479,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.009,
+          "ordinal": 490,
+          "total": 7122,
+          "binary": "lamp-body::it",
+          "name": "head_qualification::a_prepared_exact_return_cannot_survive_stop_fault_cancellation_or_privacy",
+          "raw_line": 1196
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 491,
+          "total": 7122,
+          "binary": "lamp-body::it",
+          "name": "head_qualification::actual_worker_out_and_exact_return_write_only_id5_and_keep_original_readbacks",
+          "raw_line": 1197
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.005,
+          "ordinal": 445,
+          "total": 7122,
+          "binary": "lamp-body::it",
+          "name": "control::cancellation_at_every_local_tick_adds_no_wait_and_no_later_goal",
+          "raw_line": 1151
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.005,
+          "ordinal": 451,
+          "total": 7122,
+          "binary": "lamp-body::it",
+          "name": "control::cubic_segment_is_monotonic_bounded_and_rest_to_rest",
+          "raw_line": 1157
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.005,
+          "ordinal": 501,
+          "total": 7122,
+          "binary": "lamp-body::it",
+          "name": "protocol::arbitrary_byte_streams_retain_bounded_storage_and_can_be_reset",
+          "raw_line": 1207
+        }
+      ]
+    },
+    {
+      "binary": "lamp-voice-eval::bin/lamp-voice-eval",
+      "terminal_cases": 7,
+      "passed": 7,
+      "leaky": 0,
+      "summed_case_seconds": 0.382,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.16,
+          "ordinal": 7115,
+          "total": 7122,
+          "binary": "lamp-voice-eval::bin/lamp-voice-eval",
+          "name": "observe_dry::tests::a_cut_that_joins_or_drops_made_up_conversations_is_refused",
+          "raw_line": 7821
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.158,
+          "ordinal": 7120,
+          "total": 7122,
+          "binary": "lamp-voice-eval::bin/lamp-voice-eval",
+          "name": "observe_dry::tests::the_made_up_set_is_scored_against_what_each_conversation_should_keep",
+          "raw_line": 7826
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.047,
+          "ordinal": 7118,
+          "total": 7122,
+          "binary": "lamp-voice-eval::bin/lamp-voice-eval",
+          "name": "observe_dry::tests::a_dry_run_keeps_what_the_store_allows_and_removes_its_copy",
+          "raw_line": 7824
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.005,
+          "ordinal": 7119,
+          "total": 7122,
+          "binary": "lamp-voice-eval::bin/lamp-voice-eval",
+          "name": "observe_dry::tests::the_score_counts_whole_words_and_each_thing_once",
+          "raw_line": 7825
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 7113,
+          "total": 7122,
+          "binary": "lamp-voice-eval::bin/lamp-voice-eval",
+          "name": "observe_dry::tests::a_copy_that_fails_partway_is_removed",
+          "raw_line": 7819
+        }
+      ]
+    },
+    {
+      "binary": "lamp-peek",
+      "terminal_cases": 15,
+      "passed": 15,
+      "leaky": 0,
+      "summed_case_seconds": 0.325,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.212,
+          "ordinal": 1579,
+          "total": 7122,
+          "binary": "lamp-peek",
+          "name": "units::tests::a_command_past_its_deadline_is_killed_and_tells_nothing",
+          "raw_line": 2285
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.039,
+          "ordinal": 1573,
+          "total": 7122,
+          "binary": "lamp-peek",
+          "name": "turns::tests::the_records_are_read_on_from_where_the_last_read_ended",
+          "raw_line": 2279
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.025,
+          "ordinal": 1572,
+          "total": 7122,
+          "binary": "lamp-peek",
+          "name": "units::tests::the_worker_state_is_the_newest_of_the_newest_session_and_nothing_else_is_read",
+          "raw_line": 2278
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.005,
+          "ordinal": 1568,
+          "total": 7122,
+          "binary": "lamp-peek",
+          "name": "turns::tests::denied_root_metadata_and_file_keep_the_read_status_and_recover",
+          "raw_line": 2274
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1560,
+          "total": 7122,
+          "binary": "lamp-peek",
+          "name": "serve::tests::a_cancelled_turn_read_keeps_its_cache_lock_without_blocking_the_runtime",
+          "raw_line": 2266
+        }
+      ]
+    },
+    {
+      "binary": "lamp-setup",
+      "terminal_cases": 16,
+      "passed": 16,
+      "leaky": 0,
+      "summed_case_seconds": 0.313,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.205,
+          "ordinal": 1592,
+          "total": 7122,
+          "binary": "lamp-setup",
+          "name": "scan::tests::a_command_that_hangs_is_killed_at_its_limit",
+          "raw_line": 2298
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.051,
+          "ordinal": 1593,
+          "total": 7122,
+          "binary": "lamp-setup",
+          "name": "scan::tests::a_long_output_is_read_whole_without_stalling_the_command",
+          "raw_line": 2299
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.007,
+          "ordinal": 1585,
+          "total": 7122,
+          "binary": "lamp-setup",
+          "name": "keys::tests::the_check_is_one_request_with_the_key_in_its_header",
+          "raw_line": 2291
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1586,
+          "total": 7122,
+          "binary": "lamp-setup",
+          "name": "keys::tests::the_services_error_body_is_never_passed_on",
+          "raw_line": 2292
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1587,
+          "total": 7122,
+          "binary": "lamp-setup",
+          "name": "light::tests::a_new_look_turns_into_the_next_over_the_change",
+          "raw_line": 2293
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::forgot",
+      "terminal_cases": 1,
+      "passed": 1,
+      "leaky": 0,
+      "summed_case_seconds": 0.309,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.309,
+          "ordinal": 1375,
+          "total": 7122,
+          "binary": "lamp-memory::forgot",
+          "name": "a_forget_of_everything_kept_under_a_person_is_told_on_the_bus_and_nothing_else",
+          "raw_line": 2081
+        }
+      ]
+    },
+    {
+      "binary": "lamp-keeper",
+      "terminal_cases": 40,
+      "passed": 40,
+      "leaky": 0,
+      "summed_case_seconds": 0.266,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.025,
+          "ordinal": 1164,
+          "total": 7122,
+          "binary": "lamp-keeper",
+          "name": "profile::tests::a_moved_lamp_gets_no_reset_whatever_its_wiring_says",
+          "raw_line": 1870
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.019,
+          "ordinal": 1163,
+          "total": 7122,
+          "binary": "lamp-keeper",
+          "name": "profile::tests::a_prepare_cut_between_the_marker_and_the_plan_leaves_the_lamp_set_up",
+          "raw_line": 1869
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.013,
+          "ordinal": 1166,
+          "total": 7122,
+          "binary": "lamp-keeper",
+          "name": "profile::tests::a_prepared_lamp_is_not_refused_for_its_account",
+          "raw_line": 1872
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.012,
+          "ordinal": 1173,
+          "total": 7122,
+          "binary": "lamp-keeper",
+          "name": "profile::tests::prepare_writes_what_is_missing_and_says_the_gaze_is_the_models",
+          "raw_line": 1879
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.011,
+          "ordinal": 1169,
+          "total": 7122,
+          "binary": "lamp-keeper",
+          "name": "profile::tests::a_shipped_reset_plan_is_written_over_and_a_changed_one_kept",
+          "raw_line": 1875
+        }
+      ]
+    },
+    {
+      "binary": "lamp-lean::it",
+      "terminal_cases": 51,
+      "passed": 51,
+      "leaky": 0,
+      "summed_case_seconds": 0.242,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.028,
+          "ordinal": 1217,
+          "total": 7122,
+          "binary": "lamp-lean::it",
+          "name": "paths::positive_samples_cannot_turn_work_exhaustion_into_a_pass",
+          "raw_line": 1923
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.014,
+          "ordinal": 1207,
+          "total": 7122,
+          "binary": "lamp-lean::it",
+          "name": "paths::depth_exhaustion_is_unresolved_even_when_every_sample_exceeds_the_reserve",
+          "raw_line": 1913
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 1194,
+          "total": 7122,
+          "binary": "lamp-lean::it",
+          "name": "catalogue::builtin_catalogue_all_states_and_both_masks_match_independent_dense_composition",
+          "raw_line": 1900
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.005,
+          "ordinal": 1199,
+          "total": 7122,
+          "binary": "lamp-lean::it",
+          "name": "paths::analytic_bound_is_below_a_dense_independent_static_sample",
+          "raw_line": 1905
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.005,
+          "ordinal": 1233,
+          "total": 7122,
+          "binary": "lamp-lean::it",
+          "name": "poses::json_unknown_and_missing_fields_do_not_get_silent_defaults",
+          "raw_line": 1939
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::health_control",
+      "terminal_cases": 23,
+      "passed": 23,
+      "leaky": 0,
+      "summed_case_seconds": 0.181,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.045,
+          "ordinal": 1370,
+          "total": 7122,
+          "binary": "lamp-memory::health_control",
+          "name": "missing_marker_after_child_advance_latches_closed_without_cadence_commit",
+          "raw_line": 2076
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.024,
+          "ordinal": 1352,
+          "total": 7122,
+          "binary": "lamp-memory::health_control",
+          "name": "bootstrap_pipe_write_cannot_reset_an_expired_or_blocked_deadline",
+          "raw_line": 2058
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.024,
+          "ordinal": 1364,
+          "total": 7122,
+          "binary": "lamp-memory::health_control",
+          "name": "missing_reply_is_bounded_and_does_not_manufacture_report_progress",
+          "raw_line": 2070
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.007,
+          "ordinal": 1360,
+          "total": 7122,
+          "binary": "lamp-memory::health_control",
+          "name": "initial_checked_identity_counters_and_deadline_are_validated",
+          "raw_line": 2066
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 1363,
+          "total": 7122,
+          "binary": "lamp-memory::health_control",
+          "name": "malformed_truncated_and_oversized_receipts_close_control",
+          "raw_line": 2069
+        }
+      ]
+    },
+    {
+      "binary": "lamp-expression",
+      "terminal_cases": 27,
+      "passed": 27,
+      "leaky": 0,
+      "summed_case_seconds": 0.155,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.023,
+          "ordinal": 818,
+          "total": 7122,
+          "binary": "lamp-expression",
+          "name": "runtime::unplug_tests::switch_off_shadow_failed_mismatch_and_stale_never_acknowledge",
+          "raw_line": 1524
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.017,
+          "ordinal": 815,
+          "total": 7122,
+          "binary": "lamp-expression",
+          "name": "runtime::unplug_tests::body_ready_from_the_real_publishers_is_acknowledged_asleep",
+          "raw_line": 1521
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.01,
+          "ordinal": 816,
+          "total": 7122,
+          "binary": "lamp-expression",
+          "name": "runtime::unplug_tests::closed_privacy_and_failed_light_publication_never_acknowledge",
+          "raw_line": 1522
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.008,
+          "ordinal": 814,
+          "total": 7122,
+          "binary": "lamp-expression",
+          "name": "runtime::unplug_tests::a_matching_skills_cancel_hands_the_body_back",
+          "raw_line": 1520
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.007,
+          "ordinal": 817,
+          "total": 7122,
+          "binary": "lamp-expression",
+          "name": "runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges",
+          "raw_line": 1523
+        }
+      ]
+    },
+    {
+      "binary": "lamp-update::self-cli-exec",
+      "terminal_cases": 1,
+      "passed": 1,
+      "leaky": 0,
+      "summed_case_seconds": 0.144,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.144,
+          "ordinal": 2607,
+          "total": 7122,
+          "binary": "lamp-update::self-cli-exec",
+          "name": "actual_cli_exec_confirms_before_the_next_round",
+          "raw_line": 3313
+        }
+      ]
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body",
+      "terminal_cases": 32,
+      "passed": 32,
+      "leaky": 0,
+      "summed_case_seconds": 0.137,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.015,
+          "ordinal": 575,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body",
+          "name": "tests::nothing_deployed_passes_hold_from",
+          "raw_line": 1281
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 556,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body",
+          "name": "tests::a_force_limit_is_a_number_in_its_range_and_brings_the_load_bound_under_it",
+          "raw_line": 1262
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 557,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body",
+          "name": "tests::a_gesture_dropped_as_it_is_read_is_told_whose_it_was_and_who_keeps_the_body",
+          "raw_line": 1263
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 558,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body",
+          "name": "tests::a_gesture_is_asked_for_by_the_name_of_a_clip_and_nothing_else",
+          "raw_line": 1264
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 559,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body",
+          "name": "tests::a_line_repeated_is_said_once_in_five_seconds_with_a_count",
+          "raw_line": 1265
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::voice_forget_named",
+      "terminal_cases": 2,
+      "passed": 2,
+      "leaky": 0,
+      "summed_case_seconds": 0.124,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.089,
+          "ordinal": 1537,
+          "total": 7122,
+          "binary": "lamp-memory::voice_forget_named",
+          "name": "a_forget_that_names_a_thing_removes_only_it_and_never_the_newest_kept_line",
+          "raw_line": 2243
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.035,
+          "ordinal": 1536,
+          "total": 7122,
+          "binary": "lamp-memory::voice_forget_named",
+          "name": "a_named_forget_in_the_room_never_reaches_a_persons_or_an_earlier_conversations",
+          "raw_line": 2242
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::forget_shared_exchange",
+      "terminal_cases": 4,
+      "passed": 4,
+      "leaky": 0,
+      "summed_case_seconds": 0.113,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.031,
+          "ordinal": 1346,
+          "total": 7122,
+          "binary": "lamp-memory::forget_shared_exchange",
+          "name": "forgetting_an_exchange_keeps_its_kept_thing_and_loses_its_observation",
+          "raw_line": 2052
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.028,
+          "ordinal": 1345,
+          "total": 7122,
+          "binary": "lamp-memory::forget_shared_exchange",
+          "name": "forgetting_a_noticed_thing_leaves_a_kept_thing_from_the_same_exchange",
+          "raw_line": 2051
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.028,
+          "ordinal": 1347,
+          "total": 7122,
+          "binary": "lamp-memory::forget_shared_exchange",
+          "name": "forgetting_everything_still_leaves_nothing_of_the_persons",
+          "raw_line": 2053
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.026,
+          "ordinal": 1344,
+          "total": 7122,
+          "binary": "lamp-memory::forget_shared_exchange",
+          "name": "forgetting_a_kept_thing_leaves_a_noticed_thing_from_the_same_exchange",
+          "raw_line": 2050
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::voice_follows_face",
+      "terminal_cases": 1,
+      "passed": 1,
+      "leaky": 0,
+      "summed_case_seconds": 0.096,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.096,
+          "ordinal": 1526,
+          "total": 7122,
+          "binary": "lamp-memory::voice_follows_face",
+          "name": "what_the_caller_said_before_their_face_was_saved_follows_them_and_no_one_elses",
+          "raw_line": 2232
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::voice_link_used",
+      "terminal_cases": 2,
+      "passed": 2,
+      "leaky": 0,
+      "summed_case_seconds": 0.091,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.052,
+          "ordinal": 1538,
+          "total": 7122,
+          "binary": "lamp-memory::voice_link_used",
+          "name": "forgetting_a_kept_thing_leaves_the_talk_that_did_not_use_it",
+          "raw_line": 2244
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.039,
+          "ordinal": 1539,
+          "total": 7122,
+          "binary": "lamp-memory::voice_link_used",
+          "name": "the_talk_that_used_a_kept_thing_goes_with_it",
+          "raw_line": 2245
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::voice_since_until",
+      "terminal_cases": 2,
+      "passed": 2,
+      "leaky": 0,
+      "summed_case_seconds": 0.076,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.041,
+          "ordinal": 1545,
+          "total": 7122,
+          "binary": "lamp-memory::voice_since_until",
+          "name": "recall_says_since_and_gives_history_with_until_only_when_asked",
+          "raw_line": 2251
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.035,
+          "ordinal": 1544,
+          "total": 7122,
+          "binary": "lamp-memory::voice_since_until",
+          "name": "the_rooms_scope_never_gives_history",
+          "raw_line": 2250
+        }
+      ]
+    },
+    {
+      "binary": "lamp-voice::example/stop_words_stt_replay",
+      "terminal_cases": 6,
+      "passed": 6,
+      "leaky": 0,
+      "summed_case_seconds": 0.074,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.022,
+          "ordinal": 6501,
+          "total": 7122,
+          "binary": "lamp-voice::example/stop_words_stt_replay",
+          "name": "tests::only_the_lamps_sounding_is_sent_and_raw_is_asked_on_the_cadence",
+          "raw_line": 7207
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.02,
+          "ordinal": 6504,
+          "total": 7122,
+          "binary": "lamp-voice::example/stop_words_stt_replay",
+          "name": "tests::the_voices_stop_words_are_counted_against_the_played_lines",
+          "raw_line": 7210
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.014,
+          "ordinal": 6498,
+          "total": 7122,
+          "binary": "lamp-voice::example/stop_words_stt_replay",
+          "name": "tests::the_lamps_own_words_stop_nothing",
+          "raw_line": 7204
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.007,
+          "ordinal": 6495,
+          "total": 7122,
+          "binary": "lamp-voice::example/stop_words_stt_replay",
+          "name": "tests::blocks_are_dated_and_scored_as_the_lamp_read_them",
+          "raw_line": 7201
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.007,
+          "ordinal": 6496,
+          "total": 7122,
+          "binary": "lamp-voice::example/stop_words_stt_replay",
+          "name": "tests::options_are_read",
+          "raw_line": 7202
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::voice_early_words",
+      "terminal_cases": 1,
+      "passed": 1,
+      "leaky": 0,
+      "summed_case_seconds": 0.071,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.071,
+          "ordinal": 1525,
+          "total": 7122,
+          "binary": "lamp-memory::voice_early_words",
+          "name": "the_rooms_early_words_follow_a_lone_face_once_known_and_never_with_another",
+          "raw_line": 2231
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::voice_forget_about",
+      "terminal_cases": 2,
+      "passed": 2,
+      "leaky": 0,
+      "summed_case_seconds": 0.062,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.037,
+          "ordinal": 1535,
+          "total": 7122,
+          "binary": "lamp-memory::voice_forget_about",
+          "name": "forget_about_removes_that_persons_kept_things_about_it_and_nothing_else",
+          "raw_line": 2241
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.025,
+          "ordinal": 1533,
+          "total": 7122,
+          "binary": "lamp-memory::voice_forget_about",
+          "name": "forget_about_in_the_room_reaches_only_this_conversations_kept_things",
+          "raw_line": 2239
+        }
+      ]
+    },
+    {
+      "binary": "lamp-keeper::bin/lamp-keeper",
+      "terminal_cases": 2,
+      "passed": 2,
+      "leaky": 0,
+      "summed_case_seconds": 0.04,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.035,
+          "ordinal": 1189,
+          "total": 7122,
+          "binary": "lamp-keeper::bin/lamp-keeper",
+          "name": "tests::waiting_ends_when_it_is_done_or_after_the_longest",
+          "raw_line": 1895
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.005,
+          "ordinal": 1181,
+          "total": 7122,
+          "binary": "lamp-keeper::bin/lamp-keeper",
+          "name": "tests::a_pause_is_kept_on_the_bus_until_resumed",
+          "raw_line": 1887
+        }
+      ]
+    },
+    {
+      "binary": "lamp-lean",
+      "terminal_cases": 10,
+      "passed": 10,
+      "leaky": 0,
+      "summed_case_seconds": 0.04,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1182,
+          "total": 7122,
+          "binary": "lamp-lean",
+          "name": "footprint::tests::asymmetric_support_distinguishes_yaw_and_rotates_with_coordinates",
+          "raw_line": 1888
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1183,
+          "total": 7122,
+          "binary": "lamp-lean",
+          "name": "footprint::tests::diagonal_inset_uses_unit_normals",
+          "raw_line": 1889
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1184,
+          "total": 7122,
+          "binary": "lamp-lean",
+          "name": "footprint::tests::inset_removes_a_short_chamfer_edge",
+          "raw_line": 1890
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1185,
+          "total": 7122,
+          "binary": "lamp-lean",
+          "name": "footprint::tests::invalid_queries_cannot_report_positive_clearance",
+          "raw_line": 1891
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1186,
+          "total": 7122,
+          "binary": "lamp-lean",
+          "name": "footprint::tests::maximum_vertex_count_retains_the_analytic_regular_polygon",
+          "raw_line": 1892
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::voice_observe",
+      "terminal_cases": 1,
+      "passed": 1,
+      "leaky": 0,
+      "summed_case_seconds": 0.037,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.037,
+          "ordinal": 1540,
+          "total": 7122,
+          "binary": "lamp-memory::voice_observe",
+          "name": "the_pass_keeps_what_the_model_proposes_and_closes_a_job_it_gave_nothing_for",
+          "raw_line": 2246
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::bin/lamp-memory",
+      "terminal_cases": 8,
+      "passed": 8,
+      "leaky": 0,
+      "summed_case_seconds": 0.037,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 1543,
+          "total": 7122,
+          "binary": "lamp-memory::bin/lamp-memory",
+          "name": "factory_tests::no_bus_root_never_invokes_the_factory_for_either_backend",
+          "raw_line": 2249
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.005,
+          "ordinal": 1542,
+          "total": 7122,
+          "binary": "lamp-memory::bin/lamp-memory",
+          "name": "factory_tests::a_socket_bind_failure_precedes_the_factory_and_store_for_either_backend",
+          "raw_line": 2248
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.005,
+          "ordinal": 1546,
+          "total": 7122,
+          "binary": "lamp-memory::bin/lamp-memory",
+          "name": "factory_tests::the_selected_factory_gets_the_original_root_and_source_once_after_socket_bind",
+          "raw_line": 2252
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.005,
+          "ordinal": 1551,
+          "total": 7122,
+          "binary": "lamp-memory::bin/lamp-memory",
+          "name": "tests::the_two_paths_are_required_and_the_days_and_the_offset_have_defaults",
+          "raw_line": 2257
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1547,
+          "total": 7122,
+          "binary": "lamp-memory::bin/lamp-memory",
+          "name": "tests::a_relative_path_an_unknown_option_or_a_bad_number_is_refused",
+          "raw_line": 2253
+        }
+      ]
+    },
+    {
+      "binary": "lamp-update::functions",
+      "terminal_cases": 4,
+      "passed": 4,
+      "leaky": 0,
+      "summed_case_seconds": 0.036,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.012,
+          "ordinal": 2403,
+          "total": 7122,
+          "binary": "lamp-update::functions",
+          "name": "with_reports_on_dance_stays_at_the_bound",
+          "raw_line": 3109
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.01,
+          "ordinal": 2400,
+          "total": 7122,
+          "binary": "lamp-update::functions",
+          "name": "a_product_chat_request_offers_dance_at_the_bound",
+          "raw_line": 3106
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.01,
+          "ordinal": 2401,
+          "total": 7122,
+          "binary": "lamp-update::functions",
+          "name": "a_product_lamp_declares_every_function_it_has_within_the_bound",
+          "raw_line": 3107
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 2402,
+          "total": 7122,
+          "binary": "lamp-update::functions",
+          "name": "the_product_voice_s_functions_in_a_process_of_their_own",
+          "raw_line": 3108
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::bin/lamp-memory-eval",
+      "terminal_cases": 8,
+      "passed": 8,
+      "leaky": 0,
+      "summed_case_seconds": 0.032,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1552,
+          "total": 7122,
+          "binary": "lamp-memory::bin/lamp-memory-eval",
+          "name": "tests::evidence_labels_never_change_retrieved_text_or_ranking",
+          "raw_line": 2258
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1553,
+          "total": 7122,
+          "binary": "lamp-memory::bin/lamp-memory-eval",
+          "name": "tests::legacy_ties_are_newer_first_and_nonmatches_are_not_retrieved",
+          "raw_line": 2259
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1554,
+          "total": 7122,
+          "binary": "lamp-memory::bin/lamp-memory-eval",
+          "name": "tests::missing_or_unaligned_evidence_is_rejected",
+          "raw_line": 2260
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1555,
+          "total": 7122,
+          "binary": "lamp-memory::bin/lamp-memory-eval",
+          "name": "tests::no_labels_never_produces_vacuous_recall",
+          "raw_line": 2261
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1556,
+          "total": 7122,
+          "binary": "lamp-memory::bin/lamp-memory-eval",
+          "name": "tests::partial_evidence_is_not_all_evidence_and_ndcg_matches_upstream_discount",
+          "raw_line": 2262
+        }
+      ]
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-measure",
+      "terminal_cases": 5,
+      "passed": 5,
+      "leaky": 0,
+      "summed_case_seconds": 0.024,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.009,
+          "ordinal": 593,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body-measure",
+          "name": "tests::the_file_is_written_once_and_never_over_another",
+          "raw_line": 1299
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 590,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body-measure",
+          "name": "tests::it_needs_its_device_unit_and_lock_and_takes_nothing_that_moves",
+          "raw_line": 1296
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 591,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body-measure",
+          "name": "tests::measured_at_is_a_utc_minute",
+          "raw_line": 1297
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 594,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body-measure",
+          "name": "tests::the_generic_units_read_seated_once_and_the_confirmed_poses_win",
+          "raw_line": 1300
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.003,
+          "ordinal": 592,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body-measure",
+          "name": "tests::seated_is_a_flag_given_once",
+          "raw_line": 1298
+        }
+      ]
+    },
+    {
+      "binary": "lamp-voice::example/render_line_second",
+      "terminal_cases": 4,
+      "passed": 4,
+      "leaky": 0,
+      "summed_case_seconds": 0.017,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 6493,
+          "total": 7122,
+          "binary": "lamp-voice::example/render_line_second",
+          "name": "tests::the_manifest_names_the_configured_voice_and_model",
+          "raw_line": 7199
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 6489,
+          "total": 7122,
+          "binary": "lamp-voice::example/render_line_second",
+          "name": "tests::silence_is_cut_at_either_end_with_50_ms_kept",
+          "raw_line": 7195
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 6492,
+          "total": 7122,
+          "binary": "lamp-voice::example/render_line_second",
+          "name": "tests::the_wav_is_mono_16_bit_at_the_routes_rate",
+          "raw_line": 7198
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.003,
+          "ordinal": 6491,
+          "total": 7122,
+          "binary": "lamp-voice::example/render_line_second",
+          "name": "tests::the_arguments_are_checked_as_render_lines_are",
+          "raw_line": 7197
+        }
+      ]
+    },
+    {
+      "binary": "lamp-expression::bin/lamp-expression",
+      "terminal_cases": 4,
+      "passed": 4,
+      "leaky": 0,
+      "summed_case_seconds": 0.016,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1136,
+          "total": 7122,
+          "binary": "lamp-expression::bin/lamp-expression",
+          "name": "tests::invalid_options_cannot_accidentally_enable_a_service",
+          "raw_line": 1842
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1137,
+          "total": 7122,
+          "binary": "lamp-expression::bin/lamp-expression",
+          "name": "tests::outputs_require_the_explicit_enable_switch",
+          "raw_line": 1843
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1138,
+          "total": 7122,
+          "binary": "lamp-expression::bin/lamp-expression",
+          "name": "tests::the_hour_and_the_time_of_day_are_asked_for_by_name",
+          "raw_line": 1844
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1139,
+          "total": 7122,
+          "binary": "lamp-expression::bin/lamp-expression",
+          "name": "tests::the_start_line_names_the_zone_only_when_one_is_given",
+          "raw_line": 1845
+        }
+      ]
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-mood",
+      "terminal_cases": 3,
+      "passed": 3,
+      "leaky": 0,
+      "summed_case_seconds": 0.01,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 597,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body-mood",
+          "name": "tests::the_datagram_reaches_a_socket",
+          "raw_line": 1303
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.003,
+          "ordinal": 595,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body-mood",
+          "name": "tests::it_refuses_what_the_body_could_not_read",
+          "raw_line": 1301
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.003,
+          "ordinal": 596,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body-mood",
+          "name": "tests::it_takes_a_socket_a_mood_and_a_level",
+          "raw_line": 1302
+        }
+      ]
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-inspect",
+      "terminal_cases": 2,
+      "passed": 2,
+      "leaky": 0,
+      "summed_case_seconds": 0.008,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 588,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body-inspect",
+          "name": "tests::explicit_bounded_arguments_and_help_are_valid_without_any_open",
+          "raw_line": 1294
+        },
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 589,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body-inspect",
+          "name": "tests::no_implicit_device_or_unit_and_no_unknown_controls",
+          "raw_line": 1295
+        }
+      ]
+    },
+    {
+      "binary": "lamp-memory::paraphrase_fixture",
+      "terminal_cases": 1,
+      "passed": 1,
+      "leaky": 0,
+      "summed_case_seconds": 0.004,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 1524,
+          "total": 7122,
+          "binary": "lamp-memory::paraphrase_fixture",
+          "name": "paraphrase_fixture_has_its_shape",
+          "raw_line": 2230
+        }
+      ]
+    },
+    {
+      "binary": "lamp-voice::bin/lamp-voice",
+      "terminal_cases": 1,
+      "passed": 1,
+      "leaky": 0,
+      "summed_case_seconds": 0.004,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 6488,
+          "total": 7122,
+          "binary": "lamp-voice::bin/lamp-voice",
+          "name": "tests::stt_checks_options_are_rounds_then_what_is_held_within_their_bounds",
+          "raw_line": 7194
+        }
+      ]
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-worker",
+      "terminal_cases": 1,
+      "passed": 1,
+      "leaky": 0,
+      "summed_case_seconds": 0.003,
+      "longest_cases": [
+        {
+          "status": "PASS",
+          "seconds": 0.003,
+          "ordinal": 598,
+          "total": 7122,
+          "binary": "lamp-body::bin/lamp-body-worker",
+          "name": "tests::no_implicit_devices_or_motion_commands",
+          "raw_line": 1304
+        }
+      ]
+    }
+  ]
+}

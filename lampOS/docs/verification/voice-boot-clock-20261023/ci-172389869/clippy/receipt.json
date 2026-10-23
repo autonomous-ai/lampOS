@@ -1,0 +1,77 @@
+{
+  "workflow_id": 39891902443,
+  "job_id": 120213379860,
+  "status": "completed",
+  "conclusion": "success",
+  "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+  "rust_toolchain": "1.96.0-x86_64-unknown-linux-gnu",
+  "actual_checkout": "286466bc4bb6922a1ec2f50282f35118b194f327",
+  "parents": [
+    "70cbefceee62c0bc4cad4ec0b7054335dd8f0a5d",
+    "172389869129a7466623cc9b45d1c536f42f7429"
+  ],
+  "merge_tree": "75c7bd43a9d78a9f16dc1b63987c7b21b009d876",
+  "pr_head": "172389869129a7466623cc9b45d1c536f42f7429",
+  "base": "70cbefceee62c0bc4cad4ec0b7054335dd8f0a5d",
+  "whole_tree_equals_pr_head": true,
+  "lampOS_tree": "0871aadde62d2c9688a1a913085c94a959423c6b",
+  "github_tree": "d6cdf1fbf133c642ef9aeadd0cd40bdae4b03acf",
+  "step_durations": [
+    {
+      "name": "Set up job",
+      "conclusion": "success",
+      "seconds": 1.0
+    },
+    {
+      "name": "system packages",
+      "conclusion": "success",
+      "seconds": 24.0
+    },
+    {
+      "name": "Run actions/checkout@v4",
+      "conclusion": "success",
+      "seconds": 6.0
+    },
+    {
+      "name": "Rust 1.96.0",
+      "conclusion": "success",
+      "seconds": 8.0
+    },
+    {
+      "name": "restore the cache",
+      "conclusion": "success",
+      "seconds": 45.0
+    },
+    {
+      "name": "unchanged source files get the cached build's times back",
+      "conclusion": "success",
+      "seconds": 1.0
+    },
+    {
+      "name": "clippy (every crate and target, warnings as errors)",
+      "conclusion": "success",
+      "seconds": 68.0
+    },
+    {
+      "name": "save the cache",
+      "conclusion": "skipped",
+      "seconds": 0.0
+    },
+    {
+      "name": "Post Run actions/checkout@v4",
+      "conclusion": "success",
+      "seconds": 0.0
+    },
+    {
+      "name": "Complete job",
+      "conclusion": "success",
+      "seconds": 0.0
+    }
+  ],
+  "cargo_reported_duration": "1m 06s",
+  "runtime_tests_executed": 0,
+  "runtime_test_qualification": "Clippy checks all workspace targets; it does not execute tests.",
+  "log_bytes": 35473,
+  "log_sha256": "2fbb6148edf3c08987f85a44e7cbfcb4af29c205aa9de8e1e2e678515423d934",
+  "cache_note": "The workflow restored cached target/source times. Whole-tree Git identity binds source, not proof of a cold rebuild."
+}

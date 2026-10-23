@@ -1,0 +1,126 @@
+{
+  "README.md": {
+    "bytes": 5397,
+    "sha256": "c8d1f42f4bd5675f3ce2954ce1974ce20dfc358d47351d7947b378a91472b340"
+  },
+  "affected-case-inventory-inherited.json": {
+    "bytes": 29120,
+    "sha256": "acda19cc6ce3ccd38f0536dcdfefccaa5f407c9c91bb5fb2e7eb30e27cc4d636"
+  },
+  "arm64/affected-census.json": {
+    "bytes": 48881,
+    "sha256": "301e64ceea9bf7d711622b1dd71401d42d6a48927054943845b6807778f48fb1"
+  },
+  "arm64/binary-durations.json": {
+    "bytes": 77766,
+    "sha256": "0666954b9f8ffcd431c2a439a8463c66054c7394f9ee497bece17e74f61e07a6"
+  },
+  "arm64/doc-census.json": {
+    "bytes": 5096,
+    "sha256": "ff94dc2e90c8d83bae5a91458c464d6bc12efd363e9f1d0c80b4f6b53761cec0"
+  },
+  "arm64/download-log.json": {
+    "bytes": 365,
+    "sha256": "6b8437a2e794a6e96a959a4fd7b7274fccf60a4e91311148c35004930aa9a4f1"
+  },
+  "arm64/job.log.json": {
+    "bytes": 1266939,
+    "sha256": "a88eb331055bf1a5746a86bb7febee5782a6a2652a4c2a3a56cffdd89aa807fe"
+  },
+  "arm64/masked-name-matches.json": {
+    "bytes": 789,
+    "sha256": "0f0eae78897b8845d3404540cda20b5b1824359591fa64c06a5be4b5abc8e023"
+  },
+  "arm64/receipt.json": {
+    "bytes": 13219,
+    "sha256": "2c5358e76b672ff07d40fe8122dcc2f7ab457da83c089bf9d5714f1b78a167e8"
+  },
+  "arm64/selected-terminal-census.json": {
+    "bytes": 1710196,
+    "sha256": "95f23df14f221dd497599a4b6f98c7e65106b38776522a2a7f05c7f734396b10"
+  },
+  "arm64/separate-harness-census.json": {
+    "bytes": 2232,
+    "sha256": "dd68084896b9cb94b268812b91589edb032e0f1c0e439745da0b354d42cf234b"
+  },
+  "arm64/workflow-jobs-command.json": {
+    "bytes": 361,
+    "sha256": "02d68585082f7b9ed2d6ddc2a30eb42403129d3f944a5ff76103cab3bdefe326"
+  },
+  "arm64/workflow-jobs.json": {
+    "bytes": 7936,
+    "sha256": "06a2faf788694139775372752ab6dc8ef4c77e0d209711a18914f24030e90550"
+  },
+  "arm64/workflow-run-command.json": {
+    "bytes": 357,
+    "sha256": "4eb4b573c7ac9a8159bbdcbc5dd88603bd3c4273dc8360c05f327d8303f794dd"
+  },
+  "arm64/workflow-run.json": {
+    "bytes": 486,
+    "sha256": "7e579c97011d3a45e2c213c0d47cf199bf6060887be46e6745df8f7837aaeb83"
+  },
+  "attribution-scan.json": {
+    "bytes": 1481,
+    "sha256": "bd4858b4c9ddd18b6df43813534133aa6a5a37d67ddb6d0a4b39df2547eb6a67"
+  },
+  "changed-source-identities.json": {
+    "bytes": 1777,
+    "sha256": "ff9ce4813262174e3eeece3e6651da83cbfd45dc12206fcd8073f13431e7c710"
+  },
+  "clippy/download-log.json": {
+    "bytes": 363,
+    "sha256": "b052a34ae58b2f280aca811fcf3abcc4de75d5e2bf2e68e122eb87227ee7936e"
+  },
+  "clippy/job.log.json": {
+    "bytes": 36211,
+    "sha256": "f43fda7bc164d1bda027c6a541e154bd813a8a4995f09b585f44b3f03d709f90"
+  },
+  "clippy/merge-commit.json": {
+    "bytes": 367,
+    "sha256": "4291959a4616b7b940cf006836504cc78e2fac8dd328006d756f2d0101afe1bf"
+  },
+  "clippy/merge-root-tree.json": {
+    "bytes": 5120,
+    "sha256": "157f6373785d42a365aa2a20305f37e8fe717384a948e0e43e729a65196ca43e"
+  },
+  "clippy/receipt.json": {
+    "bytes": 2262,
+    "sha256": "a86062fde9ab72b8b4523c883e55364705b60f2404d465fae7fd9bcf00e30be5"
+  },
+  "clippy/workflow-jobs.json": {
+    "bytes": 3140,
+    "sha256": "57d2011590cf3ce86518586cbe3226a1de9fb88af2f4b31383e0c1b9465973f9"
+  },
+  "clippy/workflow-run.json": {
+    "bytes": 485,
+    "sha256": "0e129cff7e60bb32ca274f9136216c33636eaded196194898ad38e452c3b5b29"
+  },
+  "metadata-projections.json": {
+    "bytes": 2212,
+    "sha256": "d5c1f04be71a3a9d610cbf1da1d1a4aeaa465987bc3b6bcef049cd58e845e9c0"
+  },
+  "pr-at-clippy.json": {
+    "bytes": 307,
+    "sha256": "20bf025dd9c6082af4b4567d136849a5ebc8ec7fe078acb82a81cba91477a339"
+  },
+  "source-binding.json": {
+    "bytes": 3683,
+    "sha256": "69566e85f7de009ff727c40c25695be9f3c76aef2b9d946a310769c52d99357c"
+  },
+  "source-lampos-arm64.yml": {
+    "bytes": 18332,
+    "sha256": "ad1a4cd650db5f2a721b510263ff5c1697b09f872646395fb4cab6173f8757f9"
+  },
+  "source-lampos-clippy.yml": {
+    "bytes": 4189,
+    "sha256": "2b41648cade7109e94995fd076f638166345867600e38e5e9aa9438a9b18c9ac"
+  },
+  "source-nextest.toml": {
+    "bytes": 5157,
+    "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+  },
+  "source-selection-script.json": {
+    "bytes": 5960,
+    "sha256": "37540e2708db115e7ca0a95857aca31d7f21cce07f4fc93e867a0d61badbe683"
+  }
+}

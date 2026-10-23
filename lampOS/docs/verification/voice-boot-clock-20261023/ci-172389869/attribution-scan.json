@@ -1,0 +1,28 @@
+{
+  "method": "Scan decoded UTF-8 logs case-insensitively for standalone identity names/handles/emails extracted from User account objects and human commit attribution in retained raw API responses. Also scan all other publication text, including decoded JSON strings. Organization account handles and service committer attribution are not person identities; all attribution objects are omitted from the API projections anyway.",
+  "person_identity_tokens": 3,
+  "identity_token_sha256": [
+    "34f0bc2f01b52c83923f28c18f8de42ad6f771e0b8a0e3638e5489e81f8e53e4",
+    "3684d6e399bedce8744344af0523163448bf0f8beb983f801009949710cfa55b",
+    "cdf02b27b16e175786c14aaa8b36c01666d0abc7361a5d5bb5fd92fa2b0b0955"
+  ],
+  "log_results": [
+    {
+      "path": "clippy/job.log.json",
+      "original_bytes": 35473,
+      "original_sha256": "2fbb6148edf3c08987f85a44e7cbfcb4af29c205aa9de8e1e2e678515423d934",
+      "matched_person_attribution_offsets": [],
+      "redactions": [],
+      "published_text_equals_original": true
+    },
+    {
+      "path": "arm64/job.log.json",
+      "original_bytes": 1257506,
+      "original_sha256": "8995c2758bf65b6fd95f0f3b147b14d30c8e895ae1221775726c2f838fd433c8",
+      "matched_person_attribution_offsets": [],
+      "redactions": [],
+      "published_text_equals_original": true
+    }
+  ],
+  "limitation": "This is a check against attribution present in the captured metadata, not a claim to recognize every possible human name in arbitrary test text."
+}

@@ -1,0 +1,16 @@
+[
+  {
+    "expected_name": "coordinator::tests::hand_controls::a_hand_kept_on_the_head_sighs_in_its_last_second_and_sleeps_on_time",
+    "observed_name": "coordinator::tests::hand_controls::a_hand_kept_on_the_head_si***",
+    "raw_line": 3942,
+    "status": "PASS",
+    "seconds": 0.034,
+    "source": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+    "source_sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+    "source_function_prefix": "a_hand_kept_on_the_head_si",
+    "matching_source_functions": [
+      "a_hand_kept_on_the_head_sighs_in_its_last_second_and_sleeps_on_time"
+    ],
+    "limitation": "Full name is not present in the Actions log; attribution uses the unique visible module/function prefix in the exact tested source."
+  }
+]

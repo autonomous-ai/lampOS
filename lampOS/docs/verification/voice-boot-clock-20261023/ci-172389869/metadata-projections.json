@@ -1,0 +1,35 @@
+{
+  "policy": "Published API records are explicit minimal provenance projections, not byte-identical original responses. Original API responses remain unchanged externally; their byte counts and SHA-256 values bind each projection. No person attribution is copied.",
+  "records": {
+    "clippy/workflow-run.json": {
+      "original_bytes": 12724,
+      "original_sha256": "97d676dbbeb3192ab5658a075a92ae329cdfa1660e36da78f9f6f9c7f7ebea3f",
+      "projection": "Only workflow identity, event, head, status, timestamps and URL. Actor, triggering_actor, head_commit author/committer and other account objects omitted."
+    },
+    "arm64/workflow-run.json": {
+      "original_bytes": 12725,
+      "original_sha256": "7eeb5c27d25d6eaefde96eac1ab9540ef7d2496f88fd687ee55b9798fcf9f77c",
+      "projection": "Only workflow identity, event, head, status, timestamps and URL. Actor, triggering_actor, head_commit author/committer and other account objects omitted."
+    },
+    "clippy/workflow-jobs.json": {
+      "original_bytes": 2635,
+      "original_sha256": "e45fdf9149c1eeb2d091a47c2e53094e9d8c09beb06b3e603aa112ae853d0385",
+      "projection": "Job identity, descriptive name, head, status, timestamps, runner labels, URL and step status/timestamps only; runner/account objects omitted."
+    },
+    "arm64/workflow-jobs.json": {
+      "original_bytes": 7021,
+      "original_sha256": "6a992b0b77bb1f5f380ed6cb8e055ae4ee7161c3b34e10d19b7fee8342a297cd",
+      "projection": "Job identity, descriptive name, head, status, timestamps, runner labels, URL and step status/timestamps only; runner/account objects omitted."
+    },
+    "clippy/merge-commit.json": {
+      "original_bytes": 2603,
+      "original_sha256": "a05100b4f30835c8b858b5c015a3233e0c08b80a8617dba778f78e7efd9149f2",
+      "projection": "Commit SHA, tree SHA, parent SHAs and author/committer timestamps only; attribution names/emails and message omitted."
+    },
+    "pr-at-clippy.json": {
+      "original_bytes": 20641,
+      "original_sha256": "27f07fb99da14e4c446ec3752c7c3a270e9ba38a877d7f84aa2d82fdece4b63a",
+      "projection": "PR number/title and head/base SHA/ref only; all user/account objects, body and review objects omitted."
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "lampOS/crates/voice/src/coordinator/second.rs": {
+    "git_blob": "18422cfda93ef559ce7364489a024cb6b4837e38",
+    "bytes": 76253,
+    "sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf"
+  },
+  "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": {
+    "git_blob": "f7a2640063815a8607e9b03d24870f8b9224db5d",
+    "bytes": 133195,
+    "sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1"
+  },
+  "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": {
+    "git_blob": "8ac21f8f4c67e033e7e505c3619d736da8745e88",
+    "bytes": 109424,
+    "sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf"
+  },
+  "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": {
+    "git_blob": "707b3b2e972bb25e6a136611b1680c944f415b0b",
+    "bytes": 73989,
+    "sha256": "65af6a4a052ef808e094284373f4c155bf4f09250a09c2c090b9b225c77cda6e"
+  },
+  "lampOS/crates/voice/src/scenario_clock.rs": {
+    "git_blob": "9d3491a63326a3113a418d0f2fe99aecabec1689",
+    "bytes": 19561,
+    "sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2"
+  },
+  "lampOS/crates/voice/src/second_provider/worker.rs": {
+    "git_blob": "3327329eb8101e06466e636e0d3ce0ed15fa365b",
+    "bytes": 771127,
+    "sha256": "a5144c77508ee1d19ff651290f42e4b8f442193bf22a366c595c973dbf0e9123"
+  },
+  "lampOS/crates/voice/src/stop_words.rs": {
+    "git_blob": "34738eec915c8a45db19116db4f57f147f9c7362",
+    "bytes": 119297,
+    "sha256": "5524521c56061be6af4b8ee95d52ecc3b9b1d3c3ee4a2344db4fa75dbf4f9a0f"
+  },
+  "lampOS/docs/voice-test-fixtures.md": {
+    "git_blob": "a48624225a9f57d2fc74d12a1468de43276761cc",
+    "bytes": 31717,
+    "sha256": "7a3164aec84b4fb303944d8e97056e21e8c3563acc469779b376ae0b06510194"
+  }
+}
