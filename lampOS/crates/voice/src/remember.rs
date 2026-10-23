@@ -2291,6 +2291,9 @@ pub fn told_for_fresh_session(
     fresh_session_note(socket, session, person, fresh).text
 }
 
+/// Internal request-owned read permission, never a wire or model value.
+pub(crate) type NotePermission = Arc<dyn Fn() -> bool + Send + Sync>;
+
 /// A rendered note and whether every requested snapshot scope was read.
 /// A valid empty snapshot is complete; unavailable personal data is not.
 pub struct SessionNote {
@@ -2396,18 +2399,19 @@ pub(crate) fn fresh_note_read(
     person: Option<&str>,
     deadline: Duration,
     follow_up: bool,
+    permitted: NotePermission,
 ) -> NoteRead {
     match DAYS
         .get()
         .and_then(Option::as_ref)
         .filter(|client| DAYS_MODE.get() == Some(&true) && client.socket == socket)
     {
-        Some(client) => client.read_note_within(
+        Some(client) => client.read_note_permitted(
             session,
             person,
             crate::rules::on(),
             deadline,
-            (true, follow_up),
+            (true, follow_up, &permitted),
         ),
         None => NoteRead::unavailable(),
     }
@@ -2544,6 +2548,16 @@ impl DaysClient {
 /// ([`DaysClient::follow_up_read`], [`NoteRead::follow_up`]). Given, it
 /// counts as one of the memory's offers.
 fn read_follow_up(socket: &Path, person: &str, events: bool, until: Instant) -> Option<FollowUp> {
+    read_follow_up_permitted(socket, person, events, until, None)
+}
+
+fn read_follow_up_permitted(
+    socket: &Path,
+    person: &str,
+    events: bool,
+    until: Instant,
+    permitted: Option<&NotePermission>,
+) -> Option<FollowUp> {
     let left = until.checked_duration_since(Instant::now())?;
     let mut line = json!({"op":"follow_up","person":person});
     // With events, a dated one comes only after its day, with that day
@@ -2558,7 +2572,7 @@ fn read_follow_up(socket: &Path, person: &str, events: bool, until: Instant) -> 
     // lamp-06c1 told one at "good morning" and never asked). An older
     // memory refuses the field and the session is told none.
     line["until_asked"] = json!(true);
-    let answer = bounded_exchange(socket, &line, left)?;
+    let answer = bounded_exchange_permitted(socket, &line, left, permitted)?;
     let found = &answer["follow_up"];
     let id = found["id"]
         .as_u64()
@@ -2958,6 +2972,18 @@ impl NoteRead {
     /// to take it ([`Self::adopt`]); nothing when none is wanted. Only now
     /// does the memory count the offer.
     pub fn follow_up(&mut self, within: Duration) {
+        self.follow_up_checked(within, None);
+    }
+
+    pub(crate) fn follow_up_permitted(&mut self, within: Duration, permitted: &NotePermission) {
+        self.follow_up_checked(within, Some(permitted));
+    }
+
+    fn follow_up_checked(&mut self, within: Duration, permitted: Option<&NotePermission>) {
+        let until = Instant::now() + within;
+        if !note_permitted(permitted) {
+            return;
+        }
         let Some(held) = self.held.as_mut().filter(|held| held.follow_wanted) else {
             return;
         };
@@ -2965,7 +2991,8 @@ impl NoteRead {
         let Some(person) = held.person.as_deref() else {
             return;
         };
-        held.follow_up = read_follow_up(&held.socket, person, held.events, Instant::now() + within);
+        held.follow_up =
+            read_follow_up_permitted(&held.socket, person, held.events, until, permitted);
         if let Some(follow_up) = &held.follow_up {
             self.text.push_str(&follow_up.told);
         }
@@ -2990,7 +3017,18 @@ impl NoteRead {
     /// keeps may have changed since the read began ([`DaysContext::changes`]:
     /// a forget, a rule forgotten, a stop or a lost write): its snapshot may
     /// hold what was forgotten, and it is never told.
-    pub fn adopt(mut self) -> Option<SessionNote> {
+    pub fn adopt(self) -> Option<SessionNote> {
+        self.adopt_checked(None)
+    }
+
+    pub(crate) fn adopt_permitted(self, permitted: &NotePermission) -> Option<SessionNote> {
+        self.adopt_checked(Some(permitted))
+    }
+
+    fn adopt_checked(mut self, permitted: Option<&NotePermission>) -> Option<SessionNote> {
+        if !note_permitted(permitted) {
+            return None;
+        }
         let text = std::mem::take(&mut self.text);
         let (complete, cause) = (self.complete, self.cause);
         let Some(held) = self.held.as_mut() else {
@@ -3004,7 +3042,8 @@ impl NoteRead {
         let Ok(mut context) = held.context.lock() else {
             return None;
         };
-        if context.changes != changes {
+        // A previous bounded writer may have held this lock while proof ended.
+        if !note_permitted(permitted) || context.changes != changes {
             return None;
         }
         context.read_done(&held.name);
@@ -3096,15 +3135,40 @@ impl Drop for NoteRead {
     }
 }
 
-/// The legacy note with what the person at the lamp asked to keep, read
-/// now within `deadline` (the note's 300 ms on the lamp, a test's longer
-/// one on a loaded machine), after the room's. Nobody known, or a voice
-/// without a memory: the room's note as it is.
+/// Second's legacy note after the room-note lock, with request permission
+/// checked again at the personal kept exchange. Raw Live callers keep their
+/// existing `theirs_too` transport and authority behavior.
+pub(crate) fn legacy_told_permitted(
+    socket: &Path,
+    person: Option<&str>,
+    permitted: &NotePermission,
+) -> String {
+    if !permitted() {
+        return String::new();
+    }
+    // NOTE may have been contended while proof expired. Recheck after it.
+    let room = told();
+    if !permitted() {
+        return String::new();
+    }
+    theirs_too_checked(socket, room, person, FIRST_READ, Some(permitted))
+}
+
 fn theirs_too(socket: &Path, room: String, person: Option<&str>, deadline: Duration) -> String {
+    theirs_too_checked(socket, room, person, deadline, None)
+}
+
+fn theirs_too_checked(
+    socket: &Path,
+    room: String,
+    person: Option<&str>,
+    deadline: Duration,
+    permitted: Option<&NotePermission>,
+) -> String {
     let Some(person) = person.filter(|_| !room.is_empty()) else {
         return room;
     };
-    let theirs = kept(socket, Some(person), deadline).unwrap_or_default();
+    let theirs = kept_permitted(socket, Some(person), deadline, permitted).unwrap_or_default();
     if theirs.is_empty() {
         return room;
     }
@@ -3767,6 +3831,15 @@ pub fn event_turn_note(person: Option<&str>, heard: &str) -> Option<String> {
     days_client()?.event_turn(person, heard)
 }
 
+/// Second's event read rechecks its request after waiting for the Days lock.
+pub(crate) fn event_turn_note_permitted(
+    person: Option<&str>,
+    heard: &str,
+    permitted: &NotePermission,
+) -> Option<String> {
+    days_client()?.event_turn_checked(person, heard, Some(permitted))
+}
+
 /// [`DaysClient::event_withheld`] on the lamp's Days client: nothing
 /// without one.
 pub fn event_withheld() -> Option<String> {
@@ -3928,11 +4001,41 @@ pub fn hits_note(
     now_unix_ms: u64,
     zone: Option<&LocalTime>,
 ) -> Option<String> {
-    if content_words(heard).is_empty() {
+    hits_note_checked(socket, person, heard, now_unix_ms, zone, None)
+}
+
+/// Second's hits use the same request permission at each socket boundary.
+pub(crate) fn hits_note_permitted(
+    socket: &Path,
+    person: Option<&str>,
+    heard: &str,
+    now_unix_ms: u64,
+    zone: Option<&LocalTime>,
+    permitted: &NotePermission,
+) -> Option<String> {
+    hits_note_checked(socket, person, heard, now_unix_ms, zone, Some(permitted))
+}
+
+fn hits_note_checked(
+    socket: &Path,
+    person: Option<&str>,
+    heard: &str,
+    now_unix_ms: u64,
+    zone: Option<&LocalTime>,
+    permitted: Option<&NotePermission>,
+) -> Option<String> {
+    if !note_permitted(permitted) || content_words(heard).is_empty() {
         return None;
     }
     let request = for_person(json!({"op":"kept","max_bytes":HITS_KEPT_BYTES}), person);
-    let answer = bounded_exchange_up_to(socket, &request, HITS_WITHIN, HITS_ANSWER_BYTES)?;
+    let answer = exchange_permitted(
+        socket,
+        &request,
+        HITS_WITHIN,
+        None,
+        HITS_ANSWER_BYTES,
+        permitted,
+    )?;
     let ids = DAYS
         .get()
         .and_then(Option::as_ref)
@@ -3942,10 +4045,16 @@ pub fn hits_note(
     if let Some(client) = ids
         && let Ok(mut context) = client.context.lock()
     {
+        if !note_permitted(permitted) {
+            return None;
+        }
         context.hit(person, &shown);
         for (id, text) in entry_texts(&answer, &shown) {
             context.shown_as(person, id, &text);
         }
+    }
+    if !note_permitted(permitted) {
+        return None;
     }
     Some(match person {
         Some(_) => told,
@@ -4583,7 +4692,40 @@ impl DaysClient {
         deadline: Duration,
         (fresh, follow_up): (bool, bool),
     ) -> NoteRead {
+        self.read_note_checked(session, person, rules, deadline, (fresh, follow_up, None))
+    }
+
+    /// Second's request-owned read. Every subdispatch keeps its original budget
+    /// and checks the same caller's current private-source permission.
+    pub(crate) fn read_note_permitted(
+        &self,
+        session: u64,
+        person: Option<&str>,
+        rules: bool,
+        deadline: Duration,
+        (fresh, follow_up, permitted): (bool, bool, &NotePermission),
+    ) -> NoteRead {
+        self.read_note_checked(
+            session,
+            person,
+            rules,
+            deadline,
+            (fresh, follow_up, Some(permitted)),
+        )
+    }
+
+    fn read_note_checked(
+        &self,
+        session: u64,
+        person: Option<&str>,
+        rules: bool,
+        deadline: Duration,
+        (fresh, follow_up, permitted): (bool, bool, Option<&NotePermission>),
+    ) -> NoteRead {
         let started = Instant::now();
+        if !note_permitted(permitted) {
+            return NoteRead::unavailable();
+        }
         let name = format!("{}-{session:x}", self.prefix);
         // Taken as the read begins: a keep after it marks the note again,
         // and one this read was to cover is marked again if it is never
@@ -4594,7 +4736,10 @@ impl DaysClient {
                 "lamp-voice second: something was kept: this turn asks the memory's note again (#2540)"
             );
         }
-        let begun = self.context.lock().ok().map(|mut context| {
+        let begun = self.context.lock().ok().and_then(|mut context| {
+            if !note_permitted(permitted) {
+                return None;
+            }
             // Stopped before this read began, with what was then uncertain.
             let resumable = (fresh
                 && (context.journal_inhibited || context.lost_writes > 0)
@@ -4602,7 +4747,7 @@ impl DaysClient {
                 && self.resumes.load(Ordering::Acquire))
             .then_some((context.inhibits, context.lost_writes));
             context.reading(&name, person);
-            (context.changes, resumable)
+            Some((context.changes, resumable))
         });
         let mut held = ReadHeld {
             context: Arc::clone(&self.context),
@@ -4644,10 +4789,12 @@ impl DaysClient {
         }
         let until = started + deadline;
         let opened = self
-            .open_one(&name, None, until)
+            .open_one_permitted(&name, None, until, permitted)
             .map(|room| {
-                let theirs =
-                    person.and_then(|person| self.open_one(&name, Some(person), until).ok());
+                let theirs = person.and_then(|person| {
+                    self.open_one_permitted(&name, Some(person), until, permitted)
+                        .ok()
+                });
                 self.opened(room, theirs)
             })
             .and_then(|opened| {
@@ -4683,7 +4830,7 @@ impl DaysClient {
         let mut follows = true;
         if rules {
             match crate::rules::read(
-                |line, left| bounded_exchange_scoped(&self.socket, line, left, None),
+                |line, left| bounded_exchange_permitted(&self.socket, line, left, permitted),
                 person,
                 until,
             ) {
@@ -4696,7 +4843,13 @@ impl DaysClient {
         }
         if let Some(person) = person.filter(|_| follows && self.threads.load(Ordering::Acquire)) {
             if follow_up {
-                held.follow_up = self.follow_up_read(person, until);
+                held.follow_up = read_follow_up_permitted(
+                    &self.socket,
+                    person,
+                    self.events.load(Ordering::Acquire),
+                    until,
+                    permitted,
+                );
                 if let Some(follow_up) = &held.follow_up {
                     text.push_str(&follow_up.told);
                 }
@@ -4720,6 +4873,16 @@ impl DaysClient {
         person: Option<&str>,
         until: Instant,
     ) -> Result<(Value, Vec<u64>), NoteCause> {
+        self.open_one_permitted(name, person, until, None)
+    }
+
+    fn open_one_permitted(
+        &self,
+        name: &str,
+        person: Option<&str>,
+        until: Instant,
+        permitted: Option<&NotePermission>,
+    ) -> Result<(Value, Vec<u64>), NoteCause> {
         let close = || {
             let _ = self
                 .jobs
@@ -4729,13 +4892,14 @@ impl DaysClient {
             close();
             return Err(NoteCause::Timeout);
         };
-        let answer = bounded_exchange(
+        let answer = bounded_exchange_permitted(
             &self.socket,
             &for_person(
                 json!({"op":"session_open","session":name,"max_bytes":NOTE_BYTES}),
                 person,
             ),
             left,
+            permitted,
         );
         let scope = if person.is_some() {
             PERSON_SCOPE
@@ -5772,12 +5936,24 @@ impl DaysClient {
     /// ([`Opening::Nothing`]), anyone else's, and every line after the
     /// first decide nothing.
     pub fn event_turn(&self, person: Option<&str>, heard: &str) -> Option<String> {
-        if !self.events.load(Ordering::Acquire) {
+        self.event_turn_checked(person, heard, None)
+    }
+
+    fn event_turn_checked(
+        &self,
+        person: Option<&str>,
+        heard: &str,
+        permitted: Option<&NotePermission>,
+    ) -> Option<String> {
+        if !note_permitted(permitted) || !self.events.load(Ordering::Acquire) {
             return None;
         }
         let person = person?;
         let opening = opening(heard);
         let mut context = self.context.lock().ok()?;
+        if !note_permitted(permitted) {
+            return None;
+        }
         let context = &mut *context;
         let event = context.event_turn.as_mut()?;
         if event.decided.is_some() || event.person != person || opening == Opening::Nothing {
@@ -7254,6 +7430,19 @@ fn bounded_exchange(socket: &Path, line: &Value, budget: Duration) -> Option<Val
     bounded_exchange_scoped(socket, line, budget, None)
 }
 
+fn note_permitted(permitted: Option<&NotePermission>) -> bool {
+    permitted.is_none_or(|permitted| permitted())
+}
+
+fn bounded_exchange_permitted(
+    socket: &Path,
+    line: &Value,
+    budget: Duration,
+    permitted: Option<&NotePermission>,
+) -> Option<Value> {
+    exchange_permitted(socket, line, budget, None, ANSWER_BYTES, permitted)
+}
+
 fn bounded_exchange_scoped(
     socket: &Path,
     line: &Value,
@@ -7281,29 +7470,41 @@ fn exchange_within(
     lease: Option<&crate::memory_scope::ScopeLease>,
     most: usize,
 ) -> Option<Value> {
-    if !scope_current(lease) {
+    exchange_permitted(socket, line, budget, lease, most, None)
+}
+
+fn exchange_permitted(
+    socket: &Path,
+    line: &Value,
+    budget: Duration,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    most: usize,
+    permitted: Option<&NotePermission>,
+) -> Option<Value> {
+    let until = Instant::now().checked_add(budget)?;
+    let current = || scope_current(lease) && note_permitted(permitted);
+    if !current() {
         return None;
     }
     use rustix::{
         event::{PollFd, PollFlags, Timespec, poll},
         net::{SocketAddrUnix, connect},
     };
-    let until = Instant::now().checked_add(budget)?;
     let address = SocketAddrUnix::new(socket).ok()?;
     let stream = unconnected()?;
-    if !scope_current(lease) {
+    if !current() {
         return None;
     }
     let connected = connect(&stream, &address);
     let wait = |interest| -> Option<()> {
         loop {
-            if !scope_current(lease) {
+            if !current() {
                 return None;
             }
             let left = until
                 .checked_duration_since(Instant::now())
                 .filter(|left| !left.is_zero())?;
-            let left = if lease.is_some() {
+            let left = if lease.is_some() || permitted.is_some() {
                 left.min(Duration::from_millis(20))
             } else {
                 left
@@ -7314,7 +7515,7 @@ fn exchange_within(
             };
             let mut fds = [PollFd::new(&stream, interest)];
             match poll(&mut fds, Some(&timeout)) {
-                Ok(0) if lease.is_some() => continue,
+                Ok(0) if lease.is_some() || permitted.is_some() => continue,
                 Ok(0) => return None,
                 Ok(_)
                     if fds[0]
@@ -7348,7 +7549,7 @@ fn exchange_within(
     bytes.push(b'\n');
     let mut sent = 0;
     while sent < bytes.len() {
-        if !scope_current(lease) {
+        if !current() {
             return None;
         }
         until.checked_duration_since(Instant::now())?;
@@ -7363,7 +7564,7 @@ fn exchange_within(
     let mut answer = Vec::with_capacity(1_024);
     let mut chunk = [0u8; 1_024];
     loop {
-        if !scope_current(lease) {
+        if !current() {
             return None;
         }
         until.checked_duration_since(Instant::now())?;
@@ -7375,11 +7576,11 @@ fn exchange_within(
                 if let Some(end) = chunk[..n].iter().position(|byte| *byte == b'\n') {
                     answer.extend_from_slice(&chunk[..=end]);
                     let value = serde_json::from_slice(&answer).ok()?;
-                    if !scope_current(lease) {
+                    if !current() {
                         return None;
                     }
                     until.checked_duration_since(Instant::now())?;
-                    return scope_current(lease).then_some(value);
+                    return current().then_some(value);
                 }
                 answer.extend_from_slice(&chunk[..n]);
             }
@@ -7416,11 +7617,23 @@ fn note(kept: &[String]) -> String {
 /// The newest kept things that fit the note, asked of the memory now: the
 /// room's, or this person's.
 fn kept(socket: &Path, person: Option<&str>, deadline: Duration) -> Option<Vec<String>> {
+    kept_permitted(socket, person, deadline, None)
+}
+
+fn kept_permitted(
+    socket: &Path,
+    person: Option<&str>,
+    deadline: Duration,
+    permitted: Option<&NotePermission>,
+) -> Option<Vec<String>> {
     let mut line = json!({"op":"kept","max_bytes":NOTE_BYTES});
     if let Some(person) = person {
         line["person"] = json!(person);
     }
-    let answer = crate::tools::exchange(socket, &line, deadline)?;
+    let answer = match permitted {
+        Some(_) => bounded_exchange_permitted(socket, &line, deadline, permitted),
+        None => crate::tools::exchange(socket, &line, deadline),
+    }?;
     Some(
         answer
             .get("entries")?
@@ -15160,7 +15373,15 @@ mod tests {
         assert_eq!((note.complete, note.cause), (false, Some(NoteCause::Busy)));
         drop(held);
         let elsewhere = socket.with_extension("elsewhere");
-        let read = fresh_note_read(&elsewhere, 1, None, FIRST_READ, false);
+        let read = fresh_note_read(
+            &elsewhere,
+            1,
+            None,
+            FIRST_READ,
+            false,
+            // Raw no-client control: no request or private scope is present.
+            Arc::new(|| true),
+        );
         assert_eq!(
             (read.complete(), read.cause()),
             (false, Some(NoteCause::NoClient))

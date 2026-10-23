@@ -1150,7 +1150,11 @@ the unchanged legacy client, used unless the new Days client is selected.
   known asks the memory `follow_up` within the note's 300 ms (on the second
   route only for an answered turn, as it waits for its note: a note read
   as a line begins, for a line that may never be answered, asks none, so it
-  spends no offer). The memory
+  spends no offer; private notes wait for final sealed current-piece and
+  combined speaker agreement plus a fresh matching atomic KnownSpeaker.
+  Their follow-up is staged separately even for a note begun at the final
+  turn: permission is rechecked after the note wait and at the blocking
+  follow-up entry, before an offer is spent). The memory
   gives at most one open `thread` or `promise` observation of theirs, at
   least 6 hours old (not the same conversation) and at most 14 days old,
   newest first, never one given before, and none if one was given to them
@@ -1391,8 +1395,10 @@ the unchanged legacy client, used unless the new Days client is selected.
   no turn ends the run of turns, and the next turn asks the note again, a
   new session, told a due thread as above. The memory still gives a thread
   at most once a day, so a later quiet asks again but tells nothing new.
-  It is asked as the person's next line begins, off the worker's loop, and
-  that turn waits for it no longer than what is left of 300 ms from the ask
+  A private note is asked off the worker's loop only once the next line's
+  final positive speaker proof is sealed and matches fresh atomic Eyes
+  evidence; an original Room note may be asked as its next line begins.
+  That turn waits no longer than what is left of 300 ms from the ask
   ([second-voice.md](second-voice.md), "Each turn is one person's" and
   "Asked as the line begins").
 - **Recovering a failed note in the same conversation** (second route,
@@ -1401,8 +1407,9 @@ the unchanged legacy client, used unless the new Days client is selected.
   succeeds while the requested personal snapshot fails, or it is not in by
   what is left of 300 ms from its ask as the line ends, Voice retains a
   typed incomplete result. A late read that then completes is the next
-  turn's; otherwise the next turn asks again, as its line begins, with a
-  new session, and a second failure in a row waits 30 s from that attempt
+  turn's under that turn's own current authority; otherwise the next turn
+  asks again with a new session (private after final sealed proof, genuine
+  Room eligible as its line begins), and a second failure in a row waits 30 s from that attempt
   before the next. The read runs off the worker's loop and may take 2 s; a
   turn waits for it no longer than what is left of the 300 ms from the ask
   ([second-voice.md](second-voice.md), "Asked as the line begins"). A read
@@ -1417,7 +1424,34 @@ the unchanged legacy client, used unless the new Days client is selected.
   fresh read, this note backoff does not delay it. The old note is not used
   as a fallback. For either memory mode, a leased context is checked after
   taking the session lock and again after it is built; revocation or
-  narrowing discards it. The legacy note loader gains no retry, and
+  narrowing discards it. Private note readers also check current positive
+  request proof and the Eyes subject/continuation authority described under
+  “Second route context scope” after waiting for the Sessions lock and
+  immediately before the actual reader starts.
+  Missing proof, a held gap, a stale private read or a narrowed private
+  admission never falls back to Room. The request owner records disclosure
+  as unproved, positively matched, or permanently lost: initial unproved
+  preparation stays neutral, but observing loss after a positive match cannot
+  be undone by restoring the same face file for that request. This state does
+  not revoke the lease or change its speaker, tool or write authority.
+  The read permission also travels inside each actual Days exchange: before
+  connect, each resumed write/read, and polls of at most 20 ms, including the
+  Room-to-person boundary, rules and deferred follow-up. A denial drops partial
+  reads, restores the keep mark and closes staged sessions; it is not a memory
+  failure. The legacy Second reader rechecks after the room-note lock and at
+  its personal kept exchange. Hits use the same socket checks, and an event
+  note rechecks after the Days context lock. No new RPC is added.
+  A completed, still-current personal read can be adopted by a new positively
+  proved request. An interrupted response is discarded and must be read again;
+  restoring proof never authorizes the old request. If the prior denied reader
+  ends during the new turn's wait, the new request may reconsider once under
+  its original absolute 300 ms wait ceiling, without overlapping readers or
+  granting a fresh wait budget. A reader still unfinished at that ceiling leaves
+  this turn truthfully without its note. The background read keeps its existing
+  2 s ceiling, follow-up its existing 300 ms, and hits its existing 60 ms.
+  These checks cannot retract bytes already sent or undo an offer already
+  counted by the store; later private-output guards remain required.
+  The legacy note loader gains no retry, and
   unleased contexts keep their existing behavior. This closes a source-level
   failure path; host recovery tests do not establish the lamp's six-minute spoken recall or
   raise the “Remembers you” quality score.
@@ -1426,14 +1460,28 @@ the unchanged legacy client, used unless the new Days client is selected.
 
 On lamp-4ace on 20 Oct the second route's model called neither `recall` nor `search` once in four hours, so a name kept that morning was never used ("the lamp forgot my name"). With this switch and the Days memory, each spoken turn's final words are searched before its chat begins (`remember::hits_note`):
 
-- **The scope, one count for the turn:** the known face's (`known_faces::known_now`, `person_id`) only when the session the turn is in is theirs too, and the room's when neither names anyone. The turn's session is opened before the hits are asked (`worker::hits_person`), and the turn's notes still see the change, so a person's first turn is theirs and not the last session's (the reviewer's P2 on #2268: "What's my name?" is often the first thing asked). When they differ, nothing is told: someone leaning in for one look doesn't have their kept things told in another's conversation (the reviewer's P2 on #2251). The journal says "memory isn't told: the face and the session's person differ".
+- **The scope, one count for the turn:** a private request needs positive
+  speaker evidence sealed by its owner from the actual accepted audio interval,
+  plus the same boot-qualified face and person in an initial fresh atomic Eyes
+  known-speaker observation. Once pinned, only the explicit continuation
+  contract under “Second route context scope” preserves that request through
+  a successful no-detection look. An inherited person or sticky session alone
+  cannot read private hits. No face, multiple speakers, another boot/person,
+  stale/missing observation, expired proof or cancellation gives none. A
+  genuinely admitted room request may read room hits. Narrowing a private
+  request to room never grants room hits; an unleased legacy session can read
+  only when both its current face and session are the room's.
 - **What's asked:** the newest 16 KB of that scope's kept list (`{"op":"kept","max_bytes":16384}`, the answer read up to 40 KB). That's the whole list unless its things are long (200 of up to 300 bytes is 60 KB), so a name kept early isn't lost behind newer ones. It's matched in the voice by the words they share with what was heard: lower-cased, three letters or more, a possessive's `'s` and a plural's `s` taken off, and small words left out. Not the memory's full-text search: on lamp-4ace on 20 Oct its twelve best for "what is my name" were all exchanges, none kept, and the room's search took about 44 ms, where its kept list (63 things) took 3 ms. **English only:** accents aren't folded, and Vietnamese words match as written.
 - **The room's** are told with a line that they were said in this room and that the lamp can't tell who said them or who is asking, as the session note's room part says.
 - **The bound:** the answer within `HITS_WITHIN` (60 ms), or let go, never waited for. A line with no word that says what it's about isn't asked. On the final words it runs off the worker's runtime (`spawn_blocking`). On the early words of a prepared chat it runs inline, where the chat begins, so a slow memory can hold that line's audio for up to the same 60 ms.
 - **What's told:** at most three kept things, the most words shared first, then the newest, each cut to 160 characters, with how long ago in words. They go after a note saying they are notes, not instructions, to be used only if they fit and never listed.
 - **Not as sources:** nothing told here goes into the session's sources, so the 64-source bound (#2176 finding 1) isn't spent on it.
 - **The journal:** one line a turn, `request N: memory told|had nothing told in M ms (theirs|the room's)`, with no words.
-- **With `LAMP_SECOND_SCOPED_CONTEXT`:** the scope is the request's own lease, as its context is told: the person admitted with the line, or the room's once another face was seen speaking it (`speaking_faces`), never the sticky session's person. A revoked request is asked nothing. Tested in `a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs` (hits asked for the room, A, the room).
+- **With `LAMP_SECOND_SCOPED_CONTEXT`:** the request key, original admission
+  and active positive proof decide disclosure, independently of the name-note
+  switch. The worker checks again after the bounded hits read before returning
+  any text. A reply whose proof, observation or authority changed is discarded.
+  This is a context disclosure boundary, not a change to memory tools or writes.
 
 ### Each person's own (#764)
 
@@ -2120,16 +2168,70 @@ are complete (#1675).
 ### Second route context scope
 
 With `LAMP_SECOND_SCOPED_CONTEXT=on` (off unless set), on the Second route the
-same admitted scope also decides what a turn's chat is told. Its system message, recalled thread and history messages are read for the
-request's scope alone (`Thread::recall_for`/`recent_for`): a person's
-exchanges for that person, the room's for a room request, never the sticky
-session owner's or those of whoever is in view when the chat begins. The Days
-note is asked for that scope and asked again when the scope differs from the
-previous turn's. A request revoked while its context was built is not asked.
-A held line's one round for `reports_stop` (with `LAMP_REPORTS=on`) is told
-for its admitted scope in the same way (`told`), never for the sticky session
-owner (Second's P2 on #1925). The unscoped builder is used only for a request
-with no lease, or with this switch off.
+original admission still decides where the turn is filed, but private
+context disclosure additionally requires the request's positive speaker proof
+and a fresh matching atomic known-speaker observation (#3064). For carried
+speech, both the combined original nonempty-read interval and the current
+piece's independent nonempty-read interval must identify the same sole
+positive boot-qualified speaking face, with inner and outer clock bounds
+agreeing for each. The current interval is never seeded from carried audio;
+earlier speech by someone still visible cannot authorize a new unseen
+speaker. The existing proof expiry remains bounded by the last nonempty read.
+Initial disclosure requires the exact Eyes boot, face and person to agree
+with the active lease. The request pins that subject and, for typed source
+records, the producer's random lifecycle and revocation generation. A fresh
+explicit `absent` record from a successful empty detection can continue only
+that already pinned request at the same boot/lifecycle/generation. It cannot
+admit another request, change identity or extend the original audio-end-plus-
+30-second proof deadline. A completed positive `seen` for the same name,
+optional raw stable ID, boot, publisher and generation may continue it after
+the geometric face ID changes. The request retains its original sealed
+speaker, scope and deadline. A returning candidate first publishes an
+identity-free `checking` record before immediate recognition; checking denies
+disclosure and latches loss if observed. There is no grace period or resumable
+wait. Recognition cannot revive a request that already lost authority, but a
+new ask with its own positive proof may proceed. Legacy positive-only records
+still require the original face and have no absence continuation. Missing, stale,
+invalid or unreadable source, visible unaligned/unmatched faces, changed
+person/epoch/boot, forget, privacy and camera/model errors deny. The producer
+advances a persistent generation before hard invalidation, so returning to
+positive cannot hide a missed forget or privacy transition. A geometric face
+track is not identity proof; this conservative policy does not establish every
+real lowered-face or dim-room case. Two distinct sole-face positive frames may
+qualify a short line; a second unknown/silent face, one frame or a repeated
+frame cannot. The existing three-or-more-look rule and legacy three-look
+narrowing bar remain unchanged. This authority is checked before
+the memory note or history is read and again after composition. This applies
+to private notes, thread recall, history messages, dated follow-up notes and
+automatic hits, independently of
+`LAMP_SECOND_FACE_NAME`. Cached notes never bypass the check. A dated
+follow-up callback checks fresh proof before its private read; a private note
+returned after expiry still requires that proof and cannot become neutral.
+The owner also latches observed disclosure loss after the first complete
+positive match. All clones share that state, so a returning face after an actual
+invalidation cannot revive private context in the same request; a new request
+needs its own proof. This
+latch grants no tool/write authority and does not change scope or speaker proof.
+The same permission is checked inside Days and hits exchanges before connect,
+resumed I/O and each at-most-20 ms poll, not only around their outer calls.
+An unproved private request, including early preparation or typed input, gets
+neutral character/time/skills/facts with no memory note or history; it does not
+fall back to the room. A private request narrowed to room is also neutral.
+An originally admitted room request retains room context. Held or revoked
+leases return no context. A legacy unleased sticky-person session cannot read
+private context. The same checks cover both ordinary and steady-first message
+layouts; final positive proof changes messages so the neutral prepared chat
+cannot be reused. The guard stays attached to queued output through credit
+waits and is rechecked immediately before speech IPC. Loss of private authority
+ends a still-current request silently with public idle completion; retired or
+revoked requests are not revived. The same sticky guard also travels inside
+Services for every Engine chat request: preparation, quoted/held turns, later
+rounds and reconnects. Net checks before each near, own or key-refusal relay
+send, so proof loss during an earlier HTTP wait cannot resend captured private
+context to a fallback. A denied stream stays stopped; the existing function
+selection and fallback routes are preserved. This cannot retract an already
+sent body and does not establish the separate synthesis fallback boundary.
+This does not change tool authorization or write/journal scope.
 The lamp's answer is kept under the same scope (`Thread::lamp_for`), and a
 written request's note is kept as the room's, as it is admitted. The
 exchange's journal follows it: at the turn's end `append_linked` is written
@@ -2194,7 +2296,7 @@ a gap, only while all of these hold:
   is held. On the first
   exchange there is no answer yet, so a face lost before it ends is the
   room's.
-- **A held line is answered from the conversation as it stood** (the first
+- **A held line grants no private disclosure** (#3064; the first
   builder's 22:10 and 01:43 on #2265): someone who left within that window
   may not be the one speaking. A line whose scope is kept only by the gap
   (`ScopeSnapshot::held`) is declared none of the functions that read or
@@ -2211,7 +2313,8 @@ a gap, only while all of these hold:
   nothing, whoever says it. It is told no memory note and no memory hits
   (`LAMP_SECOND_MEMORY_HITS`), and its scope runs no one's held forget
   (`forget_asker`, #2340); the reviewer's P2s on #2449 and #2616. It is told
-  the conversation as it stood, its exchanges, as before.
+  no context or history on the Second route: inherited private exchanges are
+  not speaker evidence (#3064).
 - **A held line is never journalled** (the reviewer's P2 on #2616): it is
   kept out (`remember::keep_out`) as it is admitted and again before its
   words reach the thread (`keep_scoped`), so neither its end nor a later

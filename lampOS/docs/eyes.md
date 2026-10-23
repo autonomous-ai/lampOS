@@ -922,6 +922,53 @@ this room" until someone asks to be recognised.
   The voice reads it as it reads `known`, so whatever access a deploy gives
   the voice to `known` it needs to `known-face` too (the voice runs as root
   on lamp-4ace and in the product unit).
+- **Explicit speaker observation** (#3014): with the same tracking switches,
+  `known-speaker` beside `known` publishes one atomic JSON record. A positive
+  record has `state: "seen"`, `name`, optional `id`, the actual faces-publisher
+  `boot`, passing `face`, a random 32-hex `publisher` lifecycle and a nonzero
+  `generation`. A successful empty detection may publish `state: "absent"`
+  with only boot, publisher and generation. It carries no new identity and
+  can only continue a request that Voice already pinned from a positive record.
+  A detected return after absence, even with the same passing face ID, or a
+  changed visible track first publishes identity-free `state: "checking"`.
+  Recognition runs immediately for that candidate, before the ordinary 2 s
+  refresh is due; an unchanged unmatched candidate then keeps that ordinary
+  cadence. Checking denies personal output; it is neither absence nor
+  a grace period. A completed positive match for the same name, optional
+  stable ID and boot may retain the generation across a new passing face ID.
+  Voice keeps its original request grant and deadline; if it already observed
+  checking and lost disclosure authority, recognition cannot revive that
+  request. A fresh proved ask may use the new positive observation.
+  Disappearance before recognition completes advances the generation before
+  another absence is published, so a reader cannot miss the unresolved return.
+  Visible unaligned/unmatched faces and model/decode/camera errors hard-revoke,
+  not ordinary absence. A `revoked` record advances the generation before
+  forgetting, privacy loss, store mutation or teardown; a later `seen` keeps
+  that generation. A new publisher lifecycle cannot continue an old request.
+  Generation exhaustion or publication failure disables the source.
+  The file stays in the existing volatile `/run` folder, mode 0600 and owned
+  by the Eyes writer. Linux checks the canonical parent is on tmpfs, owned by
+  that writer and not group/other writable. An existing legacy `known` must
+  also be a regular 0600 file owned by the writer; its ordinary removal does
+  not prevent an explicit absence record. Persistent custom locations cannot
+  enable this source. Publication uses an exclusive temporary file and atomic
+  rename. Startup and orderly exit invalidate it; abrupt death leaves no fresh
+  look and the source expires. No heartbeat invents a successful camera look.
+  A skipped empty-room inference cannot refresh the record. The active source
+  must ask for a real detection at its recognition refresh cadence instead of
+  turning the empty-room optimization into either fabricated absence or a
+  routine revocation; this work stays in the independent Eyes process.
+  Readers require the opened record's own freshness (3 s), with metadata and
+  content from the same bounded FD. Wall time is sampled after open metadata;
+  monotonic expiry remains anchored before I/O. Future/stale/missing/invalid
+  records refuse, never imply absence. Legacy `known` and `known-face` stay
+  compatible. Legacy positive-only source records grant no absence continuation.
+  Voice requires request-owned positive speaking evidence and an exact initial
+  face/person match. Neither the file nor a geometric passing ID proves
+  physical identity, acoustic authentication or liveness. No frame, print,
+  audio, durable history, extra model tool or RPC is added. This source change
+  does not activate the product's second-route name switch; #3014 and its
+  physical owner checks remain separate. The Live route is unchanged.
 - **Named in Who was here, only with their yes** (#1997, the lead's yes on
   20 Oct; nothing asks it until the voice's question is built):
   - `{"visits_yes":NAME}` keeps a remembered person's yes to being named to

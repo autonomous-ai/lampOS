@@ -8,7 +8,7 @@
 //! turn kept in that thread and the memory's journal as the Live route
 //! keeps its own.
 use super::{
-    Engine, Joined, Net, Told, ToolRunner,
+    Engine, Joined, Net, QueuedOutput, Told, ToolRunner,
     net::{Message, search::Search},
     output_request,
 };
@@ -23,12 +23,19 @@ use lamp_turn_owner::{BootId, BoundaryGuard, MonoTime, Snapshot};
 use std::{
     io,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant, SystemTime},
 };
 
 #[cfg(test)]
+mod lookaway_authority_tests;
+#[cfg(test)]
 mod memory_note_retries;
+#[cfg(test)]
+mod private_output_tests;
 
 /// The coordinator renews authority at least this often.
 const CONTROL_LEASE_US: u64 = 250_000;
@@ -238,10 +245,11 @@ impl Gate {
         &mut self,
         engine: &Engine,
         now_us: u64,
-        event: &ProviderOutput,
+        queued: &QueuedOutput,
         send: impl FnOnce(&ProviderOutput) -> io::Result<()>,
     ) -> io::Result<bool> {
-        if !engine.current_output(event) {
+        let event = &queued.event;
+        if !queued.current() || !engine.current_output(event) {
             return Ok(true);
         }
         if let ProviderOutput::RequestedAudio {
@@ -258,6 +266,14 @@ impl Gate {
             return Ok(true);
         }
         self.may_send(now_us, event)?;
+        if !self.flow.can_send() {
+            return Ok(false);
+        }
+        // No await separates this final proof check from the synchronous IPC
+        // attempt. A discard consumes neither an IPC attempt nor output credit.
+        if !queued.current() || !engine.current_output(event) {
+            return Ok(true);
+        }
         self.flow.try_send(|| send(event))
     }
 
@@ -2097,7 +2113,7 @@ pub fn serve(
         == Some("on");
     if known_name {
         eprintln!(
-            "lamp-voice second: a turn that is the known face's own person is told their name, as the Live route tells it (LAMP_SECOND_FACE_NAME)"
+            "lamp-voice second: a known person's name is told only with their face positively seen speaking this request (LAMP_SECOND_FACE_NAME)"
         );
     }
     let told_for = memory_context(
@@ -2105,9 +2121,10 @@ pub fn serve(
         socket,
         who.clone(),
         days,
-        move |now, person, memory| {
-            let going_on = crate::thread::current(file.as_deref(), |thread| thread.going_on(now))
-                .unwrap_or_default();
+        move |now, person, memory, lease, history| {
+            let going_on = history
+                && crate::thread::current(file.as_deref(), |thread| thread.going_on(now))
+                    .unwrap_or_default();
             let room = room_bus.as_ref().map(crate::bus_out::room_now);
             let skills = if skills_told.use_skill {
                 crate::use_skill::section(crate::use_skill::offered(&crate::tools::skill_tools(
@@ -2126,21 +2143,26 @@ pub fn serve(
             let time = crate::agent_tasks::noted(time, tasks.as_ref());
             let facts = facts(session_fact && !going_on, room)
                 + &health_fact(health.as_deref())
-                + &known_name_told(known_name, who.as_deref(), person.as_deref());
+                + &known_name_told(known_name, who.as_deref(), lease);
             if steady_first {
-                steady_first_message(
-                    format!("{character}{skills}"),
+                disclosure_message(
+                    true,
+                    &format!("{character}{skills}"),
+                    None,
                     &format!("{memory}{}{facts}", time.as_deref().unwrap_or_default()),
                     file.as_deref(),
                     person.as_deref(),
+                    history,
                 )
             } else {
-                system_message(
+                disclosure_message(
+                    false,
                     &character,
                     time.as_deref(),
                     &(memory + &facts + &skills),
                     file.as_deref(),
                     person.as_deref(),
+                    history,
                 )
             }
         },
@@ -2228,6 +2250,7 @@ pub fn serve(
     let system: crate::second_provider::System = Arc::new(system);
     // The relay's routes, asked on the runtime below (#2882).
     let routes_task = net.routes_task();
+    let private_who = scope_file.clone();
     let mut engine = Engine::new(
         Arc::new(net),
         {
@@ -2237,6 +2260,9 @@ pub fn serve(
         runner.clone(),
     )
     .with_memory_scope(boot, face_cache.clone(), scoped_runner, scoped_system)
+    .guarding_private_context(Arc::new(move |lease| {
+        private_context_current(private_who.as_deref(), lease)
+    }))
     .checking_sounds(checked)
     .telling_cut_ins(files.cut_in_told)
     .holding_hand_on(files.said_as_heard)
@@ -2312,46 +2338,15 @@ pub fn serve(
     // turn's note is told for, the known face's or the room's, within
     // `HITS_WITHIN`, and told as notes, never as sources. With
     // `LAMP_SECOND_SCOPED_CONTEXT`, in the request's own admitted scope (its
-    // lease, narrowed to the room when another face spoke it), as its context
-    // is told: never the sticky session's person.
+    // lease) with positive speaker proof for private disclosure, as its context
+    // is told: never the sticky session's person or a narrowed private fallback.
     match (crate::remember::hits_on(), hits_socket) {
         (true, Some(socket)) if days => {
             eprintln!(
                 "lamp-voice second: each spoken turn is told what memory holds that may fit its words ({})",
                 crate::remember::HITS_ENVIRONMENT
             );
-            let who = hits_who;
-            engine = engine.remembering(Arc::new(move |request, heard, lease| {
-                let started = Instant::now();
-                let person = hits_whose(request, lease, &hits_sessions, who.as_deref(), started)?;
-                let now_unix_ms = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map_or(0, |since| since.as_millis() as u64);
-                // The lamp's own zone, as memory's other notes read the day
-                // (#820): each moment at its own offset.
-                let note = crate::remember::hits_note(
-                    &socket,
-                    person.as_deref(),
-                    heard,
-                    now_unix_ms,
-                    crate::local_time::system(),
-                );
-                eprintln!(
-                    "lamp-voice second: request {request}: memory {} in {} ms ({})",
-                    if note.is_some() {
-                        "told"
-                    } else {
-                        "had nothing told"
-                    },
-                    started.elapsed().as_millis(),
-                    if person.is_some() {
-                        "theirs"
-                    } else {
-                        "the room's"
-                    }
-                );
-                note
-            }));
+            engine = engine.remembering(memory_hits(hits_sessions, socket, hits_who));
         }
         (true, _) => eprintln!(
             "lamp-voice second: memory isn't told on each turn: {} needs the Days memory",
@@ -2377,7 +2372,8 @@ pub fn serve(
                     event_who.as_deref(),
                     Instant::now(),
                 )?;
-                crate::remember::event_turn_note(person.as_deref(), heard)
+                let permitted = memory_read_permission(lease, event_who.as_deref(), &person);
+                crate::remember::event_turn_note_permitted(person.as_deref(), heard, &permitted)
             }),
             Arc::new(crate::remember::event_withheld),
         );
@@ -3780,20 +3776,130 @@ pub(crate) fn lamp_just_asked(thread: &crate::thread::Thread, request: u64, now:
 }
 
 /// The known person's name for a turn (#2539, `LAMP_SECOND_FACE_NAME=on`),
-/// as the Live route tells it (`known_faces::note`): when the face the eyes
-/// know now, in `who`, is this turn's own person. A room's turn, a line
-/// narrowed to the room, or another person's has none; nor does a face gone.
-pub(crate) fn known_name_told(on: bool, who: Option<&Path>, person: Option<&str>) -> String {
+/// as the Live route phrases it (`known_faces::note`), only after this
+/// request's accepted microphone interval positively identifies that face
+/// speaking. A fresh matching known observation and person scope initially
+/// bind it. Explicit same-epoch no-detection or completed recognition of the
+/// same person under a new track can retain that request's original grant.
+/// Prepared/typed turns have no proof; inherited scope, no speaking face,
+/// another Eyes boot, held/narrowed scope and revoked requests give none.
+pub(crate) fn known_name_told(
+    on: bool,
+    who: Option<&Path>,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> String {
     if !on {
         return String::new();
     }
-    let Some(name) = who.and_then(crate::known_faces::known_now) else {
+    let Some(known) = lease.and_then(|lease| private_speaker(who, lease)) else {
         return String::new();
     };
-    if person != Some(crate::known_faces::memory_person(&name).as_str()) {
-        return String::new();
+    format!("\n\n{}", crate::known_faces::note(&known.name))
+}
+
+/// A fresh Seen binds the original positive speaker to its private scope.
+/// Thereafter explicit same-epoch no-detection or completed recognition of
+/// the same name/person/stable ID under that epoch may retain the original
+/// grant despite a new passing track. Checking or observed loss cannot revive.
+/// Every slow-work boundary still checks source freshness, request ownership
+/// and the original audio deadline; errors never continue.
+fn private_speaker(
+    who: Option<&Path>,
+    lease: &crate::memory_scope::ScopeLease,
+) -> Option<crate::speaking_faces::KnownSpeaker> {
+    if lease.private_context_lost() {
+        return None;
     }
-    format!("\n\n{}", crate::known_faces::note(&name))
+    let known = (|| {
+        use crate::speaking_faces::KnownSpeakerSource;
+        let speaker = lease.speaker()?;
+        let source = who.and_then(crate::speaking_faces::known_speaker_source)?;
+        let known = match source {
+            KnownSpeakerSource::Seen(known) => {
+                if let Some(grant) = lease.private_speaker() {
+                    // Completed recognition may assign the same person a new
+                    // passing track. It cannot retarget the request's immutable
+                    // audio speaker, stable identity, scope or deadline.
+                    (known.epoch == grant.epoch
+                        && known.name == grant.name
+                        && known.person == grant.person
+                        && known.id == grant.id)
+                        .then(|| grant.clone())?
+                } else {
+                    // Initial and legacy authorization still need an exact
+                    // match to this request's original accepted audio face.
+                    if speaker != known.face
+                        || lease.scope()?.person() != Some(known.person.as_str())
+                    {
+                        return None;
+                    }
+                    if known.epoch.is_some() {
+                        let grant = lease.pin_private_speaker(known.clone());
+                        (grant == &known).then_some(known)?
+                    } else {
+                        // Legacy sources cannot mint a continuation grant.
+                        known
+                    }
+                }
+            }
+            KnownSpeakerSource::Absent(epoch) => {
+                let grant = lease.private_speaker()?;
+                (grant.epoch.as_ref() == Some(&epoch)).then(|| grant.clone())?
+            }
+            KnownSpeakerSource::Checking(_epoch) | KnownSpeakerSource::Revoked(_epoch) => {
+                return None;
+            }
+        };
+        (speaker == known.face
+            && lease.scope()?.person() == Some(known.person.as_str())
+            && lease.speaker() == Some(known.face.as_str()))
+        .then_some(known)
+    })();
+    lease
+        .private_context_permitted(known.is_some())
+        .then_some(known)
+        .flatten()
+}
+
+/// Read-only final Services boundary validator for explicitly tagged private
+/// context. It grants no tool or write permission and has no room fallback.
+pub(super) fn private_context_current(
+    who: Option<&Path>,
+    lease: &crate::memory_scope::ScopeLease,
+) -> bool {
+    private_speaker(who, lease).is_some()
+}
+
+/// A private request without speaker proof is neutral, never a room request.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum MemoryDisclosure {
+    Neutral,
+    Room,
+    Person { person: String, face: String },
+}
+
+fn memory_disclosure(
+    lease: &crate::memory_scope::ScopeLease,
+    who: Option<&Path>,
+) -> Option<MemoryDisclosure> {
+    let admitted = lease.admitted_scope()?;
+    let scope = lease.scope()?;
+    if lease.private_context_lost() {
+        return None;
+    }
+    if admitted.held() || scope.held() {
+        return None;
+    }
+    if admitted.person().is_none() {
+        return Some(MemoryDisclosure::Room);
+    }
+    Some(match private_speaker(who, lease) {
+        Some(known) => MemoryDisclosure::Person {
+            person: known.person,
+            face: known.face,
+        },
+        None => MemoryDisclosure::Neutral,
+    })
 }
 
 /// What a Live session is told of the moment beside what it hears, told
@@ -6418,12 +6524,9 @@ fn hits_person(
     crate::remember::hits_scope(known.as_deref(), session.as_deref())
 }
 
-/// Whose kept things a spoken turn's hits are asked in: `Some(None)` the
-/// room's, `Some(Some(person))` that person's, `None` nothing. With a
-/// request's lease (`LAMP_SECOND_SCOPED_CONTEXT`), its own admitted scope,
-/// narrowed to the room when another face spoke it, and nothing for a revoked
-/// one. Without, the sticky session's person, and nothing when the face and
-/// the session's person differ.
+/// Private hits need this request's positive speaker proof and fresh Eyes
+/// match. A genuine room admission may read room hits; narrowed private,
+/// held, revoked and legacy sticky-person requests may not fall back to room.
 fn hits_whose(
     request: u64,
     lease: Option<&crate::memory_scope::ScopeLease>,
@@ -6432,15 +6535,86 @@ fn hits_whose(
     now: Instant,
 ) -> Option<Option<String>> {
     if let Some(lease) = lease {
-        return Some(lease.scope()?.person().map(str::to_owned));
+        if lease.key().request != request {
+            return None;
+        }
+        return match memory_disclosure(lease, who)? {
+            MemoryDisclosure::Room => Some(None),
+            MemoryDisclosure::Person { person, .. } => Some(Some(person)),
+            MemoryDisclosure::Neutral => None,
+        };
     }
-    let person = hits_person(sessions, who, now);
-    if person.is_none() {
-        eprintln!(
-            "lamp-voice second: request {request}: memory isn't told: the face and the session's person differ"
+    // Without a request-owned proof carrier, only a true room session is
+    // eligible. A sticky private session is never positive speaker evidence.
+    hits_person(sessions, who, now).filter(Option::is_none)
+}
+
+/// Pin every actual memory read to the same request and selected person.
+/// The live proof check also latches disclosure loss on that request's owner.
+fn memory_read_permission(
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    who: Option<&Path>,
+    person: &Option<String>,
+) -> NotePermission {
+    let Some(lease) = lease else {
+        // Callers have already excluded legacy sticky-person requests.
+        return Arc::new(|| true);
+    };
+    let lease = lease.clone();
+    let who = who.map(Path::to_path_buf);
+    let person = person.clone();
+    Arc::new(move || match memory_disclosure(&lease, who.as_deref()) {
+        Some(MemoryDisclosure::Room) => person.is_none(),
+        Some(MemoryDisclosure::Person {
+            person: current, ..
+        }) => person.as_ref() == Some(&current),
+        _ => false,
+    })
+}
+
+/// Actual remembered callback, shared with its socket integration controls.
+/// The reply is discarded if slow I/O outlives proof, identity or authority.
+fn memory_hits(
+    sessions: Arc<Mutex<Sessions>>,
+    socket: PathBuf,
+    who: Option<PathBuf>,
+) -> super::Remembered {
+    Arc::new(move |request, heard, lease| {
+        let started = Instant::now();
+        let person = hits_whose(request, lease, &sessions, who.as_deref(), started)?;
+        let now_unix_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_millis() as u64);
+        let permitted = memory_read_permission(lease, who.as_deref(), &person);
+        let note = crate::remember::hits_note_permitted(
+            &socket,
+            person.as_deref(),
+            heard,
+            now_unix_ms,
+            crate::local_time::system(),
+            &permitted,
         );
-    }
-    person
+        if hits_whose(request, lease, &sessions, who.as_deref(), Instant::now())
+            != Some(person.clone())
+        {
+            return None;
+        }
+        eprintln!(
+            "lamp-voice second: request {request}: memory {} in {} ms ({})",
+            if note.is_some() {
+                "told"
+            } else {
+                "had nothing told"
+            },
+            started.elapsed().as_millis(),
+            if person.is_some() {
+                "theirs"
+            } else {
+                "the room's"
+            }
+        );
+        note
+    })
 }
 
 /// Whether the faces seen speaking a line are the caller's one face and no
@@ -6462,15 +6636,42 @@ fn memory_context(
     socket: Option<PathBuf>,
     who: Option<PathBuf>,
     days: bool,
-    tell: impl Fn(Instant, Option<String>, String) -> Told + Send + Sync,
+    tell: impl Fn(
+        Instant,
+        Option<String>,
+        String,
+        Option<&crate::memory_scope::ScopeLease>,
+        bool,
+    ) -> Told
+    + Send
+    + Sync,
 ) -> impl Fn(Option<&crate::memory_scope::ScopeLease>) -> Told + Send + Sync {
     let compose = move |sessions: &mut Sessions,
-                        scope: Option<&crate::memory_scope::ScopeSnapshot>| {
+                        scope: Option<&crate::memory_scope::ScopeSnapshot>,
+                        lease: Option<&crate::memory_scope::ScopeLease>| {
         let now = Instant::now();
-        // Counted at every ask, before anything can return early: a turn's
-        // second ask (its prepared chat, then its rounds) is never quiet.
-        let quiet = sessions.quiet_long_enough(now);
+        let selected = match lease {
+            Some(lease) => match memory_disclosure(lease, who.as_deref()) {
+                Some(selected) => selected,
+                None => return Told::default(),
+            },
+            None => MemoryDisclosure::Room,
+        };
+        if selected == MemoryDisclosure::Neutral {
+            return tell(now, None, String::new(), None, false);
+        }
+        // A scoped request does not inherit the sticky session's identity.
+        // An unscoped sticky person cannot disclose without positive proof.
         let (opened, person) = sessions.open(who.as_deref(), now);
+        if lease.is_none() && person.is_some() {
+            return tell(now, None, String::new(), None, false);
+        }
+        if lease.is_some_and(|lease| {
+            memory_disclosure(lease, who.as_deref()).as_ref() != Some(&selected)
+        }) {
+            return Told::default();
+        }
+        let quiet = sessions.quiet_long_enough(now);
         let (changed, person) = match scope {
             None => (opened, person),
             Some(scope) => {
@@ -6478,12 +6679,8 @@ fn memory_context(
                 (sessions.told_for(&person), person)
             }
         };
-        // A line held only by a known face's gap is told no one's memory
-        // note: it may not be theirs (the reviewer's P2 on #2449). Its
-        // exchanges, the conversation as it stood, are told as before.
-        let held = scope.is_some_and(crate::memory_scope::ScopeSnapshot::held);
+        let permitted = memory_read_permission(lease, who.as_deref(), &person);
         let memory = match &socket {
-            _ if held => String::new(),
             // Every request here is built afresh from the thread and the
             // session's snapshot: a new session is a fresh context (#2176
             // row 1b).
@@ -6497,14 +6694,34 @@ fn memory_context(
             Some(_) if days => {
                 let kept = crate::remember::kept_since_note_peek();
                 let fresh = crate::remember::wants_fresh_session();
-                sessions.taken(changed || quiet || kept, fresh, person.as_deref())
+                sessions.taken_permitted(
+                    changed || quiet || kept,
+                    fresh,
+                    person.as_deref(),
+                    &permitted,
+                )
             }
-            Some(socket) => crate::remember::told_for_session(socket, 0, person.as_deref()),
+            Some(socket) => {
+                crate::remember::legacy_told_permitted(socket, person.as_deref(), &permitted)
+            }
             None => crate::remember::told(),
         };
-        tell(now, person, memory)
+        let mut told = tell(now, person, memory, lease, true);
+        told.requires_speaker = matches!(selected, MemoryDisclosure::Person { .. });
+        // Includes history composition and cache retrieval, not only the RPC.
+        if lease.is_some_and(|lease| {
+            memory_disclosure(lease, who.as_deref()).as_ref() != Some(&selected)
+        }) {
+            Told::default()
+        } else {
+            told
+        }
     };
-    move |lease| told_while_scope_holds(&sessions, lease, &compose)
+    move |lease| {
+        told_while_scope_holds(&sessions, lease, |sessions, scope| {
+            compose(sessions, scope, lease)
+        })
+    }
 }
 
 /// Do not hand a context to a prepared or ordinary chat if its authority
@@ -6660,11 +6877,9 @@ impl Sessions {
     /// retry pacing or a journal resume's backoff say (reviewer-two's P2s on
     /// #3016).
     fn tidy(&mut self) {
-        if self
-            .asked
-            .as_ref()
-            .is_some_and(|asked| asked.void && !asked.reading())
-        {
+        if self.asked.as_ref().is_some_and(|asked| {
+            (asked.void || asked.denied.load(Ordering::Acquire)) && !asked.reading()
+        }) {
             self.asked = None;
         }
         if self
@@ -6769,7 +6984,8 @@ impl Sessions {
     /// Whose note a turn told in `lease` (its admitted scope; without one,
     /// the session's, as memory's hits find it, [`Self::open_ahead`]) would
     /// be, and whether that is someone other than the last turn's: nothing
-    /// for a revoked scope or a line held by a gap, which is told no note.
+    /// for a revoked/held scope or an unproved private line. An originally
+    /// private admission narrowed to Room never becomes a Room read.
     fn whose_note(
         &mut self,
         lease: Option<&crate::memory_scope::ScopeLease>,
@@ -6778,14 +6994,18 @@ impl Sessions {
     ) -> Option<(Option<String>, bool)> {
         match lease {
             Some(lease) => {
-                let scope = lease.scope().filter(|scope| !scope.held())?;
-                let person = scope.person().map(str::to_owned);
+                let person = match memory_disclosure(lease, who)? {
+                    MemoryDisclosure::Room => None,
+                    MemoryDisclosure::Person { person, .. } => Some(person),
+                    MemoryDisclosure::Neutral => return None,
+                };
                 let changed = self.scoped.as_ref() != Some(&person);
                 Some((person, changed))
             }
             None => {
                 let (_, person) = self.open_ahead(who, now);
-                Some((person, self.unsaid))
+                // A legacy sticky person has no request-owned speaker proof.
+                person.is_none().then_some((None, self.unsaid))
             }
         }
     }
@@ -6803,6 +7023,7 @@ impl Sessions {
         now: Instant,
         ask: &AskNote,
         ahead: bool,
+        permitted: NotePermission,
     ) {
         self.tidy();
         if self.asked.as_ref().is_some_and(NoteAsk::reading) {
@@ -6812,7 +7033,9 @@ impl Sessions {
         let theirs = self
             .asked
             .as_ref()
-            .filter(|asked| !asked.void && asked.person == person)
+            .filter(|asked| {
+                !asked.void && !asked.denied.load(Ordering::Acquire) && asked.person == person
+            })
             .map(|asked| {
                 (
                     asked.standing(now),
@@ -6852,7 +7075,14 @@ impl Sessions {
         // it is never told (`remember::NoteRead`).
         self.opened += 1;
         let begun = (now, self.lines);
-        self.asked = Some(NoteAsk::start(self.opened, person, begun, ask, ahead));
+        self.asked = Some(NoteAsk::start(
+            self.opened,
+            person,
+            begun,
+            ask,
+            ahead,
+            permitted,
+        ));
     }
 
     /// The Days note a turn is told, taken from what was asked for `person`
@@ -6864,13 +7094,30 @@ impl Sessions {
     /// person or the run changed, it was quiet, or something was kept that
     /// no read has covered; `fresh` when journalling waits for a fresh
     /// context.
-    fn taken(&mut self, due: bool, fresh: bool, person: Option<&str>) -> String {
+    fn taken_permitted(
+        &mut self,
+        due: bool,
+        fresh: bool,
+        person: Option<&str>,
+        permitted: &NotePermission,
+    ) -> String {
+        self.taken_checked(due, fresh, person, Some(permitted))
+    }
+
+    fn taken_checked(
+        &mut self,
+        due: bool,
+        fresh: bool,
+        person: Option<&str>,
+        permitted: Option<&NotePermission>,
+    ) -> String {
         self.tidy();
         let unavailable = || crate::remember::SessionNote::unavailable().text;
-        let theirs = self
-            .asked
-            .as_mut()
-            .filter(|asked| !asked.void && asked.person.as_deref() == person);
+        let theirs = self.asked.as_mut().filter(|asked| {
+            !asked.void
+                && !asked.denied.load(Ordering::Acquire)
+                && asked.person.as_deref() == person
+        });
         if let Some(asked) = theirs {
             let begun = (asked.at, asked.line);
             if asked.waited
@@ -6879,7 +7126,11 @@ impl Sessions {
                 let late = asked.late;
                 self.asked = None;
                 let stamp = read.stamp();
-                let Some(note) = read.adopt() else {
+                let note = match permitted {
+                    Some(permitted) => read.adopt_permitted(permitted),
+                    None => read.adopt(),
+                };
+                let Some(note) = note else {
                     // Counts only: what it held is never told.
                     eprintln!(
                         "lamp-voice second: memory note let go: the memory changed while it was read; asked again"
@@ -6935,11 +7186,18 @@ const NOTE_AHEAD_WITHIN: Duration = Duration::from_secs(2);
 /// id, or none for the room's), within how long, and whether its follow-up
 /// is read with it, for a turn already answered
 /// ([`crate::remember::DaysClient::read_note_within`]).
-type AskNote =
-    Arc<dyn Fn(u64, Option<&str>, Duration, bool) -> crate::remember::NoteRead + Send + Sync>;
+type AskNote = Arc<
+    dyn Fn(u64, Option<&str>, Duration, bool, NotePermission) -> crate::remember::NoteRead
+        + Send
+        + Sync,
+>;
 
 /// An ask's read, held by the ask and, while it reads, by its thread.
 type AskedRead = Arc<Mutex<Option<crate::remember::NoteRead>>>;
+
+/// Bound to the original request and selected person, never to a later visible
+/// face. A queued reader rechecks this immediately before the real socket client.
+type NotePermission = crate::remember::NotePermission;
 
 /// How long an answered turn waits for its note's follow-up, read only once
 /// the turn is answered ([`Ahead::ready`]): the note's own 300 ms.
@@ -6974,6 +7232,10 @@ struct NoteAsk {
     /// Let go when the camera or the microphone closed or opened: never
     /// told, though while it is still read no other is asked.
     void: bool,
+    /// Authorization lost at an actual read boundary: not a memory failure.
+    /// A partial read is dropped, restoring its keep mark and closing staged
+    /// sessions, without retry pacing or note adoption.
+    denied: Arc<AtomicBool>,
 }
 
 impl NoteAsk {
@@ -6983,14 +7245,44 @@ impl NoteAsk {
         (now, line): (Instant, u64),
         ask: &AskNote,
         ahead: bool,
+        permitted: NotePermission,
     ) -> Self {
         let answer = Arc::new(Mutex::new(None));
+        let denied = Arc::new(AtomicBool::new(false));
         let (said, done) = tokio::sync::watch::channel(false);
         let read = {
             let (ask, answer, person) = (ask.clone(), answer.clone(), person.clone());
+            let denied = denied.clone();
             move || {
+                let refusal = denied.clone();
+                let permitted = Arc::new(move || {
+                    let current = permitted();
+                    if !current {
+                        refusal.store(true, Ordering::Release);
+                    }
+                    current
+                });
+                if !permitted() {
+                    drop(answer);
+                    let _ = said.send(true);
+                    return;
+                }
                 let began = Instant::now();
-                let read = ask(session, person.as_deref(), NOTE_AHEAD_WITHIN, !ahead);
+                let read = ask(
+                    session,
+                    person.as_deref(),
+                    NOTE_AHEAD_WITHIN,
+                    !ahead && person.is_none(),
+                    permitted,
+                );
+                if denied.load(Ordering::Acquire) {
+                    // Dropping a partial read restores its keep mark and closes
+                    // staged sessions; denial is not a memory/retry failure.
+                    drop(read);
+                    drop(answer);
+                    let _ = said.send(true);
+                    return;
+                }
                 // Counts and times only, never the note.
                 eprintln!(
                     "lamp-voice second: memory note asked {}; {} in {} ms",
@@ -7034,11 +7326,17 @@ impl NoteAsk {
             waited: false,
             late: false,
             void: false,
+            denied,
         }
     }
 
     /// Whether its read is still going on.
     fn reading(&self) -> bool {
+        // Waiters also hold the answer. After a denied read has actually
+        // finished, its completion receipt, not their Arc count, ends the read.
+        if self.denied.load(Ordering::Acquire) && *self.done.borrow() {
+            return false;
+        }
         Arc::strong_count(&self.answer) > 1 && self.answer.lock().is_ok_and(|note| note.is_none())
     }
 
@@ -7074,7 +7372,7 @@ impl NoteAsk {
 
     /// Its read, once done: incomplete when the read ended without one.
     fn take(&mut self) -> Option<crate::remember::NoteRead> {
-        if self.reading() {
+        if self.reading() || self.denied.load(Ordering::Acquire) {
             return None;
         }
         Some(
@@ -7104,13 +7402,13 @@ impl NoteAsk {
 /// The second route's memory note asked ahead (lamp-4ace, 22 Oct 17:45: asked
 /// as the line ended, the note held the worker's one thread 300 ms, came
 /// 60 ms after the voice gave up, and wasn't asked again for 30 s). As a
-/// spoken line begins its run's note is asked, when due, on a thread of its
-/// own, but only for the scope the last answered turn was told in: a line
+/// spoken room line begins its run's note is asked, when due, on a thread of
+/// its own. Private notes wait for the final request's positive speaker proof: a line
 /// begins before the lamp knows it is for it, and one that is not answered
 /// (someone else's talk in the room) must open and close no Days session.
 /// An answered turn asks for its own scope if that differs. The turn waits
 /// for it off the loop, no longer than what is left of the note's 300 ms
-/// from that ask, and its context only takes it ([`Sessions::taken`]).
+/// from that ask, and its context only takes it ([`Sessions::taken_permitted`]).
 #[derive(Clone)]
 struct Ahead {
     sessions: Arc<Mutex<Sessions>>,
@@ -7128,8 +7426,10 @@ impl Ahead {
         Self::asking(
             sessions,
             who,
-            Arc::new(move |session, person, within, follow_up| {
-                crate::remember::fresh_note_read(&socket, session, person, within, follow_up)
+            Arc::new(move |session, person, within, follow_up, permitted| {
+                crate::remember::fresh_note_read(
+                    &socket, session, person, within, follow_up, permitted,
+                )
             }),
         )
     }
@@ -7153,10 +7453,44 @@ impl Ahead {
         self
     }
 
+    /// One request's selected note authority. Scope currency alone is not
+    /// speaker authority: the fresh atomic Eyes source must still agree.
+    fn permission(
+        &self,
+        lease: Option<&crate::memory_scope::ScopeLease>,
+        person: Option<&str>,
+    ) -> Option<NotePermission> {
+        let who = self.who.clone();
+        let permitted: NotePermission = match lease {
+            Some(lease) => {
+                let selected = memory_disclosure(lease, who.as_deref())?;
+                match &selected {
+                    MemoryDisclosure::Neutral => return None,
+                    MemoryDisclosure::Room if person.is_some() => return None,
+                    MemoryDisclosure::Person {
+                        person: selected, ..
+                    } if Some(selected.as_str()) != person => return None,
+                    _ => {}
+                }
+                let lease = lease.clone();
+                Arc::new(move || {
+                    memory_disclosure(&lease, who.as_deref()).as_ref() == Some(&selected)
+                })
+            }
+            None if person.is_none() => Arc::new(move || {
+                who.as_deref()
+                    .and_then(crate::known_faces::known_now)
+                    .is_none()
+            }),
+            None => return None,
+        };
+        permitted().then_some(permitted)
+    }
+
     /// A spoken line begins, its turn told in `lease`: the note asked now
-    /// if it is due and the line is in the scope the last answered turn was
-    /// told in (without a lease, taken to be). Nothing is let go here, and
-    /// nothing is read of who is at the lamp.
+    /// if it is due and both this admission and the last answered turn are
+    /// genuinely room-scoped. Private reads wait for final proof. No socket
+    /// work is waited for on the worker's loop.
     fn begin(&self, lease: Option<&crate::memory_scope::ScopeLease>, now: Instant) {
         let Ok(mut sessions) = self.sessions.lock() else {
             return;
@@ -7171,15 +7505,15 @@ impl Ahead {
         let Some(answered) = sessions.answered.clone() else {
             return;
         };
-        if let Some(lease) = lease {
-            let Some(scope) = lease.scope().filter(|scope| !scope.held()) else {
-                return;
-            };
-            if scope.person() != answered.as_deref() {
-                return;
-            }
+        // A Start has no final audio proof. Only a genuine room admission may
+        // prefetch; even the previous person's scope cannot authorize this line.
+        if answered.is_some() {
+            return;
         }
-        sessions.ask_if_due((answered, false), now, &self.ask, true);
+        let Some(permitted) = self.permission(lease, None) else {
+            return;
+        };
+        sessions.ask_if_due((answered, false), now, &self.ask, true, permitted);
     }
 
     /// Just before a turn told in `lease` is built, which only an answered
@@ -7191,10 +7525,18 @@ impl Ahead {
         &self,
         lease: Option<&crate::memory_scope::ScopeLease>,
         now: Instant,
-    ) -> Option<(tokio::sync::watch::Receiver<bool>, Instant, AskedRead)> {
+    ) -> Option<(
+        tokio::sync::watch::Receiver<bool>,
+        Instant,
+        AskedRead,
+        NotePermission,
+    )> {
         let mut sessions = self.sessions.lock().ok()?;
         sessions.tidy();
         let whose = sessions.whose_note(lease, self.who.as_deref(), now)?;
+        // This check is after the potentially contended sessions lock. The
+        // reader has its own check again after its thread has been scheduled.
+        let permitted = self.permission(lease, whose.0.as_deref())?;
         sessions.answered = Some(whose.0.clone());
         if sessions
             .asked
@@ -7204,16 +7546,18 @@ impl Ahead {
             sessions.asked = None;
         }
         let person = whose.0.clone();
-        sessions.ask_if_due(whose, now, &self.ask, false);
-        let asked = sessions
-            .asked
-            .as_mut()
-            .filter(|asked| !asked.void && asked.person == person)?;
+        sessions.ask_if_due(whose, now, &self.ask, false, permitted.clone());
+        let asked = sessions.asked.as_mut().filter(|asked| {
+            !asked.void
+                && (!asked.denied.load(Ordering::Acquire) || asked.reading())
+                && asked.person == person
+        })?;
         asked.waited = true;
         Some((
             asked.done.clone(),
             asked.at + self.within.0,
             Arc::clone(&asked.answer),
+            permitted,
         ))
     }
 
@@ -7223,24 +7567,45 @@ impl Ahead {
     /// answered, off the loop, within [`FOLLOW_UP_WITHIN`] more (reviewer-
     /// two's P2 on #3016). While it is read the ask counts as being read.
     async fn ready(self, lease: Option<crate::memory_scope::ScopeLease>) {
-        let Some((mut done, until, answer)) = self.ready_now(lease.as_ref(), Instant::now()) else {
+        // A prior request's cancelled read can still own the one reader.
+        // Once it actually ends, reconsider once for this request, within the
+        // original wait ceiling. Never overlap reads or extend this turn's wait.
+        let wait_until = Instant::now() + self.within.0;
+        let mut ready = None;
+        for attempt in 0..2 {
+            let Some((mut done, until, answer, permitted)) =
+                self.ready_now(lease.as_ref(), Instant::now())
+            else {
+                return;
+            };
+            let until = tokio::time::Instant::from_std(until.min(wait_until));
+            let _ = tokio::time::timeout_at(until, done.wait_for(|done| *done)).await;
+            let denied = self.sessions.lock().is_ok_and(|sessions| {
+                sessions.asked.as_ref().is_some_and(|asked| {
+                    Arc::ptr_eq(&asked.answer, &answer)
+                        && asked.denied.load(Ordering::Acquire)
+                        && !asked.reading()
+                })
+            });
+            if denied && attempt == 0 && permitted() && Instant::now() < wait_until {
+                continue;
+            }
+            ready = Some((answer, permitted));
+            break;
+        }
+        let Some((answer, permitted)) = ready else {
             return;
         };
-        let until = tokio::time::Instant::from_std(until);
-        let _ = tokio::time::timeout_at(until, done.wait_for(|done| *done)).await;
         // Still this turn's to take: not voided by a privacy change, nor its
         // scope revoked or held, meanwhile. Only then is an offer spent.
-        let scoped = lease
-            .as_ref()
-            .is_none_or(|lease| lease.scope().is_some_and(|scope| !scope.held()));
-        let ours = scoped
+        let ours = permitted()
             && self.sessions.lock().is_ok_and(|sessions| {
                 sessions
                     .asked
                     .as_ref()
                     .is_some_and(|asked| !asked.void && Arc::ptr_eq(&asked.answer, &answer))
             });
-        if !ours {
+        if !ours || !permitted() {
             return;
         }
         let wanted = answer.lock().ok().and_then(|mut read| {
@@ -7253,8 +7618,19 @@ impl Ahead {
             return;
         };
         let within = self.within.1;
+        let sessions = self.sessions.clone();
         let reading = tokio::task::spawn_blocking(move || {
-            read.follow_up(within);
+            // The blocking pool may have queued this after the asynchronous
+            // wait. A private offer must not be spent on the expired request.
+            let ours = sessions.lock().is_ok_and(|sessions| {
+                sessions
+                    .asked
+                    .as_ref()
+                    .is_some_and(|asked| !asked.void && Arc::ptr_eq(&asked.answer, &answer))
+            });
+            if ours && permitted() {
+                read.follow_up_permitted(within, &permitted);
+            }
             if let Ok(mut slot) = answer.lock() {
                 *slot = Some(read);
             }
@@ -7296,6 +7672,7 @@ impl Ahead {
 pub(super) fn reading_ahead(
     client: Arc<crate::remember::DaysClient>,
     within: Duration,
+    who: Option<PathBuf>,
 ) -> (
     crate::second_provider::NoteAhead,
     crate::second_provider::ScopedSystem,
@@ -7303,22 +7680,36 @@ pub(super) fn reading_ahead(
     let sessions = Arc::new(Mutex::new(Sessions::default()));
     let ahead = Ahead::asking(
         sessions.clone(),
-        None,
-        Arc::new(move |session, person, _, follow_up| {
-            client.read_note_within(session, person, false, within, (true, follow_up))
+        who.clone(),
+        Arc::new(move |session, person, _, follow_up, permitted| {
+            client.read_note_permitted(
+                session,
+                person,
+                false,
+                within,
+                (true, follow_up, &permitted),
+            )
         }),
     )
     .waiting_up_to(within);
     let socket = Some(PathBuf::from("/unused/the note is asked ahead"));
-    let told = memory_context(sessions, socket, None, true, |_, person, note| {
-        system_message(
-            "Synthetic character.\n",
-            None,
-            &note,
-            None,
-            person.as_deref(),
-        )
-    });
+    let told = memory_context(
+        sessions,
+        socket,
+        who,
+        true,
+        |_, person, note, _, history| {
+            disclosure_message(
+                false,
+                "Synthetic character.\n",
+                None,
+                &note,
+                None,
+                person.as_deref(),
+                history,
+            )
+        },
+    );
     (
         ahead.told_as(),
         Arc::new(move |lease: &crate::memory_scope::ScopeLease| told(Some(lease))),
@@ -7356,6 +7747,7 @@ pub(crate) fn system_message(
         text: told + &thread,
         after: None,
         history,
+        requires_speaker: false,
     }
 }
 
@@ -7378,6 +7770,51 @@ pub(crate) fn steady_first_message(
         text: steady,
         after: (!after.is_empty()).then_some(after),
         history,
+        requires_speaker: false,
+    }
+}
+
+/// Compose either layout without touching any thread or history when the
+/// private request has no positive speaker proof. `whose=None` alone means
+/// room history, so it must never stand in for this neutral state.
+fn disclosure_message(
+    steady_first: bool,
+    character: &str,
+    time: Option<&str>,
+    memory: &str,
+    file: Option<&Path>,
+    whose: Option<&str>,
+    history: bool,
+) -> Told {
+    if history {
+        return if steady_first {
+            steady_first_message(
+                character.to_owned(),
+                &format!("{memory}{}", time.unwrap_or_default()),
+                file,
+                whose,
+            )
+        } else {
+            system_message(character, time, memory, file, whose)
+        };
+    }
+    if steady_first {
+        let after = format!("{memory}{}", time.unwrap_or_default())
+            .trim_start()
+            .to_owned();
+        Told {
+            text: character.into(),
+            after: (!after.is_empty()).then_some(after),
+            history: vec![],
+            requires_speaker: false,
+        }
+    } else {
+        Told {
+            text: format!("{character}{}{memory}", time.unwrap_or_default()),
+            after: None,
+            history: vec![],
+            requires_speaker: false,
+        }
     }
 }
 
@@ -7481,6 +7918,7 @@ pub(crate) fn texts_system_message(character: &str, time: Option<&str>, memory: 
         text: format!("{character}{}{memory}", time.unwrap_or_default()),
         after: None,
         history: Vec::new(),
+        requires_speaker: false,
     }
 }
 
@@ -7707,10 +8145,10 @@ fn sign_in_written(command: &ProviderInput) {
 /// The engine's next output, with a sign-in's code and account taken out
 /// of its words (#1676, `crate::sign_in::leaving`): before the thread keeps
 /// them, and before they are sent.
-fn next_output(engine: &mut Engine) -> Option<ProviderOutput> {
-    let mut event = engine.try_output();
+fn next_output(engine: &mut Engine) -> Option<QueuedOutput> {
+    let mut event = engine.try_guarded_output();
     if let Some(event) = event.as_mut() {
-        crate::sign_in::leaving(event);
+        crate::sign_in::leaving(&mut event.event);
     }
     event
 }
@@ -7742,7 +8180,7 @@ pub async fn run(
     // At most one input read ahead of its authority, and one output waiting
     // for credit or a full socket.
     let mut retained: Option<ProviderInput> = None;
-    let mut pending: Option<ProviderOutput> = None;
+    let mut pending: Option<QueuedOutput> = None;
     // The answer's sound as it goes out, for when the lamp has finished
     // saying it (`AnswerSound::ends`).
     let mut answer_sound = AnswerSound::default();
@@ -7825,14 +8263,15 @@ pub async fn run(
         // Output kept waiting for a request since retired is dropped.
         if pending
             .as_ref()
-            .and_then(output_request)
+            .and_then(|queued| output_request(&queued.event))
             .is_some_and(|request| request <= gate.retired_through)
         {
             pending = None;
         }
         if pending.is_none() {
             pending = next_output(&mut engine);
-            if let Some(event) = &pending {
+            if let Some(queued) = &pending {
+                let event = &queued.event;
                 let lease = engine
                     .scopes_context()
                     .then(|| engine.memory_lease())
@@ -7854,7 +8293,7 @@ pub async fn run(
                 }
             }
             if let Some(event) = &pending {
-                link.output(monotonic_us(), event);
+                link.output(monotonic_us(), &event.event);
             }
         }
         // The lamp's only voice tells the coordinator its link (#1844).
@@ -11769,8 +12208,8 @@ mod tests {
                     idle: true,
                 },
             ] {
-                engine.shared.out.try_send(event).unwrap();
-                let pending = engine.try_output().unwrap();
+                engine.shared.out.try_send(event.into()).unwrap();
+                let pending = engine.try_guarded_output().unwrap();
                 assert!(
                     gate.send_or_discard(&engine, NOW, &pending, |event| worker
                         .data
@@ -11808,15 +12247,18 @@ mod tests {
             engine
                 .shared
                 .out
-                .try_send(ProviderOutput::RequestedAudio {
-                    request,
-                    session: 1,
-                    offer,
-                })
+                .try_send(
+                    ProviderOutput::RequestedAudio {
+                        request,
+                        session: 1,
+                        offer,
+                    }
+                    .into(),
+                )
                 .unwrap();
             // This is the event held outside Engine when the worker has no
             // credit. The later retry must not trust that earlier dequeue.
-            let pending = engine.try_output().unwrap();
+            let pending = engine.try_guarded_output().unwrap();
             assert!(
                 !gate
                     .send_or_discard(&engine, NOW, &pending, |event| worker
@@ -11866,7 +12308,7 @@ mod tests {
                 }
             }
             gate.fresh(retry_us).unwrap();
-            gate.may_send(retry_us, &pending).unwrap();
+            gate.may_send(retry_us, &pending.event).unwrap();
             let after = gate.guard.state().unwrap();
             assert_eq!(before.owner(), after.owner());
             assert_eq!(
@@ -11904,7 +12346,7 @@ mod tests {
                 gate.send_or_discard(
                     &engine,
                     retry_us,
-                    &ProviderOutput::GenerationComplete { request },
+                    &ProviderOutput::GenerationComplete { request }.into(),
                     |event| worker.data.send_with(event, || retry_us)
                 )
                 .unwrap()
@@ -12030,7 +12472,7 @@ mod tests {
         engine.queue_for_test(words(4, " example dot com?"));
         engine.queue_for_test(words(3, "It wrote the story."));
         let said: Vec<String> = std::iter::from_fn(|| next_output(&mut engine))
-            .map(|event| match event {
+            .map(|queued| match queued.event {
                 ProviderOutput::Transcript { text, .. } => text,
                 other => panic!("{other:?}"),
             })
@@ -12635,25 +13077,66 @@ mod tests {
         }
     }
 
-    /// #2539 (`LAMP_SECOND_FACE_NAME`): a turn that is the known face's own
-    /// person is told their name, as the Live route tells it; the room's
-    /// turn (or a line narrowed to the room), another person's, a face gone,
-    /// no eyes, and the switch off are told none. Made-up names.
+    /// Name disclosure needs this request's positive speaker proof and the
+    /// explicit fresh Eyes observation; inherited scope alone is insufficient.
     #[test]
     fn a_turn_of_the_known_persons_own_is_told_their_name() {
+        use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
         let dir = std::env::temp_dir().join(format!("lv-known-name-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir(&dir).unwrap();
         let known = dir.join("known");
         std::fs::write(&known, "Pippa").unwrap();
-        let pippa = crate::known_faces::memory_person("Pippa");
-        let told = known_name_told(true, Some(&known), Some(&pippa));
+        let source = crate::speaking_faces::known_speaker_of(&known);
+        let write_source = |boot: &str| {
+            std::fs::write(
+                &source,
+                serde_json::json!({
+                    "name": "Pippa", "id": null, "boot": boot, "face": "f7"
+                })
+                .to_string(),
+            )
+            .unwrap();
+        };
+        write_source("0123456789abcdef");
+        let key = RequestKey {
+            worker: lamp_turn_owner::BootId::new([7; 16]).unwrap(),
+            session: 3,
+            request: 5,
+        };
+        let proved = |name: &str, speaker: &str| {
+            let mut owner = RequestScope::new(key, ScopeSnapshot::of(name));
+            assert!(owner.speaker_recorder().unwrap().seal(
+                key,
+                &[speaker.to_owned()],
+                Instant::now() + Duration::from_secs(10)
+            ));
+            owner
+        };
+        let owner = proved("Pippa", "0123456789abcdef/f7");
+        let lease = owner.lease();
+        let started = Instant::now();
+        let told = known_name_told(true, Some(&known), Some(&lease));
+        let first = started.elapsed();
+        let started = Instant::now();
+        let repeated = known_name_told(true, Some(&known), Some(&lease));
+        let repeat = started.elapsed();
+        eprintln!(
+            "face_name_lookup calls=1 attempt=first elapsed_us={} notes={}",
+            first.as_micros(),
+            usize::from(!told.is_empty())
+        );
+        eprintln!(
+            "face_name_lookup calls=1 attempt=repeat elapsed_us={} notes={}",
+            repeat.as_micros(),
+            usize::from(!repeated.is_empty())
+        );
+        assert_eq!(repeated, told);
         assert_eq!(
             told,
             "\n\n(The person at the lamp now is Pippa: you know their face.)"
         );
-        // After the memory in the turn's system message, so "what's my
-        // name?" is asked with it.
+        let pippa = crate::remember::person_id("Pippa");
         let message = system_message(
             "You are a lamp.",
             None,
@@ -12664,30 +13147,54 @@ mod tests {
         assert!(
             message
                 .text
-                .contains("- tea, no sugar\n\n(The person at the lamp now is Pippa"),
-            "{}",
-            message.text
+                .contains("- tea, no sugar\n\n(The person at the lamp now is Pippa")
         );
-        let jim = crate::known_faces::memory_person("Jim");
-        for (on, who, person) in [
-            // The room's turn, or a line narrowed to the room.
+        let inherited = RequestScope::new(key, ScopeSnapshot::of("Pippa"));
+        let room = RequestScope::new(key, ScopeSnapshot::room());
+        let other = proved("Jim", "0123456789abcdef/f7");
+        let wrong_face = proved("Pippa", "0123456789abcdef/f8");
+        let old_boot = proved("Pippa", "fedcba9876543210/f7");
+        for (on, who, lease) in [
+            (false, Some(known.as_path()), Some(owner.lease())),
+            (true, None, Some(owner.lease())),
             (true, Some(known.as_path()), None),
-            // Someone else's turn.
-            (true, Some(known.as_path()), Some(jim.as_str())),
-            // The switch off: as today.
-            (false, Some(known.as_path()), Some(pippa.as_str())),
-            // No eyes.
-            (true, None, Some(pippa.as_str())),
+            (true, Some(known.as_path()), Some(inherited.lease())),
+            (true, Some(known.as_path()), Some(room.lease())),
+            (true, Some(known.as_path()), Some(other.lease())),
+            (true, Some(known.as_path()), Some(wrong_face.lease())),
+            (true, Some(known.as_path()), Some(old_boot.lease())),
         ] {
-            assert_eq!(
-                known_name_told(on, who, person),
-                "",
-                "{on} {who:?} {person:?}"
-            );
+            assert_eq!(known_name_told(on, who, lease.as_ref()), "");
         }
-        // The face gone: no known file.
-        std::fs::remove_file(&known).unwrap();
-        assert_eq!(known_name_told(true, Some(&known), Some(&pippa)), "");
+        write_source("fedcba9876543210");
+        assert_eq!(known_name_told(true, Some(&known), Some(&lease)), "");
+        write_source("0123456789abcdef");
+        std::fs::File::options()
+            .write(true)
+            .open(&source)
+            .unwrap()
+            .set_times(
+                std::fs::FileTimes::new().set_modified(SystemTime::now() - Duration::from_secs(4)),
+            )
+            .unwrap();
+        assert_eq!(known_name_told(true, Some(&known), Some(&lease)), "");
+        write_source("0123456789abcdef");
+        let narrowed = proved("Pippa", "0123456789abcdef/f7");
+        narrowed.lease().narrow_to_room();
+        assert_eq!(
+            known_name_told(true, Some(&known), Some(&narrowed.lease())),
+            ""
+        );
+        owner.revoke();
+        assert_eq!(known_name_told(true, Some(&known), Some(&lease)), "");
+        // A valid legacy known/known-face pair cannot manufacture the boot.
+        std::fs::remove_file(&source).unwrap();
+        std::fs::write(crate::speaking_faces::known_face_of(&known), "f7").unwrap();
+        let fresh = proved("Pippa", "0123456789abcdef/f7");
+        assert_eq!(
+            known_name_told(true, Some(&known), Some(&fresh.lease())),
+            ""
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -13324,9 +13831,8 @@ mod tests {
     }
 
     /// The reviewer-lead's P3 on #2537: with a request's lease, its hits are
-    /// asked in the lease's own scope, whoever the sticky session holds; in
-    /// the room's once another face spoke the line; and not at all once it is
-    /// revoked. Without a lease, the session's person as before.
+    /// asked in the lease's private scope only with positive speaker proof.
+    /// Narrowing, revocation and legacy sticky-person state disclose nothing.
     #[test]
     fn a_turns_hits_are_asked_in_its_leases_scope() {
         // One test at a time on the process's thread and room.
@@ -13346,7 +13852,18 @@ mod tests {
             session: 1,
             request: 3,
         };
-        let scope = RequestScope::new(key, ScopeSnapshot::of("Ossa"));
+        let mut scope = RequestScope::new(key, ScopeSnapshot::of("Ossa"));
+        assert!(scope.speaker_recorder().unwrap().seal(
+            key,
+            &["0123456789abcdef/f7".into()],
+            now + Duration::from_secs(10)
+        ));
+        std::fs::write(
+            crate::speaking_faces::known_speaker_of(&file),
+            serde_json::json!({"name":"Ossa","id":null,"boot":"0123456789abcdef","face":"f7"})
+                .to_string(),
+        )
+        .unwrap();
         let lease = scope.lease();
         let ossa = Some(crate::remember::person_id("Ossa"));
         let theirs = hits_whose(3, Some(&lease), &sessions, Some(&file), now);
@@ -13357,12 +13874,11 @@ mod tests {
         let unleased = hits_whose(3, None, &sessions, Some(&file), now);
         std::fs::remove_dir_all(&dir).unwrap();
         assert_eq!(theirs, Some(ossa), "the lease's person, not the session's");
-        assert_eq!(narrowed, Some(None), "another face spoke it: the room's");
+        assert_eq!(narrowed, None, "narrowed private is not a room admission");
         assert_eq!(revoked, None, "a revoked lease asks nothing");
         assert_eq!(
-            unleased,
-            Some(Some(crate::remember::person_id("Kesh"))),
-            "without a lease, the session's person"
+            unleased, None,
+            "legacy session identity is not speaker proof"
         );
     }
 
