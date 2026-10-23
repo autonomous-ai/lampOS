@@ -5,6 +5,24 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 17:06 — touch carry review finds a conditional update gap
+
+Ready for lamp-voice: no (#2948 transition held; generic clock gate continues).
+
+- The #2948 carry is faithful: the first patch adds the required new
+  reset-plan hash on its new base; the second patch is equal. Final fixture
+  hashes match their allowlists. First owns this branch and its merge.
+- A [focused transition reproduction](verification/head-touch-ota-carry-20261023/README.md)
+  at exact `f69bdea64` passes with settings off and fails with settings on.
+  The actual update round removes legacy head delivery in recorded default
+  pins while linked product reader units stay old. Controls restarts with
+  no enabled head reader. The conditional P2 and correction direction are
+  posted on #2948. No deployed-lamp or complete hardware claim.
+- The separate hum-default hold and privacy read remain with their owners.
+  The attended hand trial and c0a4 injected fault rows do not establish one
+  combined real-hand first-speaker latency measurement; the stale census
+  evidence rows need those distinctions.
+
 ## 2026-10-23 16:58 — current Body carry retains a stationary-hand failure
 
 Ready for lamp-voice: no (#3248 held; generic clock work is in progress).
