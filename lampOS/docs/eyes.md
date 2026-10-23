@@ -1036,7 +1036,14 @@ analysis on #3126). With the switch on:
   (`who::KNOWN_HOLD`, `who::Held`): one missed check, two seconds on, keeps
   them, and the next lets them go, so someone who leaves is let go within
   4 s of their last match. A held check does not count a visit. Someone
-  else matched, or a face from a photo, replaces them at once.
+  else matched, or a face from a photo, replaces them at once. An unknown
+  face ends the hold too: a near face that printed and matched nobody keeps
+  the held name only if it is still at least 0.30 alike to that person's
+  own prints (`who::HOLD_LIKENESS`, under `SAME_PERSON`'s 0.363: their
+  flicker sat at 0.34 to 0.36, strangers lower; to be tuned from the score
+  line) and, while speaking is judged, has the passing id their face had
+  at the match (`Held::keeps_print`). Anything else lets them go at once,
+  the known file with them, so a stranger sitting down is never named.
 - **The camera closed lets them go at once**: the name and the known file
   go as it closes, held or not.
 
