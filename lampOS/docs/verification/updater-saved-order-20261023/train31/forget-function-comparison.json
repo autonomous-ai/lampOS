@@ -1,0 +1,184 @@
+{
+  "reviewed_head": "82bc0f4ec46f1a8b088805b0aa281a8605bce539",
+  "train_head": "f42887330292883f225b147df64c0846e84588dc",
+  "path": "lampOS/crates/voice/src/remember.rs",
+  "method": "Function declarations selected by the reviewed patch ranges; blocks end at a brace at the declaration indentation. Compared byte-for-byte; source review remains required for changed blocks and shared state.",
+  "functions": [
+    {
+      "name": "pick_forget",
+      "reviewed_start": 1418,
+      "train_start": 1576,
+      "identical": true,
+      "reviewed_sha256": "4a28a1314dc4a207dd98580e3b3da72573061d81c897490cd1a2bc6e1465f4a0",
+      "train_sha256": "4a28a1314dc4a207dd98580e3b3da72573061d81c897490cd1a2bc6e1465f4a0"
+    },
+    {
+      "name": "named_forget_with",
+      "reviewed_start": 1445,
+      "train_start": 1603,
+      "identical": true,
+      "reviewed_sha256": "99ad498c78bfa370bf6a097a142b8888ecb97c77642255a03e47499ce7c64361",
+      "train_sha256": "99ad498c78bfa370bf6a097a142b8888ecb97c77642255a03e47499ce7c64361"
+    },
+    {
+      "name": "replace_session",
+      "reviewed_start": 2739,
+      "train_start": 2925,
+      "identical": true,
+      "reviewed_sha256": "b68054f56168a68a81307baee65fd7f70eee951705a6b52f7c9895f6b2a85227",
+      "train_sha256": "b68054f56168a68a81307baee65fd7f70eee951705a6b52f7c9895f6b2a85227"
+    },
+    {
+      "name": "bare_forget_target",
+      "reviewed_start": 3402,
+      "train_start": 3597,
+      "identical": true,
+      "reviewed_sha256": "6cd1ed6ed27a07f81234b4d2e9b7d01a4ea7f994d31736e67e2bbf2a8eee98c3",
+      "train_sha256": "6cd1ed6ed27a07f81234b4d2e9b7d01a4ea7f994d31736e67e2bbf2a8eee98c3"
+    },
+    {
+      "name": "older_memory_refused",
+      "reviewed_start": 4300,
+      "train_start": 4629,
+      "identical": true,
+      "reviewed_sha256": "fd989dbdf6d5866a936d836850497edc531eb383f59693ffa361656539e57963",
+      "train_sha256": "fd989dbdf6d5866a936d836850497edc531eb383f59693ffa361656539e57963"
+    },
+    {
+      "name": "close_open_session",
+      "reviewed_start": 4470,
+      "train_start": 4804,
+      "identical": true,
+      "reviewed_sha256": "aa1952216a078e0a00ab1b42713b193911703013682dff313bcb9e68665949bf",
+      "train_sha256": "aa1952216a078e0a00ab1b42713b193911703013682dff313bcb9e68665949bf"
+    },
+    {
+      "name": "run_at_guarded",
+      "reviewed_start": 4890,
+      "train_start": 5304,
+      "identical": false,
+      "reviewed_sha256": "5a8c1437b8078bf3037bf82961e3c703e5221d6976ac9f7a6d5f9d8e55a4617a",
+      "train_sha256": "0ed20c6e3b1000e98bc6b2b9c02cd8694355d2df33437492edcc93c2439ab09a"
+    },
+    {
+      "name": "forget_about",
+      "reviewed_start": 5344,
+      "train_start": 5773,
+      "identical": true,
+      "reviewed_sha256": "8716c7e78875a3253053eb987bdf0e043e8ebc6f917b3f59bfdde272ac141df4",
+      "train_sha256": "8716c7e78875a3253053eb987bdf0e043e8ebc6f917b3f59bfdde272ac141df4"
+    },
+    {
+      "name": "telling_events",
+      "reviewed_start": 5708,
+      "train_start": 6149,
+      "identical": true,
+      "reviewed_sha256": "df6ae228dc229594dc9247eb89a29748fb8d9c6935f16a0f138908408e8313b6",
+      "train_sha256": "df6ae228dc229594dc9247eb89a29748fb8d9c6935f16a0f138908408e8313b6"
+    },
+    {
+      "name": "mark_if_asked",
+      "reviewed_start": 5963,
+      "train_start": 6404,
+      "identical": true,
+      "reviewed_sha256": "aee742bca18b5f4610298ecd9dc1062798ede5bf754438e9812160c07f2644c1",
+      "train_sha256": "aee742bca18b5f4610298ecd9dc1062798ede5bf754438e9812160c07f2644c1"
+    },
+    {
+      "name": "a_bare_forget_in_their_next_two_lines_forgets_the_follow_up_asked",
+      "reviewed_start": 9483,
+      "train_start": 10374,
+      "identical": true,
+      "reviewed_sha256": "15925230218ed7b292bdfba65c952a3195d06bffb1f9ba9d956020ee3a55d1e5",
+      "train_sha256": "15925230218ed7b292bdfba65c952a3195d06bffb1f9ba9d956020ee3a55d1e5"
+    },
+    {
+      "name": "probe",
+      "reviewed_start": 9530,
+      "train_start": 10421,
+      "identical": true,
+      "reviewed_sha256": "3e6da643b40f2e2cadca634a6eab3534463fc32f55a0cf9d5ff68ee30d3eb4fa",
+      "train_sha256": "3e6da643b40f2e2cadca634a6eab3534463fc32f55a0cf9d5ff68ee30d3eb4fa"
+    },
+    {
+      "name": "a_bare_forget_past_a_minute_of_the_ask_is_forget_last",
+      "reviewed_start": 9537,
+      "train_start": 10428,
+      "identical": true,
+      "reviewed_sha256": "34e2464ae623ed3b53583d1248f754fe35e75a8d6de181987c9fddccbb0d9328",
+      "train_sha256": "34e2464ae623ed3b53583d1248f754fe35e75a8d6de181987c9fddccbb0d9328"
+    },
+    {
+      "name": "a_refused_forget_of_the_follow_up_is_retried_by_id_never_forget_last",
+      "reviewed_start": 9571,
+      "train_start": 10462,
+      "identical": true,
+      "reviewed_sha256": "baaaf77ffaf453dd46ae37e331f6857d5d06a9560e1ab410ce4b9618818022a0",
+      "train_sha256": "baaaf77ffaf453dd46ae37e331f6857d5d06a9560e1ab410ce4b9618818022a0"
+    },
+    {
+      "name": "a_refused_forget_leaves_the_slot_and_another_s_forget_is_forget_last",
+      "reviewed_start": 9654,
+      "train_start": 10545,
+      "identical": true,
+      "reviewed_sha256": "a7b2f775be49eda468a54a299f024768d76c15ae88e6da782926ed7d9e949bb4",
+      "train_sha256": "a7b2f775be49eda468a54a299f024768d76c15ae88e6da782926ed7d9e949bb4"
+    },
+    {
+      "name": "pick_forget_takes_the_follow_up_asked_only_for_a_bare_forget",
+      "reviewed_start": 9691,
+      "train_start": 10582,
+      "identical": true,
+      "reviewed_sha256": "d4b667ae0e48be7c00c7a2255de56288b4106ec1ef4d6b6a95f1db597b65a767",
+      "train_sha256": "d4b667ae0e48be7c00c7a2255de56288b4106ec1ef4d6b6a95f1db597b65a767"
+    },
+    {
+      "name": "asked_with_memory",
+      "reviewed_start": 9720,
+      "train_start": 10611,
+      "identical": true,
+      "reviewed_sha256": "94283bcda2615e32af32298f50191a0a650748111a8d740120093644dd8fc785",
+      "train_sha256": "94283bcda2615e32af32298f50191a0a650748111a8d740120093644dd8fc785"
+    },
+    {
+      "name": "another_speaker_s_bare_forget_never_takes_the_follow_up_asked",
+      "reviewed_start": 9733,
+      "train_start": 10624,
+      "identical": true,
+      "reviewed_sha256": "60c3d99d3124722ab6969576e03e9cf7c236a0d7c4fc12e1d64f25e1bfeca473",
+      "train_sha256": "60c3d99d3124722ab6969576e03e9cf7c236a0d7c4fc12e1d64f25e1bfeca473"
+    },
+    {
+      "name": "a_remember_after_the_ask_makes_the_bare_forget_forget_last",
+      "reviewed_start": 9750,
+      "train_start": 10641,
+      "identical": true,
+      "reviewed_sha256": "7be567c1378c82ad8807bf2c66a6f33732f618b59b37b457929a014deee166e7",
+      "train_sha256": "7be567c1378c82ad8807bf2c66a6f33732f618b59b37b457929a014deee166e7"
+    },
+    {
+      "name": "a_session_change_lets_the_follow_up_asked_go",
+      "reviewed_start": 9775,
+      "train_start": 10666,
+      "identical": true,
+      "reviewed_sha256": "b0e1ae5e257e12297e984540940d920710e4d71e0963292d8513efad66ee1402",
+      "train_sha256": "b0e1ae5e257e12297e984540940d920710e4d71e0963292d8513efad66ee1402"
+    },
+    {
+      "name": "with_threads_off_a_bare_forget_is_forget_last",
+      "reviewed_start": 9825,
+      "train_start": 10716,
+      "identical": true,
+      "reviewed_sha256": "c0941527128e6a50dd91fc129e122620b4431898619426fe2c2f1d0884ab7716",
+      "train_sha256": "c0941527128e6a50dd91fc129e122620b4431898619426fe2c2f1d0884ab7716"
+    },
+    {
+      "name": "pick_forget_names_the_subject_and_leaves_the_last_kept_thing_to_that",
+      "reviewed_start": 15925,
+      "train_start": 17086,
+      "identical": true,
+      "reviewed_sha256": "6faeab7d8abcbfc8918558e50f5a709aa89c1758b2642229863dc286380f730d",
+      "train_sha256": "6faeab7d8abcbfc8918558e50f5a709aa89c1758b2642229863dc286380f730d"
+    }
+  ]
+}

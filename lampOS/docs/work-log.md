@@ -1,3 +1,29 @@
+## Current checkpoint: 2026-10-23 10:38 +07, updater landed in train 31
+
+Ready for lamp-voice: yes, #3186 landed through #3192 at `498aca8a2`
+
+The updater commit `e3d9324df` has the identical reviewed patch and all eight
+authored files from `c02328dd7`. The entire landed tree equals tested train
+`f42887330`. Official train ARM64 **10,927 / 0 / 68 skipped**, one passing
+leaky case, and Linux Clippy both pass on their first attempts. The original
+PR **7,129 / 0 / 31 skipped** and Mac **332 / 0 / 4 ignored** remain bound to
+their original heads. [Final train and landing receipts](verification/updater-saved-order-20261023/train31/README.md)
+retain all raw output, source bindings and the current artifact identity.
+
+#3130 also landed in this train. Second's scoped carry READ-OK keeps the
+prior **12 / 0** execution at its actual reviewed head; the composed source
+and current native results are recorded separately. No own PR remains open
+from this work. #3173 and #3160 were already merged.
+
+The remaining list requires the assigned operators: First selects the real
+candidate/fallback pair and observer setup for #2810, Fifth and the attending
+person provide the 52e6 window and physical unplug, then First owns #1812's
+protected publishing/signing run. The [attended worksheet](verification/updater-attended-exec-cut-20261022.md)
+and current process-test receipts are ready. No lamp access, installation,
+physical cut, flash-durability result or real-key release is claimed.
+
+---
+
 ## Current checkpoint: 2026-10-23 10:15 +07, saved rollback order green and read
 
 Ready for lamp-voice: yes (#3186), for First's next gated train
