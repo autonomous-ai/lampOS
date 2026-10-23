@@ -1,12 +1,12 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-23 11:24 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-23 12:21 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 91.2% over 72 rows. Quality 65.0% over 16 rows.**
+**Build 92.3% over 70 rows. Quality 65.0% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
-**Not a ship gate:** a row marked so stays in V2 and in the build figure, but a lamp ships with it off if its runs haven't passed by then (the lead, 22 Oct on #1711).
+**Mood, for later:** the two mood rows stay in V2 but out of the build figure, which counts the rows that ship. No day slot or new work goes into them until those reach 100% (the lead, 23 Oct on #1711). On 22 Oct the first builder had kept them in the figure as rows that aren't ship gates.
 
 ## Build rows
 
@@ -37,7 +37,7 @@ Written by the first builder from the team's review page at 2026-10-23 11:24 (+0
 | One install for a new lamp | 1.00 | #811 | nine | Shown 19 Oct 15:1x on a second lamp, lamp-c0a4: build 3162 installed over V1 from a test-signed local channel, all 45 files equal to the build’s checksums, V1 stopped and kept, no reboot; |
 | No internet at home | 1.00 | #830 #1242 #1256 #1247 | nine | 21 Oct 14:1x: its lamp runs passed on lamp-75c9 (Nine): the outage found with nobody speaking, the offline line once, “back online” after, and the unavailable face. |
 | Everything is a skill, core and installable, no one-off code | 0.72 | #940 #938 #1667 #1696 #1698 #2643 #2654 #2674 #2822 #2823 #2824 #2825 #2826 | seventh | 23 Oct 09:2x, up from 0.7: night sleep runs through its skill, with the built-in one only as a fallback for one release (#2744). |
-| An owner makes their own skill | 0.78 | #941 #1698 #2424 #2811 #2813 #2814 #2815 #2816 | sixth, ten | 22 Oct 22:0x, up from 0.75: a developer’s path to make a skill by hand, in skill-creator’s README (#3055 merged, Blue). |
+| An owner makes their own skill | 0.80 | #941 #1698 #2424 #2811 #2813 #2814 #2815 #2816 | sixth, ten | 23 Oct 12:2x, up from 0.78: the whole path ran on a real lamp (Mobile, lamp-0c89, 12:12): a skill typed in the app reached the office computer through Harness, which made its project, and Claude made the skill. |
 | A Skills Store to publish skills | 0.60 | #1698 #2801 #2802 | fourteen | 22 Oct 22:0x, up from 0.55: an installed package keeps its sha256 and skills.list gives it beside the catalogue’s (Backend3, #3042 merged; |
 | Updates over the internet, by themselves | 0.65 | #737 #1812 | migrate, second | 20 Oct 06:11: shown again on lamp-4ace on the merged code (El’s test, three cases: a good build kept, one that fails to start put back in under 2 min, one that never confirms put back after its 10 min), the lamp left exa… |
 | A voice cheaper than Gemini Live, as fast and as good | 1.00 | #754 #1686 #1712 #1973 #2135 #2136 | sixth, first, fourth, ten, backend, third, eighth, twelve | 20 Oct 10:1x, built, by the lead’s rule (it works and it is fast enough are separate): on the main line since #1973, on lamp-4ace, and 32 of 32 answered for the lead on lamp-52e6. |
@@ -49,12 +49,12 @@ Written by the first builder from the team's review page at 2026-10-23 11:24 (+0
 | Always alive: breathing, small drift, a glance at a bang | 1.00 | #710 #714 #715 | fifth, second | Built |
 | Moves with its words while it speaks | 1.00 | #933 #1067 #1365 #2030 | thirteen, fifth, third | 20 Oct 09:4x, built: #1759 (with #1067’s sway) merged into lamp-voice after its try on lamp-52e6 with the lead, so every lamp nods and sways while it speaks, sparse as the lead chose. |
 | Never tips itself over | 1.00 | #1072 #704 | eighth | Built with V1’s limits; |
-| One inner state (mood) every behaviour reads, and familiarity *(not a ship gate)* | 0.72 | #713 #1670 #1728 #1749 #1772 #2829 #2830 #2831 | fourth, ten | 22 Oct 22:0x, up from 0.7: a say’s record keeps who it told and the familiar level (#3056 merged, Seventh), so #2831’s last bar can be read on 52e6. |
+| One inner state (mood) every behaviour reads, and familiarity *(mood, for later: not in the build figure)* | 0.72 | #713 #1670 #1728 #1749 #1772 #2829 #2830 #2831 | fourth, ten | 22 Oct 22:0x, up from 0.7: a say’s record keeps who it told and the familiar level (#3056 merged, Seventh), so #2831’s last bar can be read on 52e6. |
 | Joys: sways to music, watches you leave, core skills | 0.70 | #1669 #1707 #1748 #2832 #2833 #2834 | sixth | 21 Oct 14:3x: the glance at a laugh is taken out of the row (the lead on #1711: you never asked for it; |
 | Dance when asked | 1.00 | #999 | jarvis | Built (the Dance skill, V1’s dance clips) |
 | Bedtime and Morning as a skill, with night caps on light and volume | 0.85 | #1672 #1732 #2803 #2804 | jarvis, second | 23 Oct 09:2x, up from 0.65: a full real night through the skills on lamp-06c1 met its done-when (#2803), the night caps on light and volume held across restarts and silence (#2804), and night sleep now runs through the s… |
 | “What do you see?” and showing it a page | 1.00 | #836 #842 | seventh | Built |
-| Seeing someone speak (is the face it looks at talking?) | 0.92 | #720 #1470 #2008 #2026 #2859 #2860 | fifth, ten | 23 Oct 09:2x, up from 0.9: with the eyes as they ship (blendshapes on), the speaking read now reads the lips each look (#3158, train 26); |
+| Seeing someone speak (is the face it looks at talking?) | 0.90 | #720 #1470 #2008 #2026 #2859 #2860 | fifth, ten | 23 Oct 12:2x, down from 0.92: the lips read of 09:2x (#3158) is reverted (#3220). |
 | The eye: looks toward you, blinks, a face for each state | 1.00 | #712 | first | Built (ring eye, asleep face) |
 | Its light by voice and in the app, kept across a restart | 1.00 | #1472 #1484 #1464 #1468 | — | Built |
 | Volume by voice and in the app | 1.00 | #1458 #1465 | — | Built |
@@ -70,8 +70,8 @@ Written by the first builder from the team's review page at 2026-10-23 11:24 (+0
 | Hand-overs from a home lamp: Harness installed, the person signed in | 0.85 | #751 #765 #798 #1854 #2702 #2838 #2839 #2840 #2841 #2842 | seventh, eighth | 23 Oct 11:2x, up from 0.8: a misheard hand-over is put right at its read-back: five misheard asks on lamp-75c9 each started on a yes after the correction, nothing on a no (Eighth, #2838 closed). |
 | Updates cover the whole lamp, so V3, V4 and V5 update a shipped lamp in place: units, models, the updater itself, rollback, every part’s saved data read across versions | 0.60 | #1369 #1505 #2700 #2809 #2810 | migrate, tests | 23 Oct 09:2x, up from 0.55: an update restarts the parts the voice calls before the voice, and rolls back the same way (#3173, train 27), and the rule that every part works with the previous build of the other side is wr… |
 | The company sees its lamps in homes: health, crash and support logs, opt-in | 0.95 | #1683 #1755 #2862 | jarvis, mobile, backend | 22 Oct 12:46, up from 0.9: the health report lists the product parts that have failed, under the same consent (Second, #2764). |
-| The factory’s per-lamp steps: body poses, touch pads, the update key | 0.70 | #1682 #1717 #1744 #2817 #2818 | third, thirteen | 22 Oct 16:3x, up from 0.65: the factory steps start the body before the stand, so a whole run needs no person between steps (Fifth, #2869, ef1eb0cf2). |
-| Reads your mood from your face or voice *(not a ship gate)* | 0.45 | #2796 #2797 #2798 #2799 #2800 | ten, fourth | 23 Oct 02:1x, up from 0.35: the product units carry the face reader, Blendshape alone (#2953, #2799 closed), and onboarding’s one ask whether the lamp may notice how a face seems, keeping only a yes, is merged (#3082, tr… |
+| The factory’s per-lamp steps: body poses, touch pads, the update key | 0.85 | #1682 #1717 #1744 #2817 #2818 | third, thirteen | 23 Oct 12:2x, up from 0.7: the factory steps ran whole on lamp-52e6, 6 of 6 with nothing set by hand: steps 1–4, the body file with its measured stand, pad lines 97 and 98, the self-test report naming the lamp, and the a… |
+| Reads your mood from your face or voice *(mood, for later: not in the build figure)* | 0.45 | #2796 #2797 #2798 #2799 #2800 | ten, fourth | 23 Oct 02:1x, up from 0.35: the product units carry the face reader, Blendshape alone (#2953, #2799 closed), and onboarding’s one ask whether the lamp may notice how a face seems, keeping only a yes, is merged (#3082, tr… |
 | Notices your activity and posture | 1.00 | — | — | Built and tried on lamp-4ace 20 Oct 01:23: with LAMP_ACTIVITY on the eyes say what the person at the desk is doing on room/activity (away in an empty room); |
 | Habits and wellbeing nudges beyond Stretch break, as skills | 1.00 | — | — | 20 Oct 11:46, built: all four tried on lamp-52e6 with the lead (row 12: rest your eyes, a sip of water, stand up, wind down), each passed with its skill done. |
 | Text your lamp from your phone, in the Autonomous app | 0.70 | #1396 #1673 #1726 #1742 #2836 | ten, mobile, backend, fourth | 20 Oct 11:3x, up from 0.25: on lamp-0c89 from a phone, a texted reminder was set and said at the lamp 2 min later, and a moving skill was refused from a text; |
