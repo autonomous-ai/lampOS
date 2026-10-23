@@ -1,0 +1,30 @@
+{
+  "before": {
+    "env": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true"
+    },
+    "RUST_TEST_THREADS": "unset",
+    "RUSTFLAGS": "unset",
+    "CARGO_BUILD_TARGET": "unset",
+    "target_ownership": "MAIN explicitly granted before --run; no host-isolation claim",
+    "architecture_limit": "Rust target and file output identify compiler/binary ISA; physical hardware or translation not inferred."
+  },
+  "after": {
+    "env": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true"
+    },
+    "RUST_TEST_THREADS": "unset; readers alone use explicit --test-threads=1",
+    "compiled_binary_format": "Saved file receipt: Mach-O 64-bit executable x86_64, not ELF",
+    "no_hardware_or_host_isolation_claim": true
+  }
+}

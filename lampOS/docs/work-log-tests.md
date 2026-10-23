@@ -1,5 +1,29 @@
 # Tests work log
 
+## 2026-10-23 10:02 +0700 — full Voice failures published; reader snapshot defect identified
+
+Ready for lamp-voice: no (#3190).
+
+The [complete frozen Mac Voice comparison](verification/voice-boot-clock-20261023/mac-full-comparison/)
+preserves both full raw streams, identical 3,843-case compiled inventories,
+source/binary identities and exact diagnostics. The library changes from
+**3,548/0/14 to 3,543/5/14**; total Voice changes from **3,828/1/14 to
+3,823/6/14**. These five added failures remain unclassified and unwaived.
+The later read found both reported child PIDs absent, without proving their
+exit times or the original cleanup cause.
+
+The verifier archived only `lampOS`, omitting repository-root `robots/lamp`
+fixtures that Update image/install tests require. Its resulting reader
+failures are invalid qualification on an incomplete snapshot, not inherited
+product failures. The owned reader invocation is being stopped with its
+partial raw results retained; no fixtures are repaired in flight. Corrected
+qualification will use complete repository worktrees and pin those inputs.
+
+Current-head Linux workspace Clippy run **39891902443 passed**. ARM64 run
+**39891902416** continues. Neither result makes the unresolved Mac failures
+green. #2839's product proposal still awaits a decision; its regression and
+raw evidence are already pushed.
+
 ## 2026-10-23 09:56 +0700 — boot-clock PR opened on the current base
 
 Ready for lamp-voice: no ([#3190](https://github.com/autonomous-ai/lampOS/pull/3190)).

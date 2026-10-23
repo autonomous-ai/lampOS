@@ -1,0 +1,13 @@
+Retained raw stream: rustc-version.stdout
+Source: /private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/rustc-version.stdout
+Payload bytes: 191
+Payload SHA256: 4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281
+BEGIN RAW PAYLOAD
+rustc 1.96.0 (ac68faa20 2026-05-25)
+binary: rustc
+commit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96
+commit-date: 2026-05-25
+host: x86_64-apple-darwin
+release: 1.96.0
+LLVM version: 22.1.2
+END RAW PAYLOAD

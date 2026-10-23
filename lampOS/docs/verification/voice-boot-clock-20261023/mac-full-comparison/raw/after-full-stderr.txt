@@ -1,0 +1,18 @@
+Retained raw stream: after-full-tests.stderr
+Source: /private/tmp/tests-codex-boot-clock-mac-continuation-20261023/run-20261023T021033.713247Z/after-full-tests.stderr
+Payload bytes: 901
+Payload SHA256: bec8a9803f4979205606f61b83cc5c3da89536ee9eb1b48297c448a7ece9f352
+BEGIN RAW PAYLOAD
+    Finished `test` profile [unoptimized] target(s) in 0.35s
+     Running unittests src/lib.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d)
+error: test failed, to rerun pass `-p lamp-voice --lib`
+     Running unittests src/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0)
+     Running tests/it/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428)
+error: test failed, to rerun pass `-p lamp-voice --test it`
+     Running unittests examples/render_line_second.rs (/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f)
+     Running unittests examples/stop_words_stt_replay.rs (/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff)
+   Doc-tests lamp_voice
+error: 2 targets failed:
+    `-p lamp-voice --lib`
+    `-p lamp-voice --test it`
+END RAW PAYLOAD

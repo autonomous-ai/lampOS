@@ -1,0 +1,140 @@
+{
+  "files": {
+    "README.md": {
+      "bytes": 4776,
+      "sha256": "7452b8e8b9104a2229617979dab361104355cf0ba6e6e4ce676d003459f593d3"
+    },
+    "artifacts.json": {
+      "bytes": 26156,
+      "sha256": "ff2cc8babf64480a64bfdfe4c9e6c929cdb1f30d0385da024535340268e2e268"
+    },
+    "child-absence.json": {
+      "bytes": 754,
+      "sha256": "88e50959756093a078171cbf5c501a457d26a6cec0f6747573ae8c8acfa60402"
+    },
+    "environment.json": {
+      "bytes": 1098,
+      "sha256": "e5a83bd3441794f54dd68902e092b7d8244411f0b60e0ee9bb897bd3ac47cbf2"
+    },
+    "inventories.json": {
+      "bytes": 367376,
+      "sha256": "79492d533368cdd7e78e2225a2ec79bf418972d73d6dee84924b1b670050caf4"
+    },
+    "raw/after-full-stderr.txt": {
+      "bytes": 1202,
+      "sha256": "cb817a08d57bfa859b9dadfa4d151a8495374642a4eae8f5d0ee834b8f027ebf"
+    },
+    "raw/after-full-stdout.txt": {
+      "bytes": 390336,
+      "sha256": "932e6752add2064de56ae9b290d58c671d6867bcc7b1f7c0a8e48aa749f29d4e"
+    },
+    "raw/after-lib-file.txt": {
+      "bytes": 416,
+      "sha256": "9d558ab41c81b49c540f94bfe97c7e34e71ec436bef69266eee151823603f091"
+    },
+    "raw/before-full-stderr.txt": {
+      "bytes": 1118,
+      "sha256": "3ad42b0a1db444eae6a5a0c12edd3af827f4bcd02de70104bcf0b2f9a5388d4a"
+    },
+    "raw/before-full-stdout.txt": {
+      "bytes": 380674,
+      "sha256": "fbcd174d44e93563c76fe88d65a36a7a17fa2e9c91b457ec9d21218c96dfd143"
+    },
+    "raw/before-lib-file.txt": {
+      "bytes": 429,
+      "sha256": "37ba707749988d76cdfc9beffca5e5a49ef0f7bc49ae84da2c249dfa965a171e"
+    },
+    "raw/child-ps-stderr.txt": {
+      "bytes": 267,
+      "sha256": "06310690b31b2eb366cb64b85776f142d31b531594bc5a9b6991958c57b2b310"
+    },
+    "raw/child-ps-stdout.txt": {
+      "bytes": 267,
+      "sha256": "0df78882355f991899906739536bc3cbbbba1e903b8cfd00e730c12c625f0313"
+    },
+    "raw/host-uname.txt": {
+      "bytes": 415,
+      "sha256": "3d52af169357b6c6b2aecbace45ade8273fea8610aeca36ca3cfda2cb33c4adb"
+    },
+    "raw/rustc-version.txt": {
+      "bytes": 483,
+      "sha256": "c08116981ebe855f3aa0cf0432053178ac485e03144ccd556a112edb5c3bca18"
+    },
+    "results.json": {
+      "bytes": 34940,
+      "sha256": "d09e7199c5c3150d510ce879e1abbbcffab1123959d8ded9c59622e533dc6ce4"
+    }
+  },
+  "raw_payloads": [
+    {
+      "file": "raw/before-full-stdout.txt",
+      "payload_offset_bytes": 287,
+      "payload_bytes": 380371,
+      "payload_sha256": "07ae6a05ceb8ce102b7d28efc3e32250f76ad7771a84c9cdd1823cdd2bd4ac8f",
+      "original_source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-tests.stdout"
+    },
+    {
+      "file": "raw/before-full-stderr.txt",
+      "payload_offset_bytes": 284,
+      "payload_bytes": 818,
+      "payload_sha256": "aac29ff345adb948f678af7fa774fc9c74b822694b544e12010782c8334daed0",
+      "original_source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-tests.stderr"
+    },
+    {
+      "file": "raw/after-full-stdout.txt",
+      "payload_offset_bytes": 288,
+      "payload_bytes": 390032,
+      "payload_sha256": "29cf3f71c21e8ab1acdde5e60826c0c3a727e18b7d0124f9ce0128c42bea013b",
+      "original_source": "/private/tmp/tests-codex-boot-clock-mac-continuation-20261023/run-20261023T021033.713247Z/after-full-tests.stdout"
+    },
+    {
+      "file": "raw/after-full-stderr.txt",
+      "payload_offset_bytes": 285,
+      "payload_bytes": 901,
+      "payload_sha256": "bec8a9803f4979205606f61b83cc5c3da89536ee9eb1b48297c448a7ece9f352",
+      "original_source": "/private/tmp/tests-codex-boot-clock-mac-continuation-20261023/run-20261023T021033.713247Z/after-full-tests.stderr"
+    },
+    {
+      "file": "raw/child-ps-stdout.txt",
+      "payload_offset_bytes": 250,
+      "payload_bytes": 0,
+      "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "original_source": "/private/tmp/tests-codex-boot-clock-mac-continuation-20261023/child-exit-observation/ps.stdout"
+    },
+    {
+      "file": "raw/child-ps-stderr.txt",
+      "payload_offset_bytes": 250,
+      "payload_bytes": 0,
+      "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "original_source": "/private/tmp/tests-codex-boot-clock-mac-continuation-20261023/child-exit-observation/ps.stderr"
+    },
+    {
+      "file": "raw/rustc-version.txt",
+      "payload_offset_bytes": 276,
+      "payload_bytes": 191,
+      "payload_sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+      "original_source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/rustc-version.stdout"
+    },
+    {
+      "file": "raw/host-uname.txt",
+      "payload_offset_bytes": 270,
+      "payload_bytes": 129,
+      "payload_sha256": "204a83e2b8636953a75868a7fe8e89acf55106ebad3f52c033cd94f377dcf868",
+      "original_source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/host-uname.stdout"
+    },
+    {
+      "file": "raw/before-lib-file.txt",
+      "payload_offset_bytes": 304,
+      "payload_bytes": 109,
+      "payload_sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4",
+      "original_source": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-artifact-4-file.stdout"
+    },
+    {
+      "file": "raw/after-lib-file.txt",
+      "payload_offset_bytes": 291,
+      "payload_bytes": 109,
+      "payload_sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4",
+      "original_source": "/private/tmp/tests-codex-boot-clock-mac-continuation-20261023/run-20261023T021033.713247Z/baseline-reuse-file.stdout"
+    }
+  ]
+}

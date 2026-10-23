@@ -1,0 +1,7 @@
+Retained raw stream: host-uname.stdout
+Source: /private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/host-uname.stdout
+Payload bytes: 129
+Payload SHA256: 204a83e2b8636953a75868a7fe8e89acf55106ebad3f52c033cd94f377dcf868
+BEGIN RAW PAYLOAD
+Darwin m0.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:11:49 PDT 2026; root:xnu-12377.161.14~5/RELEASE_X86_64 x86_64
+END RAW PAYLOAD
