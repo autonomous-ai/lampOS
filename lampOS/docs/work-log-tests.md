@@ -1,5 +1,27 @@
 # Tests work log
 
+## 2026-10-23 12:13 +0700 — phone-news complete gate published with six failures
+
+Ready for lamp-voice: no (#3218 draft, native checks and review pending).
+
+The [terminal Mac receipt](verification/phone-news-start-20261023/final-gates-e5/)
+binds the exact two-file candidate subsequently committed as `47adb38fd`.
+Voice is **3,868 / 2 / 15**, readers **3,200 / 4 / 17**; formatting, strict
+12-package Clippy, workspace build and diff check pass. All 74 targets and
+7,106 case identities are complete, with 9,992 source paths unchanged.
+All 193 command records and 386 human output streams were checked against
+original bytes, with only explicitly indexed Cargo machine lines omitted.
+
+The exact-e5 baseline remains **3,860 / 10 / 15** on the same Voice census.
+Light-call fails both; the tools-directory EEXIST is newly observed and
+unclassified, not waived because its source is unchanged. The reader failures
+are Thinking latency, Unplug readiness, requested-audio generation and the
+relay PID parse; no exact-e5 full reader baseline was run. All diagnostics,
+original times, source boundaries and assertions not reached are retained.
+The separate post-gate commit binding leaves original null-commit records
+and failures intact. The phone startup controls remain at their earlier
+pinned receipt; no failed full gate was rerun to seek a pass.
+
 ## 2026-10-23 12:08 +0700 — phone PR and requested Linux formatting
 
 Ready for lamp-voice: no (#3218 is draft; #3190 keeps its execution HOLD).

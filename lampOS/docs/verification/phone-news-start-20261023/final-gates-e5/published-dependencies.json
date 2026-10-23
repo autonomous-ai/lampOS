@@ -1,0 +1,18 @@
+{
+  "exact_e5_baseline": {
+    "url": "https://github.com/autonomous-ai/lampOS/blob/699591f0cb8ec5839f6e9c1e953ebb1ae89d4733/lampOS/docs/verification/voice-boot-clock-20261023/baseline-e5/README.md",
+    "publication_commit": "699591f0cb8ec5839f6e9c1e953ebb1ae89d4733",
+    "manifest_sha256": "7810f3343053d2b7997ba96e7a15d1b0f12087cc8c3b3c4457eb3198e72c0e08",
+    "local_verified_source": "/private/tmp/tests-boot-clock-base-e5-counterfactual-20261023/prepared-public",
+    "complete_published_manifest_verified_against_git": true
+  },
+  "separate_directory_audit": {
+    "relative": "eexist-audit/README.md",
+    "manifest_sha256": "c3b7e207f98d892546023b9c86337935147fe60e3c6b5bb2b01b5de82e390269",
+    "local_verified_source": "/private/tmp/tests-phone-tools-eexist-audit-20261023",
+    "copied_verbatim": false,
+    "original_external_manifest_sha256": "03731628390e6dfe68236715d675b13a83530d3b66c19080194f5cfd88dfd974",
+    "publication_projection_correction": "Only four display spaces after line-number colons on blank source lines were removed; original projection preserved losslessly in source-excerpts-original.json. No source hashes or actual diagnostics changed."
+  },
+  "limit": "This new receipt packages only the phone candidate full gate. It links and reuses the already published baseline without relabeling it or replacing any failed observation."
+}

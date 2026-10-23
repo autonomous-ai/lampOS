@@ -1,0 +1,123 @@
+{
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "candidate_commit": null,
+  "candidate_kind": "uncommitted two-file phone fixture candidate",
+  "authored_changed_paths": [
+    "lampOS/crates/voice/src/messages.rs",
+    "lampOS/docs/messages.md"
+  ],
+  "whole_reader_crates_unchanged": {
+    "skills": {
+      "base_tree": "8343ab198612c3e16372db72e9f60875a898dcbd",
+      "all_captured_entries_equal": true
+    },
+    "voice-eval": {
+      "base_tree": "d4f3d6aa348aa982929936cde81105e0bfc08baa",
+      "all_captured_entries_equal": true
+    }
+  },
+  "checked_paths": [
+    {
+      "path": "lampOS/crates/skills/tests/it/skills.rs",
+      "bytes": 453349,
+      "sha256": "ba5c06d90f777082416243ee82fbc4b55fe97a4eac78bf4eef7fd2805a100311",
+      "base_blob": "d71b9941ff31bbc962e4918b22d2cf0d594263cd",
+      "candidate_captured_record_equal": true
+    },
+    {
+      "path": "lampOS/crates/skills/tests/requested_audio.rs",
+      "bytes": 62489,
+      "sha256": "2d85663a8ecab38ed3df1e8beb4bcd05209ac3aa1bacd6d3d9bcd9ce3057ef36",
+      "base_blob": "b4c6d6a852b5eb00988e671fd8265c1edfceffc4",
+      "candidate_captured_record_equal": true
+    },
+    {
+      "path": "lampOS/crates/skills/src/main.rs",
+      "bytes": 215408,
+      "sha256": "a4bb122ca5326280e1626f5e1f9c94dde4a26bf9f5a93910ae364e2339b63777",
+      "base_blob": "d6d28a5c8d92df01c77e1a1fadb4227eae54cf1a",
+      "candidate_captured_record_equal": true
+    },
+    {
+      "path": "lampOS/crates/skills/src/requested_audio.rs",
+      "bytes": 40941,
+      "sha256": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56",
+      "base_blob": "d88da9e59241a12ae2be202784e4cbd4b64fe962",
+      "candidate_captured_record_equal": true
+    },
+    {
+      "path": "lampOS/crates/skills/src/unplug.rs",
+      "bytes": 14918,
+      "sha256": "4cac520cc9bdf09df466f6ad01b79f0f7b79bad3de923c209c91cf9ff0ffeec8",
+      "base_blob": "1c5027f271e438c92a849791d8c06d4bebe08f2b",
+      "candidate_captured_record_equal": true
+    },
+    {
+      "path": "lampOS/crates/voice-eval/tests/it/relay_hardening.rs",
+      "bytes": 10853,
+      "sha256": "94cb3ff48b5973b1e9ba05dd144f452288a6b3d652980df10e0e76f8419d8e4a",
+      "base_blob": "ac23d016d12d73cd7741d40bfc59a114bb313921",
+      "candidate_captured_record_equal": true
+    },
+    {
+      "path": "lampOS/crates/voice-eval/tests/it/common/mod.rs",
+      "bytes": 3237,
+      "sha256": "39d30134e50f4f0b291c1bc78f36a9b87a11f9ae8f65872a43eb3dc94e7a102d",
+      "base_blob": "94a8bc6083bc805ec4eea2f1b2d2e7a903cf8ffd",
+      "candidate_captured_record_equal": true
+    },
+    {
+      "path": "lampOS/crates/voice-eval/src/physical/session.rs",
+      "bytes": 79408,
+      "sha256": "c5baf822c82a0824ca655a11ad73a36d266fe121ce8853961732925da6f67212",
+      "base_blob": "ea644da757b097cba5491e1078ad7c943555f4fc",
+      "candidate_captured_record_equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/tools.rs",
+      "bytes": 184490,
+      "sha256": "a6bbaadc5befad84e1e44f0f438a8afc747ff4a2c3dbda977c3c89e68a049610",
+      "base_blob": "f06517ac708197aae34024afccd5884cbeaea1c9",
+      "candidate_captured_record_equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/light_call.rs",
+      "bytes": 3214,
+      "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+      "base_blob": "2827452b9b6336d505c82219f036424858626ee5",
+      "candidate_captured_record_equal": true
+    }
+  ],
+  "findings": [
+    {
+      "case": "skills::thinking_after_a_moment_of_speaking_is_still_the_line",
+      "location": "crates/skills/tests/it/skills.rs:4686:5",
+      "observed": "first gesture minus stopped = 1.163475702 s; required strictly less than 300 ms.",
+      "measurement_boundary": "stopped is sampled immediately after publishing resting. The stand-in records clock.now() when it takes the first gesture from its Unix datagram; the clock adds fixture skips to host Instant. No further skip occurs between stopped and that first observation in this case. The helper already reached its Done and dropped-gesture assertions before this final latency assertion.",
+      "limit": "Includes the real service/IPC/stand-in scheduling path; no trace identifies the cause of the delay. No latency bound was changed or waived."
+    },
+    {
+      "case": "skills::unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt",
+      "location": "crates/skills/tests/it/skills.rs:11692:9",
+      "observed": "No readiness request after physical and rendered proof; admission was 625.825 microseconds.",
+      "measurement_boundary": "One 10 s host deadline starts after spawn and also covers catalog/socket startup, request admission/body-request observation, five 20 ms no-ring absence checks and the eventual say connection. The final loop republishes matching body/expression/ring state and polls accept every 10 ms. Product progress requires all three fresh matching receipts within 500 ms and rechecks before saying.",
+      "limit": "The log does not retain the service observed receipt state or elapsed setup split. It establishes expiry of this fixture watchdog, not a proven stale-state/product failure or host-load cause. Later readiness-text and final request assertions were not reached."
+    },
+    {
+      "case": "refused_cap_reload_keeps_audio_generation_but_asset_scan_still_revokes_it",
+      "location": "crates/skills/tests/requested_audio.rs:1639:5",
+      "observed": "before.definition_generation = 1, after.definition_generation = 2; equality failed.",
+      "measurement_boundary": "After the initial offer, the fixture creates nine cap-owning skill folders one by one in the live watched directory and edits the plain fixture. It skips 2,000,001 us, observes at least one refusal log, and requests the second offer. Product reload scans every 2 s; accepted replacement increments generation, while the cap-refusal branch continues before replace.",
+      "source_visible_possibility": "A scan while only a valid partial set of new folders exists could accept a generation before the later over-cap refusal. The refusal barrier does not prove no earlier accepted replacement. This possible interleaving is not demonstrated by the retained log.",
+      "limit": "The test failed before SHA equality, prior-offer authorization/finish, unchanged plain answer, asset mutation/metadata preservation and final revocation assertions. The latter half did not execute successfully. No child reload trace/control was captured by this audit."
+    },
+    {
+      "case": "relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers",
+      "location": "crates/voice-eval/tests/it/relay_hardening.rs:126:54",
+      "observed": "ParseIntError { kind: Empty } in the final process_gone(read_pid(...)) argument.",
+      "measurement_boundary": "The /bin/sh fake runtime creates worker.pid through shell redirection; the transport closer waits only for existence. Creation before PID writing permits transport closure and process-group teardown before complete PID publication.",
+      "limit": "Earlier elapsed/exit/killed/error/trace assertions did not panic; worker absence was not evaluated because PID parsing failed. This is a plausible fixture ordering, not proven by the trace. Earlier occurrences exist in separately published boot/history receipts; they do not waive this failure or constitute an exact-e5 reader baseline."
+    }
+  ],
+  "shared_causal_limit": "The only Rust change is inside one Voice cfg(test) fixture, with one documentation paragraph. Skills and VoiceEval source are unchanged, but no clean exact-e5 reader command was run for this comparison. Source identity alone does not establish an inherited failure or causation. All four reader failures remain failed; no test/trace/control was run during packaging."
+}

@@ -1,0 +1,34 @@
+{
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "candidate_commit": null,
+  "started_at": "2026-10-23T04:20:58.431220+00:00",
+  "finished_at": "2026-10-23T04:59:26.382171+00:00",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_BUILD_TARGET": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTFLAGS": null,
+    "RUST_BACKTRACE": "0",
+    "RUST_TEST_THREADS": null
+  },
+  "omitted_local_path_value_sha256": "2db016c7667ac4d5a4a753bf030da00184e7a76845c12f56803253e8ceca34a9",
+  "os": {
+    "sysname": "Darwin",
+    "release": "25.6.0",
+    "machine": "x86_64"
+  },
+  "host_node_and_kernel_build_metadata_omitted": true,
+  "toolchain_raw_command": "rustc",
+  "baseline_toolchain_and_declared_environment_equal": true,
+  "comparison_scope": "Declared environment/cleared keys plus CARGO_TARGET_DIR and rustc -vV bytes; not all inherited environment, physical hardware/translation or matched host load.",
+  "test_scheduling": "Full Voice and 11 reader packages use default parallel libtest, no test-thread argv override, RUST_TEST_THREADS unset.",
+  "architecture": "Captured Rust host x86_64-apple-darwin; all 62 listed test executables have captured Mach-O 64-bit x86_64 output.",
+  "socket_bind": "passed",
+  "packaging_did_not_execute_tests_or_read_target": true
+}

@@ -1,0 +1,116 @@
+{
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "candidate_commit": null,
+  "candidate_kind": "uncommitted two-file phone fixture candidate",
+  "base_git_tree": "753d9453602d19ec91543762119a422b1e0ce89c",
+  "tracked_paths": 9992,
+  "lampOS_paths": 6649,
+  "tracked_symlinks": 1,
+  "tracked_bytes": 265353106,
+  "base_aggregate_sha256": "60c8a01944775148f7c790efee71bfe03c9d996756adcfa186525f3db190ded1",
+  "candidate_source_aggregate_sha256": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97",
+  "aggregate_algorithm": "Sorted path UTF-8 + NUL + Git mode + NUL + u64 big-endian byte length + content; symlinks use literal target bytes.",
+  "source_map": {
+    "path": "/private/tmp/tests-phone-news-start-e5-gates-20261023/source-map.json",
+    "bytes": 2131971,
+    "sha256": "ecc2fbfa7db723cc481cf62576bf5eb0962fad2a42b352028af3191d38255d9d",
+    "reason": "Full source map stays external; independently reconstructed from exact Git base plus the two frozen candidate snapshots."
+  },
+  "base_source_map": {
+    "path": "/private/tmp/tests-phone-news-start-e5-gates-20261023/base-source-map.json",
+    "bytes": 2131971,
+    "sha256": "e399639d3b45f840ccfe321d31c09512626f88d55f215f5cfb4057078bb3067f",
+    "reason": "All 9,992 base entries checked against immutable Git objects."
+  },
+  "owned_snapshots": [
+    {
+      "path": "lampOS/crates/voice/src/messages.rs",
+      "git_mode": "100644",
+      "base_snapshot": "snapshots/0-base.txt",
+      "base_sha256": "1bc28d917159472dcd6de1e2436c07b85f1215f9f67d8b39563e0bd339a62fb5",
+      "candidate_snapshot": "snapshots/0-candidate.txt",
+      "candidate_sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de"
+    },
+    {
+      "path": "lampOS/docs/messages.md",
+      "git_mode": "100644",
+      "base_snapshot": "snapshots/1-base.txt",
+      "base_sha256": "60ac65a303056dbf6829e3b3eda24a0d1163ab359cfa18ad92e97c930b632ec9",
+      "candidate_snapshot": "snapshots/1-candidate.txt",
+      "candidate_sha256": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3"
+    }
+  ],
+  "authored_patch": {
+    "path": "/private/tmp/tests-phone-news-start-e5-gates-20261023/authored.patch",
+    "bytes": 3139,
+    "sha256": "6a85e3205664487c98f2aced6fb303315cc6af39079f17f91bcdc5ee7d7c0e65",
+    "reason": "Exact prepared two-file patch stays external; source hashes and every unchanged entry are independently checked."
+  },
+  "source_identity": {
+    "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+    "candidate_commit": null,
+    "candidate_kind": "uncommitted two-file phone fixture candidate",
+    "source_aggregate_sha256": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97",
+    "base_source_aggregate_sha256": "60c8a01944775148f7c790efee71bfe03c9d996756adcfa186525f3db190ded1",
+    "changed_paths": [
+      "lampOS/crates/voice/src/messages.rs",
+      "lampOS/docs/messages.md"
+    ],
+    "test": "messages::tests::a_text_never_waits_on_the_news_for_the_phone",
+    "source_map_sha256": "ecc2fbfa7db723cc481cf62576bf5eb0962fad2a42b352028af3191d38255d9d",
+    "patch_sha256": "6a85e3205664487c98f2aced6fb303315cc6af39079f17f91bcdc5ee7d7c0e65",
+    "repository_paths": 9992,
+    "lampOS_paths": 6649,
+    "candidate_snapshot_hashes": {
+      "lampOS/crates/voice/src/messages.rs": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "lampOS/docs/messages.md": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3"
+    },
+    "predecessor_source_invariants": {
+      "production_prefix_sha256": "fc9f0adee7b7f37ed160c11e26e67bcd98616ef2ac69484e8574e8731e3860c0",
+      "production_prefix_equal": true,
+      "original_assertions_equal": 5,
+      "entire_response_and_quiet_tail_equal": true,
+      "all_source_outside_exact_test_equal": true
+    },
+    "preparation_live_phone_reads": false,
+    "preparation_source_edits": false
+  },
+  "freshness": {
+    "tracked_files": 9992,
+    "mtime_ns": 1792729260135087000,
+    "before_sha256": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97",
+    "after_sha256": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97",
+    "identical_bytes": true,
+    "algorithm": "sorted path + NUL + Git mode + NUL + u64 big-endian length + exact bytes; symlinks use literal target bytes"
+  },
+  "after_each_step": [
+    {
+      "step": "fmt",
+      "aggregate": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97"
+    },
+    {
+      "step": "clippy",
+      "aggregate": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97"
+    },
+    {
+      "step": "voice-default-parallel",
+      "aggregate": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97"
+    },
+    {
+      "step": "readers-default-parallel",
+      "aggregate": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97"
+    },
+    {
+      "step": "workspace-build",
+      "aggregate": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97"
+    },
+    {
+      "step": "diff-check",
+      "aggregate": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97"
+    }
+  ],
+  "final_source_aggregate_sha256": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97",
+  "source_bytes_unchanged": true,
+  "overlay_status": "This full gate used the already-frozen two-file candidate throughout, with no mutation controls or restoration overlays. Candidate remains uncommitted; no committed head is invented.",
+  "packaging_read_scope": "Git objects and immutable snapshots/receipts only, no live worktree or MAIN artifact."
+}

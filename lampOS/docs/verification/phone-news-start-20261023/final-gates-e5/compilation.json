@@ -1,0 +1,8 @@
+[
+  {"step":"fmt","machine_records":0,"machine_record_kinds":{},"compiler_diagnostics":[],"build_finished_success":null,"command_exit":0},
+  {"step":"clippy","machine_records":488,"machine_record_kinds":{"compiler-artifact":451,"build-script-executed":36,"build-finished":1},"compiler_diagnostics":[],"build_finished_success":true,"command_exit":0},
+  {"step":"voice-default-parallel","machine_records":341,"machine_record_kinds":{"compiler-artifact":308,"build-script-executed":32,"build-finished":1},"compiler_diagnostics":[],"build_finished_success":true,"command_exit":101},
+  {"step":"readers-default-parallel","machine_records":461,"machine_record_kinds":{"compiler-artifact":424,"build-script-executed":36,"build-finished":1},"compiler_diagnostics":[],"build_finished_success":true,"command_exit":101},
+  {"step":"workspace-build","machine_records":476,"machine_record_kinds":{"compiler-artifact":436,"build-script-executed":39,"build-finished":1},"compiler_diagnostics":[],"build_finished_success":true,"command_exit":0},
+  {"step":"diff-check","machine_records":0,"machine_record_kinds":{},"compiler_diagnostics":[],"build_finished_success":null,"command_exit":0}
+]

@@ -1,0 +1,14 @@
+{
+  "candidate_commit": "47adb38fd0f61dfbfc1172e9a668d54c43983794",
+  "parent": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "tree": "237a63ab66f38bcd2e1d9910ab7a4d7a31171640",
+  "commit_time": "2026-10-23T12:03:45+07:00",
+  "tracked_entries": 9992,
+  "unchanged_base_entries": 9990,
+  "two_changed_blob_hashes_match_frozen_candidate": true,
+  "all_modes_match_frozen_candidate": true,
+  "source_aggregate_sha256": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97",
+  "proof": "The full candidate source proof already checked exact base blobs plus two frozen overlays. The post-gate commit has identical base entries everywhere else and those exact two blob bytes/modes. No live worktree or target artifact was read.",
+  "original_null_candidate_metadata_preserved": true,
+  "gate_remains_failed": true
+}

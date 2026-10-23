@@ -1,0 +1,19 @@
+{
+  "candidate_commit": "47adb38fd0f61dfbfc1172e9a668d54c43983794",
+  "parent_commit": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "tree": "237a63ab66f38bcd2e1d9910ab7a4d7a31171640",
+  "source_aggregate_sha256": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97",
+  "files": [
+    {
+      "path": "lampOS/crates/voice/src/messages.rs",
+      "sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "git_blob": "7ede2e9b0b14c32c36aa1bca279dbcf65f6a7608"
+    },
+    {
+      "path": "lampOS/docs/messages.md",
+      "sha256": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3",
+      "git_blob": "3c8f3b35827cd753501db2fb07eff88a763c6f18"
+    }
+  ],
+  "qualification": "Commit created after the completed frozen two-file gate. This binds unchanged source bytes; it does not make the failed gate pass or change its original candidate_commit=null record."
+}

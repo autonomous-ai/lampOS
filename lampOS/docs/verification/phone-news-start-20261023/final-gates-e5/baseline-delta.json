@@ -1,0 +1,210 @@
+{
+  "baseline_publication_commit": "699591f0cb8ec5839f6e9c1e953ebb1ae89d4733",
+  "baseline_url": "https://github.com/autonomous-ai/lampOS/blob/699591f0cb8ec5839f6e9c1e953ebb1ae89d4733/lampOS/docs/verification/voice-boot-clock-20261023/baseline-e5/README.md",
+  "baseline_manifest_sha256": "7810f3343053d2b7997ba96e7a15d1b0f12087cc8c3b3c4457eb3198e72c0e08",
+  "baseline_command": {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--no-fail-fast",
+      "--message-format=json-render-diagnostics"
+    ],
+    "cwd": "/private/tmp/tests-codex-phone-news-start-20261023/lampOS",
+    "started_at": "2026-10-23T03:36:49.543202+00:00",
+    "timeout_seconds": 1800,
+    "stdout": "voice-default-parallel.stdout.txt",
+    "stderr": "voice-default-parallel.stderr.txt",
+    "timed_out": false,
+    "exit_code": 101,
+    "wall_seconds": 618.682987,
+    "finished_at": "2026-10-23T03:47:08.217929+00:00",
+    "stdout_sha256": "91d309c28bfd36dc62a75a927847f2bdd97c0284e1028459975b35160908f948",
+    "stdout_bytes": 648797,
+    "stderr_sha256": "f51ee2a067049f60f09b6597c0a23ec767fbc902536d3bf9c295bf4c69b7e11f",
+    "stderr_bytes": 3586
+  },
+  "phone_command": {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--no-fail-fast",
+      "--message-format=json-render-diagnostics"
+    ],
+    "cwd": "/private/tmp/tests-codex-phone-news-start-20261023/lampOS",
+    "started_at": "2026-10-23T04:22:54.570530+00:00",
+    "timeout_seconds": 1800,
+    "stdout": "voice-default-parallel.stdout.txt",
+    "stderr": "voice-default-parallel.stderr.txt",
+    "timed_out": false,
+    "exit_code": 101,
+    "wall_seconds": 358.749842,
+    "finished_at": "2026-10-23T04:28:53.308976+00:00",
+    "stdout_sha256": "077e74877d60c79acb691d891968f569013088bc24890f038f4a3d676ebbe8d5",
+    "stdout_bytes": 644391,
+    "stderr_sha256": "1bb424df4e5c328bd65687746a354b99a9c1fd9fbbb5eed5693d11fd4db48b7e",
+    "stderr_bytes": 3586
+  },
+  "commands_equal": true,
+  "full_case_identity_count": 3885,
+  "case_identity_and_ignored_sets_equal": true,
+  "baseline_totals": {
+    "passed": 3860,
+    "failed": 10,
+    "ignored": 15,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "phone_totals": {
+    "passed": 3868,
+    "failed": 2,
+    "ignored": 15,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "failed_to_passed": 9,
+  "passed_to_failed": 1,
+  "failed_in_both": 1,
+  "changed_or_failed_and_owned_rows": [
+    {
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal",
+      "baseline": "FAILED",
+      "phone": "ok"
+    },
+    {
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure",
+      "baseline": "FAILED",
+      "phone": "ok"
+    },
+    {
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "coordinator::motor::tests::privacy_revoke_survives_a_host_pause_before_the_gated_worker_is_released",
+      "baseline": "FAILED",
+      "phone": "ok"
+    },
+    {
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "coordinator::motor::tests::readback_and_original_placement_are_required_and_bad_offers_do_not_enqueue",
+      "baseline": "FAILED",
+      "phone": "ok"
+    },
+    {
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "coordinator::motor::tests::same_owner_input_end_cancels_queued_gesture_before_inert_bus_write",
+      "baseline": "FAILED",
+      "phone": "ok"
+    },
+    {
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "coordinator::motor::tests::same_owner_input_end_survives_a_host_pause_before_the_gated_worker_is_released",
+      "baseline": "FAILED",
+      "phone": "ok"
+    },
+    {
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "coordinator::motor::tests::stale_snapshot_does_not_revoke_newer_idle_authority",
+      "baseline": "FAILED",
+      "phone": "ok"
+    },
+    {
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token",
+      "baseline": "FAILED",
+      "phone": "ok"
+    },
+    {
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "messages::tests::a_text_never_waits_on_the_news_for_the_phone",
+      "baseline": "ok",
+      "phone": "ok"
+    },
+    {
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "baseline": "FAILED",
+      "phone": "ok"
+    },
+    {
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "tools::tests::scoped_audio_rejects_revocation_and_mixed_request_keys_before_dispatch",
+      "baseline": "ok",
+      "phone": "FAILED"
+    },
+    {
+      "target": "lamp-voice:test:it",
+      "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "baseline": "FAILED",
+      "phone": "FAILED"
+    }
+  ],
+  "artifacts": [
+    {
+      "target": [
+        "example",
+        "render_line_second"
+      ],
+      "baseline_sha256": "8db8ae055c86ab69d7d0e100ef8f1aacfe91b4a97ee24fdbec94bb9a3a61651a",
+      "phone_sha256": "8db8ae055c86ab69d7d0e100ef8f1aacfe91b4a97ee24fdbec94bb9a3a61651a",
+      "equal_executable_hash": true,
+      "compiled_case_count": 4,
+      "ignored_case_count": 0
+    },
+    {
+      "target": [
+        "bin",
+        "lamp-voice"
+      ],
+      "baseline_sha256": "6f581d039b5f8887952115056821d6f3f42afb25594e8dc66a520e4f22294fbd",
+      "phone_sha256": "6f581d039b5f8887952115056821d6f3f42afb25594e8dc66a520e4f22294fbd",
+      "equal_executable_hash": true,
+      "compiled_case_count": 1,
+      "ignored_case_count": 0
+    },
+    {
+      "target": [
+        "example",
+        "stop_words_stt_replay"
+      ],
+      "baseline_sha256": "35841c0cfc01e94deac4446b71d883d4ad5a4e1a545f02b365bd6381085d0404",
+      "phone_sha256": "35841c0cfc01e94deac4446b71d883d4ad5a4e1a545f02b365bd6381085d0404",
+      "equal_executable_hash": true,
+      "compiled_case_count": 6,
+      "ignored_case_count": 0
+    },
+    {
+      "target": [
+        "test",
+        "it"
+      ],
+      "baseline_sha256": "ecfcbe7fe52525db9c57740a908cb5a05c44fa56860ec14db1a788f3c677134b",
+      "phone_sha256": "ecfcbe7fe52525db9c57740a908cb5a05c44fa56860ec14db1a788f3c677134b",
+      "equal_executable_hash": true,
+      "compiled_case_count": 270,
+      "ignored_case_count": 0
+    },
+    {
+      "target": [
+        "lib",
+        "lamp_voice"
+      ],
+      "baseline_sha256": "b39b289ff6749b2151a9b74cd6971ff6ac7e980e76660ca1b3999c2ae1a7899c",
+      "phone_sha256": "dcc4c8437799c83135fa563ea58afddd2c1513ac004cc005e7a2141e0afdc6fa",
+      "equal_executable_hash": false,
+      "compiled_case_count": 3604,
+      "ignored_case_count": 15
+    }
+  ],
+  "baseline_source_aggregate_sha256": "60c8a01944775148f7c790efee71bfe03c9d996756adcfa186525f3db190ded1",
+  "phone_source_aggregate_sha256": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97",
+  "tools_source_sha256": "a6bbaadc5befad84e1e44f0f438a8afc747ff4a2c3dbda977c3c89e68a049610",
+  "qualification": "This reuses the one published exact-e5 observation with its original timestamps and failures; it is not a new baseline or retry. Nine prior failures passed here, one additional tools fixture failed, light-call failed both and the owned messages case passed both. These observations do not establish causes or cure prior failures. No reader baseline comparison exists."
+}

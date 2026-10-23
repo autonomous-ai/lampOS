@@ -1,0 +1,5 @@
+---- tools::tests::scoped_audio_rejects_revocation_and_mixed_request_keys_before_dispatch stdout ----
+
+thread 'tools::tests::scoped_audio_rejects_revocation_and_mixed_request_keys_before_dispatch' (706344828) panicked at crates/voice/src/tools.rs:2270:36:
+called `Result::unwrap()` on an `Err` value: Os { code: 17, kind: AlreadyExists, message: "File exists" }
+END

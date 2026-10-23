@@ -1,0 +1,464 @@
+Raw stream: voice-default-parallel/lamp-voice-it-ecfcbe7fe5/file.stdout
+Payload bytes: 101
+Payload SHA256: ffe6eb73f9fc834c3983a3dea33371d221dcb847ea31a79bb8cd0e054b104763
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: voice-default-parallel/lamp-voice-it-ecfcbe7fe5/file.stderr
+Payload bytes: 0
+Payload SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+BEGIN RAW PAYLOAD
+END RAW PAYLOAD
+Raw stream: voice-default-parallel/lamp-voice-lamp-voice-6f581d039b/file.stdout
+Payload bytes: 109
+Payload SHA256: 7acec4f4eea5570cda847dadb10df910daa5487e2eb3c42288d2b80251ac8d18
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: voice-default-parallel/lamp-voice-lamp_voice-dcc4c84377/file.stdout
+Payload bytes: 109
+Payload SHA256: d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: voice-default-parallel/lamp-voice-lamp_voice-dcc4c84377/ignored.stdout
+Payload bytes: 1015
+Payload SHA256: 5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf
+BEGIN RAW PAYLOAD
+coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance: test
+coordinator::tests::hand_controls::head_tap_cue_decision_to_speaker_dispatch_latency: test
+coordinator::tests::hand_controls::local_hand_stop_dispatch_latency: test
+hand_controls::tests::head_touch_bus_to_poll_latency: test
+provider_worker::tests::sixty_second_answer_follows_output_capacity: test
+provider_worker::tests::three_minute_answer_follows_output_capacity: test
+reference::recovery::tests::recentred_the_fixed_margin_carries_an_hour_of_that_lamps_drift: test
+reference::tests::four_virtual_hours_capture_clocked: test
+remember::tests::hits_note_latency_on_a_200_entry_kept_list: test
+reminders::tests::parent_poll_cost: test
+reminders::transport::tests::poll_cost: test
+second_provider::tests::policy::measure_the_wait_from_the_call_to_its_run: test
+task_news::tests::work_whose_agent_never_answers_after_it_was_accepted_is_told: test
+thread::tests::write_a_thread_fixture: test
+tools::tests::use_skill_cost: test
+END RAW PAYLOAD
+Raw stream: voice-default-parallel/lamp-voice-render_line_second-8db8ae055c/file.stdout
+Payload bytes: 121
+Payload SHA256: 8818cae6fd13a952438433c2b8170ac8664b0886abd068f5dad75f58dcfcfff4
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: voice-default-parallel/lamp-voice-stop_words_stt_replay-35841c0cfc/file.stdout
+Payload bytes: 124
+Payload SHA256: f2d2f57ca3c4700e3cd53cf5290c10a1e35b0b669bc413ff0770c929346546e4
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-body-it-9f4a4b6492/file.stdout
+Payload bytes: 101
+Payload SHA256: 26041add4131ae5b852b9f350089b5f387afec0e6ce5aacf72c0882f101ffb40
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/it-8bf4d1aea99732a6: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-body-lamp-body-6ec75377f1/file.stdout
+Payload bytes: 108
+Payload SHA256: 2b52709b849bb80aa5b813333b3361c77fae259bf2b84bac3dbb35409ee1ccd8
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_body-9ff199928743cc99: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-body-lamp-body-inspect-7500a8a609/file.stdout
+Payload bytes: 116
+Payload SHA256: 1e0a437f72d9dd2a41002ac00a6c61676ad8a872dc08950d31a80082dbae2a50
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_inspect-637ece4159665738: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-body-lamp-body-measure-9fe7536378/file.stdout
+Payload bytes: 116
+Payload SHA256: c49b5e8a7bd88f961d515c7929d1f7368ebfde8b09f3444f45805f23449a75a8
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_measure-7f0ba0e9571da263: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-body-lamp-body-mood-00ae69951b/file.stdout
+Payload bytes: 113
+Payload SHA256: 746e4439a3e4bc67ec331bb487fe3382b5907cd152fb3a0eb42f92ebb0b10b5f
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_mood-30267137783a16a9: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-body-lamp-body-worker-6ca8ad5a94/file.stdout
+Payload bytes: 115
+Payload SHA256: 4fec3a7ac99285e5a7578ded6257d196eb0e88f5985f6c69dc23ed5ae945bb1f
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_worker-29a1b45163b9be85: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-body-lamp_body-88e3fab5be/file.stdout
+Payload bytes: 108
+Payload SHA256: fc38d231a3d58732795374141e281f169ea57a21821016ca5a05e874adfaa0c2
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_body-3bda0a619327d99b: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-cloud-it-33d92b26d3/file.stdout
+Payload bytes: 101
+Payload SHA256: c89904dbe4badd9d67d4236701e945c21663f6ac0d50276839f08a662f4a54a2
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/it-baf52b4e33708f12: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-cloud-lamp-cloud-20d2cdd3ae/file.stdout
+Payload bytes: 109
+Payload SHA256: 12840873ce89b61964714b1296b81b6b0a4d61aac4547d89d9c5d78e593160cb
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-44d498984d4c09df: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-cloud-lamp_cloud-630e533b4e/file.stdout
+Payload bytes: 109
+Payload SHA256: 32929686e965ea50a70016475d6f3937438420831f4d78704cc09a97e51545de
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-14b8d1ecc993e2b4: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-cloud-lamp_cloud-630e533b4e/ignored.stdout
+Payload bytes: 92
+Payload SHA256: c6bbe827c7ed16a7e17edb8410f049b4b86009a136c1bc67aaf0fead4a41af21
+BEGIN RAW PAYLOAD
+account::tests::write_a_rotated_fixture: test
+reports::tests::write_a_reports_fixture: test
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-expression-it-7a11f7a486/file.stdout
+Payload bytes: 101
+Payload SHA256: d891381893005055ac34eeb6ea4573390c1ad4ec12c8fb1a599a21062b8aa85a
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/it-d30071be32c9fc43: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-expression-lamp-expression-9236472d9c/file.stdout
+Payload bytes: 114
+Payload SHA256: 84f71bb5766595b9daa5be74e8e0b8cafe4d3165528f09354c08886f659d3f1c
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_expression-367629d2b98fd09c: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-expression-lamp_expression-59637f1e5d/file.stdout
+Payload bytes: 114
+Payload SHA256: 50fbe49d98a7e163b3622e39ecacaa5ed852fa7901e9cba3dec9cbab66f150c2
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_expression-9c5b6f2fc96ff8fb: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-expression-runtime-03b3bab81d/file.stdout
+Payload bytes: 106
+Payload SHA256: db0c245fdb4fea68d82f8db6a17eea3f04685f1058dd4b24ef4e3adfceac55c5
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/runtime-8ba534de81614d18: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-keeper-lamp-keeper-0cb1b0425c/file.stdout
+Payload bytes: 110
+Payload SHA256: 397d3b4e04db3fd4a5089eaad9c466903117a63967dd1dcf99ce2747988d1d96
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_keeper-a9f34008275109b0: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-keeper-lamp_keeper-ce818cf005/file.stdout
+Payload bytes: 110
+Payload SHA256: f78e629d5e54cb2c0de1569d209a96cf96bdde3400b2b9fbb42b6282d7a9776f
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_keeper-d493629e7c7f7339: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-keeper-lamp_keeper-ce818cf005/ignored.stdout
+Payload bytes: 49
+Payload SHA256: 004cc930537bae0f6e4aea018876ecab6479c14f8972a9b7f011cdbfc114a425
+BEGIN RAW PAYLOAD
+profile::tests::write_a_moved_pins_fixture: test
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-lean-it-5342a2f907/file.stdout
+Payload bytes: 101
+Payload SHA256: 1f870801fa92fb55dd1d3c85280e050bdeb38dfcea540982d90e4f29d4c050a3
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/it-71b3c4366a177b0c: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-lean-it-5342a2f907/ignored.stdout
+Payload bytes: 58
+Payload SHA256: 42ed561c7f28d0bed5d81a3e99531ab158df915aedfc8c4f0e50be05032e40a2
+BEGIN RAW PAYLOAD
+cost::arithmetic_cost: test
+cost::inconclusive_cost: test
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-lean-lamp_lean-44abcfe664/file.stdout
+Payload bytes: 108
+Payload SHA256: e1e0d65f7ccecd5b1fecf4013ffab2d6e6ce9f18ab007ec64f1f707ec88efdae
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_lean-bf9e165f7a87ea41: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-forget_person-e29eb66b34/file.stdout
+Payload bytes: 112
+Payload SHA256: d1a5e2ebc3b0635ccc91876348b1fab7bf093c1f10c38f96efda4051dbb768b3
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/forget_person-8deb8a5a5a1bec4c: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-forget_shared_exchange-929da592b6/file.stdout
+Payload bytes: 121
+Payload SHA256: b98b7ba7ac4a35a4572a0d5ba573388fb7e20a06c964b8a18eb3ea66b6d718c9
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/forget_shared_exchange-14fe9e8e0d114920: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-forgot-a2983846c1/file.stdout
+Payload bytes: 105
+Payload SHA256: ee8b0658998ce279ecf86fafc578005d7cd57160399324215a3f76f913fa8f6a
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/forgot-0205b773d3329302: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-health_control-9013675e0b/file.stdout
+Payload bytes: 113
+Payload SHA256: 09c512826f3969b96fa98d720e2df231f4bd7e19062cb35e4a55007f96c10167
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/health_control-ac8c12dcd2c7ad1a: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-it-978ff8109b/file.stdout
+Payload bytes: 101
+Payload SHA256: 2fdcea77ee9e6f3d61c4636fc077ac339451456868c8f37303c652471fc20212
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-it-978ff8109b/ignored.stdout
+Payload bytes: 355
+Payload SHA256: 1464fe30badbad989476eff83279c5f510934b883ca5efae66c8ca2c11a82de4
+BEGIN RAW PAYLOAD
+days_timing::file_and_ranked_reads_have_the_same_socket_boundary_and_corpus: test
+health_timing::health_costs_and_socket_requests_with_identical_synthetic_stores: test
+kept::write_a_days_fixture: test
+timing::how_long_each_request_takes_with_a_month_of_talk_behind_it: test
+voice_timing::legacy_and_days_voice_requests_over_matched_synthetic_stores: test
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-lamp-memory-721c0bc401/file.stdout
+Payload bytes: 110
+Payload SHA256: 3a3f2793a225cd2ef56f7c06269ff9f1500fb93c94bd8ee1e3e84291c73bf574
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-3e6428a6ad440a7c: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-lamp-memory-eval-131320525e/file.stdout
+Payload bytes: 115
+Payload SHA256: 6dbe9aa75b6b926942d70da322308b941e890875ddc2bc2a4cb312cc0ad807e7
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory_eval-297b5b933d9c5e5c: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-lamp_memory-6352f58a27/file.stdout
+Payload bytes: 110
+Payload SHA256: 982af47ce549e46700f0043f6f8e29a88fe84373a8c5699b079203df4cdef50e
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-b9e503bdd61f7e70: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-lamp_memory-6352f58a27/ignored.stdout
+Payload bytes: 76
+Payload SHA256: 8964966b0ba39baeee0d1bbda243723c8f7fb433747388793f9faf71966d5c0c
+BEGIN RAW PAYLOAD
+health::tests::measure_health_update_and_socket_with_a_held_publisher: test
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-paraphrase_fixture-a90b3281f7/file.stdout
+Payload bytes: 117
+Payload SHA256: f52b560fd85cd3b93548659b9795ad1ffa762968696a71def21983e2340f7398
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/paraphrase_fixture-18e0766b1f009ff2: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-voice_early_words-4b8705c2a2/file.stdout
+Payload bytes: 116
+Payload SHA256: bec4a83996f6958cab07343e3b6de6d88eaec9a84f50b7586ad03c2cd0cda649
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/voice_early_words-ac6d63cbcd0176af: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-voice_follows_face-de6e663c2a/file.stdout
+Payload bytes: 117
+Payload SHA256: e6bd923e082cc97fa6e3337fb6a6bad5d72f62f6692c3e1487ff0db49b18d827
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/voice_follows_face-2d49a4baff95c2cd: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-voice_forget-b7809ccba4/file.stdout
+Payload bytes: 111
+Payload SHA256: 69590d0d822623813b2bae5745ccd109b0610336f2165d34ecec45faae53e35e
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/voice_forget-74ce451f0225a361: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-voice_forget_about-2764f0ba69/file.stdout
+Payload bytes: 117
+Payload SHA256: d19f2ae77fce530e0fe7dbe0fd8a2145e09427252eb7d425d2a313c47ad20bf5
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/voice_forget_about-8f04a42ed8e04aa3: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-voice_forget_named-09f736d3e2/file.stdout
+Payload bytes: 117
+Payload SHA256: d2acf816d12ec2d48a8d8278787d2a5a46f62da5d81e359b609a63386e350dde
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/voice_forget_named-b3b64eb830ff6b4b: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-voice_link_used-7510e43ddd/file.stdout
+Payload bytes: 114
+Payload SHA256: 87df20f4e7ad99f334ad8efc4250eb7fba1cb777ae12985f5170680da730bc6a
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/voice_link_used-caa8157749a15aa8: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-voice_observe-9154ea6286/file.stdout
+Payload bytes: 112
+Payload SHA256: bcb4ca6e2bf70b83ec086672dfbe6f3642664bc136cf69ca9f27fc41c36e0ed0
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/voice_observe-f06824b26415b941: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-memory-voice_since_until-d1ede12263/file.stdout
+Payload bytes: 116
+Payload SHA256: b4446477ae36f00c96be33935bb32373c79ae487afd289a9e91bd164d6ef4fc0
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/voice_since_until-4fd3a6b392a7d272: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-peek-lamp-peek-e5b27000ff/file.stdout
+Payload bytes: 108
+Payload SHA256: 4efdf59fed53a04eabd77afcb4da4021996b47685551207918991ad11b11289e
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_peek-bb7b8ca29d47dc1f: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-peek-lamp_peek-73f9a4eb2f/file.stdout
+Payload bytes: 108
+Payload SHA256: 18dd9ff01556762fd967a5aaff6daab1a82a92ac0c3c6863713c9db1841795d2
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_peek-2fa9472102c7793a: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-peek-peek-606ca39a2d/file.stdout
+Payload bytes: 103
+Payload SHA256: 7997e5017c8c4e24d442963d74286ff68694fef9558bc499e11f9331aba65a77
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/peek-c90c67e1b5376e51: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-setup-it-819ac8c1ba/file.stdout
+Payload bytes: 101
+Payload SHA256: 9e7a8756adc666a24c1a2643c19e1481a552c4aa7ee7d49a11a0533564495d67
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/it-c5f75c9d30c5f818: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-setup-it-819ac8c1ba/ignored.stdout
+Payload bytes: 44
+Payload SHA256: 0878c01d3e3575a6590bc204c68c407c6aee4d7f49aa223c1c2639701387a325
+BEGIN RAW PAYLOAD
+serve::write_a_reports_answer_fixture: test
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-setup-lamp-setup-9a2fffb651/file.stdout
+Payload bytes: 109
+Payload SHA256: ab406765858e34c9082ad1b2edc82969da0a5a0bfba4353ccc789354cc47924a
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_setup-7641d9289b7af3f6: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-setup-lamp_setup-3fda9fe2ec/file.stdout
+Payload bytes: 109
+Payload SHA256: 3c0b3deb0e467689c381f9b9b54c546d9fa0230e3a08532cbcde3b3ae550b2fc
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_setup-b7eab6c6ff05712c: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-setup-wake-a014fe856b/file.stdout
+Payload bytes: 103
+Payload SHA256: 9a5482918e682d9c7d01cc374050d2485e1aacbe44c7e7a373dba17b68274c19
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/wake-1879b0f98b9c49a0: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-skills-it-280a41a1bb/file.stdout
+Payload bytes: 101
+Payload SHA256: 60fd24db0fb30a49960fa7ef66ddaa7484f5133e9aca200fecca36718843b1c0
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/it-2daae09844723b26: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-skills-it-280a41a1bb/ignored.stdout
+Payload bytes: 35
+Payload SHA256: 163d33ee43b30a5a7645433ba3a13e9da5256f58bd03c729b798fc95ae23396c
+BEGIN RAW PAYLOAD
+skills::write_an_off_fixture: test
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-skills-lamp-skills-f6955090d7/file.stdout
+Payload bytes: 110
+Payload SHA256: 8eee133db99e55156f71ae0746f12af2871bd71ed6742cc9dd006644b34b9cf7
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-e433beab2fb911b9: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-skills-lamp_skills-e48ca48177/file.stdout
+Payload bytes: 110
+Payload SHA256: 73ec29d51ad082ee48bcc5df56757ff59669a6ce2c51654a9aba679dd51aa293
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-b2f0ae0b3b02a39a: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-skills-requested_audio-a99e198229/file.stdout
+Payload bytes: 114
+Payload SHA256: 135386c06580f3148eb637c8345098830745316723abae933a4a40dafa915d97
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/requested_audio-6d30f8c0024b0543: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-update-functions-3d84f16ced/file.stdout
+Payload bytes: 108
+Payload SHA256: a25188ea8820e1dbd668fe128f1fc0cf99aa32a7e1c133ecde0134c80b85bdcc
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/functions-a019e8e3d9f18c56: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-update-install-d2cc0e0a47/file.stdout
+Payload bytes: 106
+Payload SHA256: 203af2c93d6f6df19f748e14ac3b6645bd27fc8fc70cf43ea62fbee0c4fa5b34
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/install-8ab651138ba2189d: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-update-it-48af4c745d/file.stdout
+Payload bytes: 101
+Payload SHA256: f785a027375bf83298bdcff1888e46a485a5dcebb9702e59fd112640c00ed4df
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/it-bed542c0cfe5e8a7: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-update-lamp-update-8ca372c7d8/file.stdout
+Payload bytes: 110
+Payload SHA256: 5387f6d7603e43bff46240d757bdeabdae03096978eb08eefa7cc601e5570935
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-aaea79408ab23117: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-update-lamp_update-2e9879f03c/file.stdout
+Payload bytes: 110
+Payload SHA256: 8345d464e1eec1f0248661240faede7a686903ac07b696aae9a8b5b7daa630b2
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-dda903a1250bc605: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-update-lamp_update-2e9879f03c/ignored.stdout
+Payload bytes: 92
+Payload SHA256: bc91a05483d02d07eac64b1dfbfc89be9ee76b939b7cbdf10473700665cba987
+BEGIN RAW PAYLOAD
+fetch::tests::a_release_file_from_github: test
+records::tests::write_records_fixtures: test
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-update-round-4a410b63d4/file.stdout
+Payload bytes: 104
+Payload SHA256: c219034710e689c62e05b5ede66ebf793bfb3c0cd65dcc3025dbf92c2214536c
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-update-self-cli-exec-61fb916654/file.stdout
+Payload bytes: 112
+Payload SHA256: bc36d930dbf59fdd98f74bd23ed6f2cc5a742ca721b1e457b51564f9784f151d
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/self_cli_exec-bc85a62cb2f27284: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-update-self-cli-exec-61fb916654/ignored.stdout
+Payload bytes: 53
+Payload SHA256: 635e634394d967384e42754cf17d0a7b33ba13614d6169cb8ba9d8ee2a6da7cd
+BEGIN RAW PAYLOAD
+actual_cli_exec_confirms_before_the_next_round: test
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-update-self-process-cuts-72da66f3ab/file.stdout
+Payload bytes: 116
+Payload SHA256: 284fea42585b4730b572afefb741b05699fcbfb61a83d680c4413c188a288402
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/self_process_cuts-225e6342b519b0b0: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-update-self-process-cuts-72da66f3ab/ignored.stdout
+Payload bytes: 46
+Payload SHA256: 902aefa939fe0a67e5b85cc08b264e25ed9ae462a25569e46159c9a20f948c17
+BEGIN RAW PAYLOAD
+persisted_self_switches_survive_sigkill: test
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-voice-eval-it-f5a668b094/file.stdout
+Payload bytes: 101
+Payload SHA256: 40f48ec878604a75d7c39e125afec367d6f55816f8b5437f950bb6c21e1a7813
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/it-f337388f4e72a80e: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-voice-eval-lamp-voice-eval-763d7951ae/file.stdout
+Payload bytes: 114
+Payload SHA256: a53e1bfcb015cb4bbfea5fc9896829947bca3025f315b220efef3ecc5999d3a5
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice_eval-390c3d26497b9ea4: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD
+Raw stream: readers-default-parallel/lamp-voice-eval-lamp_voice_eval-91bc89d5da/file.stdout
+Payload bytes: 114
+Payload SHA256: 1c58e273b44ae1517bc613513092e9c7ea38dc2aacb33fd273e61d7d5ebe252e
+BEGIN RAW PAYLOAD
+/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice_eval-dbe254449ccce883: Mach-O 64-bit executable x86_64
+END RAW PAYLOAD

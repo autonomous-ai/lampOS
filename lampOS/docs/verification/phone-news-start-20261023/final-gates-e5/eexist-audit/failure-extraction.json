@@ -1,0 +1,17 @@
+{
+  "source": {
+    "path": "/private/tmp/tests-phone-news-start-e5-gates-20261023/gates-20261023T042058.430495Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+    "sha256": "077e74877d60c79acb691d891968f569013088bc24890f038f4a3d676ebbe8d5",
+    "bytes": 644391
+  },
+  "source_line_first": 3951,
+  "source_line_last": 3955,
+  "complete_panic_block_preserved": true,
+  "wrapper": "Final END line added after the exact diagnostic block; trailing blank lines are normalized. No original diagnostic characters changed.",
+  "original_extracted_utf8_sha256": "ed17f811fb7de1aea33ab6db7195cbbbb67fec717e6765e01eb3eed1e7a1cfbd",
+  "original_extracted_utf8_bytes": 363,
+  "path_recorded": false,
+  "process_id_recorded": false,
+  "iteration_recorded": false,
+  "thread_id_is_not_process_id": true
+}

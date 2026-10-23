@@ -1,0 +1,139 @@
+Source: e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc:lampOS/crates/voice/src/tools.rs lines 1838-1841
+1838: #[cfg(test)]
+1839: mod tests {
+1840:     use super::*;
+1841:
+
+Source: e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc:lampOS/crates/voice/src/tools.rs lines 2256-2272
+2256:     fn schedule_directory(name: &str) -> PathBuf {
+2257:         let base = if Path::new("/private/tmp").is_dir() {
+2258:             PathBuf::from("/private/tmp")
+2259:         } else {
+2260:             std::env::temp_dir()
+2261:         };
+2262:         let path = base.join(format!(
+2263:             "lvs-{name}-{}-{:x}",
+2264:             std::process::id(),
+2265:             std::time::SystemTime::now()
+2266:                 .duration_since(std::time::UNIX_EPOCH)
+2267:                 .unwrap()
+2268:                 .subsec_nanos()
+2269:         ));
+2270:         std::fs::create_dir(&path).unwrap();
+2271:         path
+2272:     }
+
+Source: e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc:lampOS/crates/voice/src/tools.rs lines 2802-2832
+2802:     fn scoped_audio_setup(wrapped: bool) -> (PathBuf, Settings, ToolCall) {
+2803:         let dir = schedule_directory("audio-scope");
+2804:         std::fs::write(
+2805:             dir.join(CATALOG_FILE),
+2806:             r#"{"tools":[{"name":"play_relaxing_music","description":"A requested recording."}]}"#,
+2807:         )
+2808:         .unwrap();
+2809:         let settings = Settings {
+2810:             skills: Some(dir.clone()),
+2811:             requested_audio: true,
+2812:             use_skill: wrapped,
+2813:             ..Default::default()
+2814:         };
+2815:         let call = ToolCall {
+2816:             id: "c1".into(),
+2817:             name: if wrapped {
+2818:                 crate::use_skill::NAME
+2819:             } else {
+2820:                 "play_relaxing_music"
+2821:             }
+2822:             .into(),
+2823:             args: if wrapped {
+2824:                 json!({"skill":"play_relaxing_music"})
+2825:             } else {
+2826:                 json!({})
+2827:             },
+2828:         };
+2829:         (dir, settings, call)
+2830:     }
+2831:
+2832:     fn scoped_reply(
+
+Source: e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc:lampOS/crates/voice/src/tools.rs lines 2879-2957
+2879:             asked
+2880:         })
+2881:     }
+2882:
+2883:     #[test]
+2884:     fn scoped_audio_direct_and_wrapped_replies_require_a_live_lease() {
+2885:         for wrapped in [false, true] {
+2886:             for revoke in [false, true] {
+2887:                 let (dir, settings, call) = scoped_audio_setup(wrapped);
+2888:                 let (owner, context) = audio_scope(crate::memory_scope::ScopeSnapshot::room());
+2889:                 let lease = owner.lease();
+2890:                 let offer = audio_offer(context.clone());
+2891:                 let served = scoped_reply(
+2892:                     &dir.join(CALL_SOCKET),
+2893:                     owner.clone(),
+2894:                     revoke,
+2895:                     json!({"ok":true,"result":{
+2896:                         "next":"Say one short confirmation.","requested_audio":&offer,
+2897:                     }}),
+2898:                 );
+2899:                 let answer = answer_spoken_scoped(&settings, &call, &context, &lease);
+2900:                 if revoke {
+2901:                     assert_eq!(answer.told, unavailable());
+2902:                     assert!(answer.requested_audio.is_none());
+2903:                     assert!(!lease.is_current());
+2904:                 } else {
+2905:                     assert_eq!(answer.told, json!({"next":"Say one short confirmation."}));
+2906:                     assert_eq!(answer.requested_audio, Some(offer));
+2907:                     assert!(lease.is_current());
+2908:                 }
+2909:                 assert_eq!(
+2910:                     served.join().unwrap(),
+2911:                     json!({"op":"call","name":"play_relaxing_music","args":{},
+2912:                         "requested_audio_context":context}),
+2913:                     "translation must retain the original call id, request and time bound"
+2914:                 );
+2915:                 std::fs::remove_dir_all(dir).unwrap();
+2916:             }
+2917:         }
+2918:     }
+2919:
+2920:     #[test]
+2921:     fn scoped_audio_rejects_revocation_and_mixed_request_keys_before_dispatch() {
+2922:         for wrapped in [false, true] {
+2923:             let (dir, settings, call) = scoped_audio_setup(wrapped);
+2924:             let listener = UnixListener::bind(dir.join(CALL_SOCKET)).unwrap();
+2925:             listener.set_nonblocking(true).unwrap();
+2926:             for change in ["revoked", "request", "session", "worker"] {
+2927:                 let (owner, mut context) = audio_scope(crate::memory_scope::ScopeSnapshot::room());
+2928:                 let lease = owner.lease();
+2929:                 match change {
+2930:                     "revoked" => owner.revoke(),
+2931:                     "request" => context.request += 1,
+2932:                     "session" => context.provider_session += 1,
+2933:                     "worker" => context.worker_boot = "b".repeat(32),
+2934:                     _ => unreachable!(),
+2935:                 }
+2936:                 let (whom, answer, answered) = run_spoken_call_scoped(
+2937:                     &settings,
+2938:                     &route(&settings, &call.name),
+2939:                     &call,
+2940:                     lease.key().request,
+2941:                     true,
+2942:                     Some(&context),
+2943:                     &lease,
+2944:                 );
+2945:                 assert_eq!(whom, "nobody", "{change}");
+2946:                 assert!(!answered, "{change}");
+2947:                 assert_eq!(answer.told, unavailable(), "{change}");
+2948:                 assert!(answer.requested_audio.is_none(), "{change}");
+2949:                 assert_eq!(
+2950:                     listener.accept().unwrap_err().kind(),
+2951:                     std::io::ErrorKind::WouldBlock,
+2952:                     "{change} reached Skills"
+2953:                 );
+2954:             }
+2955:             std::fs::remove_dir_all(dir).unwrap();
+2956:         }
+2957:     }
+END

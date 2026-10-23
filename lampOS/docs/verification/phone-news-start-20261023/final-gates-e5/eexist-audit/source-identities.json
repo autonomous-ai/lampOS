@@ -1,0 +1,77 @@
+{
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "tools_path": "lampOS/crates/voice/src/tools.rs",
+  "tools_sha256": "a6bbaadc5befad84e1e44f0f438a8afc747ff4a2c3dbda977c3c89e68a049610",
+  "tools_bytes": 184490,
+  "base_and_phone_tools_records_equal": true,
+  "frozen_record": {
+    "path": "lampOS/crates/voice/src/tools.rs",
+    "git_mode": "100644",
+    "bytes": 184490,
+    "sha256": "a6bbaadc5befad84e1e44f0f438a8afc747ff4a2c3dbda977c3c89e68a049610"
+  },
+  "source_maps": {
+    "base-source-map.json": {
+      "path": "/private/tmp/tests-phone-news-start-e5-gates-20261023/base-source-map.json",
+      "sha256": "e399639d3b45f840ccfe321d31c09512626f88d55f215f5cfb4057078bb3067f",
+      "bytes": 2131971
+    },
+    "source-map.json": {
+      "path": "/private/tmp/tests-phone-news-start-e5-gates-20261023/source-map.json",
+      "sha256": "ecc2fbfa7db723cc481cf62576bf5eb0962fad2a42b352028af3191d38255d9d",
+      "bytes": 2131971
+    }
+  },
+  "changed_paths": [
+    "lampOS/crates/voice/src/messages.rs",
+    "lampOS/docs/messages.md"
+  ],
+  "source_identity_record": {
+    "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+    "candidate_commit": null,
+    "candidate_kind": "uncommitted two-file phone fixture candidate",
+    "source_aggregate_sha256": "5dd15400b0c4a66eed69f9f02de03e574cbacf429e48c738d60a78d93349aa97",
+    "base_source_aggregate_sha256": "60c8a01944775148f7c790efee71bfe03c9d996756adcfa186525f3db190ded1",
+    "changed_paths": [
+      "lampOS/crates/voice/src/messages.rs",
+      "lampOS/docs/messages.md"
+    ],
+    "test": "messages::tests::a_text_never_waits_on_the_news_for_the_phone",
+    "source_map_sha256": "ecc2fbfa7db723cc481cf62576bf5eb0962fad2a42b352028af3191d38255d9d",
+    "patch_sha256": "6a85e3205664487c98f2aced6fb303315cc6af39079f17f91bcdc5ee7d7c0e65",
+    "repository_paths": 9992,
+    "lampOS_paths": 6649,
+    "candidate_snapshot_hashes": {
+      "lampOS/crates/voice/src/messages.rs": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "lampOS/docs/messages.md": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3"
+    },
+    "predecessor_source_invariants": {
+      "production_prefix_sha256": "fc9f0adee7b7f37ed160c11e26e67bcd98616ef2ac69484e8574e8731e3860c0",
+      "production_prefix_equal": true,
+      "original_assertions_equal": 5,
+      "entire_response_and_quiet_tail_equal": true,
+      "all_source_outside_exact_test_equal": true
+    },
+    "preparation_live_phone_reads": false,
+    "preparation_source_edits": false
+  },
+  "test_only_module_at_line": 1838,
+  "allocator_lines": [
+    2256,
+    2271
+  ],
+  "shared_setup_lines": [
+    2802,
+    2832
+  ],
+  "two_test_lines": [
+    2880,
+    2921
+  ],
+  "source_paths_read": [
+    "Git object e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc:lampOS/crates/voice/src/tools.rs",
+    "/private/tmp/tests-phone-news-start-e5-gates-20261023/source-map.json",
+    "/private/tmp/tests-phone-news-start-e5-gates-20261023/base-source-map.json"
+  ],
+  "live_phone_source_read": false
+}

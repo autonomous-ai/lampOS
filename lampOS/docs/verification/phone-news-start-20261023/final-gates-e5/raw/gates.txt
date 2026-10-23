@@ -1,0 +1,110 @@
+Raw stream: rustc.stdout
+Payload bytes: 191
+Payload SHA256: 4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281
+BEGIN RAW PAYLOAD
+rustc 1.96.0 (ac68faa20 2026-05-25)
+binary: rustc
+commit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96
+commit-date: 2026-05-25
+host: x86_64-apple-darwin
+release: 1.96.0
+LLVM version: 22.1.2
+END RAW PAYLOAD
+Raw stream: rustc.stderr
+Payload bytes: 0
+Payload SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+BEGIN RAW PAYLOAD
+END RAW PAYLOAD
+Raw stream: clippy.stderr
+Payload bytes: 3943
+Payload SHA256: fadeb8e573ca52f022d60f9d4bca671af671313a170bc25f58a13a9e60478430
+BEGIN RAW PAYLOAD
+    Checking lamp-bus v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/bus)
+    Checking lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/turn-owner)
+    Checking lamp-ipc v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/ipc)
+    Checking lamp-local-time v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/local-time)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/camera)
+    Checking sonora v0.2.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/third_party/sonora)
+    Checking lamp-ring v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/ring)
+    Checking lamp-msgs v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/msgs)
+    Checking lamp-turn-end-wire v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/turn-end-wire)
+    Checking lamp-audio v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/audio)
+    Checking lamp-gemini v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/gemini)
+    Checking lamp-near-call v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/near-call)
+    Checking lamp-voice-processes v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice-processes)
+    Checking lamp-observer v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/observer)
+    Checking lamp-sound-fixtures v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/sound-fixtures)
+    Checking lamp-turn-end v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/turn-end)
+    Checking lamp-same-voice v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/same-voice)
+    Checking lamp-update v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/update)
+    Checking lamp-lean v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/lean)
+    Checking lamp-schedule v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/schedule)
+    Checking lamp-controls v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/controls)
+    Checking lamp-health v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/health)
+    Checking lamp-memory v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory)
+    Checking lamp-policy v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/policy)
+    Checking lamp-actions v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/actions)
+    Checking lamp-ears v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/ears)
+    Checking lamp-keeper v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/keeper)
+    Checking lamp-tasks v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/tasks)
+    Checking lamp-body v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body)
+    Checking lamp-setup v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/setup)
+    Checking lamp-peek v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/peek)
+    Checking lamp-voice v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice)
+    Checking lamp-expression v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/expression)
+    Checking lamp-skills v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/skills)
+    Checking lamp-voice-eval v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice-eval)
+    Checking lamp-cloud v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/cloud)
+    Finished `dev` profile [unoptimized] target(s) in 1m 30s
+END RAW PAYLOAD
+Raw stream: workspace-build.stderr
+Payload bytes: 4859
+Payload SHA256: 8e06d8dc97b4f8531c917bc92e3b8bbc45e160ce95b3ba2d7930cb02f721409e
+BEGIN RAW PAYLOAD
+   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/turn-owner)
+   Compiling sonora v0.2.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/third_party/sonora)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/gemini)
+   Compiling lamp-ring v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/ring)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/msgs)
+   Compiling lamp-audio v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/audio)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/camera)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/near-call)
+   Compiling lamp-turn-end v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/turn-end)
+   Compiling lamp-observer v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/observer)
+   Compiling lamp-sound-fixtures v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/sound-fixtures)
+   Compiling tough v0.24.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/vendor/tough)
+   Compiling lamp-same-voice v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/same-voice)
+   Compiling lamp-update v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/update)
+   Compiling lamp-lean v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/lean)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/schedule)
+   Compiling lamp-controls v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/controls)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/keeper)
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body)
+   Compiling lamp-health v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/health)
+   Compiling lamp-memory v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory)
+   Compiling lamp-policy v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/policy)
+   Compiling lamp-records v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/records)
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice)
+   Compiling lamp-expression v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/expression)
+   Compiling lamp-actions v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/actions)
+   Compiling lamp-air v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/air)
+   Compiling lamp-tasks v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/tasks)
+   Compiling lamp-eyes v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/eyes)
+   Compiling lamp-selftest v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/selftest)
+   Compiling lamp-settings v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/settings)
+   Compiling lamp-peek v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/peek)
+   Compiling lamp-setup v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/setup)
+   Compiling lamp-surround v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/surround)
+   Compiling lamp-mood v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/mood)
+   Compiling lamp-ears v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/ears)
+   Compiling lamp-station v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/station)
+   Compiling lamp-addons v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/addons)
+   Compiling lamp-name v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/name)
+   Compiling lamp-environment v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/environment)
+   Compiling lamp-ipc v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/ipc)
+   Compiling lamp-skills v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/skills)
+   Compiling lamp-voice-eval v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice-eval)
+   Compiling lamp-cloud v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/cloud)
+    Finished `dev` profile [unoptimized] target(s) in 1m 14s
+END RAW PAYLOAD

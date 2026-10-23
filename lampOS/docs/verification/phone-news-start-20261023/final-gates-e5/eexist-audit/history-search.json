@@ -1,0 +1,130 @@
+{
+  "earlier_selected_rows": [
+    {
+      "source": {
+        "path": "/private/tmp/tests-codex-boot-clock-mac-continuation-20261023/complete-receipt/voice-comparison/raw/before-full-stdout.txt",
+        "sha256": "fbcd174d44e93563c76fe88d65a36a7a17fa2e9c91b457ec9d21218c96dfd143",
+        "bytes": 380674
+      },
+      "selected_rows": [
+        [
+          3428,
+          "test tools::tests::scoped_audio_rejects_revocation_and_mixed_request_keys_before_dispatch ... ok"
+        ]
+      ],
+      "limitations": "Only this retained execution row inspected; no historical binary/source-identity equivalence claimed."
+    },
+    {
+      "source": {
+        "path": "/private/tmp/tests-codex-boot-clock-mac-continuation-20261023/complete-receipt/voice-comparison/raw/after-full-stdout.txt",
+        "sha256": "932e6752add2064de56ae9b290d58c671d6867bcc7b1f7c0a8e48aa749f29d4e",
+        "bytes": 390336
+      },
+      "selected_rows": [
+        [
+          3454,
+          "test tools::tests::scoped_audio_rejects_revocation_and_mixed_request_keys_before_dispatch ... ok"
+        ]
+      ],
+      "limitations": "Only this retained execution row inspected; no historical binary/source-identity equivalence claimed."
+    }
+  ],
+  "archive_search": {
+    "roots": [
+      "/private/tmp/tests-823-voice-remaining-evidence",
+      "/private/tmp/tests-boot-clock-base-counterfactual-20261023",
+      "/private/tmp/tests-boot-clock-base-e5-counterfactual-20261023",
+      "/private/tmp/tests-boot-clock-cache-20261023",
+      "/private/tmp/tests-boot-clock-current-audit-20261023",
+      "/private/tmp/tests-boot-clock-current-gates-20261023",
+      "/private/tmp/tests-boot-clock-e5-carry-20261023",
+      "/private/tmp/tests-boot-clock-environment-20261023",
+      "/private/tmp/tests-boot-clock-linux-20261023",
+      "/private/tmp/tests-boot-clock-linux-corrected-20261023",
+      "/private/tmp/tests-codex-boot-clock-audit-20261023",
+      "/private/tmp/tests-codex-boot-clock-current-20261023",
+      "/private/tmp/tests-codex-boot-clock-fixtures-20261023",
+      "/private/tmp/tests-codex-boot-clock-mac-20261023",
+      "/private/tmp/tests-codex-boot-clock-mac-continuation-20261023",
+      "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023",
+      "/private/tmp/tests-codex-voice-ae-parallel-control-20261023",
+      "/private/tmp/tests-codex-voice-ae-parallel-evidence-20261023",
+      "/private/tmp/tests-codex-voice-bus-20261022",
+      "/private/tmp/tests-codex-voice-bus-evidence-20261022",
+      "/private/tmp/tests-codex-voice-clock-probe-20261022",
+      "/private/tmp/tests-codex-voice-current-parallel-control-20261023",
+      "/private/tmp/tests-codex-voice-current-parallel-evidence-20261023",
+      "/private/tmp/tests-codex-voice-ec-parallel-control-20261022",
+      "/private/tmp/tests-codex-voice-ec-parallel-evidence-20261022",
+      "/private/tmp/tests-codex-voice-events-20261022",
+      "/private/tmp/tests-codex-voice-events-base-20261022",
+      "/private/tmp/tests-codex-voice-events-base-current-20261022",
+      "/private/tmp/tests-codex-voice-events-evidence-20261022",
+      "/private/tmp/tests-codex-voice-rebase-20261023",
+      "/private/tmp/tests-voice-consumer-completion-20261022",
+      "/private/tmp/tests-voice-latest-receipt-final-20261022",
+      "/private/tmp/tests-voice-latest-receipt-prepared-20261022",
+      "/private/tmp/tests-voice-latest-refresh-20261022",
+      "/private/tmp/tests-voice-serial-refresh-20261022"
+    ],
+    "globs": [
+      "*.txt",
+      "*.log",
+      "*.json"
+    ],
+    "excluded_globs": [
+      "source*",
+      "compile*",
+      "inventory*",
+      "inventories*",
+      "*-cargo.json"
+    ],
+    "maximum_file_size": "20M",
+    "patterns": [
+      "tools.rs:2270",
+      "scoped_audio_rejects_revocation_and_mixed_request_keys_before_dispatch \\.\\.\\. FAILED"
+    ],
+    "rg_exit": 1,
+    "matches": [],
+    "stderr": ""
+  },
+  "committed_log_receipt_search": {
+    "ref": "lamp-tests",
+    "captured_head": "aa5f13431f319bdbcf2f9a7e7db523774d884746",
+    "path": "lampOS/docs/verification",
+    "patterns": [
+      "tools.rs:2270",
+      "scoped_audio_rejects_revocation_and_mixed_request_keys_before_dispatch followed by FAILED",
+      "lvs-audio-scope"
+    ],
+    "git_grep_exit": 1,
+    "matches": [],
+    "command": [
+      "git",
+      "grep",
+      "-l",
+      "-E",
+      "tools.rs:2270|scoped_audio_rejects_revocation_and_mixed_request_keys_before_dispatch[^[:cntrl:]]{0,12}FAILED|lvs-audio-scope",
+      "aa5f13431f319bdbcf2f9a7e7db523774d884746",
+      "--",
+      "lampOS/docs/verification"
+    ]
+  },
+  "scope_limit": "No earlier matching actual failure found within these retained sources. This is not an exhaustive claim about all runs or all builders.",
+  "ownership_context": {
+    "cached_queue_json_files": 34,
+    "exact_pattern_matches": 0,
+    "patterns": [
+      "scoped_audio_rejects",
+      "schedule_directory",
+      "audio-scope",
+      "tools.rs near 2270",
+      "AlreadyExists"
+    ],
+    "tests_log_ref": "aa5f13431f319bdbcf2f9a7e7db523774d884746",
+    "matching_work_log_lines": 0,
+    "network_requests": 0,
+    "new_claim": false,
+    "tests_log_sha256": "e28804a0a05565ae01d04bd22e76abebb391b336d4573b701aa53a3454473f8e"
+  }
+}
