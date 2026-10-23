@@ -269,6 +269,17 @@ impl Turns {
     }
 }
 
+/// `end`, seconds on the wire, in the caller's audio: less each keep-alive's
+/// quiet that began before it, wholly, so an end inside one errs early and
+/// a result is at worst not the yield's.
+fn caller_seconds(end: f64, quiet_at: &[usize]) -> f64 {
+    let quiet = quiet_at
+        .iter()
+        .filter(|at| (**at as f64) < end * 16_000.0)
+        .count();
+    end - (quiet * CHUNK_BYTES / 2) as f64 / 16_000.0
+}
+
 /// The stream's task on Flux: [`super::run`]'s part, in Flux's messages.
 pub(super) async fn run<S>(
     socket: tokio_tungstenite::WebSocketStream<S>,
@@ -276,6 +287,7 @@ pub(super) async fn run<S>(
     words_at: Arc<OnceLock<Instant>>,
     (said, early): (mpsc::UnboundedSender<String>, mpsc::UnboundedSender<Early>),
     replies: Arc<Replies>,
+    finals: mpsc::UnboundedSender<(bool, f64)>,
 ) -> Result<(String, Option<String>)>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
@@ -285,6 +297,10 @@ where
     let mut chunk: Vec<u8> = Vec::with_capacity(CHUNK_BYTES);
     let mut last_sent = Instant::now();
     let mut samples_sent = 0usize;
+    // Where on the wire each keep-alive's quiet began, in samples: audio the
+    // caller never fed, taken out of the ends `finals` reports so they are
+    // on the caller's audio, as the yield's mark is (reviewer-two on #3200).
+    let mut quiet_at: Vec<usize> = Vec::new();
     // Every `ForceEndTurn` gets one answer, an `EndOfTurn` it ended or the
     // warning that there was none: a flush's may still be on its way at
     // the end of the line.
@@ -349,6 +365,7 @@ where
             _ = tokio::time::sleep_until(last_sent + KEEP_ALIVE), if force_by.is_none() && !closing => {
                 // What is waiting goes, or else quiet, which is audio sent.
                 let audio = if chunk.is_empty() {
+                    quiet_at.push(samples_sent);
                     samples_sent += CHUNK_BYTES / 2;
                     QUIET.to_vec()
                 } else {
@@ -376,6 +393,10 @@ where
                         }
                         if !info.transcript.is_empty() {
                             let _ = words_at.set(Instant::now());
+                            // Only an `EndOfTurn` is final: an `Update`'s
+                            // words may yet change (reviewer-two on #3200).
+                            let end = caller_seconds(info.audio_window_end, &quiet_at);
+                            let _ = finals.send((info.event == Event::EndOfTurn, end));
                             let _ = said.send(info.transcript.clone());
                         }
                         let forced = info.event == Event::EndOfTurn

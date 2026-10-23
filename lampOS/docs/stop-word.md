@@ -886,8 +886,8 @@ With the switch:
 ### A backchannel held as a yield (#2939, 22 October)
 
 Off unless `LAMP_BACKCHANNEL_HOLDS=on`, and only with
-`LAMP_STOP_WORDS=heard`: without it the journal says once that
-backchannels aren't held, and nothing changes. On lamp-52e6 on 22 October,
+`LAMP_STOP_WORDS=heard` or `heard-always`: without either the journal says
+once that backchannels aren't held, and nothing changes. On lamp-52e6 on 22 October,
 9 of 12 short cut-ins committed as a new turn; a person who only said
 "Mm-hm." lost the rest of the answer.
 
@@ -908,7 +908,10 @@ backchannels aren't held, and nothing changes. On lamp-52e6 on 22 October,
 - **A backchannel resumes.** Words of one or two, all on the list, with no
   "?" and no stop phrase (`stop_words::backchannel`, read after hyphens are
   joined and NFC): mm, mhm, mmhm, mmhmm, hm, hmm, uhhuh, yeah, yes, yep,
-  yup, ok, okay, alright, right, oh, ah, sure; with `stt_language` vi, ừ,
+  yup, ok, okay, alright, right, oh, ah, sure; a pair counts as one word:
+  "I see", "all right", "uh huh", "mm hm", "mm hmm", "got it", so "Oh, I
+  see." and "Okay, sure." are backchannels (`BACKCHANNEL_PAIRS`; on
+  lamp-52e6 on 23 October "Right" came as two words and committed); with `stt_language` vi, ừ,
   ừm, ờ, à, ồ, dạ, vâng, ok. Left out, so they commit: uh, so, no, what,
   huh, hả, and "rồi" and "đúng", as often a reply as an acknowledgment.
   Nor are they a backchannel when the lamp's last finished sentence
@@ -922,6 +925,32 @@ backchannels aren't held, and nothing changes. On lamp-52e6 on 22 October,
   after its commit was held 200 ms: committed"), since words that come
   after are dropped with the yield. A stop phrase ("wait" is one) and a forced `stop/heard` are
   never held.
+- **With `heard-always`** (#2939, lamp-52e6 at 09:44 on 23 October: 5 of
+  5 backchannels cut a story with `heard-always`, where the hold was inert),
+  the one stream that hears the whole reply also tells the yield its words
+  (`StopWords::with_backchannel_holds`): the yield waits for them, they are
+  asked for at its tenth still block if no pause has asked yet, and only
+  its own final words decide it: an interim result ("Okay" before "Okay,
+  what was that?") and a result that ends before the yield began (a
+  flush's or an utterance's from before it) are passed over, so the
+  commit stays held, within the same bounds, until a final of its own
+  comes. Its finals add up: a backchannel so far is told as one, and told
+  again as words if a later final makes them more ("Okay." then "What was
+  that?" commits). Where a result ends and where the yield began are read
+  on one clock, the samples sent to the reply's streams, across a stream
+  still connecting and a stream replaced; on Flux the 80 ms of quiet an
+  idle stream sends every 5 s, which the reply never fed, is taken out of
+  each result's end, so it is on the reply's samples too; a result the
+  thread classified
+  before the yield's mark reached it decides nothing; on Flux only an
+  `EndOfTurn` is final; a result with no account of its finality decides
+  nothing. Each errs toward no decision, so the yield then commits as a
+  turn at the bound, as with the switch off (reviewer-two on #3200). A stop
+  phrase among them is told as no stop: it stops the lamp as a hand Stop
+  does, as without the switch. A face turned to the lamp plays no part:
+  the duplex rule decides the hold, and "its answer is played: someone is
+  turned to the lamp" is the busy-room rule's verdict on a turn already
+  committed.
 - **A backchannel resume is not fruitless**, nor other-fruitless: two
   "mm-hm"s don't stop the reply yielding for 20 s.
 - **Latency.** Words come about 350 ms after the word ends, inside the

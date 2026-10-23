@@ -514,6 +514,11 @@ pub struct SttStream {
     /// Each result's words as they come, interim and final, until taken
     /// ([`Self::take_words`], `LAMP_STOP_WORDS=heard-always`, #828).
     words: Option<mpsc::UnboundedReceiver<String>>,
+    /// Beside each of `words`, sent just before it: whether the result was
+    /// final and where in the audio it ends, in seconds: on Flux, whether it
+    /// ends the turn, and the turn's window end ([`Self::take_finals`],
+    /// #2939).
+    finals: Option<mpsc::UnboundedReceiver<(bool, f64)>>,
     /// What the service has sent back so far, by kind.
     replies: Arc<Replies>,
     /// The words a line has before they are final, until taken
@@ -615,6 +620,15 @@ impl SttStream {
         Self::start(socket)
     }
 
+    /// A stream on Flux's `socket`, for tests of its results (#2939).
+    #[cfg(test)]
+    pub(crate) fn on_flux<S>(socket: tokio_tungstenite::WebSocketStream<S>) -> Self
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin + 'static,
+    {
+        Self::start_flux(socket)
+    }
+
     fn start<S>(socket: tokio_tungstenite::WebSocketStream<S>) -> Self
     where
         S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin + 'static,
@@ -637,6 +651,7 @@ impl SttStream {
         let (audio, queued) = mpsc::channel(QUEUE);
         let words_at = Arc::new(OnceLock::new());
         let (said, words) = mpsc::unbounded_channel();
+        let (final_of, finals) = mpsc::unbounded_channel();
         let (early_words, early) = mpsc::unbounded_channel();
         let replies = Arc::new(Replies::default());
         let quiet_end = Arc::new(AtomicBool::new(false));
@@ -647,6 +662,7 @@ impl SttStream {
                 Arc::clone(&words_at),
                 (said, early_words),
                 Arc::clone(&replies),
+                final_of,
             ))
         } else {
             tokio::spawn(run(
@@ -656,6 +672,7 @@ impl SttStream {
                 (said, early_words),
                 Arc::clone(&replies),
                 Arc::clone(&quiet_end),
+                final_of,
             ))
         };
         Self {
@@ -663,6 +680,7 @@ impl SttStream {
             task,
             words_at,
             words: Some(words),
+            finals: Some(finals),
             replies,
             early: Some(early),
             quiet_end,
@@ -676,6 +694,14 @@ impl SttStream {
     /// when the stream ends (#828).
     pub fn take_words(&mut self) -> Option<mpsc::UnboundedReceiver<String>> {
         self.words.take()
+    }
+
+    /// For each of [`Self::take_words`]' results, sent just before it,
+    /// whether it was final and where in the caller's audio it ends, in
+    /// seconds (on Flux, an `EndOfTurn` and its window's end, less the
+    /// keep-alive quiet sent before it). For one taker (#2939).
+    pub fn take_finals(&mut self) -> Option<mpsc::UnboundedReceiver<(bool, f64)>> {
+        self.finals.take()
     }
 
     /// The words the line has before they are final ([`Early`]), for one
@@ -933,6 +959,7 @@ async fn run<S>(
     (said, early): (mpsc::UnboundedSender<String>, mpsc::UnboundedSender<Early>),
     replies: Arc<Replies>,
     quiet_end: Arc<AtomicBool>,
+    finals: mpsc::UnboundedSender<(bool, f64)>,
 ) -> Result<(String, Option<String>)>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
@@ -1153,6 +1180,7 @@ where
                         });
                         if !words.transcript.is_empty() {
                             let _ = words_at.set(Instant::now());
+                            let _ = finals.send((words.is_final, words.end));
                             let _ = said.send(words.transcript.clone());
                         }
                         let finalized = words.from_finalize;
