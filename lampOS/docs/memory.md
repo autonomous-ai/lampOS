@@ -321,6 +321,56 @@ result, or `"ok":false`, an `"error"` (`bad_json`, `bad_request`, `unknown_op`,
   `exchange`) it is the highest of that kind, whatever came after it:
   "forget what I asked you to remember" means the last kept thing. Any
   other `kind` is `bad_request`.
+
+  **"Forget that" right after a follow-up** (the first builder, 03:29;
+  with `LAMP_MEMORY_THREADS`, no switch of its own). When the lamp has
+  just asked a person about a follow-up (`follow_up_asked`), a bare
+  forget (no `about`, no `source_id`) from that same person in either of
+  their next two lines, and within 60 s of the ask (`HELD_FORGET_FOR`),
+  sends `{"op":"forget","id":<the follow-up's id>}`
+  instead of `forget_last`, whether the follow-up was kept by `remember`
+  or by the end-of-talk pass as an observation, so it goes with its
+  follow-up, offer and event rows. The lamp's ask and the person's reply,
+  journalled before the forget, cite the follow-up the session was shown,
+  so the store's walk takes them too and the end-of-talk pass is given
+  none of them. Reading the slot waits for the voice's context rather
+  than failing on a busy one. The voice logs the id only, never the
+  words. Before the `forget`, #3113's older-memory probe (the
+  `kept` listing with `observations`) is sent: an older lamp-memory, which
+  could take another kept thing citing the same exchange, refuses it, and
+  the voice then sends no forget and answers as a refused named forget
+  does ("I couldn't forget that just now"), keeping the slot (Second's
+  second P2 on #3130). It is let go only once the store confirms a forget of theirs:
+  one the store refuses, or whose answer is lost, leaves it and gives
+  back its line of their two, so their next retry within the 60 s
+  forgets the same id again and never falls to `forget_last` of another kept thing (Second's
+  P2 on #3130). Another person's or the room's forget is their own
+  `forget_last` and leaves it. A third line, 60 s past the ask, a
+  `remember` of theirs after the ask (the newer kept thing is then
+  "that"), a session closing, a session opening for another person or
+  nobody known, or a confirmed forget of theirs leave `forget_last` as
+  before. A session opening for the same person within the bound keeps
+  it: an attempted forget makes the second route ask its note again, and
+  that refresh opens the next session before their retry, which must
+  still forget the same id (Second on #3130). `forgotten: true` is told only when the
+  store removed something. The one picker decides it:
+  `remember::bare_forget_target` fills `Recent::asked`, and `pick_forget`
+  returns `ForgetPick::Asked(id)` for a bare forget only; a forget that
+  names a thing still picks what it names. Tests:
+  `voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about`,
+  `voice::forget_that_with_no_follow_up_asked_still_forgets_the_newest_kept_line`,
+  `voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation`,
+  `voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence`,
+  `voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh`,
+  and `remember::tests` `a_bare_forget_in_their_next_two_lines_forgets_the_follow_up_asked`,
+  `a_refused_forget_of_the_follow_up_is_retried_by_id_never_forget_last`,
+  `a_refused_forget_leaves_the_slot_and_another_s_forget_is_forget_last`,
+  `a_bare_forget_past_a_minute_of_the_ask_is_forget_last`,
+  `another_speaker_s_bare_forget_never_takes_the_follow_up_asked`,
+  `a_remember_after_the_ask_makes_the_bare_forget_forget_last`,
+  `a_session_change_lets_the_follow_up_asked_go`,
+  `with_threads_off_a_bare_forget_is_forget_last` and
+  `pick_forget_takes_the_follow_up_asked_only_for_a_bare_forget`.
 - `forget_all` empties one person's directory, unreadable lines included:
   `{"ok":true,"removed":14}`. With `"person":null`, everyone's; every other
   request but `status` refuses `null`.
@@ -633,8 +683,9 @@ the unchanged legacy client, used unless the new Days client is selected.
   - **`forget_last` stays only for a bare forget:** "forget that" right
     after a keep removes that keep. A bare forget within 60 s of a named one
     in the same scope ("Yes, please forget it.") is that name again; a
-    `remember` since ends that. #2808 adds its case to `pick_forget`: a
-    bare forget just after a follow-up was asked.
+    `remember` since ends that. A bare forget just after a follow-up was
+    asked is that follow-up's entry (`ForgetPick::Asked`, #2808; "Forget
+    that" right after a follow-up, above).
   - **The legacy memory**, which can forget only the last kept thing,
     forgets nothing for a named forget and says so. A Days lamp-memory
     older than this build refuses `kept`'s `observations`
