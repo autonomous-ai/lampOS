@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""First baseline observation of candidate case10, using the existing retained ELF; no Cargo."""
+from datetime import datetime, timezone
+import hashlib
+import importlib.util
+import json
+from pathlib import Path
+import re
+
+ROOT = Path('/private/tmp/tests-boot-clock-linux-20261023')
+CASE = 'coordinator::tests::hand_controls::a_head_touch_stops_the_lamp_while_it_says_its_answer'
+EXPECTED_ELF_SHA = '442130b0537e141fd32cda7da604b0a5fc39777fed0458569f4190fb774176d3'
+spec = importlib.util.spec_from_file_location('frozen_linux_runner', ROOT / 'run_linux.py')
+lib = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(lib)
+
+
+class Control(lib.Runner):
+    def __init__(self):
+        self.plan_path = ROOT / 'plan.json'
+        self.plan = json.loads(self.plan_path.read_text())
+        self.role = 'baseline-case10-control'
+        self.id = self.role + '-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ').lower()
+        self.out = ROOT / 'controls' / self.id
+        self.out.mkdir(parents=True)
+        ledger = ROOT / 'baseline-case10-control-started.json'
+        with ledger.open('x') as stream:
+            json.dump({'out': str(self.out), 'case': CASE, 'rule': 'One newly authorized baseline observation; no retry'}, stream)
+            stream.write('\n')
+        prior = json.loads((ROOT / 'baseline-execution-started.json').read_text())
+        self.before = json.loads((Path(prior['run']) / 'results.json').read_text())
+        self.manifest_path = ROOT / 'snapshots/baseline/source-manifest.json'
+        self.manifest = json.loads(self.manifest_path.read_text())
+        self.binary = self.before['binary']['retained_path']
+        if self.before['binary']['sha256'] != EXPECTED_ELF_SHA:
+            raise RuntimeError('Retained baseline identity differs from the explicitly authorized binary')
+        self.cwd = '/target/snapshots/baseline-' + self.manifest['archive_sha256'][:16] + '/lampOS'
+        frozen = {'authorization': 'Root explicitly granted this one baseline-only observation after candidate case10 failure',
+                  'source_ref': self.manifest['source_ref'], 'source_manifest_path': str(self.manifest_path),
+                  'source_manifest_sha256': lib.sha_file(self.manifest_path),
+                  'source_archive_sha256': self.manifest['archive_sha256'], 'binary': self.binary,
+                  'binary_sha256': EXPECTED_ELF_SHA, 'case': CASE, 'clock_seconds': 60,
+                  'watchdog_seconds': 120, 'expected_exit': 0, 'expected_counts': {'passed': 1, 'failed': 0, 'ignored': 0, 'filtered': 3582},
+                  'compiled_inventory_source': str(Path(prior['run']) / 'compiled-inventory.json'),
+                  'compiled_inventory_sha256': lib.sha_file(Path(prior['run']) / 'compiled-inventory.json'),
+                  'frozen_runner_sha256': lib.sha_file(ROOT / 'run_linux.py'),
+                  'control_runner_sha256': lib.sha_file(Path(__file__)), 'no_cargo': True,
+                  'previous_candidate_receipt_unchanged': True}
+        self.results = {'status': 'started', 'plan': frozen, 'commands': [], 'tests': []}
+        lib.save(self.out / 'control-plan.json', frozen)
+        self.flush()
+
+    def run(self):
+        argv, name = self.container('binary-before', command=['sha256sum', self.binary])
+        identity = self.checked('binary-before', argv, container_name=name)
+        if Path(identity['stdout']['path']).read_text().split()[0] != EXPECTED_ELF_SHA:
+            raise RuntimeError('Baseline binary bytes changed')
+        argv, name = self.container('case', workdir=self.cwd, command=['perl', '-e', lib.OUTER, '--',
+            '60', lib.INNER, self.binary, CASE, '--exact', '--nocapture', '--test-threads=1'])
+        lib.save(self.out / 'exact-command-before-execution.json', {'argv': argv, 'watchdog_seconds': 120,
+            'expected_exit': 0, 'expected_case': CASE, 'namespace_wrapper_sha256': {
+                'outer': hashlib.sha256(lib.OUTER.encode()).hexdigest(), 'inner': hashlib.sha256(lib.INNER.encode()).hexdigest()}})
+        result = self.command('case', argv, timeout=120, container_name=name)
+        stdout = Path(result['stdout']['path']).read_text()
+        clocks = [json.loads(line.split(' ', 1)[1]) for line in stdout.splitlines() if line.startswith('BOOT_CLOCK_RECEIPT ')]
+        by_phase = {row['phase']: row for row in clocks}
+        complete = set(by_phase) == {'outer_before', 'namespace_before', 'test_child_before_exec', 'namespace_after', 'outer_after'}
+        clock_ok = False
+        if complete:
+            outer, child, after = by_phase['outer_before'], by_phase['test_child_before_exec'], by_phase['outer_after']
+            clock_ok = (child['time_namespace'] != outer['time_namespace'] and after['time_namespace'] == outer['time_namespace']
+                and outer['offsets'] == after['offsets'] and after['monotonic'] >= outer['monotonic']
+                and after['boottime'] >= outer['boottime'] and all(60 <= child[k] < 62 for k in ['monotonic','boottime']))
+        summaries = re.findall(r'test result: (ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out', stdout)
+        valid = result['exit'] == 0 and summaries == [('ok','1','0','0','0','3582')] and CASE in stdout and clock_ok
+        self.results['tests'].append({'case': CASE, 'exit': result['exit'], 'clocks': clocks,
+            'test_summaries': summaries, 'clock_checks_passed': clock_ok, 'expected_outcome_matched': valid})
+        self.flush()
+        argv, name = self.container('binary-after', command=['sha256sum', self.binary])
+        identity = self.checked('binary-after', argv, container_name=name)
+        unchanged = Path(identity['stdout']['path']).read_text().split()[0] == EXPECTED_ELF_SHA
+        self.results['baseline_binary_unchanged'] = unchanged
+        self.results['status'] = 'frozen_baseline_expectation_matched' if valid and unchanged else 'failed_observation_retained_no_retry'
+        self.flush()
+        if not valid or not unchanged:
+            raise RuntimeError('Baseline control did not match its frozen expectation; preserve outcome, no retry')
+
+
+if __name__ == '__main__':
+    control = Control()
+    try:
+        control.run()
+    except BaseException as error:
+        control.results['error'] = repr(error)
+        if control.results['status'] == 'started':
+            control.results['status'] = 'stopped_without_retry'
+        control.flush()
+        raise

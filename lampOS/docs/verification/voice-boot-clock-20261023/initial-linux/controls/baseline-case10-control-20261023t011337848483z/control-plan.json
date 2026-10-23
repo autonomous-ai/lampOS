@@ -1,0 +1,25 @@
+{
+  "authorization": "Root explicitly granted this one baseline-only observation after candidate case10 failure",
+  "source_ref": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+  "source_manifest_path": "/private/tmp/tests-boot-clock-linux-20261023/snapshots/baseline/source-manifest.json",
+  "source_manifest_sha256": "3fa1adec4ff294161964abc2fc05bd2f5bdc41aa4064b7f4db266d4c436eabb9",
+  "source_archive_sha256": "b9a6066717c5ff7d0306c096f161350b05733c3b90d992b03775102d3c0a7595",
+  "binary": "/target/retained/baseline-b9a6066717c5ff7d",
+  "binary_sha256": "442130b0537e141fd32cda7da604b0a5fc39777fed0458569f4190fb774176d3",
+  "case": "coordinator::tests::hand_controls::a_head_touch_stops_the_lamp_while_it_says_its_answer",
+  "clock_seconds": 60,
+  "watchdog_seconds": 120,
+  "expected_exit": 0,
+  "expected_counts": {
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 3582
+  },
+  "compiled_inventory_source": "/private/tmp/tests-boot-clock-linux-20261023/runs/baseline-20261023t010211777596z/compiled-inventory.json",
+  "compiled_inventory_sha256": "1ff0b6e4e7a7a5c2c23a1c155a9d28a728d0650ed294508d1e798d239fb1d6ba",
+  "frozen_runner_sha256": "9cad9a187bce621cf16f69f45ef0d18e1807c3e18cfa6f45c6f47c1e67d7a9f4",
+  "control_runner_sha256": "9a55755587240e30bbb475e70029cab94f81039e151a51c74f73198b4183d450",
+  "no_cargo": true,
+  "previous_candidate_receipt_unchanged": true
+}

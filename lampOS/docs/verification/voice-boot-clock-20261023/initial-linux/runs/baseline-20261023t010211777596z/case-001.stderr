@@ -1,0 +1,4 @@
+
+thread 'second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy' (5) panicked at crates/voice/src/second_provider/worker.rs:8341:25:
+attempt to subtract with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

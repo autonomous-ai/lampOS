@@ -1,0 +1,70 @@
+{
+  "created_utc": "2026-10-23T01:15:55.407519+00:00",
+  "original_candidate": "b5f2e39d2a1d561364c754c1ff904ca588c63c29",
+  "baseline": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+  "changed_path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+  "before_sha256": "feaefd6d0817c1361f2f17553e3ede56a8c6b709a226eafd23e023198c751df4",
+  "after_sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+  "assertions_before": 305,
+  "assertions_after": 305,
+  "assertions_byte_identical": true,
+  "assertion_digest": "eaf39df097991fd44af60a9590fd8fe54867041906643dad306418be642a2a45",
+  "patch_sha256": "c0e94dd77333ae02d7681f715873ebc3e0ef3495e3e1deb75683309d2f94261b",
+  "original_failure_streams_unchanged": [
+    {
+      "path": "/private/tmp/tests-boot-clock-linux-20261023/runs/candidate-20261023t010826336047z/case-010.stderr",
+      "bytes": 398,
+      "sha256": "e0c9c8a8e88eb6557ebbfcdd66c0e8d72a90497898170ad3c9538b7cd81e3b32"
+    },
+    {
+      "path": "/private/tmp/tests-boot-clock-linux-20261023/runs/candidate-20261023t010826336047z/case-010.stdout",
+      "bytes": 1702,
+      "sha256": "e3b117a89bf7be0fa246b075452cc1cc92f0d0a6e24e91c6e217f4ce420cbdf8"
+    }
+  ],
+  "current_seven_source_sha256": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/second.rs",
+      "sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+      "changed_from_initial_b5f2": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+      "changed_from_initial_b5f2": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "changed_from_initial_b5f2": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "sha256": "65af6a4a052ef808e094284373f4c155bf4f09250a09c2c090b9b225c77cda6e",
+      "changed_from_initial_b5f2": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/scenario_clock.rs",
+      "sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "changed_from_initial_b5f2": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "sha256": "983d30959d6322c97be81be053f00596796d15e52eb8eb8d35ffaad8d276b9c7",
+      "changed_from_initial_b5f2": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/stop_words.rs",
+      "sha256": "5524521c56061be6af4b8ee95d52ecc3b9b1d3c3ee4a2344db4fa75dbf4f9a0f",
+      "changed_from_initial_b5f2": false
+    }
+  ],
+  "diagnosis": "Initial synthetic provider Fault sent before the stepped epoch: raw namespace60.449453s vs receiver600s, yielding539550547us age. The scope now begins after all readiness barriers and before protocol sends/clock-bearing observers. OptionalCamera construction is also deferred into the shared epoch.",
+  "checks_run": [
+    "git diff --check",
+    "source lexical assertion comparison",
+    "seven-file SHA256 closure and original failure hashes"
+  ],
+  "cargo_or_tests_run_for_correction": false,
+  "status": "Source frozen for parent review/qualification; earlier no-source-blocker conclusion was disproved by case10 and is retained as history."
+}

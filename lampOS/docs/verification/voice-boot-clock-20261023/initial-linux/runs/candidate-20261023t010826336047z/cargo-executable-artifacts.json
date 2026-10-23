@@ -1,0 +1,34 @@
+[
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///target/snapshots/candidate-893f26a0e354d1a6/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/target/snapshots/candidate-893f26a0e354d1a6/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_voice",
+      "src_path": "/target/snapshots/candidate-893f26a0e354d1a6/lampOS/crates/voice/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/build/x86_64-unknown-linux-gnu/debug/deps/lamp_voice-a9031edb52550e8e"
+    ],
+    "executable": "/target/build/x86_64-unknown-linux-gnu/debug/deps/lamp_voice-a9031edb52550e8e",
+    "fresh": false
+  }
+]

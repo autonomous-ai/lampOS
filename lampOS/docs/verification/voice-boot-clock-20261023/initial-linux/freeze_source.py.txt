@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""Archive an exact committed baseline or explicitly approved frozen worktree; no Cargo."""
+import argparse
+import hashlib
+import io
+import json
+import os
+from pathlib import Path
+import subprocess
+import tarfile
+import time
+
+ENV = dict(os.environ, GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL='/dev/null')
+
+
+def digest(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def git(root, *args):
+    return subprocess.check_output(['git', '-C', str(root), *args], env=ENV)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--plan', required=True)
+    parser.add_argument('--role', choices=['baseline', 'candidate'], required=True)
+    args = parser.parse_args()
+    plan_path = Path(args.plan).resolve()
+    plan_bytes = plan_path.read_bytes()
+    plan = json.loads(plan_bytes)
+    role = plan['snapshots'][args.role]
+    root, base = Path(plan['worktree']), plan['base']
+    source_ref = role.get('ref', base)
+    if git(root, 'rev-parse', base).decode().strip() != base:
+        raise RuntimeError('Base must be the exact immutable commit')
+    if role['source_mode'] not in ['commit', 'frozen_worktree']:
+        raise RuntimeError('Unsupported snapshot mode')
+    allowed = role.get('allowed_changed_sha256', {})
+    if args.role == 'candidate':
+        if not role.get('root_source_freeze_approved'):
+            raise RuntimeError('Candidate has not received the explicit root source freeze')
+        if role['source_mode'] == 'frozen_worktree':
+            if git(root, 'rev-parse', 'HEAD').decode().strip() != base:
+                raise RuntimeError('Candidate worktree is not based on the expected exact commit')
+            if git(root, 'diff', '--cached', '--name-only', '--', 'lampOS').strip():
+                raise RuntimeError('Unexpected staged source state')
+        changed_args = ['diff', '--name-only', '-z', base]
+        if role['source_mode'] == 'commit':
+            changed_args.append(source_ref)
+        changed = set(git(root, *changed_args, '--', 'lampOS').decode().strip('\0').split('\0')) - {''}
+        if changed != set(allowed):
+            raise RuntimeError('Actual changed paths differ from the approved candidate scope')
+        for relative, expected in allowed.items():
+            actual = git(root, 'show', source_ref + ':' + relative) if role['source_mode'] == 'commit' else (root / relative).read_bytes()
+            if digest(actual) != expected:
+                raise RuntimeError('Candidate frozen hash mismatch: ' + relative)
+    out = Path(plan['evidence_root']) / 'snapshots' / args.role
+    out.mkdir(parents=True, exist_ok=True)
+    archive = out / 'source.tar'
+    manifest_path = out / 'source-manifest.json'
+    if archive.exists() or manifest_path.exists():
+        raise RuntimeError('Snapshot already exists; preserve it, do not overwrite')
+    entries, base_objects = [], {}
+    for row in git(root, 'ls-tree', '-rz', base, '--', 'lampOS').split(b'\0'):
+        if row:
+            meta, path = row.split(b'\t', 1)
+            base_objects[path.decode()] = meta.decode().split()[2]
+    for row in git(root, 'ls-tree', '-rz', source_ref, '--', 'lampOS').split(b'\0'):
+        if not row:
+            continue
+        meta, path = row.split(b'\t', 1)
+        mode, kind, oid = meta.decode().split()
+        relative = path.decode()
+        if kind != 'blob' or mode not in ['100644', '100755']:
+            raise RuntimeError('Unexpected nonregular tracked entry: ' + relative)
+        pieces = Path(relative).parts
+        if pieces[0] != 'lampOS' or '.git' in pieces or '..' in pieces or any(
+            p in ['.netrc', 'credentials', 'credentials.toml', 'id_rsa', 'id_ed25519', '.aws'] for p in pieces
+        ):
+            raise RuntimeError('Excluded authentication or unsafe archive path: ' + relative)
+        entries.append((relative, mode, oid))
+    batch = subprocess.Popen(['git', '-C', str(root), 'cat-file', '--batch'], stdin=subprocess.PIPE,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=ENV)
+    records = []
+    started = time.monotonic()
+    try:
+        with tarfile.open(archive, 'w', format=tarfile.PAX_FORMAT) as writer:
+            for relative, mode, oid in entries:
+                batch.stdin.write((oid + '\n').encode())
+                batch.stdin.flush()
+                response = batch.stdout.readline().decode().strip().split()
+                if len(response) != 3 or response[:2] != [oid, 'blob']:
+                    raise RuntimeError('Unexpected Git blob response')
+                source_bytes = batch.stdout.read(int(response[2]))
+                if batch.stdout.read(1) != b'\n':
+                    raise RuntimeError('Truncated Git blob stream')
+                base_oid = base_objects.get(relative)
+                base_bytes = source_bytes if base_oid == oid else (git(root, 'cat-file', 'blob', base_oid) if base_oid else b'')
+                data = (root / relative).read_bytes() if role['source_mode'] == 'frozen_worktree' else source_bytes
+                changed = data != base_bytes
+                if args.role == 'candidate' and changed != (relative in allowed):
+                    raise RuntimeError('Source drift outside the approved exact-byte overlay: ' + relative)
+                info = tarfile.TarInfo(relative)
+                info.size, info.mode, info.mtime = len(data), int(mode, 8) & 0o777, 0
+                info.uid = info.gid = 1000
+                info.uname = info.gname = ''
+                writer.addfile(info, io.BytesIO(data))
+                records.append({'path': relative, 'bytes': len(data), 'sha256': digest(data),
+                                'source_blob': oid, 'base_blob': base_oid, 'base_sha256': digest(base_bytes), 'changed': changed, 'mode': mode})
+        batch.stdin.close()
+        if batch.wait(timeout=30) != 0:
+            raise RuntimeError('Git blob reader failed')
+    finally:
+        if batch.poll() is None:
+            batch.kill()
+            batch.wait()
+    if role['source_mode'] == 'frozen_worktree':
+        for row in records:
+            if digest((root / row['path']).read_bytes()) != row['sha256']:
+                raise RuntimeError('Candidate changed while archiving: ' + row['path'])
+    with archive.open('rb') as stream:
+        archive_sha = hashlib.file_digest(stream, 'sha256').hexdigest()
+    source_rows = [{'path': r['path'], 'sha256': r['sha256'], 'mode': r['mode']} for r in records]
+    aggregate = digest(json.dumps(source_rows, sort_keys=True, separators=(',', ':')).encode())
+    manifest = {'role': args.role, 'base': base, 'source_ref': source_ref, 'source_mode': role['source_mode'],
+                'plan_path': str(plan_path), 'plan_sha256_at_freeze': digest(plan_bytes),
+                'archive': str(archive), 'archive_sha256': archive_sha, 'archive_bytes': archive.stat().st_size,
+                'source_aggregate_sha256': aggregate, 'tracked_file_count': len(records),
+                'source_regular_file_bytes': sum(r['bytes'] for r in records),
+                'files': records, 'changed_paths': [r['path'] for r in records if r['changed']],
+                'scope': 'All tracked lampOS regular files at the exact base plus approved frozen candidate bytes; no .git or host authentication data',
+                'wall_seconds': time.monotonic() - started}
+    manifest_path.write_text(json.dumps(manifest, indent=2) + '\n')
+    (out / 'source-files.sha256').write_text(''.join(f"{r['sha256']}  {r['path']}\n" for r in records))
+    archive.chmod(0o444)
+    manifest_path.chmod(0o444)
+    print(json.dumps({k: manifest[k] for k in ['role', 'base', 'archive', 'archive_sha256',
+        'archive_bytes', 'source_aggregate_sha256', 'tracked_file_count', 'source_regular_file_bytes', 'changed_paths']}, indent=2))
+
+
+if __name__ == '__main__':
+    main()

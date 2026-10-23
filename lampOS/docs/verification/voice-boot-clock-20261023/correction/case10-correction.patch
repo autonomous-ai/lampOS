@@ -1,0 +1,55 @@
+diff --git a/lampOS/crates/voice/src/coordinator/tests/hand_controls.rs b/lampOS/crates/voice/src/coordinator/tests/hand_controls.rs
+index f954f478f8..f7a2640063 100644
+--- a/lampOS/crates/voice/src/coordinator/tests/hand_controls.rs
++++ b/lampOS/crates/voice/src/coordinator/tests/hand_controls.rs
+@@ -1517,14 +1517,20 @@ fn run_loop_ringed(
+             height: 240,
+             max_frame_bytes: 128 * 1024,
+         };
+-        (
+-            // Opening for the whole run: the side never answers a start.
+-            Some(OptionalCamera::new(worker, source).opening_until(u64::MAX)),
+-            Some((false, peer, input)),
+-        )
++        (Some((worker, source)), Some((false, peer, input)))
+     } else {
+         (None, None)
+     };
++    // Every child has crossed its real readiness barrier. Enter the scenario
++    // before any runtime message is queued or any observer samples its clock:
++    // the first provider fault and the camera must share the loop's epoch too.
++    let mut scope = (clocking == Clocking::Stepped).then(|| {
++        crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap()
++    });
++    let camera = camera.map(|(worker, source)| {
++        // Opening for the whole run: the side never answers a start.
++        OptionalCamera::new(worker, source).opening_until(u64::MAX)
++    });
+     let mut rig = Rig {
+         expression_out: None,
+         second: None,
+@@ -1586,13 +1592,8 @@ fn run_loop_ringed(
+     .chain(ring_peer)
+     .chain(camera_peer)
+     .collect::<Vec<_>>();
+-    let (mut threads, mut stepped, mut scope) = (Vec::new(), None, None);
+-    if clocking == Clocking::Stepped {
+-        // Every child has crossed its readiness barrier: the loop, its
+-        // controls and these peers share the scenario clock from here.
+-        // The controls also need their full prehistory before the first step.
+-        let clock =
+-            crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
++    let (mut threads, mut stepped) = (Vec::new(), None);
++    if let Some(clock) = scope.as_ref() {
+         let shared = Rc::new(RefCell::new(
+             peers
+                 .into_iter()
+@@ -1646,7 +1647,7 @@ fn run_loop_ringed(
+                 Ok(())
+             })
+             .unwrap();
+-        (stepped, scope) = (Some(shared), Some(clock));
++        stepped = Some(shared);
+     } else {
+         threads = peers
+             .into_iter()

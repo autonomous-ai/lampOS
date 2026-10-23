@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"pid":1,"time_namespace":"time:[4026531834]","realtime":1792717846.58497,"boottime":1032690.13352608,"offsets":"monotonic           0         0\nboottime            0         0\n","uid":1000,"monotonic":1032690.13351846,"phase":"outer_before"}
+BOOT_CLOCK_RECEIPT {"phase":"namespace_before","offsets":"monotonic    -1032630         0\nboottime     -1032630         0\n","pid":3,"monotonic":60.150541623,"uid":1000,"realtime":1792717846.602,"time_namespace":"time:[4026532607]","boottime":60.150553147}
+BOOT_CLOCK_RECEIPT {"boottime":60.151301107,"time_namespace":"time:[4026532607]","realtime":1792717846.60274,"uid":1000,"monotonic":60.151292865,"offsets":"monotonic    -1032630         0\nboottime     -1032630         0\n","pid":4,"phase":"test_child_before_exec"}
+
+running 1 test
+test coordinator::tests::hand_controls::a_closed_switch_read_in_a_ridden_gap_is_the_mute ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.05s
+
+BOOT_CLOCK_RECEIPT {"boottime":60.205763885,"time_namespace":"time:[4026532607]","realtime":1792717846.65721,"uid":1000,"monotonic":60.2057569,"test_wait_status":0,"offsets":"monotonic    -1032630         0\nboottime     -1032630         0\n","pid":3,"phase":"namespace_after"}
+BOOT_CLOCK_RECEIPT {"monotonic":1032690.20682649,"phase":"outer_after","boottime":1032690.20683285,"time_namespace":"time:[4026531834]","realtime":1792717846.65828,"offsets":"monotonic           0         0\nboottime            0         0\n","uid":1000,"namespace_wait_status":0,"pid":1}

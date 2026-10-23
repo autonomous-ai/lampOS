@@ -1,0 +1,4 @@
+
+thread 'coordinator::tests::hand_controls::a_head_touch_stops_the_lamp_while_it_says_its_answer' (5) panicked at crates/voice/src/coordinator/tests/hand_controls.rs:1091:5:
+provider.c.p: stale, reordered or wrong-boot runtime message (sequence 1 after 0, sent 539550547 us before now, bound 1000000 us, same boot true)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

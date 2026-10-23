@@ -1,0 +1,11 @@
+BOOT_CLOCK_RECEIPT {"boottime":1032689.77498902,"monotonic":1032689.77497966,"pid":1,"uid":1000,"offsets":"monotonic           0         0\nboottime            0         0\n","time_namespace":"time:[4026531834]","realtime":1792717846.22643,"phase":"outer_before"}
+BOOT_CLOCK_RECEIPT {"realtime":1792717846.24416,"pid":3,"monotonic":60.792706779,"boottime":60.792714811,"phase":"namespace_before","uid":1000,"offsets":"monotonic    -1032629         0\nboottime     -1032629         0\n","time_namespace":"time:[4026532607]"}
+BOOT_CLOCK_RECEIPT {"pid":4,"monotonic":60.793520252,"boottime":60.793528214,"phase":"test_child_before_exec","realtime":1792717846.24497,"time_namespace":"time:[4026532607]","uid":1000,"offsets":"monotonic    -1032629         0\nboottime     -1032629         0\n"}
+
+running 1 test
+test coordinator::second::tests::a_ready_lost_in_the_same_drain_holds_the_next_request_for_the_reconnect ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.01s
+
+BOOT_CLOCK_RECEIPT {"realtime":1792717846.26122,"test_wait_status":0,"monotonic":60.809765138,"boottime":60.809771843,"phase":"namespace_after","pid":3,"offsets":"monotonic    -1032629         0\nboottime     -1032629         0\n","uid":1000,"time_namespace":"time:[4026532607]"}
+BOOT_CLOCK_RECEIPT {"realtime":1792717846.26223,"offsets":"monotonic           0         0\nboottime            0         0\n","time_namespace":"time:[4026531834]","phase":"outer_after","boottime":1032689.81078563,"monotonic":1032689.81077899,"uid":1000,"pid":1,"namespace_wait_status":0}

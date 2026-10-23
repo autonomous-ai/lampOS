@@ -1,5 +1,26 @@
 # Tests work log
 
+## 2026-10-23 08:22 +0700 — boot-clock regression isolated and corrected
+
+The first native Linux x86 run caught a candidate defect: base held-lines
+reproduced its overflow at 60.09 s; candidate `b5f2e39d2` passed 9 cases and
+failed the head-touch case, leaving 76 unrun. The same unchanged base binary
+then passed that head-touch case at 60.70 s. [Complete initial evidence and
+correction](verification/voice-boot-clock-20261023/) preserve all failures.
+The first synthetic fault was stamped before the scenario scope began.
+Corrected `da595851f` puts all initial messages and the camera observer inside
+the shared epoch, after real child readiness. All original assertions and
+bounds remain; formatting and diff checks pass. Fresh verification follows.
+
+#3165 has independent `READ-OK`, full Mac Surround 265/0 and its own native
+gates green; the merge owner takes the next current-base train. #3023 also
+has a clean source read, but its historical shared-process failures remain
+unwaived and the proposed frozen Mac pair awaits the requested decision.
+#3160's equal carry is being bound by its current reviewer. The #2839
+stand-in sign-in regression is in progress. Product-scope questions for
+#2848, #2862, Policy and #1386 remain unanswered; no product edit or lamp
+operation occurred.
+
 ## 2026-10-23 08:10 +0700 — sign-in regression claimed; product gaps audited
 
 Taken: [#2839](https://github.com/autonomous-ai/lampOS/issues/2839#issuecomment-6354934999),

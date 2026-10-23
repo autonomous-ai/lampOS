@@ -1,0 +1,14 @@
+uid=1000(1000) gid=1000(1000) groups=1000(1000)
+x86_64
+rustc 1.96.0 (ac68faa20 2026-05-25)
+binary: rustc
+commit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96
+commit-date: 2026-05-25
+host: x86_64-unknown-linux-gnu
+release: 1.96.0
+LLVM version: 22.1.2
+perl-clock-json-ready
+116636	/cargo
+0	/target
+Filesystem     1024-blocks     Used Available Capacity Mounted on
+/dev/vda4         41109908 24032760  17077148      59% /target
