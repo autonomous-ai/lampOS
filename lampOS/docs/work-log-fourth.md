@@ -7740,3 +7740,56 @@ and next work are on #2789 and #3126. Name and Photo still need merged Common
 before their current-main gates. First owns the Common configuration/lamp
 choice, Peek subscriber boundary and Photo removal-state decision. No lamp,
 service account, product default or quality score changed.
+
+## 2026-10-23 11:03 +07: Common checking P2 reproduced; Peek current Linux qualified
+
+Common's train-29 candidate on `e5cd73aca`, staged tree `3d3550424`,
+passed Mac formatting, strict workspace/all-target Clippy, workspace build,
+360 focused Voice tests (one ignored), and 311 Eyes tests (five ignored).
+All 6,655 source files and the index were verified unchanged. The earlier
+train-28 missing imports and settled-person test fixture failure remain in
+their receipts; only the imports and positive fixture were corrected, with
+all negative assertions retained. These checks precede the new return-path
+fix and do not qualify it. Core receipts are under
+`/private/tmp/fourth-common-train29-core-mac-checks-20261023/attempt1/`.
+
+El's subsequent P2 showed the real producer sequence is absent, checking,
+then recognized under a new track. The published `bf6b4e96a` treats checking
+as permanent loss. Four added Linux socket/source controls reproduced this
+on unchanged production code: zero passed, four failed, all expected runtime
+assertions, including the actual credited IPC pending piece being discarded.
+The test-only source and index stayed frozen; receipts are under
+`/private/tmp/fourth-common-checking-red-20261023/attempt1/`. The correction
+is in progress: only a prior typed grant in the same source epoch may wait,
+without private dispatch or spending credit, inside the original deadline.
+Different identity, revocation, stale source, privacy and forget remain
+terminal. Common stays held for exact-head rereads after the fix.
+
+First authorized the four missing 4ace unit settings; those are included in
+the unpublished candidate. The cadence argument is still unchanged, pending
+the required exact pinned Eyes CLI check. The local ARM64 emulation attempt
+timed out without output; it is not CLI evidence. First owns the compatible
+pins, install and new lamp acceptance. No lamp was accessed.
+
+Peek's actual train-29 candidate `1eb9d3c66` passed Linux x86 formatting,
+strict workspace/all-target Clippy, reader 10/0/1 ignored, rotation 1/0,
+census 6/0, Records 187/0/2 ignored, and the explicit dropped-UID access
+control 1/0. All 6,651 source files were unchanged. Synthetic startup
+preparation/grant took 1.567 ms first and 0.579 ms repeated, excluding real
+group lookup and hardware. Current receipts are under
+`/private/tmp/fourth-peek-train29-linux-checks-20261023/attempt1/`.
+
+The older full fourteen-package Mac run retained 7,230 passed, three failed
+and 33 ignored; Voice was 3,550/3/14. Two coordinator cleanup watchdog cases
+and one privacy-bus resync case failed. Each passed once on the same retained
+binary in isolation; that neither replaces the full-run failure nor proves
+a cause. A fresh Mac gate is running. Its first preflight caught an index
+change before Cargo; all 9,992 index entries, candidate tree and source
+hashes were then verified unchanged. A concurrent read command's index
+metadata refresh is likely, not proved. The guard and failed attempt are
+retained. ARM64 remains the PR gate.
+
+Queue and own PR comments were read through 11:00:39; responses and next
+steps are on #3064 and #3126. Name and Photo remain parked until Common
+merges. The user explicitly approved ready-for-review updates after the
+required checks; First and reviewers retain merge control.
