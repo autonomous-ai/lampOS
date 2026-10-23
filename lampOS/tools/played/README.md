@@ -247,6 +247,9 @@ after the answer's last sample, `d+S` S s after its first (cutting in),
 export LAMP_HOST=<your lamp's address>
 lampOS/tools/played/night.py --check            # the kit only: no lamp, nothing played
 lampOS/tools/played/night.py r1 weather desk1 moon
+# On a shared lamp (<lamp> = lamp-52e6, lamp-75c9), under its lease; night.py takes none itself:
+lampOS/tools/lamp-lock.sh <lamp> run <holder> <session> "night r1" -- \
+  lampOS/tools/played/night.py r1
 lampOS/tools/played/night_compare.py r1 r2      # two rounds side by side
 ```
 
@@ -264,8 +267,9 @@ lampOS/tools/played/night_compare.py r1 r2      # two rounds side by side
 - **Results:** `$PLAYED_OUT/night/ROUND.txt` (a summary line, then each line
   with what was said, heard and answered) and `ROUND.json`.
 - **When:** run it in an empty room. It plays nothing between 12:00 and
-  14:00 on weekdays (`LAMP_PLAY_AT_LUNCH=yes` overrides), and on a shared
-  lamp it runs under the lamp's lease, as the desk kit does.
+  14:00 on weekdays (`LAMP_PLAY_AT_LUNCH=yes` overrides). It takes no lamp
+  lock or lease: on a shared lamp, run it under `lamp-lock.sh <lamp> run`,
+  as above.
 
 ## What it needs
 
