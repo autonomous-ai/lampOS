@@ -1,0 +1,264 @@
+Retained raw stream: before-full-compile.stderr
+Source: /private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-full-compile.stderr
+Payload bytes: 3821
+Payload SHA256: 70f1705de117495907c60a87eb0a40d95b2e644dee02845da90e290aa4692273
+BEGIN RAW PAYLOAD
+   Compiling lamp-ipc v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ipc)
+   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-owner)
+   Compiling lamp-local-time v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/local-time)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/camera)
+   Compiling sonora v0.2.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/third_party/sonora)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/gemini)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/msgs)
+   Compiling lamp-audio v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/audio)
+   Compiling lamp-ring v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ring)
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-end-wire)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/near-call)
+   Compiling lamp-voice-processes v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice-processes)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/keeper)
+   Compiling lamp-lean v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/lean)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/schedule)
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/body)
+   Compiling lamp-health v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/health)
+   Compiling lamp-controls v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/controls)
+   Compiling lamp-actions v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/actions)
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice)
+   Compiling lamp-expression v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/expression)
+   Compiling lamp-ears v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ears)
+   Compiling lamp-tasks v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/tasks)
+   Compiling lamp-policy v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/policy)
+    Finished `test` profile [unoptimized] target(s) in 2m 09s
+END RAW PAYLOAD
+Retained raw stream: before-mod240-compile.stderr
+Source: /private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-mod240-compile.stderr
+Payload bytes: 3821
+Payload SHA256: 0a1d1fda79d84ca93e452fe903b0af73a1c73af3fd81208b460447b50a7e1b6f
+BEGIN RAW PAYLOAD
+   Compiling lamp-ipc v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ipc)
+   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-owner)
+   Compiling lamp-local-time v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/local-time)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/camera)
+   Compiling sonora v0.2.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/third_party/sonora)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/gemini)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/msgs)
+   Compiling lamp-audio v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/audio)
+   Compiling lamp-ring v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ring)
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-end-wire)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/near-call)
+   Compiling lamp-voice-processes v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice-processes)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/keeper)
+   Compiling lamp-lean v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/lean)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/schedule)
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/body)
+   Compiling lamp-tasks v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/tasks)
+   Compiling lamp-health v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/health)
+   Compiling lamp-actions v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/actions)
+   Compiling lamp-expression v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/expression)
+   Compiling lamp-ears v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ears)
+   Compiling lamp-policy v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/policy)
+   Compiling lamp-controls v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/controls)
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 1m 49s
+END RAW PAYLOAD
+Retained raw stream: after-mod240-compile.stderr
+Source: /private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/after-mod240-compile.stderr
+Payload bytes: 3821
+Payload SHA256: 698663b04a1499ae6c348e64cbe4d4be4c13786a2ec2c4c05ad044353323013e
+BEGIN RAW PAYLOAD
+   Compiling lamp-ipc v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ipc)
+   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-owner)
+   Compiling lamp-local-time v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/local-time)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/camera)
+   Compiling sonora v0.2.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/third_party/sonora)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/gemini)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/msgs)
+   Compiling lamp-audio v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/audio)
+   Compiling lamp-ring v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ring)
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-end-wire)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/near-call)
+   Compiling lamp-voice-processes v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice-processes)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/keeper)
+   Compiling lamp-lean v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/lean)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/schedule)
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/body)
+   Compiling lamp-controls v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/controls)
+   Compiling lamp-ears v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ears)
+   Compiling lamp-health v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/health)
+   Compiling lamp-expression v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/expression)
+   Compiling lamp-actions v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/actions)
+   Compiling lamp-policy v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/policy)
+   Compiling lamp-tasks v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/tasks)
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 1m 44s
+END RAW PAYLOAD
+Retained raw stream: before-near500ms-compile.stderr
+Source: /private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/before-near500ms-compile.stderr
+Payload bytes: 3821
+Payload SHA256: df750ecf21d73bcadfda51d056849202ff83737d0d09f54ae5babe4c1f42e52a
+BEGIN RAW PAYLOAD
+   Compiling lamp-ipc v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ipc)
+   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-owner)
+   Compiling lamp-local-time v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/local-time)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/camera)
+   Compiling sonora v0.2.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/third_party/sonora)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/gemini)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/msgs)
+   Compiling lamp-audio v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/audio)
+   Compiling lamp-ring v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ring)
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-end-wire)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/near-call)
+   Compiling lamp-voice-processes v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice-processes)
+   Compiling lamp-lean v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/lean)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/keeper)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/schedule)
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/body)
+   Compiling lamp-health v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/health)
+   Compiling lamp-ears v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ears)
+   Compiling lamp-tasks v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/tasks)
+   Compiling lamp-actions v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/actions)
+   Compiling lamp-expression v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/expression)
+   Compiling lamp-policy v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/policy)
+   Compiling lamp-controls v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/controls)
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 2m 05s
+END RAW PAYLOAD
+Retained raw stream: after-near500ms-compile.stderr
+Source: /private/tmp/tests-codex-boot-clock-mac-continuation-20261023/run-20261023T021033.713247Z/after-near500ms-compile.stderr
+Payload bytes: 3821
+Payload SHA256: 451127f9906b80a18e4643ce036c4cfe67639742cfe3b7a243fd8589008a0216
+BEGIN RAW PAYLOAD
+   Compiling lamp-ipc v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ipc)
+   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-owner)
+   Compiling lamp-local-time v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/local-time)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/camera)
+   Compiling sonora v0.2.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/third_party/sonora)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/msgs)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/gemini)
+   Compiling lamp-audio v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/audio)
+   Compiling lamp-ring v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ring)
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-end-wire)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/near-call)
+   Compiling lamp-voice-processes v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice-processes)
+   Compiling lamp-lean v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/lean)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/keeper)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/schedule)
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/body)
+   Compiling lamp-controls v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/controls)
+   Compiling lamp-ears v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ears)
+   Compiling lamp-policy v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/policy)
+   Compiling lamp-expression v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/expression)
+   Compiling lamp-actions v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/actions)
+   Compiling lamp-tasks v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/tasks)
+   Compiling lamp-health v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/health)
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 1m 43s
+END RAW PAYLOAD
+Retained raw stream: stale-accepted-compile.stderr
+Source: /private/tmp/tests-codex-boot-clock-mac-continuation-20261023/run-20261023T021033.713247Z/stale-accepted-compile.stderr
+Payload bytes: 3821
+Payload SHA256: 8e486577b7e6e727f926cb7aabd7c194a969e48f989a0893c8170891b9fc9f43
+BEGIN RAW PAYLOAD
+   Compiling lamp-ipc v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ipc)
+   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-owner)
+   Compiling lamp-local-time v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/local-time)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/camera)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/msgs)
+   Compiling sonora v0.2.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/third_party/sonora)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/gemini)
+   Compiling lamp-audio v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/audio)
+   Compiling lamp-ring v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ring)
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-end-wire)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/near-call)
+   Compiling lamp-voice-processes v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice-processes)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/keeper)
+   Compiling lamp-lean v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/lean)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/schedule)
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/body)
+   Compiling lamp-controls v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/controls)
+   Compiling lamp-health v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/health)
+   Compiling lamp-actions v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/actions)
+   Compiling lamp-expression v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/expression)
+   Compiling lamp-policy v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/policy)
+   Compiling lamp-tasks v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/tasks)
+   Compiling lamp-ears v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ears)
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 1m 54s
+END RAW PAYLOAD
+Retained raw stream: after-full-compile.stderr
+Source: /private/tmp/tests-codex-boot-clock-mac-continuation-20261023/run-20261023T021033.713247Z/after-full-compile.stderr
+Payload bytes: 3821
+Payload SHA256: 248ba82aac44742ec3be076cb17c9e67df2641910c354a1d9bf97bc1d07584f8
+BEGIN RAW PAYLOAD
+   Compiling lamp-ipc v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ipc)
+   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-owner)
+   Compiling lamp-local-time v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/local-time)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/camera)
+   Compiling sonora v0.2.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/third_party/sonora)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/gemini)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/msgs)
+   Compiling lamp-audio v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/audio)
+   Compiling lamp-ring v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ring)
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-end-wire)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/near-call)
+   Compiling lamp-voice-processes v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice-processes)
+   Compiling lamp-lean v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/lean)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/keeper)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/schedule)
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/body)
+   Compiling lamp-health v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/health)
+   Compiling lamp-controls v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/controls)
+   Compiling lamp-actions v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/actions)
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice)
+   Compiling lamp-expression v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/expression)
+   Compiling lamp-ears v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ears)
+   Compiling lamp-policy v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/policy)
+   Compiling lamp-tasks v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/tasks)
+    Finished `test` profile [unoptimized] target(s) in 1m 51s
+END RAW PAYLOAD
+Retained raw stream: readers-full-compile.stderr
+Source: /private/tmp/tests-codex-boot-clock-mac-continuation-20261023/run-20261023T021033.713247Z/readers-full-compile.stderr
+Payload bytes: 5055
+Payload SHA256: 7b38abd21cc2ebade4b811bf4d07c45a68f4a979674a7452b6a2c88e725d19ee
+BEGIN RAW PAYLOAD
+   Compiling lamp-ipc v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ipc)
+   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/bus)
+   Compiling lamp-local-time v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/local-time)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-owner)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/camera)
+   Compiling sonora v0.2.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/third_party/sonora)
+   Compiling lamp-ring v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/ring)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/msgs)
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-end-wire)
+   Compiling lamp-audio v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/audio)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/gemini)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/near-call)
+   Compiling lamp-voice-processes v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice-processes)
+   Compiling lamp-observer v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/observer)
+   Compiling lamp-sound-fixtures v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/sound-fixtures)
+   Compiling lamp-lean v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/lean)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/keeper)
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/body)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/schedule)
+   Compiling lamp-health v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/health)
+   Compiling lamp-controls v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/controls)
+   Compiling lamp-update v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/update)
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice)
+   Compiling lamp-expression v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/expression)
+   Compiling lamp-memory v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/memory)
+   Compiling lamp-actions v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/actions)
+   Compiling lamp-policy v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/policy)
+   Compiling lamp-turn-end v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/turn-end)
+   Compiling lamp-same-voice v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/same-voice)
+   Compiling lamp-setup v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/setup)
+   Compiling lamp-skills v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/skills)
+   Compiling lamp-voice-eval v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice-eval)
+   Compiling lamp-cloud v0.1.0 (/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/cloud)
+    Finished `test` profile [unoptimized] target(s) in 1m 38s
+END RAW PAYLOAD

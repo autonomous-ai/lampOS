@@ -1,0 +1,496 @@
+{
+  "before": [
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "src_path": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "features": [],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+      "bytes": 1119920,
+      "sha256": "f31afe82eaf4b223947eea7540bdbaf757b3c889f7ccccc1a91b7044a8360d78",
+      "source": {
+        "files": 6523,
+        "bytes": 203358103,
+        "sha256": "aa6e6059f97bd704e9288893db4fc57af00d2d735dee95143466ede24f18ffcc",
+        "selected": {
+          "lampOS/Cargo.lock": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c",
+          "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+          "lampOS/crates/ipc/src/lib.rs": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+          "lampOS/crates/voice/Cargo.toml": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+          "lampOS/crates/voice/src/coordinator/second.rs": "428701e0e25869675634954b80356b9dfb18e4268f14a82683a7a4e1e4c1c984",
+          "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "805d7f55a0351c097d43e1f7c8f03c09bb7f1c116176545783be00a28f963128",
+          "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "47075418dac7fc54591976ca2557e3be698590b94e8cdbd49a8f4f5c379da0c8",
+          "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "2fb8205fb7ebd46161f13f7403e4de713675b4c64c0438f34c4f01e2b6dfae26",
+          "lampOS/crates/voice/src/scenario_clock.rs": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80",
+          "lampOS/crates/voice/src/second_provider/worker.rs": "e049e0d33f89545f4aeafe75f7ea29c9610cf81e9f4bbe917a120672c5efa2b5",
+          "lampOS/crates/voice/src/stop_words.rs": "64a87b6ed17e45db6eb2b0e0ef7d3458dc8055c9945299902a761a22edebed4f",
+          "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+        }
+      },
+      "inventory_count": 1,
+      "inventory_sha256": "30de1c62b6aba6c454737f876f62414f733dd4a9e30f4e4e6e35613a0214bd8b"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "stop_words_stt_replay",
+        "src_path": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "features": [],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "path": "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+      "bytes": 2711824,
+      "sha256": "4ba8993cfe5aa083ab96999584da75d07b6bdaf1313c7e4e96e10a13282888ef",
+      "source": {
+        "files": 6523,
+        "bytes": 203358103,
+        "sha256": "aa6e6059f97bd704e9288893db4fc57af00d2d735dee95143466ede24f18ffcc",
+        "selected": {
+          "lampOS/Cargo.lock": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c",
+          "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+          "lampOS/crates/ipc/src/lib.rs": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+          "lampOS/crates/voice/Cargo.toml": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+          "lampOS/crates/voice/src/coordinator/second.rs": "428701e0e25869675634954b80356b9dfb18e4268f14a82683a7a4e1e4c1c984",
+          "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "805d7f55a0351c097d43e1f7c8f03c09bb7f1c116176545783be00a28f963128",
+          "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "47075418dac7fc54591976ca2557e3be698590b94e8cdbd49a8f4f5c379da0c8",
+          "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "2fb8205fb7ebd46161f13f7403e4de713675b4c64c0438f34c4f01e2b6dfae26",
+          "lampOS/crates/voice/src/scenario_clock.rs": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80",
+          "lampOS/crates/voice/src/second_provider/worker.rs": "e049e0d33f89545f4aeafe75f7ea29c9610cf81e9f4bbe917a120672c5efa2b5",
+          "lampOS/crates/voice/src/stop_words.rs": "64a87b6ed17e45db6eb2b0e0ef7d3458dc8055c9945299902a761a22edebed4f",
+          "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+        }
+      },
+      "inventory_count": 6,
+      "inventory_sha256": "a3812b72abbde6dffb4029306caf8b920a6b5f3e1a077fb6278a9893c37af2e0"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "render_line_second",
+        "src_path": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice/examples/render_line_second.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "features": [],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "path": "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f",
+      "bytes": 1435656,
+      "sha256": "17d993eebdf9c3ce4221d8a44a6a281c27475a27b695a0717a1bc83815ca9968",
+      "source": {
+        "files": 6523,
+        "bytes": 203358103,
+        "sha256": "aa6e6059f97bd704e9288893db4fc57af00d2d735dee95143466ede24f18ffcc",
+        "selected": {
+          "lampOS/Cargo.lock": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c",
+          "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+          "lampOS/crates/ipc/src/lib.rs": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+          "lampOS/crates/voice/Cargo.toml": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+          "lampOS/crates/voice/src/coordinator/second.rs": "428701e0e25869675634954b80356b9dfb18e4268f14a82683a7a4e1e4c1c984",
+          "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "805d7f55a0351c097d43e1f7c8f03c09bb7f1c116176545783be00a28f963128",
+          "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "47075418dac7fc54591976ca2557e3be698590b94e8cdbd49a8f4f5c379da0c8",
+          "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "2fb8205fb7ebd46161f13f7403e4de713675b4c64c0438f34c4f01e2b6dfae26",
+          "lampOS/crates/voice/src/scenario_clock.rs": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80",
+          "lampOS/crates/voice/src/second_provider/worker.rs": "e049e0d33f89545f4aeafe75f7ea29c9610cf81e9f4bbe917a120672c5efa2b5",
+          "lampOS/crates/voice/src/stop_words.rs": "64a87b6ed17e45db6eb2b0e0ef7d3458dc8055c9945299902a761a22edebed4f",
+          "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+        }
+      },
+      "inventory_count": 4,
+      "inventory_sha256": "dcf0dcca2636523fca4933ffd065115fbd084937b1146e8cd36c53bddb06e282"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "features": [],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+      "bytes": 94038356,
+      "sha256": "065f4feac057e673dba63ae1a93a556f7177213e35a65faf18b72fafe49ec9bb",
+      "source": {
+        "files": 6523,
+        "bytes": 203358103,
+        "sha256": "aa6e6059f97bd704e9288893db4fc57af00d2d735dee95143466ede24f18ffcc",
+        "selected": {
+          "lampOS/Cargo.lock": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c",
+          "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+          "lampOS/crates/ipc/src/lib.rs": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+          "lampOS/crates/voice/Cargo.toml": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+          "lampOS/crates/voice/src/coordinator/second.rs": "428701e0e25869675634954b80356b9dfb18e4268f14a82683a7a4e1e4c1c984",
+          "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "805d7f55a0351c097d43e1f7c8f03c09bb7f1c116176545783be00a28f963128",
+          "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "47075418dac7fc54591976ca2557e3be698590b94e8cdbd49a8f4f5c379da0c8",
+          "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "2fb8205fb7ebd46161f13f7403e4de713675b4c64c0438f34c4f01e2b6dfae26",
+          "lampOS/crates/voice/src/scenario_clock.rs": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80",
+          "lampOS/crates/voice/src/second_provider/worker.rs": "e049e0d33f89545f4aeafe75f7ea29c9610cf81e9f4bbe917a120672c5efa2b5",
+          "lampOS/crates/voice/src/stop_words.rs": "64a87b6ed17e45db6eb2b0e0ef7d3458dc8055c9945299902a761a22edebed4f",
+          "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+        }
+      },
+      "inventory_count": 270,
+      "inventory_sha256": "b62a00ee9797b37598a3612f9911ee7516b63c3a3ffe0efd0b72425ee0105a48"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "features": [],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "bytes": 111198512,
+      "sha256": "66a16235dcefe4d24e001bc563ccebe631b7a4a8c3dff06370f994ceb553f1ad",
+      "source": {
+        "files": 6523,
+        "bytes": 203358103,
+        "sha256": "aa6e6059f97bd704e9288893db4fc57af00d2d735dee95143466ede24f18ffcc",
+        "selected": {
+          "lampOS/Cargo.lock": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c",
+          "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+          "lampOS/crates/ipc/src/lib.rs": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+          "lampOS/crates/voice/Cargo.toml": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+          "lampOS/crates/voice/src/coordinator/second.rs": "428701e0e25869675634954b80356b9dfb18e4268f14a82683a7a4e1e4c1c984",
+          "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "805d7f55a0351c097d43e1f7c8f03c09bb7f1c116176545783be00a28f963128",
+          "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "47075418dac7fc54591976ca2557e3be698590b94e8cdbd49a8f4f5c379da0c8",
+          "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "2fb8205fb7ebd46161f13f7403e4de713675b4c64c0438f34c4f01e2b6dfae26",
+          "lampOS/crates/voice/src/scenario_clock.rs": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80",
+          "lampOS/crates/voice/src/second_provider/worker.rs": "e049e0d33f89545f4aeafe75f7ea29c9610cf81e9f4bbe917a120672c5efa2b5",
+          "lampOS/crates/voice/src/stop_words.rs": "64a87b6ed17e45db6eb2b0e0ef7d3458dc8055c9945299902a761a22edebed4f",
+          "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+        }
+      },
+      "inventory_count": 3562,
+      "inventory_sha256": "7721cb237a7c4e63d07fb31e09acae57302faa0748576d37d32e12a77c54d733"
+    }
+  ],
+  "after": [
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "render_line_second",
+        "src_path": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice/examples/render_line_second.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "features": [],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "path": "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f",
+      "bytes": 1435656,
+      "sha256": "17d993eebdf9c3ce4221d8a44a6a281c27475a27b695a0717a1bc83815ca9968",
+      "source": {
+        "files": 6523,
+        "bytes": 203361607,
+        "sha256": "47551982f2a0f34789d2c0284e2df5c1bf9223221a28cb2bbbe0f210254e0388",
+        "selected": {
+          "lampOS/Cargo.lock": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c",
+          "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+          "lampOS/crates/ipc/src/lib.rs": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+          "lampOS/crates/voice/Cargo.toml": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+          "lampOS/crates/voice/src/coordinator/second.rs": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+          "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+          "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+          "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "65af6a4a052ef808e094284373f4c155bf4f09250a09c2c090b9b225c77cda6e",
+          "lampOS/crates/voice/src/scenario_clock.rs": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+          "lampOS/crates/voice/src/second_provider/worker.rs": "983d30959d6322c97be81be053f00596796d15e52eb8eb8d35ffaad8d276b9c7",
+          "lampOS/crates/voice/src/stop_words.rs": "5524521c56061be6af4b8ee95d52ecc3b9b1d3c3ee4a2344db4fa75dbf4f9a0f",
+          "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+        }
+      },
+      "inventory_count": 4,
+      "inventory_sha256": "dcf0dcca2636523fca4933ffd065115fbd084937b1146e8cd36c53bddb06e282"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "src_path": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "features": [],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+      "bytes": 1119920,
+      "sha256": "f31afe82eaf4b223947eea7540bdbaf757b3c889f7ccccc1a91b7044a8360d78",
+      "source": {
+        "files": 6523,
+        "bytes": 203361607,
+        "sha256": "47551982f2a0f34789d2c0284e2df5c1bf9223221a28cb2bbbe0f210254e0388",
+        "selected": {
+          "lampOS/Cargo.lock": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c",
+          "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+          "lampOS/crates/ipc/src/lib.rs": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+          "lampOS/crates/voice/Cargo.toml": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+          "lampOS/crates/voice/src/coordinator/second.rs": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+          "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+          "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+          "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "65af6a4a052ef808e094284373f4c155bf4f09250a09c2c090b9b225c77cda6e",
+          "lampOS/crates/voice/src/scenario_clock.rs": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+          "lampOS/crates/voice/src/second_provider/worker.rs": "983d30959d6322c97be81be053f00596796d15e52eb8eb8d35ffaad8d276b9c7",
+          "lampOS/crates/voice/src/stop_words.rs": "5524521c56061be6af4b8ee95d52ecc3b9b1d3c3ee4a2344db4fa75dbf4f9a0f",
+          "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+        }
+      },
+      "inventory_count": 1,
+      "inventory_sha256": "30de1c62b6aba6c454737f876f62414f733dd4a9e30f4e4e6e35613a0214bd8b"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "stop_words_stt_replay",
+        "src_path": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "features": [],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "path": "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+      "bytes": 2711824,
+      "sha256": "7dc5f84eda8a6700689c98ee5ae19d8ee283282ab7c03b43b101d1af1a89a695",
+      "source": {
+        "files": 6523,
+        "bytes": 203361607,
+        "sha256": "47551982f2a0f34789d2c0284e2df5c1bf9223221a28cb2bbbe0f210254e0388",
+        "selected": {
+          "lampOS/Cargo.lock": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c",
+          "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+          "lampOS/crates/ipc/src/lib.rs": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+          "lampOS/crates/voice/Cargo.toml": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+          "lampOS/crates/voice/src/coordinator/second.rs": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+          "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+          "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+          "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "65af6a4a052ef808e094284373f4c155bf4f09250a09c2c090b9b225c77cda6e",
+          "lampOS/crates/voice/src/scenario_clock.rs": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+          "lampOS/crates/voice/src/second_provider/worker.rs": "983d30959d6322c97be81be053f00596796d15e52eb8eb8d35ffaad8d276b9c7",
+          "lampOS/crates/voice/src/stop_words.rs": "5524521c56061be6af4b8ee95d52ecc3b9b1d3c3ee4a2344db4fa75dbf4f9a0f",
+          "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+        }
+      },
+      "inventory_count": 6,
+      "inventory_sha256": "a3812b72abbde6dffb4029306caf8b920a6b5f3e1a077fb6278a9893c37af2e0"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "features": [],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+      "bytes": 94038356,
+      "sha256": "065f4feac057e673dba63ae1a93a556f7177213e35a65faf18b72fafe49ec9bb",
+      "source": {
+        "files": 6523,
+        "bytes": 203361607,
+        "sha256": "47551982f2a0f34789d2c0284e2df5c1bf9223221a28cb2bbbe0f210254e0388",
+        "selected": {
+          "lampOS/Cargo.lock": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c",
+          "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+          "lampOS/crates/ipc/src/lib.rs": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+          "lampOS/crates/voice/Cargo.toml": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+          "lampOS/crates/voice/src/coordinator/second.rs": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+          "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+          "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+          "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "65af6a4a052ef808e094284373f4c155bf4f09250a09c2c090b9b225c77cda6e",
+          "lampOS/crates/voice/src/scenario_clock.rs": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+          "lampOS/crates/voice/src/second_provider/worker.rs": "983d30959d6322c97be81be053f00596796d15e52eb8eb8d35ffaad8d276b9c7",
+          "lampOS/crates/voice/src/stop_words.rs": "5524521c56061be6af4b8ee95d52ecc3b9b1d3c3ee4a2344db4fa75dbf4f9a0f",
+          "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+        }
+      },
+      "inventory_count": 270,
+      "inventory_sha256": "b62a00ee9797b37598a3612f9911ee7516b63c3a3ffe0efd0b72425ee0105a48"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "features": [],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "bytes": 111236920,
+      "sha256": "408ab8b6336344948d8dd64c2bc1946c0c030b7b7aded9dec4cde9500c1228fb",
+      "source": {
+        "files": 6523,
+        "bytes": 203361607,
+        "sha256": "47551982f2a0f34789d2c0284e2df5c1bf9223221a28cb2bbbe0f210254e0388",
+        "selected": {
+          "lampOS/Cargo.lock": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c",
+          "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+          "lampOS/crates/ipc/src/lib.rs": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+          "lampOS/crates/voice/Cargo.toml": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+          "lampOS/crates/voice/src/coordinator/second.rs": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+          "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+          "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+          "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": "65af6a4a052ef808e094284373f4c155bf4f09250a09c2c090b9b225c77cda6e",
+          "lampOS/crates/voice/src/scenario_clock.rs": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+          "lampOS/crates/voice/src/second_provider/worker.rs": "983d30959d6322c97be81be053f00596796d15e52eb8eb8d35ffaad8d276b9c7",
+          "lampOS/crates/voice/src/stop_words.rs": "5524521c56061be6af4b8ee95d52ecc3b9b1d3c3ee4a2344db4fa75dbf4f9a0f",
+          "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+        }
+      },
+      "inventory_count": 3562,
+      "inventory_sha256": "7721cb237a7c4e63d07fb31e09acae57302faa0748576d37d32e12a77c54d733"
+    }
+  ]
+}

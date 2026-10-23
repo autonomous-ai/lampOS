@@ -1,0 +1,2145 @@
+Retained raw stream: readers-full-tests.stdout
+Source: /private/tmp/tests-codex-boot-clock-mac-continuation-20261023/run-20261023T021033.713247Z/readers-full-tests.stdout
+Payload bytes: 112354
+Payload SHA256: fe5613fbd8f3a164b019d4a00b3166874efb37bb40fc5a8cdaa781c86ad05878
+BEGIN RAW PAYLOAD
+
+running 168 tests
+test account::tests::a_kept_account_is_complete_and_its_secret_is_never_printed ... ok
+test account::tests::a_ping_reply_rotates_only_what_it_changes ... ok
+test account::tests::a_rotated_account_from_a_later_build_still_reads ... ok
+test account::tests::a_rotated_account_is_kept_for_this_user_alone ... ok
+test account::tests::each_kept_rotated_login_reads_as_it_was_kept ... ok
+test account::tests::write_a_rotated_fixture ... ignored, writes a fixture
+test answer::tests::a_volume_out_of_range_is_refused_before_anything_is_asked ... ok
+test answer::tests::reports_are_read_and_set_from_the_app_only_with_their_switch ... ok
+test answer::tests::system_info_says_each_switchs_kinds_only_while_it_is_on ... ok
+test answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts ... ok
+test answer::tests::the_light_row_reads_sets_and_previews_the_persons_light ... ok
+test answer::tests::the_skills_are_listed_for_the_app_only_with_their_switch ... ok
+test answer::tests::unmuting_from_the_app_and_what_this_lamp_lacks_are_refused_plainly ... ok
+test beat::tests::the_ping_says_the_lamp_and_takes_a_new_broker_from_its_reply ... ok
+test chat::tests::a_chat_send_is_its_message_and_v1s_session_and_speak ... ok
+test chat::tests::a_fault_and_task_news_go_as_v1s_events_and_news_has_no_run ... ok
+test chat::tests::a_run_nothing_answers_ends_as_a_fault_after_a_minute ... ok
+test chat::tests::a_summary_is_the_first_two_hundred_characters ... ok
+test chat::tests::each_run_has_its_own_name ... ok
+test chat::tests::words_are_gathered_for_a_quarter_second_and_the_whole_reply_ends_the_run ... ok
+test faces::tests::a_remove_entirely_after_the_face_is_gone_still_forgets_the_memory ... ok
+test faces::tests::a_remove_entirely_forgets_the_person_in_memory_too ... ok
+test faces::tests::a_remove_names_one_and_says_how_the_forget_went ... ok
+test faces::tests::a_remove_never_takes_the_memory_of_someone_renamed_from_the_name ... ok
+test faces::tests::a_remove_of_the_face_only_never_asks_memory ... ok
+test faces::tests::a_remove_takes_the_person_off_the_eyes_and_memory ... ok
+test faces::tests::a_remove_with_the_eyes_on_and_the_voice_off_leaves_nothing_half_removed ... ok
+test faces::tests::entirely_is_true_unless_said_false_and_a_flag_only ... ok
+test faces::tests::it_is_off_unless_switched_on_with_the_eyes_socket ... ok
+test faces::tests::memory_is_asked_for_the_persons_own_id_and_their_rules ... ok
+test faces::tests::memory_is_said_forgotten_only_when_every_forget_was_done ... ok
+test faces::tests::the_eyes_are_asked_over_their_socket ... ok
+test faces::tests::the_list_is_names_and_whether_each_waits_for_a_yes ... ok
+test guard::tests::guard_from_the_app_is_handed_to_lamp_skills_call_socket ... ok
+test lamp::tests::a_child_still_there_after_the_kill_is_handed_back_not_waited_for ... ok
+test lamp::tests::a_killed_iw_that_will_not_die_is_never_waited_for ... ok
+test lamp::tests::recovery_is_read_from_setups_file ... ok
+test lamp::tests::the_build_and_the_default_route_are_read_as_written ... ok
+test lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back ... ok
+test lamp::tests::the_reset_is_read_from_the_controls_pins ... ok
+test lamp::tests::the_volume_is_asked_of_lamp_actions_and_the_host_read_from_proc ... ok
+test lamp::tests::the_wifis_name_is_asked_within_a_bound_and_kept_a_minute ... ok
+test light::tests::a_choice_is_checked_as_v1_checks_it_and_off_keeps_the_colour ... ok
+test light::tests::a_colour_is_the_nearest_tint_at_the_level_its_brightest_channel_reaches ... ok
+test light::tests::each_of_the_fifty_lights_comes_back_from_its_own_colour ... ok
+test light::tests::the_snapshot_is_v1s_shape_with_the_light_by_its_own_names ... ok
+test make_skill::tests::a_make_is_handed_to_the_voice_and_its_answer_told ... ok
+test make_skill::tests::made_is_told_with_may_use_as_the_skills_page_says_it ... ok
+test make_skill::tests::the_played_command_tells_the_same_answers_in_plain_words ... ok
+test make_skill::tests::the_switch_and_the_socket_are_lamp_voices ... ok
+test online::tests::a_change_is_acked_starting_and_its_result_follows_on_the_channel ... ok
+test online::tests::a_command_with_the_largest_photo_is_read_and_answered ... ok
+test online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will ... ok
+test online::tests::a_dropped_connection_is_made_again_and_subscribed_again ... ok
+test online::tests::a_named_text_behind_an_unacknowledged_publish_goes_unnamed ... ok
+test online::tests::a_preview_done_is_not_answered_and_one_that_fails_is ... ok
+test online::tests::a_refused_login_backs_off_and_is_said_once ... ok
+test online::tests::a_result_lost_before_its_ack_is_handed_back ... ok
+test online::tests::a_skills_line_goes_up_as_task_news_with_no_run_and_the_journal_has_no_text ... ok
+test online::tests::a_skills_line_lost_with_the_connection_goes_again_unchanged ... ok
+test online::tests::a_slow_connack_is_waited_for_while_texts_are_taken ... ok
+test online::tests::a_text_is_acked_with_its_run_and_its_answer_goes_out_as_chat_events ... ok
+test online::tests::a_wifi_result_ready_while_offline_is_said_once_back_online ... ok
+test online::tests::an_own_key_is_acked_at_once_and_is_in_no_reply ... ok
+test online::tests::only_a_command_on_the_lamps_own_account_channel_is_done_and_answered ... ok
+test online::tests::only_the_lamps_own_account_channel_commands_it ... ok
+test online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset ... ok
+test online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack ... ok
+test online::tests::reports_go_below_the_channel_and_leave_the_queue_on_the_ack ... ok
+test online::tests::the_lamp_comes_online_as_v1_and_answers_on_its_channel ... ok
+test online::tests::the_time_is_rfc3339_in_utc ... ok
+test online::tests::with_its_switch_the_broker_is_left_a_will_that_says_offline ... ok
+test online::tests::with_its_switch_the_broker_is_reached_over_tls ... ok
+test online::tests::without_the_switch_no_skills_line_goes_up ... ok
+test photos::tests::it_is_off_unless_switched_on_with_both_places ... ok
+test photos::tests::the_apps_photo_is_a_name_and_a_jpeg_checked ... ok
+test photos::tests::the_eyes_reasons_are_said_plainly ... ok
+test photos::tests::the_photo_goes_to_the_eyes_and_is_never_kept ... ok
+test ping::tests::the_payload_is_v1s_and_a_reply_may_move_the_broker_or_the_id ... ok
+test ping::tests::the_ping_goes_above_the_v1_base_and_asks_for_a_broker_while_none_is_kept ... ok
+test ping::tests::the_wait_doubles_to_a_minute_and_starts_again_once_connected ... ok
+test reports::tests::a_choice_is_kept_with_who_made_it_whether_held_and_when ... ok
+test reports::tests::a_choice_it_cant_read_is_off_kept_whole_and_said ... ok
+test reports::tests::a_crash_report_is_systemds_numbers_by_the_lists ... ok
+test reports::tests::a_health_report_carries_numbers_enums_and_listed_names_only ... ok
+test reports::tests::a_local_template_exit_note_cannot_grant_consent_to_send ... ok
+test reports::tests::a_newer_builds_choice_reads_off_and_is_kept ... ok
+test reports::tests::a_no_deletes_what_waits_and_nothing_but_stopped_goes_after ... ok
+test reports::tests::a_no_given_offline_goes_when_connected_and_once_more_on_the_next ... ok
+test reports::tests::a_no_given_while_a_newer_yes_reads_off_is_kept_and_does_all_a_no_does ... ok
+test reports::tests::a_no_on_the_bus_reaches_lamp_cloud ... ok
+test reports::tests::a_report_over_four_kib_is_cut_or_counted ... ok
+test reports::tests::a_report_sent_again_is_the_same_message_with_infos_id ... ok
+test reports::tests::an_error_held_a_minute_sends_at_once_and_once_an_hour ... ok
+test reports::tests::an_exit_note_it_cant_read_is_skipped_once_and_left_whole ... ok
+test reports::tests::each_kept_reports_record_reads_as_it_was_kept ... ok
+test reports::tests::exit_notes_are_systemds_variables_and_success_writes_nothing ... ok
+test reports::tests::failed_units_are_current_allowlisted_and_unambiguous ... ok
+test reports::tests::failed_units_share_the_gated_restart_query_and_cached_recovery ... ok
+test reports::tests::handed_reports_go_on_the_ack_and_again_after_a_drop_with_the_same_seq ... ok
+test reports::tests::no_secret_planted_in_any_input_reaches_any_report ... ok
+test reports::tests::no_value_from_a_file_reaches_the_journal ... ok
+test reports::tests::nothing_goes_without_each_of_the_three_gates ... ok
+test reports::tests::only_nonempty_instances_of_listed_templates_are_exit_notes ... ok
+test reports::tests::only_the_newest_health_waits ... ok
+test reports::tests::queued_reports_read_one_release_forward ... ok
+test reports::tests::template_exit_notes_keep_only_the_fixed_name_in_files_and_reports ... ok
+test reports::tests::the_bus_can_only_turn_reports_off ... ok
+test reports::tests::the_exit_note_drop_in_runs_this_binary_for_the_unit_stopped ... ok
+test reports::tests::the_lists_are_the_products ... ok
+test reports::tests::the_queue_keeps_its_bounds_and_the_rate_its_limits ... ok
+test reports::tests::the_queues_state_reads_forward_and_is_set_aside_when_it_cant ... ok
+test reports::tests::the_voices_no_on_the_bus_sends_stopped_and_ends_the_health ... ok
+test reports::tests::times_read_back_as_written ... ok
+test reports::tests::write_a_reports_fixture ... ignored, writes a reports fixture: run by hand with LAMP_CLOUD_REPORTS_FIXTURE set
+test settings::tests::a_broker_on_an_address_with_colons_is_bracketed ... ok
+test settings::tests::a_change_is_acked_at_once_and_its_result_follows ... ok
+test settings::tests::a_confirm_with_a_request_id_is_taken_for_a_change_without_one ... ok
+test settings::tests::a_failure_with_no_join_is_said_on_the_link_there_is ... ok
+test settings::tests::a_refusal_a_helper_not_running_and_one_that_never_answers_are_failures ... ok
+test settings::tests::a_wifi_change_is_one_at_a_time_and_its_result_carries_the_request_id ... ok
+test settings::tests::each_kind_becomes_one_line_for_the_helper ... ok
+test settings::tests::every_keys_request_gets_a_coded_result_with_its_id ... ok
+test settings::tests::followup_2_lamp_clouds_online_deadline_ends_before_the_helpers ... ok
+test settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks ... ok
+test settings::tests::followup_3_a_joined_never_acked_is_dropped_once_its_wait_ended ... ok
+test settings::tests::followup_5_a_confirm_for_another_request_id_is_refused ... ok
+test settings::tests::off_each_kind_is_refused_as_one_this_lamp_lacks ... ok
+test settings::tests::off_the_wifi_is_refused_as_a_kind_this_lamp_lacks ... ok
+test settings::tests::own_keys_need_their_switch_and_their_lines_hold_only_what_the_helper_reads ... ok
+test settings::tests::p3_a_confirm_1_s_after_the_helpers_deadline_is_failure_only ... ok
+test settings::tests::p3_a_confirm_1_s_before_the_helpers_deadline_is_success_only ... ok
+test settings::tests::the_lamps_name_in_the_app_is_read_from_the_helpers_file ... ok
+test settings::tests::the_switch_needs_both_words ... ok
+test settings::tests::the_wifi_line_carries_the_broker_and_no_error_holds_a_value ... ok
+test settings::tests::the_wifi_needs_its_own_switch_beside_the_names ... ok
+test skills::tests::a_core_skill_can_never_be_removed_and_an_installed_one_can ... ok
+test skills::tests::a_core_skill_is_never_removed ... ok
+test skills::tests::a_folder_that_cannot_be_changed_leaves_the_skill_whole ... ok
+test skills::tests::a_link_named_as_a_skill_is_left_as_it_is ... ok
+test skills::tests::a_remove_held_past_the_helpers_wait_is_refused_and_never_done_later ... ok
+test skills::tests::a_request_that_is_not_an_entry_is_refused_here_and_the_store_can_be_off ... ok
+test skills::tests::a_signed_package_from_the_store_is_installed_by_the_helper_and_listed ... ok
+test skills::tests::a_skill_is_turned_off_and_on_and_one_of_the_lamp_itself_is_refused ... ok
+test skills::tests::a_skill_made_here_is_removed_and_the_page_is_given_as_it_now_is ... ok
+test skills::tests::a_skill_made_on_this_lamp_has_its_own_group_and_can_be_removed ... ok
+test skills::tests::a_skill_that_does_not_load_is_listed_with_why_and_what_it_says_of_itself ... ok
+test skills::tests::a_skills_folder_that_cannot_be_read_is_said_plainly ... ok
+test skills::tests::an_add_on_is_said_off_while_add_ons_are_off_on_this_lamp ... ok
+test skills::tests::an_installed_skill_is_removed ... ok
+test skills::tests::an_installed_skill_that_does_not_load_is_removed_too ... ok
+test skills::tests::an_unknown_name_and_every_path_trick_are_refused_and_nothing_is_touched ... ok
+test skills::tests::each_kept_off_file_reads_the_same_skills_off ... ok
+test skills::tests::only_a_skill_that_loads_can_be_turned_off ... ok
+test skills::tests::the_reply_is_bounded ... ok
+test skills::tests::the_reply_lists_each_skill_with_its_group_and_what_it_may_use ... ok
+test skills::tests::the_store_is_on_only_with_its_own_switch_and_the_pages ... ok
+test skills::tests::the_switch_is_on_only_with_the_cloud ... ok
+test skills::tests::what_a_skill_may_use_is_said_in_plain_words_with_the_privacy_switch ... ok
+test skills::tests::without_the_manage_helper_nothing_is_removed ... ok
+test unasked::tests::a_named_text_goes_named_only_at_once_and_is_held_unnamed ... ok
+test unasked::tests::at_most_six_are_taken_in_any_hour ... ok
+test unasked::tests::only_lamp_skills_lines_are_taken_and_another_publisher_is_named_once ... ok
+test unasked::tests::pieces_keep_their_order_and_one_heard_again_is_dropped ... ok
+test unasked::tests::the_journals_lines_name_the_skill_and_never_the_text ... ok
+test unasked::tests::while_offline_the_newest_few_wait_in_order_and_owed_go_first ... ok
+test wire::tests::commands_are_read_as_v1_sends_them ... ok
+test wire::tests::replies_carry_v1s_identity_fields ... ok
+
+test result: ok. 166 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 58.69s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 30 tests
+test app_contract::a_restart_from_the_app_is_the_keepers_answered_first_and_refused_under_an_update ... ok
+test app_contract::each_field_the_apps_page_reads_is_there_with_the_type_it_takes ... ok
+test app_contract::schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without ... ok
+test app_contract::the_faces_page_reads_names_and_removes_one ... ok
+test app_contract::the_software_update_is_answered_from_lamp_updates_status ... ok
+test report_contract::a_lamp_with_the_armed_way_back_or_the_switch_off_says_nothing_waits ... ok
+test report_contract::a_lamp_without_the_armed_way_back_says_lamp_update_waits ... ok
+test report_contract::every_report_carries_the_agreed_fields_and_sent_at_is_set_once ... ok
+test report_contract::failed_units_are_canonical_in_schema_one_and_kept_on_retransmit ... ok
+test report_contract::the_apps_switch_reads_the_agreed_reply_and_its_refusal ... ok
+test ring::a_light_asked_at_the_lamp_ends_the_apps_preview_and_a_drag_after_it_stays_given_way ... ok
+test setup::the_generation_on_every_reply_is_the_one_setups_status_says ... ok
+test setup::the_unit_reads_the_account_where_the_products_setup_writes_it ... ok
+test setup::what_setup_writes_from_the_apps_request_reads_as_a_complete_account ... ok
+test skills_contract::a_skill_from_a_package_is_listed_with_its_sha256_and_version ... ok
+test skills_contract::removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope ... ok
+test skills_contract::the_skills_page_reads_the_agreed_reply_and_its_refusal ... ok
+test switch::lamp_4aces_cloud_on_writes_the_units_whole_drop_in ... ok
+test switch::the_photo_folder_the_unit_may_write_is_the_one_made_at_boot ... ok
+test switch::the_product_unit_is_on_and_stops_v1s_os_server_only_as_it_really_starts ... ok
+test switch::the_unit_may_reach_lamp_skills_call_socket_where_lamp_skills_makes_it ... ok
+test switch::the_unit_may_reach_lamp_voices_app_make_socket ... ok
+test switch::with_the_switch_on_it_connects_to_the_accounts_broker ... ok
+test switch::without_the_switch_it_says_so_and_connects_nowhere ... ok
+test texts::a_line_from_another_publisher_on_messages_out_is_not_sent ... ok
+test texts::a_named_text_goes_named_only_while_its_yes_stands_as_it_goes ... ok
+test texts::a_skills_line_on_messages_out_comes_off_the_bus_as_task_news ... ok
+test texts::a_text_goes_on_the_bus_and_its_answer_comes_back_as_v1s_chat_events ... ok
+test texts::task_news_comes_out_with_no_text_asked_first ... ok
+test texts::with_nothing_listening_a_text_is_refused_at_once_and_off_it_is_not_here ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.83s
+
+
+running 97 tests
+test days::tests::a_remember_once_links_its_sources_to_the_kept_thing_it_finds ... ok
+test days::tests::a_remember_once_passes_over_a_kept_thing_no_longer_active ... ok
+test days::tests::retention_counts_local_days_across_both_clock_changes ... ok
+test days::tests::the_live_connection_requests_durable_commits_and_private_deletion ... ok
+test days::tests::the_rooms_early_words_are_adopted_whole_and_nothing_else_is ... ok
+test days_protocol::tests::a_conversation_end_passes_over_sources_it_no_longer_has ... ok
+test days_protocol::tests::a_correction_replaces_a_kept_thing_this_session_was_shown_by_link ... ok
+test days_protocol::tests::a_correction_with_once_is_never_deduplicated_and_an_id_out_of_range_is_refused ... ok
+test days_protocol::tests::a_forget_person_that_was_done_says_whose_and_takes_only_a_known_persons_id ... ok
+test days_protocol::tests::a_remember_once_the_same_person_already_keeps_word_for_word_is_that_kept_thing ... ok
+test days_protocol::tests::a_sqlite_write_failure_reports_storage_but_no_write_evidence ... ok
+test days_protocol::tests::caller_refusals_and_overlong_lines_do_not_report_storage_or_write_evidence ... ok
+test days_protocol::tests::every_opt_in_request_shape_in_the_document_parses ... ok
+test days_protocol::tests::kept_with_observations_lists_the_persons_current_observations_too ... ok
+test days_protocol::tests::only_a_forget_all_that_was_done_says_whose ... ok
+test days_protocol::tests::only_successful_additions_report_write_evidence_without_changing_the_wire_or_log ... ok
+test health::schedule_tests::completion_waits_for_actual_publication_and_overrun_has_no_catchup_queue ... ok
+test health::schedule_tests::frozen_spurious_and_predeadline_wakes_do_not_publish_but_the_exact_deadline_does ... ok
+test health::schedule_tests::publication_outcomes_follow_the_actual_error_and_recovery_results ... ok
+test health::schedule_tests::schedule_reads_are_pure_and_the_default_source_uses_host_time ... ok
+test health::schedule_tests::stopping_a_frozen_wait_unparks_and_preserves_the_final_best_effort_report ... ok
+test health::schedule_tests::stopping_a_held_publication_keeps_the_host_bound_without_false_completion ... ok
+test health::schedule_tests::successful_publication_is_not_a_receipt_and_the_shared_bus_clock_rescans_real_sockets ... ok
+test health::schedule_tests::the_shared_worker_samples_once_at_cycle_start_and_once_at_the_wait_check ... ok
+test health::tests::a_hung_handler_is_visible_while_the_socket_owner_cannot_finish ... ok
+test health::tests::an_unblocked_reporter_says_open_failed_without_ever_claiming_readiness ... ok
+test health::tests::count_scans_overlapping_even_a_finished_request_are_discarded ... ok
+test health::tests::counts_and_storage_faults_are_independent_and_reads_do_not_prove_recovery ... ok
+test health::tests::exact_budgets_recent_window_and_in_flight_answers_have_distinct_meanings ... ok
+test health::tests::extra_thread_wakes_do_not_burst_reports ... ok
+test health::tests::held_publication_cannot_block_a_real_socket_or_bounded_shutdown ... ok
+test health::tests::held_publisher_cleanup_also_has_a_bounded_shutdown_wait ... ok
+test health::tests::measure_health_update_and_socket_with_a_held_publisher ... ignored, host timing measurement; run in release with --ignored --nocapture
+test health::tests::session_note_classification_retains_no_request_content ... ok
+test health_counts::tests::days_counts_exclude_observations_and_notes_and_follow_cascading_deletion ... ok
+test health_counts::tests::days_counts_follow_expiry_and_a_failed_delete_keeps_the_previous_counts ... ok
+test health_counts::tests::legacy_counts_readable_records_after_capped_replacement_and_forgetting ... ok
+test health_counts::tests::legacy_probe_bounds_lines_and_accepts_a_valid_final_line_without_newline ... ok
+test health_counts::tests::legacy_probe_refuses_nonregular_kept_files_and_does_not_follow_journal_links ... ok
+test health_counts::tests::sqlite_counts_are_temporary_idempotent_and_follow_commit_rollback_and_kind ... ok
+test protocol::tests::a_bad_person_id_is_refused_and_nothing_on_the_disk_is_touched ... ok
+test protocol::tests::a_forget_person_that_was_done_says_whose_and_takes_only_a_known_persons_id ... ok
+test protocol::tests::a_line_that_is_no_request_is_refused_by_name_and_nothing_is_written ... ok
+test protocol::tests::a_recall_gives_eight_entries_unless_told_and_never_more_than_fifty_or_sixteen_kibibytes ... ok
+test protocol::tests::an_actual_store_write_failure_reports_storage_but_no_write_evidence ... ok
+test protocol::tests::caller_refusals_and_overlong_lines_do_not_report_storage_or_write_evidence ... ok
+test protocol::tests::each_person_has_a_memory_apart_and_null_means_every_person_only_where_that_is_safe ... ok
+test protocol::tests::each_request_reads_from_its_line ... ok
+test protocol::tests::every_default_request_written_in_the_document_is_read_and_done ... ok
+test protocol::tests::forgetting_can_be_asked_for_the_last_of_one_kind ... ok
+test protocol::tests::only_a_forget_all_that_was_done_says_whose ... ok
+test protocol::tests::only_successful_additions_report_write_evidence_without_changing_the_wire_or_log ... ok
+test protocol::tests::the_first_request_of_a_new_day_deletes_the_days_too_old_whatever_it_asks ... ok
+test protocol::tests::the_legacy_store_ignores_once ... ok
+test protocol::tests::the_log_line_names_the_request_the_person_and_the_counts_and_never_the_text ... ok
+test protocol::tests::the_narrow_check_lets_through_one_forget_person_and_nothing_else ... ok
+test protocol::tests::what_is_added_is_recalled_kept_counted_and_forgotten_in_these_shapes ... ok
+test server::tests::a_group_is_found_by_its_whole_name_only ... ok
+test store::tests::a_cut_off_last_line_and_a_garbage_line_are_skipped_and_counted_and_the_rest_loads ... ok
+test store::tests::a_removal_leaves_no_copy_and_one_left_by_a_cut_off_removal_is_cleared_on_opening ... ok
+test store::tests::an_exchange_is_recalled_by_its_day_by_its_words_and_as_the_newest ... ok
+test store::tests::directories_and_files_are_their_owners_alone ... ok
+test store::tests::forgetting_everything_for_one_person_leaves_another_untouched ... ok
+test store::tests::forgetting_the_last_of_one_kind_leaves_the_other_kind_alone ... ok
+test store::tests::forgetting_the_last_thing_takes_the_highest_id_of_either_kind ... ok
+test store::tests::ids_go_on_rising_across_both_files_after_the_store_is_opened_again ... ok
+test store::tests::journal_days_too_old_to_keep_are_deleted_on_opening_and_on_a_new_day ... ok
+test store::tests::kept_gives_the_newest_that_fit_and_recall_stops_at_the_count_and_the_bytes ... ok
+test store::tests::lines_from_a_later_build_read_as_the_fields_this_build_knows ... ok
+test store::tests::more_of_the_words_rank_first_and_then_the_newer ... ok
+test store::tests::one_persons_memory_is_never_given_for_another ... ok
+test store::tests::only_a_day_the_calendar_has_is_a_day_and_it_is_written_back_the_same ... ok
+test store::tests::only_a_plain_short_lower_case_id_is_a_person ... ok
+test store::tests::status_counts_each_person_and_a_directory_is_one_stores_at_a_time ... ok
+test store::tests::text_is_cut_at_a_character_and_its_blanks_made_one ... ok
+test store::tests::the_kept_list_holds_two_hundred_and_drops_the_oldest ... ok
+test store::tests::the_local_day_turns_at_midnight_where_the_lamp_stands ... ok
+test store::tests::with_a_zone_the_day_turns_at_local_midnight_in_winter_and_in_summer ... ok
+test tidy::tests::a_conforming_adapter_does_not_deliver_an_old_job_to_a_new_pass ... ok
+test tidy::tests::a_result_ready_at_or_after_the_deadline_is_never_accepted ... ok
+test tidy::tests::an_input_from_a_later_build_is_read - should panic ... ok
+test tidy::tests::bad_input_is_rejected_before_the_model_is_started ... ok
+test tidy::tests::categories_and_records_have_strict_round_tripping_json_shapes ... ok
+test tidy::tests::clock_rollback_does_not_underflow_restore_spent_time_or_reach_the_adapter ... ok
+test tidy::tests::deadline_arithmetic_saturates_and_timeout_settings_are_bounded ... ok
+test tidy::tests::delayed_work_is_pending_and_a_second_start_is_refused_without_touching_it ... ok
+test tidy::tests::dropping_an_active_pass_cancels_it_once ... ok
+test tidy::tests::empty_and_malformed_results_end_the_pass_without_becoming_success ... ok
+test tidy::tests::errors_never_contain_the_invalid_text ... ok
+test tidy::tests::evidence_shape_text_and_dates_are_checked_before_model_work ... ok
+test tidy::tests::explicit_cancellation_ignores_late_completion_and_is_idempotent ... ok
+test tidy::tests::input_requires_exact_bounded_source_records_and_separate_previous_ids ... ok
+test tidy::tests::proposals_require_known_sources_valid_replacements_and_utf8_byte_caps ... ok
+test tidy::tests::ready_results_are_given_once_and_leave_no_active_pass ... ok
+test tidy::tests::stalled_work_is_cancelled_at_the_deadline_without_repeated_cancellation ... ok
+test tidy::tests::start_and_poll_failures_end_the_pass_without_retrying ... ok
+test tidy::tests::the_input_byte_limit_counts_json_escaping_not_just_plain_text ... ok
+
+test result: ok. 96 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 83.03s
+
+
+running 8 tests
+test factory_tests::a_socket_bind_failure_precedes_the_factory_and_store_for_either_backend ... ok
+test factory_tests::no_bus_root_never_invokes_the_factory_for_either_backend ... ok
+test factory_tests::the_selected_factory_gets_the_original_root_and_source_once_after_socket_bind ... ok
+test tests::a_relative_path_an_unknown_option_or_a_bad_number_is_refused ... ok
+test tests::health_reporting_requires_one_explicit_absolute_bus_root ... ok
+test tests::the_forget_socket_is_off_unless_set_and_needs_its_group_and_an_absolute_path ... ok
+test tests::the_memory_days_start_line_names_the_zone_only_when_one_is_given ... ok
+test tests::the_two_paths_are_required_and_the_days_and_the_offset_have_defaults ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+running 8 tests
+test tests::evidence_labels_never_change_retrieved_text_or_ranking ... ok
+test tests::legacy_ties_are_newer_first_and_nonmatches_are_not_retrieved ... ok
+test tests::missing_or_unaligned_evidence_is_rejected ... ok
+test tests::no_labels_never_produces_vacuous_recall ... ok
+test tests::partial_evidence_is_not_all_evidence_and_ndcg_matches_upstream_discount ... ok
+test tests::repeated_session_occurrences_do_not_count_as_distinct_recalled_evidence ... ok
+test tests::roles_and_units_keep_the_two_label_conventions_separate ... ok
+test tests::utf8_bytes_and_full_cutoff_are_measured_without_truncation ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+
+running 3 tests
+test forget_person_leaves_nothing_of_one_person_in_days_and_nobody_elses_is_touched ... ok
+test forget_person_leaves_nothing_of_one_person_in_the_legacy_store_and_nobody_elses_is_touched ... ok
+test the_narrow_socket_takes_forget_person_only_and_refuses_the_rest_untouched ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.49s
+
+
+running 3 tests
+test forgetting_a_kept_thing_leaves_a_noticed_thing_from_the_same_exchange ... ok
+test forgetting_a_noticed_thing_leaves_a_kept_thing_from_the_same_exchange ... ok
+test forgetting_everything_still_leaves_nothing_of_the_persons ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.28s
+
+
+running 1 test
+test a_forget_of_everything_kept_under_a_person_is_told_on_the_bus_and_nothing_else ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+
+
+running 23 tests
+test a_real_marker_requires_its_exact_complete_line ... ok
+test a_window_from_another_controller_is_rejected_before_step ... ok
+test bootstrap_closes_after_one_frame_and_preserves_real_argv_and_child_ownership ... ok
+test bootstrap_pipe_write_cannot_reset_an_expired_or_blocked_deadline ... ok
+test cadence_reads_and_same_time_rounds_do_not_invent_publications ... ok
+test connected_and_checked_queued_before_peer_close_are_read_completely ... ok
+test counters_and_round_overflow_fail_without_wrapping ... ok
+test every_due_cycle_is_split_before_a_longer_target ... ok
+test exact_due_requires_one_real_cycle_and_the_matching_attempt_delta ... ok
+test expired_host_window_cannot_be_reset_by_a_new_step ... ok
+test initial_checked_identity_counters_and_deadline_are_validated ... ok
+test logical_window_is_fixed_and_cannot_be_extended_by_a_later_call ... ok
+test malformed_truncated_and_oversized_receipts_close_control ... ok
+test marker_scanning_retains_a_partial_following_line ... ok
+test missing_marker_after_child_advance_latches_closed_without_cadence_commit ... ok
+test missing_reply_is_bounded_and_does_not_manufacture_report_progress ... ok
+test next_due_and_zero_wait_preserve_the_checked_boundary ... ok
+test pre_due_progress_cannot_regress_or_claim_a_fresh_cycle ... ok
+test replacing_or_truncating_the_real_log_is_rejected ... ok
+test startup_guard_kills_and_reaps_the_actual_owned_child ... ok
+test startup_validates_private_paths_and_expired_budget_before_spawn ... ok
+test targets_cannot_regress_round_microseconds_or_overflow ... ok
+test wrong_connected_identity_never_creates_a_controller ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.31s
+
+
+running 154 tests
+test binary::a_directory_others_can_enter_is_refused_with_the_reason_and_exit_code_two ... ok
+test binary::a_forget_socket_that_cant_be_made_leaves_memory_serving ... ok
+test binary::a_killed_process_leaves_a_store_the_next_one_loads_and_a_socket_it_replaces ... ok
+test binary::a_relative_path_or_an_unknown_option_gets_the_usage_line_and_exit_code_two ... ok
+test binary::log_completion_waits_for_the_later_repeated_terminal_record ... ok
+test binary::log_completion_waits_for_the_newline_after_a_private_suffix ... ok
+test binary::opted_in_memory_migrates_and_forgets_linked_facts_across_sigkill_restarts ... ok
+test days::a_bad_event_day_is_dropped_and_the_observation_kept ... ok
+test days::a_bad_second_proposal_leaves_the_whole_batch_unwritten_and_the_job_retryable ... ok
+test days::a_dated_one_given_until_asked_is_offered_again_until_marked_asked ... ok
+test days::a_dated_one_never_asked_is_offered_at_most_three_times ... ok
+test days::a_dated_thing_adopted_from_the_room_is_asked_only_of_its_teller ... ok
+test days::a_delayed_old_conversation_cannot_supersede_a_fact_from_newer_evidence ... ok
+test days::a_due_event_comes_before_a_newer_undated_thread ... ok
+test days::a_failed_import_rolls_back_the_database_and_preserves_all_legacy_bytes_for_retry ... ok
+test days::a_follow_up_is_one_open_thread_given_once_a_day_and_never_for_the_room ... ok
+test days::a_full_kept_list_refuses_the_next_fact_without_evicting_an_explicit_memory ... ok
+test days::a_kept_day_is_given_only_to_the_person_who_kept_it ... ok
+test days::a_kept_thing_goes_with_the_conversation_it_came_up_in_and_nothing_else ... ok
+test days::a_kept_thing_outlives_the_expiry_of_the_conversation_it_came_up_in ... ok
+test days::a_kept_thing_with_a_day_is_given_once_the_day_after_it ... ok
+test days::a_kept_thing_without_a_good_day_is_never_given ... ok
+test days::a_newer_category_shows_in_a_session_note_as_a_plain_fact ... ok
+test days::a_newer_database_version_is_set_aside_whole_and_a_new_store_begins ... ok
+test days::a_past_event_day_keeps_the_observation_and_its_batch ... ok
+test days::a_re_dated_event_is_offered_afresh ... ok
+test days::a_relevant_old_fact_remains_available_to_correct_after_thirty_two_unrelated_observations ... ok
+test days::a_replaced_kept_thing_loses_its_day ... ok
+test days::a_set_aside_database_goes_once_keep_days_old_one_second_either_side ... ok
+test days::a_sqlite_delete_failure_rolls_back_entries_search_notes_and_pending_jobs ... ok
+test days::a_sqlite_failure_on_the_second_proposal_rolls_back_the_first_and_its_index ... ok
+test days::a_store_without_event_days_opens_and_answers ... ok
+test days::a_weekly_kept_thing_said_again_for_a_later_day_is_followed_up_again ... ok
+test days::after_its_day_another_face_talking_first_is_never_asked_and_the_teller_is_once ... ok
+test days::an_adopted_offer_is_the_new_persons_to_mark ... ok
+test days::an_empty_result_closes_the_job_with_nothing_kept_and_frees_its_place ... ok
+test days::an_event_far_off_is_kept_to_its_follow_up_window ... ok
+test days::an_event_is_asked_about_after_its_day_once ... ok
+test days::an_event_is_given_only_to_the_person_who_said_it ... ok
+test days::an_event_is_not_asked_about_fifteen_days_after_it ... ok
+test days::an_observation_with_a_newer_category_is_kept_and_never_tidied_over ... ok
+test days::an_offer_asked_about_is_not_taken_back ... ok
+test days::an_offer_taken_back_is_not_counted ... ok
+test days::an_undated_thread_given_until_asked_is_offered_again_until_asked ... ok
+test days::an_undated_thread_never_asked_is_offered_at_most_three_times ... ok
+test days::delayed_model_work_retains_new_appends_and_retries_commit_only_once ... ok
+test days::deleting_memory_invalidates_a_prepared_job_even_when_its_source_survives ... ok
+test days::expiring_journal_evidence_removes_even_a_recently_used_observation_and_stales_jobs ... ok
+test days::explicit_previous_observations_must_exist_in_scope_and_a_prepared_selection_cannot_change ... ok
+test days::forgetting_a_kept_thing_removes_its_day ... ok
+test days::forgetting_an_empty_person_still_invalidates_their_existing_empty_snapshot ... ok
+test days::forgetting_an_observation_never_reaches_a_kept_thing_its_evidence_was_only_shown ... ok
+test days::forgetting_an_observation_removes_its_cited_exchanges_and_linked_descendants_only ... ok
+test days::forgetting_either_supersession_version_removes_both_without_reviving_the_old_fact ... ok
+test days::forgetting_everything_also_removes_a_set_aside_database ... ok
+test days::forgetting_everything_preserves_invalidated_snapshots_until_the_caller_closes_them ... ok
+test days::forgetting_leaves_no_event_day ... ok
+test days::forgetting_one_fact_also_removes_a_set_aside_database ... ok
+test days::forgetting_the_last_thing_also_removes_a_set_aside_database ... ok
+test days::legacy_default_stays_jsonl_and_upgrade_removes_duplicate_files_before_serving ... ok
+test days::missing_duplicate_foreign_and_nonjournal_tidy_sources_are_refused ... ok
+test days::observations_are_dated_by_their_own_cited_evidence_not_when_the_job_was_prepared ... ok
+test days::observations_in_a_newer_category_take_no_previous_slot ... ok
+test days::ordinary_source_expiry_does_not_follow_a_replacement_to_its_independent_new_evidence ... ok
+test days::protocol_accepts_explicit_prior_ids_and_freezes_them_in_the_prepared_job ... ok
+test days::protocol_expires_old_sources_before_returning_a_read ... ok
+test days::protocol_keeps_legacy_shapes_and_limits_without_logging_private_text ... ok
+test days::protocol_round_trip_records_links_prepares_and_applies_a_job_then_verifies_forgetting ... ok
+test days::ranked_search_handles_english_and_vietnamese_without_crossing_person_scope ... ok
+test days::rejected_tidy_requests_cannot_accumulate_empty_people ... ok
+test days::replaced_kept_versions_do_not_use_the_kept_lists_room ... ok
+test days::session_and_pending_job_limits_are_bounded_and_released_without_duplicate_work ... ok
+test days::session_notes_are_frozen_under_the_total_utf8_cap_and_deletion_invalidates_them ... ok
+test days::successful_ids_are_never_reused_after_forgetting_everything_and_restarting ... ok
+test days::successful_retrieval_extends_observation_use_but_clock_rollback_does_not ... ok
+test days::supersession_changed_after_preparation_rolls_back_an_earlier_proposal_in_the_same_batch ... ok
+test days::the_follow_up_asked_request_marks_and_a_forget_takes_the_offer ... ok
+test days::the_follow_up_request_answers_for_a_person_and_refuses_the_room ... ok
+test days::unused_observations_lapse_but_kept_facts_do_not_and_note_reads_do_not_extend_use ... ok
+test days::without_events_an_event_is_not_asked_about_before_its_day ... ok
+test days::without_until_asked_an_undated_thread_is_recorded_when_given ... ok
+test days_recall::a_keyword_with_common_words_still_finds_its_exchange ... ok
+test days_recall::a_question_about_an_finds_an_likes_tea ... ok
+test days_recall::a_question_of_common_words_only_searches_nothing ... ok
+test days_recall::a_span_is_both_ends_oldest_first_at_most_fourteen_days_and_not_with_a_day ... ok
+test days_recall::a_span_of_seven_days_to_one_finds_three_days_ago_and_not_nine ... ok
+test days_recall::a_thing_kept_two_days_ago_is_found_by_a_span_with_the_option ... ok
+test days_recall::an_accented_word_that_folds_onto_a_common_one_still_matches_it ... ok
+test days_recall::what_is_my_drink_order_does_not_match_an_exchange_on_my_alone ... ok
+test days_recall::without_the_option_answers_are_what_they_were ... ok
+test days_timing::file_and_ranked_reads_have_the_same_socket_boundary_and_corpus ... ignored, local measurement; does not qualify a lamp
+test fixture_child::actual_marker_follows_prior_bytes_through_the_real_log_relay ... ok
+test fixture_child::an_expired_absolute_deadline_rejects_even_queued_data ... ok
+test fixture_child::bootstrap_requires_the_explicit_private_socket_and_matching_version ... ok
+test fixture_child::close_freezes_clock_and_does_not_block_the_real_reporter_finish ... ok
+test fixture_child::complete_queued_frame_survives_peer_close_and_eof_is_not_a_receipt ... ok
+test fixture_child::held_work_then_positive_wait_is_required_and_wake_before_park_is_retained ... ok
+test fixture_child::invalid_first_step_stale_round_backwards_time_and_skipped_due_fail_closed ... ok
+test fixture_child::malformed_oversized_and_unterminated_frames_are_rejected ... ok
+test fixture_child::pre_deadline_wait_preserves_the_full_period_and_due_requires_real_publication ... ok
+test fixture_child::reads_are_pure_and_equal_time_steps_do_not_create_reports ... ok
+test fixture_child::real_channel_shutdown_wakes_a_waiting_reader_without_fabricating_a_frame ... ok
+test fixture_child::zero_left_wait_and_observer_overflow_cannot_produce_checked ... ok
+test health::a_failed_legacy_write_stays_warn_through_reads_until_a_write_succeeds ... ok
+test health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves ... ok
+test health::a_store_that_cannot_open_never_claims_readiness_and_any_delivered_report_is_warn ... ok
+test health::a_working_bus_that_fails_stays_failed_until_publication_really_recovers ... ok
+test health::an_unusable_bus_does_not_prevent_serving_and_reports_recover_when_it_returns ... ok
+test health::forgetting_everything_removes_a_set_aside_database_and_health_stops_warning ... ok
+test health::legacy_reports_retained_counts_and_stays_well_after_caller_refusals ... ok
+test health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals ... ok
+test health::the_environment_alone_does_not_enable_reporting_or_create_bus_data ... ok
+test health_timing::health_costs_and_socket_requests_with_identical_synthetic_stores ... ignored, release host measurement; does not qualify a lamp
+test kept::each_kept_database_opens_with_what_it_held ... ok
+test kept::write_a_days_fixture ... ignored, writes a store fixture: run by hand with LAMP_MEMORY_DAYS_FIXTURE set
+test retrieval::bm25_uses_term_rarity_and_has_deterministic_ties ... ok
+test retrieval::cli_marks_partial_runs_and_does_not_score_all_abstention_input ... ok
+test retrieval::cli_rejects_missing_labels_and_never_overwrites_per_query_output ... ok
+test retrieval::cli_reports_distinct_denominators_hashes_bytes_and_repeated_timings ... ok
+test retrieval::decomposed_vietnamese_and_multiple_diacritics_match ... ok
+test retrieval::first_sixteen_distinct_words_are_the_only_query_terms ... ok
+test retrieval::independently_created_indexes_do_not_leak_between_people_or_questions ... ok
+test retrieval::legacy_words_and_matches_preserve_the_existing_behavior ... ok
+test retrieval::nfc_lowercase_and_d_with_stroke_are_shared_by_query_and_index ... ok
+test retrieval::query_uses_literal_terms_and_cannot_supply_fts_operators ... ok
+test server::a_client_that_says_nothing_or_half_a_request_is_dropped_and_the_next_is_served ... ok
+test server::a_socket_nobody_answers_on_is_replaced_and_anything_else_at_the_path_is_left ... ok
+test server::the_server_answers_over_its_socket_and_a_bad_line_does_not_end_the_connection ... ok
+test timing::how_long_each_request_takes_with_a_month_of_talk_behind_it ... ignored, a measurement, not a check
+test voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note ... ok
+test voice::a_missing_store_never_becomes_an_empty_or_successful_memory_answer ... ok
+test voice::a_remembered_fact_links_later_journal_echoes_and_forgetting_removes_them ... ok
+test voice::a_timed_out_mutation_may_commit_but_cannot_seed_unlinked_journal_history ... ok
+test voice::a_voice_session_receives_a_frozen_note_with_provenance_then_a_new_snapshot ... ok
+test voice::deletion_invalidates_a_frozen_note_and_linked_writes_never_fall_back_to_plain_append ... ok
+test voice::ranked_voice_recall_finds_an_earlier_day_and_respects_a_named_day ... ok
+test voice::repeated_real_conversation_ends_reach_memory_without_retaining_model_jobs ... ok
+test voice_name::a_told_name_against_each_way_a_run_of_turns_ends ... ok
+test voice_note_ahead::a_note_read_ahead_spends_the_last_follow_up_offer_only_when_a_turn_takes_it ... ok
+test voice_people::days_a_malformed_rule_acknowledgement_is_not_taken_and_journals_nothing ... ok
+test voice_people::days_a_rule_is_taken_back_by_its_number_and_never_by_default ... ok
+test voice_people::days_a_rule_is_told_in_the_next_session_to_that_person_only_until_it_is_forgotten ... ok
+test voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled ... ok
+test voice_people::days_an_answer_under_a_rule_is_journalled_and_goes_when_the_rule_is_forgotten ... ok
+test voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused ... ok
+test voice_people::days_rules_kept_at_once_never_pass_the_most ... ok
+test voice_people::days_store_never_links_another_persons_rule ... ok
+test voice_people::days_two_known_people_and_the_room_are_never_answered_from_each_other ... ok
+test voice_people::legacy_two_known_people_and_the_room_are_never_answered_from_each_other ... ok
+test voice_submit::selected_previous_ids_must_be_distinct_current_observations ... ok
+test voice_submit::submission_checks_names_person_shape_and_finished_same_person_sources ... ok
+test voice_submit::unconfigured_submission_never_builds_the_bounded_model_payload ... ok
+test voice_submit::unconfigured_submissions_do_not_allocate_jobs_or_fill_prepare_capacity ... ok
+test voice_timing::legacy_and_days_voice_requests_over_matched_synthetic_stores ... ignored, release host measurement; run alone, not during builds
+
+test result: ok. 149 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 496.03s
+
+
+running 1 test
+test paraphrase_fixture_has_its_shape ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test the_rooms_early_words_follow_a_lone_face_once_known_and_never_with_another ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.37s
+
+
+running 1 test
+test what_the_caller_said_before_their_face_was_saved_follows_them_and_no_one_elses ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.40s
+
+
+running 5 tests
+test after_forgetting_the_next_thing_remembered_is_kept ... ok
+test forget_everything_removes_all_of_someone_known_and_never_the_room_s ... ok
+test forget_my_favourite_colour_leaves_the_wedding_kept_in_the_same_conversation ... ok
+test forget_that_removes_the_conversation_a_kept_thing_came_up_in ... ok
+test forget_that_removes_what_recall_gave_and_nothing_else ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.61s
+
+
+running 2 tests
+test forget_about_in_the_room_reaches_only_this_conversations_kept_things ... ok
+test forget_about_removes_that_persons_kept_things_about_it_and_nothing_else ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.31s
+
+
+running 2 tests
+test a_forget_that_names_a_thing_removes_only_it_and_never_the_newest_kept_line ... ok
+test a_named_forget_in_the_room_never_reaches_a_persons_or_an_earlier_conversations ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.31s
+
+
+running 2 tests
+test forgetting_a_kept_thing_leaves_the_talk_that_did_not_use_it ... ok
+test the_talk_that_used_a_kept_thing_goes_with_it ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.94s
+
+
+running 1 test
+test the_pass_keeps_what_the_model_proposes_and_closes_a_job_it_gave_nothing_for ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.43s
+
+
+running 2 tests
+test recall_says_since_and_gives_history_with_until_only_when_asked ... ok
+test the_rooms_scope_never_gives_history ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.00s
+
+
+running 156 tests
+test addon::tests::a_drop_holds_that_add_ons_next_proposal_five_minutes ... ok
+test addon::tests::a_proposal_that_fails_its_check_is_not_sent_or_counted ... ok
+test addon::tests::a_say_the_judge_dropped_does_not_spend_the_hours_four ... ok
+test addon::tests::an_add_on_has_twenty_an_hour_and_all_have_four_says ... ok
+test addon::tests::proposals_are_numbered_in_order_and_spaced_per_add_on ... ok
+test clock::tests::a_skip_past_the_most_is_refused ... ok
+test clock::tests::without_a_test_driving_it_a_wait_takes_its_whole_time ... ok
+test daily::tests::a_second_owner_is_refused_until_the_first_is_dropped ... ok
+test daily::tests::a_window_remainder_uses_the_trusted_sample_without_forecasting_dst ... ok
+test daily::tests::added_fields_keep_known_days_and_maximum_length_keys_survive_a_save ... ok
+test daily::tests::current_bitmap_values_and_duplicate_keys_are_refused_without_repair ... ok
+test daily::tests::failed_directory_sync_never_grants_a_claim_or_rolls_back_installed_evidence ... ok
+test daily::tests::forward_claim_and_date_correction_preserve_exact_days_across_restart ... ok
+test daily::tests::key_and_file_bounds_never_evict_existing_days ... ok
+test daily::tests::legacy_high_water_migrates_conservatively_only_after_a_new_claim ... ok
+test daily::tests::malformed_newer_or_duplicate_state_is_never_replaced ... ok
+test daily::tests::moment_rejects_unset_clock_and_observes_the_local_midnight ... ok
+test daily::tests::new_york_dst_gap_does_not_invent_a_window_and_repeated_hour_claims_once ... ok
+test daily::tests::pre_rename_failures_preserve_bytes_and_poison_the_owner_without_consuming_a_day ... ok
+test daily::tests::synchronization_is_required_even_for_a_plausible_wall_clock ... ok
+test daily::tests::the_full_supported_calendar_and_all_maximum_keys_fit_without_eviction ... ok
+test daily::tests::unique_temporaries_do_not_overwrite_or_remove_other_files ... ok
+test daily::tests::unsafe_files_and_replacement_outside_the_owner_are_refused ... ok
+test daily::tests::window_remainders_keep_milliseconds_and_cross_midnight_exactly ... ok
+test daily::tests::windows_have_exact_half_open_and_overnight_boundaries ... ok
+test daily::tests::windows_refuse_ambiguous_or_malformed_times ... ok
+test glow::tests::a_cool_brighter_light_is_asked_one_step_warmer_and_one_dimmer ... ok
+test glow::tests::a_light_is_asked_from_the_skill_asked_again_while_kept_and_given_back ... ok
+test glow::tests::a_light_off_or_not_known_asks_nothing ... ok
+test glow::tests::a_light_outranked_is_said_at_the_give_back_by_what ... ok
+test glow::tests::a_long_name_is_cut_to_a_source_the_ring_takes ... ok
+test glow::tests::a_pattern_is_asked_with_the_light_and_a_second_pulse_is_said_not_played ... ok
+test glow::tests::a_ring_that_starts_during_a_run_is_asked_from_the_next_step ... ok
+test glow::tests::a_step_asks_for_its_colour_at_its_level_or_the_lights_and_a_dim_steps_down ... ok
+test glow::tests::at_the_dimmest_level_the_evening_asks_nothing ... ok
+test glow::tests::every_evening_ask_is_at_least_one_level_under_the_persons_light ... ok
+test glow::tests::nothing_is_asked_without_a_taker_or_a_light_to_dim_and_nothing_given_back ... ok
+test glow::tests::over_a_warm_three_the_evening_breathes_a_level_down_in_the_persons_colour ... ok
+test known::tests::the_known_file_gives_the_name_only_while_fresh_and_plain ... ok
+test known::tests::the_tellable_file_gives_the_names_who_said_yes ... ok
+test limits::tests::end_is_exclusive_and_unknown_time_creates_no_cap ... ok
+test limits::tests::rejected_batches_preserve_the_accepted_definitions_and_generation ... ok
+test limits::tests::reload_while_caps_get_is_held_fences_both_put_and_remove ... ok
+test limits::tests::restart_recovers_the_exact_token_and_unknown_or_older_time_keeps_it ... ok
+test limits::tests::spring_and_autumn_windows_end_in_local_time ... ok
+test limits::tests::the_final_cap_boundary_refuses_a_revoked_put_but_keeps_exact_token_cleanup ... ok
+test limits::tests::unsynchronized_plausible_time_cannot_create_or_expire_a_window_cap ... ok
+test limits::tests::window_end_removes_only_its_owned_token_and_entry_uses_private_put ... ok
+test package::tests::a_file_swapped_after_its_folder_was_listed_is_not_read ... ok
+test package::tests::a_store_package_is_never_older_than_what_it_replaces ... ok
+test package::tests::only_a_runs_own_folder_names_are_taken_for_what_it_left ... ok
+test package::tests::only_lamp_cloud_and_the_voice_may_ask_the_manage_helper ... ok
+test package::tests::the_askers_cgroups_are_their_product_units_slices ... ok
+test requested_audio::file_checks::a_replaced_parent_is_refused_even_when_the_leaf_inode_is_the_same ... ok
+test requested_audio::file_checks::a_replaced_path_cannot_supply_the_stamp_for_already_opened_bytes ... ok
+test requested_audio::file_checks::each_stamp_change_is_refused_and_identifies_its_observation_side ... ok
+test requested_audio::file_checks::equal_stamps_cannot_hide_changed_audio_or_permission_bytes ... ok
+test requested_audio::file_checks::maximum_width_numeric_refusal_stays_within_1536_bytes ... ok
+test requested_audio::file_checks::non_regular_observations_keep_their_refusal_and_fixed_type_details ... ok
+test requested_audio::file_checks::sha256_keeps_the_existing_lowercase_and_length_prefix_encoding ... ok
+test requested_audio::file_checks::stability_refusals_identify_role_and_phase_without_disclosing_input ... ok
+test routine::tests::a_completion_keeps_its_captured_definition_generation ... ok
+test routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline ... ok
+test routine::tests::a_delayed_wall_sample_cannot_renew_or_admit_after_its_window_ended ... ok
+test routine::tests::a_foreign_completion_neither_confirms_nor_renews_a_pending_wake ... ok
+test routine::tests::a_future_wall_sample_cannot_admit_work_or_extend_the_cached_window ... ok
+test routine::tests::a_lamp_asleep_by_hand_or_private_is_not_stretched_the_morning_after ... ok
+test routine::tests::a_late_sample_keeps_only_the_existing_lease_and_recovers_the_same_episode ... ok
+test routine::tests::a_queued_completion_cannot_extend_the_original_deadline ... ok
+test routine::tests::a_rest_a_sound_ended_settles_again_at_most_three_times_a_night ... ok
+test routine::tests::a_rest_a_stir_ended_at_0530_is_greeted_at_0710_with_a_stretch ... ok
+test routine::tests::a_rest_ended_for_anything_but_a_sound_does_not_settle_again ... ok
+test routine::tests::a_rest_ended_in_a_turn_does_not_settle_again ... ok
+test routine::tests::a_sound_with_a_face_in_view_does_not_settle_again ... ok
+test routine::tests::a_sound_with_no_turn_and_no_face_settles_again_once ... ok
+test routine::tests::a_terminal_receipt_before_the_last_renewal_still_ends_the_episode ... ok
+test routine::tests::a_thread_captured_before_reload_cannot_start_old_work ... ok
+test routine::tests::a_trusted_correction_shortens_the_published_lease_only_with_fresh_evidence ... ok
+test routine::tests::a_trusted_outside_window_sample_cancels_rest_immediately ... ok
+test routine::tests::a_turn_ends_the_nights_rest_and_quiet_after_it_does_not_settle_again ... ok
+test routine::tests::an_ask_issued_after_the_tick_sample_waits_so_its_request_is_not_stamped_earlier ... ok
+test routine::tests::an_edited_disabled_or_removed_owner_cannot_keep_its_rest ... ok
+test routine::tests::an_unchanged_definition_cannot_retain_pending_admission_or_wake ... ok
+test routine::tests::an_untrusted_clock_cannot_start_rest_or_wake_an_admitted_rest ... ok
+test routine::tests::changed_expression_does_not_rebind_rest_during_clock_loss ... ok
+test routine::tests::clock_loss_cancels_pending_admission_and_wake_even_with_a_fresh_ack ... ok
+test routine::tests::clock_loss_does_not_renew_without_fresh_matching_expression_evidence ... ok
+test routine::tests::clock_loss_keeps_admitted_rest_only_until_the_last_trusted_window_end ... ok
+test routine::tests::completion_cannot_cross_an_owner_window_or_clock_change ... ok
+test routine::tests::leaving_the_night_window_ends_the_resettling ... ok
+test routine::tests::missing_receipts_cannot_extend_an_issued_rest_lease ... ok
+test routine::tests::no_rest_tonight_no_greeting ... ok
+test routine::tests::only_a_completed_wake_allows_its_following_sound ... ok
+test routine::tests::publication_stops_at_the_episode_cap_but_cancel_remains_deliverable ... ok
+test routine::tests::published_rest_and_wake_leases_end_at_the_window_if_skills_stalls ... ok
+test routine::tests::reload_cancels_pending_admission_and_a_late_ack_cannot_restore_it ... ok
+test routine::tests::stale_or_missing_faces_do_not_settle_again ... ok
+test routine::tests::the_longest_window_carries_a_held_rest_into_the_next_night ... ok
+test routine::tests::the_night_rested_is_kept_across_a_restart_until_the_next_night ... ok
+test routine::tests::unrelated_reload_retains_admitted_rest_but_invalidates_old_run_authority ... ok
+test routine::tests::wake_uses_the_admitted_episode_and_cancellation_stops_renewal ... ok
+test tests::a_body_ask_says_who_asks_only_with_the_switch ... ok
+test tests::a_dotted_field_reads_inside_an_object ... ok
+test tests::a_rise_is_over_the_lowest_reading_of_its_while_before ... ok
+test tests::a_say_from_names_where_the_voice_keeps_the_words ... ok
+test unplug::tests::a_cancel_needs_the_bodys_fresh_matching_folding_or_ready ... ok
+test unplug::tests::failure_wins_over_still_live_asleep_receipts ... ok
+test unplug::tests::never_mind_is_refused_unless_a_latch_is_in_force ... ok
+test unplug::tests::ordinary_skill_or_tool_cannot_publish_or_borrow_an_unplug_request ... ok
+test unplug::tests::readiness_requires_all_three_matching_fresh_receipts ... ok
+test unplug::tests::repeated_calls_keep_the_original_latch ... ok
+test unplug::tests::stay_minutes_default_to_ten ... ok
+test visits::tests::a_length_is_said_as_a_person_says_it ... ok
+test visits::tests::a_spell_is_named_only_for_who_said_yes_and_let_go_on_a_no ... ok
+test visits::tests::a_spell_only_a_voice_showed_is_told_as_heard_not_seen ... ok
+test visits::tests::a_spell_the_eyes_knew_is_someone_the_lamp_knows_and_never_who ... ok
+test visits::tests::a_stretch_unseen_is_said_and_nobody_else_is_said_when_nobody_came ... ok
+test visits::tests::a_visit_while_someone_was_out_is_kept_as_a_spell_with_its_length ... ok
+test visits::tests::spells_older_than_the_window_are_not_told_nor_older_than_a_day_kept ... ok
+test visits::tests::who_was_heres_words_are_what_the_lamp_said_before_byte_for_byte ... ok
+test visits::tests::who_was_heres_words_have_only_their_own_slots ... ok
+test visits::tests::with_no_value_there_is_no_record_and_with_values_stopped_it_says_since_when ... ok
+test watch::tests::a_door_then_a_face_gives_one_arrival ... ok
+test watch::tests::a_door_with_no_face_within_thirty_seconds_texts_nothing ... ok
+test watch::tests::a_mark_the_ring_has_not_confirmed_for_thirty_seconds_counts_nothing ... ok
+test watch::tests::a_pause_lasts_until_asked_or_its_most ... ok
+test watch::tests::a_reload_never_turns_a_watch_on_and_a_changed_or_removed_one_is_off ... ok
+test watch::tests::a_second_arrival_within_two_minutes_does_not_turn_the_head ... ok
+test watch::tests::a_second_visit_within_ten_minutes_is_not_texted ... ok
+test watch::tests::a_text_says_known_or_not_and_never_a_name ... ok
+test watch::tests::a_visit_gives_one_text_with_its_time_and_length ... ok
+test watch::tests::a_voice_alone_never_names ... ok
+test watch::tests::a_watch_without_known_faces_names_nobody ... ok
+test watch::tests::a_watchs_words_have_only_their_own_slots ... ok
+test watch::tests::a_yes_taken_back_before_the_text_goes_names_nobody ... ok
+test watch::tests::guard_from_the_app_is_on_without_a_voice_and_counts_only_once_its_mark_shows ... ok
+test watch::tests::it_ends_by_itself_at_its_most ... ok
+test watch::tests::it_is_never_on_by_itself ... ok
+test watch::tests::more_than_one_person_at_the_desk_were_one_was ... ok
+test watch::tests::names_too_long_for_one_line_send_the_unnamed_text_not_nothing ... ok
+test watch::tests::nothing_is_taken_until_the_ring_first_shows_its_mark ... ok
+test watch::tests::off_when_asked_gives_the_mark_back ... ok
+test watch::tests::once_the_switch_has_ended_it_nothing_about_the_desk_is_taken ... ok
+test watch::tests::only_lamp_clouds_unit_is_the_app ... ok
+test watch::tests::sounds_are_taken_only_with_the_switch_and_the_lamps_voice_clear ... ok
+test watch::tests::the_apps_op_past_its_deadline_or_with_none_is_let_go ... ok
+test watch::tests::the_face_of_the_person_who_asked_ends_it ... ok
+test watch::tests::the_local_minute_is_the_wall_clock_east_of_utc ... ok
+test watch::tests::the_named_lines_have_only_their_own_slots ... ok
+test watch::tests::the_persons_light_pauses_it_until_they_ask_again ... ok
+test watch::tests::the_privacy_switch_closed_ends_it_with_one_text ... ok
+test watch::tests::the_topics_are_the_messages_own ... ok
+test watch::tests::the_watch_words_are_guard_modes_and_what_the_lamp_said_before ... ok
+test watch::tests::two_known_one_tellable_names_one_and_says_someone_the_lamp_knows_for_the_other ... ok
+test watch::tests::while_its_mark_is_not_shown_nothing_about_the_desk_is_taken ... ok
+test watch::tests::with_names_off_nobody_is_ever_named ... ok
+
+test result: ok. 156 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.82s
+
+
+running 20 tests
+test tests::a_failure_after_ready_says_it_needs_checking_and_never_stands ... ok
+test tests::a_failure_after_the_cancel_says_it_needs_checking ... ok
+test tests::a_forged_rest_plan_is_refused_before_any_rest_or_say_request ... ok
+test tests::a_line_never_begun_cancels_nothing ... ok
+test tests::a_path_comes_by_its_flag_or_else_the_environment ... ok
+test tests::a_runs_sockets_carry_its_skills_permissions_and_nothing_for_another ... ok
+test tests::a_say_the_skill_may_not_make_is_never_asked_and_nothing_comes_with_it ... ok
+test tests::a_step_the_skill_may_not_make_is_not_sent_nor_counted ... ok
+test tests::an_already_awake_morning_stretches_then_hums ... ok
+test tests::clock_warning_tracks_enabled_schedules_without_repeating_each_tick ... ok
+test tests::live_scheduled_time_requires_kernel_trust_or_an_explicit_override ... ok
+test tests::never_mind_says_its_line_before_the_cancel_that_moves_the_body ... ok
+test tests::only_a_skill_given_who_has_its_note_told_who_is_at_the_lamp ... ok
+test tests::ordinary_and_disabled_skills_do_not_query_kernel_clock_trust ... ok
+test tests::the_actions_part_is_called_only_for_what_the_skill_may_call ... ok
+test tests::the_timeout_fires_once_and_never_from_failed ... ok
+test tests::the_timer_counts_unbroken_minutes_ready ... ok
+test tests::the_unplug_words_are_the_skills_and_what_the_lamp_said_before ... ok
+test tests::unplug_denied_at_dispatch_neither_latches_nor_sends_delayed_speech ... ok
+test tests::unplug_reload_changes_new_admissions_not_captured_run_grants ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.06s
+
+
+running 304 tests
+test addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing ... ok
+test addon::a_say_needs_the_quoted_grant_and_only_an_add_on_has_it ... ok
+test addon::only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted ... ok
+test addon::only_an_add_on_proposes ... ok
+test addon::says_the_judge_dropped_do_not_spend_the_hour ... ok
+test addon::the_documents_examples_load_as_add_ons_that_propose ... ok
+test addon::the_loader_refuses_an_add_on_anything_but_proposing ... ok
+test addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on ... ok
+test addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written ... ok
+test call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics ... ok
+test daily_engine::a_claimed_day_and_a_spoken_window_say_why_not_run ... ok
+test daily_engine::a_daily_chance_requires_both_a_sane_clock_and_a_durable_journal ... ok
+test daily_engine::a_daily_watch_leaving_its_window_says_so_once ... ok
+test daily_engine::a_daily_watch_losing_the_trusted_moment_says_so_once ... ok
+test daily_engine::a_daily_watch_reset_by_a_face_says_so_once_with_its_held_time ... ok
+test daily_engine::a_daily_watch_reset_by_a_silent_camera_says_so_once ... ok
+test daily_engine::a_dropped_morning_lets_welcome_back_greet_after_it ... ok
+test daily_engine::a_face_the_morning_never_holds_for_is_greeted_by_welcome_back_at_once ... ok
+test daily_engine::a_gap_in_the_empty_face_stream_restarts_the_absence_duration ... ok
+test daily_engine::a_missing_camera_is_not_absence_and_time_outside_the_window_does_not_count ... ok
+test daily_engine::a_missing_journal_reports_once_across_ticks_and_reload_until_one_is_installed ... ok
+test daily_engine::a_pending_daily_ask_cannot_be_rebound_to_a_reordered_trigger ... ok
+test daily_engine::a_restart_after_the_morning_greets_nobody_twice ... ok
+test daily_engine::a_restart_before_the_morning_still_greets_with_it ... ok
+test daily_engine::a_rested_night_and_a_first_face_greet_once_with_the_morning ... ok
+test daily_engine::a_storage_fault_withholds_pending_daily_output_and_is_not_retried ... ok
+test daily_engine::a_watch_that_never_held_or_is_not_daily_says_nothing ... ok
+test daily_engine::an_ordinary_pending_policy_run_revalidates_across_an_unrelated_reload ... ok
+test daily_engine::an_unsynchronized_clock_neither_spends_a_day_nor_approves_pending_output ... ok
+test daily_engine::bedtime_keeps_a_chance_that_matured_while_the_voice_was_listening ... ok
+test daily_engine::clock_triggers_use_no_external_topic_and_an_expired_clock_cannot_start_them ... ok
+test daily_engine::core_bedtime_manifest_is_disabled_and_has_no_model_function ... ok
+test daily_engine::corrected_dates_run_once_after_a_future_claim_restart_and_reload ... ok
+test daily_engine::disabled_daily_skills_and_ordinary_quiet_hours_keep_their_existing_behavior ... ok
+test daily_engine::disabled_skills_are_validated_but_never_started_or_offered ... ok
+test daily_engine::disabled_tool_is_excluded_even_when_passed_directly_to_the_catalogue ... ok
+test daily_engine::generic_routines_subscribe_to_the_voice_their_final_gate_requires ... ok
+test daily_engine::relative_lights_and_resettles_are_checked_at_load ... ok
+test daily_engine::routine_quiet_time_restarts_after_a_stale_voice_heartbeat ... ok
+test daily_engine::spoken_to_at_0650_a_face_at_0710_is_not_greeted ... ok
+test daily_engine::the_daily_claim_precedes_a_policy_answer_and_is_not_replayed_after_refusal ... ok
+test daily_engine::two_faces_in_one_morning_greet_once ... ok
+test daily_engine::unknown_rest_values_and_unsafe_caps_are_refused_at_load ... ok
+test daily_engine::unless_heard_goes_with_during ... ok
+test daily_engine::welcome_back_says_each_dropped_chance_once_with_its_gate ... ok
+test daily_engine::welcome_backs_hello_after_a_dropped_morning_claims_the_morning ... ok
+test daily_engine::windowed_and_routine_policy_runs_keep_their_definition_fence ... ok
+test daily_engine::without_a_rested_night_welcome_back_does_not_wait ... ok
+test daily_engine::without_bedtime_morning_welcome_back_does_not_wait ... ok
+test daily_engine::yields_to_goes_with_an_appears_trigger ... ok
+test journal_output::a_broken_journal_does_not_end_skills_or_lose_its_tool_replies ... ok
+test journal_output::a_full_unread_journal_does_not_hold_startup_or_tool_replies ... ok
+test journal_output::a_normal_cli_usage_error_reaches_stderr_before_skills_exits ... ok
+test made::a_made_skill_goes_on_by_its_sha256_and_only_by_it ... ok
+test made::a_made_skill_goes_on_only_within_its_ask_and_only_the_newest ... ok
+test made::a_made_skill_is_put_on_by_a_spoken_yes_through_the_helper ... ok
+test made::a_made_skill_never_takes_the_place_of_one_put_on_another_way ... ok
+test made::a_made_skill_past_the_cap_or_not_made_here_does_not_go_on ... ok
+test made::a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept ... ok
+test made::a_made_skill_whose_package_changed_does_not_go_on ... ok
+test made::a_skill_made_by_voice_is_checked_packed_and_kept ... ok
+test made::at_most_five_made_skills_are_kept ... ok
+test made::once_the_newest_is_on_an_older_ask_puts_nothing_on ... ok
+test night_sleep::a_claim_back_mid_sleep_keeps_the_fallbacks_sleep_to_the_morning ... ok
+test night_sleep::a_dead_claimer_passes_the_night_to_the_fallback_with_no_lift ... ok
+test night_sleep::a_lamp_nobody_saw_all_day_keeps_its_head_down_into_the_next_night ... ok
+test night_sleep::a_newer_episode_takes_the_night_over_with_no_lift ... ok
+test night_sleep::a_skills_restart_mid_night_hands_the_sleep_over_with_the_head_down ... ok
+test night_sleep::night_sleep_turned_off_claims_the_night_and_nothing_sleeps ... ok
+test night_sleep::the_claim_names_night_sleep_on_or_off_and_nothing_without_it ... ok
+test night_sleep::the_skill_and_the_product_catalogue_name_the_same_night ... ok
+test night_sleep::the_skill_route_settles_with_the_built_in_sleep_and_wakes_on_the_same_reflexes ... ok
+test night_sleep::the_sleep_grant_is_core_rest_alone_and_asks_nobody ... ok
+test night_sleep::with_no_claim_the_fallback_sleeps_as_the_built_in_one ... ok
+test night_sleep::with_the_switch_a_gap_in_the_voice_begins_the_fifteen_minutes_again ... ok
+test night_sleep::with_the_switch_a_push_begins_the_fifteen_minutes_again_and_no_push_does_not ... ok
+test night_sleep::with_the_switch_a_push_held_begins_the_fifteen_minutes_again_once_at_its_start ... ok
+test night_sleep::with_the_switch_a_push_let_go_and_pushed_again_begins_it_again ... ok
+test night_sleep::with_the_switch_a_sound_heard_as_no_words_is_slept_through ... ok
+test night_sleep::with_the_switch_a_spell_of_thinking_alone_is_slept_through ... ok
+test night_sleep::with_the_switch_a_touch_begins_the_fifteen_minutes_again_and_one_off_does_not ... ok
+test night_sleep::with_the_switch_the_lamp_speaking_begins_the_fifteen_minutes_again ... ok
+test night_sleep::with_the_switch_the_name_heard_with_no_words_begins_it_again ... ok
+test night_sleep::with_the_switch_words_heard_after_the_voice_rests_begin_it_again ... ok
+test night_sleep::with_the_switch_words_heard_begin_the_fifteen_minutes_again ... ok
+test night_sleep::without_the_switch_each_sound_begins_the_fifteen_minutes_again ... ok
+test package::a_core_skill_is_never_installed_replaced_or_removed ... ok
+test package::a_core_skill_or_one_without_a_version_or_that_does_not_load_is_not_packed ... ok
+test package::a_disabled_core_stays_in_inventory_and_cannot_be_packaged_replaced_or_removed ... ok
+test package::a_disabled_installable_reserves_its_tool_but_adds_no_live_function ... ok
+test package::a_folder_with_a_link_or_nowhere_to_go_is_not_installed ... ok
+test package::a_list_says_each_skills_name_kind_version_and_what_it_may_use ... ok
+test package::a_package_changed_damaged_or_out_of_shape_installs_nothing ... ok
+test package::a_package_installs_whole_its_files_checked_and_open_to_the_parts ... ok
+test package::a_packages_signature_is_carried_and_not_checked ... ok
+test package::a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed ... ok
+test package::a_skill_packs_to_a_versioned_tar_of_its_files_and_their_sha256_the_same_each_time ... ok
+test package::a_skill_put_on_from_a_package_keeps_its_sha256_and_manifest_and_one_from_a_folder_none ... ok
+test package::a_skill_renamed_aside_but_not_deleted_is_answered_done_its_path_in_the_journal_only ... ok
+test package::a_skill_whose_tool_another_skill_has_is_not_installed ... ok
+test package::an_install_waits_while_another_run_holds_the_skills_folder ... ok
+test package::an_installable_skill_is_replaced_by_its_next_version_and_removed_whole ... ok
+test package::the_apps_off_and_on_are_kept_and_a_skill_of_the_lamp_itself_is_refused ... ok
+test package::the_daily_journal_opens_beside_the_apps_off_in_a_0700_state_folder ... ok
+test package::the_manage_helper_refuses_core_skills_and_bad_names_on_its_own ... ok
+test package::the_manage_helper_waits_for_a_held_folder_only_so_long_then_does_nothing ... ok
+test package::the_off_file_is_never_written_or_read_through_a_link ... ok
+test package::what_a_killed_install_or_remove_left_is_deleted_by_the_next_install ... ok
+test routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum ... ok
+test routine_service::denied_body_or_speak_never_reaches_expression_or_say ... ok
+test routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline ... ok
+test routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest ... ok
+test routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum ... ok
+test skills::a_baseline_coming_in_mid_run_is_no_noticing ... ok
+test skills::a_breath_held_until_it_ends_is_given_back_when_its_skill_is_removed ... ok
+test skills::a_breath_until_it_ends_is_asked_of_the_ring_and_given_back_when_the_trigger_ends ... ok
+test skills::a_breath_until_it_ends_without_the_ring_is_held_steady_and_given_back ... ok
+test skills::a_case_calls_the_skills_tool_at_its_time_and_needs_no_recording_for_it ... ok
+test skills::a_chance_held_back_by_a_talk_waits_for_its_end_within_the_wait ... ok
+test skills::a_clip_dropped_for_another_skill_says_why_and_who_holds_the_body ... ok
+test skills::a_clip_ended_for_a_higher_ask_is_followed_by_nothing ... ok
+test skills::a_clip_the_body_said_dropped_is_followed_by_nothing ... ok
+test skills::a_colour_until_it_ends_is_loaded_and_refused_with_a_for_or_keep ... ok
+test skills::a_condition_changed_by_a_reload_begins_again ... ok
+test skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end ... ok
+test skills::a_declared_tool_is_in_the_tools_file_and_a_call_runs_the_skills_steps ... ok
+test skills::a_dim_at_the_lowest_level_changes_nothing_and_is_given_back_as_nothing ... ok
+test skills::a_dim_held_until_it_ends_is_given_back_when_its_skill_is_removed ... ok
+test skills::a_dim_until_it_ends_asked_of_the_ring_is_given_back_when_the_trigger_ends ... ok
+test skills::a_dim_until_it_ends_is_held_and_given_back_when_the_trigger_ends ... ok
+test skills::a_dim_until_it_ends_stays_past_the_says_outcome_until_the_trigger_ends ... ok
+test skills::a_dropped_chance_says_its_gate_once ... ok
+test skills::a_field_above_a_line_for_a_while_once_a_spell_and_only_with_someone_there ... ok
+test skills::a_folder_beginning_with_a_dot_is_passed_over ... ok
+test skills::a_found_with_no_look_held_is_refused ... ok
+test skills::a_groups_hour_goes_to_the_member_waiting_longest_while_it_waits ... ok
+test skills::a_hand_on_the_body_ends_the_dance_and_the_clip_is_not_sent_again ... ok
+test skills::a_held_run_ends_when_its_trigger_value_expires_or_its_topic_goes_silent ... ok
+test skills::a_history_from_before_its_words_says_the_built_in_ones_for_one_release ... ok
+test skills::a_history_is_told_to_the_call_from_room_presence_and_held_to_its_rules ... ok
+test skills::a_last_clip_dropped_for_another_skill_is_said_at_the_runs_end ... ok
+test skills::a_level_is_stepped_to_from_the_level_shown_and_given_back ... ok
+test skills::a_light_changed_while_a_breath_was_held_is_left_as_it_is ... ok
+test skills::a_light_files_pattern_is_loaded_and_held_to_its_bounds ... ok
+test skills::a_light_show_plays_its_frames_in_turn_and_stops_when_someone_speaks ... ok
+test skills::a_light_someone_changed_while_it_was_held_is_left_as_it_is ... ok
+test skills::a_line_the_person_spoke_over_is_not_followed_by_the_dance ... ok
+test skills::a_line_with_no_words_does_not_end_a_search ... ok
+test skills::a_look_at_a_face_subscribes_to_the_faces_whatever_the_trigger ... ok
+test skills::a_macs_appledouble_files_are_passed_over ... ok
+test skills::a_not_equals_condition_holds_while_the_field_is_anything_else_for_its_time ... ok
+test skills::a_pause_ends_a_search_its_pose_and_its_light ... ok
+test skills::a_queued_run_whose_item_left_is_let_go_and_the_next_still_starts ... ok
+test skills::a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go ... ok
+test skills::a_reading_pose_needs_a_known_mood_and_a_for_of_at_most_two_minutes ... ok
+test skills::a_rearm_line_waits_for_the_field_to_stay_past_it_for_a_while ... ok
+test skills::a_recorded_case_fails_when_the_skill_no_longer_does_what_it_expects ... ok
+test skills::a_reload_ends_a_held_run_whose_skill_or_trigger_is_gone ... ok
+test skills::a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way ... ok
+test skills::a_repeat_tool_call_holds_the_runs_pose_again_and_only_that ... ok
+test skills::a_rise_after_a_gap_in_readings_or_a_dropout_is_not_one ... ok
+test skills::a_rise_and_an_each_read_a_dotted_path_and_an_empty_step_is_refused ... ok
+test skills::a_rise_begins_again_at_a_reload_and_is_asked_again_as_it_was ... ok
+test skills::a_rise_fires_on_a_sharp_climb_and_never_on_a_slow_one_or_noise ... ok
+test skills::a_rise_rearms_only_after_its_line_and_its_cooldown ... ok
+test skills::a_run_is_noticed_by_the_eyes_activity_changing_or_a_stand_up ... ok
+test skills::a_run_noticed_by_a_look_a_move_a_word_or_leaving_is_not_ignored ... ok
+test skills::a_say_from_the_voices_own_asks_for_it_by_source_and_moves_with_it ... ok
+test skills::a_say_never_begun_moves_nothing_and_changes_no_light ... ok
+test skills::a_say_now_after_a_reload_moved_a_held_trigger_does_nothing ... ok
+test skills::a_say_now_with_its_trigger_still_held_dims_until_it_ends ... ok
+test skills::a_say_of_the_persons_reminder_or_task_news_reads_its_topic ... ok
+test skills::a_say_table_is_exact_words_or_a_note_at_its_priority ... ok
+test skills::a_scene_after_the_run_ended_still_lets_a_pose_held_again_go ... ok
+test skills::a_scene_keeps_the_persons_light_and_the_next_scene_lets_the_pose_go ... ok
+test skills::a_search_is_held_to_its_rules_and_its_looks_are_counted ... ok
+test skills::a_search_looks_at_the_desk_first_then_where_asked_and_no_more_than_its_looks ... ok
+test skills::a_search_told_found_keeps_its_pose_and_takes_no_look ... ok
+test skills::a_searchs_found_is_held_to_its_rules ... ok
+test skills::a_searchs_note_and_walk_are_its_files_and_go_in_the_tools_file ... ok
+test skills::a_searchs_pose_held_past_its_run_still_ends_when_someone_speaks ... ok
+test skills::a_searchs_pose_held_past_its_run_still_ends_when_the_lamp_is_paused ... ok
+test skills::a_shared_budget_gives_its_group_its_runs_an_hour_between_them ... ok
+test skills::a_shared_stop_is_one_groups_only ... ok
+test skills::a_short_sound_loads_and_a_long_loud_or_other_one_is_refused_with_why ... ok
+test skills::a_skill_reads_and_does_only_what_its_permissions_declare ... ok
+test skills::a_skill_rests_until_the_morning_after_runs_nobody_noticed ... ok
+test skills::a_skill_runs_once_at_a_time_and_says_so_when_it_cannot ... ok
+test skills::a_skills_kind_and_version_are_read_and_checked ... ok
+test skills::a_skills_own_move_loads_as_the_body_takes_it_and_a_bad_one_is_refused_with_why ... ok
+test skills::a_skills_stop_is_one_function_held_to_its_rules ... ok
+test skills::a_skills_stop_snoozes_it_until_the_morning_or_turns_it_off_until_asked ... ok
+test skills::a_sound_is_asked_of_the_voice_and_its_refusal_is_said_in_the_event ... ok
+test skills::a_step_for_some_choices_is_made_only_for_them_and_the_default_stands_in ... ok
+test skills::a_timed_condition_begins_again_after_its_value_expired ... ok
+test skills::a_tool_is_one_skills_a_core_skills_first ... ok
+test skills::a_tool_needs_no_trigger_and_a_look_needs_a_tool ... ok
+test skills::a_tools_call_runs_only_while_its_conditions_hold_on_values_that_last ... ok
+test skills::a_tools_choice_and_flag_are_told_to_the_model_and_checked_on_a_call ... ok
+test skills::a_turned_pose_takes_the_place_of_the_one_held ... ok
+test skills::a_watch_from_before_its_words_says_the_built_in_ones_for_one_release ... ok
+test skills::a_watch_is_turned_only_by_its_tool_and_holds_to_its_permissions ... ok
+test skills::an_active_window_starts_a_skill_only_between_its_hours ... ok
+test skills::an_expired_face_is_not_looked_at_and_the_other_steps_still_run ... ok
+test skills::an_expired_queued_call_is_never_committed ... ok
+test skills::an_installable_or_addon_declaring_a_core_grant_is_refused ... ok
+test skills::an_installable_skill_goes_on_and_off_a_running_lamp_with_nothing_restarted ... ok
+test skills::an_items_run_asked_of_the_policy_goes_ahead_only_while_its_item_holds ... ok
+test skills::an_items_tasks_ask_names_its_task_and_a_schedule_ask_does_not ... ok
+test skills::an_unknown_holds_condition_holds_only_while_its_topic_has_said_nothing ... ok
+test skills::another_skills_dropped_clip_is_not_the_runs_own ... ok
+test skills::asking_the_policy_a_hello_made_and_not_noticed_rests ... ok
+test skills::asking_the_policy_a_skill_acts_only_on_a_say_now_that_names_its_ask ... ok
+test skills::asking_the_policy_a_skill_that_is_not_a_hello_asks_its_act ... ok
+test skills::asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait ... ok
+test skills::asking_the_policy_with_nobody_to_answer_is_no_at_once ... ok
+test skills::daily_held_dim_keeps_clock_reload_and_restart_fences ... ok
+test skills::daily_rise_revalidation_keeps_window_and_reload_fences ... ok
+test skills::disabled_skills_enter_neither_tools_nor_body_metadata ... ok
+test skills::each_item_of_a_list_comes_or_turns_and_a_restart_or_reload_is_not_news ... ok
+test skills::each_item_of_a_list_on_its_own_and_steps_by_the_trigger_that_fired ... ok
+test skills::each_kept_off_file_keeps_its_skills_off ... ok
+test skills::every_skill_folder_passes_its_own_recorded_tests ... ok
+test skills::every_skill_folder_says_its_kind_and_version ... ok
+test skills::exact_say_and_routine_cue_share_one_speech_slot ... ok
+test skills::exact_words_reach_the_voice_unchanged_at_their_priority ... ok
+test skills::guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s ... ok
+test skills::guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again ... ok
+test skills::guard_mode_from_the_app_is_the_owners_alone_and_the_switch_closed_ends_it ... ok
+test skills::guard_mode_pauses_under_the_persons_light_until_they_ask_again ... ok
+test skills::guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face ... ok
+test skills::guard_modes_new_words_come_only_with_their_switch ... ok
+test skills::item_runs_go_by_the_items_number_across_triggers ... ok
+test skills::most_a_day_lets_a_skill_start_itself_that_often_a_local_day ... ok
+test skills::news_and_reminder_words_are_checked_as_the_voice_reads_them ... ok
+test skills::no_skill_may_take_the_reserved_never_mind_tool ... ok
+test skills::off_is_kept_as_one_line_a_skill_and_a_snooze_is_not ... ok
+test skills::onboarding_consent_clauses_cannot_be_removed_when_loading_or_packaging ... ok
+test skills::onboarding_data_is_required_and_checked_before_a_skill_loads ... ok
+test skills::onboarding_pending_snapshot_is_asked_once_and_retry_is_an_explicit_edge ... ok
+test skills::onboarding_refuses_wrong_kind_wrong_trigger_and_unbounded_pending_identity ... ok
+test skills::onboarding_request_names_invitation_and_has_no_extra_tool_or_authority ... ok
+test skills::present_for_a_while_through_short_dropouts_once_a_sitting_and_only_while_resting ... ok
+test skills::quiet_hours_keep_a_skill_still_and_so_does_a_time_of_day_not_known ... ok
+test skills::quiet_hours_keep_their_clock_hours_across_summer_time_in_the_lamps_zone ... ok
+test skills::resting_a_budget_queue_and_a_while_without_a_wait_say_why_not_run ... ok
+test skills::routines_need_each_output_grant_and_their_implicit_voice_read ... ok
+test skills::someone_speaking_ends_a_search_its_pose_and_its_light ... ok
+test skills::task_news_the_policy_declines_does_nothing_and_asks_once_a_task ... ok
+test skills::the_asking_lines_late_words_do_not_end_its_search ... ok
+test skills::the_body_drops_a_clip_sent_at_the_first_ones_length_and_takes_one_sent_a_few_steps_later ... ok
+test skills::the_light_going_out_is_asked_of_the_ring_with_its_fade_and_given_back_when_the_trigger_ends ... ok
+test skills::the_light_going_out_is_loaded_with_its_fade_and_refused_with_anything_else ... ok
+test skills::the_loader_holds_kept_lights_shows_turns_and_choices_to_their_rules ... ok
+test skills::the_loader_refuses_a_clip_it_does_not_have_and_arguments_it_cannot_use ... ok
+test skills::the_loader_refuses_a_rearm_line_quiet_hours_or_an_end_it_cannot_use ... ok
+test skills::the_loader_refuses_a_rise_it_cannot_judge ... ok
+test skills::the_loader_refuses_an_again_it_cannot_use ... ok
+test skills::the_loader_refuses_an_item_trigger_or_a_step_it_cannot_use ... ok
+test skills::the_loader_refuses_what_it_cannot_do ... ok
+test skills::the_nudge_limits_are_held_to_their_rules ... ok
+test skills::the_permissions_refuse_every_call_and_action_they_do_not_give ... ok
+test skills::the_program_dances_again_on_dance_again_but_not_on_a_noise ... ok
+test skills::the_program_does_nothing_without_the_skip ... ok
+test skills::the_program_forgets_a_snooze_at_a_restart ... ok
+test skills::the_program_keeps_a_skill_off_across_a_restart ... ok
+test skills::the_program_looks_and_lights_with_the_words_and_gives_the_light_back ... ok
+test skills::the_program_says_each_items_news_in_turn ... ok
+test skills::the_startle_is_its_granted_skills_move_and_nothing_else ... ok
+test skills::the_tools_socket_lost_is_made_again_and_the_folder_gone_ends_lamp_skills ... ok
+test skills::the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due ... ok
+test skills::the_zone_flags_are_refused_before_the_start_when_they_cannot_stand ... ok
+test skills::thinking_after_a_moment_of_speaking_is_still_the_line ... ok
+test skills::through_and_broken_by_are_refused_where_they_mean_nothing ... ok
+test skills::unplug_core_is_installed_but_hidden_and_uncallable_with_switch_off ... ok
+test skills::unplug_is_only_an_explicit_single_step_and_admission_is_never_readiness ... ok
+test skills::unplug_operation_is_the_core_grant_not_the_skill_name ... ok
+test skills::unplug_requires_core_kind_and_each_declared_permission ... ok
+test skills::unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt ... ok
+test skills::unplug_words_are_the_granted_skills_own ... ok
+test skills::watch_you_leave_asked_of_the_policy_goes_ahead_only_while_a_side_is_chosen ... ok
+test skills::who_was_here_marks_someone_the_lamp_knows_only_with_known_faces_and_never_names_them ... ok
+test skills::who_was_here_names_only_who_said_yes_and_only_to_a_skill_with_known_faces ... ok
+test skills::with_body_requests_each_gesture_a_skill_sends_says_who_asks ... ok
+test skills::with_no_over_from_the_body_the_second_clip_is_not_sent ... ok
+test skills::with_the_policy_asked_only_a_run_made_can_be_ignored ... ok
+test skills::with_the_switch_a_skills_light_is_asked_of_the_ring_and_the_persons_never_touched ... ok
+test skills::with_the_switch_and_nothing_to_take_it_the_light_is_left_and_the_run_says_why ... ok
+test skills::within_its_while_a_tool_runs_again_only_when_what_was_heard_asks_for_it ... ok
+test skills::without_body_requests_a_last_clip_dropped_is_not_said ... ok
+test skills::without_the_ring_the_light_is_never_put_out ... ok
+test skills::without_the_skip_nothing_the_skill_starts_is_done ... ok
+test skills::words_after_the_voice_starts_again_end_a_search ... ok
+test skills::write_an_off_fixture ... ignored, writes a fixture
+test store::a_catalogue_entry_installs_only_the_package_it_names ... ok
+test store::a_package_signed_with_the_update_channels_key_installs_and_is_listed ... ok
+test store::an_install_waits_for_a_held_folder_only_so_long_then_writes_nothing ... ok
+test store::an_older_version_is_refused_and_the_same_or_a_newer_one_taken ... ok
+test store::an_over_size_package_or_a_path_trick_link_or_core_name_is_refused ... ok
+test store::an_unsigned_wrongly_signed_or_tampered_package_is_refused_before_anything_is_written ... ok
+test store::only_an_https_url_is_fetched_and_a_redirect_only_to_https ... ok
+test store::the_real_helper_refuses_on_its_own ... ok
+test welcome_stuck::a_chance_let_go_after_its_wait_says_so ... ok
+test welcome_stuck::an_arrival_after_a_say_that_expired_is_greeted ... ok
+
+test result: ok. 303 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 246.84s
+
+
+running 31 tests
+test a_second_start_and_finish_are_terminal ... ok
+test a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation ... ok
+test byte_identical_file_edits_remain_accepted_with_full_content_reads ... ok
+test catalog_body_and_core_metadata_follow_filtered_duplicate_tool_winners ... ok
+test disabled_media_reserves_its_tool_without_advertisement_or_authority ... ok
+test every_asset_scan_reads_all_payloads_and_preserves_live_offers ... ok
+test exact_context_offer_and_unknown_private_enums_are_checked ... ok
+test in_place_permission_edit_and_asset_edit_revoke_existing_offers ... ok
+test original_start_and_finish_boundaries_never_move ... ok
+test paths_links_and_modified_assets_are_refused ... ok
+test real_call_socket_keeps_legacy_tools_and_requires_private_spoken_context ... ok
+test real_service_switch_off_hides_and_refuses_media_with_valid_context ... ok
+test refused_cap_reload_keeps_audio_generation_but_asset_scan_still_revokes_it ... ok
+test refuses_every_ungranted_or_non_tool_shape_and_unknown_values ... ok
+test renewal_never_revives_a_lease_and_terminal_call_cannot_be_reissued ... ok
+test replacement_revocation_restart_and_stale_scans_fail_quiet ... ok
+test requested_audio_cannot_mix_with_proposals_or_unplug_words ... ok
+test requested_audio_permission_cannot_turn_search_found_into_a_run ... ok
+test requested_audio_refuses_a_granted_daily_clock_trigger ... ok
+test requested_audio_refuses_exact_and_ranked_confirmation_tables ... ok
+test requested_audio_refuses_fully_granted_limits_and_routine_steps ... ok
+test requested_audio_refuses_fully_granted_rise_triggers ... ok
+test requested_audio_refuses_fully_granted_shows_and_choice_steps ... ok
+test requested_audio_refuses_history_that_an_ordinary_tool_can_tell ... ok
+test requested_audio_refuses_valid_nudge_limits_and_stop_settings ... ok
+test requested_audio_refuses_valid_search_and_watch_settings ... ok
+test restored_size_and_modified_time_cannot_hide_audio_or_permission_edits ... ok
+test sixteen_maximum_recordings_report_full_content_scan_costs ... ok
+test the_bounded_table_refuses_instead_of_evicting_replay_protection ... ok
+test unchanged_file_metadata_cannot_validate_a_different_public_asset_digest ... ok
+test validates_and_packs_while_off_but_never_advertises_or_runs_media ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.29s
+
+
+running 114 tests
+test apply::tests::a_new_skills_folder_is_removed_when_it_is_put_back_and_a_folder_in_use_stays ... ok
+test apply::tests::a_path_both_a_setting_and_an_image_file_is_refused_with_nothing_written ... ok
+test apply::tests::a_put_back_asked_again_after_being_cut_short_puts_every_record_back ... ok
+test apply::tests::a_reload_that_fails_fails_the_apply_and_a_speaker_that_fails_is_said ... ok
+test apply::tests::a_removed_setting_goes_only_where_it_is_still_the_builds ... ok
+test apply::tests::a_request_with_a_field_it_does_not_know_is_read ... ok
+test apply::tests::a_setting_still_the_builds_is_written_and_one_the_lamp_changed_is_kept ... ok
+test apply::tests::a_setting_the_lamp_removed_stays_removed_and_one_never_there_is_written ... ok
+test apply::tests::a_signed_image_file_outside_the_list_is_refused_with_nothing_written ... ok
+test apply::tests::a_unit_systemd_cannot_load_writes_nothing ... ok
+test apply::tests::an_envelope_signed_with_another_key_or_of_another_build_writes_nothing ... ok
+test apply::tests::put_back_keeps_a_file_changed_since_and_a_stale_back_file_is_not_used ... ok
+test apply::tests::put_back_restores_each_file_byte_for_byte_and_its_mode ... ok
+test apply::tests::put_back_restores_the_images_files_and_reloads_again ... ok
+test apply::tests::the_apply_path_never_restarts_or_signals_journald ... ok
+test apply::tests::the_apply_unit_can_write_every_carried_path_and_never_names_journald ... ok
+test apply::tests::the_images_files_are_written_where_the_lamp_has_one_the_image_shipped ... ok
+test apply::tests::the_tmpfiles_are_created_only_when_they_are_there ... ok
+test apply::tests::the_tmpfiles_install_writes_is_one_it_shipped ... ok
+test apply::tests::the_variants_file_is_written_and_none_of_another ... ok
+test apply::tests::unrecorded_tmpfiles_an_install_shipped_are_the_builds_and_others_the_lamps ... ok
+test apply::tests::without_a_request_nothing_is_done ... ok
+test apply::tests::without_the_image_asked_or_from_an_older_copy_none_is_written ... ok
+test check_units::tests::a_masked_unit_fails_an_implicit_slice_does_not_and_white_space_shows ... ok
+test check_units::tests::a_units_own_path_line_is_its_text_and_hides_nothing ... ok
+test check_units::tests::exactly_the_product_passes_and_a_unit_from_elsewhere_does_not ... ok
+test check_units::tests::same_changed_drop_in_extra_and_missing_are_each_said_and_fail_the_check ... ok
+test check_units::tests::systemctl_cat_is_read_file_by_file_and_a_comment_with_a_path_is_no_file ... ok
+test check_units::tests::the_images_unit_is_the_images_not_extra_and_compared_with_its_variant ... ok
+test check_units::tests::the_product_as_install_writes_it_passes ... ok
+test fetch::tests::a_chunked_file_and_one_to_the_end ... ok
+test fetch::tests::a_file_by_its_length_after_a_redirect ... ok
+test fetch::tests::a_folder_on_the_lamp ... ok
+test fetch::tests::a_name_lookup_that_hangs_is_given_up_and_no_round_starts_another_until_it_ends ... ok
+test fetch::tests::a_release_file_from_github ... ignored
+test fetch::tests::an_answered_lookup_is_counted_out_before_its_answer_arrives ... ok
+test fetch::tests::missing_too_large_short_and_other_answers ... ok
+test fetch::tests::no_network_is_unreachable ... ok
+test fetch::tests::urls_and_redirects ... ok
+test image::tests::a_file_not_listed_as_shipped_is_refused ... FAILED
+test image::tests::a_unit_reloads_systemd_a_rule_reloads_udev_and_asound_restarts_the_voice ... ok
+test image::tests::every_image_file_of_every_variant_is_listed_as_shipped ... FAILED
+test image::tests::journald_is_never_restarted_nor_signalled ... ok
+test image::tests::the_variant_is_the_images_and_none_is_standard ... ok
+test install::tests::a_timed_service_is_never_enabled_and_its_timer_is ... ok
+test install::tests::a_unit_through_current_is_read ... ok
+test install::tests::every_deploy_product_unit_is_installed_or_named_left_out ... ok
+test install::tests::every_product_part_starts_through_its_current_link ... ok
+test install::tests::every_tool_the_factory_steps_run_is_installed_where_they_look ... ok
+test install::tests::no_product_unit_names_a_lamp ... ok
+test install::tests::offsets_are_read ... ok
+test install::tests::the_cloud_is_enabled_with_the_lamp ... ok
+test install::tests::the_eyes_camera_helper_socket_is_enabled_and_names_the_eyes_camera ... ok
+test install::tests::the_skills_manage_socket_is_enabled_and_its_template_is_not ... ok
+test install::tests::the_wifi_helper_is_never_listed_without_its_restore_at_boot ... ok
+test judge::tests::a_part_that_stays_up_with_one_process_and_says_it_is_well_is_well ... ok
+test judge::tests::restarted_failed_or_another_process_is_not_well ... ok
+test judge::tests::the_part_s_own_word_counts_against_what_it_said_before ... ok
+test manifest::tests::a_build_for_a_newer_updater_is_refused_by_an_older_one_only ... ok
+test manifest::tests::a_key_made_by_openssl_signs_as_well ... ok
+test manifest::tests::a_manifest_without_min_updater_is_written_and_read_as_before ... ok
+test manifest::tests::a_newer_manifest_this_updater_cannot_read_is_refused_for_its_updater ... ok
+test manifest::tests::a_sealed_manifest_opens_with_its_key_and_gives_back_its_bytes ... ok
+test manifest::tests::a_setting_with_a_field_it_does_not_know_is_still_read ... ok
+test manifest::tests::an_image_file_outside_the_list_listed_twice_or_not_its_sha_is_refused ... ok
+test manifest::tests::another_key_a_changed_byte_or_a_changed_signature_is_refused ... ok
+test manifest::tests::min_updater_is_signed_with_the_rest ... ok
+test manifest::tests::min_updater_raised_under_the_same_signature_is_a_bad_signature ... ok
+test manifest::tests::models_are_read_only_with_the_updater_they_need_and_plain_paths ... ok
+test manifest::tests::names_are_plain ... ok
+test manifest::tests::nothing_but_a_plain_manifest_is_signed_or_taken ... ok
+test manifest::tests::settings_are_read_only_with_the_updater_they_need_and_their_own_paths ... ok
+test manifest::tests::the_reset_plan_is_read_only_with_its_updater_and_its_own_path ... ok
+test models::tests::a_link_into_the_store_is_relative_and_a_unit_reads_by_path_or_folder ... ok
+test product_skills::tests::a_link_in_place_of_a_core_file_is_put_back_and_never_read ... ok
+test product_skills::tests::each_file_is_one_of_three ... ok
+test product_skills::tests::only_plain_paths_in_the_skills_it_names_are_taken ... ok
+test product_skills::tests::the_bundle_of_the_repository_is_what_install_writes ... ok
+test product_skills::tests::what_is_written_is_put_back_and_a_file_changed_since_is_left ... ok
+test publish::tests::binaries_and_each_lamps_units_but_nothing_else ... ok
+test publish::tests::models_are_carried_with_the_updater_they_need ... ok
+test publish::tests::the_images_files_are_carried_with_the_updater_they_need ... FAILED
+test publish::tests::the_products_settings_are_carried_with_the_updater_they_need ... ok
+test quiet::tests::a_voice_that_says_nothing_is_never_quiet ... ok
+test quiet::tests::forty_five_seconds_of_nothing_after_the_last_word ... ok
+test quiet::tests::hearing_thinking_or_speaking_is_a_turn ... ok
+test quiet::tests::quiet_needs_as_long_a_watch ... ok
+test records::tests::a_link_left_beside_is_replaced_and_never_written_through ... ok
+test records::tests::a_state_from_a_later_build_keeps_its_fields_across_a_save ... ok
+test records::tests::a_state_from_before_the_settings_reads_and_writes_as_before ... ok
+test records::tests::a_state_that_cannot_be_read_is_kept_aside ... ok
+test records::tests::each_kept_state_and_journal_reads_as_saved ... ok
+test records::tests::one_at_a_time ... ok
+test records::tests::state_journal_and_previous_units_are_kept ... ok
+test records::tests::write_records_fixtures ... ignored, writes records fixtures: run by hand with LAMP_UPDATE_RECORDS_FIXTURE set
+test status::tests::a_restart_keeps_the_last_result_each_end_is_said_and_it_is_said_again ... ok
+test status::tests::the_status_is_the_records_build_the_phase_and_the_last_end_without_its_reason ... ok
+test status::tests::the_value_lasts_three_periods_so_a_dead_updater_reads_stale ... ok
+test unit::tests::a_new_build_is_written_everywhere_the_folder_is_named ... ok
+test unit::tests::comments_do_not_make_a_unit_another ... ok
+test unit::tests::lamp_4aces_own_units_are_read ... ok
+test unit::tests::only_a_part_installed_by_build_is_a_program ... ok
+test unit::tests::the_generic_package_sets_up_and_resets_as_the_product_does ... ok
+test unit::tests::the_generic_voice_answers_whom_the_product_does ... ok
+test unit::tests::the_generic_voice_runs_the_ring_as_the_product_does ... ok
+test unit::tests::the_generic_voice_says_its_failures_as_the_product_does ... ok
+test world::tests::self_recovery_accepts_an_armed_timer_and_an_inactive_service ... ok
+test world::tests::self_recovery_refuses_a_timer_not_armed_persistently ... ok
+test world::tests::self_recovery_refuses_an_unloaded_masked_or_ephemeral_service ... ok
+test world::tests::self_recovery_refuses_malformed_or_unexpected_query_records ... ok
+test world::tests::self_recovery_requires_one_of_each_record_and_required_property ... ok
+test world::tests::systemctl_show_is_read_unit_by_unit ... ok
+test world::tests::the_bus_hears_the_voice_and_not_an_old_state ... ok
+test world::tests::the_real_disk_has_room ... ok
+
+failures:
+
+---- image::tests::a_file_not_listed_as_shipped_is_refused stdout ----
+
+thread 'image::tests::a_file_not_listed_as_shipped_is_refused' (705359699) panicked at crates/update/src/image.rs:271:50:
+called `Result::unwrap_err()` on an `Ok` value: []
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- image::tests::every_image_file_of_every_variant_is_listed_as_shipped stdout ----
+
+thread 'image::tests::every_image_file_of_every_variant_is_listed_as_shipped' (705359701) panicked at crates/update/src/image.rs:235:36:
+/etc/systemd/system/lamp-cmedia-speaker.service of standard
+
+---- publish::tests::the_images_files_are_carried_with_the_updater_they_need stdout ----
+
+thread 'publish::tests::the_images_files_are_carried_with_the_updater_they_need' (705359795) panicked at crates/update/src/publish.rs:502:9:
+assertion `left == right` failed
+  left: None
+ right: Some(4)
+
+
+failures:
+    image::tests::a_file_not_listed_as_shipped_is_refused
+    image::tests::every_image_file_of_every_variant_is_listed_as_shipped
+    publish::tests::the_images_files_are_carried_with_the_updater_they_need
+
+test result: FAILED. 109 passed; 3 failed; 2 ignored; 0 measured; 0 filtered out; finished in 9.01s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test a_product_chat_request_offers_dance_at_the_bound ... ok
+test a_product_lamp_declares_every_function_it_has_within_the_bound ... ok
+test the_product_voice_s_functions_in_a_process_of_their_own ... ok
+test with_reports_on_dance_stays_at_the_bound ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+
+running 78 tests
+test a_blank_lamp_gets_every_part_its_units_and_nothing_started ... ok
+test a_blank_lamp_runs_every_product_skill_as_the_skill ... ok
+test a_build_without_a_part_is_refused_before_anything_is_written ... ok
+test a_build_without_the_bodys_factory_tools_still_installs ... ok
+test a_closed_etc_lampos_is_said_and_left_as_it_is ... ok
+test a_default_found_closed_is_opened_and_a_lamps_own_found_closed_is_said ... ok
+test a_device_key_found_open_is_narrowed_and_never_said ... ok
+test a_disabled_core_skill_turned_on_stays_on_through_an_install ... ok
+test a_failed_exit_note_write_keeps_reload_debt_for_the_next_install ... ok
+test a_failing_step_keeps_the_record_and_a_later_run_finishes ... ok
+test a_file_left_beside_by_a_run_cut_off_does_not_lend_its_mode_to_the_key ... ok
+test a_file_that_does_not_match_installs_nothing_of_it ... ok
+test a_key_a_reset_removed_is_never_put_back_from_v1s_config ... ok
+test a_lamp_set_up_before_setup_wrote_zone_env_gets_its_saved_zone_at_the_next_install ... ok
+test a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest ... ok
+test a_lamps_own_pins_on_the_old_guess_get_every_head_line ... ok
+test a_newer_build_moves_each_link_and_keeps_the_old_folders ... ok
+test a_newer_default_replaces_only_a_setting_nobody_changed ... ok
+test a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence ... ok
+test a_refused_service_install_records_nothing_and_keeps_the_drop_in ... ok
+test a_reset_then_prepare_does_not_restore_the_old_key ... ok
+test a_set_aside_holds_for_keys_there_and_after_a_mark_that_was_not_saved ... ok
+test a_setting_changed_on_the_lamp_is_kept_when_install_runs_again ... ok
+test a_setting_in_the_way_stops_the_install_before_any_is_written ... ok
+test a_setting_written_but_not_yet_recorded_is_still_installs ... ok
+test an_install_puts_a_core_skills_changed_file_back_and_says_so ... ok
+test an_install_stopped_after_writing_its_units_enables_at_the_next_run ... ok
+test an_install_whose_enable_failed_enables_at_the_next_run_and_keeps_its_settings_record ... ok
+test corrupt_records_are_set_aside_and_never_bring_back_a_key_a_reset_removed ... ok
+test every_part_of_the_brain_has_a_product_unit ... ok
+test every_part_of_the_lamp_waits_for_setups_marker_itself ... ok
+test every_skill_folder_is_in_the_product_or_says_why_not ... ok
+test harness_at_boot_gives_lamposs_manager_its_home_first ... ok
+test harness_is_set_to_start_at_boot_once_when_it_is_there ... ok
+test harness_off_after_a_first_install_leaves_no_linger ... ok
+test harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep ... ok
+test harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot ... ok
+test harness_on_keeps_a_harness_already_there ... ok
+test harness_on_stops_at_a_failing_step_and_leaves_no_link ... ok
+test harness_on_updates_its_own_older_harness_and_says_one_too_old ... ok
+test harness_versions_are_read_as_harness_prints_them ... ok
+test head_touch_comes_whole_and_never_beside_the_old_engines_head ... ok
+test install_places_every_exit_note_hook_and_keeps_other_drop_ins ... ok
+test install_places_the_voices_recorded_lines_where_the_product_voice_reads_them ... ok
+test install_records_the_tmpfiles_it_writes ... ok
+test install_setup_on_replaces_a_hand_placed_plan_and_keeps_the_old_in_the_records ... ok
+test lamp_update_back_waits_for_its_binary_rather_than_failing ... ok
+test missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept ... ok
+test prepare_sets_corrupt_records_aside_and_leaves_unreadable_ones_alone ... ok
+test prepare_then_reset_then_install_does_not_restore_the_old_key ... ok
+test product_routine_state_is_private_persistent_and_keeps_new_switches_off ... ok
+test product_units_pass_only_options_an_older_binary_takes ... ok
+test run_twice_it_changes_nothing ... ok
+test settings_written_before_one_that_fails_are_still_installs ... ok
+test setup_settings_are_written_only_with_setup_on_and_kept_once_changed ... ok
+test the_builds_plan_already_there_is_no_change_and_no_backup ... ok
+test the_device_key_is_provisioned_private_and_only_where_missing ... ok
+test the_exit_note_allowlist_is_exactly_clouds_product_services ... ok
+test the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs ... ok
+test the_parts_that_keep_local_time_read_the_zone_setup_saves ... ok
+test the_pinned_models_are_the_ones_their_parts_check ... ok
+test the_plans_install_shipped_are_listed ... ok
+test the_product_full_look_is_on_in_both_units_with_one_file ... ok
+test the_product_sees_who_speaks ... ok
+test the_product_skills_are_exactly_the_core_skills ... ok
+test the_second_route_gets_its_services_on_the_voices_key_and_a_lamps_own_is_kept ... ok
+test the_skills_tools_are_in_their_own_folder_which_the_voice_reads ... ok
+test the_tasks_part_closes_the_harness_a_told_task_started ... ok
+test the_tasks_part_waits_for_harness_rather_than_failing ... ok
+test the_voice_gets_its_service_and_the_lamps_device_key_from_v1s_config ... ok
+test time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set ... ok
+test tmpfiles_make_lock_folders_the_parts_accept_and_the_voices_sessions_folder ... ok
+test two_failed_runs_in_a_row_keep_a_written_setting_as_installs ... ok
+test unreadable_records_stop_install_rather_than_being_written_over ... ok
+test what_harness_service_status_still_has_is_read_from_its_json ... ok
+test what_harness_still_has_is_said_and_without_harness_the_record_is_kept ... ok
+test without_a_usable_key_nothing_is_written_and_the_key_is_never_said ... ok
+test without_setup_on_a_plan_there_follows_the_build_and_none_is_never_added ... ok
+
+test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 531.00s
+
+
+running 8 tests
+test ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths ... ok
+test ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose ... ok
+test image_journal::systemd_reads_it_last_beside_another_drop_in ... ok
+test image_journal::the_journal_is_kept_well_inside_the_ram_disk ... FAILED
+test image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases ... FAILED
+test image_ramlog::the_copy_back_leaves_the_journal_alone ... FAILED
+test scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder ... ok
+test scratch_paths::the_names_read_are_the_scratch_folders_only ... ok
+
+failures:
+
+---- image_journal::the_journal_is_kept_well_inside_the_ram_disk stdout ----
+
+thread 'image_journal::the_journal_is_kept_well_inside_the_ram_disk' (705458769) panicked at crates/update/tests/it/image_journal.rs:69:60:
+called `Result::unwrap()` on an `Err` value: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases stdout ----
+
+thread 'image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases' (705458770) panicked at crates/update/tests/it/image_ramlog.rs:16:6:
+called `Result::unwrap()` on an `Err` value: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+---- image_ramlog::the_copy_back_leaves_the_journal_alone stdout ----
+
+thread 'image_ramlog::the_copy_back_leaves_the_journal_alone' (705458771) panicked at crates/update/tests/it/image_ramlog.rs:86:9:
+bash: /private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS/crates/update/../../../robots/lamp/rootfs/usr/local/libexec/lamp-ramlog-postrotate: No such file or directory
+
+
+
+failures:
+    image_journal::the_journal_is_kept_well_inside_the_ram_disk
+    image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases
+    image_ramlog::the_copy_back_leaves_the_journal_alone
+
+test result: FAILED. 5 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.96s
+
+
+running 107 tests
+test a_bad_signature_or_a_bad_checksum_is_refused_with_nothing_installed ... ok
+test a_build_for_a_newer_updater_is_refused_and_taken_once_the_updater_can ... ok
+test a_build_of_only_new_product_skills_places_them_and_restarts_nothing ... ok
+test a_build_put_back_puts_its_settings_back_byte_for_byte ... ok
+test a_build_put_back_puts_the_images_files_back ... ok
+test a_build_put_back_puts_the_old_reset_plan_back ... ok
+test a_build_put_back_puts_the_product_skills_back ... ok
+test a_changed_model_is_fetched_checked_and_switched_with_its_part ... ok
+test a_command_is_read_within_its_bound_and_killed_after ... ok
+test a_core_skill_turned_on_stays_on_through_a_round ... ok
+test a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around ... ok
+test a_disk_too_full_for_a_second_copy_is_refused_before_anything_is_written ... ok
+test a_folder_made_two_builds_ago_is_removed_and_one_never_made_is_kept ... ok
+test a_hardware_profile_that_cannot_be_read_never_fails_the_round ... ok
+test a_lamp_short_of_room_for_the_models_refuses_before_fetching ... ok
+test a_lamp_update_back_from_before_the_plan_writes_the_rest_and_the_round_says_so ... ok
+test a_lamp_with_an_old_reset_plan_updated_by_a_round_ends_with_the_builds_and_a_backup ... ok
+test a_lamp_with_no_reset_plan_gets_none_from_a_round ... ok
+test a_lamp_without_lamp_update_apply_puts_the_build_back_with_nothing_written ... ok
+test a_lamps_own_asound_is_kept_and_the_voice_not_restarted_for_it ... ok
+test a_link_switch_cut_short_is_put_back_at_the_next_start ... ok
+test a_linked_part_keeps_its_build_and_the_one_before ... ok
+test a_linked_part_that_dies_is_put_back_by_its_link ... ok
+test a_model_fetch_cut_by_the_network_is_unreachable_not_refused ... ok
+test a_model_only_switch_cut_short_restarts_the_part_that_reads_it ... ok
+test a_model_switch_cut_short_is_put_back_at_the_next_start ... ok
+test a_model_switch_whose_part_dies_puts_the_model_back ... ok
+test a_model_that_cannot_be_put_back_leaves_the_others_put_back_and_the_journal_kept ... ok
+test a_model_that_does_not_match_its_sha_refuses_the_build_with_nothing_switched ... ok
+test a_new_build_is_installed_beside_the_old_and_switched ... ok
+test a_new_updater_not_confirmed_by_the_deadline_is_put_back ... ok
+test a_new_updater_that_confirms_keeps_its_switch ... ok
+test a_new_updater_that_exits_at_once_is_put_back ... ok
+test a_new_updater_that_refuses_every_manifest_is_put_back ... ok
+test a_new_worker_beside_an_unchanged_voice_gets_a_folder_named_by_its_list ... ok
+test a_part_put_back_says_its_restarts_and_last_line_in_the_outcome_only ... ok
+test a_part_that_dies_is_put_back_and_its_build_refused ... ok
+test a_part_that_says_it_is_in_error_is_put_back_after_its_minute ... ok
+test a_part_whose_folder_is_gone_is_installed_afresh ... ok
+test a_product_lamp_without_a_tmpfiles_record_takes_the_builds_tmpfiles ... ok
+test a_reset_plan_changed_on_the_lamp_is_replaced_by_a_round_never_kept ... ok
+test a_round_after_install_keeps_lamp_updates_own_folder ... ok
+test a_round_after_its_own_switch_keeps_the_old_binarys_folder ... ok
+test a_round_by_hand_keeps_the_folder_it_runs_from ... ok
+test a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail ... ok
+test a_round_keeping_second_json_still_reaches_deepseek_through_the_relay ... ok
+test a_round_places_second_json_before_a_voice_unit_that_needs_it ... ok
+test a_round_puts_a_core_skills_files_back_and_keeps_the_persons_own ... ok
+test a_round_that_cannot_place_second_json_writes_no_unit ... ok
+test a_round_that_sets_damaged_records_aside_keeps_the_keys_marked ... ok
+test a_round_with_nothing_to_change_only_checks ... ok
+test a_self_json_from_a_later_version_still_reads ... ok
+test a_self_json_the_disk_cannot_give_is_tried_again_next_round ... ok
+test a_skill_the_build_removes_leaves_the_turned_on_record_with_one_line ... ok
+test a_switch_cut_short_after_its_settings_puts_them_back_at_the_next_start ... ok
+test a_switch_cut_short_is_put_back_at_the_next_start ... ok
+test a_unit_the_build_carries_is_carried_with_the_build_written_in ... ok
+test a_voice_that_is_well_is_put_back_between_two_turns ... ok
+test an_old_updater_climbs_one_updater_a_round ... ok
+test an_older_build_is_not_taken ... ok
+test an_older_lamp_update_back_ignores_the_images_files_and_the_round_says_so ... ok
+test an_unchanged_model_is_not_fetched_and_its_file_stays ... ok
+test an_unreadable_journal_is_set_aside_and_the_round_goes_on ... ok
+test an_unreadable_self_json_with_both_builds_known_is_put_back ... ok
+test an_unreadable_self_json_with_the_builds_unknown_is_set_aside ... ok
+test an_updater_too_old_for_a_build_not_newer_than_installed_takes_nothing_it_carries ... ok
+test an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest ... ok
+test an_updater_too_old_for_a_build_without_an_updater_is_refused_with_nothing_written ... ok
+test asound_waits_for_a_quiet_moment_within_the_bound_and_then_for_the_next_round ... ok
+test both_kinds_of_part_switch_in_one_round_each_its_own_way ... ok
+test install_writes_the_fallback_and_no_round_touches_it ... ok
+test lamp_update_back_puts_back_an_unreadable_self_json ... ok
+test no_line_is_asked_of_a_good_switch_and_none_is_said_when_there_is_none ... ok
+test no_line_is_asked_when_systemd_itself_cannot_be_asked ... ok
+test no_network_changes_nothing_and_says_so ... ok
+test no_second_round_begins_while_lamp_updates_own_switch_waits ... END RAW PAYLOAD
+Retained raw stream: readers-full-tests.stderr
+Source: /private/tmp/tests-codex-boot-clock-mac-continuation-20261023/run-20261023T021033.713247Z/readers-full-tests.stderr
+Payload bytes: 53736
+Payload SHA256: d89f34f74e212a276f9134caeb94e13119ff5b37ebc9a4d12e705df2141e36b0
+BEGIN RAW PAYLOAD
+    Finished `test` profile [unoptimized] target(s) in 0.97s
+     Running unittests src/lib.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-5b10ae8b40069597)
+     Running unittests src/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-2dd79f9a5966afe8)
+     Running tests/it/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/it-a5aa86b625925383)
+     Running unittests src/lib.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-680740775cd48f79)
+     Running unittests src/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-3302b5f82630b00f)
+lamp-memory: health reports off: no --bus-root
+lamp-memory: health reports off: no --bus-root
+lamp-memory: health worker could not start; serving without reports
+lamp-memory: health worker could not start; serving without reports
+     Running unittests src/bin/lamp-memory-eval.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory_eval-0ecbf326ca3f4c08)
+     Running tests/forget_person.rs (/private/tmp/tests-codex-1569-target/debug/deps/forget_person-752f7b3f1dc97750)
+     Running tests/forget_shared_exchange.rs (/private/tmp/tests-codex-1569-target/debug/deps/forget_shared_exchange-d822f07aaf1741d8)
+     Running tests/forgot.rs (/private/tmp/tests-codex-1569-target/debug/deps/forgot-f9f048486ec58af0)
+     Running tests/health_control.rs (/private/tmp/tests-codex-1569-target/debug/deps/health_control-37010c4d4200149c)
+     Running tests/it/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/it-9b6d2773a8dc284c)
+     Running tests/paraphrase_fixture.rs (/private/tmp/tests-codex-1569-target/debug/deps/paraphrase_fixture-b2641065b2ec8594)
+     Running tests/voice_early_words.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_early_words-2b81231ad7f1ebc4)
+     Running tests/voice_follows_face.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_follows_face-f18a3bd0caf850a6)
+     Running tests/voice_forget.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_forget-6db8c6139e9eef33)
+     Running tests/voice_forget_about.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_forget_about-66cc01516d7ec5dc)
+     Running tests/voice_forget_named.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_forget_named-5ffcae745e1b572c)
+     Running tests/voice_link_used.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_link_used-1c109ee612822fe0)
+     Running tests/voice_observe.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_observe-c08fe7c55f98398b)
+     Running tests/voice_since_until.rs (/private/tmp/tests-codex-1569-target/debug/deps/voice_since_until-e446b6d4758f7ad3)
+     Running unittests src/lib.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-c97c684ec5255ab2)
+     Running unittests src/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-4a0c94b71b11baa7)
+     Running tests/it/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/it-4ed15c97132e2e7d)
+lamp-skills: skills from /tmp/cwloEM6q/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["air", "faces", "rests", "wave"]
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: skills from /tmp/skRckf8U/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: loaded []
+lamp-skills: hello Done: light white: done, to level 2: done, steady: its pattern needs the ring's LAMP_LIGHT_REQUESTS=on; held until its trigger ended; light given back to on blue at 3: done, done
+lamp-skills: skills from /tmp/sk2I1PEx/skills, the Policy's ask skipped, a skill's light asked of the ring on light/request
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: light white: asked of the ring at level 2, breathing every 10000 ms down to 1; held until its trigger ended; light given back: asked again with a time already passed
+lamp-skills: skills from /tmp/skLL0scE/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: light white: done, to level 2: done, steady: its pattern needs the ring's LAMP_LIGHT_REQUESTS=on; held until its trigger ended; light given back to on blue at 3: done, done
+lamp-skills: skills from /tmp/dndt5L1a/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: skill:nods: the body dropped nod (dropped: busy, skill, held by skill:stretch-break)
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 515 ms later; light warm: done; gesture nod: told the body; gesture nod: not sent, the body dropped nod (dropped: busy, skill, held by skill:stretch-break), so nothing more is sent; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/dnX7RDno/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 512 ms later; light warm: done; gesture nod: told the body; gesture nod: not sent, the body dropped nod (body/gesture), so nothing more is sent; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/dnmQG4mK/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: nods Done: after the say: spoken from 21 ms after the call, the turn over 498 ms later; light warm: done; gesture nod: told the body; gesture nod: not sent, the body dropped nod (body/gesture), so nothing more is sent; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/dn6SaJw4/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 516 ms later; light warm: done; gesture nod: told the body; gesture nod: told the body; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/stKKYJtc/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["tutor"]
+lamp-skills: tutor Triggered: the model called check_my_work with {}
+lamp-skills: tutor Triggered: the model called check_my_work with {}
+lamp-skills: tutor Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: nobody_has_this with {} not run: No skill of mine does that just now.
+lamp-skills: tutor Done: light white: done; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/sktwnlzX/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: dim: done; say: spoken; light given back to on blue at 1: it already was
+lamp-skills: skills from /tmp/sknNqbQz/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: dim: done; say: spoken; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/sk9MULFi/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: loaded []
+lamp-skills: hello Done: dim: done; held until its trigger ended; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/skJyhw4a/skills, the Policy's ask skipped, a skill's light asked of the ring on light/request
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: dim: asked of the ring at level 2; held until its trigger ended; light given back: asked again with a time already passed
+lamp-skills: skills from /tmp/skX3BYPV/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: dim: done; held until its trigger ended; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/skhC6h08/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: dim: done; say: spoken; held until its trigger ended; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/tp8S8Ty7/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: look_for with {"place":"found"} not run: look's search has no look held
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; someone spoke to the lamp: the search ended; light given back to on blue at 3: done
+lamp-skills: look_for with {"place":"found"} not run: look's search has no look held
+lamp-skills: skills from /tmp/dnDDjtZP/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 510 ms later; light warm: done; gesture nod: told the body; gesture nod: not sent, the body was pushed; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/dnRgXMpu/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: skill:nods: the body dropped nod (dropped: busy, skill, held by skill:stretch-break)
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 512 ms later; light warm: done; gesture nod: told the body; gesture nod: told the body; the body dropped nod (dropped: busy, skill, held by skill:stretch-break); light given back to on blue at 3: done
+lamp-skills: skills from /tmp/skyk1gDb/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: look at the face: told the body; light warm: done, to level 5: done, done; say: spoken; light given back to on blue at 3: done, done, done
+lamp-skills: skills from /tmp/skHjWcfd/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: light white: done, to level 2: done, steady: its pattern needs the ring's LAMP_LIGHT_REQUESTS=on; held until its trigger ended; light: changed meanwhile or not known, so left as it is
+lamp-skills: skills from /tmp/tpYbfiZz/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: skill:show: show short: light purple: done
+lamp-skills: show Done: after the say: the voice's state is not known, so at once; show short: 3 frames shown; light given back to on blue at 3: done
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: skill:show: show short: light purple: done
+lamp-skills: show Done: after the say: the voice's state is not known, so at once; show short: stopped in frame 1 of 3, the voice is listening to someone; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/sk68crEE/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: dim: done; held until its trigger ended; light: changed meanwhile or not known, so left as it is
+lamp-skills: skills from /tmp/dn1Zkuhj/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 517 ms later; the line was cut (the voice went from speaking to listening): nothing after it is made
+lamp-skills: skills from /tmp/tpVkWXRi/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; someone spoke to the lamp: the search ended; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/tpxTyBn5/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; the lamp was paused: the search ended; light given back to on blue at 3: done
+lamp-skills: /tmp/tpxTyBn5/tools is gone; ending, so that the folder is made again as lamp-skills starts
+lamp-skills: skills from /tmp/skPsl9Wd/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded ["news"]
+lamp-skills: news Triggered: task 4 of settled on tasks/status came to hold
+lamp-skills: news Asked: policy news
+lamp-skills: news Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: news Triggered: task 5 of settled on tasks/status came to hold
+lamp-skills: news Asked: policy news
+lamp-skills: news Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: news Triggered: task 6 of settled on tasks/status came to hold
+lamp-skills: news Asked: policy news
+lamp-skills: news Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: news Done: say: spoken
+lamp-skills: news Done: not made: its item no longer holds as its turn came
+lamp-skills: news Done: say: spoken
+lamp-skills: skills from /tmp/skfxFW4s/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: mood reading: told the body, held 1 s; light warm: done; say: spoken; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/stQ3LvXe/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["glow"]
+lamp-skills: glow Triggered: the model called glow with {}
+lamp-skills: glow with {} not run: its run is under way
+lamp-skills: skills from /tmp/smHTckHx/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["tutor"]
+lamp-skills: tutor Triggered: the model called check_my_work with {}
+lamp-skills: tutor Triggered: the model called check_my_work with {}
+lamp-skills: tutor Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: skills from /tmp/skseEYb6/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: light warm: done; say: spoken; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/skuqLwyC/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: say: expired
+lamp-skills: skills from /tmp/srY79Aui/skills, the Policy's ask asked on skills/ask, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: loaded ["hello", "stuffy"]
+lamp-skills: stuffy Triggered: air/state has held for 0 s
+lamp-skills: stuffy Asked: policy nudge
+lamp-skills: loaded ["hello", "stuffy"]
+lamp-skills: stuffy not run: in its cooldown, 10 min left
+lamp-skills: stuffy Answered: the Policy answered say_now (unprompted, by rule), but its trigger no longer holds: nothing is done
+lamp-skills: skills from /tmp/srQ2ALgV/skills, the Policy's ask asked on skills/ask, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: loaded ["hello", "stuffy"]
+lamp-skills: stuffy Triggered: air/state has held for 0 s
+lamp-skills: stuffy Asked: policy nudge
+lamp-skills: stuffy Answered: the Policy answered say_now (unprompted, by rule)
+lamp-skills: stuffy Done: dim: done; held until its trigger ended; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/tpCsOs0w/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["scenes-after"]
+lamp-skills: scenes-after Triggered: the model called light_scene with {"scene":"reading"}
+lamp-skills: scenes-after Triggered: the model called light_scene with {"scene":"reading"}
+lamp-skills: scenes-after Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: scenes-after Done: mood reading: told the body, held 5 s; light white, the person's, kept: done
+lamp-skills: scenes-after Triggered: the model called light_scene with {"scene":"relax"}
+lamp-skills: scenes-after Done: light warm, the person's, kept: done
+lamp-skills: skills from /tmp/tpUsu4a7/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["scenes"]
+lamp-skills: scenes Triggered: the model called light_scene with {"scene":"reading"}
+lamp-skills: scenes Triggered: the model called light_scene with {"scene":"relax"}
+lamp-skills: scenes Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: scenes Done: mood reading: told the body, held 5 s; light white, the person's, kept: done
+lamp-skills: skills from /tmp/tpFMyW4Y/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: look Triggered: the model called look_for with {"place":"left"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look_for with {"place":"left"} not run: its search took its 3 looks
+lamp-skills: skills from /tmp/tpHu1ixP/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: look Triggered: the model called look_for with {"place":"left"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look_for with {"place":"found"}: look's search found it
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look_for with {"place":"left"} not run: its search took its 3 looks
+lamp-skills: skills from /tmp/tpauZwDV/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/tp1NVaA7/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/skT2VafN/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: not made: its last run is still under way
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: not made: its last run is still under way
+lamp-skills: hello Done: look at the face: told the body; light warm: done; say: spoken; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/skZdIakr/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: light warm: done; sound: spoken; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/skQSTH2w/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: sound: refused (the lamp is speaking)
+lamp-skills: skills from /tmp/tpb9fH4d/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["point"]
+lamp-skills: point Triggered: the model called point_light with {}
+lamp-skills: point Triggered: the model called point_light with {"toward":"left"}
+lamp-skills: point Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: skills from /tmp/siD6Flr1/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["dance"]
+lamp-skills: loaded ["dance", "desk-tutor"]
+lamp-skills: loaded ["dance"]
+lamp-skills: skills from /tmp/dnrgSLJ1/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: nods Done: after the say: spoken from 21 ms after the call, the turn over 499 ms later; light warm: done; gesture nod: told the body; gesture nod: told the body; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/srEbBsMz/skills, the Policy's ask asked on skills/ask, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy answered say_now (hello, by rule)
+lamp-skills: hello Done: say: spoken
+lamp-skills: hello not run: resting after runs nobody noticed, 720 min left
+lamp-skills: skills from /tmp/srfdBxE0/skills, the Policy's ask asked on skills/ask, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy answered wait (hello, by rule)
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 12 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: skills from /tmp/spJ0f4mJ/skills, the Policy's ask asked on skills/ask, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy answered say_now (hello, by rule)
+lamp-skills: hello Done: say: spoken
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy answered wait (hello, by rule)
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy answered say_now (hello, by rule) in shadow: nothing is done
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy answered say_now (hello, by rule) in shadow: nothing is done
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy did not answer in time: nothing is done
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 4 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy answered say_now (hello, by rule), but its trigger no longer holds: nothing is done
+lamp-skills: skills from /tmp/shK9c81w/skills, the Policy's ask asked on skills/ask, a skill's light set through the actions part and given back
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy did not answer in time: nothing is done
+lamp-skills: skills from /tmp/snk6A6iC/skills, the Policy's ask asked on skills/ask, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: not asked: nobody is subscribed to skills/ask (lamp-policy --gate)
+lamp-skills: skills from /tmp/sk6VlX4y/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: light warm: done; say: spoken; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/gqMvJYOR/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: guard-mode Triggered: the model called keep_watch with {"turn":"on"}
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: guard-mode Done: on, asked at the lamp, by someone whose face it does not know
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: the desk is empty: keeping watch
+lamp-skills: guard-mode Done: its mark has not been confirmed for 30 s: no visit counted
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: text: sent on messages/out: Someone was at your desk, for under a minute.
+lamp-skills: skills from /tmp/gsBjK1mm/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: guard-mode Triggered: the model called keep_watch with {"turn":"on"}
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: guard-mode Done: on, asked at the lamp, by someone whose face it does not know
+lamp-skills: guard-mode Done: mark: outranked by skill:light-out: asked for again with a new claim
+lamp-skills: skill:guard-mode's light is outranked by skill:light-out
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: its mark has not been confirmed for 30 s: no visit counted
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: the desk is empty: keeping watch
+lamp-skills: guard-mode Done: its mark has not been confirmed for 30 s: no visit counted
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: text: sent on messages/out: Someone was at your desk, for about 2 minutes.
+lamp-skills: skills from /tmp/ga50QwKc/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: guard from the app refused: guard mode from the app is not on: LAMP_GUARD_FROM_APP is not on
+lamp-skills: skills from /tmp/ganBvH9i/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: guard from the app refused: guard mode is turned on and off from afar only by the owner's app
+lamp-skills: skills from /tmp/ga9Ulaqf/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: guard from the app refused: guard.on let go: it says no deadline_us, so it can't be told from one the app gave up on
+lamp-skills: guard from the app refused: guard.on let go: it waited 2000 ms behind another call, past the app's 2 s
+lamp-skills: a tool call was not answered: Resource temporarily unavailable (os error 35)
+lamp-skills: guard from the app refused: guard.on let go: it waited 2494 ms behind another call, past the app's 2 s
+lamp-skills: guard-mode Triggered: the owner's app asked guard.off
+lamp-skills: guard-mode Triggered: the owner's app asked guard.on
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: guard-mode Done: on, from the owner's app
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard from the app refused: turn is "on" or "off"
+lamp-skills: guard-mode Done: mark: light given back: asked again with a time already passed
+lamp-skills: guard-mode Done: text: sent on messages/out: Guard is off: the privacy switch is closed.
+lamp-skills: guard-mode Done: off: the privacy switch closed
+lamp-skills: guard.on from the app refused: The privacy switch is closed, so I can't see: I won't keep an eye on things.
+lamp-skills: guard-mode Triggered: the owner's app asked guard.off
+lamp-skills: skills from /tmp/gpDUanWZ/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: guard-mode Triggered: the model called keep_watch with {"turn":"on"}
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: guard-mode Done: on, asked at the lamp, by someone whose face it does not know
+lamp-skills: guard-mode Done: text: sent on messages/out: I've paused watching while your light is off.
+lamp-skills: guard-mode Done: paused: the person's own light is over its mark; on again only when they ask
+lamp-skills: skill:guard-mode's light is outranked by person
+lamp-skills: guard-mode Triggered: the model called keep_watch with {"turn":"on"}
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: guard-mode Done: on again, asked at the lamp: its mark asked for anew
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: its mark has not been confirmed for 30 s: no visit counted
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: the desk is empty: keeping watch
+lamp-skills: guard-mode Done: its mark has not been confirmed for 30 s: no visit counted
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: text: sent on messages/out: Someone was at your desk, for about 2 minutes.
+lamp-skills: skills from /tmp/gmQYIMhv/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: keep_watch with {"turn":"on"} not run: I keep an eye on things only when someone asks me out loud, at the lamp.
+lamp-skills: guard-mode Triggered: the model called keep_watch with {"turn":"on"}
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: guard-mode Done: on, asked at the lamp, by someone whose face it knows
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: the desk is empty: keeping watch
+lamp-skills: guard-mode Done: its mark has not been confirmed for 30 s: no visit counted
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: text: sent on messages/out: Someone was at your desk, for about 2 minutes.
+lamp-skills: guard-mode Done: mark: light given back: asked again with a time already passed
+lamp-skills: guard-mode Done: say: asked of the voice: I'm off guard.
+lamp-skills: guard-mode Done: off: the person who asked is back
+lamp-skills: skill:guard-mode: say: said
+lamp-skills: guard-mode Triggered: the model called keep_watch with {"turn":"off"}
+lamp-skills: skills from /tmp/tpGGloOg/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; someone spoke to the lamp: the search ended; light given back to on blue at 3: done
+lamp-skills: look Triggered: the model called look_for with {"place":"left"}
+lamp-skills: skills from /tmp/tpOPuQsw/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; someone spoke to the lamp: the search ended; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/skPqvYxJ/skills, the Policy's ask skipped, a skill's light asked of the ring on light/request
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy light
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: light out: asked of the ring, faded into over 30000 ms; held until its trigger ended; light given back: asked again with a time already passed
+lamp-skills: skills from /tmp/agtjvomn/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["jig"]
+lamp-skills: jig Triggered: the model called jig with {}
+lamp-skills: jig Done: gesture acknowledge: told the body
+lamp-skills: jig with {} not run: You just danced.
+lamp-skills: jig Triggered: the model called jig with {}
+lamp-skills: jig with {} not run: its run is under way
+lamp-skills: jig Done: gesture acknowledge: told the body
+lamp-skills: jig Triggered: the model called jig with {}
+lamp-skills: skills from /tmp/sktez5kp/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: LAMP_SKILLS_ASK is not set: nothing the lamp starts itself is done (LAMP_SKILLS_ASK=policy asks the Policy's gate, skip acts without asking)
+lamp-skills: the skills a person turned off kept in /tmp/snM9XEys/state: []
+lamp-skills: skills from /tmp/snM9XEys/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded ["sip"]
+lamp-skills: sip Triggered: the model called stuffy_nudges with {"how":"snooze"}, for ["sip"]
+lamp-skills: sip Done: the model was told what to do next
+lamp-skills: sip not run: snoozed, 720 min left
+lamp-skills: the skills a person turned off kept in /tmp/snM9XEys/state: []
+lamp-skills: skills from /tmp/snM9XEys/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded ["sip"]
+lamp-skills: sip Triggered: air/indoor has held for 0 s
+lamp-skills: sip Asked: policy nudge
+lamp-skills: sip Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: the skills a person turned off kept in /tmp/soKoGtgS/state: []
+lamp-skills: skills from /tmp/soKoGtgS/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded ["sip"]
+lamp-skills: sip Triggered: the model called stuffy_nudges with {"how":"off"}, for ["sip"]
+lamp-skills: sip Done: the model was told what to do next
+lamp-skills: sip not run: off
+lamp-skills: the skills a person turned off kept in /tmp/soKoGtgS/state: ["sip"]
+lamp-skills: skills from /tmp/soKoGtgS/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded ["sip"]
+lamp-skills: sip not run: off
+lamp-skills: sip Triggered: the model called stuffy_nudges with {"how":"on"}, for ["sip"]
+lamp-skills: sip Done: the model was told what to do next
+lamp-skills: sip Triggered: air/indoor has held for 0 s
+lamp-skills: sip Asked: policy nudge
+lamp-skills: sip Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: sip Done: light: left alone, since the light shown is not known and could not be given back
+lamp-skills: skills from /tmp/sk1sLYwa/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: look at the face: told the body; light warm: done; say: spoken; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/skwcwifm/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded ["news"]
+lamp-skills: news Triggered: task 1 of tasks on tasks/status came to hold
+lamp-skills: news Asked: policy news
+lamp-skills: news Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: news Triggered: task 2 of tasks on tasks/status came to hold
+lamp-skills: news Asked: policy news
+lamp-skills: news Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: news Done: say: spoken
+lamp-skills: news Done: say: spoken
+lamp-skills: skills from /tmp/dnfrLBtz/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: nods Done: after the say: spoken from 20 ms after the call, the turn over 1642 ms later; light warm: done; gesture nod: told the body; gesture nod: told the body; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/uoFMIWCV/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["dance"]
+lamp-skills: prepare_to_unplug with {} not run: No skill of mine does that just now.
+lamp-skills: skills from /var/folders/qg/lhfdx6q166z5cj705q22mh480000gn/T/.tmpOqG645/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["prepare-unplug"]
+lamp-skills: prepare-unplug Triggered: the model called prepare_to_unplug with {}
+lamp-skills: prepare-unplug Done: unplug readiness line: spoken
+lamp-skills: skills from /tmp/dnaLjn9x/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 517 ms later; light warm: done; gesture nod: told the body; gesture nod: told the body; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/dns90CMt/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 512 ms later; light warm: done; gesture nod: told the body; gesture nod: not sent, the body said no over for nod on body/gesture within 6168 ms of its send; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/skpOqb0P/skills, the Policy's ask skipped, a skill's light asked of the ring on light/request
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: look at the face: told the body; light warm: asked of the ring at level 5; say: spoken; light given back: asked again with a time already passed
+lamp-skills: skills from /tmp/skZucFFZ/skills, the Policy's ask skipped, a skill's light asked of the ring on light/request
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: look at the face: told the body; light warm: asked of the ring at level 3; say: spoken; light given back: asked again with a time already passed
+lamp-skills: skills from /tmp/sk3yNhjd/skills, the Policy's ask skipped, a skill's light asked of the ring on light/request
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: dim: asked of the ring at level 2; say: spoken; light given back: asked again with a time already passed
+lamp-skills: skills from /tmp/skvy9FcZ/skills, the Policy's ask skipped, a skill's light asked of the ring on light/request
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: look at the face: told the body; light warm: left alone, since nothing takes light/request (the ring needs LAMP_LIGHT_REQUESTS=on); say: spoken
+lamp-skills: skills from /tmp/dnah2wrA/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 518 ms later; light warm: done; gesture nod: told the body; gesture nod: told the body; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/skZDKU7F/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy light
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: light out: left alone, since only the ring puts it out (LAMP_LIGHT_REQUESTS=on)
+lamp-skills: skills from /tmp/tppXWxIM/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; someone spoke to the lamp: the search ended; light given back to on blue at 3: done
+     Running tests/requested_audio.rs (/private/tmp/tests-codex-1569-target/debug/deps/requested_audio-42bb4f6d3e6c83c2)
+     Running unittests src/lib.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-ac46a17873633cde)
+error: test failed, to rerun pass `-p lamp-update --lib`
+     Running unittests src/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-f327694480d0afc5)
+     Running tests/functions.rs (/private/tmp/tests-codex-1569-target/debug/deps/functions-6f19063dfc398812)
+     Running tests/install.rs (/private/tmp/tests-codex-1569-target/debug/deps/install-622cec8bd2b73c0c)
+     Running tests/it/main.rs (/private/tmp/tests-codex-1569-target/debug/deps/it-b9b4763ea7f948a7)
+error: test failed, to rerun pass `-p lamp-update --test it`
+     Running tests/round.rs (/private/tmp/tests-codex-1569-target/debug/deps/round-6fe6708dfc43b4d3)
+END RAW PAYLOAD

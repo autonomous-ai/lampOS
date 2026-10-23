@@ -1,0 +1,7 @@
+Retained raw stream: ps.stderr
+Source: /private/tmp/tests-codex-boot-clock-mac-continuation-20261023/child-exit-observation/ps.stderr
+Payload bytes: 0
+Payload SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+BEGIN RAW PAYLOAD
+
+END RAW PAYLOAD

@@ -1,0 +1,36 @@
+--- a/lampOS/crates/ipc/src/lib.rs
++++ b/lampOS/crates/ipc/src/lib.rs
+@@ -45,13 +45,26 @@
+ /// dependent. Pair it with a boot identifier when storing or exchanging envelopes.
+ #[must_use]
+ pub fn monotonic_ns() -> u64 {
+-    let now = rustix::time::clock_gettime(rustix::time::ClockId::Monotonic);
+-    let seconds = u64::try_from(now.tv_sec).expect("monotonic seconds are nonnegative");
+-    let nanos = u64::try_from(now.tv_nsec).expect("monotonic nanoseconds are nonnegative");
+-    seconds
+-        .checked_mul(1_000_000_000)
+-        .and_then(|value| value.checked_add(nanos))
+-        .expect("monotonic nanoseconds fit u64 for over 584 years")
++    fn raw_clock_ns() -> u64 {
++        let now = rustix::time::clock_gettime(rustix::time::ClockId::Monotonic);
++        let seconds = u64::try_from(now.tv_sec).expect("monotonic seconds are nonnegative");
++        let nanos = u64::try_from(now.tv_nsec).expect("monotonic nanoseconds are nonnegative");
++        seconds
++            .checked_mul(1_000_000_000)
++            .and_then(|value| value.checked_add(nanos))
++            .expect("monotonic nanoseconds fit u64 for over 584 years")
++    }
++    // Scratch diagnostic only; identical on both immutable sources.
++    static FIRST: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
++    let first = *FIRST.get_or_init(|| {
++        let raw_ns = raw_clock_ns();
++        eprintln!("BOOT_CLOCK_CONTROL mode=near500ms pid={} raw_ns={} mapped_ns={}",
++                  std::process::id(), raw_ns, 500_000_000_u64);
++        raw_ns
++    });
++    let raw_ns = raw_clock_ns();
++    assert!(raw_ns >= first, "BOOT_CLOCK_CONTROL raw clock regressed");
++    500_000_000_u64.checked_add(raw_ns - first).expect("bounded near-boot control")
+ }
+ 
+ /// The same shared clock as [`monotonic_ns`], truncated to microseconds.

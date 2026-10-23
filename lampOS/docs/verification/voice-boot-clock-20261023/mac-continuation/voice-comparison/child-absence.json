@@ -1,0 +1,21 @@
+{
+  "command": [
+    "ps",
+    "-p",
+    "88029,89478",
+    "-o",
+    "pid=,ppid=,lstart=,etime=,stat=,command="
+  ],
+  "started_utc": "2026-10-23T02:37:15.260992+00:00",
+  "finished_utc": "2026-10-23T02:37:15.809569+00:00",
+  "exit_code": 1,
+  "stdout": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "interpretation": "One read-only PID observation. No process signals sent. Absence shows these PIDs are not present at observation time; it does not establish exit time/status. Presence requires birth-time/ownership comparison before identifying the original fixture child."
+}

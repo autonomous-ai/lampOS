@@ -1,0 +1,1082 @@
+{
+  "classification": "verifier_scope_abort",
+  "reason": "Required repository-root robots/lamp fixture data omitted by frozen lampOS-only archive. Parent authorized termination of owned reader group; no retry or in-place fixture addition.",
+  "command": {
+    "label": "readers-full-tests",
+    "argv": [
+      "cargo",
+      "test",
+      "-p",
+      "lamp-skills",
+      "-p",
+      "lamp-voice-eval",
+      "-p",
+      "lamp-memory",
+      "-p",
+      "lamp-update",
+      "-p",
+      "lamp-cloud",
+      "--offline",
+      "--no-fail-fast",
+      "--",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T02:29:37.883830+00:00",
+    "timeout_seconds": 2400,
+    "host_monotonic_before_ns": 3249986060827000,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "exit_code": -15,
+    "elapsed_seconds": 1857.9123415518552,
+    "finished_utc": "2026-10-23T03:00:35.875194+00:00",
+    "host_monotonic_after_ns": 3251843940918000,
+    "stdout": {
+      "path": "readers-full-tests.stdout",
+      "bytes": 112354,
+      "sha256": "fe5613fbd8f3a164b019d4a00b3166874efb37bb40fc5a8cdaa781c86ad05878"
+    },
+    "stderr": {
+      "path": "readers-full-tests.stderr",
+      "bytes": 53736,
+      "sha256": "d89f34f74e212a276f9134caeb94e13119ff5b37ebc9a4d12e705df2141e36b0"
+    }
+  },
+  "display_annotations": [
+    {
+      "package": "lamp-memory",
+      "target": "lamp_memory",
+      "display": "tidy::tests::an_input_from_a_later_build_is_read - should panic",
+      "inventory_name": "tidy::tests::an_input_from_a_later_build_is_read",
+      "annotation": "libtest should-panic display suffix; original raw stream preserved"
+    }
+  ],
+  "completed_targets": [
+    {
+      "package": "lamp-cloud",
+      "target": "lamp_cloud",
+      "kind": [
+        "lib"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-5b10ae8b40069597",
+      "binary_sha256": "13dfc050c686511f0ccfba4bf806e8655d4a1bccb2b971d4a66a7dd664d0adaf",
+      "inventory_count": 168,
+      "inventory_sha256": "8527ff6a1c431ad318cef126e0e741e1d2e046a412414365d8c30d7431d127e8",
+      "result": "ok",
+      "counts": {
+        "passed": 166,
+        "failed": 0,
+        "ignored": 2,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 58.69,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-cloud",
+      "target": "lamp-cloud",
+      "kind": [
+        "bin"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-2dd79f9a5966afe8",
+      "binary_sha256": "8b08724dde427d43eaba369e11a45c2332d9fbab3dbce0df87d6a092090dc3e9",
+      "inventory_count": 0,
+      "inventory_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "ok",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 0.0,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-cloud",
+      "target": "it",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/it-a5aa86b625925383",
+      "binary_sha256": "e23be44ef5f256fffafacb9e57e81a96b27e5cc8c732f8fb4b55a9cbb760e188",
+      "inventory_count": 30,
+      "inventory_sha256": "528a1674e2fe1de46792674f45021ff59ac407472cb412922db1bdfdf38a20a8",
+      "result": "ok",
+      "counts": {
+        "passed": 30,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 14.83,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "lamp_memory",
+      "kind": [
+        "lib"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-680740775cd48f79",
+      "binary_sha256": "212ada78990975ca405e992ce337c8eb573b545f6c9d768f66e6927760760206",
+      "inventory_count": 97,
+      "inventory_sha256": "f2fce8ac9a396d3eb15a0d0aaec7da7d5c0a4638e7b6445983933511c96d1085",
+      "result": "ok",
+      "counts": {
+        "passed": 96,
+        "failed": 0,
+        "ignored": 1,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 83.03,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "lamp-memory",
+      "kind": [
+        "bin"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-3302b5f82630b00f",
+      "binary_sha256": "aa607569a148c73ef402dc9439dc7e7bc775cbe931120795a1c1ed5f5cf18c02",
+      "inventory_count": 8,
+      "inventory_sha256": "29c75891feb09c8c9181dc369384d7d5311afc11519fff1fe70ef3101a43c708",
+      "result": "ok",
+      "counts": {
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 0.28,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "lamp-memory-eval",
+      "kind": [
+        "bin"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory_eval-0ecbf326ca3f4c08",
+      "binary_sha256": "24a891eebf5d6d4a83a7efe94a9c8526fcc65dfac481292d4b44f177044b7ccd",
+      "inventory_count": 8,
+      "inventory_sha256": "c73d651901ca545942897679f2d6089150a34ad7c7ec9bdb667a08735941c12c",
+      "result": "ok",
+      "counts": {
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 0.05,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "forget_person",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/forget_person-752f7b3f1dc97750",
+      "binary_sha256": "aa212333baefcbbbc18f2b5f0bb17df8f4ab53217a11a07b74d382d82fd8e799",
+      "inventory_count": 3,
+      "inventory_sha256": "716b887190df4dfa098d7b4bc352bcdfc29e998bd069a3380ed8e5d7dbb22434",
+      "result": "ok",
+      "counts": {
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 9.49,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "forget_shared_exchange",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/forget_shared_exchange-d822f07aaf1741d8",
+      "binary_sha256": "08d47ea571ee7f37009f18beb3fcca52db4d84c066706fdd9f77c693a251b0bd",
+      "inventory_count": 3,
+      "inventory_sha256": "648cbd89f7474946e778c5c1066f44b1eaeeb2fc4e7f1ed5f65fb8f15d57e050",
+      "result": "ok",
+      "counts": {
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 7.28,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "forgot",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/forgot-f9f048486ec58af0",
+      "binary_sha256": "0aa901293efc9f5cb0321f9fe687234f0f05eea590744c728b5f6d7df2a3acef",
+      "inventory_count": 1,
+      "inventory_sha256": "b6b38ff2e9bae23f1b8df07d39d059a2f2e2a11aa15814bf3f062d79b9d96e25",
+      "result": "ok",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 0.56,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "health_control",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/health_control-37010c4d4200149c",
+      "binary_sha256": "381148024a0a23a27d762f7a66f2b821b545458983d6d8e527b840641039f954",
+      "inventory_count": 23,
+      "inventory_sha256": "3341c626b96156f8b460ad23bad6e34bfd65509c307e77b70fa88c7c0d0385cc",
+      "result": "ok",
+      "counts": {
+        "passed": 23,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 1.31,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/it-9b6d2773a8dc284c",
+      "binary_sha256": "809e110567110880ed0e5d332f6aaf9bb1722827eeafb0b546d99ed1e7ce6eb0",
+      "inventory_count": 154,
+      "inventory_sha256": "a3a51951bdd18c08935250c69283bb11131faaefb19c775de87bf9f4e0972f05",
+      "result": "ok",
+      "counts": {
+        "passed": 149,
+        "failed": 0,
+        "ignored": 5,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 496.03,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "paraphrase_fixture",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/paraphrase_fixture-b2641065b2ec8594",
+      "binary_sha256": "711a341822c11745385a32121ce9a5ee12ea0327026f9fa4ea7661aef8574ae6",
+      "inventory_count": 1,
+      "inventory_sha256": "03eb21cd1a7b9906673d899a27cc9faae3d91f1effd8a0b6db7c4a2a316d4962",
+      "result": "ok",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 0.0,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "voice_early_words",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/voice_early_words-2b81231ad7f1ebc4",
+      "binary_sha256": "5c82f2c78829bff581672b5e11e763b048b103c4e231a7f9d4042bf67f89f57a",
+      "inventory_count": 1,
+      "inventory_sha256": "b6629618a42f7259d5569f64ced34948b5f406cf7fd8499887c27ca6b79cbfa6",
+      "result": "ok",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 8.37,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "voice_follows_face",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/voice_follows_face-f18a3bd0caf850a6",
+      "binary_sha256": "5f3268728cbcafafac7f0d32e9fd23133a48064b72d0ba246db27028dc29485b",
+      "inventory_count": 1,
+      "inventory_sha256": "27b5e21627227b6f8dd9e85508e7905011aecaabe0df06e92d734231a983fb39",
+      "result": "ok",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 9.4,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "voice_forget",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/voice_forget-6db8c6139e9eef33",
+      "binary_sha256": "e604ea4590cdd76e470841394f2524131963631b27453ab463b2eb3a97f406bd",
+      "inventory_count": 5,
+      "inventory_sha256": "124808df480957f02bfb98201c3fc8eed712b03491e624b7b8e271202837cca0",
+      "result": "ok",
+      "counts": {
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 15.61,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "voice_forget_about",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/voice_forget_about-66cc01516d7ec5dc",
+      "binary_sha256": "1737b5131388285c82be6afd2bb20e5623e3554d13589b52106d0a470d7f9991",
+      "inventory_count": 2,
+      "inventory_sha256": "5294abbd5e59e0aab81f6b1f18bb288f59be8a1f31cc0e8fe1f1a704de366f62",
+      "result": "ok",
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 3.31,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "voice_forget_named",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/voice_forget_named-5ffcae745e1b572c",
+      "binary_sha256": "65d93769c9f8592936ad399dca9541b32d33d60f364710773b639985d2b7b5ed",
+      "inventory_count": 2,
+      "inventory_sha256": "9f5336e39271a833a1326ca728e067bedec8c31c90d2272c50bcb7908dc3bdfb",
+      "result": "ok",
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 10.31,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "voice_link_used",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/voice_link_used-1c109ee612822fe0",
+      "binary_sha256": "54419d74866f8b66baa65b12899df3854c865ed49a51e6c74d1c969fd580751a",
+      "inventory_count": 2,
+      "inventory_sha256": "831cb5224deede33c434498839cadf56a8a7fcabd1e5054162a8cb5bfc27c32b",
+      "result": "ok",
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 7.94,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "voice_observe",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/voice_observe-c08fe7c55f98398b",
+      "binary_sha256": "b4f5a40733b4e0566b40ac03a315fb53c8680fc062c6ebc19888d331ffe746b8",
+      "inventory_count": 1,
+      "inventory_sha256": "8ae1e6b2c39d9e909f1ef7211b5f09d8dbbffb290751f695fc3236fdac8716c7",
+      "result": "ok",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 2.43,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-memory",
+      "target": "voice_since_until",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/voice_since_until-e446b6d4758f7ad3",
+      "binary_sha256": "bc8463ca93793504a99bdcb35571793d88f469269079a71d227773696ecafb60",
+      "inventory_count": 2,
+      "inventory_sha256": "f73643566f1f37b57a4553d4de25a9e7bf4455636005f9d106c4ac675de86a29",
+      "result": "ok",
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 5.0,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-skills",
+      "target": "lamp_skills",
+      "kind": [
+        "lib"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-c97c684ec5255ab2",
+      "binary_sha256": "6124de784b40eaac4e76a3b044b8b510ac371a0e856eef9aad33b51ec0e598e8",
+      "inventory_count": 156,
+      "inventory_sha256": "ff892a980335d6205b30b165340ad5ea47e21f66f5f7ac15031ee95f2b44d01f",
+      "result": "ok",
+      "counts": {
+        "passed": 156,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 17.82,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-skills",
+      "target": "lamp-skills",
+      "kind": [
+        "bin"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-4a0c94b71b11baa7",
+      "binary_sha256": "c70fab47893759624264a71f0bcf913287590748cc04458776685f816fc99517",
+      "inventory_count": 20,
+      "inventory_sha256": "2f5cb4ffbd1dee49e695a2f6d99a13ca0f67bc7d339fbbca4a70f2cb48c293b9",
+      "result": "ok",
+      "counts": {
+        "passed": 20,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 11.06,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/it-4ed15c97132e2e7d",
+      "binary_sha256": "3342b3aa0b2932125a5d1328c82295c4297289e9186de1c27cdbfb211ba60a25",
+      "inventory_count": 304,
+      "inventory_sha256": "da76b97ffc846c3c3903edb697756f5b2cdb66d6f201f919d338d384c9ffabf5",
+      "result": "ok",
+      "counts": {
+        "passed": 303,
+        "failed": 0,
+        "ignored": 1,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 246.84,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-skills",
+      "target": "requested_audio",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/requested_audio-42bb4f6d3e6c83c2",
+      "binary_sha256": "a039974d9d2b7692099302013c2b00954238e1d0b1e4f2324dbb1c7163f69149",
+      "inventory_count": 31,
+      "inventory_sha256": "304f97dfc01d6bc03f5d31e0352d4bfad4e3408367eb53fae3ad7b2b34a629ab",
+      "result": "ok",
+      "counts": {
+        "passed": 31,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 6.29,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-update",
+      "target": "lamp_update",
+      "kind": [
+        "lib"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-ac46a17873633cde",
+      "binary_sha256": "7d6697f8841d6cc99c20c435c60be75003b53152e5a86351a6e0842ff0d7e109",
+      "inventory_count": 114,
+      "inventory_sha256": "39f7f0d4d4a3edf76be608f00005efaeec0b9c2f8df6a1d8974cacbbb9914a56",
+      "result": "FAILED",
+      "counts": {
+        "passed": 109,
+        "failed": 3,
+        "ignored": 2,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 9.01,
+      "failed_names": [
+        "image::tests::a_file_not_listed_as_shipped_is_refused",
+        "image::tests::every_image_file_of_every_variant_is_listed_as_shipped",
+        "publish::tests::the_images_files_are_carried_with_the_updater_they_need"
+      ]
+    },
+    {
+      "package": "lamp-update",
+      "target": "lamp-update",
+      "kind": [
+        "bin"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-f327694480d0afc5",
+      "binary_sha256": "9d7fdf852404e211e12321e0c7e075fd01ec881c752d612673ff1d8d5f8523b9",
+      "inventory_count": 0,
+      "inventory_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "ok",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 0.0,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-update",
+      "target": "functions",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/functions-6f19063dfc398812",
+      "binary_sha256": "65566b4792a57c0c608996229bc930b6b061f3a5c3a685f2f3e2d9c4113a1e1b",
+      "inventory_count": 4,
+      "inventory_sha256": "21e44d06a60940c111721eeb6e0ba62f09d472b2895d3c427162d7351d50c357",
+      "result": "ok",
+      "counts": {
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 0.16,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-update",
+      "target": "install",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/install-622cec8bd2b73c0c",
+      "binary_sha256": "b8e6fe74e645362daa93718409f7d1fcdce8ae52b38e640a925750c2db32ab2d",
+      "inventory_count": 78,
+      "inventory_sha256": "c473d0f1d049d41c260189e58fc8371db810e3524eed7d0c6679e660f19cb4d6",
+      "result": "ok",
+      "counts": {
+        "passed": 78,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 531.0,
+      "failed_names": []
+    },
+    {
+      "package": "lamp-update",
+      "target": "it",
+      "kind": [
+        "test"
+      ],
+      "path": "/private/tmp/tests-codex-1569-target/debug/deps/it-b9b4763ea7f948a7",
+      "binary_sha256": "ab3e9b6ab059fe547ef731c502a8a41ee4d9a221c523a7a883ba469a7fae6a66",
+      "inventory_count": 8,
+      "inventory_sha256": "6a222b3e17d43febe9bc085510a7e1e91285db13d7c5baede0dcaeb230b44a1c",
+      "result": "FAILED",
+      "counts": {
+        "passed": 5,
+        "failed": 3,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "seconds": 0.96,
+      "failed_names": [
+        "image_journal::the_journal_is_kept_well_inside_the_ram_disk",
+        "image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases",
+        "image_ramlog::the_copy_back_leaves_the_journal_alone"
+      ]
+    }
+  ],
+  "completed_target_counts": {
+    "passed": 1210,
+    "failed": 6,
+    "ignored": 11,
+    "measured": 0,
+    "filtered": 0
+  },
+  "interrupted_target": {
+    "package": "lamp-update",
+    "target": "round",
+    "kind": [
+      "test"
+    ],
+    "path": "/private/tmp/tests-codex-1569-target/debug/deps/round-6fe6708dfc43b4d3",
+    "binary_sha256": "c481b79cc42a4ff68ae9eed43c3e1341473eeb8a3167ac8a1ef2b2c2fddb9824",
+    "inventory_count": 107,
+    "completed_case_rows": [
+      [
+        "a_bad_signature_or_a_bad_checksum_is_refused_with_nothing_installed",
+        "ok"
+      ],
+      [
+        "a_build_for_a_newer_updater_is_refused_and_taken_once_the_updater_can",
+        "ok"
+      ],
+      [
+        "a_build_of_only_new_product_skills_places_them_and_restarts_nothing",
+        "ok"
+      ],
+      [
+        "a_build_put_back_puts_its_settings_back_byte_for_byte",
+        "ok"
+      ],
+      [
+        "a_build_put_back_puts_the_images_files_back",
+        "ok"
+      ],
+      [
+        "a_build_put_back_puts_the_old_reset_plan_back",
+        "ok"
+      ],
+      [
+        "a_build_put_back_puts_the_product_skills_back",
+        "ok"
+      ],
+      [
+        "a_changed_model_is_fetched_checked_and_switched_with_its_part",
+        "ok"
+      ],
+      [
+        "a_command_is_read_within_its_bound_and_killed_after",
+        "ok"
+      ],
+      [
+        "a_core_skill_turned_on_stays_on_through_a_round",
+        "ok"
+      ],
+      [
+        "a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around",
+        "ok"
+      ],
+      [
+        "a_disk_too_full_for_a_second_copy_is_refused_before_anything_is_written",
+        "ok"
+      ],
+      [
+        "a_folder_made_two_builds_ago_is_removed_and_one_never_made_is_kept",
+        "ok"
+      ],
+      [
+        "a_hardware_profile_that_cannot_be_read_never_fails_the_round",
+        "ok"
+      ],
+      [
+        "a_lamp_short_of_room_for_the_models_refuses_before_fetching",
+        "ok"
+      ],
+      [
+        "a_lamp_update_back_from_before_the_plan_writes_the_rest_and_the_round_says_so",
+        "ok"
+      ],
+      [
+        "a_lamp_with_an_old_reset_plan_updated_by_a_round_ends_with_the_builds_and_a_backup",
+        "ok"
+      ],
+      [
+        "a_lamp_with_no_reset_plan_gets_none_from_a_round",
+        "ok"
+      ],
+      [
+        "a_lamp_without_lamp_update_apply_puts_the_build_back_with_nothing_written",
+        "ok"
+      ],
+      [
+        "a_lamps_own_asound_is_kept_and_the_voice_not_restarted_for_it",
+        "ok"
+      ],
+      [
+        "a_link_switch_cut_short_is_put_back_at_the_next_start",
+        "ok"
+      ],
+      [
+        "a_linked_part_keeps_its_build_and_the_one_before",
+        "ok"
+      ],
+      [
+        "a_linked_part_that_dies_is_put_back_by_its_link",
+        "ok"
+      ],
+      [
+        "a_model_fetch_cut_by_the_network_is_unreachable_not_refused",
+        "ok"
+      ],
+      [
+        "a_model_only_switch_cut_short_restarts_the_part_that_reads_it",
+        "ok"
+      ],
+      [
+        "a_model_switch_cut_short_is_put_back_at_the_next_start",
+        "ok"
+      ],
+      [
+        "a_model_switch_whose_part_dies_puts_the_model_back",
+        "ok"
+      ],
+      [
+        "a_model_that_cannot_be_put_back_leaves_the_others_put_back_and_the_journal_kept",
+        "ok"
+      ],
+      [
+        "a_model_that_does_not_match_its_sha_refuses_the_build_with_nothing_switched",
+        "ok"
+      ],
+      [
+        "a_new_build_is_installed_beside_the_old_and_switched",
+        "ok"
+      ],
+      [
+        "a_new_updater_not_confirmed_by_the_deadline_is_put_back",
+        "ok"
+      ],
+      [
+        "a_new_updater_that_confirms_keeps_its_switch",
+        "ok"
+      ],
+      [
+        "a_new_updater_that_exits_at_once_is_put_back",
+        "ok"
+      ],
+      [
+        "a_new_updater_that_refuses_every_manifest_is_put_back",
+        "ok"
+      ],
+      [
+        "a_new_worker_beside_an_unchanged_voice_gets_a_folder_named_by_its_list",
+        "ok"
+      ],
+      [
+        "a_part_put_back_says_its_restarts_and_last_line_in_the_outcome_only",
+        "ok"
+      ],
+      [
+        "a_part_that_dies_is_put_back_and_its_build_refused",
+        "ok"
+      ],
+      [
+        "a_part_that_says_it_is_in_error_is_put_back_after_its_minute",
+        "ok"
+      ],
+      [
+        "a_part_whose_folder_is_gone_is_installed_afresh",
+        "ok"
+      ],
+      [
+        "a_product_lamp_without_a_tmpfiles_record_takes_the_builds_tmpfiles",
+        "ok"
+      ],
+      [
+        "a_reset_plan_changed_on_the_lamp_is_replaced_by_a_round_never_kept",
+        "ok"
+      ],
+      [
+        "a_round_after_install_keeps_lamp_updates_own_folder",
+        "ok"
+      ],
+      [
+        "a_round_after_its_own_switch_keeps_the_old_binarys_folder",
+        "ok"
+      ],
+      [
+        "a_round_by_hand_keeps_the_folder_it_runs_from",
+        "ok"
+      ],
+      [
+        "a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail",
+        "ok"
+      ],
+      [
+        "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay",
+        "ok"
+      ],
+      [
+        "a_round_places_second_json_before_a_voice_unit_that_needs_it",
+        "ok"
+      ],
+      [
+        "a_round_puts_a_core_skills_files_back_and_keeps_the_persons_own",
+        "ok"
+      ],
+      [
+        "a_round_that_cannot_place_second_json_writes_no_unit",
+        "ok"
+      ],
+      [
+        "a_round_that_sets_damaged_records_aside_keeps_the_keys_marked",
+        "ok"
+      ],
+      [
+        "a_round_with_nothing_to_change_only_checks",
+        "ok"
+      ],
+      [
+        "a_self_json_from_a_later_version_still_reads",
+        "ok"
+      ],
+      [
+        "a_self_json_the_disk_cannot_give_is_tried_again_next_round",
+        "ok"
+      ],
+      [
+        "a_skill_the_build_removes_leaves_the_turned_on_record_with_one_line",
+        "ok"
+      ],
+      [
+        "a_switch_cut_short_after_its_settings_puts_them_back_at_the_next_start",
+        "ok"
+      ],
+      [
+        "a_switch_cut_short_is_put_back_at_the_next_start",
+        "ok"
+      ],
+      [
+        "a_unit_the_build_carries_is_carried_with_the_build_written_in",
+        "ok"
+      ],
+      [
+        "a_voice_that_is_well_is_put_back_between_two_turns",
+        "ok"
+      ],
+      [
+        "an_old_updater_climbs_one_updater_a_round",
+        "ok"
+      ],
+      [
+        "an_older_build_is_not_taken",
+        "ok"
+      ],
+      [
+        "an_older_lamp_update_back_ignores_the_images_files_and_the_round_says_so",
+        "ok"
+      ],
+      [
+        "an_unchanged_model_is_not_fetched_and_its_file_stays",
+        "ok"
+      ],
+      [
+        "an_unreadable_journal_is_set_aside_and_the_round_goes_on",
+        "ok"
+      ],
+      [
+        "an_unreadable_self_json_with_both_builds_known_is_put_back",
+        "ok"
+      ],
+      [
+        "an_unreadable_self_json_with_the_builds_unknown_is_set_aside",
+        "ok"
+      ],
+      [
+        "an_updater_too_old_for_a_build_not_newer_than_installed_takes_nothing_it_carries",
+        "ok"
+      ],
+      [
+        "an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest",
+        "ok"
+      ],
+      [
+        "an_updater_too_old_for_a_build_without_an_updater_is_refused_with_nothing_written",
+        "ok"
+      ],
+      [
+        "asound_waits_for_a_quiet_moment_within_the_bound_and_then_for_the_next_round",
+        "ok"
+      ],
+      [
+        "both_kinds_of_part_switch_in_one_round_each_its_own_way",
+        "ok"
+      ],
+      [
+        "install_writes_the_fallback_and_no_round_touches_it",
+        "ok"
+      ],
+      [
+        "lamp_update_back_puts_back_an_unreadable_self_json",
+        "ok"
+      ],
+      [
+        "no_line_is_asked_of_a_good_switch_and_none_is_said_when_there_is_none",
+        "ok"
+      ],
+      [
+        "no_line_is_asked_when_systemd_itself_cannot_be_asked",
+        "ok"
+      ],
+      [
+        "no_network_changes_nothing_and_says_so",
+        "ok"
+      ]
+    ],
+    "observed_case_counts": {
+      "ok": 75
+    },
+    "partial_output_case_names": [
+      "no_second_round_begins_while_lamp_updates_own_switch_waits"
+    ],
+    "without_terminal_row": [
+      "no_second_round_begins_while_lamp_updates_own_switch_waits",
+      "only_a_skill_that_would_stop_loading_holds_lamp_skills_back",
+      "product_skills_go_only_into_installs_folder_and_only_when_it_can_be_written",
+      "product_skills_written_by_a_switch_cut_short_are_put_back_at_the_next_start",
+      "prune_keeps_the_models_of_the_kept_builds",
+      "prune_keeps_what_a_model_path_links_to_when_the_state_was_set_aside",
+      "self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate",
+      "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round",
+      "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written",
+      "self_recovery::an_absent_or_unrunnable_fallback_keeps_the_completed_parts_and_old_updater",
+      "self_recovery::an_unchanged_or_refused_updater_needs_no_recovery_query",
+      "self_recovery::missing_recovery_also_defers_an_updater_first_climb_without_touching_parts",
+      "self_recovery::unavailable_recovery_keeps_the_parts_and_can_be_retried_when_armed",
+      "the_apps_off_and_on_hold_through_a_round_and_a_restart",
+      "the_fallback_reads_a_self_json_written_by_a_later_updater",
+      "the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load",
+      "the_journal_line_is_the_units_own_last_cleaned_and_cut",
+      "the_old_build_not_well_either_says_the_first_unit_not_wells_line",
+      "the_voice_is_not_switched_while_someone_talks_to_the_lamp",
+      "with_apply_off_a_builds_settings_are_not_written_and_that_is_said",
+      "with_apply_on_a_builds_settings_are_written_at_the_switch_and_the_part_reading_one_restarted",
+      "with_image_off_the_images_files_are_not_written_and_that_is_said",
+      "with_image_on_the_images_files_are_written_and_asound_restarts_the_voice_at_a_quiet_moment",
+      "with_models_off_a_new_updater_confirms_and_the_build_waits_for_models",
+      "with_the_switch_off_a_build_with_other_models_is_refused",
+      "with_the_switch_off_a_lamps_own_model_is_kept_as_with_it_on",
+      "with_the_switch_off_an_updater_too_old_for_a_build_takes_nothing_it_carries",
+      "with_the_switch_off_lamp_update_never_switches_itself",
+      "without_apply_nothing_is_written_and_what_would_change_is_said"
+    ],
+    "result": "interrupted; no libtest target summary; not a completed/passing target"
+  },
+  "unlaunched_executable_targets": [
+    {
+      "package": "lamp-voice-eval",
+      "target": "it",
+      "kind": [
+        "test"
+      ],
+      "inventory_count": 238,
+      "binary_sha256": "d47dccd05ce070569dbb2fb231097edf0f917ba65c7140c9e338e454c12fda86"
+    },
+    {
+      "package": "lamp-update",
+      "target": "self-cli-exec",
+      "kind": [
+        "test"
+      ],
+      "inventory_count": 1,
+      "binary_sha256": "5010fb4f24fa5c08098a394ca3016cfdba657985022a0778c43cc6ba88acd5bf"
+    },
+    {
+      "package": "lamp-update",
+      "target": "self-process-cuts",
+      "kind": [
+        "test"
+      ],
+      "inventory_count": 1,
+      "binary_sha256": "26d5a1e9ee984e5182e8ab8e9daa71f3ffc7310f6fd8bbf13216a9fd001140c5"
+    },
+    {
+      "package": "lamp-voice-eval",
+      "target": "lamp-voice-eval",
+      "kind": [
+        "bin"
+      ],
+      "inventory_count": 7,
+      "binary_sha256": "ab97e42c470f6ed87a740b59695011729a0021fb4dad6a9b5bdfc18f4fd2d8d4"
+    },
+    {
+      "package": "lamp-voice-eval",
+      "target": "lamp_voice_eval",
+      "kind": [
+        "lib"
+      ],
+      "inventory_count": 378,
+      "binary_sha256": "f74f84253d9fab7f882293f2f3f958960dcc91c517742bde469e9d9dc8affbde"
+    }
+  ],
+  "doctests": "unrun; command interrupted before doctest stage",
+  "planned_workspace_build": "unrun in original continuation; separately authorized build recorded elsewhere"
+}

@@ -1,5 +1,32 @@
 # Tests work log
 
+## 2026-10-23 10:24 +0700 — complete boot-clock controls published; ARM64 passed
+
+Ready for lamp-voice: no (#3190, execution review hold remains).
+
+The [complete Mac continuation receipt](verification/voice-boot-clock-20261023/mac-continuation/)
+publishes all 175 clock observations and their 350 raw streams. The same
+86 near-boot cases change from **34 passed, 51 failed and one abort** to
+**86 passed**. Accepting stale audio fails the unchanged original assertion.
+The full Voice failures remain unclassified: **3,828/1/14 before** and
+**3,823/6/14 after**. The historical source branch is now fetchable at
+`da595851f`, so both sides of the carry can be checked.
+
+The invalid reader snapshot was stopped after verifying its owned process
+group. Its partial 1,210 passes, six failures and 11 ignored cases, plus
+75 completed rows in the interrupted target, are retained without a passing
+gate claim. Exact source restoration and a separate workspace build passed.
+The next fixed comparison uses complete repository worktrees on `70cbefcee`;
+it has not run yet. Current PR ARM64 run `39891902416` and Linux Clippy
+`39891902443` both passed; detailed ARM64 census extraction is in progress.
+
+Phone-news controls are running on the separate two-file slice. The old
+setup sleep falsely passed with delayed startup and broken preemption;
+waiting for actual phone-news entry catches the original response failure.
+No product changes or device execution were made.
+The eight whitespace findings are original blank context lines in the three
+raw patch files; those bytes are preserved, and authored text passes the check.
+
 ## 2026-10-23 10:02 +0700 — full Voice failures published; reader snapshot defect identified
 
 Ready for lamp-voice: no (#3190).

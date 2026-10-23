@@ -1,0 +1,47 @@
+{
+  "original_native_session": 79387,
+  "original_runner_exit": 1,
+  "original_failure": {
+    "type": "AssertionError",
+    "error": "{'label': 'before-near500ms-013', 'argv': ['/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d', '--exact', 'coordinator::tests::hand_controls::a_ridden_gap_gives_the_camera_and_the_eyes_nothing_until_it_reopens', '--nocapture'], 'cwd': '/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS', 'started_utc': '2026-10-23T01:46:31.500684+00:00', 'timeout_seconds': 120, 'host_monotonic_before_ns': 3247399789872000, 'timed_out': False, 'leftover_process_group': False, 'exit_code': -4, 'elapsed_seconds': 0.09596081404015422, 'finished_utc': '2026-10-23T01:46:31.596635+00:00', 'host_monotonic_after_ns': 3247399885890000, 'stdout': {'path': 'before-near500ms-013.stdout', 'bytes': 16, 'sha256': 'daf071121a9ffe32bbce44190e37a068c96d08bff63fd7b660dd95b77d786dca'}, 'stderr': {'path': 'before-near500ms-013.stderr', 'bytes': 768, 'sha256': 'f3c4d5ae62e9c140a8c62d1926e40bcb76f57ca409fba092ab86441485437b7e'}}",
+    "commands_completed": 41
+  },
+  "original_execution_marker": {
+    "started_utc": "2026-10-23T01:33:29.268305+00:00",
+    "pid": 72707,
+    "base": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+    "candidate": "da595851f239cd6456cc1fb4565d3fc272675702",
+    "runner_sha256": "e28de088626dab9a252fb16566e45ad05c655ce08787e625d44510d4df22211a",
+    "prepared_sha256": "0a2c6011cfdb759ff5e240da1408180d200b0279a1d6adf054c490a55707e72c",
+    "argv": [
+      "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/verify_boot_clock.py",
+      "--run",
+      "--main-target-granted"
+    ]
+  },
+  "continuation_native_session": 20847,
+  "continuation_runner_exit": 1,
+  "continuation_failure": {
+    "type": "AssertionError",
+    "error": "{'label': 'readers-full-tests', 'argv': ['cargo', 'test', '-p', 'lamp-skills', '-p', 'lamp-voice-eval', '-p', 'lamp-memory', '-p', 'lamp-update', '-p', 'lamp-cloud', '--offline', '--no-fail-fast', '--', '--test-threads=1'], 'cwd': '/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS', 'started_utc': '2026-10-23T02:29:37.883830+00:00', 'timeout_seconds': 2400, 'host_monotonic_before_ns': 3249986060827000, 'timed_out': False, 'leftover_process_group': False, 'exit_code': -15, 'elapsed_seconds': 1857.9123415518552, 'finished_utc': '2026-10-23T03:00:35.875194+00:00', 'host_monotonic_after_ns': 3251843940918000, 'stdout': {'path': 'readers-full-tests.stdout', 'bytes': 112354, 'sha256': 'fe5613fbd8f3a164b019d4a00b3166874efb37bb40fc5a8cdaa781c86ad05878'}, 'stderr': {'path': 'readers-full-tests.stderr', 'bytes': 53736, 'sha256': 'd89f34f74e212a276f9134caeb94e13119ff5b37ebc9a4d12e705df2141e36b0'}}",
+    "commands_completed": 254
+  },
+  "continuation_execution_marker": {
+    "started_utc": "2026-10-23T02:10:33.694836+00:00",
+    "pid": 30102,
+    "runner_sha256": "13ee81e3d52ee76a8df0b5bf98326ff18d8a46fd4f45277388df758e181f60fc",
+    "prepared_sha256": "005b265aa21fd88b429b3ebeb76fb47274c5588b855a3eee6b2868c101c0e2a1",
+    "base": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+    "candidate": "da595851f239cd6456cc1fb4565d3fc272675702",
+    "argv": [
+      "/private/tmp/tests-codex-boot-clock-mac-continuation-20261023/continue_boot_clock.py",
+      "--run",
+      "--main-target-granted"
+    ]
+  },
+  "continuation_exit_explanation": "Parent-authorized SIGTERM of verified reader process group34013 due to omitted rootfs fixture data; classify rejected -15, then finally restored exact candidate and wrote terminal manifest. This is a verifier-scope abort, never a passing gate or expected test assertion.",
+  "separate_build_native_session": 79761,
+  "separate_build_exit": 0,
+  "no_automatic_retries": true,
+  "MAIN_and_CPU_released": true
+}

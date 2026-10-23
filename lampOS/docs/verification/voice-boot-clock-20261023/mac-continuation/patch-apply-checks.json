@@ -1,0 +1,63 @@
+[
+  {
+    "patch": "mod240.patch",
+    "argv": [
+      "git",
+      "apply",
+      "--check",
+      "/private/tmp/tests-codex-boot-clock-mac-continuation-20261023/complete-receipt/patches/mod240.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-fixtures-20261023",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "checked_utc": "2026-10-23T03:14:55.212555+00:00",
+    "repository_mutation": false
+  },
+  {
+    "patch": "near500ms.patch",
+    "argv": [
+      "git",
+      "apply",
+      "--check",
+      "/private/tmp/tests-codex-boot-clock-mac-continuation-20261023/complete-receipt/patches/near500ms.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-fixtures-20261023",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "checked_utc": "2026-10-23T03:14:55.238739+00:00",
+    "repository_mutation": false
+  },
+  {
+    "patch": "stale-accepted.patch",
+    "argv": [
+      "git",
+      "apply",
+      "--check",
+      "/private/tmp/tests-codex-boot-clock-mac-continuation-20261023/complete-receipt/patches/stale-accepted.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-fixtures-20261023",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "checked_utc": "2026-10-23T03:14:55.266454+00:00",
+    "repository_mutation": false
+  },
+  {
+    "patch": "candidate.patch",
+    "argv": [
+      "git",
+      "apply",
+      "--check",
+      "--reverse",
+      "/private/tmp/tests-codex-boot-clock-mac-continuation-20261023/complete-receipt/patches/candidate.patch"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-fixtures-20261023",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "checked_utc": "2026-10-23T03:14:55.298933+00:00",
+    "repository_mutation": false
+  }
+]

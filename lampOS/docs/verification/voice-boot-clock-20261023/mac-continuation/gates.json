@@ -1,0 +1,227 @@
+{
+  "candidate_gates": [
+    {
+      "label": "gate-fmt",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+      "started_utc": "2026-10-23T02:16:09.422161+00:00",
+      "timeout_seconds": 300,
+      "host_monotonic_before_ns": 3249177599160000,
+      "timed_out": false,
+      "leftover_process_group": false,
+      "exit_code": 0,
+      "elapsed_seconds": 12.53360125189647,
+      "finished_utc": "2026-10-23T02:16:21.955590+00:00",
+      "host_monotonic_after_ns": 3249190132650000,
+      "stdout": {
+        "path": "gate-fmt.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "gate-fmt.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "label": "gate-clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+      "started_utc": "2026-10-23T02:16:24.400210+00:00",
+      "timeout_seconds": 1800,
+      "host_monotonic_before_ns": 3249192577224000,
+      "timed_out": false,
+      "leftover_process_group": false,
+      "exit_code": 0,
+      "elapsed_seconds": 87.24397279601544,
+      "finished_utc": "2026-10-23T02:17:51.643058+00:00",
+      "host_monotonic_after_ns": 3249279820121000,
+      "stdout": {
+        "path": "gate-clippy.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "gate-clippy.stderr",
+        "bytes": 3820,
+        "sha256": "22d1d0932a42088cd17a8d3111909048d8dcda3c939efd766ccc2ca9ba0b7819"
+      }
+    },
+    {
+      "label": "gate-readers-clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice-eval",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-cloud",
+        "--all-targets",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+      "started_utc": "2026-10-23T02:26:13.149025+00:00",
+      "timeout_seconds": 1800,
+      "host_monotonic_before_ns": 3249781326018000,
+      "timed_out": false,
+      "leftover_process_group": false,
+      "exit_code": 0,
+      "elapsed_seconds": 56.55410441104323,
+      "finished_utc": "2026-10-23T02:27:09.702141+00:00",
+      "host_monotonic_after_ns": 3249837879208000,
+      "stdout": {
+        "path": "gate-readers-clippy.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "gate-readers-clippy.stderr",
+        "bytes": 5455,
+        "sha256": "39417a75c332d544bc3455ccd249e4ba792be14d5b646aeb670a5153111c047f"
+      }
+    }
+  ],
+  "separate_authorized_build": {
+    "argv": [
+      "cargo",
+      "build",
+      "--workspace",
+      "--offline"
+    ],
+    "cwd": "/private/tmp/tests-codex-boot-clock-mac-corrected-20261023/run-20261023T013329.274115Z/source/lampOS",
+    "started_utc": "2026-10-23T03:04:08.124015+00:00",
+    "timeout_seconds": 2400,
+    "timed_out": false,
+    "leftover_process_group": false,
+    "source_before": {
+      "files": 6523,
+      "bytes": 203361607,
+      "sha256": "47551982f2a0f34789d2c0284e2df5c1bf9223221a28cb2bbbe0f210254e0388"
+    },
+    "env": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true"
+    },
+    "pid": 4346,
+    "pgid": 4346,
+    "exit_code": 0,
+    "elapsed_seconds": 60.94963935576379,
+    "finished_utc": "2026-10-23T03:05:09.128182+00:00",
+    "source_after": {
+      "files": 6523,
+      "bytes": 203361607,
+      "sha256": "47551982f2a0f34789d2c0284e2df5c1bf9223221a28cb2bbbe0f210254e0388"
+    },
+    "source_unchanged": true,
+    "stdout": {
+      "path": "build.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stderr": {
+      "path": "build.stderr",
+      "bytes": 7281,
+      "sha256": "fd88e7321a56720ea38e32653722f353a391304d68200201a8ed975d1231ba9d"
+    }
+  },
+  "source_checks": [
+    {
+      "label": "diff-check",
+      "argv": [
+        "git",
+        "diff",
+        "--check",
+        "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+        "da595851f239cd6456cc1fb4565d3fc272675702"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-fixtures-20261023",
+      "observed_utc": "2026-10-23T03:07:30.687894+00:00",
+      "exit_code": 0,
+      "stdout": {
+        "path": "diff-check.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "diff-check.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "label": "authored-head",
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-fixtures-20261023",
+      "observed_utc": "2026-10-23T03:07:30.713765+00:00",
+      "exit_code": 0,
+      "stdout": {
+        "path": "authored-head.stdout",
+        "bytes": 41,
+        "sha256": "2186dd4f53f386fb76c7704851d1681bfb5a587fe16a4b558a53e118f93bbd37"
+      },
+      "stderr": {
+        "path": "authored-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "label": "authored-status",
+      "argv": [
+        "git",
+        "status",
+        "--porcelain=v1"
+      ],
+      "cwd": "/private/tmp/tests-codex-boot-clock-fixtures-20261023",
+      "observed_utc": "2026-10-23T03:07:30.890833+00:00",
+      "exit_code": 0,
+      "stdout": {
+        "path": "authored-status.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "authored-status.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "original_planned_build": "unrun after verifier-scope abort; separately authorized build above ran once",
+  "reader_gate": "aborted and incomplete; not passing",
+  "candidate_full_voice_gate": "failed; see voice-comparison/",
+  "current_base_qualification": false
+}

@@ -1,0 +1,161 @@
+{
+  "created_utc": "2026-10-23T03:14:55.350981+00:00",
+  "files": {
+    "README.md": {
+      "bytes": 8548,
+      "sha256": "c7df939cf2957254cc8456a6aaea22e7e44a7946539dcf271a69b9bdde9fa9f9"
+    },
+    "artifacts.json": {
+      "bytes": 86959,
+      "sha256": "07a7f485a7f19424afa21290e48453d6c9b3f6c5cccd0e00ccf541b37a65c165"
+    },
+    "compile-provenance.json": {
+      "bytes": 7152,
+      "sha256": "ba835cf6697e2404b64d0a2f72b9c940ea507ce766e1722a64f9261099230863"
+    },
+    "controls/observations.json": {
+      "bytes": 170700,
+      "sha256": "37dac05e3148042d4ddaf8bfb7f79ad4c1ecd82470cd6ace769ebebc635f5c95"
+    },
+    "execution-status.json": {
+      "bytes": 3861,
+      "sha256": "95cc303ea0bb0ad3085e0b0574c1b61dc9287cce898aa473a116c8f61f015f5e"
+    },
+    "gates.json": {
+      "bytes": 7010,
+      "sha256": "d34f6505e916be92206f8a773d2ab8efac5bea80f3aa2f203666fa2382a033d8"
+    },
+    "patch-apply-checks.json": {
+      "bytes": 1746,
+      "sha256": "9f0b34cd5f78fe971eea3f732278fd60c855d30ed395d1bae45669a26be9bf3a"
+    },
+    "patches/candidate.patch": {
+      "bytes": 17767,
+      "sha256": "40004d7f4e26102b20b6efd23bf769a39255c5d50406a0d6bca07eef29623a32"
+    },
+    "patches/mod240.patch": {
+      "bytes": 1893,
+      "sha256": "4d4e063757c9bf450837d7cffa97d9805f805f92e3b2e0fe21f70e0641032d4c"
+    },
+    "patches/near500ms.patch": {
+      "bytes": 1824,
+      "sha256": "268df0971f2649005bdcf007ba61b54c7050621f4aaae4c6b982cc130c5b654b"
+    },
+    "patches/stale-accepted.patch": {
+      "bytes": 424,
+      "sha256": "44083a66cec03c1ae86d4579683ba3921615249e8fb799f2a62441c507187c09"
+    },
+    "raw/clock-controls.txt": {
+      "bytes": 217516,
+      "sha256": "69cf455c62a37b18d0c91953101fafa7f6dac4348d67a4786574029c8a3f6af1"
+    },
+    "raw/compile-stderr.txt": {
+      "bytes": 34284,
+      "sha256": "0f9129759dfe004a2eb2745991a94863f7e28dd6dd673ad7be3f51e1d4f21531"
+    },
+    "raw/final-gates.txt": {
+      "bytes": 20651,
+      "sha256": "7ae3f1b8534a4db643a83db514f5b4ca0fc71cc32828afb295b7bf600215ac74"
+    },
+    "raw/reader-partial.txt": {
+      "bytes": 166705,
+      "sha256": "b5cee66fb0cf77a09bd3ff13dcadf422c8c49b30a06c21edaf48b24b6017f202"
+    },
+    "raw-payloads.json": {
+      "bytes": 142520,
+      "sha256": "913fe12b02bec3b4020490f888c2240a0ef618daeba09fd1f6393350504f305a"
+    },
+    "reader-abort/interruption.json": {
+      "bytes": 2634,
+      "sha256": "27319d5ef7cb2d2cfbfbed4d414531aa205f5a5af53875ad3718916d4a50eabc"
+    },
+    "reader-abort/inventories.json": {
+      "bytes": 157777,
+      "sha256": "4763d2816dc567da92cab921951b3e7d00b7b025a978524e9b2b8f1af34ca1a3"
+    },
+    "reader-abort/partial-target-outcomes.json": {
+      "bytes": 32840,
+      "sha256": "285b160d75aceae65c803a3a2fee362d078a01088db5b334d825414a8d38b526"
+    },
+    "source-integrity.json": {
+      "bytes": 7469,
+      "sha256": "52f6d883d9fc7166716762896e689570b8da420358a2f0779dd1aabf9115a702"
+    },
+    "voice-comparison/README.md": {
+      "bytes": 4776,
+      "sha256": "7452b8e8b9104a2229617979dab361104355cf0ba6e6e4ce676d003459f593d3"
+    },
+    "voice-comparison/artifacts.json": {
+      "bytes": 26156,
+      "sha256": "ff2cc8babf64480a64bfdfe4c9e6c929cdb1f30d0385da024535340268e2e268"
+    },
+    "voice-comparison/child-absence.json": {
+      "bytes": 754,
+      "sha256": "88e50959756093a078171cbf5c501a457d26a6cec0f6747573ae8c8acfa60402"
+    },
+    "voice-comparison/environment.json": {
+      "bytes": 1098,
+      "sha256": "e5a83bd3441794f54dd68902e092b7d8244411f0b60e0ee9bb897bd3ac47cbf2"
+    },
+    "voice-comparison/inventories.json": {
+      "bytes": 367376,
+      "sha256": "79492d533368cdd7e78e2225a2ec79bf418972d73d6dee84924b1b670050caf4"
+    },
+    "voice-comparison/manifest.json": {
+      "bytes": 5756,
+      "sha256": "6b82cc34d805fbd8dc548446b258c7f01dac39bece9f275ae978a83d10e0a40e"
+    },
+    "voice-comparison/raw/after-full-stderr.txt": {
+      "bytes": 1202,
+      "sha256": "cb817a08d57bfa859b9dadfa4d151a8495374642a4eae8f5d0ee834b8f027ebf"
+    },
+    "voice-comparison/raw/after-full-stdout.txt": {
+      "bytes": 390336,
+      "sha256": "932e6752add2064de56ae9b290d58c671d6867bcc7b1f7c0a8e48aa749f29d4e"
+    },
+    "voice-comparison/raw/after-lib-file.txt": {
+      "bytes": 416,
+      "sha256": "9d558ab41c81b49c540f94bfe97c7e34e71ec436bef69266eee151823603f091"
+    },
+    "voice-comparison/raw/before-full-stderr.txt": {
+      "bytes": 1118,
+      "sha256": "3ad42b0a1db444eae6a5a0c12edd3af827f4bcd02de70104bcf0b2f9a5388d4a"
+    },
+    "voice-comparison/raw/before-full-stdout.txt": {
+      "bytes": 380674,
+      "sha256": "fbcd174d44e93563c76fe88d65a36a7a17fa2e9c91b457ec9d21218c96dfd143"
+    },
+    "voice-comparison/raw/before-lib-file.txt": {
+      "bytes": 429,
+      "sha256": "37ba707749988d76cdfc9beffca5e5a49ef0f7bc49ae84da2c249dfa965a171e"
+    },
+    "voice-comparison/raw/child-ps-stderr.txt": {
+      "bytes": 267,
+      "sha256": "06310690b31b2eb366cb64b85776f142d31b531594bc5a9b6991958c57b2b310"
+    },
+    "voice-comparison/raw/child-ps-stdout.txt": {
+      "bytes": 267,
+      "sha256": "0df78882355f991899906739536bc3cbbbba1e903b8cfd00e730c12c625f0313"
+    },
+    "voice-comparison/raw/host-uname.txt": {
+      "bytes": 415,
+      "sha256": "3d52af169357b6c6b2aecbace45ade8273fea8610aeca36ca3cfda2cb33c4adb"
+    },
+    "voice-comparison/raw/rustc-version.txt": {
+      "bytes": 483,
+      "sha256": "c08116981ebe855f3aa0cf0432053178ac485e03144ccd556a112edb5c3bca18"
+    },
+    "voice-comparison/results.json": {
+      "bytes": 34940,
+      "sha256": "d09e7199c5c3150d510ce879e1abbbcffab1123959d8ded9c59622e533dc6ce4"
+    }
+  },
+  "raw_payload_count": 374,
+  "validation": {
+    "json_parsed": true,
+    "markdown_links_exist": true,
+    "all_payloads_losslessly_recovered_and_hashed": true,
+    "nonpatch_trailing_whitespace": [],
+    "patches": "All four byte-identical frozen patches pass git apply --check (candidate reverse); ordinary diff context spaces preserved."
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "reason": "Parent-authorized verifier-scope abort: the frozen archive includes only lampOS and omits required repository-root robots/lamp fixture data. No fixtures or source were changed in-place.",
+  "classification": "verifier_scope_abort; not a libtest pass, expected assertion, or product-regression classification",
+  "identity_command": [
+    "ps",
+    "-axo",
+    "pid=,ppid=,pgid=,lstart=,command="
+  ],
+  "identity_observed_utc": "2026-10-23T03:00:35.835004+00:00",
+  "verified_runner": {
+    "pid": 30102,
+    "ppid": 67233,
+    "pgid": 30102,
+    "started": "Fri Oct 23 09:10:33 2026",
+    "command": "/usr/local/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python /private/tmp/tests-codex-boot-clock-mac-continuation-20261023/continue_boot_clock.py --run --main-target-granted"
+  },
+  "verified_reader_leader": {
+    "pid": 34013,
+    "ppid": 30102,
+    "pgid": 34013,
+    "started": "Fri Oct 23 09:29:37 2026",
+    "command": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/cargo test -p lamp-skills -p lamp-voice-eval -p lamp-memory -p lamp-update -p lamp-cloud --offline --no-fail-fast -- --test-threads=1"
+  },
+  "verified_group_members": [
+    {
+      "pid": 34013,
+      "ppid": 30102,
+      "pgid": 34013,
+      "started": "Fri Oct 23 09:29:37 2026",
+      "command": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/cargo test -p lamp-skills -p lamp-voice-eval -p lamp-memory -p lamp-update -p lamp-cloud --offline --no-fail-fast -- --test-threads=1"
+    },
+    {
+      "pid": 68447,
+      "ppid": 34013,
+      "pgid": 34013,
+      "started": "Fri Oct 23 09:55:37 2026",
+      "command": "/private/tmp/tests-codex-1569-target/debug/deps/round-6fe6708dfc43b4d3 --test-threads=1"
+    },
+    {
+      "pid": 89038,
+      "ppid": 68447,
+      "pgid": 34013,
+      "started": "Fri Oct 23 10:00:35 2026",
+      "command": "/bin/sh /var/folders/qg/lhfdx6q166z5cj705q22mh480000gn/T/.tmp3dHkjj/opt/lampOS/skills/ac63b670433ce70da52e72308df7dcc8dbde76e8384f9034ef638ae6aa56ac90/lamp-skills list --dir /var/folders/qg/lhfdx6q166z5cj705q22mh480000gn/T/.tmp3dHkjj/var/lib/lampOS/skills"
+    }
+  ],
+  "signal": "SIGTERM",
+  "signal_number": 15,
+  "process_group": 34013,
+  "signal_sent_utc": "2026-10-23T03:00:35.835320+00:00",
+  "other_groups_signalled": false,
+  "frozen_runner_files_modified": false,
+  "expected_cleanup": "Frozen runner records the signal exit, rejects it in classify(), restores exact candidate bytes in finally, and writes terminal evidence. Planned workspace build will be unrun if it exits there."
+}
