@@ -24,7 +24,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
-    io::{self, Write},
+    io::{self, Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     time::{Duration, Instant, SystemTime},
@@ -422,7 +422,7 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
         Ok::<_, io::Error>(())
     })()
     .map_err(unkept);
-    let packed = made.and_then(|()| pack(&keeping.program, &folder, &out));
+    let packed = made.and_then(|()| pack(&keeping.program, &folder, &out, &name));
     let result = packed.and_then(|()| {
         let package = format!("{name}-{version}.tar");
         let bytes = fs::read(out.join(&package)).map_err(unkept)?;
@@ -455,7 +455,14 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
 
 /// `lamp-skills pack --out OUT FOLDER`: the checks a load makes, its
 /// permissions among them, and the package read back as an install would.
-fn pack(program: &Path, folder: &Path, out: &Path) -> Result<(), Refused> {
+/// Its words go to a file beside OUT, in the private folder, so a long
+/// answer never blocks it.
+fn pack(program: &Path, folder: &Path, out: &Path, name: &str) -> Result<(), Refused> {
+    let said = out.with_file_name("check.err");
+    let stderr = fs::File::create(&said).map_err(|why| {
+        eprintln!("lamp-voice: a made skill was not checked: {why}");
+        Refused::new("the lamp couldn't check it")
+    })?;
     let mut child = Command::new(program)
         .arg("pack")
         .arg("--out")
@@ -463,7 +470,7 @@ fn pack(program: &Path, folder: &Path, out: &Path) -> Result<(), Refused> {
         .arg(folder)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(stderr)
         .spawn()
         .map_err(|why| {
             eprintln!("lamp-voice: a made skill was not checked: {why}");
@@ -486,15 +493,69 @@ fn pack(program: &Path, folder: &Path, out: &Path) -> Result<(), Refused> {
     if status.success() {
         return Ok(());
     }
-    // Only its code: lamp-skills' words can quote the skill's, which come
-    // from the agent and the request (the reviewer on #2011).
+    let mut words = Vec::new();
+    if let Ok(file) = fs::File::open(&said) {
+        let _ = file.take(MOST_CHECK_BYTES).read_to_end(&mut words);
+    }
     eprintln!(
-        "lamp-voice: a made skill did not pass lamp-skills' check (exit {})",
+        "lamp-voice: a made skill did not pass lamp-skills' check (exit {}): {}",
         status
             .code()
-            .map_or("none".to_owned(), |code| code.to_string())
+            .map_or("none".to_owned(), |code| code.to_string()),
+        check_reason(&String::from_utf8_lossy(&words), folder, name)
     );
     Err(Refused::new("it doesn't pass the lamp's check"))
+}
+
+/// The check's answer read, at most.
+const MOST_CHECK_BYTES: u64 = 8 * 1024;
+/// The reason logged, at most, in characters.
+const MOST_REASON_CHARS: usize = 200;
+
+/// The check's first line, for the journal (Mobile's #2813 rerun on
+/// lamp-0c89, 23 Oct, gave only `exit 1`). lamp-skills' words can quote the
+/// skill's, which come from the agent and the person's request (the
+/// reviewer on #2011), so anything in quotes, the skill's own name and its
+/// folder are left out, and the line is cut short.
+fn check_reason(said: &str, folder: &Path, name: &str) -> String {
+    let Some(line) = said.lines().map(str::trim).find(|line| !line.is_empty()) else {
+        return "it said nothing".into();
+    };
+    let line = line.strip_prefix("lamp-skills: ").unwrap_or(line);
+    let line = line.replace(&*folder.to_string_lossy(), "<folder>");
+    let chars: Vec<char> = line.chars().collect();
+    let word = |at: Option<&char>| at.is_some_and(|c| c.is_alphanumeric());
+    let mut kept = String::new();
+    let mut open: Option<char> = None;
+    for (at, &c) in chars.iter().enumerate() {
+        let before = at.checked_sub(1).and_then(|at| chars.get(at));
+        // An apostrophe in a word ("skill's", "don't") neither opens nor
+        // closes a quote.
+        let in_word = word(before) && word(chars.get(at + 1));
+        match open {
+            Some(quote) if !in_word && c == if quote == '“' { '”' } else { quote } => {
+                kept.push('…');
+                kept.push(c);
+                open = None;
+            }
+            Some(_) => {}
+            None if !word(before) && matches!(c, '"' | '\'' | '`' | '“') => {
+                kept.push(c);
+                open = Some(c);
+            }
+            None => kept.push(c),
+        }
+    }
+    // A quote never closed hides the rest of the line.
+    if open.is_some() {
+        kept.push('…');
+    }
+    let kept = if name.is_empty() {
+        kept
+    } else {
+        kept.replace(name, "<skill>")
+    };
+    cut_chars(&kept, MOST_REASON_CHARS)
 }
 
 /// The folder, made 0700 if it is not there; one already there is made
@@ -1054,6 +1115,66 @@ light = { dim = 1 }
                 .0
                 .contains("cut off")
         );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The check's first line goes to the journal with the skill's words
+    /// left out: quoted text, its name and its folder (Mobile's #2813 rerun:
+    /// only `exit 1` was logged).
+    #[test]
+    fn the_checks_reason_is_logged_without_the_skills_words() {
+        let folder = Path::new("/var/lib/made/.making-7/skill/evening-dim");
+        let reason = |said: &str| check_reason(said, folder, "evening-dim");
+        assert_eq!(
+            reason(
+                "lamp-skills: not packed: /var/lib/made/.making-7/skill/evening-dim/skill.toml: \
+                 [[do]] light: unknown key \"glow\" (expected colour, level, for or dim)\n\
+                 more lines\n"
+            ),
+            "not packed: <folder>/skill.toml: [[do]] light: unknown key \"…\" (expected colour, level, for or dim)"
+        );
+        // Its name, an apostrophe in a word, single quotes, backticks and
+        // curly quotes.
+        assert_eq!(
+            reason("not packed: evening-dim's skill.toml says no version: a package carries one"),
+            "not packed: <skill>'s skill.toml says no version: a package carries one"
+        );
+        assert_eq!(
+            reason("gesture 'wave to Lan' isn't one of `nod`, “curious”"),
+            "gesture '…' isn't one of `…`, “…”"
+        );
+        // An apostrophe inside a quote doesn't end it early.
+        assert_eq!(reason("said 'don't wake me' at 7"), "said '…' at 7");
+        // A quote never closed hides the rest.
+        assert_eq!(reason("bad value \"call Lan at"), "bad value \"…");
+        assert_eq!(reason("\n  \n"), "it said nothing");
+        let long = reason(&"word ".repeat(100));
+        assert!(long.chars().count() <= MOST_REASON_CHARS + 1, "{long}");
+        assert!(long.ends_with('…'));
+    }
+
+    /// A check that says a lot and fails is answered "doesn't pass" at
+    /// once: its words go to a file, so a full pipe never holds it.
+    #[test]
+    fn a_check_that_says_a_lot_still_ends() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = scratch("made-loud");
+        let program = dir.join("lamp-skills");
+        fs::write(
+            &program,
+            "#!/bin/sh\nhead -c 200000 /dev/zero | tr '\\0' x >&2\nexit 1\n",
+        )
+        .unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+        let keeping = Keeping {
+            directory: dir.join("made"),
+            program,
+        };
+        let began = Instant::now();
+        let kept = keep(&answer(TOML, CARD), false, "s:1:4", &keeping);
+        assert_eq!(kept.unwrap_err().0, "it doesn't pass the lamp's check");
+        assert!(began.elapsed() < PACK_WITHIN, "{:?}", began.elapsed());
+        assert!(index(&keeping.directory).is_empty());
         let _ = fs::remove_dir_all(&dir);
     }
 

@@ -1681,7 +1681,12 @@ happens:
    this lamp" group). Then `lamp-skills pack` (#1698) checks the folder:
    every check a load makes, its permissions among them, and the package
    read back as an install reads one. A skill that does more than it
-   declares is refused there.
+   declares is refused there. When it fails, the voice's journal has the
+   check's exit code and its first line, without the skill's own words:
+   anything in quotes, the skill's name and its folder are left out, and
+   the line is at most 200 characters (`made_skill::check_reason`; #2813's
+   rerun on lamp-0c89 gave only `exit 1`). The check writes to a file in
+   the private folder, read up to 8 KiB, so a long answer never holds it.
 5. **Kept, not installed.** The package goes in the voice's own folder,
    `/var/lib/lampOS/voice/made-skills` (0700, the voice's user):
    - at most 5 are kept, and the oldest is let go with its package;
