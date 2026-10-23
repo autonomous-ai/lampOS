@@ -1,0 +1,62 @@
+{
+  "source_base": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+  "path": "lampOS/crates/update/tests/round/self_cuts.rs",
+  "source_sha256": "9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013",
+  "successful_path_boundary_calls": {
+    "cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart": 5,
+    "interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart": 12
+  },
+  "fixture_executable_checks_per_boundary": 3,
+  "successful_path_fixture_checks": {
+    "cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart": 15,
+    "interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart": 36
+  },
+  "limit": "Static successful-path fixture call counts, not observed progress in the aborted case. File preparation, process spawning and other work lie outside the per-script2s status window. A failed assertion may stop earlier.",
+  "excerpts": {
+    "executable": {
+      "first_line": 43,
+      "last_line": 125,
+      "source": "fn executable(path: &Path, script: &str) {\n    let invocation = EXECUTABLE_CHECK.with(|count| {\n        let next = count.get() + 1;\n        count.set(next);\n        next\n    });\n    let expected = if script == OLD {\n        \"old\"\n    } else {\n        assert_eq!(script, NEW);\n        \"new\"\n    };\n    let context = format!(\n        \"check={invocation} caller={} path={} expected={expected} sha256={}\",\n        std::panic::Location::caller(),\n        path.display(),\n        sha(script),\n    );\n    assert_eq!(fs::read(path).unwrap(), script.as_bytes());\n    let metadata = fs::symlink_metadata(path).unwrap();\n    assert!(metadata.is_file(), \"the executable must be a regular file\");\n    assert_eq!(metadata.permissions().mode() & 0o777, 0o755);\n    let _forking = forking();\n    let mut child = Running(\n        Command::new(path)\n            .env_clear()\n            .stdin(Stdio::null())\n            .stdout(Stdio::piped())\n            .stderr(Stdio::null())\n            .spawn()\n            .unwrap_or_else(|error| {\n                panic!(\"the selected updater must execute: {context}; {error}\")\n            }),\n    );\n    let started = Instant::now();\n    let deadline = started + Duration::from_secs(2);\n    let mut polls = 0;\n    let status = loop {\n        let poll_started = started.elapsed();\n        let observed = child.0.try_wait();\n        let poll_finished = started.elapsed();\n        polls += 1;\n        if let Some(status) = observed.unwrap_or_else(|error| {\n            panic!(\"cannot read updater fixture status: {context}; {error}\")\n        }) {\n            break status;\n        }\n        if Instant::now() >= deadline {\n            let elapsed = started.elapsed();\n            // The child may exit while the parent is descheduled after the\n            // previous poll. Preserve that evidence without clearing failure.\n            let final_status = child.0.try_wait();\n            panic!(\n                \"updater fixture did not exit: {context}; pid={} elapsed={elapsed:?} \\\n                 polls={polls} last_poll={poll_started:?}..{poll_finished:?} \\\n                 final_status={final_status:?} (diagnostic only; timeout still fails)\",\n                child.0.id(),\n            );\n        }\n        // Polling bounds the child; it does not choose a cut or order writes.\n        std::thread::sleep(Duration::from_millis(5));\n    };\n    assert!(status.success(), \"{context}; {status}\");\n    let mut output = String::new();\n    child\n        .0\n        .stdout\n        .take()\n        .unwrap()\n        .take(128)\n        .read_to_string(&mut output)\n        .unwrap();\n    assert_eq!(\n        output,\n        if script == OLD {\n            \"old-updater\\n\"\n        } else {\n            assert_eq!(script, NEW);\n            \"new-updater\\n\"\n        },\n        \"{context}\",\n    );\n}\n"
+    },
+    "build": {
+      "first_line": 128,
+      "last_line": 136,
+      "source": "fn build(lamp: &Lamp, script: &str) {\n    executable(\n        &lamp\n            .config\n            .on(&unit::folder(own::FOLDER, &sha(script)))\n            .join(own::BINARY),\n        script,\n    );\n}\n"
+    },
+    "boundary": {
+      "first_line": 141,
+      "last_line": 148,
+      "source": "fn boundary(lamp: &Lamp, current: &str) {\n    executable(&lamp.config.on(own::CURRENT).join(own::BINARY), current);\n    assert_eq!(lamp.own_build(), sha(current));\n    // Even with new selected, the old build remains runnable for put-back.\n    build(lamp, OLD);\n    // Install's fixed fallback keeps its exact original bytes and mode.\n    executable(&lamp.config.on(own::BACK), OLD);\n}\n"
+    },
+    "prepared": {
+      "first_line": 151,
+      "last_line": 158,
+      "source": "fn prepared() -> Lamp {\n    let mut lamp = Lamp::installed_with_updater(OLD);\n    lamp.config.self_switch = true;\n    lamp.systemd.self_recovery = Ok(());\n    product_build_with_updater(&mut lamp, 2, NEW);\n    boundary(&lamp, OLD);\n    lamp\n}\n"
+    },
+    "switch": {
+      "first_line": 188,
+      "last_line": 201,
+      "source": "fn switch(lamp: &mut Lamp) {\n    assert_eq!(\n        lamp.round(),\n        Outcome::SelfSwitched {\n            sequence: 2,\n            from: sha(OLD),\n            to: sha(NEW),\n        },\n        \"{:?}\",\n        lamp.said\n    );\n    pending(lamp);\n    boundary(lamp, NEW);\n}\n"
+    },
+    "confirmed": {
+      "first_line": 204,
+      "last_line": 214,
+      "source": "fn confirmed(lamp: &mut Lamp) {\n    assert!(lamp.pending().is_none());\n    assert!(own::refused(&lamp.records()).is_empty());\n    boundary(lamp, NEW);\n    assert_eq!(\n        lamp.back(update_unit(\"failed\", \"failed\"), u64::MAX),\n        own::Back::Nothing\n    );\n    assert_eq!(lamp.round(), Outcome::UpToDate(2), \"{:?}\", lamp.said);\n    boundary(lamp, NEW);\n}\n"
+    },
+    "put_back": {
+      "first_line": 217,
+      "last_line": 231,
+      "source": "fn put_back(lamp: &mut Lamp) {\n    assert!(matches!(\n        lamp.back(update_unit(\"failed\", \"failed\"), u64::MAX),\n        own::Back::PutBack(_)\n    ));\n    assert!(lamp.pending().is_none());\n    assert_eq!(own::refused(&lamp.records()), vec![sha(NEW)]);\n    boundary(lamp, OLD);\n    assert_eq!(\n        lamp.back(update_unit(\"failed\", \"failed\"), u64::MAX),\n        own::Back::Nothing\n    );\n    assert_eq!(lamp.round(), Outcome::UpToDate(2), \"{:?}\", lamp.said);\n    boundary(lamp, OLD);\n}\n"
+    },
+    "cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart": {
+      "first_line": 335,
+      "last_line": 344,
+      "source": "fn cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart() {\n    let mut lamp = prepared();\n    switch(&mut lamp);\n    // confirm returns only after removing self.json and syncing its folder.\n    // Recreate World on the next calls, with no further handover state.\n    assert_eq!(lamp.confirm(&sha(NEW)), own::Confirm::Confirmed);\n    boundary(&lamp, NEW);\n    confirmed(&mut lamp);\n    assert_eq!(lamp.confirm(&sha(NEW)), own::Confirm::Nothing);\n}\n"
+    },
+    "interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart": {
+      "first_line": 347,
+      "last_line": 418,
+      "source": "fn interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart() {\n    let mut lamp = prepared();\n    switch(&mut lamp);\n    let saved = pending(&lamp);\n\n    // Failure before atomic replacement must leave the selected new build\n    // runnable. In particular, it must not be deleted before old is linked.\n    let link_blocker = lamp\n        .config\n        .on(own::CURRENT)\n        .with_file_name(\".current.lamp-update\");\n    fs::create_dir(&link_blocker).unwrap();\n    assert!(back_error(&mut lamp).contains(own::CURRENT));\n    boundary(&lamp, NEW);\n    assert_eq!(lamp.pending(), Some(saved.clone()));\n    fs::remove_dir(&link_blocker).unwrap();\n\n    // Now the old link is restored, then recording the refusal fails. The\n    // pending record must survive until that remaining write can finish.\n    let refusal_blocker = lamp.records().join(\".self-refused.lamp-update\");\n    fs::create_dir(&refusal_blocker).unwrap();\n    assert!(back_error(&mut lamp).contains(\"self-refused\"));\n    boundary(&lamp, OLD);\n    assert_eq!(lamp.pending(), Some(saved));\n    assert!(own::refused(&lamp.records()).is_empty());\n    fs::remove_dir(&refusal_blocker).unwrap();\n    put_back(&mut lamp);\n\n    // A separate logical-prefix reconstruction covers the remaining gap:\n    // old restored and new refused, but self.json not yet removed. This\n    // does not interrupt back at that point: let the real back write its\n    // result, then restore only the exact pending bytes captured beforehand.\n    let mut lamp = prepared();\n    switch(&mut lamp);\n    let saved = pending(&lamp);\n    let pending_path = lamp.records().join(\"self.json\");\n    let pending_bytes = fs::read(&pending_path).unwrap();\n    assert_eq!(\n        lamp.back(update_unit(\"failed\", \"failed\"), u64::MAX),\n        own::Back::PutBack(saved.clone())\n    );\n    assert!(lamp.pending().is_none());\n    boundary(&lamp, OLD);\n    let refusal_path = lamp.records().join(\"self-refused\");\n    let refused_bytes = fs::read(&refusal_path).unwrap();\n    assert_eq!(refused_bytes, format!(\"{}\\n\", sha(NEW)).as_bytes());\n    let completed_files = lamp.files();\n\n    lamp_update::records::write_whole(&pending_path, &pending_bytes, 0o600).unwrap();\n    let mut reconstructed_files = completed_files.clone();\n    reconstructed_files.insert(\n        \"var/lib/lampos-update/self.json\".into(),\n        pending_bytes.clone(),\n    );\n    assert_eq!(lamp.files(), reconstructed_files);\n    assert_eq!(fs::read(&pending_path).unwrap(), pending_bytes);\n    assert_eq!(lamp.pending(), Some(saved.clone()));\n    assert_eq!(own::refused(&lamp.records()), vec![sha(NEW)]);\n    boundary(&lamp, OLD);\n\n    assert_eq!(\n        lamp.back(update_unit(\"failed\", \"failed\"), u64::MAX),\n        own::Back::PutBack(saved)\n    );\n    assert!(lamp.pending().is_none());\n    assert_eq!(fs::read(&refusal_path).unwrap(), refused_bytes);\n    assert_eq!(lamp.files(), completed_files);\n    boundary(&lamp, OLD);\n    assert_eq!(lamp.round(), Outcome::UpToDate(2), \"{:?}\", lamp.said);\n    assert_eq!(fs::read(&refusal_path).unwrap(), refused_bytes);\n    boundary(&lamp, OLD);\n}\n"
+    }
+  }
+}

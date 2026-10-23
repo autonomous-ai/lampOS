@@ -1,0 +1,145 @@
+{
+  "streams": {
+    "source-identity": {
+      "stdout": {
+        "file": "source-identity.stdout",
+        "external_path": "/private/tmp/tests-3190-combined-linux-fmt-20261023/run-20261023T145414.635313Z/source-identity.stdout",
+        "bytes": 123,
+        "sha256": "607affa7b85edc0c9c5fc97fb69e5cc71a12ea4f1bc2da55a386050851e56c6a",
+        "published_raw": true,
+        "encoding": "Exact UTF-8, no normalization",
+        "utf8": "4e8ea747cd7dc745742283d6d08cb100297a8bfa\n1a2db98b23f06944cbe06dd567f3ff3c11c0cae8\n09f8e7412f92870e16ccca14e1b9cdc1b14add48\n"
+      },
+      "stderr": {
+        "file": "source-identity.stderr",
+        "external_path": "/private/tmp/tests-3190-combined-linux-fmt-20261023/run-20261023T145414.635313Z/source-identity.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "published_raw": true,
+        "encoding": "Exact UTF-8, no normalization",
+        "utf8": ""
+      }
+    },
+    "workspace-tree": {
+      "stdout": {
+        "file": "workspace-tree.stdout",
+        "external_path": "/private/tmp/tests-3190-combined-linux-fmt-20261023/run-20261023T145414.635313Z/workspace-tree.stdout",
+        "bytes": 41,
+        "sha256": "565eaaddb9300072cdd498b2408ae9346e1d96c33a9ffa2c79271191bf2b728d",
+        "published_raw": true,
+        "encoding": "Exact UTF-8, no normalization",
+        "utf8": "b83d1ff7b1d6f54202be2e48ff4da53dc25bfcff\n"
+      },
+      "stderr": {
+        "file": "workspace-tree.stderr",
+        "external_path": "/private/tmp/tests-3190-combined-linux-fmt-20261023/run-20261023T145414.635313Z/workspace-tree.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "published_raw": true,
+        "encoding": "Exact UTF-8, no normalization",
+        "utf8": ""
+      }
+    },
+    "image-inspect": {
+      "stdout": {
+        "file": "image-inspect.stdout",
+        "external_path": "/private/tmp/tests-3190-combined-linux-fmt-20261023/run-20261023T145414.635313Z/image-inspect.stdout",
+        "bytes": 7701,
+        "sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74",
+        "published_raw": false,
+        "reason": "Minimal image provenance projection avoids image history, labels and attribution metadata. Complete raw response stays external."
+      },
+      "stderr": {
+        "file": "image-inspect.stderr",
+        "external_path": "/private/tmp/tests-3190-combined-linux-fmt-20261023/run-20261023T145414.635313Z/image-inspect.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "published_raw": true,
+        "encoding": "Exact UTF-8, no normalization",
+        "utf8": ""
+      }
+    },
+    "archive": {
+      "stdout": {
+        "file": "archive.stdout",
+        "external_path": "/private/tmp/tests-3190-combined-linux-fmt-20261023/run-20261023T145414.635313Z/archive.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "published_raw": true,
+        "encoding": "Exact UTF-8, no normalization",
+        "utf8": ""
+      },
+      "stderr": {
+        "file": "archive.stderr",
+        "external_path": "/private/tmp/tests-3190-combined-linux-fmt-20261023/run-20261023T145414.635313Z/archive.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "published_raw": true,
+        "encoding": "Exact UTF-8, no normalization",
+        "utf8": ""
+      }
+    },
+    "archive-commit": {
+      "stdout": {
+        "file": "archive-commit.stdout",
+        "external_path": "/private/tmp/tests-3190-combined-linux-fmt-20261023/run-20261023T145414.635313Z/archive-commit.stdout",
+        "bytes": 41,
+        "sha256": "2123f0bd6de6090f23df81412ceec8a564c8d239cdcc7bdf2c9e7a1306c05bc9",
+        "published_raw": true,
+        "encoding": "Exact UTF-8, no normalization",
+        "utf8": "4e8ea747cd7dc745742283d6d08cb100297a8bfa\n"
+      },
+      "stderr": {
+        "file": "archive-commit.stderr",
+        "external_path": "/private/tmp/tests-3190-combined-linux-fmt-20261023/run-20261023T145414.635313Z/archive-commit.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "published_raw": true,
+        "encoding": "Exact UTF-8, no normalization",
+        "utf8": ""
+      }
+    },
+    "format": {
+      "stdout": {
+        "file": "format.stdout",
+        "external_path": "/private/tmp/tests-3190-combined-linux-fmt-20261023/run-20261023T145414.635313Z/format.stdout",
+        "bytes": 746,
+        "sha256": "150287c19eb21961af909b7dc91469b4810145b47b2896483c8298e345616c24",
+        "published_raw": true,
+        "encoding": "Exact UTF-8, no normalization",
+        "utf8": "Linux 933b58360282 6.12.13-200.fc41.x86_64 #1 SMP PREEMPT_DYNAMIC Sat Feb  8 20:05:26 UTC 2025 x86_64 GNU/Linux\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nrustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.96.0\nLLVM version: 22.1.2\nhost: x86_64-unknown-linux-gnu\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nsource-before-manifest f06f56532d39d04368b39848abfaac787d8971545acfb94f7c6ecd0fd205bc94  /tmp/source-before.sha256\nsource-after-manifest f06f56532d39d04368b39848abfaac787d8971545acfb94f7c6ecd0fd205bc94  /tmp/source-after.sha256\ncargo_fmt_exit=0\n"
+      },
+      "stderr": {
+        "file": "format.stderr",
+        "external_path": "/private/tmp/tests-3190-combined-linux-fmt-20261023/run-20261023T145414.635313Z/format.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "published_raw": true,
+        "encoding": "Exact UTF-8, no normalization",
+        "utf8": ""
+      }
+    },
+    "final-source-identity": {
+      "stdout": {
+        "file": "final-source-identity.stdout",
+        "external_path": "/private/tmp/tests-3190-combined-linux-fmt-20261023/run-20261023T145414.635313Z/final-source-identity.stdout",
+        "bytes": 123,
+        "sha256": "607affa7b85edc0c9c5fc97fb69e5cc71a12ea4f1bc2da55a386050851e56c6a",
+        "published_raw": true,
+        "encoding": "Exact UTF-8, no normalization",
+        "utf8": "4e8ea747cd7dc745742283d6d08cb100297a8bfa\n1a2db98b23f06944cbe06dd567f3ff3c11c0cae8\n09f8e7412f92870e16ccca14e1b9cdc1b14add48\n"
+      },
+      "stderr": {
+        "file": "final-source-identity.stderr",
+        "external_path": "/private/tmp/tests-3190-combined-linux-fmt-20261023/run-20261023T145414.635313Z/final-source-identity.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "published_raw": true,
+        "encoding": "Exact UTF-8, no normalization",
+        "utf8": ""
+      }
+    }
+  },
+  "format_stdout_complete": true,
+  "format_stderr_complete": true
+}

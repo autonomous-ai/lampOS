@@ -1,0 +1,12 @@
+{
+  "source": {
+    "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/patches/diagnostic.patch",
+    "bytes": 2040,
+    "sha256": "f891716dc39b564a2e91b2579813787a457028ce7cabe7683b825c5d78f3e4c0"
+  },
+  "format": "utf8-string-envelope-v1",
+  "encoding": "utf-8",
+  "decoded_bytes": 2040,
+  "decoded_sha256": "f891716dc39b564a2e91b2579813787a457028ce7cabe7683b825c5d78f3e4c0",
+  "data": "--- a/lampOS/crates/update/tests/round/self_cuts.rs\n+++ b/lampOS/crates/update/tests/round/self_cuts.rs\n@@ -37,6 +37,28 @@\n             );\n         }\n     }\n+}\n+\n+type StdoutSnapshot = (\n+    rustix::fs::OFlags,\n+    rustix::fs::OFlags,\n+    (Duration, Duration),\n+    Result<Vec<u8>, rustix::io::Errno>,\n+);\n+\n+// A timeout diagnostic only: never wait for bytes or EOF from a live child.\n+fn stdout_now(stdout: &impl std::os::fd::AsFd, since: Instant) -> io::Result<StdoutSnapshot> {\n+    let before = rustix::fs::fcntl_getfl(stdout)?;\n+    rustix::fs::fcntl_setfl(stdout, before | rustix::fs::OFlags::NONBLOCK)?;\n+    let after = rustix::fs::fcntl_getfl(stdout)?;\n+    if !after.contains(rustix::fs::OFlags::NONBLOCK) {\n+        return Err(io::Error::other(\"stdout remained blocking\"));\n+    }\n+    let mut buffer = [0_u8; 128];\n+    let read_started = since.elapsed();\n+    let read = rustix::io::read(stdout, &mut buffer).map(|count| buffer[..count].to_vec());\n+    let read_finished = since.elapsed();\n+    Ok((before, after, (read_started, read_finished), read))\n }\n \n #[track_caller]\n@@ -92,6 +114,16 @@\n             // The child may exit while the parent is descheduled after the\n             // previous poll. Preserve that evidence without clearing failure.\n             let final_status = child.0.try_wait();\n+            let probe_started = started.elapsed();\n+            let stdout = child.0.stdout.as_ref().map(|fd| stdout_now(fd, started));\n+            let probe_finished = started.elapsed();\n+            let _ = writeln!(\n+                io::stderr().lock(),\n+                \"updater fixture timeout stdout: {context}; pid={} \\\n+                 probe={probe_started:?}..{probe_finished:?} \\\n+                 snapshot=(flags_before, flags_after, read_interval, result) {stdout:?}\",\n+                child.0.id(),\n+            );\n             panic!(\n                 \"updater fixture did not exit: {context}; pid={} elapsed={elapsed:?} \\\n                  polls={polls} last_poll={poll_started:?}..{poll_finished:?} \\\n"
+}

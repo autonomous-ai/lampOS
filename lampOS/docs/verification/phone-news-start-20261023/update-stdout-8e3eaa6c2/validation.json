@@ -1,0 +1,19 @@
+{
+  "five_intended_observations_validated": true,
+  "additional_ten_second_failed_execution_preserved": true,
+  "two_zero_test_environment_failures_separate": true,
+  "all_four_terminal_result_objects_retained": true,
+  "all_human_raw_streams_byte_exact": true,
+  "all_stream_offsets_hashes_verified": true,
+  "only_two_complete_Cargo_machine_streams_omitted": true,
+  "both_full_case_sets_bound": true,
+  "all_four_source_restorations_match": true,
+  "all_input_manifests_and_patch_envelopes_exact": true,
+  "JSON_links_and_whitespace_checked": true,
+  "no_current_MAIN_artifacts_read_for_publication": true,
+  "default_staged_diff_check_exit_code": 0,
+  "all_frozen_input_manifest_entries_rechecked": true,
+  "input_manifest_entries_checked": 71,
+  "prepare_and_runtime_short_socket_cleanup_verified": true,
+  "all_four_result_objects_equal_original_JSON_values": true
+}

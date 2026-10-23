@@ -1,0 +1,110 @@
+{
+  "five_intended_observations": [
+    {
+      "label": "available-bytes",
+      "case": "self_cuts::timeout_stdout_reads_available_bytes_without_waiting_for_eof",
+      "variant": "controls",
+      "expected": "pass",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "wall_seconds": 0.32621928630396724,
+      "source_aggregate": "fd9a4901796b79a50587cb878d2b8dbd6510572ae4f361a98e94841eefaf6ac1",
+      "binary_sha256": "14ce867b946f5080619c674732de23c82e31211c061b131d897c7faefd1a97f8",
+      "original_timeout_observed": false,
+      "stdout_diagnostic_observed": false,
+      "post_run_validation_complete": true,
+      "libtest_reported_seconds": 0.0
+    },
+    {
+      "label": "live-empty-pipe",
+      "case": "self_cuts::timeout_stdout_leaves_a_live_empty_pipe_without_waiting_for_eof",
+      "variant": "controls",
+      "expected": "pass",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "wall_seconds": 0.32569913985207677,
+      "source_aggregate": "fd9a4901796b79a50587cb878d2b8dbd6510572ae4f361a98e94841eefaf6ac1",
+      "binary_sha256": "14ce867b946f5080619c674732de23c82e31211c061b131d897c7faefd1a97f8",
+      "original_timeout_observed": false,
+      "stdout_diagnostic_observed": false,
+      "post_run_validation_complete": true,
+      "libtest_reported_seconds": 0.0
+    },
+    {
+      "label": "forced-parent-timeout",
+      "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "variant": "controls",
+      "expected": "forced_parent_timeout",
+      "exit_code": 101,
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0,
+      "wall_seconds": 9.227944324258715,
+      "source_aggregate": "fd9a4901796b79a50587cb878d2b8dbd6510572ae4f361a98e94841eefaf6ac1",
+      "binary_sha256": "14ce867b946f5080619c674732de23c82e31211c061b131d897c7faefd1a97f8",
+      "original_timeout_observed": true,
+      "stdout_diagnostic_observed": true,
+      "post_run_validation_complete": true,
+      "libtest_reported_seconds": 8.85
+    },
+    {
+      "label": "original-cut-after-confirmation",
+      "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "variant": "diagnostic",
+      "expected": "record_once",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "wall_seconds": 13.93399206828326,
+      "source_aggregate": "8f6815f4e7e5e1a556d605638e26a030642f1d3253b55e7456919ef54fd751fb",
+      "binary_sha256": "243452cab513f89e06177b15a1d6f381205f5c58a8e7279d0ddc69e983c22354",
+      "original_timeout_observed": false,
+      "stdout_diagnostic_observed": false,
+      "post_run_validation_complete": true,
+      "libtest_reported_seconds": 13.6
+    },
+    {
+      "label": "original-interrupted-put-back",
+      "case": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "variant": "diagnostic",
+      "expected": "record_once",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "wall_seconds": 26.804466685745865,
+      "source_aggregate": "8f6815f4e7e5e1a556d605638e26a030642f1d3253b55e7456919ef54fd751fb",
+      "binary_sha256": "243452cab513f89e06177b15a1d6f381205f5c58a8e7279d0ddc69e983c22354",
+      "original_timeout_observed": false,
+      "stdout_diagnostic_observed": false,
+      "post_run_validation_complete": true,
+      "libtest_reported_seconds": 26.46
+    }
+  ],
+  "validated_count": 5,
+  "actual_completed_libtest_results": {
+    "passed": 4,
+    "failed_expected_forced_parent": 1
+  },
+  "additional_failed_execution": {
+    "kind": "verifier-aborted original execution; no assertion outcome",
+    "attempt": "ten-second",
+    "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+    "actual_exit": -15,
+    "elapsed_seconds": 10.02529701590538,
+    "original_timeout_diagnostic_observed": false,
+    "complete_libtest_result": false,
+    "preserved": true
+  },
+  "separate_zero_test_setup_failures": [
+    "path-setup",
+    "long-socket-setup"
+  ],
+  "original_cause_established": false,
+  "no_full_gate_or_retry_for_green": true
+}

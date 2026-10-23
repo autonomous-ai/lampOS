@@ -1,0 +1,780 @@
+{
+  "offset_unit": "UTF-8 bytes in decoded raw.txt.json data, without adding a newline.",
+  "scope": "Every captured human stdout/stderr stream, including zero-byte streams, is retained losslessly. Only two entirely machine-JSON Cargo stdout streams are external; their full byte hashes and exact reason counts are listed. Exception tracebacks captured as metadata are retained in attempts.json.",
+  "streams": [
+    {
+      "attempt": "path-setup",
+      "command_label": "rustc-identity",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-diagnostic-20261023/run-20261023T141910.718087Z/rustc-identity/stdout.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 119,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "path-setup",
+      "command_label": "rustc-identity",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-diagnostic-20261023/run-20261023T141910.718087Z/rustc-identity/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 276,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "rustc-identity",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/rustc-identity/stdout.txt",
+        "bytes": 191,
+        "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 191,
+      "decoded_offset": 435,
+      "bytes": 191,
+      "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "rustc-identity",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/rustc-identity/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 783,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "git-status",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/git-status/stdout.txt",
+        "bytes": 49,
+        "sha256": "b3ab580d5cfe27d17986b72f9c97c8ed29fac7cb735d476dab7daf69817b8935"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 49,
+      "decoded_offset": 937,
+      "bytes": 49,
+      "sha256": "b3ab580d5cfe27d17986b72f9c97c8ed29fac7cb735d476dab7daf69817b8935"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "git-status",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/git-status/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 1135,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "controls-compile",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/controls-compile/stdout.txt",
+        "bytes": 185585,
+        "sha256": "ea7d06ef0d034bab3dc8553f63361f7aa8b5d10c17e9939322163170f4ac99bc"
+      },
+      "storage": "external complete Cargo machine-record stream only",
+      "omitted_bytes": 185585,
+      "record_counts": {
+        "compiler-artifact": 220,
+        "build-script-executed": 20,
+        "build-finished": 1
+      },
+      "build_finished_success": true,
+      "coverage": "Every byte belongs to the parsed complete JSON lines; zero human/diagnostic bytes omitted."
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "controls-compile",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/controls-compile/stderr.txt",
+        "bytes": 2838,
+        "sha256": "3189ad273ba70a3f3894b2ec4f2c82378bee59ec42081f0942b24131857945a6"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 2838,
+      "decoded_offset": 1293,
+      "bytes": 2838,
+      "sha256": "3189ad273ba70a3f3894b2ec4f2c82378bee59ec42081f0942b24131857945a6"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "controls-binary-architecture",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/controls-binary-architecture/stdout.txt",
+        "bytes": 104,
+        "sha256": "c219034710e689c62e05b5ede66ebf793bfb3c0cd65dcc3025dbf92c2214536c"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 104,
+      "decoded_offset": 4306,
+      "bytes": 104,
+      "sha256": "c219034710e689c62e05b5ede66ebf793bfb3c0cd65dcc3025dbf92c2214536c"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "controls-binary-architecture",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/controls-binary-architecture/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 4595,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "controls-inventory",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/controls-inventory/stdout.txt",
+        "bytes": 9027,
+        "sha256": "95e68d98bdd40fa752ffc10cc2dc831826fb8f65c539bc57a07194c93227c06e"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 9027,
+      "decoded_offset": 4773,
+      "bytes": 9027,
+      "sha256": "95e68d98bdd40fa752ffc10cc2dc831826fb8f65c539bc57a07194c93227c06e"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "controls-inventory",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/controls-inventory/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 13965,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "controls-ignored-inventory",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/controls-ignored-inventory/stdout.txt",
+        "bytes": 22,
+        "sha256": "414c144fa67f1df75f7b14a69af5641637772e81c4c3fa0a171e3228adbb922e"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 22,
+      "decoded_offset": 14139,
+      "bytes": 22,
+      "sha256": "414c144fa67f1df75f7b14a69af5641637772e81c4c3fa0a171e3228adbb922e"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "controls-ignored-inventory",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/controls-ignored-inventory/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 14342,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "available-bytes",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/available-bytes/stdout.txt",
+        "bytes": 198,
+        "sha256": "2098031dfeeb13bfa285bcce4c3230eead35b0d53114e1e924919609ae8c3d52"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 198,
+      "decoded_offset": 14514,
+      "bytes": 198,
+      "sha256": "2098031dfeeb13bfa285bcce4c3230eead35b0d53114e1e924919609ae8c3d52"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "available-bytes",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/available-bytes/stderr.txt",
+        "bytes": 156,
+        "sha256": "6f3bcb665f2262e07c53e5d5f8a156b42b959e3269d25d73ba032a6d5a4b86eb"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 156,
+      "decoded_offset": 14873,
+      "bytes": 156,
+      "sha256": "6f3bcb665f2262e07c53e5d5f8a156b42b959e3269d25d73ba032a6d5a4b86eb"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "live-empty-pipe",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/live-empty-pipe/stdout.txt",
+        "bytes": 201,
+        "sha256": "78c1d05cfd9ab30e289ec86fc9688b6856e67f7ce8a3dbdfefcce4ed0d489e76"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 201,
+      "decoded_offset": 15190,
+      "bytes": 201,
+      "sha256": "78c1d05cfd9ab30e289ec86fc9688b6856e67f7ce8a3dbdfefcce4ed0d489e76"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "live-empty-pipe",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/live-empty-pipe/stderr.txt",
+        "bytes": 178,
+        "sha256": "1fbe1545da45e74b7c36038e4ca78af89619691f8ab6af95299f9c8514523e2b"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 178,
+      "decoded_offset": 15552,
+      "bytes": 178,
+      "sha256": "1fbe1545da45e74b7c36038e4ca78af89619691f8ab6af95299f9c8514523e2b"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "forced-parent-timeout",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/forced-parent-timeout/stdout.txt",
+        "bytes": 318,
+        "sha256": "7167c70bd940732a2af43b62213ed4bd09567a7fab955113a8ed6a281cbc22bd"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 318,
+      "decoded_offset": 15897,
+      "bytes": 318,
+      "sha256": "7167c70bd940732a2af43b62213ed4bd09567a7fab955113a8ed6a281cbc22bd"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "forced-parent-timeout",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/forced-parent-timeout/stderr.txt",
+        "bytes": 1312,
+        "sha256": "637a740bd99de9a42b3e800b6ccf28194e8196bf8459da6956db8e20efe4c616"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 1312,
+      "decoded_offset": 16389,
+      "bytes": 1312,
+      "sha256": "637a740bd99de9a42b3e800b6ccf28194e8196bf8459da6956db8e20efe4c616"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "diagnostic-compile",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/diagnostic-compile/stdout.txt",
+        "bytes": 185559,
+        "sha256": "dd4af8269c9b7728e91b129df080892de57be0fec40a7c7beb8064f1a39b7e43"
+      },
+      "storage": "external complete Cargo machine-record stream only",
+      "omitted_bytes": 185559,
+      "record_counts": {
+        "compiler-artifact": 220,
+        "build-script-executed": 20,
+        "build-finished": 1
+      },
+      "build_finished_success": true,
+      "coverage": "Every byte belongs to the parsed complete JSON lines; zero human/diagnostic bytes omitted."
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "diagnostic-compile",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/diagnostic-compile/stderr.txt",
+        "bytes": 175,
+        "sha256": "f843e7f5fb96768008b0bbbaecf88576bd23cc387cfde894431c430c24c92b64"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 175,
+      "decoded_offset": 17871,
+      "bytes": 175,
+      "sha256": "f843e7f5fb96768008b0bbbaecf88576bd23cc387cfde894431c430c24c92b64"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "diagnostic-binary-architecture",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/diagnostic-binary-architecture/stdout.txt",
+        "bytes": 104,
+        "sha256": "c219034710e689c62e05b5ede66ebf793bfb3c0cd65dcc3025dbf92c2214536c"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 104,
+      "decoded_offset": 18225,
+      "bytes": 104,
+      "sha256": "c219034710e689c62e05b5ede66ebf793bfb3c0cd65dcc3025dbf92c2214536c"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "diagnostic-binary-architecture",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/diagnostic-binary-architecture/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 18518,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "diagnostic-inventory",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/diagnostic-inventory/stdout.txt",
+        "bytes": 8868,
+        "sha256": "cc409294bd7d520dcb52585263eaede83e082653f8eef8718d474983141f4f2a"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 8868,
+      "decoded_offset": 18700,
+      "bytes": 8868,
+      "sha256": "cc409294bd7d520dcb52585263eaede83e082653f8eef8718d474983141f4f2a"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "diagnostic-inventory",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/diagnostic-inventory/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 27737,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "diagnostic-ignored-inventory",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/diagnostic-ignored-inventory/stdout.txt",
+        "bytes": 22,
+        "sha256": "414c144fa67f1df75f7b14a69af5641637772e81c4c3fa0a171e3228adbb922e"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 22,
+      "decoded_offset": 27915,
+      "bytes": 22,
+      "sha256": "414c144fa67f1df75f7b14a69af5641637772e81c4c3fa0a171e3228adbb922e"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "diagnostic-ignored-inventory",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/diagnostic-ignored-inventory/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 28122,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "original-cut-after-confirmation",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/original-cut-after-confirmation/stdout.txt",
+        "bytes": 104,
+        "sha256": "971edd8d224bdb77bdda96c5ca32124a733bdf018f463532596114d3a737f8a6"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 104,
+      "decoded_offset": 28312,
+      "bytes": 104,
+      "sha256": "971edd8d224bdb77bdda96c5ca32124a733bdf018f463532596114d3a737f8a6"
+    },
+    {
+      "attempt": "ten-second",
+      "command_label": "original-cut-after-confirmation",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/original-cut-after-confirmation/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 28607,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "long-socket-setup",
+      "command_label": "rustc-identity",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-originals-continuation-20261023/run-20261023T144050.514732Z/rustc-identity/stdout.txt",
+        "bytes": 191,
+        "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 191,
+      "decoded_offset": 28790,
+      "bytes": 191,
+      "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+    },
+    {
+      "attempt": "long-socket-setup",
+      "command_label": "rustc-identity",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-originals-continuation-20261023/run-20261023T144050.514732Z/rustc-identity/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 29152,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "long-socket-setup",
+      "command_label": "git-status",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-originals-continuation-20261023/run-20261023T144050.514732Z/git-status/stdout.txt",
+        "bytes": 49,
+        "sha256": "b3ab580d5cfe27d17986b72f9c97c8ed29fac7cb735d476dab7daf69817b8935"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 49,
+      "decoded_offset": 29320,
+      "bytes": 49,
+      "sha256": "b3ab580d5cfe27d17986b72f9c97c8ed29fac7cb735d476dab7daf69817b8935"
+    },
+    {
+      "attempt": "long-socket-setup",
+      "command_label": "git-status",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-originals-continuation-20261023/run-20261023T144050.514732Z/git-status/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 29532,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "originals-120s",
+      "command_label": "rustc-identity",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/rustc-identity/stdout.txt",
+        "bytes": 191,
+        "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 191,
+      "decoded_offset": 29698,
+      "bytes": 191,
+      "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+    },
+    {
+      "attempt": "originals-120s",
+      "command_label": "rustc-identity",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/rustc-identity/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 30054,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "originals-120s",
+      "command_label": "git-status",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/git-status/stdout.txt",
+        "bytes": 49,
+        "sha256": "b3ab580d5cfe27d17986b72f9c97c8ed29fac7cb735d476dab7daf69817b8935"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 49,
+      "decoded_offset": 30216,
+      "bytes": 49,
+      "sha256": "b3ab580d5cfe27d17986b72f9c97c8ed29fac7cb735d476dab7daf69817b8935"
+    },
+    {
+      "attempt": "originals-120s",
+      "command_label": "git-status",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/git-status/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 30422,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "originals-120s",
+      "command_label": "retained-binary-architecture",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/retained-binary-architecture/stdout.txt",
+        "bytes": 104,
+        "sha256": "c219034710e689c62e05b5ede66ebf793bfb3c0cd65dcc3025dbf92c2214536c"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 104,
+      "decoded_offset": 30599,
+      "bytes": 104,
+      "sha256": "c219034710e689c62e05b5ede66ebf793bfb3c0cd65dcc3025dbf92c2214536c"
+    },
+    {
+      "attempt": "originals-120s",
+      "command_label": "retained-binary-architecture",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/retained-binary-architecture/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 30896,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "originals-120s",
+      "command_label": "retained-inventory",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/retained-inventory/stdout.txt",
+        "bytes": 8868,
+        "sha256": "cc409294bd7d520dcb52585263eaede83e082653f8eef8718d474983141f4f2a"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 8868,
+      "decoded_offset": 31082,
+      "bytes": 8868,
+      "sha256": "cc409294bd7d520dcb52585263eaede83e082653f8eef8718d474983141f4f2a"
+    },
+    {
+      "attempt": "originals-120s",
+      "command_label": "retained-inventory",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/retained-inventory/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 40123,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "originals-120s",
+      "command_label": "retained-ignored-inventory",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/retained-ignored-inventory/stdout.txt",
+        "bytes": 22,
+        "sha256": "414c144fa67f1df75f7b14a69af5641637772e81c4c3fa0a171e3228adbb922e"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 22,
+      "decoded_offset": 40305,
+      "bytes": 22,
+      "sha256": "414c144fa67f1df75f7b14a69af5641637772e81c4c3fa0a171e3228adbb922e"
+    },
+    {
+      "attempt": "originals-120s",
+      "command_label": "retained-ignored-inventory",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/retained-ignored-inventory/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 40516,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "originals-120s",
+      "command_label": "original-cut-after-confirmation",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/original-cut-after-confirmation/stdout.txt",
+        "bytes": 206,
+        "sha256": "2e27ef83b0a6d7f9e707de89e15528c0c7b52315e84323fdf43ab6dc7b23c3a8"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 206,
+      "decoded_offset": 40712,
+      "bytes": 206,
+      "sha256": "2e27ef83b0a6d7f9e707de89e15528c0c7b52315e84323fdf43ab6dc7b23c3a8"
+    },
+    {
+      "attempt": "originals-120s",
+      "command_label": "original-cut-after-confirmation",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/original-cut-after-confirmation/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 41117,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "attempt": "originals-120s",
+      "command_label": "original-interrupted-put-back",
+      "stream": "stdout",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/original-interrupted-put-back/stdout.txt",
+        "bytes": 208,
+        "sha256": "8855d3cc884496f4da84e1044c7474ab9ce8bea2cdec77aadcd8d6f2a40a6d41"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 208,
+      "decoded_offset": 41316,
+      "bytes": 208,
+      "sha256": "8855d3cc884496f4da84e1044c7474ab9ce8bea2cdec77aadcd8d6f2a40a6d41"
+    },
+    {
+      "attempt": "originals-120s",
+      "command_label": "original-interrupted-put-back",
+      "stream": "stderr",
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/original-interrupted-put-back/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "storage": "lossless raw envelope",
+      "source_start": 0,
+      "source_end": 0,
+      "decoded_offset": 41719,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

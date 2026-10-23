@@ -1,0 +1,12 @@
+{
+  "source": {
+    "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/patches/controls.patch",
+    "bytes": 1916,
+    "sha256": "9473d69225f86579d0f0fd44afc92f33f1f5d62dc960cc8f0d337350e2e40fc5"
+  },
+  "format": "utf8-string-envelope-v1",
+  "encoding": "utf-8",
+  "decoded_bytes": 1916,
+  "decoded_sha256": "9473d69225f86579d0f0fd44afc92f33f1f5d62dc960cc8f0d337350e2e40fc5",
+  "data": "--- a/lampOS/crates/update/tests/round/self_cuts.rs\n+++ b/lampOS/crates/update/tests/round/self_cuts.rs\n@@ -101,7 +101,8 @@\n     let mut polls = 0;\n     let status = loop {\n         let poll_started = started.elapsed();\n-        let observed = child.0.try_wait();\n+        // Scratch control: force parent pending, never change the real child.\n+        let observed = Ok::<Option<std::process::ExitStatus>, io::Error>(None);\n         let poll_finished = started.elapsed();\n         polls += 1;\n         if let Some(status) = observed.unwrap_or_else(|error| {\n@@ -475,3 +476,29 @@\n     assert_eq!(lamp.round(), Outcome::UpToDate(2), \"{:?}\", lamp.said);\n     boundary(&lamp, OLD);\n }\n+\n+// Scratch-only controls: the writer stays open through each single read.\n+#[test]\n+fn timeout_stdout_reads_available_bytes_without_waiting_for_eof() {\n+    let (reader, mut writer) = std::io::pipe().unwrap();\n+    writer.write_all(b\"old-updater\\n\").unwrap();\n+    let started = Instant::now();\n+    let (before, after, interval, read) = stdout_now(&reader, started).unwrap();\n+    eprintln!(\"stdout control: before={before:?} after={after:?} read_at={interval:?} read={read:?}\");\n+    assert!(after.contains(rustix::fs::OFlags::NONBLOCK));\n+    assert_eq!(read.unwrap(), b\"old-updater\\n\");\n+    assert!(started.elapsed() < Duration::from_secs(2));\n+    drop(writer);\n+}\n+\n+#[test]\n+fn timeout_stdout_leaves_a_live_empty_pipe_without_waiting_for_eof() {\n+    let (reader, writer) = std::io::pipe().unwrap();\n+    let started = Instant::now();\n+    let (before, after, interval, read) = stdout_now(&reader, started).unwrap();\n+    eprintln!(\"stdout control: before={before:?} after={after:?} read_at={interval:?} read={read:?}\");\n+    assert!(after.contains(rustix::fs::OFlags::NONBLOCK));\n+    assert_eq!(read.unwrap_err(), rustix::io::Errno::AGAIN);\n+    assert!(started.elapsed() < Duration::from_secs(2));\n+    drop(writer);\n+}\n"
+}

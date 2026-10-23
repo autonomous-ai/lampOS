@@ -1,0 +1,69 @@
+{
+  "source_identity": {
+    "base": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+    "worktree": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023",
+    "branch": "tests/1569-update-stdout-diagnostic-8e3",
+    "path": "lampOS/crates/update/tests/round/self_cuts.rs",
+    "base_sha256": "9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013",
+    "diagnostic_sha256": "f614490a48eb58e364c23b04d87eb654578ba7276595ad214dc413e54b2a216b",
+    "controls_sha256": "29b2711bd92bd45088c7dc8dd8d9b2693b52f4bd87b4fe55620d2bbd8fe0eb9e",
+    "original_byte_preservation": "Removing the exact two inserted diagnostic blocks reconstructs every original source byte. No original line, assertion/panic body, OLD/NEW script, 2s watchdog, 5ms poll or scenario sequence was modified.",
+    "new_helper_single_read": true,
+    "probe_call_only_after_existing_final_try_wait": true,
+    "control_limit": "Only the explicit scratch-control variant substitutes the parent polling observation with Ok(None). The real final try_wait, original timeout panic and actual child/scripts are unchanged."
+  },
+  "actual_fs_source_map": {
+    "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/source-map.json",
+    "bytes": 2711446,
+    "sha256": "3eeed1710e9fb94c8f4063884c35148c6210a8380a642fcb3efed1d4399b0d1d"
+  },
+  "source_map_records": 10028,
+  "mode_and_kind_counts": {
+    "100644 / file / 0o644": 9856,
+    "100755 / file / 0o755": 171,
+    "120000 / symlink / 0o755": 1
+  },
+  "diagnostic_source_aggregate": "8f6815f4e7e5e1a556d605638e26a030642f1d3253b55e7456919ef54fd751fb",
+  "controls_source_aggregate": "fd9a4901796b79a50587cb878d2b8dbd6510572ae4f361a98e94841eefaf6ac1",
+  "base_source_aggregate": "1f7cefb706ec5c83003a82abc8b12e758e3fc5cfe3ae05a2ce45761b4ffabfec",
+  "restoration_all_attempts": [
+    {
+      "attempt": "path-setup",
+      "restored": true,
+      "source_aggregate": "8f6815f4e7e5e1a556d605638e26a030642f1d3253b55e7456919ef54fd751fb",
+      "owned_live_direct_children": []
+    },
+    {
+      "attempt": "ten-second",
+      "restored": true,
+      "source_aggregate": "8f6815f4e7e5e1a556d605638e26a030642f1d3253b55e7456919ef54fd751fb",
+      "owned_live_direct_children": []
+    },
+    {
+      "attempt": "long-socket-setup",
+      "restored": true,
+      "source_aggregate": "8f6815f4e7e5e1a556d605638e26a030642f1d3253b55e7456919ef54fd751fb",
+      "owned_live_direct_children": []
+    },
+    {
+      "attempt": "originals-120s",
+      "restored": true,
+      "source_aggregate": "8f6815f4e7e5e1a556d605638e26a030642f1d3253b55e7456919ef54fd751fb",
+      "owned_live_direct_children": []
+    }
+  ],
+  "source_freshness": {
+    "source": {
+      "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/source-freshness.json",
+      "bytes": 233,
+      "sha256": "d27e0a22dfc95a8db8100f6c2bd9ab7d7f45e6a099f263d99a3ba1566909de3b"
+    },
+    "value": {
+      "files": 10028,
+      "before_sha256": "8f6815f4e7e5e1a556d605638e26a030642f1d3253b55e7456919ef54fd751fb",
+      "after_sha256": "8f6815f4e7e5e1a556d605638e26a030642f1d3253b55e7456919ef54fd751fb",
+      "content_and_modes_unchanged": true
+    }
+  },
+  "source_map_limit": "Complete10028-path mode/kind/content map remains external with SHA/bytes. The exact base and diagnostic/control patches are public; no current-base or compiled-parent equivalence claim."
+}

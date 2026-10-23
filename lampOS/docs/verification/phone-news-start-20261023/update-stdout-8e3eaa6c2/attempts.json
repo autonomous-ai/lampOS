@@ -1,0 +1,1550 @@
+[
+  {
+    "attempt": "path-setup",
+    "native_session": 98667,
+    "native_terminal_exit": 1,
+    "results_source": {
+      "external_path": "/private/tmp/tests-update-stdout-diagnostic-20261023/run-20261023T141910.718087Z/results.json",
+      "bytes": 6234,
+      "sha256": "d848852a31eee57ae2afb3b44372e0c7e706e2542e05225ec15f213e831ecd73"
+    },
+    "results": {
+      "planned_observations": [
+        {
+          "label": "available-bytes",
+          "case": "self_cuts::timeout_stdout_reads_available_bytes_without_waiting_for_eof",
+          "expected": "pass",
+          "variant": "controls"
+        },
+        {
+          "label": "live-empty-pipe",
+          "case": "self_cuts::timeout_stdout_leaves_a_live_empty_pipe_without_waiting_for_eof",
+          "expected": "pass",
+          "variant": "controls"
+        },
+        {
+          "label": "forced-parent-timeout",
+          "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+          "expected": "forced_parent_timeout",
+          "variant": "controls"
+        },
+        {
+          "label": "original-cut-after-confirmation",
+          "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+          "expected": "record_once",
+          "variant": "diagnostic"
+        },
+        {
+          "label": "original-interrupted-put-back",
+          "case": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+          "expected": "record_once",
+          "variant": "diagnostic"
+        }
+      ],
+      "observed_result_count": 0,
+      "completed_observation_count": 0,
+      "unrun_observations": [
+        {
+          "label": "available-bytes",
+          "case": "self_cuts::timeout_stdout_reads_available_bytes_without_waiting_for_eof",
+          "expected": "pass",
+          "variant": "controls"
+        },
+        {
+          "label": "live-empty-pipe",
+          "case": "self_cuts::timeout_stdout_leaves_a_live_empty_pipe_without_waiting_for_eof",
+          "expected": "pass",
+          "variant": "controls"
+        },
+        {
+          "label": "forced-parent-timeout",
+          "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+          "expected": "forced_parent_timeout",
+          "variant": "controls"
+        },
+        {
+          "label": "original-cut-after-confirmation",
+          "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+          "expected": "record_once",
+          "variant": "diagnostic"
+        },
+        {
+          "label": "original-interrupted-put-back",
+          "case": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+          "expected": "record_once",
+          "variant": "diagnostic"
+        }
+      ],
+      "incomplete_or_invalid_observations": [],
+      "attempted_command_labels": [
+        "rustc-identity"
+      ],
+      "observations": [],
+      "steps": [
+        {
+          "label": "rustc-identity",
+          "command": [
+            "rustc",
+            "-vV"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023",
+          "started_at": "2026-10-23T14:19:10.956327+00:00",
+          "wall_seconds": 0.008425442967563868,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": null,
+          "cleanup": [],
+          "exception_traceback": "Traceback (most recent call last):\n  File \"/private/tmp/tests-update-stdout-diagnostic-20261023/run.py\", line 73, in command\n    child=subprocess.Popen(argv,cwd=cwd,env=env,stdout=stdout,stderr=stderr,start_new_session=True);children.append(child)\n  File \"/usr/local/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py\", line 1038, in __init__\n    self._execute_child(args, executable, preexec_fn, close_fds,\n    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n                        pass_fds, cwd, env,\n                        ^^^^^^^^^^^^^^^^^^^\n    ...<5 lines>...\n                        gid, gids, uid, umask,\n                        ^^^^^^^^^^^^^^^^^^^^^^\n                        start_new_session, process_group)\n                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py\", line 1989, in _execute_child\n    raise child_exception_type(errno_num, err_msg, err_filename)\nFileNotFoundError: [Errno 2] No such file or directory: 'rustc'\n",
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      ],
+      "error": "FileNotFoundError: [Errno 2] No such file or directory: 'rustc'",
+      "exception_traceback": "Traceback (most recent call last):\n  File \"/private/tmp/tests-update-stdout-diagnostic-20261023/run.py\", line 162, in main\n    rec,stdout,_=command(label,argv,30,cwd=WT);assert rec['exit_code']==0\n                 ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/tests-update-stdout-diagnostic-20261023/run.py\", line 103, in command\n    if exception is not None:raise exception.with_traceback(exception_tb)\n                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/tests-update-stdout-diagnostic-20261023/run.py\", line 73, in command\n    child=subprocess.Popen(argv,cwd=cwd,env=env,stdout=stdout,stderr=stderr,start_new_session=True);children.append(child)\n  File \"/usr/local/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py\", line 1038, in __init__\n    self._execute_child(args, executable, preexec_fn, close_fds,\n    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n                        pass_fds, cwd, env,\n                        ^^^^^^^^^^^^^^^^^^^\n    ...<5 lines>...\n                        gid, gids, uid, umask,\n                        ^^^^^^^^^^^^^^^^^^^^^^\n                        start_new_session, process_group)\n                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py\", line 1989, in _execute_child\n    raise child_exception_type(errno_num, err_msg, err_filename)\nFileNotFoundError: [Errno 2] No such file or directory: 'rustc'\n",
+      "interruption": null,
+      "owned_live_children_at_restoration": [],
+      "restoration_exception_traceback": null,
+      "restored_frozen_diagnostic_source": true,
+      "source_aggregate": "8f6815f4e7e5e1a556d605638e26a030642f1d3253b55e7456919ef54fd751fb",
+      "full_gate_run": false,
+      "historical_cause_established": false
+    },
+    "owned_command_processes": []
+  },
+  {
+    "attempt": "ten-second",
+    "native_session": 16487,
+    "native_terminal_exit": 1,
+    "results_source": {
+      "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/results.json",
+      "bytes": 20366,
+      "sha256": "a9eb9d241b1a80157c27817f00a1c4cf8939219cf857c8ec14762f940a5776b7"
+    },
+    "results": {
+      "planned_observations": [
+        {
+          "label": "available-bytes",
+          "case": "self_cuts::timeout_stdout_reads_available_bytes_without_waiting_for_eof",
+          "expected": "pass",
+          "variant": "controls"
+        },
+        {
+          "label": "live-empty-pipe",
+          "case": "self_cuts::timeout_stdout_leaves_a_live_empty_pipe_without_waiting_for_eof",
+          "expected": "pass",
+          "variant": "controls"
+        },
+        {
+          "label": "forced-parent-timeout",
+          "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+          "expected": "forced_parent_timeout",
+          "variant": "controls"
+        },
+        {
+          "label": "original-cut-after-confirmation",
+          "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+          "expected": "record_once",
+          "variant": "diagnostic"
+        },
+        {
+          "label": "original-interrupted-put-back",
+          "case": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+          "expected": "record_once",
+          "variant": "diagnostic"
+        }
+      ],
+      "observed_result_count": 3,
+      "completed_observation_count": 3,
+      "unrun_observations": [
+        {
+          "label": "original-interrupted-put-back",
+          "case": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+          "expected": "record_once",
+          "variant": "diagnostic"
+        }
+      ],
+      "incomplete_or_invalid_observations": [
+        {
+          "label": "original-cut-after-confirmation",
+          "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+          "expected": "record_once",
+          "variant": "diagnostic",
+          "result_row_observed": false,
+          "actual_test_exit_code": -15,
+          "reason": "no complete validated libtest result"
+        }
+      ],
+      "attempted_command_labels": [
+        "rustc-identity",
+        "git-status",
+        "controls-compile",
+        "controls-binary-architecture",
+        "controls-inventory",
+        "controls-ignored-inventory",
+        "available-bytes",
+        "live-empty-pipe",
+        "forced-parent-timeout",
+        "diagnostic-compile",
+        "diagnostic-binary-architecture",
+        "diagnostic-inventory",
+        "diagnostic-ignored-inventory",
+        "original-cut-after-confirmation"
+      ],
+      "observations": [
+        {
+          "label": "available-bytes",
+          "case": "self_cuts::timeout_stdout_reads_available_bytes_without_waiting_for_eof",
+          "variant": "controls",
+          "expected": "pass",
+          "exit_code": 0,
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "wall_seconds": 0.32621928630396724,
+          "source_aggregate": "fd9a4901796b79a50587cb878d2b8dbd6510572ae4f361a98e94841eefaf6ac1",
+          "binary_sha256": "14ce867b946f5080619c674732de23c82e31211c061b131d897c7faefd1a97f8",
+          "original_timeout_observed": false,
+          "stdout_diagnostic_observed": false,
+          "post_run_validation_complete": true
+        },
+        {
+          "label": "live-empty-pipe",
+          "case": "self_cuts::timeout_stdout_leaves_a_live_empty_pipe_without_waiting_for_eof",
+          "variant": "controls",
+          "expected": "pass",
+          "exit_code": 0,
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "wall_seconds": 0.32569913985207677,
+          "source_aggregate": "fd9a4901796b79a50587cb878d2b8dbd6510572ae4f361a98e94841eefaf6ac1",
+          "binary_sha256": "14ce867b946f5080619c674732de23c82e31211c061b131d897c7faefd1a97f8",
+          "original_timeout_observed": false,
+          "stdout_diagnostic_observed": false,
+          "post_run_validation_complete": true
+        },
+        {
+          "label": "forced-parent-timeout",
+          "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+          "variant": "controls",
+          "expected": "forced_parent_timeout",
+          "exit_code": 101,
+          "passed": 0,
+          "failed": 1,
+          "ignored": 0,
+          "wall_seconds": 9.227944324258715,
+          "source_aggregate": "fd9a4901796b79a50587cb878d2b8dbd6510572ae4f361a98e94841eefaf6ac1",
+          "binary_sha256": "14ce867b946f5080619c674732de23c82e31211c061b131d897c7faefd1a97f8",
+          "original_timeout_observed": true,
+          "stdout_diagnostic_observed": true,
+          "post_run_validation_complete": true
+        }
+      ],
+      "steps": [
+        {
+          "label": "rustc-identity",
+          "command": [
+            "rustc",
+            "-vV"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023",
+          "started_at": "2026-10-23T14:24:03.738621+00:00",
+          "wall_seconds": 0.2919335877522826,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 191,
+            "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "git-status",
+          "command": [
+            "git",
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023",
+          "started_at": "2026-10-23T14:24:04.312946+00:00",
+          "wall_seconds": 0.4417387153953314,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 49,
+            "sha256": "b3ab580d5cfe27d17986b72f9c97c8ed29fac7cb735d476dab7daf69817b8935"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "controls-compile",
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "lamp-body",
+            "-p",
+            "lamp-cloud",
+            "-p",
+            "lamp-expression",
+            "-p",
+            "lamp-keeper",
+            "-p",
+            "lamp-lean",
+            "-p",
+            "lamp-memory",
+            "-p",
+            "lamp-peek",
+            "-p",
+            "lamp-setup",
+            "-p",
+            "lamp-skills",
+            "-p",
+            "lamp-update",
+            "-p",
+            "lamp-voice-eval",
+            "--test",
+            "round",
+            "--no-run",
+            "--message-format=json-render-diagnostics"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:24:12.104877+00:00",
+          "wall_seconds": 54.46532387379557,
+          "timeout_seconds": 1800,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 185585,
+            "sha256": "ea7d06ef0d034bab3dc8553f63361f7aa8b5d10c17e9939322163170f4ac99bc"
+          },
+          "stderr": {
+            "bytes": 2838,
+            "sha256": "3189ad273ba70a3f3894b2ec4f2c82378bee59ec42081f0942b24131857945a6"
+          }
+        },
+        {
+          "label": "controls-binary-architecture",
+          "command": [
+            "file",
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:06.885663+00:00",
+          "wall_seconds": 0.30172168696299195,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 104,
+            "sha256": "c219034710e689c62e05b5ede66ebf793bfb3c0cd65dcc3025dbf92c2214536c"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "controls-inventory",
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "--list"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:07.511461+00:00",
+          "wall_seconds": 1.1050218841992319,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 9027,
+            "sha256": "95e68d98bdd40fa752ffc10cc2dc831826fb8f65c539bc57a07194c93227c06e"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "controls-ignored-inventory",
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "--ignored",
+            "--list"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:08.905191+00:00",
+          "wall_seconds": 0.2915348466485739,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 22,
+            "sha256": "414c144fa67f1df75f7b14a69af5641637772e81c4c3fa0a171e3228adbb922e"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "available-bytes",
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "self_cuts::timeout_stdout_reads_available_bytes_without_waiting_for_eof",
+            "--exact",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:12.781642+00:00",
+          "wall_seconds": 0.32621928630396724,
+          "timeout_seconds": 10,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 198,
+            "sha256": "2098031dfeeb13bfa285bcce4c3230eead35b0d53114e1e924919609ae8c3d52"
+          },
+          "stderr": {
+            "bytes": 156,
+            "sha256": "6f3bcb665f2262e07c53e5d5f8a156b42b959e3269d25d73ba032a6d5a4b86eb"
+          }
+        },
+        {
+          "label": "live-empty-pipe",
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "self_cuts::timeout_stdout_leaves_a_live_empty_pipe_without_waiting_for_eof",
+            "--exact",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:16.826861+00:00",
+          "wall_seconds": 0.32569913985207677,
+          "timeout_seconds": 10,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 201,
+            "sha256": "78c1d05cfd9ab30e289ec86fc9688b6856e67f7ce8a3dbdfefcce4ed0d489e76"
+          },
+          "stderr": {
+            "bytes": 178,
+            "sha256": "1fbe1545da45e74b7c36038e4ca78af89619691f8ab6af95299f9c8514523e2b"
+          }
+        },
+        {
+          "label": "forced-parent-timeout",
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+            "--exact",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:20.893359+00:00",
+          "wall_seconds": 9.227944324258715,
+          "timeout_seconds": 10,
+          "timed_out": false,
+          "exit_code": 101,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 318,
+            "sha256": "7167c70bd940732a2af43b62213ed4bd09567a7fab955113a8ed6a281cbc22bd"
+          },
+          "stderr": {
+            "bytes": 1312,
+            "sha256": "637a740bd99de9a42b3e800b6ccf28194e8196bf8459da6956db8e20efe4c616"
+          }
+        },
+        {
+          "label": "diagnostic-compile",
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "lamp-body",
+            "-p",
+            "lamp-cloud",
+            "-p",
+            "lamp-expression",
+            "-p",
+            "lamp-keeper",
+            "-p",
+            "lamp-lean",
+            "-p",
+            "lamp-memory",
+            "-p",
+            "lamp-peek",
+            "-p",
+            "lamp-setup",
+            "-p",
+            "lamp-skills",
+            "-p",
+            "lamp-update",
+            "-p",
+            "lamp-voice-eval",
+            "--test",
+            "round",
+            "--no-run",
+            "--message-format=json-render-diagnostics"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:33.762236+00:00",
+          "wall_seconds": 3.497764193918556,
+          "timeout_seconds": 1800,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 185559,
+            "sha256": "dd4af8269c9b7728e91b129df080892de57be0fec40a7c7beb8064f1a39b7e43"
+          },
+          "stderr": {
+            "bytes": 175,
+            "sha256": "f843e7f5fb96768008b0bbbaecf88576bd23cc387cfde894431c430c24c92b64"
+          }
+        },
+        {
+          "label": "diagnostic-binary-architecture",
+          "command": [
+            "file",
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:37.602546+00:00",
+          "wall_seconds": 0.3021456589922309,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 104,
+            "sha256": "c219034710e689c62e05b5ede66ebf793bfb3c0cd65dcc3025dbf92c2214536c"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "diagnostic-inventory",
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "--list"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:38.267370+00:00",
+          "wall_seconds": 1.1488443296402693,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 8868,
+            "sha256": "cc409294bd7d520dcb52585263eaede83e082653f8eef8718d474983141f4f2a"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "diagnostic-ignored-inventory",
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "--ignored",
+            "--list"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:39.710274+00:00",
+          "wall_seconds": 0.3309336588717997,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 22,
+            "sha256": "414c144fa67f1df75f7b14a69af5641637772e81c4c3fa0a171e3228adbb922e"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "original-cut-after-confirmation",
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+            "--exact",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:43.754180+00:00",
+          "wall_seconds": 10.02529701590538,
+          "timeout_seconds": 10,
+          "timed_out": true,
+          "exit_code": -15,
+          "cleanup": [
+            "SIGTERM to the verified owned process group",
+            {
+              "owned_child_reaped": true,
+              "exit_code": -15
+            }
+          ],
+          "exception_traceback": "Traceback (most recent call last):\n  File \"/private/tmp/tests-update-stdout-path-continuation-20261023/run.py\", line 80, in command\n    code=child.wait(timeout=timeout);repo_guard()\n  File \"/usr/local/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py\", line 1278, in wait\n    return self._wait(timeout=timeout)\n           ~~~~~~~~~~^^^^^^^^^^^^^^^^^\n  File \"/usr/local/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py\", line 2075, in _wait\n    raise TimeoutExpired(self.args, timeout)\nsubprocess.TimeoutExpired: Command '['/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16', 'self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart', '--exact', '--nocapture', '--test-threads=1']' timed out after 10 seconds\n",
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 104,
+            "sha256": "971edd8d224bdb77bdda96c5ca32124a733bdf018f463532596114d3a737f8a6"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      ],
+      "error": "TimeoutExpired: Command '['/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16', 'self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart', '--exact', '--nocapture', '--test-threads=1']' timed out after 10 seconds",
+      "exception_traceback": "Traceback (most recent call last):\n  File \"/private/tmp/tests-update-stdout-path-continuation-20261023/run.py\", line 182, in main\n    observe('original-cut-after-confirmation','self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart','record_once','diagnostic',diagnostic)\n    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/tests-update-stdout-path-continuation-20261023/run.py\", line 143, in observe\n    rec,stdout,stderr=command(label,[str(exe),name,'--exact','--nocapture','--test-threads=1'],10)\n                      ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/tests-update-stdout-path-continuation-20261023/run.py\", line 105, in command\n    if exception is not None:raise exception.with_traceback(exception_tb)\n                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/tests-update-stdout-path-continuation-20261023/run.py\", line 80, in command\n    code=child.wait(timeout=timeout);repo_guard()\n  File \"/usr/local/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py\", line 1278, in wait\n    return self._wait(timeout=timeout)\n           ~~~~~~~~~~^^^^^^^^^^^^^^^^^\n  File \"/usr/local/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py\", line 2075, in _wait\n    raise TimeoutExpired(self.args, timeout)\nsubprocess.TimeoutExpired: Command '['/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16', 'self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart', '--exact', '--nocapture', '--test-threads=1']' timed out after 10 seconds\n",
+      "interruption": null,
+      "owned_live_children_at_restoration": [],
+      "restoration_exception_traceback": null,
+      "restored_frozen_diagnostic_source": true,
+      "source_aggregate": "8f6815f4e7e5e1a556d605638e26a030642f1d3253b55e7456919ef54fd751fb",
+      "full_gate_run": false,
+      "historical_cause_established": false
+    },
+    "owned_command_processes": [
+      {
+        "label": "rustc-identity",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/rustc-identity/owned-process.json",
+          "bytes": 217,
+          "sha256": "3cff7392cf96616e090485d142b5782d2344a23c57f03ce320f11d3d06d09ea0"
+        },
+        "value": {
+          "owned_pid": 66452,
+          "process_group": 66452,
+          "command": [
+            "rustc",
+            "-vV"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023",
+          "started_at": "2026-10-23T14:24:03.738621+00:00"
+        }
+      },
+      {
+        "label": "git-status",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/git-status/owned-process.json",
+          "bytes": 269,
+          "sha256": "9bc44e025a8465a76517f26063ade2018e2015168e019331500af97f0d97e762"
+        },
+        "value": {
+          "owned_pid": 66489,
+          "process_group": 66489,
+          "command": [
+            "git",
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023",
+          "started_at": "2026-10-23T14:24:04.312946+00:00"
+        }
+      },
+      {
+        "label": "controls-compile",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/controls-compile/owned-process.json",
+          "bytes": 668,
+          "sha256": "028f44f240d0ba3877b515baee3ebeddbdb2fac7b8dcb3934271bb9f371f76cf"
+        },
+        "value": {
+          "owned_pid": 66677,
+          "process_group": 66677,
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "lamp-body",
+            "-p",
+            "lamp-cloud",
+            "-p",
+            "lamp-expression",
+            "-p",
+            "lamp-keeper",
+            "-p",
+            "lamp-lean",
+            "-p",
+            "lamp-memory",
+            "-p",
+            "lamp-peek",
+            "-p",
+            "lamp-setup",
+            "-p",
+            "lamp-skills",
+            "-p",
+            "lamp-update",
+            "-p",
+            "lamp-voice-eval",
+            "--test",
+            "round",
+            "--no-run",
+            "--message-format=json-render-diagnostics"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:24:12.104877+00:00"
+        }
+      },
+      {
+        "label": "controls-binary-architecture",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/controls-binary-architecture/owned-process.json",
+          "bytes": 290,
+          "sha256": "465a435dfdeb2dc431c37c5b4630f8c012e109536b4729caa154978eafcd0f81"
+        },
+        "value": {
+          "owned_pid": 70107,
+          "process_group": 70107,
+          "command": [
+            "file",
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:06.885663+00:00"
+        }
+      },
+      {
+        "label": "controls-inventory",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/controls-inventory/owned-process.json",
+          "bytes": 292,
+          "sha256": "333c121657f05d03e9287c56036ec9e4eeec14307a69eba83ad883c213aa3a9f"
+        },
+        "value": {
+          "owned_pid": 70146,
+          "process_group": 70146,
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "--list"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:07.511461+00:00"
+        }
+      },
+      {
+        "label": "controls-ignored-inventory",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/controls-ignored-inventory/owned-process.json",
+          "bytes": 309,
+          "sha256": "eceaeb86172e3a6db5d0b2677a24dad7a5cf1d891540663fd6fe690d8f4e3540"
+        },
+        "value": {
+          "owned_pid": 70204,
+          "process_group": 70204,
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "--ignored",
+            "--list"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:08.905191+00:00"
+        }
+      },
+      {
+        "label": "available-bytes",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/available-bytes/owned-process.json",
+          "bytes": 415,
+          "sha256": "32151960f5cacdc4ee305895ac276d488f828af4092c85b93988da9111eb1b84"
+        },
+        "value": {
+          "owned_pid": 70308,
+          "process_group": 70308,
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "self_cuts::timeout_stdout_reads_available_bytes_without_waiting_for_eof",
+            "--exact",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:12.781642+00:00"
+        }
+      },
+      {
+        "label": "live-empty-pipe",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/live-empty-pipe/owned-process.json",
+          "bytes": 418,
+          "sha256": "84882f6a121ace32ca25f843de4978db6f6ab1e7498953bc53a911811676eba3"
+        },
+        "value": {
+          "owned_pid": 70449,
+          "process_group": 70449,
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "self_cuts::timeout_stdout_leaves_a_live_empty_pipe_without_waiting_for_eof",
+            "--exact",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:16.826861+00:00"
+        }
+      },
+      {
+        "label": "forced-parent-timeout",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/forced-parent-timeout/owned-process.json",
+          "bytes": 422,
+          "sha256": "dd45298800f481dad4ac26b0177e763bd969db5b5119ba509e47b77106f118c9"
+        },
+        "value": {
+          "owned_pid": 70571,
+          "process_group": 70571,
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+            "--exact",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:20.893359+00:00"
+        }
+      },
+      {
+        "label": "diagnostic-compile",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/diagnostic-compile/owned-process.json",
+          "bytes": 668,
+          "sha256": "d921e985b49bad6a140409df2a2f337724f033d69fd3e71b6866198e934d635f"
+        },
+        "value": {
+          "owned_pid": 71574,
+          "process_group": 71574,
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "lamp-body",
+            "-p",
+            "lamp-cloud",
+            "-p",
+            "lamp-expression",
+            "-p",
+            "lamp-keeper",
+            "-p",
+            "lamp-lean",
+            "-p",
+            "lamp-memory",
+            "-p",
+            "lamp-peek",
+            "-p",
+            "lamp-setup",
+            "-p",
+            "lamp-skills",
+            "-p",
+            "lamp-update",
+            "-p",
+            "lamp-voice-eval",
+            "--test",
+            "round",
+            "--no-run",
+            "--message-format=json-render-diagnostics"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:33.762236+00:00"
+        }
+      },
+      {
+        "label": "diagnostic-binary-architecture",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/diagnostic-binary-architecture/owned-process.json",
+          "bytes": 290,
+          "sha256": "c0d2a72f5b49d07799c22ef957540e9350433e275d03c4408d386df15f11e709"
+        },
+        "value": {
+          "owned_pid": 71683,
+          "process_group": 71683,
+          "command": [
+            "file",
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:37.602546+00:00"
+        }
+      },
+      {
+        "label": "diagnostic-inventory",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/diagnostic-inventory/owned-process.json",
+          "bytes": 292,
+          "sha256": "f5ae9a922799e3d3a5a61b1cd89931c43dc86b9c3b4325bf9b66f41147558d6f"
+        },
+        "value": {
+          "owned_pid": 71722,
+          "process_group": 71722,
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "--list"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:38.267370+00:00"
+        }
+      },
+      {
+        "label": "diagnostic-ignored-inventory",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/diagnostic-ignored-inventory/owned-process.json",
+          "bytes": 309,
+          "sha256": "a3c790508ddf2cbecceb6364e4308394c8dd9a9b090599eb2ba2ffebb2c596e5"
+        },
+        "value": {
+          "owned_pid": 71780,
+          "process_group": 71780,
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "--ignored",
+            "--list"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:39.710274+00:00"
+        }
+      },
+      {
+        "label": "original-cut-after-confirmation",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/original-cut-after-confirmation/owned-process.json",
+          "bytes": 422,
+          "sha256": "18e82ac6c815c8fb982fcfb748858da55981453fcc12f430db6ed883bcbca001"
+        },
+        "value": {
+          "owned_pid": 71892,
+          "process_group": 71892,
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+            "--exact",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:25:43.754180+00:00"
+        }
+      }
+    ]
+  },
+  {
+    "attempt": "long-socket-setup",
+    "native_session": 1120,
+    "native_terminal_exit": 1,
+    "results_source": {
+      "external_path": "/private/tmp/tests-update-stdout-originals-continuation-20261023/run-20261023T144050.514732Z/results.json",
+      "bytes": 3417,
+      "sha256": "b161c90e062488fbc7987e28a20a19ab993ec73201433eb634cf15ec47cab676"
+    },
+    "results": {
+      "planned_observations": [
+        {
+          "label": "original-cut-after-confirmation",
+          "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+          "expected": "record_once",
+          "variant": "diagnostic"
+        },
+        {
+          "label": "original-interrupted-put-back",
+          "case": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+          "expected": "record_once",
+          "variant": "diagnostic"
+        }
+      ],
+      "observed_result_count": 0,
+      "completed_observation_count": 0,
+      "unrun_observations": [
+        {
+          "label": "original-cut-after-confirmation",
+          "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+          "expected": "record_once",
+          "variant": "diagnostic"
+        },
+        {
+          "label": "original-interrupted-put-back",
+          "case": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+          "expected": "record_once",
+          "variant": "diagnostic"
+        }
+      ],
+      "incomplete_or_invalid_observations": [],
+      "attempted_command_labels": [
+        "rustc-identity",
+        "git-status"
+      ],
+      "observations": [],
+      "steps": [
+        {
+          "label": "rustc-identity",
+          "command": [
+            "rustc",
+            "-vV"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023",
+          "started_at": "2026-10-23T14:40:50.759933+00:00",
+          "wall_seconds": 0.3277530609630048,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 191,
+            "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "git-status",
+          "command": [
+            "git",
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023",
+          "started_at": "2026-10-23T14:40:51.320137+00:00",
+          "wall_seconds": 0.3890503281727433,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 49,
+            "sha256": "b3ab580d5cfe27d17986b72f9c97c8ed29fac7cb735d476dab7daf69817b8935"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      ],
+      "error": "OSError: AF_UNIX path too long",
+      "exception_traceback": "Traceback (most recent call last):\n  File \"/private/tmp/tests-update-stdout-originals-continuation-20261023/run.py\", line 151, in main\n    with socket.socket(socket.AF_UNIX,socket.SOCK_DGRAM) as sock:sock.bind(str(socket_path))\n                                                                 ~~~~~~~~~^^^^^^^^^^^^^^^^^^\nOSError: AF_UNIX path too long\n",
+      "interruption": null,
+      "owned_live_children_at_restoration": [],
+      "restoration_exception_traceback": null,
+      "restored_frozen_diagnostic_source": true,
+      "source_aggregate": "8f6815f4e7e5e1a556d605638e26a030642f1d3253b55e7456919ef54fd751fb",
+      "full_gate_run": false,
+      "historical_cause_established": false
+    },
+    "owned_command_processes": [
+      {
+        "label": "rustc-identity",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-originals-continuation-20261023/run-20261023T144050.514732Z/rustc-identity/owned-process.json",
+          "bytes": 217,
+          "sha256": "bc53a4a796102b249aa3472bb3fa7db492c587976e16755869b78190ad4dbe15"
+        },
+        "value": {
+          "owned_pid": 23426,
+          "process_group": 23426,
+          "command": [
+            "rustc",
+            "-vV"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023",
+          "started_at": "2026-10-23T14:40:50.759933+00:00"
+        }
+      },
+      {
+        "label": "git-status",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-originals-continuation-20261023/run-20261023T144050.514732Z/git-status/owned-process.json",
+          "bytes": 269,
+          "sha256": "c8174cd85388b061513348f6a868d2dfdc451dca75270a4fa21105f4ce5039ff"
+        },
+        "value": {
+          "owned_pid": 23446,
+          "process_group": 23446,
+          "command": [
+            "git",
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023",
+          "started_at": "2026-10-23T14:40:51.320137+00:00"
+        }
+      }
+    ]
+  },
+  {
+    "attempt": "originals-120s",
+    "native_session": 9731,
+    "native_terminal_exit": 0,
+    "results_source": {
+      "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/results.json",
+      "bytes": 8413,
+      "sha256": "acda2277d23fe3d56a9f1fc758d0c6919d6ffe958b4cea0e19f76542d6ad405a"
+    },
+    "results": {
+      "planned_observations": [
+        {
+          "label": "original-cut-after-confirmation",
+          "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+          "expected": "record_once",
+          "variant": "diagnostic"
+        },
+        {
+          "label": "original-interrupted-put-back",
+          "case": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+          "expected": "record_once",
+          "variant": "diagnostic"
+        }
+      ],
+      "observed_result_count": 2,
+      "completed_observation_count": 2,
+      "unrun_observations": [],
+      "incomplete_or_invalid_observations": [],
+      "attempted_command_labels": [
+        "rustc-identity",
+        "git-status",
+        "retained-binary-architecture",
+        "retained-inventory",
+        "retained-ignored-inventory",
+        "original-cut-after-confirmation",
+        "original-interrupted-put-back"
+      ],
+      "observations": [
+        {
+          "label": "original-cut-after-confirmation",
+          "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+          "variant": "diagnostic",
+          "expected": "record_once",
+          "exit_code": 0,
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "wall_seconds": 13.93399206828326,
+          "source_aggregate": "8f6815f4e7e5e1a556d605638e26a030642f1d3253b55e7456919ef54fd751fb",
+          "binary_sha256": "243452cab513f89e06177b15a1d6f381205f5c58a8e7279d0ddc69e983c22354",
+          "original_timeout_observed": false,
+          "stdout_diagnostic_observed": false,
+          "post_run_validation_complete": true
+        },
+        {
+          "label": "original-interrupted-put-back",
+          "case": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+          "variant": "diagnostic",
+          "expected": "record_once",
+          "exit_code": 0,
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "wall_seconds": 26.804466685745865,
+          "source_aggregate": "8f6815f4e7e5e1a556d605638e26a030642f1d3253b55e7456919ef54fd751fb",
+          "binary_sha256": "243452cab513f89e06177b15a1d6f381205f5c58a8e7279d0ddc69e983c22354",
+          "original_timeout_observed": false,
+          "stdout_diagnostic_observed": false,
+          "post_run_validation_complete": true
+        }
+      ],
+      "steps": [
+        {
+          "label": "rustc-identity",
+          "command": [
+            "rustc",
+            "-vV"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023",
+          "started_at": "2026-10-23T14:45:05.230409+00:00",
+          "wall_seconds": 0.28736457228660583,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 191,
+            "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "git-status",
+          "command": [
+            "git",
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023",
+          "started_at": "2026-10-23T14:45:05.753610+00:00",
+          "wall_seconds": 0.38503522798419,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 49,
+            "sha256": "b3ab580d5cfe27d17986b72f9c97c8ed29fac7cb735d476dab7daf69817b8935"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "retained-binary-architecture",
+          "command": [
+            "file",
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:45:07.936112+00:00",
+          "wall_seconds": 0.2625641440972686,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 104,
+            "sha256": "c219034710e689c62e05b5ede66ebf793bfb3c0cd65dcc3025dbf92c2214536c"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "retained-inventory",
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "--list"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:45:08.458273+00:00",
+          "wall_seconds": 0.3710681162774563,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 8868,
+            "sha256": "cc409294bd7d520dcb52585263eaede83e082653f8eef8718d474983141f4f2a"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "retained-ignored-inventory",
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "--ignored",
+            "--list"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:45:09.070966+00:00",
+          "wall_seconds": 0.26016212720423937,
+          "timeout_seconds": 30,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 22,
+            "sha256": "414c144fa67f1df75f7b14a69af5641637772e81c4c3fa0a171e3228adbb922e"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "original-cut-after-confirmation",
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+            "--exact",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:45:12.615065+00:00",
+          "wall_seconds": 13.93399206828326,
+          "timeout_seconds": 120,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 206,
+            "sha256": "2e27ef83b0a6d7f9e707de89e15528c0c7b52315e84323fdf43ab6dc7b23c3a8"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "original-interrupted-put-back",
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+            "--exact",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:45:30.111977+00:00",
+          "wall_seconds": 26.804466685745865,
+          "timeout_seconds": 120,
+          "timed_out": false,
+          "exit_code": 0,
+          "cleanup": [],
+          "exception_traceback": null,
+          "cleanup_exception_traceback": null,
+          "stdout": {
+            "bytes": 208,
+            "sha256": "8855d3cc884496f4da84e1044c7474ab9ce8bea2cdec77aadcd8d6f2a40a6d41"
+          },
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      ],
+      "error": null,
+      "exception_traceback": null,
+      "interruption": null,
+      "owned_live_children_at_restoration": [],
+      "restoration_exception_traceback": null,
+      "restored_frozen_diagnostic_source": true,
+      "source_aggregate": "8f6815f4e7e5e1a556d605638e26a030642f1d3253b55e7456919ef54fd751fb",
+      "full_gate_run": false,
+      "historical_cause_established": false
+    },
+    "owned_command_processes": [
+      {
+        "label": "rustc-identity",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/rustc-identity/owned-process.json",
+          "bytes": 217,
+          "sha256": "03827297d2c409084aac2141a27422e4fd79f6063208612a6004b0c707f13533"
+        },
+        "value": {
+          "owned_pid": 38738,
+          "process_group": 38738,
+          "command": [
+            "rustc",
+            "-vV"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023",
+          "started_at": "2026-10-23T14:45:05.230409+00:00"
+        }
+      },
+      {
+        "label": "git-status",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/git-status/owned-process.json",
+          "bytes": 269,
+          "sha256": "ab4bdb09694a34dba86ec6eacbe0f8fa74f52bc5d4b6f0f4cfeaf7222f81c9cf"
+        },
+        "value": {
+          "owned_pid": 38749,
+          "process_group": 38749,
+          "command": [
+            "git",
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023",
+          "started_at": "2026-10-23T14:45:05.753610+00:00"
+        }
+      },
+      {
+        "label": "retained-binary-architecture",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/retained-binary-architecture/owned-process.json",
+          "bytes": 290,
+          "sha256": "186a71efc0f0478d5cb886d33d57b29f5c2e0c85c0029ecb609c027f28e0ddc8"
+        },
+        "value": {
+          "owned_pid": 38795,
+          "process_group": 38795,
+          "command": [
+            "file",
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:45:07.936112+00:00"
+        }
+      },
+      {
+        "label": "retained-inventory",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/retained-inventory/owned-process.json",
+          "bytes": 292,
+          "sha256": "c1f14a05e4779584f69b573d8c10ba4bf027e43cd8296a7158e47a0672153f47"
+        },
+        "value": {
+          "owned_pid": 38833,
+          "process_group": 38833,
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "--list"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:45:08.458273+00:00"
+        }
+      },
+      {
+        "label": "retained-ignored-inventory",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/retained-ignored-inventory/owned-process.json",
+          "bytes": 309,
+          "sha256": "3c445890bf6e27591ef10a3194a28a0d3df74b42d23b4fc50fb1f5f5e85ed64c"
+        },
+        "value": {
+          "owned_pid": 38871,
+          "process_group": 38871,
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "--ignored",
+            "--list"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:45:09.070966+00:00"
+        }
+      },
+      {
+        "label": "original-cut-after-confirmation",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/original-cut-after-confirmation/owned-process.json",
+          "bytes": 422,
+          "sha256": "97e8c8fa46b78d2e7ffd88e44a25fabdd7b4d4b4c525b2a7bf74b591d96b4df8"
+        },
+        "value": {
+          "owned_pid": 39014,
+          "process_group": 39014,
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+            "--exact",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:45:12.615065+00:00"
+        }
+      },
+      {
+        "label": "original-interrupted-put-back",
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/original-interrupted-put-back/owned-process.json",
+          "bytes": 424,
+          "sha256": "3c6c3ad284abfcfd0132df30f67dde2e9c15478910ca3d176667a69be8b0fbb2"
+        },
+        "value": {
+          "owned_pid": 39715,
+          "process_group": 39715,
+          "command": [
+            "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+            "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+            "--exact",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "cwd": "/private/tmp/tests-codex-update-stdout-diagnostic-20261023/lampOS",
+          "started_at": "2026-10-23T14:45:30.111977+00:00"
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,171 @@
+[
+  {
+    "attempt": "path-setup",
+    "source": {
+      "external_path": "/private/tmp/tests-update-stdout-diagnostic-20261023/run-20261023T141910.718087Z/environment.json",
+      "bytes": 628,
+      "sha256": "36ca1411c01baa26affa4ccd520a54e70d069cd4ccdbe642f059e7afd0a3b7ec"
+    },
+    "captured_fields_except_full_PATH": {
+      "set": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_TERM_COLOR": "never",
+        "RUST_BACKTRACE": "0",
+        "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin"
+      },
+      "target": "/private/tmp/tests-codex-1569-target",
+      "cleared": [
+        "CARGO_BUILD_TARGET",
+        "RUST_TEST_THREADS",
+        "RUSTFLAGS",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "CARGO_TARGET_TMPDIR",
+        "LAMP_RELAY_PID_CONTROL_DIR"
+      ],
+      "scope": "Tool launch must use require_escalated; no physical hardware or host-isolation claim."
+    },
+    "limit": "Full inherited PATH is retained only externally to avoid unrelated user/host path disclosure. Tool resolution and exact toolchain output are retained."
+  },
+  {
+    "attempt": "ten-second",
+    "source": {
+      "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run-20261023T142403.458475Z/environment.json",
+      "bytes": 2098,
+      "sha256": "262088a79a7f26669fdbb29091cde2c5b2817338c55f89c935601a2593b47685"
+    },
+    "captured_fields_except_full_PATH": {
+      "set": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_TERM_COLOR": "never",
+        "RUST_BACKTRACE": "0",
+        "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin"
+      },
+      "target": "/private/tmp/tests-codex-1569-target",
+      "cleared": [
+        "CARGO_BUILD_TARGET",
+        "RUST_TEST_THREADS",
+        "RUSTFLAGS",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "CARGO_TARGET_TMPDIR",
+        "LAMP_RELAY_PID_CONTROL_DIR"
+      ],
+      "effective_tool_resolution": {
+        "rustc": "/Users/autonomous/.cargo/bin/rustc",
+        "cargo": "/Users/autonomous/.cargo/bin/cargo"
+      },
+      "scope": "Tool launch must use require_escalated; no physical hardware or host-isolation claim.",
+      "effective_PATH_sha256": "25f612c1fa37c332f02846c5209e4fc5cc6146e119a6610058847096c7a22428"
+    },
+    "limit": "Full inherited PATH is retained only externally to avoid unrelated user/host path disclosure. Tool resolution and exact toolchain output are retained."
+  },
+  {
+    "attempt": "long-socket-setup",
+    "source": {
+      "external_path": "/private/tmp/tests-update-stdout-originals-continuation-20261023/run-20261023T144050.514732Z/environment.json",
+      "bytes": 2098,
+      "sha256": "262088a79a7f26669fdbb29091cde2c5b2817338c55f89c935601a2593b47685"
+    },
+    "captured_fields_except_full_PATH": {
+      "set": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_TERM_COLOR": "never",
+        "RUST_BACKTRACE": "0",
+        "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin"
+      },
+      "target": "/private/tmp/tests-codex-1569-target",
+      "cleared": [
+        "CARGO_BUILD_TARGET",
+        "RUST_TEST_THREADS",
+        "RUSTFLAGS",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "CARGO_TARGET_TMPDIR",
+        "LAMP_RELAY_PID_CONTROL_DIR"
+      ],
+      "effective_tool_resolution": {
+        "rustc": "/Users/autonomous/.cargo/bin/rustc",
+        "cargo": "/Users/autonomous/.cargo/bin/cargo"
+      },
+      "scope": "Tool launch must use require_escalated; no physical hardware or host-isolation claim.",
+      "effective_PATH_sha256": "25f612c1fa37c332f02846c5209e4fc5cc6146e119a6610058847096c7a22428"
+    },
+    "limit": "Full inherited PATH is retained only externally to avoid unrelated user/host path disclosure. Tool resolution and exact toolchain output are retained."
+  },
+  {
+    "attempt": "originals-120s",
+    "source": {
+      "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/environment.json",
+      "bytes": 2098,
+      "sha256": "262088a79a7f26669fdbb29091cde2c5b2817338c55f89c935601a2593b47685"
+    },
+    "captured_fields_except_full_PATH": {
+      "set": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_TERM_COLOR": "never",
+        "RUST_BACKTRACE": "0",
+        "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin"
+      },
+      "target": "/private/tmp/tests-codex-1569-target",
+      "cleared": [
+        "CARGO_BUILD_TARGET",
+        "RUST_TEST_THREADS",
+        "RUSTFLAGS",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "CARGO_TARGET_TMPDIR",
+        "LAMP_RELAY_PID_CONTROL_DIR"
+      ],
+      "effective_tool_resolution": {
+        "rustc": "/Users/autonomous/.cargo/bin/rustc",
+        "cargo": "/Users/autonomous/.cargo/bin/cargo"
+      },
+      "scope": "Tool launch must use require_escalated; no physical hardware or host-isolation claim.",
+      "effective_PATH_sha256": "25f612c1fa37c332f02846c5209e4fc5cc6146e119a6610058847096c7a22428"
+    },
+    "limit": "Full inherited PATH is retained only externally to avoid unrelated user/host path disclosure. Tool resolution and exact toolchain output are retained.",
+    "short_socket_preflights": {
+      "prepare_only": {
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/prepare-socket-preflight.json",
+          "bytes": 201,
+          "sha256": "4e1e99276c0e5ad61ab9bed59fd82a09fb3ce789f79783c7aaaeca8adb5b8808"
+        },
+        "value": {
+          "unix_datagram_bound": true,
+          "loopback_tcp_bound": true,
+          "unix_path_bytes": 43,
+          "owned_temporary_directory": "/private/tmp/upd-stdout-mwwbnlx0",
+          "owned_temporary_directory_removed": true
+        }
+      },
+      "runtime": {
+        "source": {
+          "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run-20261023T144504.977944Z/socket-preflight.json",
+          "bytes": 201,
+          "sha256": "9f19af28f18507477ea143b72b9030157769da6067e38d6a9b8e64b1c6760a1f"
+        },
+        "value": {
+          "unix_datagram_bound": true,
+          "loopback_tcp_bound": true,
+          "unix_path_bytes": 43,
+          "owned_temporary_directory": "/private/tmp/upd-stdout-z7k0dz6w",
+          "owned_temporary_directory_removed": true
+        }
+      }
+    }
+  }
+]

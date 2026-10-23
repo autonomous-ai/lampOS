@@ -1,0 +1,126 @@
+{
+  "source": {
+    "label": "3190-combined",
+    "kind": "Committed boot correction plus exact two peer fixture overlays; no combined commit exists at snapshot",
+    "pr": 3190,
+    "source": {
+      "commit": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+      "root_tree": "1a2db98b23f06944cbe06dd567f3ff3c11c0cae8",
+      "parents": [
+        "09f8e7412f92870e16ccca14e1b9cdc1b14add48"
+      ],
+      "workspace_tree": "b83d1ff7b1d6f54202be2e48ff4da53dc25bfcff"
+    },
+    "expected_parent": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "overlays": [
+      {
+        "path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+        "snapshot": "candidate-0.txt",
+        "git_mode": "100644",
+        "base_sha256": "b50767957067efee6a502e372605a7bcc2b16e23097da1ddca85153cf966993a",
+        "candidate_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+        "candidate_bytes": 45782
+      },
+      {
+        "path": "lampOS/docs/voice-test-fixtures.md",
+        "snapshot": "candidate-1.txt",
+        "git_mode": "100644",
+        "base_sha256": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c",
+        "candidate_sha256": "77388c4a7523c56e20e5cbe9406f721e52db4463be34482ff831b6a0dd884615",
+        "candidate_bytes": 33187
+      }
+    ],
+    "image": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+    "status": "Frozen; root authorized one isolated Linux x86 format run. No MAIN/build/tests/device.",
+    "expected_lampOS_source_map_sha256": "57c343e90b9e96eaadd22d3492de6588def4ff74143f77fa4970252a4a89e71c",
+    "lampOS_expected_entries": 6709,
+    "source_scope": "All tracked lampOS entries from the exact committed head plus two declared snapshots, including byte and executable/symlink-mode identity. Every other worktree entry in this scope matched its Git blob.",
+    "mechanism": "Byte-identical approved cached Linux amd64 formatter; rootless user1000, pull=never/network=none/read-only, private1GiBtmpfs, no host mounts/volumes/MAIN. Archive600s/container300s, one attempt.",
+    "base_archive_sha256": "6c48d95b8a01e04ef981ef2c6f93a412fbced6208b5604b485afcf80ce25a483",
+    "archive_file": "source-lampOS.tar",
+    "archive_bytes": 220323840,
+    "archive_sha256": "ada0526973dac5f78bff53aba3427d16487317f090f91ef1e16846faa2c92dc5",
+    "input_scope": "All tracked lampOS files; exact Git commit or declared frozen two-file overlay only.",
+    "overlay_all_lampOS_bytes_and_modes_verified": true,
+    "runner_sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40"
+  },
+  "result": {
+    "source_kind": "Committed boot correction plus exact two peer fixture overlays; no combined commit exists at snapshot",
+    "source": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+    "candidate_commit": null,
+    "declared_overlays": [
+      {
+        "path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+        "snapshot": "candidate-0.txt",
+        "git_mode": "100644",
+        "base_sha256": "b50767957067efee6a502e372605a7bcc2b16e23097da1ddca85153cf966993a",
+        "candidate_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+        "candidate_bytes": 45782
+      },
+      {
+        "path": "lampOS/docs/voice-test-fixtures.md",
+        "snapshot": "candidate-1.txt",
+        "git_mode": "100644",
+        "base_sha256": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c",
+        "candidate_sha256": "77388c4a7523c56e20e5cbe9406f721e52db4463be34482ff831b6a0dd884615",
+        "candidate_bytes": 33187
+      }
+    ],
+    "format_container_exit": 0,
+    "timed_out": false,
+    "container_elapsed_seconds": 15.908472249284387,
+    "timing_boundary": "Entire container command including setup, extraction, rustfmt and source hashing.",
+    "formatting_success": true,
+    "source_archive_unchanged": true,
+    "git_identity_unchanged": true,
+    "snapshots_unchanged": true,
+    "compilation": false,
+    "tests": false,
+    "ARM_build": false,
+    "source_edits": false,
+    "evidence_directory": "/private/tmp/tests-3190-combined-linux-fmt-20261023/run-20261023T145414.635313Z"
+  },
+  "snapshot_preflight": {
+    "head": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+    "source": {
+      "commit": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+      "root_tree": "1a2db98b23f06944cbe06dd567f3ff3c11c0cae8",
+      "parents": [
+        "09f8e7412f92870e16ccca14e1b9cdc1b14add48"
+      ],
+      "workspace_tree": "b83d1ff7b1d6f54202be2e48ff4da53dc25bfcff"
+    },
+    "frozen_overlays": [
+      {
+        "path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+        "snapshot": "candidate-0.txt",
+        "git_mode": "100644",
+        "base_sha256": "b50767957067efee6a502e372605a7bcc2b16e23097da1ddca85153cf966993a",
+        "candidate_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+        "candidate_bytes": 45782
+      },
+      {
+        "path": "lampOS/docs/voice-test-fixtures.md",
+        "snapshot": "candidate-1.txt",
+        "git_mode": "100644",
+        "base_sha256": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c",
+        "candidate_sha256": "77388c4a7523c56e20e5cbe9406f721e52db4463be34482ff831b6a0dd884615",
+        "candidate_bytes": 33187
+      }
+    ],
+    "lampOS_entries": 6709,
+    "map_sha256": "57c343e90b9e96eaadd22d3492de6588def4ff74143f77fa4970252a4a89e71c",
+    "runner_sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40",
+    "plan_sha256": "d3f7f46a5e398d9b9883f75bcc4e201626f796ea2325eff11438e51906e31c95",
+    "head_status_overlays_unchanged_through_snapshot": true,
+    "all_nonoverlay_lampOS_blobs_and_modes_match_head": true,
+    "worktree": "/private/tmp/tests-codex-boot-clock-current-20261023"
+  },
+  "input_manifest_before_sha256": "f06f56532d39d04368b39848abfaac787d8971545acfb94f7c6ecd0fd205bc94",
+  "input_manifest_after_sha256": "f06f56532d39d04368b39848abfaac787d8971545acfb94f7c6ecd0fd205bc94",
+  "format_plan_sha256": "d3f7f46a5e398d9b9883f75bcc4e201626f796ea2325eff11438e51906e31c95",
+  "runner_sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40",
+  "prior_controls_and_gates_are_separate": true,
+  "current_full_native_gate_executed_here": false,
+  "uncommitted_overlay": "The source commit is the base only. Exact candidate identity is the base plus the two declared snapshot hashes; no candidate commit existed at this run."
+}

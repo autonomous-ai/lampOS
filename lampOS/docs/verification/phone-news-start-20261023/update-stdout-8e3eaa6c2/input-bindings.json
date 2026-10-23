@@ -1,0 +1,170 @@
+[
+  {
+    "attempt": "path-setup",
+    "runner": {
+      "external_path": "/private/tmp/tests-update-stdout-diagnostic-20261023/run.py",
+      "bytes": 16634,
+      "sha256": "7bd3118de05cb363a804c9e72099dd67becd2848068f68c59095e6b857f8526b"
+    },
+    "plan": {
+      "external_path": "/private/tmp/tests-update-stdout-diagnostic-20261023/PLAN.md",
+      "bytes": 7953,
+      "sha256": "ee134899bc81fa9f17a30ee2546ba952e4dacf3fa09a79be09e3b3b7dcb57439"
+    },
+    "prepared": {
+      "external_path": "/private/tmp/tests-update-stdout-diagnostic-20261023/prepared.json",
+      "bytes": 3343,
+      "sha256": "da0c1151be2440aeb4be6a45ae737686652873872fbb9a754ce918c972a02981"
+    },
+    "frozen_input_manifest_source": {
+      "external_path": "/private/tmp/tests-update-stdout-diagnostic-20261023/SHA256SUMS",
+      "bytes": 2547,
+      "sha256": "f54b08cb615bb2e747c0377cf8894a716c1e89db7300975dc130555f89806edb"
+    },
+    "frozen_input_manifest": {
+      "format": "utf8-string-envelope-v1",
+      "encoding": "utf-8",
+      "decoded_bytes": 2547,
+      "decoded_sha256": "f54b08cb615bb2e747c0377cf8894a716c1e89db7300975dc130555f89806edb",
+      "data": "ee134899bc81fa9f17a30ee2546ba952e4dacf3fa09a79be09e3b3b7dcb57439  PLAN.md\nc266812516631aaef27d03ebd8d9c13c703fa58f7cd8798250b0689744de140a  historical-round-inventory.json\n9473d69225f86579d0f0fd44afc92f33f1f5d62dc960cc8f0d337350e2e40fc5  patches/controls.patch\nf891716dc39b564a2e91b2579813787a457028ce7cabe7683b825c5d78f3e4c0  patches/diagnostic.patch\ne44c6893c01d435514c0e2b803a7b1d35127584c27d7233a08976a8c26264f94  prepare.py\nda0c1151be2440aeb4be6a45ae737686652873872fbb9a754ce918c972a02981  prepared.json\nb1cd44b3d457e4ea82d3c150a65683876c574d45d509e329a0ee62d785d9e590  receipt-counting-revision.json\n857603ee85ca942365166f7a7ffd36fb43d18adb5388680bbb8565c370a00fb9  receipt-counting.diff\n027ebfa706ac07e8520e533ba265d5505234ca0afe36ed142594c9f49961356b  revision-1-unexecuted/PLAN.md\n95329972ad224518b5ba407ba16047182b49896f455560a3cda3c4fb1b9b241e  revision-1-unexecuted/SHA256SUMS\n2c2c5073cd1b6f8019e76c715a571cd0ec7b487f3cc7db6a87cab43c92cd14a2  revision-1-unexecuted/prepared.json\n20f428ca4e06998d0e5d5875d3db192671f7d89f5bbdf4269308122237b12298  revision-1-unexecuted/run.py\nf6014e409070d4f69fe3c291fd796706fb65c694070ef823810aa1a82bfa24f1  revision-1-unexecuted/source-map.json\n80348b42aed0cd07b5adfdd88c7842e06bd7611a3a27473f5013a53476e23ccd  revision-2-unexecuted/PLAN.md\n957d19949c341c028a3f678f41c2d87d7ad9fea0a9c825e1395afcb03e17fe3c  revision-2-unexecuted/SHA256SUMS\nf47c8099ce8a9eb4206cac75ae7ec5fe80da4dc77b2bc69bda77ba26d1507db4  revision-2-unexecuted/prepared.json\n305af37f0e1fc6ea456c86b184b6e71ef6a2d094c87191859752fd8a6972a5be  revision-2-unexecuted/run.py\n7bd3118de05cb363a804c9e72099dd67becd2848068f68c59095e6b857f8526b  run.py\nd74453f8f02a08a961bb09cbf1390ba74175a5fdd0e0c5a23bd028eb019e9eaa  runner-validity.diff\n9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013  source/base-self_cuts.rs\n29b2711bd92bd45088c7dc8dd8d9b2693b52f4bd87b4fe55620d2bbd8fe0eb9e  source/controls-self_cuts.rs\nf614490a48eb58e364c23b04d87eb654578ba7276595ad214dc413e54b2a216b  source/diagnostic-self_cuts.rs\n1679d42ace4d2e542dc148a107a1adf5fe2a236e85c8b1b1918d065df2d5fce2  source-identity.json\n3eeed1710e9fb94c8f4063884c35148c6210a8380a642fcb3efed1d4399b0d1d  source-map.json\n5cfb3504dfce903ab5a36c70d237bb0d6e44a8c7108835dab3b3e494a90b230f  validity-revision.json\n1b5b23cbf208e062d2277346c432fea6c413b5aaba32594fb76312f410cbe5b2  worktree-add.json\n277e6d2a8fa9ba2b2855ac5f43c6ca0bbfa088f4c54e8b68e8190ddc01aeed82  worktree-add.stderr.txt\n84786a387afb46de092a9cc7780943e0e0655caac19763af5df13b2543e276e7  worktree-add.stdout.txt\n"
+    },
+    "exclusive_marker": {
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-diagnostic-20261023/execution-start.json",
+        "bytes": 198,
+        "sha256": "ca3dbd57eec6c09b7f5ecc842b97941712a8dc50c917f84ec47d1c3824d2c361"
+      },
+      "value": {
+        "started_at": "2026-10-23T14:19:10.717506+00:00",
+        "prepared_sha256": "da0c1151be2440aeb4be6a45ae737686652873872fbb9a754ce918c972a02981",
+        "plan": "Five exact observations only; no retries"
+      }
+    }
+  },
+  {
+    "attempt": "ten-second",
+    "runner": {
+      "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/run.py",
+      "bytes": 16998,
+      "sha256": "c8f7433a032e56b6c89e0ae3a7f58641975af68febfad5bd72cad79240e31c93"
+    },
+    "plan": {
+      "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/PLAN.md",
+      "bytes": 8526,
+      "sha256": "ab373637323fb2c649b7ce005c58adc6bc093c8be0b54b98d87e841d824a0d13"
+    },
+    "prepared": {
+      "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/prepared.json",
+      "bytes": 3701,
+      "sha256": "b3aac50d9922a1eb89f3c27dd5316990508e506cfd8f0ab437e10d6c95163098"
+    },
+    "frozen_input_manifest_source": {
+      "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/SHA256SUMS",
+      "bytes": 1140,
+      "sha256": "bd143270d822cebbe9965c06cd938e5efc1f7717fd56aad86eace03406b312f7"
+    },
+    "frozen_input_manifest": {
+      "format": "utf8-string-envelope-v1",
+      "encoding": "utf-8",
+      "decoded_bytes": 1140,
+      "decoded_sha256": "bd143270d822cebbe9965c06cd938e5efc1f7717fd56aad86eace03406b312f7",
+      "data": "ab373637323fb2c649b7ce005c58adc6bc093c8be0b54b98d87e841d824a0d13  PLAN.md\nef778f4ac3c7695d015c625cb0e8812d031fb8b191e5240ddd36dc7d5862247e  continuation-provenance.json\n88d32384af806acafc31f2c703dcfaa00fcb2b4657ea5d53864c73f087f7f573  environment-only.diff\nc266812516631aaef27d03ebd8d9c13c703fa58f7cd8798250b0689744de140a  historical-round-inventory.json\n9473d69225f86579d0f0fd44afc92f33f1f5d62dc960cc8f0d337350e2e40fc5  patches/controls.patch\nf891716dc39b564a2e91b2579813787a457028ce7cabe7683b825c5d78f3e4c0  patches/diagnostic.patch\nb3aac50d9922a1eb89f3c27dd5316990508e506cfd8f0ab437e10d6c95163098  prepared.json\nc8f7433a032e56b6c89e0ae3a7f58641975af68febfad5bd72cad79240e31c93  run.py\n9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013  source/base-self_cuts.rs\n29b2711bd92bd45088c7dc8dd8d9b2693b52f4bd87b4fe55620d2bbd8fe0eb9e  source/controls-self_cuts.rs\nf614490a48eb58e364c23b04d87eb654578ba7276595ad214dc413e54b2a216b  source/diagnostic-self_cuts.rs\n1679d42ace4d2e542dc148a107a1adf5fe2a236e85c8b1b1918d065df2d5fce2  source-identity.json\n3eeed1710e9fb94c8f4063884c35148c6210a8380a642fcb3efed1d4399b0d1d  source-map.json\n"
+    },
+    "exclusive_marker": {
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-path-continuation-20261023/execution-start.json",
+        "bytes": 198,
+        "sha256": "d0d5a9e584a8ff719bdb7a4ff87a3393e3b318046269feb9b60fa96ab461540f"
+      },
+      "value": {
+        "started_at": "2026-10-23T14:24:03.457973+00:00",
+        "prepared_sha256": "b3aac50d9922a1eb89f3c27dd5316990508e506cfd8f0ab437e10d6c95163098",
+        "plan": "Five exact observations only; no retries"
+      }
+    }
+  },
+  {
+    "attempt": "long-socket-setup",
+    "runner": {
+      "external_path": "/private/tmp/tests-update-stdout-originals-continuation-20261023/run.py",
+      "bytes": 14791,
+      "sha256": "696c5e148fe4c99328a1db526e4b50d8170642d91345ff549e50a8698f32c810"
+    },
+    "plan": {
+      "external_path": "/private/tmp/tests-update-stdout-originals-continuation-20261023/PLAN.md",
+      "bytes": 3117,
+      "sha256": "68886557c3d75dce45a8b4fae5fd983c8c6e918259079b8ad8808aa9cc03c2b2"
+    },
+    "prepared": {
+      "external_path": "/private/tmp/tests-update-stdout-originals-continuation-20261023/prepared.json",
+      "bytes": 3472,
+      "sha256": "a0067ec57763853868eaba87c25fbd278d583de6a157ea66a9b26db5991963d8"
+    },
+    "frozen_input_manifest_source": {
+      "external_path": "/private/tmp/tests-update-stdout-originals-continuation-20261023/SHA256SUMS",
+      "bytes": 1315,
+      "sha256": "1ff006ce79065bf8f3315d5e857796fe3c450c13b65eff211b149636550d8ec6"
+    },
+    "frozen_input_manifest": {
+      "format": "utf8-string-envelope-v1",
+      "encoding": "utf-8",
+      "decoded_bytes": 1315,
+      "decoded_sha256": "1ff006ce79065bf8f3315d5e857796fe3c450c13b65eff211b149636550d8ec6",
+      "data": "68886557c3d75dce45a8b4fae5fd983c8c6e918259079b8ad8808aa9cc03c2b2  PLAN.md\n33b50dea4499b1dacbbb36eda80a3d2aa809a638785c43c3310044c9b8c9d1eb  call-count-basis.json\n8ebfe38d769bba8ff0095c7502b15c646e44056c27f2208231986713e8c3a60b  continuation-provenance.json\nc266812516631aaef27d03ebd8d9c13c703fa58f7cd8798250b0689744de140a  historical-round-inventory.json\n451c29c08c3e0cad9dd8d2f21b897c4a13bb651b5afe2421aa6fb86e51bd4967  originals-only.diff\n9473d69225f86579d0f0fd44afc92f33f1f5d62dc960cc8f0d337350e2e40fc5  patches/controls.patch\nf891716dc39b564a2e91b2579813787a457028ce7cabe7683b825c5d78f3e4c0  patches/diagnostic.patch\na0067ec57763853868eaba87c25fbd278d583de6a157ea66a9b26db5991963d8  prepared.json\n5f3ecbac74643d461c48807806c31b5b8764bd17dccb19f8c69deb79f1fbf5c7  retained-artifact.json\n696c5e148fe4c99328a1db526e4b50d8170642d91345ff549e50a8698f32c810  run.py\n9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013  source/base-self_cuts.rs\n29b2711bd92bd45088c7dc8dd8d9b2693b52f4bd87b4fe55620d2bbd8fe0eb9e  source/controls-self_cuts.rs\nf614490a48eb58e364c23b04d87eb654578ba7276595ad214dc413e54b2a216b  source/diagnostic-self_cuts.rs\n1679d42ace4d2e542dc148a107a1adf5fe2a236e85c8b1b1918d065df2d5fce2  source-identity.json\n3eeed1710e9fb94c8f4063884c35148c6210a8380a642fcb3efed1d4399b0d1d  source-map.json\n"
+    },
+    "exclusive_marker": {
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-originals-continuation-20261023/execution-start.json",
+        "bytes": 248,
+        "sha256": "9200a6a53e6069129355fc4832fa5f00ac07533709784bcbbd038308c32bce6f"
+      },
+      "value": {
+        "started_at": "2026-10-23T14:40:50.514287+00:00",
+        "prepared_sha256": "a0067ec57763853868eaba87c25fbd278d583de6a157ea66a9b26db5991963d8",
+        "plan": "Two original observations only at the corrected external cap; no completed controls repeat"
+      }
+    }
+  },
+  {
+    "attempt": "originals-120s",
+    "runner": {
+      "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/run.py",
+      "bytes": 15310,
+      "sha256": "20a7d67881bddd1b7b229d219c3bc8ab64e75c54f7dd63262194f6cc1d8dbcdc"
+    },
+    "plan": {
+      "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/PLAN.md",
+      "bytes": 3535,
+      "sha256": "c1646d1b8b3e9850c5047d60106117edd68dd0be3fb0e0b4e15fc663e903c84a"
+    },
+    "prepared": {
+      "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/prepared.json",
+      "bytes": 3796,
+      "sha256": "ce2fe5e2e1a57779830f614b55e74dad4053bbd4fb1c81414bfbbb6ca6671673"
+    },
+    "frozen_input_manifest_source": {
+      "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/SHA256SUMS",
+      "bytes": 1322,
+      "sha256": "cfe1be32eded55fff243bf698342f540e1a285972fc53712bec5de9e0941335a"
+    },
+    "frozen_input_manifest": {
+      "format": "utf8-string-envelope-v1",
+      "encoding": "utf-8",
+      "decoded_bytes": 1322,
+      "decoded_sha256": "cfe1be32eded55fff243bf698342f540e1a285972fc53712bec5de9e0941335a",
+      "data": "c1646d1b8b3e9850c5047d60106117edd68dd0be3fb0e0b4e15fc663e903c84a  PLAN.md\n33b50dea4499b1dacbbb36eda80a3d2aa809a638785c43c3310044c9b8c9d1eb  call-count-basis.json\n86ea5bb1bd777873ad88aeb4000ab44e1cb03ab162cec2117da827758d2d5170  continuation-provenance.json\nc266812516631aaef27d03ebd8d9c13c703fa58f7cd8798250b0689744de140a  historical-round-inventory.json\n9473d69225f86579d0f0fd44afc92f33f1f5d62dc960cc8f0d337350e2e40fc5  patches/controls.patch\nf891716dc39b564a2e91b2579813787a457028ce7cabe7683b825c5d78f3e4c0  patches/diagnostic.patch\nce2fe5e2e1a57779830f614b55e74dad4053bbd4fb1c81414bfbbb6ca6671673  prepared.json\n5f3ecbac74643d461c48807806c31b5b8764bd17dccb19f8c69deb79f1fbf5c7  retained-artifact.json\n20a7d67881bddd1b7b229d219c3bc8ab64e75c54f7dd63262194f6cc1d8dbcdc  run.py\n38364df8ae35632525fad535410ff5fae351520a44b0abbd4ac152fcfd72dd3f  socket-preflight-only.diff\n9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013  source/base-self_cuts.rs\n29b2711bd92bd45088c7dc8dd8d9b2693b52f4bd87b4fe55620d2bbd8fe0eb9e  source/controls-self_cuts.rs\nf614490a48eb58e364c23b04d87eb654578ba7276595ad214dc413e54b2a216b  source/diagnostic-self_cuts.rs\n1679d42ace4d2e542dc148a107a1adf5fe2a236e85c8b1b1918d065df2d5fce2  source-identity.json\n3eeed1710e9fb94c8f4063884c35148c6210a8380a642fcb3efed1d4399b0d1d  source-map.json\n"
+    },
+    "exclusive_marker": {
+      "source": {
+        "external_path": "/private/tmp/tests-update-stdout-short-path-20261023/execution-start.json",
+        "bytes": 248,
+        "sha256": "42e097d715ac8673aea6cd10576169dd900e1a37244bbd0c51c447333360ac47"
+      },
+      "value": {
+        "started_at": "2026-10-23T14:45:04.977320+00:00",
+        "prepared_sha256": "ce2fe5e2e1a57779830f614b55e74dad4053bbd4fb1c81414bfbbb6ca6671673",
+        "plan": "Two original observations only at the corrected external cap; no completed controls repeat"
+      }
+    }
+  }
+]

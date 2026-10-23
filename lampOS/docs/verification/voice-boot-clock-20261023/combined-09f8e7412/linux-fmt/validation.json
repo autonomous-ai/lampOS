@@ -1,0 +1,71 @@
+{
+  "status": "passed",
+  "checks": {
+    "json": [
+      "commands.json",
+      "external-raw-index.json",
+      "image-provenance.json",
+      "raw-streams.json",
+      "source-and-result.json"
+    ],
+    "whitespace": [
+      {
+        "file": "README.md",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "file": "commands.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "file": "external-raw-index.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "file": "image-provenance.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "file": "raw-streams.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      },
+      {
+        "file": "source-and-result.json",
+        "exit": 1,
+        "diagnostic_bytes": 0
+      }
+    ],
+    "links": [
+      "source-and-result.json",
+      "commands.json",
+      "raw-streams.json",
+      "image-provenance.json",
+      "external-raw-index.json",
+      "validation.json",
+      "manifest.json"
+    ],
+    "raw_wrappers": [
+      "source-identity/stdout",
+      "source-identity/stderr",
+      "workspace-tree/stdout",
+      "workspace-tree/stderr",
+      "image-inspect/stderr",
+      "archive/stdout",
+      "archive/stderr",
+      "archive-commit/stdout",
+      "archive-commit/stderr",
+      "format/stdout",
+      "format/stderr",
+      "final-source-identity/stdout",
+      "final-source-identity/stderr"
+    ]
+  },
+  "all_raw_manifest_hashes_valid": true,
+  "sealing_source_target_container_access": false,
+  "no_index_note": "Exit 1 with zero diagnostics is the ordinary new-file difference, not a whitespace error."
+}

@@ -1,5 +1,37 @@
 # Tests work log
 
+## 2026-10-23 22:00 +0700 — Update diagnostic complete and combined Linux formatting
+
+Ready for lamp-voice: no; historical failed qualifications remain unwaived.
+
+The [bounded Update stdout receipt](verification/phone-news-start-20261023/update-stdout-8e3eaa6c2/)
+retains four attempts separately. The missing-PATH launch and long-socket-path
+preflight each ran zero tests. The corrected first launch validated three
+controls, then aborted one original at the separate ten-second runner limit
+(exit -15 with owned-process cleanup and no assertion outcome). That remains
+an additional failed execution. The final, separately frozen 120-second
+continuation passed both originals in 13.933992 and 26.804467 seconds using
+the unchanged retained diagnostic executable. No control was repeated.
+
+The available-output and live-empty pipe controls both return without EOF;
+the forced-parent control still fails the original two-second assertion after
+recording actual successful child exit and its output. Normal original passes
+do not reach that diagnostic and do not establish the historical cause.
+All 32 diagnostic lines are test-only insertions; all original source lines,
+scripts, assertions, limits and cleanup remain. This is historical 8e3eaa6c2
+source, not a current-base or full-suite qualification. Root verified thirteen
+payloads, 46 raw slices, four complete result objects, 71 frozen input entries
+and exact original-line preservation.
+
+The [combined clock/peer Linux formatting](verification/voice-boot-clock-20261023/combined-09f8e7412/linux-fmt/)
+passed once on 4e8ea747cd plus the two frozen peer overlays, parent 09f8e7412.
+All 6,709 lampOS source entries remain bound. Root verified seven payloads and
+thirteen complete raw streams. The cached rootless Linux x86 check compiled
+nothing and used no shared target, ARM build or device. Its 15.908472 seconds
+includes extraction and hashing. The separate combined native gate has passed
+formatting and strict 12-package Clippy; full Voice and eleven readers remain
+in progress, with no result claimed before terminal completion.
+
 ## 2026-10-23 21:46 +0700 — Expression PR and terminal CI bound
 
 Ready for lamp-voice: no; #3273 remains draft/HOLD.
