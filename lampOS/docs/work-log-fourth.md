@@ -7698,3 +7698,45 @@ AGENTS.md includes the current Queue and one-build-apart rules. Read
 Queue and own PR comments through 09:14:23 and answered on #3064 and #3126.
 Name/Photo publication still waits for merged Common. The separate Peek
 subscriber grant and Photo removal-state decisions are with First.
+
+## 2026-10-23 10:00 +07: Common train-28 carry and Peek Linux access gate
+
+Common's actual one-pick carry is resolved onto `70cbefcee`, with exactly
+27 staged paths, tree `425724348`. The source-only review retained the
+actual lease on both context routes, checked the selected person's identity
+before composing history, and bound typed setup names to positive speaker
+proof and the final output guard. Three new privacy regressions and the
+late-recorder constructor regression are included. With scoped context off,
+matching proven name/history may work; private Days-note reads still have no
+lease and remain unavailable. The docs state this limit. Fresh Linux fmt
+passed; strict workspace Clippy and execution gates are underway on frozen
+source. The old published ARM64 pass does not qualify this carry.
+
+Peek's frozen Linux candidate on `b7700b7c2` plus one test-only borrow
+correction passed formatting, strict Voice/Records all-target Clippy,
+10 reader controls (one root-only case ignored there), one rotation control,
+six census controls and all 187 Records tests (two ignored). The root-only
+case then passed separately using the compiled binary, dropped UID and
+separate reader/unrelated groups. All thirteen injected grant failures
+restored modes and groups. Rotation proves retained descriptors separately;
+there is no dropped-UID post-rotation claim. Synthetic setup measured
+1.670 ms first and 0.715 ms repeated, excluding actual group lookup and
+hardware. All frozen source hashes matched. Receipts, commands, binary
+hash and retained first Clippy failure are under
+`/private/tmp/fourth-peek-linux-checks-20261023/attempt2/`.
+
+Five old-Records-binary controls passed on the Mac: the added field leaves
+private inventory/fingerprint unchanged, while shared roots are refused
+before inventory. All 27 fixture nodes were unchanged. The expected private
+case exit is the existing Linux live-session guard, not a retention run.
+The full Mac affected suite remains active and has reported two Voice
+coordinator failures. Their test bodies and directly exercised path are
+byte-identical across the frozen base, Peek and train 28; the panic details
+are not available yet, so no cause or harmlessness is asserted. The reviewed
+14-path train-28 carry waits for this frozen target to finish.
+
+Queue and own PR comments were read through 09:52:50. The new Linux result
+and next work are on #2789 and #3126. Name and Photo still need merged Common
+before their current-main gates. First owns the Common configuration/lamp
+choice, Peek subscriber boundary and Photo removal-state decision. No lamp,
+service account, product default or quality score changed.
