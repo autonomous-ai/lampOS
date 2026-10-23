@@ -932,6 +932,8 @@ once that backchannels aren't held, and nothing changes. On lamp-52e6 on 22 Octo
 - **Anything else commits at once.** Empty words are no words (below), on
   both modes: on lamp-52e6 on 23 October "a yield's words came: 0 words"
   committed a turn; the journal now says "held as a yield with no words".
+  Words are read as `stop_words` reads them, letters and digits only, so a
+  final of only punctuation ("...") is no words too, on both modes.
 - **No words resume the answer.** A yield whose words never come, by the
   bound or before the yield ends, resumes the reply as a backchannel does:
   no turn, no cut (lamp-52e6 on #3200: 2.3 s into a story a wordless yield,
@@ -981,6 +983,17 @@ once that backchannels aren't held, and nothing changes. On lamp-52e6 on 22 Octo
   switch is on); `stop_words` carries `backchannel`; `duplex_policy` carries
   `backchannel_holds`. The journal says "a yield's words came: 1 word, a
   backchannel: the answer goes on". Counts only, never the words.
+- **Debugging the words** (`LAMP_BACKCHANNEL_DEBUG=on`, off unless set,
+  for debugging only, and only with the holds on): a yield's words of at
+  most two, the backchannel candidates, are journaled with the decision's
+  reason, lower case and without punctuation: `backchannel debug: a
+  yield's words "right": on the list`, or `not on the list`, `leads-only`,
+  `a stop phrase`, `asked as a question`, `no words`, or `on the list, but
+  the lamp asked a question`. Three words or more are never journaled.
+  With `heard-always` each final that decides the yield is told so. It
+  writes up to two words of a person's speech to the journal: not for a
+  home lamp (lamp-52e6 on 23 October: "Right." committed as "1 word, not a
+  stop phrase", and the journal could not say what was heard).
 
 ### Privacy: what goes where
 
