@@ -386,6 +386,18 @@ keeps its own:
 - The runtime directories under `/var/lib` (`lampOS`, the memory's, the
   actions', and the motor and camera locks 0700, the last four the parts'
   account's, `orangepi` on a V1 image).
+- The voice's recorded failure lines (#2943), last, in
+  `/var/lib/lampOS/voice/notices`, the folder the generic voice unit
+  names: the five files `deploy/product/models.json` pins under
+  `/opt/lampOS/voice/notices`, fetched from their release and checked by
+  size and SHA-256 with `lamp-update install`'s own code
+  (`install::place_moved_notices`). Only a missing one is fetched; one there
+  that is not the pinned one is kept and said. This is prepare's only
+  network use. A line that cannot be fetched (no network, the release out of
+  reach) is said and never refuses the update: the voice sighs in its place
+  (failure-notices.md) and the next prepare tries again. Not under
+  `/opt/lampOS`, which the package's packager takes for its own paths, and
+  the package carries no notices.
 
 A missing or doubled device, a `lamp.env` without `--home`, a setting the package
 lacks or a missing account stops it, exit 1, before any of these is written
