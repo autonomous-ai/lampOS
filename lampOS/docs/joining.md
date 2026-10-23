@@ -165,6 +165,20 @@ Only for a builder whose role file names a lamp.
   and back up whatever you stop or replace under
   `~/<name>-backup-<date>/` on the lamp. Nothing of the old software is
   deleted.
+- **Before a test that leans on the product's switches,** see how far the
+  lamp has drifted from them: `tools/switch-drift.sh <lamp>` (read-only)
+  compares the running lamp-voice's `LAMP_*` environment with the
+  `Environment=` lines of `deploy/product/lamp-voice.service` at the lamp's
+  own build (the updater's `installed.commit`), or with another lamp
+  (`--against <lamp2>`), and lists the switches missing, extra and
+  different. A value is printed only when it has a switch's shape (`on`,
+  `off`, a number, or a lower-case word of at most 24 characters,
+  `^(on|off|[0-9]+(\.[0-9]+)?|[a-z][a-z0-9_-]{0,23})$`) and its name is not
+  a secret's (ending `_URL`, `_KEY`, `_TOKEN`, `_SECRET`, `_FILE`, `_PATH`,
+  `_DIR`, `_SOCKET`, or holding `CREDENTIAL`, `PASS`, `PSK`, `KEY_TERMS`);
+  every other value, on either side, is shown only as `<set>` and compared
+  by checksum, so names, passwords and URLs never reach a posted report. lamp-52e6 was once 30 switches
+  off the owner's lamp without anyone knowing.
 - **One program on `/dev/ttyACM0` at a time**: the servo bus has one
   writer. Stop the body (or the old runtime's `hal`) before any script
   reads the servos.
