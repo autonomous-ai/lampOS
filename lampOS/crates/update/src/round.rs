@@ -57,9 +57,9 @@ use std::{
 
 /// This program's own unit, which it never switches.
 pub const OWN_UNIT: &str = "lamp-update.service";
-/// The voice: switched only at a quiet moment, and first.
+/// The voice: its restart boundary must still be quiet.
 pub const VOICE_UNIT: &str = "lamp-voice.service";
-/// The body: switched right after the voice, before the other parts.
+/// The body; its unit declarations determine its restart order.
 pub const BODY_UNIT: &str = "lamp-body.service";
 /// How often the world is looked at while waiting and watching.
 const LOOK_EVERY: Duration = Duration::from_secs(1);
@@ -368,16 +368,6 @@ struct Placing {
 impl Placing {
     fn writes(&self) -> bool {
         product_skills::writes(&self.steps)
-    }
-}
-
-/// The order of a switch: the voice first, at the quiet moment itself;
-/// then the body; then the rest by name. Going back is the reverse.
-fn order(unit: &str) -> (u8, &str) {
-    match unit {
-        VOICE_UNIT => (0, unit),
-        BODY_UNIT => (1, unit),
-        _ => (2, unit),
     }
 }
 
@@ -1871,6 +1861,15 @@ impl Run<'_, '_> {
             if !backs[at].was_active || unrestarted.contains(&backs[at].unit) {
                 continue;
             }
+            if backs[at].unit == VOICE_UNIT {
+                // A prerequisite's restart can take time. Drain speech
+                // queued during it and judge quiet at Voice's own boundary,
+                // before marking it restarted or stopping its old process.
+                self.listen(Duration::ZERO);
+                if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false) {
+                    return self.put_back(state, &build, &backs, None, why, String::new());
+                }
+            }
             backs[at].restarted = true;
             let back = &backs[at];
             if let Err(why) = self.world.systemd.restart(&back.unit) {
@@ -2039,10 +2038,11 @@ impl Run<'_, '_> {
     }
 
     /// The units written back, then those restarted on the new build
-    /// restarted again, in the reverse order of a switch: the voice last,
-    /// and between two turns unless the voice itself is what failed. Then
-    /// watched. Every unit is tried, whatever happens to one, and the parts
-    /// are restarted even when a file could not be put back.
+    /// restarted again in the saved old units' startup dependency order.
+    /// Voice waits for two turns' gap unless it is what failed. Every unit
+    /// is tried, whatever happens to one, and parts are restarted even when
+    /// a file could not be put back. An invalid ordering is refused before
+    /// any restoration write, retaining the journal and its recovery prefix.
     /// With what the first unit found not well said of itself ([`Told`]),
     /// and whether every file is as it was.
     fn restore(
@@ -2050,6 +2050,10 @@ impl Run<'_, '_> {
         backs: &[Back],
         failed: Option<&str>,
     ) -> (Result<(), String>, String, bool) {
+        let again = match self.restore_order(backs) {
+            Ok(again) => again,
+            Err(why) => return (Err(why), String::new(), false),
+        };
         // The product skills' files first, before lamp-skills is started
         // again on the old build.
         let skills = std::mem::take(&mut self.skills_back);
@@ -2063,12 +2067,11 @@ impl Run<'_, '_> {
             }
         };
         troubles.extend(skills.err());
-        let mut again: Vec<&Back> = backs.iter().filter(|back| back.restarted).collect();
-        again.sort_by(|a, b| order(&b.unit).cmp(&order(&a.unit)));
         let mut watches = Vec::new();
         for back in again {
             if back.unit == VOICE_UNIT && failed != Some(VOICE_UNIT) {
                 // A voice that is well is not cut off mid-sentence.
+                self.listen(Duration::ZERO);
                 let within = self.config.quiet_wait;
                 if let Err(why) = self.wait_quiet(BETWEEN_TURNS, within, true) {
                     self.say(&format!("the voice is put back all the same: {why}"));
@@ -2092,6 +2095,35 @@ impl Run<'_, '_> {
         } else {
             (Err(troubles.join("; ")), told, files_back)
         }
+    }
+
+    /// Reconstruct the old startup graph without depending on journal order
+    /// or the channel. Unchanged installed units retain transitive edges;
+    /// exact saved text replaces every changed unit. Already-restored and
+    /// inactive members do not gain a restart merely by being in the graph.
+    fn restore_order<'a>(&self, backs: &'a [Back]) -> Result<Vec<&'a Back>, String> {
+        let mut texts: BTreeMap<String, String> = installed_units(self.config)
+            .map_err(|error| format!("the restoration's unit order cannot be read: {error}"))?
+            .into_iter()
+            .map(|part| (part.unit, part.text))
+            .collect();
+        for back in backs {
+            texts.insert(back.unit.clone(), back.text.clone());
+        }
+        let order = unit::start_order(
+            texts
+                .iter()
+                .map(|(name, text)| (name.as_str(), text.as_str())),
+        )
+        .map_err(|why| format!("the restoration's unit order is refused: {why}"))?;
+        Ok(order
+            .iter()
+            .filter_map(|name| {
+                backs
+                    .iter()
+                    .find(|back| back.restarted && back.unit == *name)
+            })
+            .collect())
     }
 
     /// Step 1: a switch the last run did not finish is put back.
@@ -2750,7 +2782,24 @@ fn plan(
             link,
         });
     }
-    changes.sort_by(|a, b| order(&a.unit).cmp(&order(&b.unit)));
+    // Refuse a graph with no safe order before installing or switching
+    // anything. The old graph must also be usable if this build is put back.
+    let mut texts: BTreeMap<&str, &str> = installed
+        .iter()
+        .map(|part| (part.unit.as_str(), part.text.as_str()))
+        .collect();
+    unit::start_order(texts.iter().map(|(name, text)| (*name, *text)))
+        .map_err(|why| format!("the rollback unit order is refused: {why}"))?;
+    for change in &changes {
+        texts.insert(&change.unit, &change.after);
+    }
+    let order = unit::start_order(texts.iter().map(|(name, text)| (*name, *text)))?;
+    let positions: BTreeMap<&str, usize> = order
+        .iter()
+        .enumerate()
+        .map(|(position, name)| (name.as_str(), position))
+        .collect();
+    changes.sort_by_key(|change| positions[change.unit.as_str()]);
     Ok(changes)
 }
 
