@@ -11,12 +11,13 @@ remain bound separately in the [receipt](verification/updater-release-pair-nativ
 Reviewer's source-after timeline P3 is explicitly qualified there; no new
 execution or reconstructed timestamp is claimed.
 
-Third pushed #3275's Body admission repair `a449e539f`. Second's scoped source
-read finds the original P2 addressed and no new P1/P2; one execution of the
-original refusal regression is in progress. Its first shell setup found no
-Cargo on PATH before execution; that output is retained separately. Third
-needs the train 51 carry before final qualification; Second offered exact-head
-Linux formatting once that head is pushed. No device action.
+#3275 is carried unchanged to `06ae9205f`. Second's Body admission read
+finds the original P2 addressed with no new P1/P2 in the repair. The original
+refusal regression passes **1 / 0 / 0** at prior `a449e539f`, whose 26 PR paths
+and six commits carry unchanged. The initial PATH setup failure ran no test
+and is retained. Exact-current-head Linux formatting passes with 6,709 files
+unchanged and cleanup verified. [Repair read](verification/head-touch-body-pair-reread-20261024/README.md).
+Fresh native gates and First's disposition remain; no device action.
 
 ---
 
