@@ -5,6 +5,20 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 23:54 — Body admission repair under full gate
+
+- Second reproduced a P2 in #3275 `92088b7ea`: Body head-off in a
+  preserved drop-in was admitted beside Voice/Expression head-on. Retained
+  the original test and reproduced **0/1**, then fixed admission and passed
+  **9/0** focused installer controls, including untouched calibration.
+- Body's head switch and effective bus now participate in the bundle check.
+  Its known calibration files are checked conservatively without changing
+  measured poses; legacy head-off stays independent. Six update regressions
+  and complete-bundle fixture changes are included in the full Update run.
+- Full Update and strict Clippy are running; current source hashes are
+  recorded in the [repair receipt](verification/head-touch-body-pair-fix-20261023/README.md).
+  Second will re-read the new head after gates/push. No lamp action.
+
 ## 2026-10-23 23:34 — acceptance trace boundaries checked
 
 - Source-read #3275 `92088b7ea`'s tap, wake and sleep-breath decision,
