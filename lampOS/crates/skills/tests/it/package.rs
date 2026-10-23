@@ -975,35 +975,65 @@ fn ask_helper_while(
     line: &[u8],
     meanwhile: impl FnOnce(&mut std::process::Child),
 ) -> (serde_json::Value, bool, String) {
-    ask_helper_as(skills, line, true, meanwhile)
+    let (answer, ok, journal, _) = ask_helper_as(skills, line, true, |_| {}, meanwhile);
+    (answer, ok, journal)
+}
+
+struct RequestOutcome {
+    write: std::io::Result<()>,
+    half_close: std::io::Result<()>,
+}
+
+/// Reap the exact helper even if a fixture check or callback panics.
+struct HelperChild(std::process::Child);
+
+impl Drop for HelperChild {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
 }
 
 /// [`ask_helper_while`], the peer let through by the helper's test switch
-/// (`package::ANY_ASKER`) only when `any_asker`.
+/// (`package::ANY_ASKER`) only when `any_asker`. The early-refusal control
+/// can observe the child's exit before the request is written.
 fn ask_helper_as(
     skills: &Path,
     line: &[u8],
     any_asker: bool,
+    before_request: impl FnOnce(&mut std::process::Child),
     meanwhile: impl FnOnce(&mut std::process::Child),
-) -> (serde_json::Value, bool, String) {
+) -> (serde_json::Value, bool, String, RequestOutcome) {
     use std::io::{BufRead, Read, Write};
     use std::os::unix::net::UnixStream;
     use std::process::{Command, Stdio};
     let (mut ours, theirs) = UnixStream::pair().unwrap();
-    let mut child = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
-        .args(["asked", "--dir"])
-        .env(package::ANY_ASKER, if any_asker { "on" } else { "" })
-        .arg(skills)
-        .stdin(Stdio::from(std::os::fd::OwnedFd::from(
-            theirs.try_clone().unwrap(),
-        )))
-        .stdout(Stdio::from(std::os::fd::OwnedFd::from(theirs)))
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
-    ours.write_all(line).unwrap();
-    ours.shutdown(std::net::Shutdown::Write).unwrap();
-    meanwhile(&mut child);
+    let mut child = HelperChild(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args(["asked", "--dir"])
+            .env(package::ANY_ASKER, if any_asker { "on" } else { "" })
+            .arg(skills)
+            .stdin(Stdio::from(std::os::fd::OwnedFd::from(
+                theirs.try_clone().unwrap(),
+            )))
+            .stdout(Stdio::from(std::os::fd::OwnedFd::from(theirs)))
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap(),
+    );
+    let child = &mut child.0;
+    before_request(child);
+    let write = ours.write_all(line);
+    if any_asker {
+        // Authorized requests must still be delivered before the callback.
+        write.as_ref().unwrap();
+    }
+    let half_close = ours.shutdown(std::net::Shutdown::Write);
+    if any_asker {
+        half_close.as_ref().unwrap();
+    }
+    let request = RequestOutcome { write, half_close };
+    meanwhile(child);
     let mut answer = String::new();
     std::io::BufReader::new(&ours)
         .read_line(&mut answer)
@@ -1020,6 +1050,7 @@ fn ask_helper_as(
         serde_json::from_str(&answer).unwrap(),
         status.success(),
         journal,
+        request,
     )
 }
 
@@ -1028,17 +1059,76 @@ fn ask_helper_as(
 /// stays (the reviewer's P3 on #2429).
 #[test]
 fn a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed() {
+    check_non_asker_refusal(false);
+}
+
+/// Make the early refusal precede the write, without a scheduling guess.
+#[test]
+fn a_peer_refused_before_its_request_is_written_still_leaves_the_skill_in_place() {
+    check_non_asker_refusal(true);
+}
+
+fn check_non_asker_refusal(after_exit: bool) {
     let dir = tempfile::tempdir().unwrap();
     let skills = dir.path().join("skills");
     fs::create_dir_all(&skills).unwrap();
     tutor(&skills, "1.0.0");
-    let (answer, ok, _) = ask_helper_as(&skills, b"{\"remove\": \"desk-tutor\"}\n", false, |_| {});
+    let (answer, ok, journal, request) = ask_helper_as(
+        &skills,
+        b"{\"remove\": \"desk-tutor\"}\n",
+        false,
+        |child| {
+            if after_exit {
+                wait_for_helper_exit(child);
+            }
+        },
+        |_| {},
+    );
+    // Collect all three product observations before judging the write.
+    let preserved = skills.join("desk-tutor").join("skill.toml").is_file();
     assert!(!ok, "{answer}");
     assert_eq!(
         answer,
         serde_json::json!({"refused": package::NOT_AN_ASKER})
     );
-    assert!(skills.join("desk-tutor").join("skill.toml").is_file());
+    assert!(preserved);
+    let broken_pipe = request
+        .write
+        .as_ref()
+        .is_err_and(|error| error.kind() == std::io::ErrorKind::BrokenPipe);
+    assert!(
+        request.write.is_ok() || broken_pipe,
+        "request write: {:?}; {answer}; {journal}",
+        request.write
+    );
+    assert!(
+        request.half_close.is_ok()
+            || (broken_pipe
+                && request
+                    .half_close
+                    .as_ref()
+                    .is_err_and(|error| error.kind() == std::io::ErrorKind::NotConnected)),
+        "request half-close: {:?}; {answer}; {journal}",
+        request.half_close
+    );
+    if after_exit {
+        assert!(
+            broken_pipe,
+            "the exited helper must refuse the request write"
+        );
+    }
+}
+
+fn wait_for_helper_exit(child: &mut std::process::Child) {
+    use std::time::{Duration, Instant};
+    let started = Instant::now();
+    while child.try_wait().unwrap().is_none() {
+        assert!(
+            started.elapsed() < Duration::from_secs(20),
+            "the helper did not exit before the request write"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
 }
 
 /// While another run holds the skills folder, the helper waits at most

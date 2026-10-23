@@ -1254,6 +1254,10 @@ for it.
   `LAMP_SKILLS_ANY_ASKER=on` in the helper's environment, which no unit
   sets, and the helper says so in the journal each time it lets a peer
   through (`a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed`).
+  The non-asker fixture also waits for the real helper to exit before writing:
+  a `BrokenPipe` still has to accompany the original refusal, failed status
+  and preserved skill. It collects those observations and reaps the child;
+  authorized requests still require their write and half-close to succeed.
 - **It checks each request itself,** whoever connected. Five are taken,
   each exactly one key:
   - `{"remove": NAME}`, a string: it runs `remove` above, which refuses a
