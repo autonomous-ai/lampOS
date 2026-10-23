@@ -4213,12 +4213,14 @@ async fn spoken(
     // end plus `KEEPER_WAIT` (reviewer-three's P2 on #3108). Whether it is
     // armed (the cache cold at its start, or gone cold by the end plus
     // `KEEPER_WAIT`: on lamp-c0a4 the eyes' known file changed mid-line) is
-    // decided there too; armed only mid-line, it keeps only for a face the
-    // eyes saw in view as the line began (their passing id beside the known
-    // file, `LAMP_EYES_SPEAKING=on`): the known file also changes when a
-    // known person walks in (El's P2 on #3108). Without the eyes' view, a
-    // line armed mid-line keeps for nobody. Who was seen speaking it is
-    // checked once the words are in.
+    // decided there too; with the eyes' view (their passing id beside the
+    // known file, `LAMP_EYES_SPEAKING=on`) it keeps only for a face they saw
+    // in view as the line began, cold at its start or not: the known file
+    // also changes when a known person walks in (El's and reviewer-three's
+    // P2s on #3108). Without the eyes' view, a line armed mid-line keeps for
+    // nobody, and one begun cold only for a face named within one refresh
+    // of its start. Who was seen speaking it is checked once the words are
+    // in.
     let late_face = scope
         .as_ref()
         .filter(|scope| scope.may_look_later())
