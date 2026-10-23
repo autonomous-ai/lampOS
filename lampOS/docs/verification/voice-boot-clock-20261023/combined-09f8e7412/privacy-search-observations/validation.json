@@ -1,0 +1,13 @@
+{
+  "raw_run_manifest_verified": true,
+  "all_eight_actual_exit_summaries_valid": true,
+  "complete_compiled_census_equal_all_four_variants": true,
+  "source_and_artifact_guards_passed": true,
+  "owned_children_reaped": true,
+  "source_restored": true,
+  "normal_passes": 4,
+  "forced_original_assertion_failures": 4,
+  "retries": 0,
+  "preparation_failure_retained": true,
+  "no_test_or_source_access_during_packaging": true
+}

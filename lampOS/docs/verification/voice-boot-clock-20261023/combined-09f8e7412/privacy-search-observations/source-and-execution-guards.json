@@ -1,0 +1,550 @@
+{
+  "base-forced_boundaries-freshness.json": {
+    "mtime_ns": 1792774393347827000,
+    "refreshed_tracked_lampOS_inputs": 6709,
+    "bytes_guarded_separately": true
+  },
+  "base-forced_boundaries-source-before.json": {
+    "arm": "base",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "variant": "forced_boundaries",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "da827c4787c387f0c3e02561850c4984d477d64a7af1cb9cce1a05acec7faa2e"
+  },
+  "base-forced_boundaries-source-frozen.json": {
+    "arm": "base",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "variant": "forced_boundaries",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "da827c4787c387f0c3e02561850c4984d477d64a7af1cb9cce1a05acec7faa2e"
+  },
+  "base-initial.json": {
+    "arm": "base",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "variant": null,
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "797a6f78adfab0caa3d832d309a556f9966d21db40ca11fe2f0d0581cb3c4e97"
+  },
+  "base-observation-freshness.json": {
+    "mtime_ns": 1792774275377830000,
+    "refreshed_tracked_lampOS_inputs": 6709,
+    "bytes_guarded_separately": true
+  },
+  "base-observation-source-before.json": {
+    "arm": "base",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "variant": "observation",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "3e16634ca5f0ed04ce7595fb8291f0bd7335ebcbf6e4ef39042e5eb92377a7bc"
+  },
+  "base-observation-source-frozen.json": {
+    "arm": "base",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "variant": "observation",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "3e16634ca5f0ed04ce7595fb8291f0bd7335ebcbf6e4ef39042e5eb92377a7bc"
+  },
+  "base-restored.json": {
+    "arm": "base",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "variant": null,
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "797a6f78adfab0caa3d832d309a556f9966d21db40ca11fe2f0d0581cb3c4e97"
+  },
+  "candidate-forced_boundaries-freshness.json": {
+    "mtime_ns": 1792774646326032000,
+    "refreshed_tracked_lampOS_inputs": 6709,
+    "bytes_guarded_separately": true
+  },
+  "candidate-forced_boundaries-source-before.json": {
+    "arm": "candidate",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "variant": "forced_boundaries",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "00acc17fc27f8b3150e497a95993ea590bb92c76f274c2f97d650a4f16287664"
+  },
+  "candidate-forced_boundaries-source-frozen.json": {
+    "arm": "candidate",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "variant": "forced_boundaries",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "00acc17fc27f8b3150e497a95993ea590bb92c76f274c2f97d650a4f16287664"
+  },
+  "candidate-initial.json": {
+    "arm": "candidate",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "variant": null,
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "c344386244e23e370c523f7ff21b45470e4d8e1848c57cb6fbdb24b927b8b68b"
+  },
+  "candidate-observation-freshness.json": {
+    "mtime_ns": 1792774532561860000,
+    "refreshed_tracked_lampOS_inputs": 6709,
+    "bytes_guarded_separately": true
+  },
+  "candidate-observation-source-before.json": {
+    "arm": "candidate",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "variant": "observation",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "d94fbef87687d07efa8acc2d430fe4d67f948978502628684702b8c410e667c9"
+  },
+  "candidate-observation-source-frozen.json": {
+    "arm": "candidate",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "variant": "observation",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "d94fbef87687d07efa8acc2d430fe4d67f948978502628684702b8c410e667c9"
+  },
+  "candidate-restored.json": {
+    "arm": "candidate",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "variant": null,
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "c344386244e23e370c523f7ff21b45470e4d8e1848c57cb6fbdb24b927b8b68b"
+  },
+  "case-01-after.json": {
+    "arm": "base",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "variant": "observation",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "3e16634ca5f0ed04ce7595fb8291f0bd7335ebcbf6e4ef39042e5eb92377a7bc"
+  },
+  "case-01-before.json": {
+    "arm": "base",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "variant": "observation",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "3e16634ca5f0ed04ce7595fb8291f0bd7335ebcbf6e4ef39042e5eb92377a7bc"
+  },
+  "case-01-freeze.json": {
+    "case": {
+      "ordinal": 1,
+      "source_arm": "base",
+      "variant": "observation",
+      "case": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 60,
+      "expected": "Any complete original pass/failure is an observation; no retry and no waiver."
+    },
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "artifact_sha256": "819b1aba47d927aaa26d2ad64b0b60ae9507b2c8ebe8ac3eef172d51d92815c0",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+      "RUST_BACKTRACE": "1",
+      "RUST_TEST_THREADS": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "CARGO_BUILD_TARGET": null,
+      "RUSTC_WRAPPER": null,
+      "RUSTC_WORKSPACE_WRAPPER": null,
+      "CARGO_TARGET_TMPDIR": null
+    }
+  },
+  "case-02-after.json": {
+    "arm": "base",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "variant": "observation",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "3e16634ca5f0ed04ce7595fb8291f0bd7335ebcbf6e4ef39042e5eb92377a7bc"
+  },
+  "case-02-before.json": {
+    "arm": "base",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "variant": "observation",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "3e16634ca5f0ed04ce7595fb8291f0bd7335ebcbf6e4ef39042e5eb92377a7bc"
+  },
+  "case-02-freeze.json": {
+    "case": {
+      "ordinal": 2,
+      "source_arm": "base",
+      "variant": "observation",
+      "case": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 420,
+      "expected": "Any complete original pass/failure is an observation; no retry and no waiver."
+    },
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "artifact_sha256": "819b1aba47d927aaa26d2ad64b0b60ae9507b2c8ebe8ac3eef172d51d92815c0",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+      "RUST_BACKTRACE": "1",
+      "RUST_TEST_THREADS": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "CARGO_BUILD_TARGET": null,
+      "RUSTC_WRAPPER": null,
+      "RUSTC_WORKSPACE_WRAPPER": null,
+      "CARGO_TARGET_TMPDIR": null
+    }
+  },
+  "case-03-after.json": {
+    "arm": "base",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "variant": "forced_boundaries",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "da827c4787c387f0c3e02561850c4984d477d64a7af1cb9cce1a05acec7faa2e"
+  },
+  "case-03-before.json": {
+    "arm": "base",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "variant": "forced_boundaries",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "da827c4787c387f0c3e02561850c4984d477d64a7af1cb9cce1a05acec7faa2e"
+  },
+  "case-03-freeze.json": {
+    "case": {
+      "ordinal": 3,
+      "source_arm": "base",
+      "variant": "forced_boundaries",
+      "case": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 60,
+      "expected": "Exactly one original retry-exhaustion failure with privacy publisher unavailable, forced prepublication pause records and no malformed setup. Freshness must be assessed from captured stamps; expiry/other errors invalidate the intended boundary attribution."
+    },
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "artifact_sha256": "894281b1b83453fe50be2b5700e910f1ee8eb23599852b590f942f9066ffa3ac",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+      "RUST_BACKTRACE": "1",
+      "RUST_TEST_THREADS": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "CARGO_BUILD_TARGET": null,
+      "RUSTC_WRAPPER": null,
+      "RUSTC_WORKSPACE_WRAPPER": null,
+      "CARGO_TARGET_TMPDIR": null
+    }
+  },
+  "case-04-after.json": {
+    "arm": "base",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "variant": "forced_boundaries",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "da827c4787c387f0c3e02561850c4984d477d64a7af1cb9cce1a05acec7faa2e"
+  },
+  "case-04-before.json": {
+    "arm": "base",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "variant": "forced_boundaries",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "da827c4787c387f0c3e02561850c4984d477d64a7af1cb9cce1a05acec7faa2e"
+  },
+  "case-04-freeze.json": {
+    "case": {
+      "ordinal": 4,
+      "source_arm": "base",
+      "variant": "forced_boundaries",
+      "case": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 420,
+      "expected": "Exactly one original Run::assert_clean failure after forced-host-deadline marker; result must contain scenario host watchdog. Cleanup suffix is recorded as actually observed, not required: the initial waitid probe can already see an exited child. No separate-hang or historical-cause claim."
+    },
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "artifact_sha256": "894281b1b83453fe50be2b5700e910f1ee8eb23599852b590f942f9066ffa3ac",
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+      "RUST_BACKTRACE": "1",
+      "RUST_TEST_THREADS": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "CARGO_BUILD_TARGET": null,
+      "RUSTC_WRAPPER": null,
+      "RUSTC_WORKSPACE_WRAPPER": null,
+      "CARGO_TARGET_TMPDIR": null
+    }
+  },
+  "case-05-after.json": {
+    "arm": "candidate",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "variant": "observation",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "d94fbef87687d07efa8acc2d430fe4d67f948978502628684702b8c410e667c9"
+  },
+  "case-05-before.json": {
+    "arm": "candidate",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "variant": "observation",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "d94fbef87687d07efa8acc2d430fe4d67f948978502628684702b8c410e667c9"
+  },
+  "case-05-freeze.json": {
+    "case": {
+      "ordinal": 5,
+      "source_arm": "candidate",
+      "variant": "observation",
+      "case": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 60,
+      "expected": "Any complete original pass/failure is an observation; no retry and no waiver."
+    },
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "artifact_sha256": "35038df9847d9d3cc93419e7e26adac2e14c749421daa3f0951febd15354df10",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+      "RUST_BACKTRACE": "1",
+      "RUST_TEST_THREADS": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "CARGO_BUILD_TARGET": null,
+      "RUSTC_WRAPPER": null,
+      "RUSTC_WORKSPACE_WRAPPER": null,
+      "CARGO_TARGET_TMPDIR": null
+    }
+  },
+  "case-06-after.json": {
+    "arm": "candidate",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "variant": "observation",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "d94fbef87687d07efa8acc2d430fe4d67f948978502628684702b8c410e667c9"
+  },
+  "case-06-before.json": {
+    "arm": "candidate",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "variant": "observation",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "d94fbef87687d07efa8acc2d430fe4d67f948978502628684702b8c410e667c9"
+  },
+  "case-06-freeze.json": {
+    "case": {
+      "ordinal": 6,
+      "source_arm": "candidate",
+      "variant": "observation",
+      "case": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 420,
+      "expected": "Any complete original pass/failure is an observation; no retry and no waiver."
+    },
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "artifact_sha256": "35038df9847d9d3cc93419e7e26adac2e14c749421daa3f0951febd15354df10",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+      "RUST_BACKTRACE": "1",
+      "RUST_TEST_THREADS": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "CARGO_BUILD_TARGET": null,
+      "RUSTC_WRAPPER": null,
+      "RUSTC_WORKSPACE_WRAPPER": null,
+      "CARGO_TARGET_TMPDIR": null
+    }
+  },
+  "case-07-after.json": {
+    "arm": "candidate",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "variant": "forced_boundaries",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "00acc17fc27f8b3150e497a95993ea590bb92c76f274c2f97d650a4f16287664"
+  },
+  "case-07-before.json": {
+    "arm": "candidate",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "variant": "forced_boundaries",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "00acc17fc27f8b3150e497a95993ea590bb92c76f274c2f97d650a4f16287664"
+  },
+  "case-07-freeze.json": {
+    "case": {
+      "ordinal": 7,
+      "source_arm": "candidate",
+      "variant": "forced_boundaries",
+      "case": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 60,
+      "expected": "Exactly one original retry-exhaustion failure with privacy publisher unavailable, forced prepublication pause records and no malformed setup. Freshness must be assessed from captured stamps; expiry/other errors invalidate the intended boundary attribution."
+    },
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "artifact_sha256": "af0f43092ed8ed87a6ad7b9017ed689de6dd72c2e45c54fa58892cb79b6b4537",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+      "RUST_BACKTRACE": "1",
+      "RUST_TEST_THREADS": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "CARGO_BUILD_TARGET": null,
+      "RUSTC_WRAPPER": null,
+      "RUSTC_WORKSPACE_WRAPPER": null,
+      "CARGO_TARGET_TMPDIR": null
+    }
+  },
+  "case-08-after.json": {
+    "arm": "candidate",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "variant": "forced_boundaries",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "00acc17fc27f8b3150e497a95993ea590bb92c76f274c2f97d650a4f16287664"
+  },
+  "case-08-before.json": {
+    "arm": "candidate",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "variant": "forced_boundaries",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "00acc17fc27f8b3150e497a95993ea590bb92c76f274c2f97d650a4f16287664"
+  },
+  "case-08-freeze.json": {
+    "case": {
+      "ordinal": 8,
+      "source_arm": "candidate",
+      "variant": "forced_boundaries",
+      "case": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 420,
+      "expected": "Exactly one original Run::assert_clean failure after forced-host-deadline marker; result must contain scenario host watchdog. Cleanup suffix is recorded as actually observed, not required: the initial waitid probe can already see an exited child. No separate-hang or historical-cause claim."
+    },
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "artifact_sha256": "af0f43092ed8ed87a6ad7b9017ed689de6dd72c2e45c54fa58892cb79b6b4537",
+    "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+    "environment": {
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+      "RUST_BACKTRACE": "1",
+      "RUST_TEST_THREADS": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "CARGO_BUILD_TARGET": null,
+      "RUSTC_WRAPPER": null,
+      "RUSTC_WORKSPACE_WRAPPER": null,
+      "CARGO_TARGET_TMPDIR": null
+    }
+  }
+}

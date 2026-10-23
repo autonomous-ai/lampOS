@@ -1,5 +1,32 @@
 # Tests work log
 
+## 2026-10-24 00:01 +0700 — fixed privacy/search comparison complete
+
+Ready for lamp-voice: no; #3190's original local gate remains held.
+
+The [accepted fixed comparison](verification/voice-boot-clock-20261023/combined-09f8e7412/privacy-search-observations/)
+completed eight observations and four compilations once. Normal privacy and
+search passed on both 09f8e7412 and the original combined 72a62a51c source;
+the four forced controls failed their original assertions with actual exit 101.
+Controller exit zero records validated observations, not eight passing tests.
+No invalid, unrun, timeout or retry occurred. Both source trees restored exact
+bytes/modes, artifact/source guards passed and owned children were reaped.
+
+Forced privacy returned unavailable despite lease 2 remaining fresh at read end:
+591–2,085 us on base and 606–1,325 us on combined source, below 50,000 us.
+Late and SourceGone remain undistinguished. Forced search failed its original
+host watchdog after fixture push publication; coordinator consumption was not
+observed. Both recorded one probe per five distinct child PIDs using an expired
+scope deadline despite a remaining cleanup budget. This is no hung-child proof.
+
+Root verified twelve payloads, 138 complete raw streams, all eight outcomes,
+freshness calculations, distinct child probes, four compiled inventories and
+restoration guards. The initial prepare-only path-check error and correction
+are retained separately, with zero test execution in either preparation.
+These isolated controls establish reachable boundaries, not the original full
+parallel failure's cause. Reviewer-two owns evidence disposition; First owns
+any product-scope change. No extra experiment or gate waiver is proposed here.
+
 ## 2026-10-23 23:46 +0700 — Skills early-refusal repair ready
 
 Ready for lamp-voice: yes (#3277).

@@ -1,0 +1,2740 @@
+[
+  {
+    "name": "base-initial-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:51:11.129314+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 41055,
+    "sampled_process_group": 41055,
+    "finished_utc": "2026-10-23T16:51:11.178731+00:00",
+    "elapsed_seconds": 0.0494607207365334,
+    "stdout": {
+      "path": "base-initial-head.stdout",
+      "bytes": 41,
+      "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+    },
+    "stderr": {
+      "path": "base-initial-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-initial-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-base-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:51:11.179799+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 41057,
+    "sampled_process_group": 41057,
+    "finished_utc": "2026-10-23T16:51:11.226692+00:00",
+    "elapsed_seconds": 0.04694289714097977,
+    "stdout": {
+      "path": "base-initial-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "base-initial-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-initial-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:51:12.477134+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 41133,
+    "sampled_process_group": 41133,
+    "finished_utc": "2026-10-23T16:51:12.528867+00:00",
+    "elapsed_seconds": 0.051779885310679674,
+    "stdout": {
+      "path": "candidate-initial-head.stdout",
+      "bytes": 41,
+      "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+    },
+    "stderr": {
+      "path": "candidate-initial-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-initial-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-combined-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:51:12.530092+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 41135,
+    "sampled_process_group": 41135,
+    "finished_utc": "2026-10-23T16:51:12.577421+00:00",
+    "elapsed_seconds": 0.04736580094322562,
+    "stdout": {
+      "path": "candidate-initial-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "candidate-initial-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "rustc",
+    "command": [
+      "rustc",
+      "-vV"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:51:13.783481+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 41167,
+    "sampled_process_group": 41167,
+    "finished_utc": "2026-10-23T16:51:14.099256+00:00",
+    "elapsed_seconds": 0.31583157321438193,
+    "stdout": {
+      "path": "rustc.stdout",
+      "bytes": 191,
+      "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+    },
+    "stderr": {
+      "path": "rustc.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-observation-source-before-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:51:14.102022+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 41168,
+    "sampled_process_group": 41168,
+    "finished_utc": "2026-10-23T16:51:14.145543+00:00",
+    "elapsed_seconds": 0.043581607285887,
+    "stdout": {
+      "path": "base-observation-source-before-head.stdout",
+      "bytes": 41,
+      "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+    },
+    "stderr": {
+      "path": "base-observation-source-before-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-observation-source-before-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-base-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:51:14.147840+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 41169,
+    "sampled_process_group": 41169,
+    "finished_utc": "2026-10-23T16:51:14.197593+00:00",
+    "elapsed_seconds": 0.049833204597234726,
+    "stdout": {
+      "path": "base-observation-source-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "base-observation-source-before-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-observation-compile",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--no-run",
+      "--message-format=json-render-diagnostics"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:51:15.632975+00:00",
+    "timeout_seconds": 1200,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 41184,
+    "sampled_process_group": 41184,
+    "finished_utc": "2026-10-23T16:52:57.780735+00:00",
+    "elapsed_seconds": 102.14992462098598,
+    "stdout": {
+      "path": "base-observation-compile.stdout",
+      "bytes": 249412,
+      "sha256": "e0fa8f66b930bb62e141113c276ae6b03f0d3fdd26b6a1ad03d4769994f71f30"
+    },
+    "stderr": {
+      "path": "base-observation-compile.stderr",
+      "bytes": 2821,
+      "sha256": "9638278a1d2218fb5b69eaa0ded38736ccc2b26f405db3079989ba2f6f9ccdd1"
+    }
+  },
+  {
+    "name": "base-observation-file",
+    "command": [
+      "file",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:52:57.989634+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50284,
+    "sampled_process_group": 50284,
+    "finished_utc": "2026-10-23T16:52:58.005318+00:00",
+    "elapsed_seconds": 0.015747759025543928,
+    "stdout": {
+      "path": "base-observation-file.stdout",
+      "bytes": 109,
+      "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4"
+    },
+    "stderr": {
+      "path": "base-observation-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-observation-architecture",
+    "command": [
+      "lipo",
+      "-archs",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:52:58.006514+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50285,
+    "sampled_process_group": 50285,
+    "finished_utc": "2026-10-23T16:52:58.093678+00:00",
+    "elapsed_seconds": 0.08720905613154173,
+    "stdout": {
+      "path": "base-observation-architecture.stdout",
+      "bytes": 7,
+      "sha256": "aaf631698ae5160ceb04a97681a14887fdcab47cd6e0f163c87485b3b1340b62"
+    },
+    "stderr": {
+      "path": "base-observation-architecture.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-observation-list-names",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list",
+      "--format",
+      "terse"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:52:58.095653+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50286,
+    "sampled_process_group": 50286,
+    "finished_utc": "2026-10-23T16:53:00.205600+00:00",
+    "elapsed_seconds": 2.1100441170856357,
+    "stdout": {
+      "path": "base-observation-list-names.stdout",
+      "bytes": 340576,
+      "sha256": "b37e82a6580250cecc4fdd2b397f58fca43c0e6c394eaf460c6de94daa3d8d79"
+    },
+    "stderr": {
+      "path": "base-observation-list-names.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-observation-list-ignored",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list",
+      "--format",
+      "terse",
+      "--ignored"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:00.210163+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50306,
+    "sampled_process_group": 50306,
+    "finished_utc": "2026-10-23T16:53:00.241343+00:00",
+    "elapsed_seconds": 0.031246965751051903,
+    "stdout": {
+      "path": "base-observation-list-ignored.stdout",
+      "bytes": 1015,
+      "sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf"
+    },
+    "stderr": {
+      "path": "base-observation-list-ignored.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-observation-source-frozen-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:00.450365+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50307,
+    "sampled_process_group": 50307,
+    "finished_utc": "2026-10-23T16:53:00.495825+00:00",
+    "elapsed_seconds": 0.04550951812416315,
+    "stdout": {
+      "path": "base-observation-source-frozen-head.stdout",
+      "bytes": 41,
+      "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+    },
+    "stderr": {
+      "path": "base-observation-source-frozen-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-observation-source-frozen-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-base-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:00.497763+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50308,
+    "sampled_process_group": 50308,
+    "finished_utc": "2026-10-23T16:53:00.546659+00:00",
+    "elapsed_seconds": 0.04893729602918029,
+    "stdout": {
+      "path": "base-observation-source-frozen-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "base-observation-source-frozen-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-01-before-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:03.306012+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50393,
+    "sampled_process_group": 50393,
+    "finished_utc": "2026-10-23T16:53:03.349923+00:00",
+    "elapsed_seconds": 0.04395755333825946,
+    "stdout": {
+      "path": "case-01-before-head.stdout",
+      "bytes": 41,
+      "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+    },
+    "stderr": {
+      "path": "case-01-before-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-01-before-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-base-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:03.351514+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50394,
+    "sampled_process_group": 50394,
+    "finished_utc": "2026-10-23T16:53:03.400372+00:00",
+    "elapsed_seconds": 0.04890094185248017,
+    "stdout": {
+      "path": "case-01-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-01-before-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-01",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:04.744567+00:00",
+    "timeout_seconds": 60,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50406,
+    "sampled_process_group": 50406,
+    "finished_utc": "2026-10-23T16:53:04.810881+00:00",
+    "elapsed_seconds": 0.06636012811213732,
+    "stdout": {
+      "path": "case-01.stdout",
+      "bytes": 238,
+      "sha256": "56834d7e3ba51153857ada60efb2da7b1b1ad08d6385b04609c0aa9ecd318f04"
+    },
+    "stderr": {
+      "path": "case-01.stderr",
+      "bytes": 2391,
+      "sha256": "3bd2ba34f658217374c9ce15fb5cfa187fa7975b53bb8d549b99544b6bf2ba02"
+    }
+  },
+  {
+    "name": "case-01-after-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:05.016461+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50407,
+    "sampled_process_group": 50407,
+    "finished_utc": "2026-10-23T16:53:05.066049+00:00",
+    "elapsed_seconds": 0.04964775498956442,
+    "stdout": {
+      "path": "case-01-after-head.stdout",
+      "bytes": 41,
+      "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+    },
+    "stderr": {
+      "path": "case-01-after-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-01-after-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-base-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:05.067185+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50408,
+    "sampled_process_group": 50408,
+    "finished_utc": "2026-10-23T16:53:05.117689+00:00",
+    "elapsed_seconds": 0.05054693575948477,
+    "stdout": {
+      "path": "case-01-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-01-after-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-02-before-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:06.353366+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50435,
+    "sampled_process_group": 50435,
+    "finished_utc": "2026-10-23T16:53:06.403172+00:00",
+    "elapsed_seconds": 0.049865528009831905,
+    "stdout": {
+      "path": "case-02-before-head.stdout",
+      "bytes": 41,
+      "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+    },
+    "stderr": {
+      "path": "case-02-before-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-02-before-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-base-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:06.405490+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50436,
+    "sampled_process_group": 50436,
+    "finished_utc": "2026-10-23T16:53:06.457826+00:00",
+    "elapsed_seconds": 0.05239084176719189,
+    "stdout": {
+      "path": "case-02-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-02-before-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-02",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:07.826162+00:00",
+    "timeout_seconds": 420,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50523,
+    "sampled_process_group": 50523,
+    "finished_utc": "2026-10-23T16:53:10.539922+00:00",
+    "elapsed_seconds": 2.7138793519698083,
+    "stdout": {
+      "path": "case-02.stdout",
+      "bytes": 291,
+      "sha256": "84ff3d31e0e38d597722a331be444910b9c6c6319763d494b0830cc27c1c76aa"
+    },
+    "stderr": {
+      "path": "case-02.stderr",
+      "bytes": 6904,
+      "sha256": "89975691b717b74a3bb0df5cf38c5cdc4146227dba9a0904766d2844b1bf5768"
+    }
+  },
+  {
+    "name": "case-02-after-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:10.758199+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50747,
+    "sampled_process_group": 50747,
+    "finished_utc": "2026-10-23T16:53:10.806829+00:00",
+    "elapsed_seconds": 0.04868360096588731,
+    "stdout": {
+      "path": "case-02-after-head.stdout",
+      "bytes": 41,
+      "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+    },
+    "stderr": {
+      "path": "case-02-after-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-02-after-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-base-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:10.808019+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50759,
+    "sampled_process_group": 50759,
+    "finished_utc": "2026-10-23T16:53:10.857648+00:00",
+    "elapsed_seconds": 0.04966618586331606,
+    "stdout": {
+      "path": "case-02-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-02-after-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-forced_boundaries-source-before-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:12.116687+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50830,
+    "sampled_process_group": 50830,
+    "finished_utc": "2026-10-23T16:53:12.161355+00:00",
+    "elapsed_seconds": 0.044723170809447765,
+    "stdout": {
+      "path": "base-forced_boundaries-source-before-head.stdout",
+      "bytes": 41,
+      "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+    },
+    "stderr": {
+      "path": "base-forced_boundaries-source-before-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-forced_boundaries-source-before-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-base-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:12.163223+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50831,
+    "sampled_process_group": 50831,
+    "finished_utc": "2026-10-23T16:53:12.215124+00:00",
+    "elapsed_seconds": 0.05194329097867012,
+    "stdout": {
+      "path": "base-forced_boundaries-source-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "base-forced_boundaries-source-before-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-forced_boundaries-compile",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--no-run",
+      "--message-format=json-render-diagnostics"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:53:13.541581+00:00",
+    "timeout_seconds": 1200,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 50861,
+    "sampled_process_group": 50861,
+    "finished_utc": "2026-10-23T16:54:53.237222+00:00",
+    "elapsed_seconds": 99.69774983683601,
+    "stdout": {
+      "path": "base-forced_boundaries-compile.stdout",
+      "bytes": 249412,
+      "sha256": "2b6744f9fe5ac387060248a6ce9b6332b6b595b96620125008cf410693cc5735"
+    },
+    "stderr": {
+      "path": "base-forced_boundaries-compile.stderr",
+      "bytes": 2821,
+      "sha256": "96f98bf92a18a77b58a7d4fbcdd22eb716a014a22f4fa81c0c18173f348edd34"
+    }
+  },
+  {
+    "name": "base-forced_boundaries-file",
+    "command": [
+      "file",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:54:53.447196+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 56761,
+    "sampled_process_group": 56761,
+    "finished_utc": "2026-10-23T16:54:53.462094+00:00",
+    "elapsed_seconds": 0.014958687126636505,
+    "stdout": {
+      "path": "base-forced_boundaries-file.stdout",
+      "bytes": 109,
+      "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4"
+    },
+    "stderr": {
+      "path": "base-forced_boundaries-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-forced_boundaries-architecture",
+    "command": [
+      "lipo",
+      "-archs",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:54:53.463417+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 56762,
+    "sampled_process_group": 56762,
+    "finished_utc": "2026-10-23T16:54:53.513668+00:00",
+    "elapsed_seconds": 0.05029690684750676,
+    "stdout": {
+      "path": "base-forced_boundaries-architecture.stdout",
+      "bytes": 7,
+      "sha256": "aaf631698ae5160ceb04a97681a14887fdcab47cd6e0f163c87485b3b1340b62"
+    },
+    "stderr": {
+      "path": "base-forced_boundaries-architecture.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-forced_boundaries-list-names",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list",
+      "--format",
+      "terse"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:54:53.515515+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 56763,
+    "sampled_process_group": 56763,
+    "finished_utc": "2026-10-23T16:54:55.594578+00:00",
+    "elapsed_seconds": 2.0791682358831167,
+    "stdout": {
+      "path": "base-forced_boundaries-list-names.stdout",
+      "bytes": 340576,
+      "sha256": "b37e82a6580250cecc4fdd2b397f58fca43c0e6c394eaf460c6de94daa3d8d79"
+    },
+    "stderr": {
+      "path": "base-forced_boundaries-list-names.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-forced_boundaries-list-ignored",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list",
+      "--format",
+      "terse",
+      "--ignored"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:54:55.599559+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 56780,
+    "sampled_process_group": 56780,
+    "finished_utc": "2026-10-23T16:54:55.638379+00:00",
+    "elapsed_seconds": 0.03886342514306307,
+    "stdout": {
+      "path": "base-forced_boundaries-list-ignored.stdout",
+      "bytes": 1015,
+      "sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf"
+    },
+    "stderr": {
+      "path": "base-forced_boundaries-list-ignored.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-forced_boundaries-source-frozen-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:54:55.848554+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 56798,
+    "sampled_process_group": 56798,
+    "finished_utc": "2026-10-23T16:54:55.898624+00:00",
+    "elapsed_seconds": 0.05011632898822427,
+    "stdout": {
+      "path": "base-forced_boundaries-source-frozen-head.stdout",
+      "bytes": 41,
+      "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+    },
+    "stderr": {
+      "path": "base-forced_boundaries-source-frozen-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-forced_boundaries-source-frozen-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-base-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:54:55.900305+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 56799,
+    "sampled_process_group": 56799,
+    "finished_utc": "2026-10-23T16:54:55.955446+00:00",
+    "elapsed_seconds": 0.055199672002345324,
+    "stdout": {
+      "path": "base-forced_boundaries-source-frozen-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "base-forced_boundaries-source-frozen-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-03-before-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:54:58.758989+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 56873,
+    "sampled_process_group": 56873,
+    "finished_utc": "2026-10-23T16:54:58.813483+00:00",
+    "elapsed_seconds": 0.05454164603725076,
+    "stdout": {
+      "path": "case-03-before-head.stdout",
+      "bytes": 41,
+      "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+    },
+    "stderr": {
+      "path": "case-03-before-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-03-before-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-base-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:54:58.815305+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 56874,
+    "sampled_process_group": 56874,
+    "finished_utc": "2026-10-23T16:54:58.869741+00:00",
+    "elapsed_seconds": 0.05447784531861544,
+    "stdout": {
+      "path": "case-03-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-03-before-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-03",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:55:00.206051+00:00",
+    "timeout_seconds": 60,
+    "timed_out": false,
+    "exit_code": 101,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 56885,
+    "sampled_process_group": 56885,
+    "finished_utc": "2026-10-23T16:55:00.710528+00:00",
+    "elapsed_seconds": 0.5045332689769566,
+    "stdout": {
+      "path": "case-03.stdout",
+      "bytes": 383,
+      "sha256": "8ab82d7f693ea4c3cbdccd4f4087ec39bcc304dc5071974afe4cf563f6bbcd91"
+    },
+    "stderr": {
+      "path": "case-03.stderr",
+      "bytes": 9143,
+      "sha256": "63c0b838e417d988c8374c63e99f06d10abc02b2093e55e8d81170018d826ef7"
+    }
+  },
+  {
+    "name": "case-03-after-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:55:00.920345+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 56895,
+    "sampled_process_group": 56895,
+    "finished_utc": "2026-10-23T16:55:00.972026+00:00",
+    "elapsed_seconds": 0.05175041873008013,
+    "stdout": {
+      "path": "case-03-after-head.stdout",
+      "bytes": 41,
+      "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+    },
+    "stderr": {
+      "path": "case-03-after-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-03-after-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-base-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:55:00.975319+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 56896,
+    "sampled_process_group": 56896,
+    "finished_utc": "2026-10-23T16:55:01.028801+00:00",
+    "elapsed_seconds": 0.05352412024512887,
+    "stdout": {
+      "path": "case-03-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-03-after-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-04-before-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:55:02.261988+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 56923,
+    "sampled_process_group": 56923,
+    "finished_utc": "2026-10-23T16:55:02.314563+00:00",
+    "elapsed_seconds": 0.05262033874168992,
+    "stdout": {
+      "path": "case-04-before-head.stdout",
+      "bytes": 41,
+      "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+    },
+    "stderr": {
+      "path": "case-04-before-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-04-before-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-base-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:55:02.317127+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 56924,
+    "sampled_process_group": 56924,
+    "finished_utc": "2026-10-23T16:55:02.364952+00:00",
+    "elapsed_seconds": 0.047874473966658115,
+    "stdout": {
+      "path": "case-04-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-04-before-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-04",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:55:03.732562+00:00",
+    "timeout_seconds": 420,
+    "timed_out": false,
+    "exit_code": 101,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 56972,
+    "sampled_process_group": 56972,
+    "finished_utc": "2026-10-23T16:55:27.897374+00:00",
+    "elapsed_seconds": 24.165375201031566,
+    "stdout": {
+      "path": "case-04.stdout",
+      "bytes": 358,
+      "sha256": "8cdb6c5996def158d4602d4599562b3c269c057c4924932f0892624d6547321a"
+    },
+    "stderr": {
+      "path": "case-04.stderr",
+      "bytes": 6060,
+      "sha256": "cbbd63b48b23898e6b3b867b4096cd1fdd70afd3c8abe1774f6beb7d17ab8650"
+    }
+  },
+  {
+    "name": "case-04-after-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:55:28.102600+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 57859,
+    "sampled_process_group": 57859,
+    "finished_utc": "2026-10-23T16:55:28.134787+00:00",
+    "elapsed_seconds": 0.032238862942904234,
+    "stdout": {
+      "path": "case-04-after-head.stdout",
+      "bytes": 41,
+      "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+    },
+    "stderr": {
+      "path": "case-04-after-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-04-after-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-base-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:55:28.137172+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 57860,
+    "sampled_process_group": 57860,
+    "finished_utc": "2026-10-23T16:55:28.189123+00:00",
+    "elapsed_seconds": 0.05200190981850028,
+    "stdout": {
+      "path": "case-04-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-04-after-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-observation-source-before-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:55:29.408951+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 57871,
+    "sampled_process_group": 57871,
+    "finished_utc": "2026-10-23T16:55:29.464235+00:00",
+    "elapsed_seconds": 0.05534515716135502,
+    "stdout": {
+      "path": "candidate-observation-source-before-head.stdout",
+      "bytes": 41,
+      "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+    },
+    "stderr": {
+      "path": "candidate-observation-source-before-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-observation-source-before-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-combined-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:55:29.466955+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 57872,
+    "sampled_process_group": 57872,
+    "finished_utc": "2026-10-23T16:55:29.519683+00:00",
+    "elapsed_seconds": 0.05277440696954727,
+    "stdout": {
+      "path": "candidate-observation-source-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "candidate-observation-source-before-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-observation-compile",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--no-run",
+      "--message-format=json-render-diagnostics"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:55:32.784423+00:00",
+    "timeout_seconds": 1200,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 57963,
+    "sampled_process_group": 57963,
+    "finished_utc": "2026-10-23T16:57:10.249556+00:00",
+    "elapsed_seconds": 97.46721528097987,
+    "stdout": {
+      "path": "candidate-observation-compile.stdout",
+      "bytes": 249728,
+      "sha256": "d3ab553a987bf803be2eba93d6fe09ca0bed7c91047e4c0f6e005e1ea8e5449e"
+    },
+    "stderr": {
+      "path": "candidate-observation-compile.stderr",
+      "bytes": 2921,
+      "sha256": "f68c5d736ad87c1c7471ac946705b0465a8a17e3f0757ee86109c48eec614606"
+    }
+  },
+  {
+    "name": "candidate-observation-file",
+    "command": [
+      "file",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:10.459385+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 64286,
+    "sampled_process_group": 64286,
+    "finished_utc": "2026-10-23T16:57:10.472373+00:00",
+    "elapsed_seconds": 0.013047371990978718,
+    "stdout": {
+      "path": "candidate-observation-file.stdout",
+      "bytes": 109,
+      "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4"
+    },
+    "stderr": {
+      "path": "candidate-observation-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-observation-architecture",
+    "command": [
+      "lipo",
+      "-archs",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:10.474371+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 64287,
+    "sampled_process_group": 64287,
+    "finished_utc": "2026-10-23T16:57:10.502391+00:00",
+    "elapsed_seconds": 0.028070046100765467,
+    "stdout": {
+      "path": "candidate-observation-architecture.stdout",
+      "bytes": 7,
+      "sha256": "aaf631698ae5160ceb04a97681a14887fdcab47cd6e0f163c87485b3b1340b62"
+    },
+    "stderr": {
+      "path": "candidate-observation-architecture.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-observation-list-names",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list",
+      "--format",
+      "terse"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:10.504621+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 64288,
+    "sampled_process_group": 64288,
+    "finished_utc": "2026-10-23T16:57:12.615470+00:00",
+    "elapsed_seconds": 2.1109368558973074,
+    "stdout": {
+      "path": "candidate-observation-list-names.stdout",
+      "bytes": 340576,
+      "sha256": "b37e82a6580250cecc4fdd2b397f58fca43c0e6c394eaf460c6de94daa3d8d79"
+    },
+    "stderr": {
+      "path": "candidate-observation-list-names.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-observation-list-ignored",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list",
+      "--format",
+      "terse",
+      "--ignored"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:12.619521+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 64321,
+    "sampled_process_group": 64321,
+    "finished_utc": "2026-10-23T16:57:12.660529+00:00",
+    "elapsed_seconds": 0.04105409001931548,
+    "stdout": {
+      "path": "candidate-observation-list-ignored.stdout",
+      "bytes": 1015,
+      "sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf"
+    },
+    "stderr": {
+      "path": "candidate-observation-list-ignored.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-observation-source-frozen-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:12.867637+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 64335,
+    "sampled_process_group": 64335,
+    "finished_utc": "2026-10-23T16:57:12.917726+00:00",
+    "elapsed_seconds": 0.05014079716056585,
+    "stdout": {
+      "path": "candidate-observation-source-frozen-head.stdout",
+      "bytes": 41,
+      "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+    },
+    "stderr": {
+      "path": "candidate-observation-source-frozen-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-observation-source-frozen-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-combined-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:12.920363+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 64337,
+    "sampled_process_group": 64337,
+    "finished_utc": "2026-10-23T16:57:13.018310+00:00",
+    "elapsed_seconds": 0.09798794100061059,
+    "stdout": {
+      "path": "candidate-observation-source-frozen-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "candidate-observation-source-frozen-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-05-before-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:16.234277+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 64377,
+    "sampled_process_group": 64377,
+    "finished_utc": "2026-10-23T16:57:16.287194+00:00",
+    "elapsed_seconds": 0.0529802730306983,
+    "stdout": {
+      "path": "case-05-before-head.stdout",
+      "bytes": 41,
+      "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+    },
+    "stderr": {
+      "path": "case-05-before-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-05-before-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-combined-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:16.290115+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 64378,
+    "sampled_process_group": 64378,
+    "finished_utc": "2026-10-23T16:57:16.343877+00:00",
+    "elapsed_seconds": 0.053804577793926,
+    "stdout": {
+      "path": "case-05-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-05-before-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-05",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:17.679143+00:00",
+    "timeout_seconds": 60,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 64421,
+    "sampled_process_group": 64421,
+    "finished_utc": "2026-10-23T16:57:17.745609+00:00",
+    "elapsed_seconds": 0.06651416653767228,
+    "stdout": {
+      "path": "case-05.stdout",
+      "bytes": 238,
+      "sha256": "56834d7e3ba51153857ada60efb2da7b1b1ad08d6385b04609c0aa9ecd318f04"
+    },
+    "stderr": {
+      "path": "case-05.stderr",
+      "bytes": 2391,
+      "sha256": "6f06ad0cd61f46eff2a3b3ceb7f44771e92597ed7d96aa8fc614cd756b7502ce"
+    }
+  },
+  {
+    "name": "case-05-after-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:17.953801+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 64444,
+    "sampled_process_group": 64444,
+    "finished_utc": "2026-10-23T16:57:18.003228+00:00",
+    "elapsed_seconds": 0.049490819219499826,
+    "stdout": {
+      "path": "case-05-after-head.stdout",
+      "bytes": 41,
+      "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+    },
+    "stderr": {
+      "path": "case-05-after-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-05-after-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-combined-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:18.004945+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 64445,
+    "sampled_process_group": 64445,
+    "finished_utc": "2026-10-23T16:57:18.055850+00:00",
+    "elapsed_seconds": 0.050943932961672544,
+    "stdout": {
+      "path": "case-05-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-05-after-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-06-before-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:19.262668+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 64454,
+    "sampled_process_group": 64454,
+    "finished_utc": "2026-10-23T16:57:19.309070+00:00",
+    "elapsed_seconds": 0.04645144613459706,
+    "stdout": {
+      "path": "case-06-before-head.stdout",
+      "bytes": 41,
+      "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+    },
+    "stderr": {
+      "path": "case-06-before-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-06-before-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-combined-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:19.311749+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 64455,
+    "sampled_process_group": 64455,
+    "finished_utc": "2026-10-23T16:57:19.359915+00:00",
+    "elapsed_seconds": 0.048211473040282726,
+    "stdout": {
+      "path": "case-06-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-06-before-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-06",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:20.682196+00:00",
+    "timeout_seconds": 420,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 64466,
+    "sampled_process_group": 64466,
+    "finished_utc": "2026-10-23T16:57:23.493857+00:00",
+    "elapsed_seconds": 2.8117641187272966,
+    "stdout": {
+      "path": "case-06.stdout",
+      "bytes": 291,
+      "sha256": "26945fb6252cc6f11149f52c13e68a562e29007f745c9e98ef01a7e235eb006a"
+    },
+    "stderr": {
+      "path": "case-06.stderr",
+      "bytes": 6904,
+      "sha256": "19d34bf7cc89f2363a3ba2ffd380933b290faa59d96282a5015eff837c184075"
+    }
+  },
+  {
+    "name": "case-06-after-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:23.704992+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 65133,
+    "sampled_process_group": 65133,
+    "finished_utc": "2026-10-23T16:57:23.759891+00:00",
+    "elapsed_seconds": 0.05497609172016382,
+    "stdout": {
+      "path": "case-06-after-head.stdout",
+      "bytes": 41,
+      "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+    },
+    "stderr": {
+      "path": "case-06-after-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-06-after-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-combined-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:23.761797+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 65169,
+    "sampled_process_group": 65169,
+    "finished_utc": "2026-10-23T16:57:23.814938+00:00",
+    "elapsed_seconds": 0.05317798303440213,
+    "stdout": {
+      "path": "case-06-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-06-after-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-forced_boundaries-source-before-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:25.101000+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 66001,
+    "sampled_process_group": 66001,
+    "finished_utc": "2026-10-23T16:57:25.148639+00:00",
+    "elapsed_seconds": 0.0476790270768106,
+    "stdout": {
+      "path": "candidate-forced_boundaries-source-before-head.stdout",
+      "bytes": 41,
+      "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+    },
+    "stderr": {
+      "path": "candidate-forced_boundaries-source-before-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-forced_boundaries-source-before-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-combined-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:25.150807+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 66014,
+    "sampled_process_group": 66014,
+    "finished_utc": "2026-10-23T16:57:25.206918+00:00",
+    "elapsed_seconds": 0.05614650994539261,
+    "stdout": {
+      "path": "candidate-forced_boundaries-source-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "candidate-forced_boundaries-source-before-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-forced_boundaries-compile",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--no-run",
+      "--message-format=json-render-diagnostics"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:57:26.518377+00:00",
+    "timeout_seconds": 1200,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 66032,
+    "sampled_process_group": 66032,
+    "finished_utc": "2026-10-23T16:59:03.564632+00:00",
+    "elapsed_seconds": 97.04830975225195,
+    "stdout": {
+      "path": "candidate-forced_boundaries-compile.stdout",
+      "bytes": 249728,
+      "sha256": "dd1003fd405443e115017b3d6a1d22642dadeb2a95435e5ac03d4ff47ba25591"
+    },
+    "stderr": {
+      "path": "candidate-forced_boundaries-compile.stderr",
+      "bytes": 2921,
+      "sha256": "4a1e1922f055ffd0979b4b12346c8bd80e353b781ac0cbb5e5167f8c6330138e"
+    }
+  },
+  {
+    "name": "candidate-forced_boundaries-file",
+    "command": [
+      "file",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:03.772841+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 70760,
+    "sampled_process_group": 70760,
+    "finished_utc": "2026-10-23T16:59:03.788660+00:00",
+    "elapsed_seconds": 0.015882345847785473,
+    "stdout": {
+      "path": "candidate-forced_boundaries-file.stdout",
+      "bytes": 109,
+      "sha256": "d15f5dd3ede8bb71010a7ed8d9d5421662c04775d8c72ced7a7cc5b636e373b4"
+    },
+    "stderr": {
+      "path": "candidate-forced_boundaries-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-forced_boundaries-architecture",
+    "command": [
+      "lipo",
+      "-archs",
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:03.791430+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 70762,
+    "sampled_process_group": 70762,
+    "finished_utc": "2026-10-23T16:59:03.840446+00:00",
+    "elapsed_seconds": 0.04906211467459798,
+    "stdout": {
+      "path": "candidate-forced_boundaries-architecture.stdout",
+      "bytes": 7,
+      "sha256": "aaf631698ae5160ceb04a97681a14887fdcab47cd6e0f163c87485b3b1340b62"
+    },
+    "stderr": {
+      "path": "candidate-forced_boundaries-architecture.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-forced_boundaries-list-names",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list",
+      "--format",
+      "terse"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:03.842555+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 70763,
+    "sampled_process_group": 70763,
+    "finished_utc": "2026-10-23T16:59:05.907093+00:00",
+    "elapsed_seconds": 2.0646240427158773,
+    "stdout": {
+      "path": "candidate-forced_boundaries-list-names.stdout",
+      "bytes": 340576,
+      "sha256": "b37e82a6580250cecc4fdd2b397f58fca43c0e6c394eaf460c6de94daa3d8d79"
+    },
+    "stderr": {
+      "path": "candidate-forced_boundaries-list-names.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-forced_boundaries-list-ignored",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--list",
+      "--format",
+      "terse",
+      "--ignored"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:05.911674+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 70893,
+    "sampled_process_group": 70893,
+    "finished_utc": "2026-10-23T16:59:05.946020+00:00",
+    "elapsed_seconds": 0.034388051833957434,
+    "stdout": {
+      "path": "candidate-forced_boundaries-list-ignored.stdout",
+      "bytes": 1015,
+      "sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf"
+    },
+    "stderr": {
+      "path": "candidate-forced_boundaries-list-ignored.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-forced_boundaries-source-frozen-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:06.151307+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 70906,
+    "sampled_process_group": 70906,
+    "finished_utc": "2026-10-23T16:59:06.204205+00:00",
+    "elapsed_seconds": 0.05296218069270253,
+    "stdout": {
+      "path": "candidate-forced_boundaries-source-frozen-head.stdout",
+      "bytes": 41,
+      "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+    },
+    "stderr": {
+      "path": "candidate-forced_boundaries-source-frozen-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-forced_boundaries-source-frozen-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-combined-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:06.208412+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 70907,
+    "sampled_process_group": 70907,
+    "finished_utc": "2026-10-23T16:59:06.304408+00:00",
+    "elapsed_seconds": 0.09604062791913748,
+    "stdout": {
+      "path": "candidate-forced_boundaries-source-frozen-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "candidate-forced_boundaries-source-frozen-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-07-before-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:13.970324+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 71070,
+    "sampled_process_group": 71070,
+    "finished_utc": "2026-10-23T16:59:14.019723+00:00",
+    "elapsed_seconds": 0.0494606732390821,
+    "stdout": {
+      "path": "case-07-before-head.stdout",
+      "bytes": 41,
+      "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+    },
+    "stderr": {
+      "path": "case-07-before-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-07-before-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-combined-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:14.022775+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 71071,
+    "sampled_process_group": 71071,
+    "finished_utc": "2026-10-23T16:59:14.074834+00:00",
+    "elapsed_seconds": 0.052112402860075235,
+    "stdout": {
+      "path": "case-07-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-07-before-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-07",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:15.462593+00:00",
+    "timeout_seconds": 60,
+    "timed_out": false,
+    "exit_code": 101,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 71116,
+    "sampled_process_group": 71116,
+    "finished_utc": "2026-10-23T16:59:15.973537+00:00",
+    "elapsed_seconds": 0.511024366132915,
+    "stdout": {
+      "path": "case-07.stdout",
+      "bytes": 383,
+      "sha256": "e6130720ed3630996e1fc6918b2639a98ea6fc98ec39a20ad4375c9d233e71d9"
+    },
+    "stderr": {
+      "path": "case-07.stderr",
+      "bytes": 9143,
+      "sha256": "30f19be0c16ba85340f02c37aed7912a8a899d54e9698105e049c34c5e74cfcd"
+    }
+  },
+  {
+    "name": "case-07-after-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:16.177381+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 71118,
+    "sampled_process_group": 71118,
+    "finished_utc": "2026-10-23T16:59:16.223685+00:00",
+    "elapsed_seconds": 0.04638124816119671,
+    "stdout": {
+      "path": "case-07-after-head.stdout",
+      "bytes": 41,
+      "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+    },
+    "stderr": {
+      "path": "case-07-after-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-07-after-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-combined-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:16.226857+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 71121,
+    "sampled_process_group": 71121,
+    "finished_utc": "2026-10-23T16:59:16.279978+00:00",
+    "elapsed_seconds": 0.05318423919379711,
+    "stdout": {
+      "path": "case-07-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-07-after-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-08-before-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:17.510192+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 71146,
+    "sampled_process_group": 71146,
+    "finished_utc": "2026-10-23T16:59:17.563455+00:00",
+    "elapsed_seconds": 0.05331490421667695,
+    "stdout": {
+      "path": "case-08-before-head.stdout",
+      "bytes": 41,
+      "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+    },
+    "stderr": {
+      "path": "case-08-before-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-08-before-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-combined-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:17.566294+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 71147,
+    "sampled_process_group": 71147,
+    "finished_utc": "2026-10-23T16:59:17.619695+00:00",
+    "elapsed_seconds": 0.053457923233509064,
+    "stdout": {
+      "path": "case-08-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-08-before-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-08",
+    "command": [
+      "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "--exact",
+      "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:18.963368+00:00",
+    "timeout_seconds": 420,
+    "timed_out": false,
+    "exit_code": 101,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 71193,
+    "sampled_process_group": 71193,
+    "finished_utc": "2026-10-23T16:59:43.151839+00:00",
+    "elapsed_seconds": 24.189016848802567,
+    "stdout": {
+      "path": "case-08.stdout",
+      "bytes": 358,
+      "sha256": "8cdb6c5996def158d4602d4599562b3c269c057c4924932f0892624d6547321a"
+    },
+    "stderr": {
+      "path": "case-08.stderr",
+      "bytes": 6055,
+      "sha256": "9643e2c1440525bce654390c10a731dde179c5a1b489ba5456f54809b074005b"
+    }
+  },
+  {
+    "name": "case-08-after-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:43.357501+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 71854,
+    "sampled_process_group": 71854,
+    "finished_utc": "2026-10-23T16:59:43.412733+00:00",
+    "elapsed_seconds": 0.0553029659204185,
+    "stdout": {
+      "path": "case-08-after-head.stdout",
+      "bytes": 41,
+      "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+    },
+    "stderr": {
+      "path": "case-08-after-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "case-08-after-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-combined-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:43.415908+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 71855,
+    "sampled_process_group": 71855,
+    "finished_utc": "2026-10-23T16:59:43.463330+00:00",
+    "elapsed_seconds": 0.047504279762506485,
+    "stdout": {
+      "path": "case-08-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "case-08-after-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-restored-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:44.679671+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 71863,
+    "sampled_process_group": 71863,
+    "finished_utc": "2026-10-23T16:59:44.712272+00:00",
+    "elapsed_seconds": 0.0326370089314878,
+    "stdout": {
+      "path": "base-restored-head.stdout",
+      "bytes": 41,
+      "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+    },
+    "stderr": {
+      "path": "base-restored-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "base-restored-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-base-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:44.715030+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 71864,
+    "sampled_process_group": 71864,
+    "finished_utc": "2026-10-23T16:59:44.766659+00:00",
+    "elapsed_seconds": 0.05168780777603388,
+    "stdout": {
+      "path": "base-restored-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "base-restored-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-restored-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:47.563118+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 72211,
+    "sampled_process_group": 72211,
+    "finished_utc": "2026-10-23T16:59:47.595889+00:00",
+    "elapsed_seconds": 0.032812315970659256,
+    "stdout": {
+      "path": "candidate-restored-head.stdout",
+      "bytes": 41,
+      "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+    },
+    "stderr": {
+      "path": "candidate-restored-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "name": "candidate-restored-tracked",
+    "command": [
+      "git",
+      "-C",
+      "/private/tmp/tests-codex-privacy-search-combined-20261023",
+      "ls-files",
+      "-z"
+    ],
+    "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+    "started_utc": "2026-10-23T16:59:47.597971+00:00",
+    "timeout_seconds": 30,
+    "timed_out": false,
+    "exit_code": 0,
+    "spawned": true,
+    "owned_child_reaped": true,
+    "state": "terminal",
+    "owned_group_cleanup": [],
+    "pid": 72212,
+    "sampled_process_group": 72212,
+    "finished_utc": "2026-10-23T16:59:47.648004+00:00",
+    "elapsed_seconds": 0.050090696197003126,
+    "stdout": {
+      "path": "candidate-restored-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    "stderr": {
+      "path": "candidate-restored-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+]

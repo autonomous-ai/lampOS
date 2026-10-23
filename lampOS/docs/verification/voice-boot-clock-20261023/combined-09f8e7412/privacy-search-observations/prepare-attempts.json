@@ -1,0 +1,666 @@
+[
+  {
+    "directory": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164923.936616Z",
+    "result": {
+      "mode": "prepare",
+      "controller_exit_code": 1,
+      "observations": [],
+      "unrun_ordinals": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "runner_sha256": "90de6723e3c5f2e1830a9e6f6a24ba1e9875537bd314b0568a1d3b9ad241a11b",
+      "plan_sha256": "b481b63fc7662b27bf7507648da3b6857b4119f2a1dadbd9318e1646731582a4",
+      "no_retries": true,
+      "exception_traceback": "Traceback (most recent call last):\n  File \"/private/tmp/tests-privacy-search-runner-20261023/run.py\", line 121, in main\n    for arm in PLAN['arms']:guards(arm,None,arm+'-initial',env)\n                            ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/tests-privacy-search-runner-20261023/run.py\", line 24, in guards\n    b.command(label+'-tracked',['git','ls-files','-z'],env,30);assert set(filter(None,(b.OUT/(label+'-tracked.stdout')).read_text().split('\\0')))=={r['path'] for r in MAPS[arm]}\n                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+      "restore_errors": {
+        "base": "Traceback (most recent call last):\n  File \"/private/tmp/tests-privacy-search-runner-20261023/run.py\", line 146, in main\n    try:restore(arm);state.setdefault('final_source',{})[arm]=guards(arm,None,arm+'-restored',env)\n                                                              ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/tests-privacy-search-runner-20261023/run.py\", line 24, in guards\n    b.command(label+'-tracked',['git','ls-files','-z'],env,30);assert set(filter(None,(b.OUT/(label+'-tracked.stdout')).read_text().split('\\0')))=={r['path'] for r in MAPS[arm]}\n                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+        "candidate": "Traceback (most recent call last):\n  File \"/private/tmp/tests-privacy-search-runner-20261023/run.py\", line 146, in main\n    try:restore(arm);state.setdefault('final_source',{})[arm]=guards(arm,None,arm+'-restored',env)\n                                                              ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/tests-privacy-search-runner-20261023/run.py\", line 24, in guards\n    b.command(label+'-tracked',['git','ls-files','-z'],env,30);assert set(filter(None,(b.OUT/(label+'-tracked.stdout')).read_text().split('\\0')))=={r['path'] for r in MAPS[arm]}\n                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+      },
+      "started_ordinals": [],
+      "invalid_or_incomplete_ordinals": [],
+      "owned_children_all_reaped": true,
+      "interruptions": [],
+      "finished_utc": "2026-10-23T16:49:24.243766+00:00"
+    },
+    "commands": [
+      {
+        "name": "base-initial-head",
+        "command": [
+          "git",
+          "rev-parse",
+          "HEAD"
+        ],
+        "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+        "started_utc": "2026-10-23T16:49:23.939346+00:00",
+        "timeout_seconds": 30,
+        "timed_out": false,
+        "exit_code": 0,
+        "spawned": true,
+        "owned_child_reaped": true,
+        "state": "terminal",
+        "owned_group_cleanup": [],
+        "pid": 35183,
+        "sampled_process_group": 35183,
+        "finished_utc": "2026-10-23T16:49:23.986419+00:00",
+        "elapsed_seconds": 0.04712220374494791,
+        "stdout": {
+          "path": "base-initial-head.stdout",
+          "bytes": 41,
+          "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+        },
+        "stderr": {
+          "path": "base-initial-head.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "name": "base-initial-tracked",
+        "command": [
+          "git",
+          "ls-files",
+          "-z"
+        ],
+        "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+        "started_utc": "2026-10-23T16:49:23.987842+00:00",
+        "timeout_seconds": 30,
+        "timed_out": false,
+        "exit_code": 0,
+        "spawned": true,
+        "owned_child_reaped": true,
+        "state": "terminal",
+        "owned_group_cleanup": [],
+        "pid": 35184,
+        "sampled_process_group": 35184,
+        "finished_utc": "2026-10-23T16:49:24.033272+00:00",
+        "elapsed_seconds": 0.045490802731364965,
+        "stdout": {
+          "path": "base-initial-tracked.stdout",
+          "bytes": 430064,
+          "sha256": "d2445040072bc4f0029ce863222ac4d67855a1496804f639d6567e245a3a8138"
+        },
+        "stderr": {
+          "path": "base-initial-tracked.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "name": "base-restored-head",
+        "command": [
+          "git",
+          "rev-parse",
+          "HEAD"
+        ],
+        "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+        "started_utc": "2026-10-23T16:49:24.042258+00:00",
+        "timeout_seconds": 30,
+        "timed_out": false,
+        "exit_code": 0,
+        "spawned": true,
+        "owned_child_reaped": true,
+        "state": "terminal",
+        "owned_group_cleanup": [],
+        "pid": 35194,
+        "sampled_process_group": 35194,
+        "finished_utc": "2026-10-23T16:49:24.087022+00:00",
+        "elapsed_seconds": 0.04480492603033781,
+        "stdout": {
+          "path": "base-restored-head.stdout",
+          "bytes": 41,
+          "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+        },
+        "stderr": {
+          "path": "base-restored-head.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "name": "base-restored-tracked",
+        "command": [
+          "git",
+          "ls-files",
+          "-z"
+        ],
+        "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+        "started_utc": "2026-10-23T16:49:24.088046+00:00",
+        "timeout_seconds": 30,
+        "timed_out": false,
+        "exit_code": 0,
+        "spawned": true,
+        "owned_child_reaped": true,
+        "state": "terminal",
+        "owned_group_cleanup": [],
+        "pid": 35195,
+        "sampled_process_group": 35195,
+        "finished_utc": "2026-10-23T16:49:24.135388+00:00",
+        "elapsed_seconds": 0.0473927017301321,
+        "stdout": {
+          "path": "base-restored-tracked.stdout",
+          "bytes": 430064,
+          "sha256": "d2445040072bc4f0029ce863222ac4d67855a1496804f639d6567e245a3a8138"
+        },
+        "stderr": {
+          "path": "base-restored-tracked.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "name": "candidate-restored-head",
+        "command": [
+          "git",
+          "rev-parse",
+          "HEAD"
+        ],
+        "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+        "started_utc": "2026-10-23T16:49:24.143969+00:00",
+        "timeout_seconds": 30,
+        "timed_out": false,
+        "exit_code": 0,
+        "spawned": true,
+        "owned_child_reaped": true,
+        "state": "terminal",
+        "owned_group_cleanup": [],
+        "pid": 35196,
+        "sampled_process_group": 35196,
+        "finished_utc": "2026-10-23T16:49:24.189632+00:00",
+        "elapsed_seconds": 0.045716901775449514,
+        "stdout": {
+          "path": "candidate-restored-head.stdout",
+          "bytes": 41,
+          "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+        },
+        "stderr": {
+          "path": "candidate-restored-head.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "name": "candidate-restored-tracked",
+        "command": [
+          "git",
+          "ls-files",
+          "-z"
+        ],
+        "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+        "started_utc": "2026-10-23T16:49:24.190718+00:00",
+        "timeout_seconds": 30,
+        "timed_out": false,
+        "exit_code": 0,
+        "spawned": true,
+        "owned_child_reaped": true,
+        "state": "terminal",
+        "owned_group_cleanup": [],
+        "pid": 35197,
+        "sampled_process_group": 35197,
+        "finished_utc": "2026-10-23T16:49:24.235503+00:00",
+        "elapsed_seconds": 0.04484809469431639,
+        "stdout": {
+          "path": "candidate-restored-tracked.stdout",
+          "bytes": 430064,
+          "sha256": "d2445040072bc4f0029ce863222ac4d67855a1496804f639d6567e245a3a8138"
+        },
+        "stderr": {
+          "path": "candidate-restored-tracked.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    ],
+    "raw_streams": {
+      "base-initial-head.stderr": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164923.936616Z/base-initial-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "utf8": ""
+      },
+      "base-initial-head.stdout": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164923.936616Z/base-initial-head.stdout",
+        "bytes": 41,
+        "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d",
+        "utf8": "09f8e7412f92870e16ccca14e1b9cdc1b14add48\n"
+      },
+      "base-initial-tracked.stderr": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164923.936616Z/base-initial-tracked.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "utf8": ""
+      },
+      "base-restored-head.stderr": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164923.936616Z/base-restored-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "utf8": ""
+      },
+      "base-restored-head.stdout": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164923.936616Z/base-restored-head.stdout",
+        "bytes": 41,
+        "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d",
+        "utf8": "09f8e7412f92870e16ccca14e1b9cdc1b14add48\n"
+      },
+      "base-restored-tracked.stderr": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164923.936616Z/base-restored-tracked.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "utf8": ""
+      },
+      "candidate-restored-head.stderr": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164923.936616Z/candidate-restored-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "utf8": ""
+      },
+      "candidate-restored-head.stdout": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164923.936616Z/candidate-restored-head.stdout",
+        "bytes": 41,
+        "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8",
+        "utf8": "72a62a51c065002eeff4407dba77c56088e3649f\n"
+      },
+      "candidate-restored-tracked.stderr": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164923.936616Z/candidate-restored-tracked.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "utf8": ""
+      }
+    },
+    "no_cargo_or_test": true
+  },
+  {
+    "directory": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z",
+    "result": {
+      "mode": "prepare",
+      "controller_exit_code": 0,
+      "observations": [],
+      "unrun_ordinals": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "runner_sha256": "0e963fb24cd4dc9a8d79fa8df902203228f910d9b56667f9b1fd4285f8bdc653",
+      "plan_sha256": "b481b63fc7662b27bf7507648da3b6857b4119f2a1dadbd9318e1646731582a4",
+      "no_retries": true,
+      "sockets": {
+        "directory": "/private/tmp/lcp-xrl1fec9",
+        "unix_datagram_bind": true,
+        "loopback_tcp_bind": true,
+        "tcp_address": [
+          "127.0.0.1",
+          56283
+        ],
+        "removed": true
+      },
+      "preparation_passed": true,
+      "final_source": {
+        "base": {
+          "arm": "base",
+          "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+          "variant": null,
+          "tracked_paths": 10055,
+          "all_bytes_modes_match": true,
+          "aggregate_sha256": "797a6f78adfab0caa3d832d309a556f9966d21db40ca11fe2f0d0581cb3c4e97"
+        },
+        "candidate": {
+          "arm": "candidate",
+          "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+          "variant": null,
+          "tracked_paths": 10055,
+          "all_bytes_modes_match": true,
+          "aggregate_sha256": "c344386244e23e370c523f7ff21b45470e4d8e1848c57cb6fbdb24b927b8b68b"
+        }
+      },
+      "started_ordinals": [],
+      "invalid_or_incomplete_ordinals": [],
+      "owned_children_all_reaped": true,
+      "interruptions": [],
+      "finished_utc": "2026-10-23T16:49:53.472958+00:00"
+    },
+    "commands": [
+      {
+        "name": "base-initial-head",
+        "command": [
+          "git",
+          "rev-parse",
+          "HEAD"
+        ],
+        "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+        "started_utc": "2026-10-23T16:49:48.205018+00:00",
+        "timeout_seconds": 30,
+        "timed_out": false,
+        "exit_code": 0,
+        "spawned": true,
+        "owned_child_reaped": true,
+        "state": "terminal",
+        "owned_group_cleanup": [],
+        "pid": 37429,
+        "sampled_process_group": 37429,
+        "finished_utc": "2026-10-23T16:49:48.254463+00:00",
+        "elapsed_seconds": 0.04949991684406996,
+        "stdout": {
+          "path": "base-initial-head.stdout",
+          "bytes": 41,
+          "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+        },
+        "stderr": {
+          "path": "base-initial-head.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "name": "base-initial-tracked",
+        "command": [
+          "git",
+          "-C",
+          "/private/tmp/tests-codex-privacy-search-base-20261023",
+          "ls-files",
+          "-z"
+        ],
+        "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+        "started_utc": "2026-10-23T16:49:48.255950+00:00",
+        "timeout_seconds": 30,
+        "timed_out": false,
+        "exit_code": 0,
+        "spawned": true,
+        "owned_child_reaped": true,
+        "state": "terminal",
+        "owned_group_cleanup": [],
+        "pid": 37469,
+        "sampled_process_group": 37469,
+        "finished_utc": "2026-10-23T16:49:48.298792+00:00",
+        "elapsed_seconds": 0.04289809102192521,
+        "stdout": {
+          "path": "base-initial-tracked.stdout",
+          "bytes": 637750,
+          "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+        },
+        "stderr": {
+          "path": "base-initial-tracked.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "name": "candidate-initial-head",
+        "command": [
+          "git",
+          "rev-parse",
+          "HEAD"
+        ],
+        "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+        "started_utc": "2026-10-23T16:49:49.503320+00:00",
+        "timeout_seconds": 30,
+        "timed_out": false,
+        "exit_code": 0,
+        "spawned": true,
+        "owned_child_reaped": true,
+        "state": "terminal",
+        "owned_group_cleanup": [],
+        "pid": 37824,
+        "sampled_process_group": 37824,
+        "finished_utc": "2026-10-23T16:49:49.553886+00:00",
+        "elapsed_seconds": 0.0506121339276433,
+        "stdout": {
+          "path": "candidate-initial-head.stdout",
+          "bytes": 41,
+          "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+        },
+        "stderr": {
+          "path": "candidate-initial-head.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "name": "candidate-initial-tracked",
+        "command": [
+          "git",
+          "-C",
+          "/private/tmp/tests-codex-privacy-search-combined-20261023",
+          "ls-files",
+          "-z"
+        ],
+        "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+        "started_utc": "2026-10-23T16:49:49.554979+00:00",
+        "timeout_seconds": 30,
+        "timed_out": false,
+        "exit_code": 0,
+        "spawned": true,
+        "owned_child_reaped": true,
+        "state": "terminal",
+        "owned_group_cleanup": [],
+        "pid": 37831,
+        "sampled_process_group": 37831,
+        "finished_utc": "2026-10-23T16:49:49.599442+00:00",
+        "elapsed_seconds": 0.04451744770631194,
+        "stdout": {
+          "path": "candidate-initial-tracked.stdout",
+          "bytes": 637750,
+          "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+        },
+        "stderr": {
+          "path": "candidate-initial-tracked.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "name": "base-restored-head",
+        "command": [
+          "git",
+          "rev-parse",
+          "HEAD"
+        ],
+        "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+        "started_utc": "2026-10-23T16:49:50.835961+00:00",
+        "timeout_seconds": 30,
+        "timed_out": false,
+        "exit_code": 0,
+        "spawned": true,
+        "owned_child_reaped": true,
+        "state": "terminal",
+        "owned_group_cleanup": [],
+        "pid": 37907,
+        "sampled_process_group": 37907,
+        "finished_utc": "2026-10-23T16:49:50.884025+00:00",
+        "elapsed_seconds": 0.04810707736760378,
+        "stdout": {
+          "path": "base-restored-head.stdout",
+          "bytes": 41,
+          "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d"
+        },
+        "stderr": {
+          "path": "base-restored-head.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "name": "base-restored-tracked",
+        "command": [
+          "git",
+          "-C",
+          "/private/tmp/tests-codex-privacy-search-base-20261023",
+          "ls-files",
+          "-z"
+        ],
+        "cwd": "/private/tmp/tests-codex-privacy-search-base-20261023/lampOS",
+        "started_utc": "2026-10-23T16:49:50.885346+00:00",
+        "timeout_seconds": 30,
+        "timed_out": false,
+        "exit_code": 0,
+        "spawned": true,
+        "owned_child_reaped": true,
+        "state": "terminal",
+        "owned_group_cleanup": [],
+        "pid": 37911,
+        "sampled_process_group": 37911,
+        "finished_utc": "2026-10-23T16:49:50.929646+00:00",
+        "elapsed_seconds": 0.044340912252664566,
+        "stdout": {
+          "path": "base-restored-tracked.stdout",
+          "bytes": 637750,
+          "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+        },
+        "stderr": {
+          "path": "base-restored-tracked.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "name": "candidate-restored-head",
+        "command": [
+          "git",
+          "rev-parse",
+          "HEAD"
+        ],
+        "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+        "started_utc": "2026-10-23T16:49:52.156233+00:00",
+        "timeout_seconds": 30,
+        "timed_out": false,
+        "exit_code": 0,
+        "spawned": true,
+        "owned_child_reaped": true,
+        "state": "terminal",
+        "owned_group_cleanup": [],
+        "pid": 37957,
+        "sampled_process_group": 37957,
+        "finished_utc": "2026-10-23T16:49:52.206173+00:00",
+        "elapsed_seconds": 0.050000240094959736,
+        "stdout": {
+          "path": "candidate-restored-head.stdout",
+          "bytes": 41,
+          "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8"
+        },
+        "stderr": {
+          "path": "candidate-restored-head.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "name": "candidate-restored-tracked",
+        "command": [
+          "git",
+          "-C",
+          "/private/tmp/tests-codex-privacy-search-combined-20261023",
+          "ls-files",
+          "-z"
+        ],
+        "cwd": "/private/tmp/tests-codex-privacy-search-combined-20261023/lampOS",
+        "started_utc": "2026-10-23T16:49:52.207545+00:00",
+        "timeout_seconds": 30,
+        "timed_out": false,
+        "exit_code": 0,
+        "spawned": true,
+        "owned_child_reaped": true,
+        "state": "terminal",
+        "owned_group_cleanup": [],
+        "pid": 37958,
+        "sampled_process_group": 37958,
+        "finished_utc": "2026-10-23T16:49:52.253196+00:00",
+        "elapsed_seconds": 0.04570812126621604,
+        "stdout": {
+          "path": "candidate-restored-tracked.stdout",
+          "bytes": 637750,
+          "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+        },
+        "stderr": {
+          "path": "candidate-restored-tracked.stderr",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    ],
+    "raw_streams": {
+      "base-initial-head.stderr": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/base-initial-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "utf8": ""
+      },
+      "base-initial-head.stdout": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/base-initial-head.stdout",
+        "bytes": 41,
+        "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d",
+        "utf8": "09f8e7412f92870e16ccca14e1b9cdc1b14add48\n"
+      },
+      "base-initial-tracked.stderr": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/base-initial-tracked.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "utf8": ""
+      },
+      "base-restored-head.stderr": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/base-restored-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "utf8": ""
+      },
+      "base-restored-head.stdout": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/base-restored-head.stdout",
+        "bytes": 41,
+        "sha256": "308807e454b4590f994535370cbd94b3852b52cdf8c1657c92338180a469003d",
+        "utf8": "09f8e7412f92870e16ccca14e1b9cdc1b14add48\n"
+      },
+      "base-restored-tracked.stderr": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/base-restored-tracked.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "utf8": ""
+      },
+      "candidate-initial-head.stderr": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/candidate-initial-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "utf8": ""
+      },
+      "candidate-initial-head.stdout": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/candidate-initial-head.stdout",
+        "bytes": 41,
+        "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8",
+        "utf8": "72a62a51c065002eeff4407dba77c56088e3649f\n"
+      },
+      "candidate-initial-tracked.stderr": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/candidate-initial-tracked.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "utf8": ""
+      },
+      "candidate-restored-head.stderr": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/candidate-restored-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "utf8": ""
+      },
+      "candidate-restored-head.stdout": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/candidate-restored-head.stdout",
+        "bytes": 41,
+        "sha256": "0adc8f16f4d3ab03a41041b338829c4fc60effa192384330c031af7abeb476b8",
+        "utf8": "72a62a51c065002eeff4407dba77c56088e3649f\n"
+      },
+      "candidate-restored-tracked.stderr": {
+        "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/candidate-restored-tracked.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "utf8": ""
+      }
+    },
+    "no_cargo_or_test": true
+  }
+]

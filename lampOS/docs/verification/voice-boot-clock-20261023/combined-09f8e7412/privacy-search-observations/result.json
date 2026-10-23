@@ -1,0 +1,716 @@
+{
+  "mode": "run",
+  "controller_exit_code": 0,
+  "observations": [
+    {
+      "ordinal": 1,
+      "case": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "arm": "base",
+      "variant": "observation",
+      "actual_exit": 0,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 3667,
+      "seconds": 0.02,
+      "summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3667 filtered out; finished in 0.02s",
+      "panic_sites": [],
+      "valid_terminal_observation": true,
+      "historical_cause_not_established": true,
+      "privacy_attempts": [
+        {
+          "past_first_second": false,
+          "attempt": 1,
+          "rows": [
+            "read newest=2 opened_us=3301790470796 began_us=3301790471126 ended_us=3301790471358 last_publish=(2, 3301790470798, 3301790471116) before_sequence=None current=Some((2, 3301790470798, 3301790520798)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=None",
+            "read newest=4 opened_us=3301790470796 began_us=3301790476759 ended_us=3301790476869 last_publish=(4, 3301790474034, 3301790474315) before_sequence=Some(2) current=Some((4, 3301790474034, 3301790524034)) before_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } after_counts=Statistics { received: 2, gaps: 1, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1.5ms) } error=None"
+          ],
+          "result": "None"
+        },
+        {
+          "past_first_second": true,
+          "attempt": 1,
+          "rows": [
+            "read newest=2 opened_us=3301790482612 began_us=3301790482890 ended_us=3301790483013 last_publish=(2, 3301790482613, 3301790482888) before_sequence=None current=Some((2, 3301790482613, 3301790532613)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=None",
+            "read newest=4 opened_us=3301789485078 began_us=3301790490693 ended_us=3301790490823 last_publish=(4, 3301790485436, 3301790485799) before_sequence=Some(2) current=Some((2, 3301790482613, 3301790532613)) before_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } after_counts=Statistics { received: 2, gaps: 1, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(3ms) } error=Some(\"privacy lease stream changed or lost a value\")"
+          ],
+          "result": "None"
+        }
+      ],
+      "forced_boundary_validated": false
+    },
+    {
+      "ordinal": 2,
+      "case": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "arm": "base",
+      "variant": "observation",
+      "actual_exit": 0,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 3667,
+      "seconds": 2.65,
+      "summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3667 filtered out; finished in 2.65s",
+      "panic_sites": [],
+      "valid_terminal_observation": true,
+      "historical_cause_not_established": true,
+      "search_rows": [
+        "search fixture diagnostic scope started raw_us=3301793568085 scoped_us=3301793568081 host_budget_us=23999973",
+        "search fixture diagnostic pump phase=Run frame=0 logical_us=0 host_elapsed_us=1666 host_expired=false host_remaining_us=23998307 pushed_at=None muted=false result=Ok(())",
+        "search fixture diagnostic pump phase=Run frame=139 logical_us=1386000 host_elapsed_us=116736 host_expired=false host_remaining_us=23883237 pushed_at=Some(139) muted=false result=Ok(())",
+        "search fixture diagnostic pump phase=Run frame=1100 logical_us=10992000 host_elapsed_us=1951323 host_expired=false host_remaining_us=22048650 pushed_at=Some(139) muted=true result=Ok(())",
+        "search fixture diagnostic conversation returned host_elapsed_us=1952476 logical_us=11000000 result=Some(\"physical mute observed at 3301804568081 us\")",
+        "search fixture diagnostic close role=privacy pid=50587 scope_bound_expired=false scope_remaining_us=22047062 passed_cleanup_remaining_us=299832 observed_us=1029 result=Ok(())",
+        "search fixture diagnostic close role=speaker pid=50542 scope_bound_expired=false scope_remaining_us=22045622 passed_cleanup_remaining_us=298392 observed_us=1031 result=Ok(())",
+        "search fixture diagnostic close role=capture pid=50557 scope_bound_expired=false scope_remaining_us=22044504 passed_cleanup_remaining_us=297274 observed_us=1395 result=Ok(())",
+        "search fixture diagnostic close role=second pid=50572 scope_bound_expired=false scope_remaining_us=22043017 passed_cleanup_remaining_us=295786 observed_us=1521 result=Ok(())",
+        "search fixture diagnostic close role=ring pid=50602 scope_bound_expired=false scope_remaining_us=22041353 passed_cleanup_remaining_us=294123 observed_us=1541 result=Ok(())",
+        "search fixture diagnostic pump phase=Shutdown { deadline: Instant { tv_sec: 3301851, tv_nsec: 835678607 } } frame=1100 logical_us=11000000 host_elapsed_us=1960187 host_expired=false host_remaining_us=22039787 pushed_at=Some(139) muted=true result=Ok(())",
+        "search fixture diagnostic scope started raw_us=3301795554219 scoped_us=3301795554217 host_budget_us=23999994",
+        "search fixture diagnostic pump phase=Run frame=0 logical_us=0 host_elapsed_us=541 host_expired=false host_remaining_us=23999452 pushed_at=None muted=false result=Ok(())",
+        "search fixture diagnostic pump phase=Run frame=1100 logical_us=10992000 host_elapsed_us=632251 host_expired=false host_remaining_us=23367743 pushed_at=None muted=true result=Ok(())",
+        "search fixture diagnostic conversation returned host_elapsed_us=632683 logical_us=11000000 result=Some(\"physical mute observed at 3301806554217 us\")",
+        "search fixture diagnostic close role=privacy pid=50710 scope_bound_expired=false scope_remaining_us=23367084 passed_cleanup_remaining_us=299906 observed_us=1364 result=Ok(())",
+        "search fixture diagnostic close role=speaker pid=50663 scope_bound_expired=false scope_remaining_us=23365651 passed_cleanup_remaining_us=298473 observed_us=1109 result=Ok(())",
+        "search fixture diagnostic close role=capture pid=50679 scope_bound_expired=false scope_remaining_us=23364481 passed_cleanup_remaining_us=297303 observed_us=1082 result=Ok(())",
+        "search fixture diagnostic close role=second pid=50694 scope_bound_expired=false scope_remaining_us=23363345 passed_cleanup_remaining_us=296168 observed_us=1058 result=Ok(())",
+        "search fixture diagnostic close role=ring pid=50726 scope_bound_expired=false scope_remaining_us=23362143 passed_cleanup_remaining_us=294966 observed_us=1081 result=Ok(())",
+        "search fixture diagnostic pump phase=Shutdown { deadline: Instant { tv_sec: 3301852, tv_nsec: 501926420 } } frame=1100 logical_us=11000000 host_elapsed_us=638947 host_expired=false host_remaining_us=23361049 pushed_at=None muted=true result=Ok(())"
+      ],
+      "forced_boundary_validated": false
+    },
+    {
+      "ordinal": 3,
+      "case": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "arm": "base",
+      "variant": "forced_boundaries",
+      "actual_exit": 101,
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0,
+      "filtered": 3667,
+      "seconds": 0.46,
+      "summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3667 filtered out; finished in 0.46s",
+      "panic_sites": [
+        [
+          "crates/voice/src/privacy_bus.rs",
+          "1348",
+          "25"
+        ]
+      ],
+      "valid_terminal_observation": true,
+      "historical_cause_not_established": true,
+      "privacy_attempts": [
+        {
+          "past_first_second": false,
+          "attempt": 1,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3301905931636 pause_started_us=3301905931638 pause_finished_us=3301905965934",
+            "read newest=2 opened_us=3301905931636 began_us=3301905966953 ended_us=3301905967477 last_publish=(2, 3301905965986, 3301905966931) before_sequence=None current=Some((2, 3301905965986, 3301906015986)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3301905965986,
+            "publish_return_us": 3301905966931,
+            "read_begin_age_us": 967,
+            "read_end_age_us": 1491,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 35317,
+            "pause_us": 34296
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 2,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3301905971072 pause_started_us=3301905971072 pause_finished_us=3301906003481",
+            "read newest=2 opened_us=3301905971072 began_us=3301906004016 ended_us=3301906004205 last_publish=(2, 3301906003496, 3301906004013) before_sequence=None current=Some((2, 3301906003496, 3301906053496)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3301906003496,
+            "publish_return_us": 3301906004013,
+            "read_begin_age_us": 520,
+            "read_end_age_us": 709,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 32944,
+            "pause_us": 32409
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 3,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3301906006764 pause_started_us=3301906006765 pause_finished_us=3301906044425",
+            "read newest=2 opened_us=3301906006764 began_us=3301906046361 ended_us=3301906046527 last_publish=(2, 3301906044442, 3301906046357) before_sequence=None current=Some((2, 3301906044442, 3301906094442)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(2ms) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3301906044442,
+            "publish_return_us": 3301906046357,
+            "read_begin_age_us": 1919,
+            "read_end_age_us": 2085,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 39597,
+            "pause_us": 37660
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 4,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3301906049293 pause_started_us=3301906049293 pause_finished_us=3301906088065",
+            "read newest=2 opened_us=3301906049293 began_us=3301906088548 ended_us=3301906088702 last_publish=(2, 3301906088076, 3301906088544) before_sequence=None current=Some((2, 3301906088076, 3301906138076)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(0ns) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3301906088076,
+            "publish_return_us": 3301906088544,
+            "read_begin_age_us": 472,
+            "read_end_age_us": 626,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 39255,
+            "pause_us": 38772
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 5,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3301906091287 pause_started_us=3301906091287 pause_finished_us=3301906128834",
+            "read newest=2 opened_us=3301906091287 began_us=3301906129703 ended_us=3301906129986 last_publish=(2, 3301906128852, 3301906129698) before_sequence=None current=Some((2, 3301906128852, 3301906178852)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3301906128852,
+            "publish_return_us": 3301906129698,
+            "read_begin_age_us": 851,
+            "read_end_age_us": 1134,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 38416,
+            "pause_us": 37547
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 6,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3301906134373 pause_started_us=3301906134374 pause_finished_us=3301906170993",
+            "read newest=2 opened_us=3301906134373 began_us=3301906171449 ended_us=3301906171600 last_publish=(2, 3301906171009, 3301906171445) before_sequence=None current=Some((2, 3301906171009, 3301906221009)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(0ns) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3301906171009,
+            "publish_return_us": 3301906171445,
+            "read_begin_age_us": 440,
+            "read_end_age_us": 591,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 37076,
+            "pause_us": 36619
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 7,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3301906174076 pause_started_us=3301906174077 pause_finished_us=3301906211230",
+            "read newest=2 opened_us=3301906174076 began_us=3301906211888 ended_us=3301906212099 last_publish=(2, 3301906211245, 3301906211884) before_sequence=None current=Some((2, 3301906211245, 3301906261245)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3301906211245,
+            "publish_return_us": 3301906211884,
+            "read_begin_age_us": 643,
+            "read_end_age_us": 854,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 37812,
+            "pause_us": 37153
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 8,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3301906215218 pause_started_us=3301906215218 pause_finished_us=3301906250301",
+            "read newest=2 opened_us=3301906215218 began_us=3301906251020 ended_us=3301906251217 last_publish=(2, 3301906250332, 3301906251014) before_sequence=None current=Some((2, 3301906250332, 3301906300332)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3301906250332,
+            "publish_return_us": 3301906251014,
+            "read_begin_age_us": 688,
+            "read_end_age_us": 885,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 35802,
+            "pause_us": 35083
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 9,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3301906253894 pause_started_us=3301906253895 pause_finished_us=3301906293560",
+            "read newest=2 opened_us=3301906253894 began_us=3301906294462 ended_us=3301906294752 last_publish=(2, 3301906293578, 3301906294457) before_sequence=None current=Some((2, 3301906293578, 3301906343578)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3301906293578,
+            "publish_return_us": 3301906294457,
+            "read_begin_age_us": 884,
+            "read_end_age_us": 1174,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 40568,
+            "pause_us": 39665
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 10,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3301906298563 pause_started_us=3301906298563 pause_finished_us=3301906337409",
+            "read newest=2 opened_us=3301906298563 began_us=3301906337968 ended_us=3301906338155 last_publish=(2, 3301906337421, 3301906337964) before_sequence=None current=Some((2, 3301906337421, 3301906387421)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3301906337421,
+            "publish_return_us": 3301906337964,
+            "read_begin_age_us": 547,
+            "read_end_age_us": 734,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 39405,
+            "pause_us": 38846
+          }
+        }
+      ],
+      "forced_boundary_validated": true
+    },
+    {
+      "ordinal": 4,
+      "case": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "arm": "base",
+      "variant": "forced_boundaries",
+      "actual_exit": 101,
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0,
+      "filtered": 3667,
+      "seconds": 24.1,
+      "summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3667 filtered out; finished in 24.10s",
+      "panic_sites": [
+        [
+          "crates/voice/src/coordinator/tests/second_route.rs",
+          "384",
+          "9"
+        ]
+      ],
+      "valid_terminal_observation": true,
+      "historical_cause_not_established": true,
+      "search_rows": [
+        "search fixture diagnostic scope started raw_us=3301909482372 scoped_us=3301909482368 host_budget_us=23999972",
+        "search fixture diagnostic pump phase=Run frame=0 logical_us=0 host_elapsed_us=1682 host_expired=false host_remaining_us=23998290 pushed_at=None muted=false result=Ok(())",
+        "search fixture diagnostic forced host deadline after fixture push publication (coordinator consumption unobserved) frame=139 pause_us=23890886 original_bound_expired=true",
+        "search fixture diagnostic pump phase=Run frame=139 logical_us=1386000 host_elapsed_us=24009154 host_expired=true host_remaining_us=0 pushed_at=Some(139) muted=false result=Ok(())",
+        "search fixture diagnostic conversation returned host_elapsed_us=24009329 logical_us=1386000 result=Some(\"scenario host watchdog\")",
+        "search fixture diagnostic close role=privacy pid=57032 scope_bound_expired=true scope_remaining_us=0 passed_cleanup_remaining_us=299789 observed_us=14 result=Err(Custom { kind: TimedOut, error: \"fixture child 57032 exit observation timed out\" })",
+        "search fixture diagnostic pump phase=Shutdown { deadline: Instant { tv_sec: 3301989, tv_nsec: 809284665 } } frame=139 logical_us=1386000 host_elapsed_us=24009897 host_expired=true host_remaining_us=0 pushed_at=Some(139) muted=false result=Err(Custom { kind: TimedOut, error: \"fixture child 57032 exit observation timed out\" })",
+        "search fixture diagnostic close role=speaker pid=56987 scope_bound_expired=true scope_remaining_us=0 passed_cleanup_remaining_us=295885 observed_us=4 result=Err(Custom { kind: TimedOut, error: \"fixture child 56987 exit observation timed out\" })",
+        "search fixture diagnostic pump phase=Shutdown { deadline: Instant { tv_sec: 3301989, tv_nsec: 809284665 } } frame=139 logical_us=1386000 host_elapsed_us=24013788 host_expired=true host_remaining_us=0 pushed_at=Some(139) muted=false result=Err(Custom { kind: TimedOut, error: \"fixture child 56987 exit observation timed out\" })",
+        "search fixture diagnostic close role=capture pid=57002 scope_bound_expired=true scope_remaining_us=0 passed_cleanup_remaining_us=293378 observed_us=2 result=Err(Custom { kind: TimedOut, error: \"fixture child 57002 exit observation timed out\" })",
+        "search fixture diagnostic pump phase=Shutdown { deadline: Instant { tv_sec: 3301989, tv_nsec: 809284665 } } frame=139 logical_us=1386000 host_elapsed_us=24016291 host_expired=true host_remaining_us=0 pushed_at=Some(139) muted=false result=Err(Custom { kind: TimedOut, error: \"fixture child 57002 exit observation timed out\" })",
+        "search fixture diagnostic close role=second pid=57017 scope_bound_expired=true scope_remaining_us=0 passed_cleanup_remaining_us=289909 observed_us=8 result=Err(Custom { kind: TimedOut, error: \"fixture child 57017 exit observation timed out\" })",
+        "search fixture diagnostic pump phase=Shutdown { deadline: Instant { tv_sec: 3301989, tv_nsec: 809284665 } } frame=139 logical_us=1386000 host_elapsed_us=24019769 host_expired=true host_remaining_us=0 pushed_at=Some(139) muted=false result=Err(Custom { kind: TimedOut, error: \"fixture child 57017 exit observation timed out\" })",
+        "search fixture diagnostic close role=ring pid=57047 scope_bound_expired=true scope_remaining_us=0 passed_cleanup_remaining_us=286271 observed_us=5 result=Err(Custom { kind: TimedOut, error: \"fixture child 57047 exit observation timed out\" })",
+        "search fixture diagnostic pump phase=Shutdown { deadline: Instant { tv_sec: 3301989, tv_nsec: 809284665 } } frame=139 logical_us=1386000 host_elapsed_us=24023404 host_expired=true host_remaining_us=0 pushed_at=Some(139) muted=false result=Err(Custom { kind: TimedOut, error: \"fixture child 57047 exit observation timed out\" })"
+      ],
+      "forced_boundary_validated": true
+    },
+    {
+      "ordinal": 5,
+      "case": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "arm": "candidate",
+      "variant": "observation",
+      "actual_exit": 0,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 3667,
+      "seconds": 0.02,
+      "summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3667 filtered out; finished in 0.02s",
+      "panic_sites": [],
+      "valid_terminal_observation": true,
+      "historical_cause_not_established": true,
+      "privacy_attempts": [
+        {
+          "past_first_second": false,
+          "attempt": 1,
+          "rows": [
+            "read newest=2 opened_us=3302043404454 began_us=3302043404762 ended_us=3302043404978 last_publish=(2, 3302043404456, 3302043404752) before_sequence=None current=Some((2, 3302043404456, 3302043454456)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=None",
+            "read newest=4 opened_us=3302043404454 began_us=3302043411611 ended_us=3302043411725 last_publish=(4, 3302043408328, 3302043408589) before_sequence=Some(2) current=Some((4, 3302043408328, 3302043458328)) before_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } after_counts=Statistics { received: 2, gaps: 1, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(2ms) } error=None"
+          ],
+          "result": "None"
+        },
+        {
+          "past_first_second": true,
+          "attempt": 1,
+          "rows": [
+            "read newest=2 opened_us=3302043416893 began_us=3302043417178 ended_us=3302043417293 last_publish=(2, 3302043416894, 3302043417177) before_sequence=None current=Some((2, 3302043416894, 3302043466894)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(0ns) } error=None",
+            "read newest=4 opened_us=3302042420171 began_us=3302043423081 ended_us=3302043423183 last_publish=(4, 3302043420534, 3302043420815) before_sequence=Some(2) current=Some((2, 3302043416894, 3302043466894)) before_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(0ns) } after_counts=Statistics { received: 2, gaps: 1, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1.5ms) } error=Some(\"privacy lease stream changed or lost a value\")"
+          ],
+          "result": "None"
+        }
+      ],
+      "forced_boundary_validated": false
+    },
+    {
+      "ordinal": 6,
+      "case": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "arm": "candidate",
+      "variant": "observation",
+      "actual_exit": 0,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 3667,
+      "seconds": 2.75,
+      "summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3667 filtered out; finished in 2.75s",
+      "panic_sites": [],
+      "valid_terminal_observation": true,
+      "historical_cause_not_established": true,
+      "search_rows": [
+        "search fixture diagnostic scope started raw_us=3302046428530 scoped_us=3302046428506 host_budget_us=23999976",
+        "search fixture diagnostic pump phase=Run frame=0 logical_us=0 host_elapsed_us=1546 host_expired=false host_remaining_us=23998430 pushed_at=None muted=false result=Ok(())",
+        "search fixture diagnostic pump phase=Run frame=139 logical_us=1386000 host_elapsed_us=117143 host_expired=false host_remaining_us=23882833 pushed_at=Some(139) muted=false result=Ok(())",
+        "search fixture diagnostic pump phase=Run frame=1100 logical_us=10992000 host_elapsed_us=2013750 host_expired=false host_remaining_us=21986226 pushed_at=Some(139) muted=true result=Ok(())",
+        "search fixture diagnostic conversation returned host_elapsed_us=2014811 logical_us=11000000 result=Some(\"physical mute observed at 3302057428506 us\")",
+        "search fixture diagnostic close role=privacy pid=64526 scope_bound_expired=false scope_remaining_us=21984844 passed_cleanup_remaining_us=299836 observed_us=1057 result=Ok(())",
+        "search fixture diagnostic close role=speaker pid=64481 scope_bound_expired=false scope_remaining_us=21983455 passed_cleanup_remaining_us=298447 observed_us=1045 result=Ok(())",
+        "search fixture diagnostic close role=capture pid=64496 scope_bound_expired=false scope_remaining_us=21982348 passed_cleanup_remaining_us=297340 observed_us=1458 result=Ok(())",
+        "search fixture diagnostic close role=second pid=64511 scope_bound_expired=false scope_remaining_us=21980826 passed_cleanup_remaining_us=295818 observed_us=1494 result=Ok(())",
+        "search fixture diagnostic close role=ring pid=64541 scope_bound_expired=false scope_remaining_us=21979208 passed_cleanup_remaining_us=294200 observed_us=1232 result=Ok(())",
+        "search fixture diagnostic pump phase=Shutdown { deadline: Instant { tv_sec: 3302104, tv_nsec: 763586737 } } frame=1100 logical_us=11000000 host_elapsed_us=2022009 host_expired=false host_remaining_us=21977968 pushed_at=Some(139) muted=true result=Ok(())",
+        "search fixture diagnostic scope started raw_us=3302048479367 scoped_us=3302048479361 host_budget_us=23999994",
+        "search fixture diagnostic pump phase=Run frame=0 logical_us=0 host_elapsed_us=549 host_expired=false host_remaining_us=23999445 pushed_at=None muted=false result=Ok(())",
+        "search fixture diagnostic pump phase=Run frame=1100 logical_us=10992000 host_elapsed_us=665097 host_expired=false host_remaining_us=23334897 pushed_at=None muted=true result=Ok(())",
+        "search fixture diagnostic conversation returned host_elapsed_us=665535 logical_us=11000000 result=Some(\"physical mute observed at 3302059479361 us\")",
+        "search fixture diagnostic close role=privacy pid=64673 scope_bound_expired=false scope_remaining_us=23334224 passed_cleanup_remaining_us=299905 observed_us=1397 result=Ok(())",
+        "search fixture diagnostic close role=speaker pid=64626 scope_bound_expired=false scope_remaining_us=23332764 passed_cleanup_remaining_us=298445 observed_us=1292 result=Ok(())",
+        "search fixture diagnostic close role=capture pid=64642 scope_bound_expired=false scope_remaining_us=23331378 passed_cleanup_remaining_us=297059 observed_us=1251 result=Ok(())",
+        "search fixture diagnostic close role=second pid=64658 scope_bound_expired=false scope_remaining_us=23330079 passed_cleanup_remaining_us=295760 observed_us=1020 result=Ok(())",
+        "search fixture diagnostic close role=ring pid=64690 scope_bound_expired=false scope_remaining_us=23328985 passed_cleanup_remaining_us=294666 observed_us=1369 result=Ok(())",
+        "search fixture diagnostic pump phase=Shutdown { deadline: Instant { tv_sec: 3302105, tv_nsec: 465173158 } } frame=1100 logical_us=11000000 host_elapsed_us=672397 host_expired=false host_remaining_us=23327599 pushed_at=None muted=true result=Ok(())"
+      ],
+      "forced_boundary_validated": false
+    },
+    {
+      "ordinal": 7,
+      "case": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "arm": "candidate",
+      "variant": "forced_boundaries",
+      "actual_exit": 101,
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0,
+      "filtered": 3667,
+      "seconds": 0.43,
+      "summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3667 filtered out; finished in 0.43s",
+      "panic_sites": [
+        [
+          "crates/voice/src/privacy_bus.rs",
+          "1348",
+          "25"
+        ]
+      ],
+      "valid_terminal_observation": true,
+      "historical_cause_not_established": true,
+      "privacy_attempts": [
+        {
+          "past_first_second": false,
+          "attempt": 1,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3302161189039 pause_started_us=3302161189041 pause_finished_us=3302161225649",
+            "read newest=2 opened_us=3302161189039 began_us=3302161226558 ended_us=3302161227042 last_publish=(2, 3302161225717, 3302161226539) before_sequence=None current=Some((2, 3302161225717, 3302161275717)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(2ms) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3302161225717,
+            "publish_return_us": 3302161226539,
+            "read_begin_age_us": 841,
+            "read_end_age_us": 1325,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 37519,
+            "pause_us": 36608
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 2,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3302161230585 pause_started_us=3302161230585 pause_finished_us=3302161268103",
+            "read newest=2 opened_us=3302161230585 began_us=3302161268560 ended_us=3302161268727 last_publish=(2, 3302161268121, 3302161268557) before_sequence=None current=Some((2, 3302161268121, 3302161318121)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(0ns) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3302161268121,
+            "publish_return_us": 3302161268557,
+            "read_begin_age_us": 439,
+            "read_end_age_us": 606,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 37975,
+            "pause_us": 37518
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 3,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3302161271178 pause_started_us=3302161271178 pause_finished_us=3302161307958",
+            "read newest=2 opened_us=3302161271178 began_us=3302161308620 ended_us=3302161308790 last_publish=(2, 3302161307991, 3302161308601) before_sequence=None current=Some((2, 3302161307991, 3302161357991)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(0ns) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3302161307991,
+            "publish_return_us": 3302161308601,
+            "read_begin_age_us": 629,
+            "read_end_age_us": 799,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 37442,
+            "pause_us": 36780
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 4,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3302161311605 pause_started_us=3302161311605 pause_finished_us=3302161349134",
+            "read newest=2 opened_us=3302161311605 began_us=3302161349784 ended_us=3302161350066 last_publish=(2, 3302161349175, 3302161349781) before_sequence=None current=Some((2, 3302161349175, 3302161399175)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3302161349175,
+            "publish_return_us": 3302161349781,
+            "read_begin_age_us": 609,
+            "read_end_age_us": 891,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 38179,
+            "pause_us": 37529
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 5,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3302161353174 pause_started_us=3302161353174 pause_finished_us=3302161383259",
+            "read newest=2 opened_us=3302161353174 began_us=3302161384163 ended_us=3302161384495 last_publish=(2, 3302161383269, 3302161384157) before_sequence=None current=Some((2, 3302161383269, 3302161433269)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3302161383269,
+            "publish_return_us": 3302161384157,
+            "read_begin_age_us": 894,
+            "read_end_age_us": 1226,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 30989,
+            "pause_us": 30085
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 6,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3302161388002 pause_started_us=3302161388003 pause_finished_us=3302161421059",
+            "read newest=2 opened_us=3302161388002 began_us=3302161421989 ended_us=3302161422263 last_publish=(2, 3302161421117, 3302161421984) before_sequence=None current=Some((2, 3302161421117, 3302161471117)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3302161421117,
+            "publish_return_us": 3302161421984,
+            "read_begin_age_us": 872,
+            "read_end_age_us": 1146,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 33987,
+            "pause_us": 33056
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 7,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3302161425822 pause_started_us=3302161425823 pause_finished_us=3302161458599",
+            "read newest=2 opened_us=3302161425822 began_us=3302161459474 ended_us=3302161459747 last_publish=(2, 3302161458615, 3302161459469) before_sequence=None current=Some((2, 3302161458615, 3302161508615)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3302161458615,
+            "publish_return_us": 3302161459469,
+            "read_begin_age_us": 859,
+            "read_end_age_us": 1132,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 33652,
+            "pause_us": 32776
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 8,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3302161463427 pause_started_us=3302161463428 pause_finished_us=3302161499204",
+            "read newest=2 opened_us=3302161463427 began_us=3302161499837 ended_us=3302161500050 last_publish=(2, 3302161499214, 3302161499833) before_sequence=None current=Some((2, 3302161499214, 3302161549214)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3302161499214,
+            "publish_return_us": 3302161499833,
+            "read_begin_age_us": 623,
+            "read_end_age_us": 836,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 36410,
+            "pause_us": 35776
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 9,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3302161503188 pause_started_us=3302161503189 pause_finished_us=3302161536949",
+            "read newest=2 opened_us=3302161503188 began_us=3302161537512 ended_us=3302161537681 last_publish=(2, 3302161536970, 3302161537509) before_sequence=None current=Some((2, 3302161536970, 3302161586970)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(0ns) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3302161536970,
+            "publish_return_us": 3302161537509,
+            "read_begin_age_us": 542,
+            "read_end_age_us": 711,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 34324,
+            "pause_us": 33760
+          }
+        },
+        {
+          "past_first_second": false,
+          "attempt": 10,
+          "rows": [
+            "forced subscriber age before fresh lease2 opened_us=3302161540342 pause_started_us=3302161540342 pause_finished_us=3302161572830",
+            "read newest=2 opened_us=3302161540342 began_us=3302161573316 ended_us=3302161573481 last_publish=(2, 3302161572837, 3302161573313) before_sequence=None current=Some((2, 3302161572837, 3302161622837)) before_counts=Statistics { received: 0, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: None } after_counts=Statistics { received: 1, gaps: 0, expired: 0, wrong_type: 0, datagrams: 0, mean_interval: None, largest_interval: None, mean_age: Some(1ms) } error=Some(\"privacy publisher unavailable\")"
+          ],
+          "result": "Some(\"privacy publisher unavailable\")",
+          "freshness": {
+            "sequence": 2,
+            "stamp_us": 3302161572837,
+            "publish_return_us": 3302161573313,
+            "read_begin_age_us": 479,
+            "read_end_age_us": 644,
+            "lease_lifetime_us": 50000,
+            "subscriber_age_at_begin_us": 32974,
+            "pause_us": 32488
+          }
+        }
+      ],
+      "forced_boundary_validated": true
+    },
+    {
+      "ordinal": 8,
+      "case": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "arm": "candidate",
+      "variant": "forced_boundaries",
+      "actual_exit": 101,
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0,
+      "filtered": 3667,
+      "seconds": 24.1,
+      "summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3667 filtered out; finished in 24.10s",
+      "panic_sites": [
+        [
+          "crates/voice/src/coordinator/tests/second_route.rs",
+          "384",
+          "9"
+        ]
+      ],
+      "valid_terminal_observation": true,
+      "historical_cause_not_established": true,
+      "search_rows": [
+        "search fixture diagnostic scope started raw_us=3302164715939 scoped_us=3302164715911 host_budget_us=23999972",
+        "search fixture diagnostic pump phase=Run frame=0 logical_us=0 host_elapsed_us=1673 host_expired=false host_remaining_us=23998299 pushed_at=None muted=false result=Ok(())",
+        "search fixture diagnostic forced host deadline after fixture push publication (coordinator consumption unobserved) frame=139 pause_us=23892480 original_bound_expired=true",
+        "search fixture diagnostic pump phase=Run frame=139 logical_us=1386000 host_elapsed_us=24009095 host_expired=true host_remaining_us=0 pushed_at=Some(139) muted=false result=Ok(())",
+        "search fixture diagnostic conversation returned host_elapsed_us=24009235 logical_us=1386000 result=Some(\"scenario host watchdog\")",
+        "search fixture diagnostic close role=privacy pid=71254 scope_bound_expired=true scope_remaining_us=0 passed_cleanup_remaining_us=299803 observed_us=18 result=Err(Custom { kind: TimedOut, error: \"fixture child 71254 exit observation timed out\" })",
+        "search fixture diagnostic pump phase=Shutdown { deadline: Instant { tv_sec: 3302245, tv_nsec: 47932194 } } frame=139 logical_us=1386000 host_elapsed_us=24009676 host_expired=true host_remaining_us=0 pushed_at=Some(139) muted=false result=Err(Custom { kind: TimedOut, error: \"fixture child 71254 exit observation timed out\" })",
+        "search fixture diagnostic close role=speaker pid=71208 scope_bound_expired=true scope_remaining_us=0 passed_cleanup_remaining_us=296309 observed_us=4 result=Err(Custom { kind: TimedOut, error: \"fixture child 71208 exit observation timed out\" })",
+        "search fixture diagnostic pump phase=Shutdown { deadline: Instant { tv_sec: 3302245, tv_nsec: 47932194 } } frame=139 logical_us=1386000 host_elapsed_us=24013155 host_expired=true host_remaining_us=0 pushed_at=Some(139) muted=false result=Err(Custom { kind: TimedOut, error: \"fixture child 71208 exit observation timed out\" })",
+        "search fixture diagnostic close role=capture pid=71223 scope_bound_expired=true scope_remaining_us=0 passed_cleanup_remaining_us=292702 observed_us=4 result=Err(Custom { kind: TimedOut, error: \"fixture child 71223 exit observation timed out\" })",
+        "search fixture diagnostic pump phase=Shutdown { deadline: Instant { tv_sec: 3302245, tv_nsec: 47932194 } } frame=139 logical_us=1386000 host_elapsed_us=24016761 host_expired=true host_remaining_us=0 pushed_at=Some(139) muted=false result=Err(Custom { kind: TimedOut, error: \"fixture child 71223 exit observation timed out\" })",
+        "search fixture diagnostic close role=second pid=71239 scope_bound_expired=true scope_remaining_us=0 passed_cleanup_remaining_us=289328 observed_us=7 result=Err(Custom { kind: TimedOut, error: \"fixture child 71239 exit observation timed out\" })",
+        "search fixture diagnostic pump phase=Shutdown { deadline: Instant { tv_sec: 3302245, tv_nsec: 47932194 } } frame=139 logical_us=1386000 host_elapsed_us=24020151 host_expired=true host_remaining_us=0 pushed_at=Some(139) muted=false result=Err(Custom { kind: TimedOut, error: \"fixture child 71239 exit observation timed out\" })",
+        "search fixture diagnostic close role=ring pid=71269 scope_bound_expired=true scope_remaining_us=0 passed_cleanup_remaining_us=285329 observed_us=6 result=Err(Custom { kind: TimedOut, error: \"fixture child 71269 exit observation timed out\" })",
+        "search fixture diagnostic pump phase=Shutdown { deadline: Instant { tv_sec: 3302245, tv_nsec: 47932194 } } frame=139 logical_us=1386000 host_elapsed_us=24024139 host_expired=true host_remaining_us=0 pushed_at=Some(139) muted=false result=Err(Custom { kind: TimedOut, error: \"fixture child 71269 exit observation timed out\" })"
+      ],
+      "forced_boundary_validated": true
+    }
+  ],
+  "unrun_ordinals": [],
+  "runner_sha256": "0e963fb24cd4dc9a8d79fa8df902203228f910d9b56667f9b1fd4285f8bdc653",
+  "plan_sha256": "b481b63fc7662b27bf7507648da3b6857b4119f2a1dadbd9318e1646731582a4",
+  "no_retries": true,
+  "sockets": {
+    "directory": "/private/tmp/lcp-iai1g6qj",
+    "unix_datagram_bind": true,
+    "loopback_tcp_bind": true,
+    "tcp_address": [
+      "127.0.0.1",
+      57022
+    ],
+    "removed": true
+  },
+  "final_source": {
+    "base": {
+      "arm": "base",
+      "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+      "variant": null,
+      "tracked_paths": 10055,
+      "all_bytes_modes_match": true,
+      "aggregate_sha256": "797a6f78adfab0caa3d832d309a556f9966d21db40ca11fe2f0d0581cb3c4e97"
+    },
+    "candidate": {
+      "arm": "candidate",
+      "head": "72a62a51c065002eeff4407dba77c56088e3649f",
+      "variant": null,
+      "tracked_paths": 10055,
+      "all_bytes_modes_match": true,
+      "aggregate_sha256": "c344386244e23e370c523f7ff21b45470e4d8e1848c57cb6fbdb24b927b8b68b"
+    }
+  },
+  "started_ordinals": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "invalid_or_incomplete_ordinals": [],
+  "owned_children_all_reaped": true,
+  "interruptions": [],
+  "finished_utc": "2026-10-23T16:59:48.811201+00:00"
+}

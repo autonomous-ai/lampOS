@@ -1,0 +1,297 @@
+{
+  "files": [
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/base-initial-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/candidate-initial-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/base-observation-source-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/base-observation-compile.stdout",
+      "bytes": 249412,
+      "sha256": "e0fa8f66b930bb62e141113c276ae6b03f0d3fdd26b6a1ad03d4769994f71f30",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/base-observation-source-frozen-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-01-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-01-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-02-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-02-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/base-forced_boundaries-source-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/base-forced_boundaries-compile.stdout",
+      "bytes": 249412,
+      "sha256": "2b6744f9fe5ac387060248a6ce9b6332b6b595b96620125008cf410693cc5735",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/base-forced_boundaries-source-frozen-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-03-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-03-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-04-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-04-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/candidate-observation-source-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/candidate-observation-compile.stdout",
+      "bytes": 249728,
+      "sha256": "d3ab553a987bf803be2eba93d6fe09ca0bed7c91047e4c0f6e005e1ea8e5449e",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/candidate-observation-source-frozen-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-05-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-05-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-06-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-06-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/candidate-forced_boundaries-source-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/candidate-forced_boundaries-compile.stdout",
+      "bytes": 249728,
+      "sha256": "dd1003fd405443e115017b3d6a1d22642dadeb2a95435e5ac03d4ff47ba25591",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/candidate-forced_boundaries-source-frozen-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-07-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-07-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-08-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/case-08-after-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/base-restored-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/candidate-restored-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "reason": "Complete compiler-message JSON or bulk tracked inventory remains external."
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164923.936616Z/base-initial-tracked.stdout",
+      "bytes": 430064,
+      "sha256": "d2445040072bc4f0029ce863222ac4d67855a1496804f639d6567e245a3a8138"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164923.936616Z/base-restored-tracked.stdout",
+      "bytes": 430064,
+      "sha256": "d2445040072bc4f0029ce863222ac4d67855a1496804f639d6567e245a3a8138"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164923.936616Z/candidate-restored-tracked.stdout",
+      "bytes": 430064,
+      "sha256": "d2445040072bc4f0029ce863222ac4d67855a1496804f639d6567e245a3a8138"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/base-initial-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/base-restored-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/candidate-initial-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare-20261023T164948.203356Z/candidate-restored-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run.py",
+      "bytes": 14062,
+      "sha256": "0e963fb24cd4dc9a8d79fa8df902203228f910d9b56667f9b1fd4285f8bdc653"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/unexecuted-v1.py",
+      "bytes": 13966,
+      "sha256": "90de6723e3c5f2e1830a9e6f6a24ba1e9875537bd314b0568a1d3b9ad241a11b"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/prepare.py",
+      "bytes": 3717,
+      "sha256": "7f59a225f79b647d0ac045cac29779bf91df967204a638e247e6573c34c3e095"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/plan.json",
+      "bytes": 48117,
+      "sha256": "b481b63fc7662b27bf7507648da3b6857b4119f2a1dadbd9318e1646731582a4"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/base-source-map.json",
+      "bytes": 2668544,
+      "sha256": "d586aaac256604b3a222b6e83e63a80885b5bbcdd15c4bd85a53a1806414c7e2"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/candidate-source-map.json",
+      "bytes": 2668544,
+      "sha256": "3b8b58fded0a53e91eda79a27c87faf161daa25860235231ffcf704cd6b5d34f"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/expected-census.json",
+      "bytes": 345759,
+      "sha256": "5f2c48c84b95c9f10a721ed341fdc744334d142d48b5f2eda039250f26330dc2"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-runner-20261023/run-20261023T165111.127994Z/manifest.json",
+      "bytes": 32223,
+      "sha256": "93cfeae2aa5646d0524e9b8ad57b66164e1a48be7028041afa53716e45716f03"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-diagnostic-plan-20261023/observation/lampOS/crates/voice/src/privacy_bus.rs",
+      "bytes": 65014,
+      "sha256": "1c4d40d893ad97809354325689232cfd33adcc25fb74c08438b19f3138e14db8"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-diagnostic-plan-20261023/observation/lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+      "bytes": 225216,
+      "sha256": "783fe5dad9b3f1a3d84cd8abcf90ff026182eac6123e69fe72533195d978d85a"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-diagnostic-plan-20261023/forced_boundaries/lampOS/crates/voice/src/privacy_bus.rs",
+      "bytes": 65528,
+      "sha256": "e2460e181de714494a4507796b00b3f7efc3836180b4c58e807f6bc626a5549a"
+    },
+    {
+      "external_path": "/private/tmp/tests-privacy-search-diagnostic-plan-20261023/forced_boundaries/lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+      "bytes": 226141,
+      "sha256": "3f4f0f1f0d8c2e42b7f8556ef7ba7203557953248444d7422b4e69ca5fcd5bd1"
+    }
+  ],
+  "availability": "External local paths and hashes identify producer-held evidence; they are not promises of remote artifact availability. No executable bytes are published or independently retained for every earlier compile; each artifact was hashed before/after its observations. Python verifiers remain external under repository policy.",
+  "helper": {
+    "external_path": "/private/tmp/tests-light-call-phase-20261023/run.py",
+    "bytes": 24220,
+    "sha256": "de1c71cce6487a8bdff29eecd19cb9f35d23d42bb110f5594bb80a7dd08e8ad5"
+  }
+}
