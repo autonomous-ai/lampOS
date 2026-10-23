@@ -1,5 +1,15 @@
 # Reviewer work log
 
+## 2026-10-24 (reviewer-two turned-face source hold at 06:56 +07)
+
+#3305 HOLD 4fa63f1954405ad4129c7b826be36220320dd215 posted 6377088574, Queue 6377088911, after claim 6377062778. Read all eight changed files and relevant worker, room, face and voice-print ownership context. Independently confirmed reviewer-lead's two P2s (6377054471), no P1: the old turned-speaking branch runs first when both switches are on, skipping the new same-voice exception and room-talk marker; and the new helper can remove a wholly unread second turned face's sign because another still face supplies enough No votes. Requested authoritative new-policy ordering and per-face readability, with both-switch all-No/intermittent-unread/known-voice controls and second-face Unknown/absent-speaking controls. New feature remains off by default; that does not clear known required changes.
+
+Independent scoped source report c3305-independent-faces.md/json read in full. It confirms the second P2, finds no additional P1/P2 in speaking_faces.rs or same_voice.rs, and verifies the new likeness_so_far method leaves judgment/adoption ownership with the existing completion paths. Counterexamples are source-derived, not executed. Root has not run a full local gate on this source-held head. Diff check passed.
+
+Authored parent e7a1ccef72b8b31285a410eda9e1cd2218fa78b3 is behind fetched origin/lamp-voice 846b3d203fc00ec3886d71f7673d8cc29cc4a634. The five upstream Welcome-back/Skills files do not overlap the eight authored files, but the owner's literal latest-base rule still requires a carry. Native audit remains in progress: initial preview fedddb73afd17a4a9a938e8544addd0e3ca71acd includes 846b3d203 and therefore differs from authored tree by those five base files. No authored-equal or latest-base eligibility claimed from that preview. Strict Linux Clippy is reported successful by the audit; primary evidence qualification and original ARM run remain pending.
+
+Fetched origin and reread remote lampOS/AGENTS.md plus both reviewer roles; current protocol is PR comments and Queue #3126. Main inherited pr.json remains untouched, own log worktree was clean before this entry. Latest queue/PR replies read through the 06:55 scan; #3305 head unchanged, #3306/train64 and #3298 are assigned to other readers. Next corrected #3305 head, Seventh's not-yet-posted #3248 replacement, and oldest eligible ready PR. No product edit, device/provider/model action or manual merge; own merge count ten. Prior own log 85fa85805c pushed.
+
 ## 2026-10-24 (reviewer-two docs landing and next assignments at 06:31 +07)
 
 #3303 integrated by train #3304 at e7a1ccef72b8b31285a410eda9e1cd2218fa78b3 (bot Queue 6376734604, PR 6376733931). Full git diff against reviewed 792d142cda8e68b3621253cefe375782c7414dd6 is empty; parent df6830381. Root landing receipt 6376811591 and Queue next-work 6376811927. Current origin/lamp-voice has subsequently advanced to 846b3d203fc00ec3886d71f7673d8cc29cc4a634 with Welcome-back away-clock fix; build-rows.md unchanged. Own merge count remains ten.
