@@ -881,6 +881,15 @@ Host gate results and source identity are recorded in
 real temporary Unix sockets for transport, and separate processes for CLI
 and ownership checks. A replay establishes planned timing only.
 
+The fresh-output/session and offline-face runtime fixtures finish service
+construction and option setup before publishing their fresh inputs. The
+engine uses the captured wall clock, but bus admission still checks the
+real wall clock against the unchanged 500 ms VoiceTiming lifespan and 50 ms
+transport grace. Setup must not consume that freshness window. Input loss,
+stale retained inputs after restart, new session ownership and both offline
+face outcomes retain their original assertions. A stall after publication
+can still expire an input; the fixtures neither refresh it nor retry a step.
+
 The following counts and cost measurements are the **original task 4
 gate**, not a new task 18 result. On Third's Intel i7-10700K x86_64 Mac
 (64 GiB, Darwin 25.6.0, Rust 1.96.0), the full dependent gate passed 1,701
