@@ -122,7 +122,7 @@ command"). `build-orangepi.sh` is unchanged and still builds V1.
 make build-v2 LAMPOS_UPDATE_KEY=<key.pub>                              # the product channel
 make build-v2 LAMPOS_UPDATE_KEY=<key.pub> LAMPOS_CHANNEL_DIR=<folder>  # a signed channel folder
 make build-v2 ... LAMPOS_MODELS_DIR=<dir>                             # while the models release is a draft
-# → output/lamp-v2/golden-opi-lamp-v2[-<variant>].img.xz  (COMPRESS=0: output/lamp-v2/golden-opi.img)
+# → output/lamp-v2/lamp-os-v2[-<variant>].img.xz  (COMPRESS=0: output/lamp-v2/lamp-os-v2.img)
 make sd-card-flash-raw DEVICE_TYPE=lamp-v2 DISK=N
 ```
 
