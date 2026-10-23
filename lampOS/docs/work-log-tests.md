@@ -1,5 +1,23 @@
 # Tests work log
 
+## 2026-10-23 19:31 +0700 — claim bounded Memory phase diagnostic
+
+Ready for lamp-voice: no (#3190 execution HOLD remains).
+
+Under already-taken #1569, claim a temporary fixture-only diagnostic of the
+three Memory follow-up-forget failures. Reviewer-two accepted the scope on
+#3190: retain exact call arguments/results and assertions, record monotonic
+server request/answer timing, and label private client settlement/budget
+values unobserved. Use clean parent `8e3eaa6c2`, with source comparison to
+`4b92b677d`; no product instrumentation or limit relaxation.
+
+One complete instrumented Memory integration target and fixed exact controls
+are planned. A compatibility-answer hold released after the unchanged caller
+returns demonstrates a reachable pre-forget timeout. It cannot reproduce the
+old logs' later bare-forget phase; that limitation is explicit. Every hold
+must be bounded and released/joined on failure. No hook or execution has begun;
+the running phone gate stays first, then the short prepared diagnostics.
+
 ## 2026-10-23 19:17 +0700 — cue peer-closure controls completed
 
 Ready for lamp-voice: no (full gates remain).
