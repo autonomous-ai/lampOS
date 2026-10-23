@@ -1,0 +1,8 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T12:54:42.7726847Z HEAD is now at 690ab0d Merge 46f5f384ad94f9c2dcc5f7050991ef4325621384 into 810e05109bced3beca88a5b602930cfed5fba4e5
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T13:10:48.8305471Z     Starting 11067 tests across 166 binaries (69 tests and 2 binaries skipped)
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T13:13:38.2333543Z         LEAK [   0.233s] ( 8920/11067) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T13:14:08.0680722Z      Summary [ 199.237s] 11067 tests run: 11067 passed (1 leaky), 69 skipped
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T13:14:09.3865305Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T13:14:10.7160311Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T13:14:11.9160168Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T13:14:21.4112342Z test result: 12 passed; 0 failed

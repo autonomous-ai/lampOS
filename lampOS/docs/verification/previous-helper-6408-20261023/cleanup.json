@@ -1,0 +1,7 @@
+{
+  "command": "docker --context colima-lampos container ls -a --filter label=lamp.compat.owner --format '{{.Names}}'",
+  "exit_code": 0,
+  "stdout": "",
+  "observed_after": "final standalone rerun and both actual-old-helper round tests",
+  "scope": "all fixture-owner-labelled containers in the named context"
+}

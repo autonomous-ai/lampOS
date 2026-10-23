@@ -1,0 +1,89 @@
+{
+  "classification": "provisional current Mac coordinator / actual previous ARM64 fixed helper compatibility",
+  "current_source_head": "46f5f384ad94f9c2dcc5f7050991ef4325621384",
+  "integration_base": "810e05109",
+  "current_platform": "Darwin arm64",
+  "rust": "1.96.0",
+  "old_helper": {
+    "tag": "lampos-lamp-voice-6408",
+    "source": "ee53765c8d014eb00e41c1a5a7054d2546c18bdb",
+    "asset_id": 668607981,
+    "size": 4690504,
+    "sha256": "f731555d6b783a69eb00bc2ff774e8ad922988284c9f3a9114010fa75fa51778",
+    "release_signature_verified": false,
+    "platform": "linux/arm64"
+  },
+  "container_image": "sha256:7dc3bb4b3b88bb00e16e37eeb5c98a74f9d926f956584eb8c009c9ca86023cd2",
+  "results": {
+    "standalone": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "seconds": 2.23
+    },
+    "round": {
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "filtered_out": 155,
+      "seconds": 7.86
+    },
+    "fmt_exit": 0,
+    "strict_scoped_clippy_exit": 0
+  },
+  "commands": [
+    "cargo +1.96.0 test -q --locked --offline -p lamp-update --test helper_release_pair -- --ignored --test-threads=1 --nocapture",
+    "cargo +1.96.0 test -q --locked --offline -p lamp-update --test round actual_old -- --ignored --test-threads=1 --nocapture",
+    "cargo +1.96.0 fmt --all --check",
+    "cargo +1.96.0 clippy -q --locked --offline -p lamp-update --test helper_release_pair --test round --message-format=short -- -D warnings"
+  ],
+  "product_source_blobs": {
+    "lampOS/crates/update/src/apply.rs": "2c6ed3d65cc44498839c0bdee26ff2c8f4708d5b",
+    "lampOS/crates/update/src/check_units.rs": "8b2c8dba4ae6babcec94bc26ec4de7a3555a7d51",
+    "lampOS/crates/update/src/fetch.rs": "c0c3bc8f2494bd9f60ce75e757d6e9f8b9c041b8",
+    "lampOS/crates/update/src/head_touch.rs": "6b03616f6ecec221b7f61d876fc438ed777e862c",
+    "lampOS/crates/update/src/image.rs": "7a07e19d22069fe05f380a4457dddea0783ec9f5",
+    "lampOS/crates/update/src/install.rs": "f4f202540fc3cb5f2f78b9c1975ceade22e0898d",
+    "lampOS/crates/update/src/judge.rs": "ee6f994a06bfa1d3865d0b90db23813c358d9c28",
+    "lampOS/crates/update/src/lib.rs": "f500eaf667b395aeddd39ee2c3ad50b5fa51dd42",
+    "lampOS/crates/update/src/main.rs": "712443aa9a3004d24d4c9c11f89d6d274780365d",
+    "lampOS/crates/update/src/manifest.rs": "3e43f5f847d59842c2cb371e7b01fb50f72da9c3",
+    "lampOS/crates/update/src/models.rs": "d2eec8db2d31a464b052ea4c06e46938abef761c",
+    "lampOS/crates/update/src/own.rs": "d958a56a591c5f8d5d13edf8647baa4e938f1138",
+    "lampOS/crates/update/src/product_skills.rs": "20691fdf63e924c0106de3b2d3b3f737e8bac655",
+    "lampOS/crates/update/src/publish.rs": "b27475601b6882979f82ac3ca31b8c9ee3e4b48b",
+    "lampOS/crates/update/src/quiet.rs": "a25e4fdca6c9684ebf7cd0cc318ed07371152c47",
+    "lampOS/crates/update/src/records.rs": "4edb3438e36d4528f4dec707eda6735b4743dfd2",
+    "lampOS/crates/update/src/round.rs": "5ab7a4a9ab017062a3c437f5e91219086edc3eac",
+    "lampOS/crates/update/src/status.rs": "eac3a90aeae4f53f2d1a7857e3bd16f836aad008",
+    "lampOS/crates/update/src/unit.rs": "7118ed2f59bb3e321651e1f390d622f8d2c39fa1",
+    "lampOS/crates/update/src/unit/restart_order.rs": "817fecd24b77934efb67584196857edd745d4253",
+    "lampOS/crates/update/src/world.rs": "80799558375c5d848947df675145abf4b13ba53b",
+    "lampOS/crates/update/tests/round/head_touch.rs": "2221b31cc421b8477db1bc891d481c85143729a3",
+    "lampOS/crates/update/tests/round/process_cuts.rs": "392156ef65d52fb0289867664ded4e6d75bba2f0",
+    "lampOS/crates/update/tests/round/restart_order.rs": "ad97da1bbb47f6924227930374e47df82d733de0",
+    "lampOS/crates/update/tests/round/restart_quiet.rs": "07dba33b317f8b789678a323a95aa11697c85d12",
+    "lampOS/crates/update/tests/round/self_cuts.rs": "363578108de41c41b1cc8360622fe26029d90d0a",
+    "lampOS/crates/update/tests/round/self_recovery.rs": "78407621c2df0cd92acfb1b3cfa7314e0b045dce"
+  },
+  "fixture_sha256": {
+    "helper_release_pair.rs": "b6e9cd2a0ba8ee4197490412b2e2a8327199ea6ee05863c71610ba3a533cf14f",
+    "round/head_touch.rs": "ad3e474d01452807f0b52ae756aa9a1e25cbdda9357b3db431093a53c45e64d6"
+  },
+  "evidence_sha256": {
+    "clippy.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "helper_release_pair.rs.txt": "b6e9cd2a0ba8ee4197490412b2e2a8327199ea6ee05863c71610ba3a533cf14f",
+    "round-additions.patch": "c114be2abb4cc53536cb9e5c5e8c2314218786125d88a386a963a454ab357486",
+    "round.txt": "fef7e752b492e33447dfa5bf154a12abe52a84771d7e63957da66cc47735dc0d",
+    "standalone.txt": "d01f9dfcc1d538dffb7d320e5496f2ad25510ee275c612968c659e286345520e",
+    "cleanup.json": "378adefe20d57594c27e65f65ee90cdb2b5b3d5e6c6e9d3e646edc07d9af0753"
+  },
+  "output_normalization": {
+    "operation": "remove terminal blank lines, retain one final newline",
+    "raw_sha256": {
+      "standalone.txt": "680c948f59c23e9797c8326ec6125d5879fd4cb861d0671d03fc8bcdded73f82",
+      "round.txt": "c7cfd62c8af9ffa87621198a6692c419c9d45ae8f531dc5bd62faf03249a075b"
+    }
+  }
+}

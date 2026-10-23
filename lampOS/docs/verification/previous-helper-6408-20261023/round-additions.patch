@@ -1,0 +1,202 @@
+diff --git a/lampOS/crates/update/tests/round/head_touch.rs b/lampOS/crates/update/tests/round/head_touch.rs
+index 2221b31cc..a44d19fb3 100644
+--- a/lampOS/crates/update/tests/round/head_touch.rs
++++ b/lampOS/crates/update/tests/round/head_touch.rs
+@@ -1183,3 +1183,197 @@ fn malformed_environment_quotes_are_not_reader_evidence() {
+         refused_without_writes(&mut lamp);
+     }
+ }
++
++// Experimental manual transport only: the ordinary round tests never invoke
++// Docker. These checks keep the current host coordinator and fake systemd;
++// only the fixed old helper executes in an ARM64 container.
++#[path = "../helper_release_pair.rs"]
++mod helper_release_pair;
++
++fn actual_helper_owner(lamp: &mut Lamp) -> Rc<tempfile::TempDir> {
++    // Keep the lamp's actual TempDir alive in the 'static applier closure.
++    // Lamp's replacement folder is empty; root still names the original.
++    let owner = Rc::new(std::mem::replace(
++        &mut lamp._folder,
++        tempfile::tempdir().unwrap(),
++    ));
++    assert_eq!(lamp.root, owner.path());
++    let path = lamp.root.join("etc/lampOS/update/key.pub");
++    fs::create_dir_all(path.parent().unwrap()).unwrap();
++    // This is the existing fixture's throwaway signer, not another helper
++    // fixture's trust or a real lamp's key.
++    fs::write(path, manifest::public_key_text(&lamp.key)).unwrap();
++    owner
++}
++
++#[test]
++#[ignore = "manual actual old ARM64 helper; needs Docker and LAMP_COMPAT_OLD_HELPER"]
++fn actual_old_helper_pins_mismatch_is_put_back_before_readers_restart() {
++    let mut lamp = old_product(true);
++    let owner = actual_helper_owner(&mut lamp);
++    let files = etc_files(&lamp);
++    let settings = lamp.state()["settings"].clone();
++    let mut build = publish_readers(&mut lamp, true, true, true);
++    // Unlike the in-process emulation above, make the signed old-mode pins
++    // differ from those installed so the old helper really writes a backup.
++    let candidate = OLD_PINS.replace("\"every_ms\": 5", "\"every_ms\": 6");
++    build.settings = vec![Setting::new(PINS, &candidate)];
++    needing(&mut lamp, build, manifest::SETTINGS_UPDATER);
++    let (root, calls) = (lamp.root.clone(), Rc::clone(&lamp.calls));
++    let operations = Rc::new(RefCell::new(Vec::new()));
++    let seen = Rc::clone(&operations);
++    lamp.systemd.applier = Some(Box::new(move || {
++        let request: apply::Request = serde_json::from_slice(
++            &fs::read(root.join("var/lib/lampos-update/apply/request.json")).unwrap(),
++        )
++        .unwrap();
++        if request.op == apply::Op::Back {
++            assert!(
++                !calls.borrow().iter().any(|call| {
++                    call == "restart lamp-voice.service"
++                        || call == "restart lamp-expression.service"
++                        || call == "restart lamp-controls.service"
++                }),
++                "readers restarted before actual old Back restored pins: {:?}",
++                calls.borrow(),
++            );
++        }
++        assert_eq!(
++            helper_release_pair::old_apply_in_test_root(&root, &owner),
++            0
++        );
++        if request.op == apply::Op::Apply {
++            assert_eq!(
++                fs::read_to_string(root.join(PINS.trim_start_matches('/'))).unwrap(),
++                candidate
++            );
++        } else {
++            assert_eq!(
++                fs::read_to_string(root.join(PINS.trim_start_matches('/'))).unwrap(),
++                OLD_PINS
++            );
++        }
++        seen.borrow_mut().push(request.op);
++        Ok(())
++    }));
++    let outcome = lamp.round();
++    assert!(
++        matches!(
++            &outcome,
++            Outcome::RolledBack {
++                sequence: 2,
++                after: Ok(()),
++                ..
++            }
++        ),
++        "{outcome:?}; {:?}",
++        lamp.said,
++    );
++    assert_eq!(*operations.borrow(), [apply::Op::Apply, apply::Op::Back]);
++    assert_eq!(etc_files(&lamp), files);
++    assert_eq!(lamp.state()["settings"], settings);
++    assert!(!head_voice(&lamp));
++    assert!(!head_expression(&lamp));
++}
++
++#[test]
++#[ignore = "manual actual old ARM64 helper; needs Docker and LAMP_COMPAT_OLD_HELPER"]
++fn cut_after_actual_old_apply_recovers_pins_and_restarts_unchanged_controls() {
++    let mut lamp = old_product(true);
++    let owner = actual_helper_owner(&mut lamp);
++    let files = etc_files(&lamp);
++    let settings = lamp.state()["settings"].clone();
++    let links: Vec<_> = ["voice", "expression", "controls", "body"]
++        .into_iter()
++        .map(|part| {
++            let path = lamp.root.join(format!("opt/lampOS/{part}/current"));
++            let target = fs::read_link(&path).unwrap();
++            (path, target)
++        })
++        .collect();
++    let mut build = product_build(&mut lamp, 1);
++    build.sequence = 2;
++    assert!(build.units.is_empty());
++    let candidate = OLD_PINS.replace("\"every_ms\": 5", "\"every_ms\": 6");
++    build.settings = vec![Setting::new(PINS, &candidate)];
++    needing(&mut lamp, build, manifest::SETTINGS_UPDATER);
++    #[derive(Debug)]
++    struct AfterActualOldApply;
++    let first = Rc::new(Cell::new(true));
++    let cut_once = Rc::clone(&first);
++    let operations = Rc::new(RefCell::new(Vec::new()));
++    let seen = Rc::clone(&operations);
++    let root = lamp.root.clone();
++    lamp.systemd.applier = Some(Box::new(move || {
++        let request: apply::Request = serde_json::from_slice(
++            &fs::read(root.join("var/lib/lampos-update/apply/request.json")).unwrap(),
++        )
++        .unwrap();
++        assert_eq!(
++            helper_release_pair::old_apply_in_test_root(&root, &owner),
++            0
++        );
++        seen.borrow_mut().push(request.op);
++        if cut_once.replace(false) {
++            assert_eq!(request.op, apply::Op::Apply);
++            std::panic::panic_any(AfterActualOldApply);
++        }
++        assert_eq!(request.op, apply::Op::Back);
++        assert_eq!(
++            fs::read_to_string(root.join(PINS.trim_start_matches('/'))).unwrap(),
++            OLD_PINS
++        );
++        Ok(())
++    }));
++    // This is a logical coordinator cut after actual helper completion,
++    // not process death, a daemon exec handover or physical flash evidence.
++    let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| lamp.round()));
++    match cut {
++        Err(payload) if payload.is::<AfterActualOldApply>() => {}
++        Err(other) => std::panic::resume_unwind(other),
++        Ok(outcome) => panic!(
++            "actual old Apply cut was not reached: {outcome:?}; {:?}",
++            lamp.said
++        ),
++    }
++    assert!(!first.get());
++    assert_eq!(lamp.read(PINS), candidate);
++    assert!(lamp.exists("/var/lib/lampos-update/journal.json"));
++    for (name, old) in OLD_UNITS {
++        assert_eq!(lamp.read(&format!("/etc/systemd/system/{name}")), old);
++    }
++    for (path, target) in &links {
++        assert_eq!(fs::read_link(path).unwrap(), *target);
++    }
++    lamp.calls.borrow_mut().clear();
++    // Lamp::round constructs a fresh World around the same persisted files.
++    let outcome = lamp.round();
++    assert!(
++        matches!(
++            &outcome,
++            Outcome::RolledBack {
++                sequence: 2,
++                after: Ok(()),
++                ..
++            }
++        ),
++        "{outcome:?}; {:?}",
++        lamp.said,
++    );
++    assert_eq!(*operations.borrow(), [apply::Op::Apply, apply::Op::Back]);
++    assert_eq!(etc_files(&lamp), files);
++    assert_eq!(lamp.state()["settings"], settings);
++    let calls = lamp.calls();
++    let back = calls
++        .iter()
++        .position(|call| call == &format!("restart {}", apply::UNIT))
++        .unwrap();
++    let controls = calls
++        .iter()
++        .position(|call| call == "restart lamp-controls.service")
++        .expect("unchanged Controls must reload the restored pins");
++    assert!(back < controls, "{calls:?}");
++    for (path, target) in links {
++        assert_eq!(fs::read_link(path).unwrap(), target);
++    }
++}
