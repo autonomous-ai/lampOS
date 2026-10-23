@@ -259,21 +259,25 @@ def score(played, ev, J, L, heard_by):
         pieces = [q for q in reqs if begun[q] <= p['end'] + 1.0]
         heard = ' '.join(heard_by.get(q, '') for q in reqs).strip()
         answer = ''.join((r.get('text') or '') for r in ev.rows if r.get('kind') == 'transcript' and r.get('turn') in reqs).strip()
-        verdicts, firsts, let_go, joined = [], [], 0, 0
+        verdicts, firsts, let_go, joined, not_joined = [], [], 0, 0, 0
         for t, l in J:
             for q in reqs:
                 if re.search(rf'request {q}: its answer is (played|held back)', l): verdicts.append(re.search(r'its answer is (played|held back): (.*)', l).group(0)[14:][:90])
                 m = re.search(rf'request {q} first answer audio (\d+) ms', l)
                 if m: firsts.append(int(m.group(1)))
                 if re.search(rf"request {q}'s words, cut short, are let go", l): let_go += 1
-                if re.search(rf'request {q}\b.*joined', l): joined += 1
+                # A join is told only as "request N: K lines joined into it ..."; "request N: not joined with request M's
+                # words" is a refusal, counted apart (the voice writes refusals far more often).
+                m = re.search(rf'request {q}: (\d+) lines joined into it', l)
+                if m: joined += int(m.group(1))
+                if re.search(rf'request {q}: not joined with request', l): not_joined += 1
         # What was spoken is the journal's own line for the request ("first answer audio"): a transcript can hold words
         # the voice cancelled (a not_for_me after its text), and a sound's time is only when the Mac read it.
         answered = bool(firsts)
         want = kind != 'desk'
         out.append({**p, 'voice': voice, 'kind': kind, 'text': text, 'requests': reqs, 'pieces': pieces, 'heard': heard, 'wer': round(wer(text, heard), 2),
                     'answered': answered, 'right': answered == want, 'verdicts': verdicts, 'first_ms': firsts[:1], 'let_go': let_go,
-                    'joined': joined, 'answer': answer})
+                    'joined': joined, 'not_joined': not_joined, 'answer': answer})
     return out
 
 
@@ -333,18 +337,18 @@ def main():
     summary = {
         'round': rnd, 'at': time.strftime('%Y-%m-%d %H:%M'), 'lines': len(rows),
         'answered_of_talk': f"{sum(r['answered'] for r in talk)}/{len(talk)}", 'held_of_desk': f"{sum(not r['answered'] for r in desk)}/{len(desk)}", 'held_of_desk_after_answer': f"{sum(not r['answered'] for r in after)}/{len(after)}",
-        'split': sum(len(r['pieces']) > 1 for r in rows), 'pieces_total': sum(len(r['pieces']) for r in rows), 'let_go': sum(r['let_go'] for r in rows), 'joined': sum(r['joined'] for r in rows),
+        'split': sum(len(r['pieces']) > 1 for r in rows), 'pieces_total': sum(len(r['pieces']) for r in rows), 'let_go': sum(r['let_go'] for r in rows), 'joined': sum(r['joined'] for r in rows), 'not_joined': sum(r['not_joined'] for r in rows),
         'not_heard': sum(not r['requests'] for r in rows),
         'wer_median': statistics.median([r['wer'] for r in rows if r['requests']] or [0]), 'wer_over_0.2': sum(r['wer'] > 0.2 for r in rows if r['requests']),
         'first_ms_median': firsts[len(firsts) // 2] if firsts else None, 'first_ms_max': firsts[-1] if firsts else None,
         'stalls': held_up, 'stall_ms_max': max(stalls) if stalls else 0,
-        'journal': {k: sum(k in l for t, l in J) for k in ('memory note incomplete', 'memory note late', 'past the bound', 'cut short, are let go', 'joined', "the line is someone else's", 'another voice than the conversation', 'not for me', 'in a busy room: its words are not chained', 'says stop or never mind', 'judged_without')},
+        'journal': {k: sum(k in l for t, l in J) for k in ('memory note incomplete', 'memory note late', 'past the bound', 'cut short, are let go', 'lines joined into it', 'not joined with request', "the line is someone else's", 'another voice than the conversation', 'not for me', 'in a busy room: its words are not chained', 'says stop or never mind', 'judged_without')},
     }
     txt = [json.dumps(summary)]
     for r in rows:
         txt.append(f"{r['scene']:9} {r['id']} {r['when']:6} {r['kind']:6} pieces={r['pieces']} req={r['requests']} wer={r['wer']:.2f} "
                    f"{'ANSWERED' if r['answered'] else 'held'}{'' if r['right'] else ' <-- WRONG'} first={r['first_ms']} letgo={r['let_go']} "
-                   f"joined={r['joined']} names={r.get('name_scores')}\n    said:   {r['text']}\n    heard:  {r['heard']}\n    lamp:   {r['answer'][:300]}\n    why:    {r['verdicts']}")
+                   f"joined={r['joined']} not_joined={r['not_joined']} names={r.get('name_scores')}\n    said:   {r['text']}\n    heard:  {r['heard']}\n    lamp:   {r['answer'][:300]}\n    why:    {r['verdicts']}")
     open(f'{OUT}/night/{rnd}.txt', 'w').write('\n'.join(txt) + '\n')
     json.dump({'summary': summary, 'rows': rows}, open(f'{OUT}/night/{rnd}.json', 'w'), indent=1, default=str)
     print('\n'.join(txt[:1])); print(f'{OUT}/night/{rnd}.txt')

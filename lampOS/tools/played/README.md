@@ -236,7 +236,8 @@ SCENARIO files given, with no lamp and nothing played.
 `night.py ROUND [SCENE ...]` plays desk-kit-2's 50 made people's lines from
 this computer's speakers to your lamp, scene by scene, and scores each line
 from the voice's own events, its journal and the bus: words heard against
-the script, lines split into pieces, cut-short words let go, joined, the
+the script, lines split into pieces, cut-short words let go, lines joined
+into a request and joins the voice refused (`joined`, `not_joined`), the
 first answer sound, and whether each line was answered or held as its kind
 says (desk talk between colleagues must be held, every other line
 answered). A follow-up waits for the lamp's real answer: `a+S` plays S s
