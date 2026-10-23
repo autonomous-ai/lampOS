@@ -7522,3 +7522,36 @@ Mood activation; Voice/bus owners' permission contract before Peek access;
 and an authorized same-steps onboarding lamp walk. These dependencies and
 the next implementation on the policy answer are posted on Queue #3126.
 No lamp access, install, provider call, score increase or readiness claim.
+
+## 2026-10-23 07:05 +07: returning-track policy implemented from failing controls
+
+The first builder's 06:17 decision on #3064 supersedes the policy hold above:
+unresolved recognition denies personal output. A request that observes that
+loss stays ended; completed positive recognition allows a fresh proved ask.
+A still-valid pinned request may retain its original grant and deadline
+across a new passing face ID only after the same person is positively
+recognized under the same producer epoch. No grace or resumable wait is added.
+
+Rebased the existing one-commit foundation onto `ae4ab0022`, retaining both
+the upstream unplayed-answer clearing and private-output guard. The new
+local commit is `2207a1399`; public `470b4ac8c` is still the old draft head.
+Two upstream public-room test fixtures required the new `requires_speaker:
+false` field; their original compile failure is retained rather than counted
+as an executed regression.
+
+On the development Mac, tests-only controls before the correction:
+`cargo test -q --locked -p lamp-eyes --lib returning_` failed 0 passed /
+3 failed for the intended source-state and generation assertions.
+`cargo test -q --locked -p lamp-voice --lib returning_track` failed 2 passed /
+3 failed after the fixture composition correction: actual HTTP fallback and
+credited IPC refused the recognized return, and a changed raw stable identity
+was incorrectly accepted when memory used names. The five Voice controls'
+source hashes stayed unchanged throughout that run. Receipts and the retained
+compile failure are under `/private/tmp/fourth-returning-speaker-checks-20261023/`.
+
+The producer and consumer corrections are in progress in their separate
+files. Review also requires an unresolved Checking-to-empty transition to
+advance the epoch, and unchanged unmatched candidates to keep the existing
+recognition cadence rather than retry every frame. Full local and native
+qualification, the amended push, formal re-read and Name/Photo carries
+remain ahead. No lamp, provider call, physical timing or readiness claim.
