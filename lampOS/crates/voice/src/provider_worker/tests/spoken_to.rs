@@ -785,7 +785,10 @@ async fn with_the_switch_two_lines_the_lamp_left_alone_end_its_conversation() {
 /// clock, so that the long lines pass in a moment.
 #[tokio::test(start_paused = true)]
 async fn with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds() {
-    let _clock = logical_clock();
+    // The worker and its backdated answer share an epoch with 15 s of history.
+    let clock =
+        crate::scenario_clock::Scope::enter_at(Duration::from_secs(60), 600_000_000).unwrap();
+    clock.set_pump(|_| Ok(())).unwrap();
     let follow_up = "And what about tomorrow?";
     for (on, busy, ago_s, long_s, line, answered) in [
         (false, true, 12, 0, follow_up, true),
@@ -1763,16 +1766,43 @@ async fn with_a_voice_check_a_call_begun_over_a_silent_reply_gives_the_conversat
     );
 }
 
-/// A stand-in `lamp-same-voice` that never gets ready, as one still
-/// loading its model: it says nothing and sleeps. Dropped, it kills the
-/// child and removes its folder, so the child ends with its test (the
-/// reviewer on #1445: nextest found it alive after the test, its standard
-/// error still open, and its folders were left in the temp dir).
+/// A real `lamp-same-voice` child held before Ready. Its private FIFO
+/// probes acknowledge the same live child throughout the conversation.
 struct LoadingChild {
     dir: std::path::PathBuf,
+    prints: std::sync::Arc<std::sync::Mutex<Option<crate::same_voice::Prints>>>,
+    control: Option<std::fs::File>,
+    pid: Option<rustix::process::Pid>,
+    probe: u64,
+    launched: bool,
+    finished: bool,
+}
+
+/// Let cleanup close Prints even if a panicking paused test has not yet
+/// dropped the worker task. The real Printer still handles every call.
+struct LoadingPrints(std::sync::Arc<std::sync::Mutex<Option<crate::same_voice::Prints>>>);
+
+impl crate::same_voice::Printer for LoadingPrints {
+    fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+        self.0
+            .lock()
+            .unwrap()
+            .as_mut()
+            .is_some_and(|prints| crate::same_voice::Printer::ask(prints, request, samples))
+    }
+
+    fn answer(&mut self) -> Option<(u64, std::result::Result<Vec<f32>, String>)> {
+        self.0
+            .lock()
+            .unwrap()
+            .as_mut()
+            .and_then(crate::same_voice::Printer::answer)
+    }
 }
 
 impl LoadingChild {
+    const HOST_WAIT: Duration = Duration::from_secs(5);
+
     fn new() -> Self {
         use std::os::unix::fs::PermissionsExt;
         let dir = std::env::temp_dir().join(format!(
@@ -1783,35 +1813,178 @@ impl LoadingChild {
                 .unwrap()
                 .subsec_nanos()
         ));
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir(&dir).unwrap();
         let path = dir.join(crate::same_voice::EXECUTABLE);
         std::fs::write(
             &path,
-            "#!/bin/sh\necho $$ > \"$(dirname \"$0\")/pid\"\nexec sleep 10\n",
+            "#!/bin/sh\n\
+             dir=${0%/*}\n\
+             printf '%s\\n' \"$$\" > \"$dir/pid\" || exit 71\n\
+             [ ! -e \"$dir/abort\" ] || exit 0\n\
+             mkfifo \"$dir/control\" || exit 72\n\
+             exec 3< \"$dir/control\" || exit 73\n\
+             while IFS= read -r probe <&3; do\n\
+                 printf '%s %s\\n' \"$probe\" \"$$\" > \"$dir/held\" || exit 74\n\
+             done\n\
+             printf 'released %s\\n' \"$$\" > \"$dir/released\"\n",
         )
         .unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
-        Self { dir }
+        Self {
+            dir,
+            prints: std::sync::Arc::default(),
+            control: None,
+            pid: None,
+            probe: 0,
+            launched: false,
+            finished: false,
+        }
     }
 
-    fn program(&self) -> std::path::PathBuf {
-        self.dir.join(crate::same_voice::EXECUTABLE)
+    fn printer(&mut self) -> Box<dyn crate::same_voice::Printer> {
+        *self.prints.lock().unwrap() = Some(crate::same_voice::Prints::start(
+            self.dir.join(crate::same_voice::EXECUTABLE),
+            "model".into(),
+        ));
+        self.launched = true;
+        Box::new(LoadingPrints(self.prints.clone()))
+    }
+
+    fn pending(deadline: std::time::Instant, what: &str) -> std::io::Result<()> {
+        if std::time::Instant::now() >= deadline {
+            return Err(std::io::Error::new(std::io::ErrorKind::TimedOut, what));
+        }
+        // The runtime is paused: this is a host watchdog, never a Tokio wait.
+        std::thread::sleep(Duration::from_millis(1));
+        Ok(())
+    }
+
+    fn pid(&mut self, deadline: std::time::Instant) -> std::io::Result<rustix::process::Pid> {
+        while self.pid.is_none() {
+            match std::fs::read_to_string(self.dir.join("pid")) {
+                Ok(text) => {
+                    if let Some(complete) = text.strip_suffix('\n') {
+                        self.pid = complete
+                            .parse::<i32>()
+                            .ok()
+                            .filter(|pid| *pid > 0)
+                            .and_then(rustix::process::Pid::from_raw);
+                        if self.pid.is_none() {
+                            return Err(std::io::Error::other("invalid loading child PID"));
+                        }
+                    }
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error),
+            }
+            if self.pid.is_none() {
+                Self::pending(deadline, "loading child did not publish its complete PID")?;
+            }
+        }
+        Ok(self.pid.unwrap())
+    }
+
+    fn open_control(&self) -> std::io::Result<Option<std::fs::File>> {
+        use rustix::fs::{Mode, OFlags, open};
+        match open(
+            self.dir.join("control"),
+            OFlags::WRONLY | OFlags::NONBLOCK | OFlags::CLOEXEC,
+            Mode::empty(),
+        ) {
+            Ok(fd) => Ok(Some(fd.into())),
+            Err(rustix::io::Errno::NOENT | rustix::io::Errno::NXIO) => Ok(None),
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    fn held(&mut self) -> std::io::Result<()> {
+        use rustix::process::{WaitId, WaitIdOptions, waitid};
+        use std::io::Write;
+        let deadline = std::time::Instant::now() + Self::HOST_WAIT;
+        let pid = self.pid(deadline)?;
+        while self.control.is_none() {
+            self.control = self.open_control()?;
+            if self.control.is_none() {
+                Self::pending(deadline, "loading child did not open its hold FIFO")?;
+            }
+        }
+        self.probe += 1;
+        writeln!(self.control.as_mut().unwrap(), "{}", self.probe)?;
+        let expected = format!("{} {}\n", self.probe, pid.as_raw_nonzero());
+        loop {
+            let state = waitid(
+                WaitId::Pid(pid),
+                WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
+            )?;
+            if state.is_some() {
+                return Err(std::io::Error::other("loading child exited before release"));
+            }
+            match std::fs::read_to_string(self.dir.join("held")) {
+                Ok(text) if text == expected => return Ok(()),
+                Ok(_) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error),
+            }
+            Self::pending(deadline, "loading child did not acknowledge its held probe")?;
+        }
+    }
+
+    fn finish(&mut self) -> std::io::Result<()> {
+        use rustix::process::{WaitId, WaitIdOptions, waitid};
+        self.finished = true;
+        // Close the real request sender before releasing the child, including
+        // on unwind: the supervisor must exit rather than start another one.
+        self.prints.lock().unwrap_or_else(|p| p.into_inner()).take();
+        let mut released = self.control.take().is_some();
+        if self.launched {
+            // A start that missed the test's watchdog must not later block.
+            std::fs::write(self.dir.join("abort"), b"")?;
+            let deadline = std::time::Instant::now() + Self::HOST_WAIT;
+            let pid = self.pid(deadline)?;
+            loop {
+                match waitid(
+                    WaitId::Pid(pid),
+                    WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
+                ) {
+                    Err(rustix::io::Errno::CHILD) => break,
+                    Ok(None) if !released => released = self.open_control()?.is_some(),
+                    Ok(_) | Err(rustix::io::Errno::INTR) => {}
+                    Err(error) => return Err(error.into()),
+                }
+                Self::pending(deadline, "loading child was not reaped by its supervisor")?;
+            }
+            if self.probe != 0
+                && std::fs::read_to_string(self.dir.join("released"))?
+                    != format!("released {}\n", pid.as_raw_nonzero())
+            {
+                return Err(std::io::Error::other(
+                    "loading child did not acknowledge release",
+                ));
+            }
+        }
+        std::fs::remove_dir_all(&self.dir)
     }
 }
 
 impl Drop for LoadingChild {
     fn drop(&mut self) {
-        // The child's own id, as it wrote it before it slept. Signalled
-        // from here, not by a `kill` program, which a machine without
-        // procps lacks (#1497).
-        if let Some(pid) = std::fs::read_to_string(self.dir.join("pid"))
-            .ok()
-            .and_then(|pid| pid.trim().parse().ok())
-            .and_then(rustix::process::Pid::from_raw)
+        if !self.finished
+            && let Err(error) = self.finish()
         {
-            let _ = rustix::process::kill_process(pid, rustix::process::Signal::TERM);
+            // Retain the script if startup or reaping was not proved; removing
+            // it could race the asynchronous launch. Never mask an unwind.
+            if std::thread::panicking() {
+                eprintln!(
+                    "loading child cleanup failed at {}: {error}",
+                    self.dir.display()
+                );
+            } else {
+                panic!(
+                    "loading child cleanup failed at {}: {error}",
+                    self.dir.display()
+                );
+            }
         }
-        let _ = std::fs::remove_dir_all(&self.dir);
     }
 }
 
@@ -1823,15 +1996,14 @@ impl Drop for LoadingChild {
 /// a block (`voice_line`'s "was never taken").
 #[tokio::test(start_paused = true)]
 async fn a_child_still_loading_its_model_takes_nothing_from_the_worker() {
+    let _one = one_thread();
     let _clock = logical_clock();
-    let child = LoadingChild::new();
+    let mut child = LoadingChild::new();
     let mut options = options(true, quiet_going_on, crate::tools::Settings::default());
-    options.voices = Some(Box::new(crate::same_voice::Prints::start(
-        child.program(),
-        "model".into(),
-    )));
+    options.voices = Some(child.printer());
     let mut rig = LiveRig::start_with(quick_policy(), options);
     let mut dial = rig.ready().await;
+    child.held().unwrap();
     for (voice, text) in [
         (1, "Hey Lamp, how much is one hundred dollars in euros?"),
         (-1, "Anyway, if we drop the trip we save almost half."),
@@ -1841,8 +2013,10 @@ async fn a_child_still_loading_its_model_takes_nothing_from_the_worker() {
             line(&mut rig, &mut dial, false, voice, 300, text).await,
             "{text}"
         );
+        child.held().unwrap();
     }
     rig.stop().await;
+    child.finish().unwrap();
 }
 
 /// What the model does with Samantha's "Yes, give me five minutes.", let
