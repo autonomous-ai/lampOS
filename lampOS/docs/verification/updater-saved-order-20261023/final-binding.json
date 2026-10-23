@@ -192,5 +192,9 @@
       "path": "lampOS/rust-toolchain.toml",
       "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
     }
-  ]
+  ],
+  "pr": 3186,
+  "published_head": "3a332edd3b268d6a0c91667a24d40af7011e0777",
+  "published_base": "b3a1ece0b1b9db75098335ad80da14f5a3183883",
+  "one_commit": true
 }

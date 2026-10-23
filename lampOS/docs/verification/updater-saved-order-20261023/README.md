@@ -78,3 +78,14 @@ These are fake-systemd/file fixtures and existing process tests on a Mac.
 The caught reload panic models a persisted cut point, not a physical unplug.
 No lamp, real systemd restart, flash durability, real release key or acoustic
 latency was tested. The PR's official ARM64 and Linux Clippy gates are separate.
+
+## Published head
+
+PR #3186 is one commit `3a332edd3` on latest integration `b3a1ece0b` at
+publication. `published.patch` reconstructs the commit from that public
+base, and `final-binding.json` confirms every tested Update/Cargo input
+matches the published source. Exact-commit Linux formatting also passed
+in the existing Rust 1.96.0 aarch64 container with network disabled;
+`linux-format/` records the source tree, immutable image ID and raw output.
+No local ARM64 compilation or test gate ran. Official PR checks remain
+separate and pending at this checkpoint.

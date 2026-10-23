@@ -1,3 +1,26 @@
+## Current checkpoint: 2026-10-23 09:36 +07, saved rollback order published
+
+Ready for lamp-voice: no; #3186 needs native gates and external reads
+
+#3186 is one commit `3a332edd3` on `b3a1ece0b`. It saves the old restart
+order before a switch, keeps malformed recovery journals and inactive
+services intact, and preserves live build folders when inventory cannot be
+read. Mac Update: **332 passed / 0 failed / 4 ignored**; formatting and
+strict Clippy pass. Exact-source Linux formatting also passes, without a
+local ARM64 build. [Complete evidence](verification/updater-saved-order-20261023/README.md)
+includes the six test-first failures, fourteen passing ordering cases and
+one deliberate failing control. Nine and Reviewer-lead are requested for
+the follow-up read; official PR ARM64 and Linux Clippy are running.
+
+#3173 is merged through train 27. Its native train gate passed **10,873 / 0 /
+67 skipped**, one passing leaky case, plus Linux Clippy. Every authored file
+matches the landed source; [train and landing receipts](verification/updater-restart-order-20261023/README.md#train-27-and-the-landed-source).
+#3130 has Second's READ-OK and reviewer-three's read, with the latest-base
+carry and official gates owned by Seventh and the merger. #2810's physical
+unplug and #1812's real release still need the holder/publisher handoffs.
+
+---
+
 ## Current checkpoint: 2026-10-23 09:29 +07, forget hold cleared and saved rollback order gated next
 
 Ready for lamp-voice: #3130 Second READ-OK on `82bc0f4ec`; #3173 merged in train 27
