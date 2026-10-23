@@ -13,7 +13,7 @@ use std::{
     os::unix::fs::{OpenOptionsExt, PermissionsExt, symlink},
     path::PathBuf,
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
     },
     thread,
@@ -102,6 +102,7 @@ impl Rig {
             cancel: None,
             as_person: false,
             folder_missing: false,
+            journal: None,
         };
         let rig = Self {
             root,
@@ -975,6 +976,30 @@ fn the_folder_is_the_one_harness_names_whole() {
     }
 }
 
+/// The retry has only what is left of `new`'s one bound, so a hand-over
+/// waits at most one `launch_timeout`, not two (the Reviewer-lead's P3 on
+/// #3217).
+#[test]
+fn the_retry_shares_the_one_launch_bound() {
+    let mut rig = Rig::new();
+    rig.config.launch_timeout = Duration::from_millis(2500);
+    let mut refused = name_taken("fixture-project", "this computer");
+    refused["delay_ms"] = json!(1500);
+    rig.plan(json!({
+        "machines": {"default": true},
+        "new": {"each": [refused, {"delay_ms": 5000}]}
+    }));
+    let cli = rig.cli();
+    let began = Instant::now();
+    let outcome = cli.launch(&launch());
+    let took = began.elapsed();
+    assert_eq!(outcome, uncertain("timeout"));
+    assert_eq!(new_projects(&rig).len(), 2);
+    // Two full bounds would be past 4 s; one, with the kill's cleanup, is
+    // well under it.
+    assert!(took < Duration::from_millis(3800), "{took:?}");
+}
+
 /// Two tasks in a row on one name: the first makes the folder, the second
 /// is refused for it and starts in it. Neither is lost.
 #[test]
@@ -1043,6 +1068,159 @@ fn only_the_name_taken_refusal_is_asked_again_and_only_once() {
         "{outcome:?}"
     );
     assert_eq!(new_projects(&rig).len(), 1);
+}
+
+/// The journal lines one launch says, with the rig's journal kept.
+fn journal_of(rig: &mut Rig, request: &Launch) -> (LaunchOutcome, Vec<String>) {
+    let journal = Arc::new(Mutex::new(Vec::new()));
+    rig.config.journal = Some(journal.clone());
+    let outcome = rig.cli().launch(request);
+    let lines = journal.lock().unwrap().clone();
+    (outcome, lines)
+}
+
+/// No journal line holds the ask, or any of its words of four letters or
+/// more, or a word that looks secret.
+fn assert_said_nothing_private(line: &str, request: &Launch) {
+    assert!(!line.contains(&request.prompt), "{line}");
+    for word in request.prompt.split_whitespace() {
+        if word.chars().count() >= 4 {
+            assert!(
+                !line.to_lowercase().contains(&word.to_lowercase()),
+                "{word}: {line}"
+            );
+        }
+    }
+    for secret in ["token", "hunter2", "sk-live", "@example.com"] {
+        assert!(!line.contains(secret), "{secret}: {line}");
+    }
+}
+
+/// An `uncertain` dispatch left lamp-0c89's journal empty for 16 minutes
+/// (Mobile, #2813). Every dispatch now says one line: the task's label, its
+/// state and code, the CLI's exit status, the time, and stderr's last line
+/// with the ask's words and secret-looking words dropped (the first builder
+/// on #3126, 11:42).
+#[test]
+fn every_dispatch_says_one_journal_line_without_the_ask() {
+    let mut request = launch();
+    request.prompt = "Summarise quarterly invoices for Brightwater".into();
+    // Refused after `new` started: exit 1, with stderr.
+    let mut rig = Rig::new();
+    rig.new_step(json!({
+        "exit": 1,
+        "stdout": "{\"ok\":false,\"error\":\"SPAWN_FAILED\"}\n",
+        "stderr": "warming up\nerror: could not start Summarise for Brightwater token=sk-live-9f8e7d6c5b4a3921 as lee@example.com\n\n"
+    }));
+    let (outcome, lines) = journal_of(&mut rig, &request);
+    assert_eq!(outcome, uncertain("new_failed"));
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(
+        lines[0].starts_with("tasks: lamp-task-001: dispatch uncertain new_failed (exit 1, "),
+        "{}",
+        lines[0]
+    );
+    assert!(
+        lines[0].contains(", stderr: error: could not start … as …)"),
+        "{}",
+        lines[0]
+    );
+    assert_said_nothing_private(&lines[0], &request);
+    // A `new` that never answered: no exit, and no stderr.
+    rig = Rig::new();
+    rig.config.launch_timeout = Duration::from_millis(300);
+    rig.new_step(json!({"delay_ms": 2000, "stderr": "Summarise Brightwater\n"}));
+    let (outcome, lines) = journal_of(&mut rig, &request);
+    assert!(
+        matches!(outcome, LaunchOutcome::Uncertain { .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(lines[0].contains(": dispatch uncertain "), "{}", lines[0]);
+    assert!(lines[0].contains("(no exit, "), "{}", lines[0]);
+    assert!(!lines[0].contains("stderr"), "{}", lines[0]);
+    assert_said_nothing_private(&lines[0], &request);
+    // Accepted: exit 0, and an stderr of only the ask's words says none.
+    rig = Rig::new();
+    rig.new_step(
+        json!({"stdout": format!("{}\n", created()), "stderr": "Summarise quarterly invoices\n"}),
+    );
+    let (outcome, lines) = journal_of(&mut rig, &request);
+    assert_eq!(
+        outcome,
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(
+        lines[0].starts_with("tasks: lamp-task-001: dispatch accepted (exit 0, ")
+            && lines[0].ends_with(" s)"),
+        "{}",
+        lines[0]
+    );
+    assert_said_nothing_private(&lines[0], &request);
+    // Refused before any call: one line too, with no exit.
+    rig = Rig::new();
+    let mut invalid = request.clone();
+    invalid.target.project = "--bad".into();
+    let (outcome, lines) = journal_of(&mut rig, &invalid);
+    assert_eq!(outcome, not_sent("invalid_project"));
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(
+        lines[0].contains("dispatch not_sent invalid_project (no exit, "),
+        "{}",
+        lines[0]
+    );
+    assert!(rig.calls().is_empty());
+}
+
+/// Fourteen's privacy probe on #3234: the ask's short words (the people in
+/// it), a quoted echo, and the name-taken refusal's computer label, home
+/// folder and project never reach the journal; only plain words and codes
+/// do.
+#[test]
+fn a_dispatch_line_keeps_no_name_folder_or_computer_from_stderr() {
+    let mut request = launch();
+    request.prompt = "Remind Lan to call Mai about the dentist at 5".into();
+    for (stderr, said) in [
+        (
+            "error: could not start: Remind Lan to call Mai about the dentist at 5",
+            Some("error: could not start: …"),
+        ),
+        (
+            "harness: task 'remind Lan to call Mai' refused",
+            Some("harness: task … refused"),
+        ),
+        (
+            "error: “Ở nhà” already exists on Vy's MacBook: /Users/vy/harnesses/Ở nhà. Choose another name",
+            Some("error: … already exists on …"),
+        ),
+        (
+            "SPAWN_FAILED: spawn refused (exit 7)",
+            Some("SPAWN_FAILED: spawn refused (exit 7)"),
+        ),
+        ("Lan Mai Vy", None),
+    ] {
+        let mut rig = Rig::new();
+        rig.new_step(json!({
+            "exit": 1,
+            "stdout": "{\"ok\":false,\"error\":\"SPAWN_FAILED\"}\n",
+            "stderr": format!("{stderr}\n"),
+        }));
+        let (_, lines) = journal_of(&mut rig, &request);
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        let line = &lines[0];
+        match said {
+            Some(said) => assert!(line.ends_with(&format!(", stderr: {said})")), "{line}"),
+            None => assert!(!line.contains("stderr"), "{line}"),
+        }
+        for private in [
+            "Lan", "Mai", "Vy", "/Users", "nhà", "MacBook", "dentist", "Remind",
+        ] {
+            assert!(!line.contains(private), "{private}: {line}");
+        }
+    }
 }
 
 #[test]
