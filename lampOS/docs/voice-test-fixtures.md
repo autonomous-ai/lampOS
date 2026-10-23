@@ -242,6 +242,17 @@ A deterministic regression unwinds an entered real stalled writer with a
 typed panic, preserves that panic and requires its eventual finish receipt.
 It does not suppress writer failure or turn the stalled report into success.
 
+The cue peer-loss fixture establishes actual socket closure after dropping
+its receiver: a copied receiver can outlive that local handle. Fresh
+nonblocking, connect-only probes must return `ConnectionRefused` within a
+five-second host setup watchdog. Each live probe is dropped before a 1 ms
+poll; any other error fails immediately. The probes send no cues. Once
+closure is observed, the original single `CueSink::scan` must still latch the
+send failure. The stale-cue checks, trace, timestamps and all original
+assertions remain unchanged. This setup observation does not retry a product
+send or change its deadline, and does not identify the cause of a particular
+failed run.
+
 ## Motor setup
 
 The motor fixture executes and reaps an inert preflight arm of its exact
