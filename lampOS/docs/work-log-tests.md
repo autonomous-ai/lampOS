@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-23 20:29 +0700 — native binary-count precision
+
+Ready for lamp-voice: no; both current execution HOLDs remain.
+
+The reviewer independently verified the latest native receipt with no
+integrity P1/P2. Clarify its starting census: nextest reports 62 binaries,
+while the actual result rows represent 58 distinct binaries. The README
+and derived count keys now say exactly that; test totals, all raw bytes and
+source bindings are unchanged. This is a receipt clarification, no rerun.
+
 ## 2026-10-23 20:24 +0700 — claim bounded Update stdout diagnostic
 
 Ready for lamp-voice: no.
@@ -46,7 +56,7 @@ Ready for lamp-voice: no; the local execution HOLDs remain with the reviewer.
 Both [current native runs](verification/test-carries-train49-20261023/native-ci/)
 passed: #3190 ARM64 39957082492 and Clippy 39957082564; #3218 ARM64
 39957090143 and Clippy 39957090152. Each selected parallel PR run completed
-7,237 passed (one LEAK), zero failed and 33 skipped across 62 binaries and
+7,237 passed (one LEAK), zero failed and 33 skipped across 62 reported binaries (58 with result rows) and
 12 of 46 packages. The checked merge trees equal their authored heads.
 Separate doctests passed four cases and the turn-end harness passed twelve;
 these are not added to nextest. The journal LEAK and emitted warnings remain.

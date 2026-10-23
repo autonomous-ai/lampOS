@@ -12,12 +12,13 @@
       "LEAK_rows": 1,
       "failed": 0,
       "skipped_from_summary": 33,
-      "executed_binaries": 62,
       "excluded_binaries_from_starting_summary": 106,
       "unique_observed_result_rows": 7237,
       "observed_row_identity_sha256": "73856d3943040b9ced337d8034c95ab782f8f46c99fb39acd42b2630908f7ec2",
       "ordinal_span": "Every integer1..7237 observed once; parse ends at first Summary before repeated success-output recap.",
-      "skipped_limit": "Skipped names are not individually listed in this log;33 comes from nextest summary, not an inferred skipped-case census."
+      "skipped_limit": "Skipped names are not individually listed in this log;33 comes from nextest summary, not an inferred skipped-case census.",
+      "reported_starting_binaries": 62,
+      "binaries_with_actual_result_rows": 58
     },
     "scope": {
       "selected_packages": [
@@ -639,12 +640,13 @@
       "LEAK_rows": 1,
       "failed": 0,
       "skipped_from_summary": 33,
-      "executed_binaries": 62,
       "excluded_binaries_from_starting_summary": 106,
       "unique_observed_result_rows": 7237,
       "observed_row_identity_sha256": "73856d3943040b9ced337d8034c95ab782f8f46c99fb39acd42b2630908f7ec2",
       "ordinal_span": "Every integer1..7237 observed once; parse ends at first Summary before repeated success-output recap.",
-      "skipped_limit": "Skipped names are not individually listed in this log;33 comes from nextest summary, not an inferred skipped-case census."
+      "skipped_limit": "Skipped names are not individually listed in this log;33 comes from nextest summary, not an inferred skipped-case census.",
+      "reported_starting_binaries": 62,
+      "binaries_with_actual_result_rows": 58
     },
     "scope": {
       "selected_packages": [
