@@ -34,8 +34,8 @@ Environment=LAMP_EYES_SPEAKING=on
 # Blendshape V2 from Face Mesh V2's points, both placed by install (models.json). FER+ (`--seems`)
 # never runs here: its training pictures are for research only. Nothing is read without the
 # lamp's kept yes, for everyone it sees, in /var/lib/lampOS/consent/face-expressions.json (privacy-switch.md). The mesh
-# and the read run on their own thread, off the look, so the speaking read above stays on the
-# corners (eyes.md).
+# runs on the look, one a look, so the speaking read above reads the lips, and the read takes its
+# points on its own thread, off the look (eyes.md).
 # The full look: the camera at 1280x960, and "what do you see" answered from one still, at most 1024
 # across, kept in look.jpg for 15 s (LAMP_LOOK_FULL in the voice). The sight file's working frame is
 # encoded from the look's own decoded picture (--sight-from-look, #2748). On lamp-75c9 it cost about

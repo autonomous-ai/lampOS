@@ -1778,19 +1778,29 @@ logger takes the stream and splits it by `from`: `latest` holds only the
 newest, whichever reader that was.
 
 - **Off the look, on its own thread** (the reviewer-lead's P2 on #2872).
-  With `--seems-blendshapes` the mesh belongs to the `eyes-seems` thread:
-  when a read is due the look only cuts the near face's crop
-  (`mesh::crop`) and offers it through one slot that holds the newest
-  (`latest::worker`). A crop not taken yet is dropped for a newer one,
-  never queued, and the look never waits. The thread runs the mesh and
-  the blendshapes (85 ms under tract on lamp-52e6's big core, 290 ms on a
-  small one, 33 under `--mouth-runtime`), and the next look takes the read
-  and says it, stamped with when its face was seen, so it lasts its 5 s
-  from then. The journal's minute line says the longest is off the look.
-- **So the mouth's per-look pass doesn't run.** With `--seems-blendshapes`
-  the look loop has no mesh, and the speaking read judges from the corners,
-  as the product did before #2872. `--mouth-model` alone keeps its pass on
-  the look for the speaking read's lips, as below.
+  With `--seems-blendshapes` the read runs on the `eyes-seems` thread:
+  when a read is due the look offers the near face through one slot that
+  holds the newest (`latest::worker`). A face not taken yet is dropped for
+  a newer one, never queued, and the look never waits. The next look takes
+  the read and says it, stamped with when its face was seen, so it lasts
+  its 5 s from then. The journal's minute line says the longest is off the
+  look.
+- **One mesh a look, on the look** (#720; the regression #3158 brought,
+  measured on lamp-52e6 by Fifth's #720 row on 23 Oct). The mouth's
+  per-look pass runs on the look with or without `--seems-blendshapes`,
+  as with `--mouth-model` alone (below), and a read due on the face it
+  meshed takes the same points (`blendshapes::input`): the thread then
+  runs only the blendshapes. Only a read due on another face, or on a
+  look with no mouth pass (`--mouth-on-heard on` and no line heard), sends
+  the face's crop (`mesh::crop`), and the thread runs its own mesh on it
+  (85 ms under tract on lamp-52e6's big core, 290 ms on a small one, 33
+  under `--mouth-runtime`), at most once in 2 s. #3158 had the thread
+  mesh every look's crop for the mouth instead and the next look take it:
+  on lamp-52e6, in 60 s of talking, the looks fell to 97 from 234 (the
+  thread kept a second core meshing back to back while the look ran
+  YuNet; nothing in the look waits on it, so the cost is the CPU's), and
+  39 of them read the lips (speaking `yes` 39/97, against 234/234 with
+  the mesh on the look).
 - **One reader a look.** With `--seems` beside it, a look where one reader
   has read leaves the other for the next look.
 - **FER+ as before:** a face it can't cut out upright is not read, and its
@@ -2071,8 +2081,8 @@ is chosen and converted (Face Mesh V2, `models/mouth/SOURCE.md`).
 given, #720).** Install places the pinned model at
 `/opt/lampOS/eyes/models/face_mesh_v2.onnx` (`deploy/product/models.json`),
 and the product's unit passes it, for Blendshape V2 (#2799), whose mesh
-runs on its own thread off the look, so the product's speaking read stays on
-the corners. With it alone, the largest face in each look is cut out of the
+runs on the look as with it alone, one mesh a look whose points a
+Blendshape V2 read due on that face takes (above). The largest face in each look is cut out of the
 same 320 by 240 look: its box, widened by a quarter on every side and
 turned so the eyes are level, made 256 pixels square (`src/mesh.rs`).
 The mesh reads it under tract, and with `--mouth-diagnostics on` (never in
@@ -2159,8 +2169,7 @@ measured 14.35 microseconds/look off and 36.33 on over 10,000 looks (about
 22 microseconds extra). This meets the host target only; real-device overhead
 and capture-to-decision latency remain unmeasured.
 
-**A closing camera waits for the mesh.** With `--mouth-model` (and no
-`--seems-blendshapes`, whose mesh is off the look), a
+**A closing camera waits for the mesh.** With `--mouth-model`, a
 `{"camera":false}` that arrives mid-look closes the camera once that look's
 mesh is done: up to 85 ms on a big core and 290 ms on a small one under
 tract, 33 and 154 under ONNX Runtime.
