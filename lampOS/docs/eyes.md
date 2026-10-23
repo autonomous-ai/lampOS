@@ -1517,6 +1517,18 @@ kept **unconfirmed**, until its person says yes at the lamp:
   someone (the reviewer on #1968, 22:28): `photo_asked` for a face not here
   is `not_here`, and `photo_yes` is `not_here` or, if it wasn't asked,
   `not_asked`.
+  - **The face that said it** (`LAMP_PHOTO_SPEAKER=on` on lamp-eyes, off
+    unless set, #2856): `photo_here` also gives `"face":"<boot>/f<id>"`, the
+    passing id of the near face that matched the photo under the faces
+    publisher's boot, the voice's `boot/f3` form, or `null` while speaking
+    isn't judged (`LAMP_EYES_SPEAKING`) or no face is fresh here. A yes must
+    carry it, `{"photo_yes":NAME,"face":"<boot>/f<id>"}`, and is kept only
+    if it is that same id under that same boot (`photo::is_that_face`):
+    another, an older boot's, `null`, or a bare yes is `not_that_face`, and
+    the face stays unconfirmed. The id is held in memory only, beside the
+    name, and means nothing after a restart. The voice judges who spoke the
+    yes; the eyes only name the face and check it again. Off, both answer
+    as before, without `face`, and a yes with `face` is `not_understood`.
   - `{"photo_yes":NAME}` makes it an ordinary person (`People::remember_one`),
     with the photo's print and those the lamp took of them (`Taken::prints`),
     five at most, as one remembered at the lamp keeps, and the remembering's
@@ -1533,7 +1545,8 @@ kept **unconfirmed**, until its person says yes at the lamp:
   (`reset-plan-product.json`).
 - **The answers** are the voice's: `photos_off`, `not_a_name`, `unreadable`
   (no file, a link, too large, not a JPEG), `no_face`, `too_far`,
-  `two_faces`, `known_as`, `full`, `not_here`, `not_asked`, `not_unconfirmed` or
+  `two_faces`, `known_as`, `full`, `not_here`, `not_asked`, `not_that_face`,
+  `not_unconfirmed` or
   `storage`. The
   journal says only which, never the name or the file.
 
