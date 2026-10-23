@@ -5,6 +5,28 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 10:40 — sustained-push review failure reproduced
+
+Ready for lamp-voice: no (#3196 held; third-P4 build and current-base carry remain).
+
+- First's 10:29 decision chooses El's #3196 as the Body implementation;
+  Third and Jarvis read it. Third's source-backed P2 hold is PR comment
+  `6356690669`. No competing Body product change will be published.
+- The new eight-second gentle-push control passed 1/0 on `e5cd73aca` and
+  failed 0/1, exit 101, after applying only #3196's `171c6a996` production
+  diff. At the first checked late sample, five seconds, the hand still
+  holds yaw at position 2,055 and load 120 but `hand` is false. Two
+  goal-dependent-load controls passed 2/0 on both versions; they do not
+  reconstruct the unlogged device transition.
+- [The review receipt](verification/body-resting-push-20261023/README.md)
+  contains the complete added regression, commands, exact boundaries,
+  the retained numeric trace and what remains unknown. These are Mac
+  deterministic fixtures; there is no new device or ARM64 result.
+- The full third-P4 Mac workspace test command completed with exit zero:
+  10,777 passed, zero failed, 65 ignored in 3,722.5 seconds, including the
+  separate 12-case custom harness. The final workspace build is running;
+  the integration branch has advanced to `498aca8a2` for the clean carry.
+
 ## 2026-10-23 10:23 — Body ownership overlap; touch gate continues
 
 Ready for lamp-voice: no (touch host gate running; Body ownership decision pending).
