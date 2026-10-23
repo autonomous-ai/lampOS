@@ -1,0 +1,118 @@
+{
+  "review_head": "06ae9205fc10b39f7eb880941cadcf758043b11c",
+  "tested_head": "a449e539fd539535d08ab0cc9f328b3a7bec6cc8",
+  "base": "1291ef1f43b0c16135766a56859c21b02fdf5dd6",
+  "repository_tree": "17cc9531976b8b38ed5774a24b37ab90d07f3065",
+  "pr_paths": 26,
+  "changed_pr_paths": [],
+  "range_diff": "1:  a2d271fa9 = 1:  90010391a lampOS: head touch on in the product units, whole: the voice's LAMP_HEAD_TOUCH, sleep mute and restored mute, Expression's --head-touch, the body's LAMP_HEAD_TOUCH, pins without legacy_head (#711)\n2:  2cf774124 = 2:  58870f4c6 lampOS: the generic voice's census leaves head touch out of a moved lamp's group on purpose, with the product's own pins and try (#1362)\n3:  e24870b1b = 3:  ab4054e06 lampOS: check effective head readers before install writes\n4:  b61052b49 = 4:  66b137cf8 lampOS: check local system unit overrides before head activation\n5:  6100490bb = 5:  501cb409c lampOS: raise the shared head cue default to the measured level\n6:  a449e539f = 6:  06ae9205f lampOS: require the Body sleep reader in head touch admission",
+  "whole_tree_delta": [
+    "lampOS/crates/eyes/Cargo.toml",
+    "lampOS/crates/eyes/src/main.rs",
+    "lampOS/crates/eyes/src/photo.rs",
+    "lampOS/crates/eyes/src/who.rs",
+    "lampOS/docs/eyes.md"
+  ],
+  "focused_test": {
+    "command": "cargo +1.96.0 test -q --locked --offline -p lamp-update --test install second_review_body_head_off_refuses_before_bundle_mutation -- --exact --nocapture",
+    "cargo_executable": "explicit user Cargo binary path after PATH lookup failure",
+    "target_cache": "existing Second Mac target cache",
+    "platform": "macOS Rust 1.96.0",
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 89,
+    "duration_seconds": 0.01,
+    "exit": 0,
+    "first_setup": {
+      "exit": 127,
+      "test_executed": false,
+      "reason": "cargo not on PATH",
+      "output": "original-control.txt"
+    }
+  },
+  "source_read": "Original Body admission P2 addressed; no new P1/P2 in scoped repair. Full prior read findings outside this repair are not reopened or represented as device qualification.",
+  "limits": "Temporary filesystem and fake install host; no actual systemd, device, actuator, or physical acceptance. Test executed before the source-identical train51 carry; Linux fmt executed at review head.",
+  "retained_files": {
+    "linux-fmt-current-cleanup-owner.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "linux-fmt-current-cleanup-owner.stdout": {
+      "sha256": "7f06ef1a1ec313b2edaafcc8eaec01cf46e00520d415f877ac2f2a63ba559694",
+      "bytes": 37
+    },
+    "linux-fmt-current-cleanup-remaining.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "linux-fmt-current-cleanup-remaining.stdout": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "linux-fmt-current-cleanup-remove.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "linux-fmt-current-cleanup-remove.stdout": {
+      "sha256": "7f06ef1a1ec313b2edaafcc8eaec01cf46e00520d415f877ac2f2a63ba559694",
+      "bytes": 37
+    },
+    "linux-fmt-current-cleanup.json": {
+      "sha256": "4a1a44ab35dfbe67a5e36dacbd59920bc340d34722fb7f107e90f665fab44953",
+      "bytes": 260
+    },
+    "linux-fmt-current-configuration.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "linux-fmt-current-configuration.stdout": {
+      "sha256": "4c3977630a9a890fc9e67b9ed87fc31d4e8e95e45bba8b5bd7d8b69d5ae3a9c7",
+      "bytes": 6938
+    },
+    "linux-fmt-current-create.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "linux-fmt-current-create.stdout": {
+      "sha256": "1623189986487c15e7a5f9c234260c5245673ead86f48892df9d2b31c037fd77",
+      "bytes": 65
+    },
+    "linux-fmt-current-image.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "linux-fmt-current-image.stdout": {
+      "sha256": "8a68f8ddeae91fa77f009ea0134a8059c7d90f90557fe8e6fe1e2aedfeb9e68a",
+      "bytes": 84
+    },
+    "linux-fmt-current-start.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "linux-fmt-current-state.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "linux-fmt-current-state.stdout": {
+      "sha256": "31b13e0830e01daca7e3c7ae3ac77130618706e98c91438065fb0f2f6d4c8e87",
+      "bytes": 224
+    },
+    "linux-fmt-current.json": {
+      "sha256": "f5ab5f68b95153a41e4632062aa1e1d96794f8a3f8d33073f488d2af6e5abd0c",
+      "bytes": 6930
+    },
+    "linux-fmt-current.txt": {
+      "sha256": "e94bb34cfaf4eb07fa06afa766cb563700601f41356a528e702e7f670e88d612",
+      "bytes": 277
+    },
+    "original-control-execution.txt": {
+      "sha256": "a60109263c3dae1a292e43452a8dcd3859c04df0ad534e47bec48180248dd374",
+      "bytes": 218
+    },
+    "original-control.txt": {
+      "sha256": "835eb749db8ecc2784ffc25dc1ddcd83d05d8a5f2db74745983de33c5a4a7ab1",
+      "bytes": 32
+    }
+  }
+}
