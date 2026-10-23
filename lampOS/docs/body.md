@@ -2937,9 +2937,27 @@ the microphones.
 With `LAMP_BUS=on`, lamp-body says on `body/hand` (`lamp_msgs::Hand`,
 latest, kept 1 s) whether a hand is pushing it now, with every step it
 passes on (every 80 ms): `pushed` is true while a head or base joint met
-resistance and is held where it gave way, and `since_us` is when that push
-began, on the body's own clock (0 when not pushed). It adds a publication
-and changes nothing the body does.
+resistance and is held where it gave way, and a hand is on it. A push
+starts on a step where the joint is more than 15 counts (`HAND_MOVED`)
+from where it first gave way, reads a load over its own bound or, under
+`--limp on` (the default), over its contact floor (a pitch pressed at 675
+in a glance, under the glance's 700), or, pinned under `--limp on`, is
+pushed as the slump judges it (a load over the lower of its bound and its
+contact floor, or more than 11 counts, `LIMP_LAG`, off where it gave), so
+a push that slumps the lamp is always said. Once started, it stays while
+the joint is more than 15 counts off where it first gave, or reads over
+half its bound and over its own resting load by a quarter of its bound (a
+press at 300 easing to 130 on a pitch bound 240, that read 25 before, is
+still a push), and it ends on the first step that is neither (the next
+`body/hand` after a release says it is gone). A hand that keeps the joint
+off, re-held where it is each second, stays a push until it lets go;
+`since_us` is when that push began, on the body's
+own clock (0 when not pushed). A joint held at its rest that reads only its
+own weight and jitters a few counts is not a push, whichever lamp's
+calibration: lamp-06c1's head, held where it gave way to its own push at its
+rest, read 124 to 136 there and said `pushed` 8 times a second with nobody
+at the lamp (2026-10-23). It adds a publication and changes nothing the
+body does.
 
 What it can feel: a load over a joint's bound, with or without
 `--give-way`; with `--give-way` also a joint held off its goal at a load
@@ -2947,8 +2965,13 @@ over 100 (a light hand on the base) and a hand that keeps it held. Without
 `--give-way` a hand still on the joint after it gave way ends the run
 (`load`), so `pushed` lasts until then. The shoulder and the elbow are not
 in it: a hand on the arm makes the lamp sit down, which the body's report
-says. Two tests: steps say a hand only while one is on a joint, and never
-without one; the bus says it with each step passed on and keeps when the
+says. Six tests: steps say a hand only while one is on a joint, and never
+without one; a resting joint jittering inside that band, at any rest and
+resting load, never says one, while a hand moving it or pressing past its
+bound still does; a hand keeping a joint 40 counts off where it gave,
+pressing under its bound, says one on every step of the hold and none
+once it lets go (pitch and base); a pitch pressed over its contact floor
+in a glance says one until it slumps; the bus says it with each step passed on and keeps when the
 push began.
 
 ## Preparing to unplug (#1674)
