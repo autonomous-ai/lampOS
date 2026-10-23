@@ -1,0 +1,19 @@
+{
+  "worktree": "/private/tmp/tests-codex-voice-events-20261022",
+  "branch": "tests/1569-voice-full-run-events",
+  "original_head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+  "original_base": "ec5428a34c0f66688e54200473cf26e6c3dd2b88",
+  "frozen_new_base": "ae4ab0022a5716b8b393956d5e26fd1480aac350",
+  "initial_status": "clean",
+  "source_hashes": {
+    "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "9731e6c2a23b99565352a6077a550802eadbeeca8d14dee22d36e7558d1f8433",
+    "lampOS/crates/voice/src/provider_worker.rs": "2144f5d9ac40b39ca64be587f381ebb3e3a031826e9177852aeee0b6ac5bc9d7",
+    "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs": "f4fd991f9035d663751454e14ba6eeac292f88580be4391e40fd70090661cb25",
+    "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "310ef8dd0635bb19147f510d9e62834fd6620c0447faf168c12a61f5b1ceb391",
+    "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "e952adec2c664516baccd2a638180c412ddf29cdc3eb99071de85ebaf7948a02",
+    "lampOS/crates/voice/src/remember.rs": "1e9102688a5220c2a2285ef8936aa6ec621e728aeaf63b1ee79e66bf2a50ab3c",
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "5d76c1b00352bdf4395f0d39c8c5293b2d3ad0b299261df902ce664aa0f2bbf2",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "541b22a43b8ec7bd6f4e97b634a96ceefbcbe0dc430db93c59381326d57f2249"
+  },
+  "no_cargo_or_target_use": true
+}

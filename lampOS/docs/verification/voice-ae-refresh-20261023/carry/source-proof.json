@@ -1,0 +1,103 @@
+{
+  "original_head": "735b2cb5db21176a0ad80fcb42c48e739f8362fe",
+  "new_head": "157b800a1c34af5e077607c43086ec6342a324fe",
+  "base": "ae4ab0022a5716b8b393956d5e26fd1480aac350",
+  "backup_ref": "tests/1569-voice-before-ae4-20261023",
+  "conflicts": [],
+  "status": "clean",
+  "authored_added_and_removed_lines_identical_in_all_files": true,
+  "changed_paths_count": 104,
+  "rust_paths": [
+    "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs",
+    "lampOS/crates/voice/src/provider_worker.rs",
+    "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs",
+    "lampOS/crates/voice/src/provider_worker/tests/reminders.rs",
+    "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs",
+    "lampOS/crates/voice/src/remember.rs",
+    "lampOS/crates/voice/src/requested_audio/runtime.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs"
+  ],
+  "historical_docs_paths_unchanged": 96,
+  "range_diff_only_context_change": "upstream DeclineMusic _one field and initialization",
+  "assertion_checks": [
+    {
+      "file": "lampOS/crates/voice/src/provider_worker.rs",
+      "function": "requested_audio_crosses_the_live_worker_only_after_its_tool_reply",
+      "assertion_macros": 10,
+      "exact_assertion_bytes_preserved": true
+    },
+    {
+      "file": "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs",
+      "function": "a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet",
+      "assertion_macros": 6,
+      "exact_assertion_bytes_preserved": true
+    },
+    {
+      "file": "lampOS/crates/voice/src/provider_worker/tests/reminders.rs",
+      "function": "a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by",
+      "assertion_macros": 7,
+      "exact_assertion_bytes_preserved": true
+    },
+    {
+      "file": "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs",
+      "function": "an_accepted_decline_blocks_later_and_mixed_music_calls",
+      "assertion_macros": 3,
+      "exact_assertion_bytes_preserved": true
+    },
+    {
+      "file": "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs",
+      "function": "an_accepted_decline_does_not_release_a_parked_music_call",
+      "assertion_macros": 5,
+      "exact_assertion_bytes_preserved": true
+    },
+    {
+      "file": "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs",
+      "function": "a_music_action_before_decline_keeps_its_single_offer_and_confirmation",
+      "assertion_macros": 9,
+      "exact_assertion_bytes_preserved": true
+    },
+    {
+      "file": "lampOS/crates/voice/src/remember.rs",
+      "function": "the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked",
+      "assertion_macros": 3,
+      "exact_assertion_bytes_preserved": true
+    },
+    {
+      "file": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "check_stop_during_music_rpc",
+      "assertion_macros": 14,
+      "exact_assertion_bytes_preserved": true
+    },
+    {
+      "file": "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs",
+      "whole_file_identical_to_original_candidate": true,
+      "assertion_macros": 147
+    },
+    {
+      "upstream_3105_functions": [
+        "resume_next",
+        "tick",
+        "digest_mismatch_and_revoked_renewal_end_without_reusing_a_grant"
+      ],
+      "whole_function_bytes_preserved": true
+    }
+  ],
+  "unchanged_production_prefixes": [
+    "lampOS/crates/voice/src/provider_worker.rs",
+    "lampOS/crates/voice/src/remember.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs"
+  ],
+  "runtime_scope_review": "All added fields/statements/items are cfg(test); upstream renewal-refusal helper/test remains byte-identical. No product edit.",
+  "source_hashes": {
+    "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "9731e6c2a23b99565352a6077a550802eadbeeca8d14dee22d36e7558d1f8433",
+    "lampOS/crates/voice/src/provider_worker.rs": "3b65de3d70ca9c4f47973183acc7020db8ca012a2bc02ef5b7d20569da0f9418",
+    "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs": "f4fd991f9035d663751454e14ba6eeac292f88580be4391e40fd70090661cb25",
+    "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "310ef8dd0635bb19147f510d9e62834fd6620c0447faf168c12a61f5b1ceb391",
+    "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "f2555660c24b644d750686aac312be772def54819df86d4785ba8ce15dcae45d",
+    "lampOS/crates/voice/src/remember.rs": "2a5325aa94de5251a646c5574ffdb8577d202a9eced9b4f55c14dc68b44ae838",
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "7aae3364ea1dacc71bbe4115e48db4f25d6702e9cbb608285f9d223f9d901a03",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "c0bffe512c506441b76bd064064472a750d4358be03467bea5d239f25717b28f"
+  },
+  "diff_check_exit": 0,
+  "cargo_tests_builds_targets_push_log_edits": false
+}

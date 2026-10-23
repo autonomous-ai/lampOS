@@ -1,0 +1,12 @@
+{
+  "image_id": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "repo_digests": [
+    "localhost/lampos-fourth-native-user-check@sha256:340a3bdf76419083569becb186cae71d5c97cb46b24314c917a0305b322162a9"
+  ],
+  "architecture": "amd64",
+  "os": "linux",
+  "configured_user": "1000:1000",
+  "image_inspection_sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74",
+  "toolchain_output": "Linux 309b5ffaa462 6.12.13-200.fc41.x86_64 #1 SMP PREEMPT_DYNAMIC Sat Feb  8 20:05:26 UTC 2025 x86_64 GNU/Linux\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nrustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.96.0\nLLVM version: 22.1.2\n",
+  "scope": "existing local Linux x86 container; immutable git-archive input; format only; no network, compile, ARM64 build, shared target or device action"
+}

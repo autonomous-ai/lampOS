@@ -1,0 +1,18 @@
+{
+  "created_utc": "2026-10-23T00:20:45.486252+00:00",
+  "image_id": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "heads": [
+    [
+      "eyes",
+      "/private/tmp/tests-codex-eyes-failed-write-20261023",
+      "a2da872217b20147e80e194401c5eb1300c2b24a"
+    ],
+    [
+      "voice",
+      "/private/tmp/tests-codex-voice-events-20261022",
+      "157b800a1c34af5e077607c43086ec6342a324fe"
+    ]
+  ],
+  "purpose": "Linux x86 formatting only; no compilation, ARM64 build, network or shared Cargo target",
+  "timeout_seconds": 300
+}

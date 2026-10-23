@@ -1,0 +1,18 @@
+1:  735b2cb5db ! 1:  157b800a1c lampOS: make Voice fixture waits deterministic
+    @@ lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs: async fn a_l
+     +    dispatch: Option<std::sync::mpsc::Sender<()>>,
+          stop: std::sync::Arc<AtomicBool>,
+          worker: Option<std::thread::JoinHandle<()>>,
+    - }
+    +     /// The rigs' one-at-a-time lock, held from before the peer's 3 s accept
+     @@ lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs: impl DeclineMusic {
+                  std::os::unix::net::UnixListener::bind(home.path.join(crate::tools::CALL_SOCKET))
+                      .unwrap();
+    @@ lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs: impl Decline
+     +            dispatch: Some(dispatch),
+                  stop,
+                  worker: Some(worker),
+    +             _one: one,
+              }
+          }
+      

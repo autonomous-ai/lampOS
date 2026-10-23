@@ -1,5 +1,33 @@
 # Tests work log
 
+## 2026-10-23 07:23 +0700 — exact-base Voice ARM comparison and Linux formatting published
+
+Ready for lamp-voice: **source read pending** for #3156; **no** for #3023.
+The [Voice carry proof](verification/voice-ae-refresh-20261023/carry/) and
+[terminal native comparison](verification/voice-ae-refresh-20261023/ci/)
+are now recorded. Existing exact-base `ae4ab0022` ARM run `39873728333` and
+candidate `157b800a1` run `39875221807` both give **10,799/0/67**, with the same
+10,799 executed identities, one passing LEAK, all seven assigned cases passing
+and Voice library **3,554 passes**. Separate doctests **4/0**, process **12/0**,
+relay ok on both. Candidate Linux Clippy passes. This pass/pass nextest
+observation establishes no shared-process x86 cause or lower failure rate;
+those historical failures and the proposed frozen local pair remain open.
+
+A cached, already-running Podman environment provided the missing Linux x86
+formatter. Both exact current heads, Eyes `a2da87221` and Voice `157b800a1`,
+passed `cargo fmt --all --check` from immutable source-only archives using
+Rust 1.96.0. [Separate formatting receipt](verification/tests-linux-format-20261023/)
+keeps complete command outputs, image/toolchain identity, input archive hashes,
+source trees and exit codes. No compilation, network, ARM64 build on the Mac,
+shared target use or device operation occurred. Earlier notes saying Linux
+formatting was not yet run remain historical; this closes that specific gate.
+The final latest-parent train qualification and the assigned source read are
+separate. #3156's read was reassigned to another reviewer on the Queue.
+
+#1339's Surround-only fixture and controls are in progress on the claimed own
+branch. #1386's shared Bus wall-clock seam is a scoped proposal awaiting a yes;
+no product code has been changed for it.
+
 ## 2026-10-23 07:17 +0700 — claim the Surround nonblocking status fixture
 
 Taken: [#1339](https://github.com/autonomous-ai/lampOS/issues/1339#issuecomment-6354242978),

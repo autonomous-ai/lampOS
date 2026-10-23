@@ -1,0 +1,864 @@
+diff --git a/lampOS/crates/voice/src/coordinator/tests/requested_audio.rs b/lampOS/crates/voice/src/coordinator/tests/requested_audio.rs
+index b8a241b63e..fad5f96dc7 100644
+--- a/lampOS/crates/voice/src/coordinator/tests/requested_audio.rs
++++ b/lampOS/crates/voice/src/coordinator/tests/requested_audio.rs
+@@ -29,6 +29,12 @@ use std::{
+ const WAIT: Duration = Duration::from_secs(3);
+ const CLOCK: &str = "requested-recording-fixture";
+ 
++fn fixture_clock() -> crate::scenario_clock::Scope {
++    let scope = crate::scenario_clock::Scope::enter(Duration::from_secs(30)).unwrap();
++    scope.set_pump(|_| Ok(())).unwrap();
++    scope
++}
++
+ /// One bounded fake daemon, on the real private call.sock protocol. A held
+ /// Start is released by an explicit test message, never a timing sleep.
+ struct Skills {
+@@ -41,7 +47,7 @@ struct Skills {
+ }
+ 
+ impl Skills {
+-    fn new(directory: &Path, lease_us: u64, hold_start: bool) -> Self {
++    fn new(directory: &Path, lease_us: u64, hold_start: bool, clock: Arc<AtomicU64>) -> Self {
+         let socket = directory.join(crate::tools::CALL_SOCKET);
+         let listener = UnixListener::bind(&socket).unwrap();
+         let (send, operations) = mpsc::sync_channel(32);
+@@ -81,8 +87,8 @@ impl Skills {
+                                     assert_eq!(active.as_ref(), Some(&offer));
+                                 }
+                             }
+-                            let until_us =
+-                                (lamp_ipc::monotonic_us() + lease_us).min(offer.finish_before_us);
++                            let until_us = (clock.load(Ordering::Acquire) + lease_us)
++                                .min(offer.finish_before_us);
+                             lease_until.store(until_us, Ordering::Release);
+                             json!({"ok":true,"result":RequestedAudioLease {
+                                 skills_boot: offer.skills_boot,
+@@ -230,14 +236,17 @@ struct Test {
+ 
+ impl Test {
+     fn new(route: Route, lease_us: u64, hold_start: bool) -> Self {
++        assert!(crate::scenario_clock::is_active());
++        let clock = Arc::new(AtomicU64::new(monotonic_us()));
+         let directory = SessionDirectory::create().unwrap();
+-        let skills = Skills::new(&directory.path, lease_us, hold_start);
++        let skills = Skills::new(&directory.path, lease_us, hold_start, clock.clone());
+         let bus = Bus::new(directory.path.join("bus")).unwrap();
+         let mut publisher = bus
+             .publisher_declared(SpeakerState::TOPIC, &SpeakerState::declaration(), "actions")
+             .unwrap();
+         publish_state(&mut publisher, 0, false);
+-        let service = Service::new(bus, directory.path.clone(), CLOCK.into()).unwrap();
++        let service =
++            Service::new_stepped(bus, directory.path.clone(), CLOCK.into(), clock).unwrap();
+         assert!(service.wait_cached(WAIT));
+         let asset = directory.path.join("recording.wav");
+         let mut wav = hound::WavWriter::create(
+@@ -293,7 +302,15 @@ impl Test {
+         test
+     }
+ 
++    fn step(&self) {
++        assert!(self.service.step_fixture(WAIT, || {
++            assert!(crate::scenario_clock::step(crate::scenario_clock::Phase::Run).unwrap());
++            monotonic_us()
++        }));
++    }
++
+     fn renew_input(&mut self) {
++        self.step();
+         let until = MonoTime::from_micros(monotonic_us() + 1_000_000);
+         self.owner
+             .set_capture(now(), CaptureState::RetainingUntil(until))
+@@ -435,7 +452,7 @@ impl Test {
+     }
+ 
+     fn offer(&self, id: u64) -> RequestedAudioOffer {
+-        let issued_us = lamp_ipc::monotonic_us();
++        let issued_us = monotonic_us();
+         RequestedAudioOffer {
+             skills_boot: "skills-fixture".into(),
+             definition_generation: 1,
+@@ -683,7 +700,7 @@ fn publish_state(publisher: &mut Publisher, generation: u64, muted: bool) {
+     let state = SpeakerState {
+         stamp: ClockStamp {
+             clock_id: CLOCK.into(),
+-            at_us: lamp_ipc::monotonic_us(),
++            at_us: monotonic_us(),
+             sequence: publisher.totals().published + 1,
+         },
+         session_id: publisher.boot().into(),
+@@ -696,6 +713,7 @@ fn publish_state(publisher: &mut Publisher, generation: u64, muted: bool) {
+ 
+ #[test]
+ fn requested_audio_keeps_voice_state_non_resting_until_final_retirement() {
++    let _clock = fixture_clock();
+     let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+     let bus = Bus::new(test._directory.path.join("bus")).unwrap();
+     let mut out = crate::bus_out::BusOut::on(&bus).unwrap();
+@@ -754,8 +772,10 @@ fn requested_audio_keeps_voice_state_non_resting_until_final_retirement() {
+ 
+ #[test]
+ fn prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_after_retirement() {
++    let _clock = fixture_clock();
+     let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+     let mut handoffs = Vec::new();
++    let mut host_handoffs = Vec::new();
+     for id in 1..=2 {
+         if id > 1 {
+             assert!(test.service.wait_idle(WAIT));
+@@ -774,6 +794,7 @@ fn prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_afte
+         test.accept(&confirmation, 120);
+         assert!(!test.prepare(), "accepted final PCM has not retired");
+         assert!(!test.reply.as_ref().unwrap().settled(&test.pending));
++        let host_retired = std::time::Instant::now();
+         let retired = test.retire(&confirmation);
+         assert!(test.prepare());
+         let first = test.dispatch().unwrap();
+@@ -784,6 +805,11 @@ fn prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_afte
+         let accepted = test.accept(&first, 240);
+         handoffs.push(accepted - retired);
+         assert!(accepted - retired <= 250_000);
++        // Keep the host latency gate as well as the logical receipt/trace
++        // assertion. This wider boundary includes both IPC event handlers.
++        let host_handoff = host_retired.elapsed();
++        assert!(host_handoff <= Duration::from_millis(250));
++        host_handoffs.push(host_handoff.as_micros());
+         let final_chunk = test.dispatch().unwrap();
+         assert_eq!(final_chunk.permit.owner(), original_owner);
+         assert!(final_chunk.end_of_speech);
+@@ -815,12 +841,13 @@ fn prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_afte
+     assert_eq!(traced, handoffs);
+     eprintln!(
+         "requested audio prepared host handoff: first={}us repeated={}us; target<=250000us; authored speaker IPC acceptance, acoustic onset unmeasured",
+-        handoffs[0], handoffs[1]
++        host_handoffs[0], host_handoffs[1]
+     );
+ }
+ 
+ #[test]
+ fn news_in_a_music_confirmation_is_heard_once_after_both_parts_retire() {
++    let _clock = fixture_clock();
+     let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+     let offer = test.load(1);
+     test.answer_news();
+@@ -858,6 +885,7 @@ fn news_in_a_music_confirmation_is_heard_once_after_both_parts_retire() {
+ 
+ #[test]
+ fn cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news() {
++    let _clock = fixture_clock();
+     for reason in ["hand_stop", "new_owner", "privacy", "gap", "expiry"] {
+         let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+         let offer = test.load(1);
+@@ -923,6 +951,7 @@ fn cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news()
+ 
+ #[test]
+ fn offers_require_the_current_worker_session_request_and_privacy_identity() {
++    let _clock = fixture_clock();
+     let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+     let good = test.offer(1);
+     for field in [
+@@ -980,6 +1009,7 @@ fn offers_require_the_current_worker_session_request_and_privacy_identity() {
+ 
+ #[test]
+ fn written_reminder_say_and_offline_turns_never_authorize_requested_recordings() {
++    let _clock = fixture_clock();
+     for route in [Route::Written, Route::Reminder, Route::Say, Route::Offline] {
+         let mut test = Test::new(route, REQUESTED_AUDIO_LEASE_US, false);
+         let offer = test.offer(1);
+@@ -992,6 +1022,7 @@ fn written_reminder_say_and_offline_turns_never_authorize_requested_recordings()
+ 
+ #[test]
+ fn an_empty_or_gapped_confirmation_cancels_instead_of_starting_the_recording() {
++    let _clock = fixture_clock();
+     for gapped in [false, true] {
+         let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+         let offer = test.load(1);
+@@ -1033,6 +1064,7 @@ fn an_empty_or_gapped_confirmation_cancels_instead_of_starting_the_recording() {
+ 
+ #[test]
+ fn stop_privacy_capture_gap_and_new_owner_cancel_even_a_late_successful_loader() {
++    let _clock = fixture_clock();
+     for playing in [false, true] {
+         for reason in ["hand_stop", "privacy", "capture_gap", "new_owner"] {
+             let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, !playing);
+@@ -1078,6 +1110,7 @@ fn stop_privacy_capture_gap_and_new_owner_cancel_even_a_late_successful_loader()
+ 
+ #[test]
+ fn a_real_bus_mute_generation_is_terminal_even_after_unmute() {
++    let _clock = fixture_clock();
+     for playing in [false, true] {
+         let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+         let offer = test.load(1);
+@@ -1089,6 +1122,7 @@ fn a_real_bus_mute_generation_is_terminal_even_after_unmute() {
+         }
+         publish_state(&mut test.publisher, 1, true);
+         publish_state(&mut test.publisher, 1, false);
++        assert!(test.service.observe_fixture(WAIT));
+         // Even if Latest coalesces the mute, the generation still revokes the
+         // old recording. Finish is a positive monitor/worker synchronization.
+         test.skills
+@@ -1108,6 +1142,7 @@ fn a_real_bus_mute_generation_is_terminal_even_after_unmute() {
+ 
+ #[test]
+ fn the_actual_speaker_permit_cannot_outlive_a_short_skills_lease() {
++    let _clock = fixture_clock();
+     let mut test = Test::new(Route::Spoken, 90_000, true);
+     let offer = test.offer(1);
+     assert!(test.accept_offer(offer.clone()));
+@@ -1135,6 +1170,7 @@ fn the_actual_speaker_permit_cannot_outlive_a_short_skills_lease() {
+ 
+ #[test]
+ fn an_accepted_offer_survives_ready_session_renewal_and_plays_for_its_original_reply() {
++    let _clock = fixture_clock();
+     let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+     let offer = test.load(1);
+     let current = test.reply.as_ref().unwrap();
+@@ -1236,6 +1272,7 @@ fn an_accepted_offer_survives_ready_session_renewal_and_plays_for_its_original_r
+ 
+ #[test]
+ fn an_accepted_offer_stays_bound_to_its_original_worker_session_and_privacy() {
++    let _clock = fixture_clock();
+     let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+     let offer = test.load(1);
+     let current = test.reply.as_ref().unwrap();
+diff --git a/lampOS/crates/voice/src/provider_worker.rs b/lampOS/crates/voice/src/provider_worker.rs
+index a7dbb56b9d..ac7e2e56a6 100644
+--- a/lampOS/crates/voice/src/provider_worker.rs
++++ b/lampOS/crates/voice/src/provider_worker.rs
+@@ -11511,7 +11511,13 @@ pub(crate) mod tests {
+             let listener =
+                 std::os::unix::net::UnixListener::bind(home.path.join(crate::tools::CALL_SOCKET))
+                     .unwrap();
++            let (dispatch, dispatched) = std::sync::mpsc::channel();
+             let skill = std::thread::spawn(move || {
++                // Provider setup must not spend the Skills accept watchdog.
++                // Dropping the sender also releases this wait on unwind.
++                dispatched
++                    .recv()
++                    .expect("test ended before Skills dispatch");
+                 let mut stream = music_accept(&listener).unwrap();
+                 let mut line = String::new();
+                 std::io::BufReader::new((&stream).take(16_384))
+@@ -11562,6 +11568,7 @@ pub(crate) mod tests {
+             } else {
+                 "play_relaxing_music"
+             };
++            dispatch.send(()).unwrap();
+             dial.service
+                 .send(json!({"toolCall":{"functionCalls":[{
+                     "id":"music-original", "name":name,
+diff --git a/lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs b/lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs
+index e40691b355..541e7f5f05 100644
+--- a/lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs
++++ b/lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs
+@@ -729,8 +729,9 @@ async fn the_lamp_answers(rig: &mut LiveRig, dial: &mut Dial) {
+ /// timer is held (the reviewer on #1054). The volume in such a turn is
+ /// still held, and so is a cancel, which is silent and cannot be undone
+ /// (Fourth on #1054).
+-#[tokio::test]
++#[tokio::test(start_paused = true)]
+ async fn a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet() {
++    let _clock = logical_clock();
+     for spoke in [true, false] {
+         let mut desk = Desk::new(if spoke { "follows" } else { "follows-silent" });
+         let mut rig = LiveRig::start_with(quick_policy(), desk.options(true));
+diff --git a/lampOS/crates/voice/src/provider_worker/tests/reminders.rs b/lampOS/crates/voice/src/provider_worker/tests/reminders.rs
+index 6b2108bd7e..5efc471f24 100644
+--- a/lampOS/crates/voice/src/provider_worker/tests/reminders.rs
++++ b/lampOS/crates/voice/src/provider_worker/tests/reminders.rs
+@@ -674,8 +674,9 @@ async fn unanswered_reminders_and_sounds_are_not_talk_but_speech_and_actual_audi
+ /// `RoomTold::spoke_unasked`, so the room stays busy for three minutes from
+ /// its talk, not a minute from the reminder. The room is made after the
+ /// worker has started, since it sets the room's switches then.
+-#[tokio::test]
++#[tokio::test(start_paused = true)]
+ async fn a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by() {
++    let _clock = logical_clock();
+     let _restore = RestoreRoom::quiet();
+     let mut rig = LiveRig::start_with(quick_policy(), options(true));
+     let mut dial = rig.ready().await;
+diff --git a/lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs b/lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs
+index 31b374fa86..4226434332 100644
+--- a/lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs
++++ b/lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs
+@@ -615,6 +615,7 @@ async fn a_line_the_model_declines_is_told_held_back() {
+ struct DeclineMusic {
+     home: crate::process::SessionDirectory,
+     asked: std::sync::mpsc::Receiver<serde_json::Value>,
++    dispatch: Option<std::sync::mpsc::Sender<()>>,
+     stop: std::sync::Arc<AtomicBool>,
+     worker: Option<std::thread::JoinHandle<()>>,
+     /// The rigs' one-at-a-time lock, held from before the peer's 3 s accept
+@@ -638,9 +639,14 @@ impl DeclineMusic {
+             std::os::unix::net::UnixListener::bind(home.path.join(crate::tools::CALL_SOCKET))
+                 .unwrap();
+         let (sent, asked) = std::sync::mpsc::channel();
++        let (dispatch, dispatched) = std::sync::mpsc::channel();
+         let stop = std::sync::Arc::new(AtomicBool::new(false));
+         let ending = stop.clone();
+         let worker = std::thread::spawn(move || {
++            // Worker setup must not spend the first Skills accept watchdog.
++            if dispatched.recv().is_err() {
++                return;
++            }
+             loop {
+                 let mut stream = match music_accept(&listener) {
+                     Ok(stream) => stream,
+@@ -689,12 +695,21 @@ impl DeclineMusic {
+         Self {
+             home,
+             asked,
++            dispatch: Some(dispatch),
+             stop,
+             worker: Some(worker),
+             _one: one,
+         }
+     }
+ 
++    fn arm(&mut self) {
++        self.dispatch
++            .take()
++            .expect("Skills dispatch armed twice")
++            .send(())
++            .unwrap();
++    }
++
+     fn options(&self, wrapped: bool) -> Options {
+         typed_with(crate::tools::Settings {
+             decline: true,
+@@ -709,6 +724,8 @@ impl DeclineMusic {
+ impl Drop for DeclineMusic {
+     fn drop(&mut self) {
+         self.stop.store(true, std::sync::atomic::Ordering::Release);
++        // Setup may have failed before dispatch; release that wait before join.
++        drop(self.dispatch.take());
+         // Keep the wake peer connected until accept and its timeout setup
+         // finish: macOS rejects SO_RCVTIMEO after that peer disconnects.
+         let wake =
+@@ -787,7 +804,7 @@ async fn an_accepted_decline_blocks_later_and_mixed_music_calls() {
+     let _turn = one_at_a_time().await;
+     for mixed in [false, true] {
+         for wrapped in [false, true] {
+-            let skills = DeclineMusic::new();
++            let mut skills = DeclineMusic::new();
+             let mut rig = LiveRig::start_with(quick_policy(), skills.options(wrapped));
+             let mut dial = rig.ready().await;
+             let request = rig.speak(&mut dial, false, true).await;
+@@ -796,6 +813,7 @@ async fn an_accepted_decline_blocks_later_and_mixed_music_calls() {
+                 matches!(rig.output().await, ProviderOutput::Audio { request: of, .. } if of == request)
+             );
+             if mixed {
++                skills.arm();
+                 dial.service
+                     .send(json!({"toolCall":{"functionCalls":[decline_function(),music_function(wrapped)]}}))
+                     .await;
+@@ -809,6 +827,7 @@ async fn an_accepted_decline_blocks_later_and_mixed_music_calls() {
+             // Decline is recorded before its function response is sent.
+             // That response proves the next call cannot precede the guard.
+             if !mixed {
++                skills.arm();
+                 dial.service
+                     .send(json!({"toolCall":{"functionCalls":[music_function(wrapped)]}}))
+                     .await;
+@@ -833,7 +852,7 @@ async fn an_accepted_decline_blocks_later_and_mixed_music_calls() {
+ async fn an_accepted_decline_does_not_release_a_parked_music_call() {
+     let _turn = one_at_a_time().await;
+     for wrapped in [false, true] {
+-        let skills = DeclineMusic::new();
++        let mut skills = DeclineMusic::new();
+         let policy_root = skills.home.path.join("policy");
+         let mut decisions = lamp_bus::Bus::new(&policy_root)
+             .unwrap()
+@@ -852,6 +871,7 @@ async fn an_accepted_decline_does_not_release_a_parked_music_call() {
+         assert!(
+             matches!(rig.output().await, ProviderOutput::Audio { request: of, .. } if of == request)
+         );
++        skills.arm();
+         dial.service
+             .send(
+                 json!({"toolCall":{"functionCalls":[music_function(wrapped),decline_function()]}}),
+@@ -890,10 +910,11 @@ async fn an_accepted_decline_does_not_release_a_parked_music_call() {
+ async fn a_music_action_before_decline_keeps_its_single_offer_and_confirmation() {
+     let _turn = one_at_a_time().await;
+     for wrapped in [false, true] {
+-        let skills = DeclineMusic::new();
++        let mut skills = DeclineMusic::new();
+         let mut rig = LiveRig::start_with(quick_policy(), skills.options(wrapped));
+         let mut dial = rig.ready().await;
+         let request = rig.speak(&mut dial, false, true).await;
++        skills.arm();
+         dial.service
+             .send(json!({"toolCall":{"functionCalls":[music_function(wrapped)]}}))
+             .await;
+diff --git a/lampOS/crates/voice/src/remember.rs b/lampOS/crates/voice/src/remember.rs
+index d87aecdeb2..330b0782b8 100644
+--- a/lampOS/crates/voice/src/remember.rs
++++ b/lampOS/crates/voice/src/remember.rs
+@@ -11497,18 +11497,43 @@ mod tests {
+     #[test]
+     fn the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked() {
+         const NOW: u64 = 1_792_000_000_000;
+-        let (socket, served) = memory("hits-long", 2, |_| {
++        let answer = {
+             let mut entries = vec![
+                 json!({"id":1,"at_unix_ms":NOW - 100 * 86_400_000,"text":"Their sister lives in Hue."}),
+             ];
+             for id in 2..=150u64 {
+                 entries.push(json!({"id":id,"at_unix_ms":NOW - id,"text":format!("A kept thing about the garden, number {id}.")}));
+             }
+-            json!({"ok":true,"entries":entries})
++            format!("{}\n", json!({"ok":true,"entries":entries}))
++        };
++        // Prepare the long reply before either real 60 ms call. Readiness
++        // below is the fake worker's setup, not the response being received.
++        let socket = std::env::temp_dir().join(format!(
++            "lamp-remember-hits-long-{}.sock",
++            std::process::id()
++        ));
++        let _ = std::fs::remove_file(&socket);
++        let listener = UnixListener::bind(&socket).unwrap();
++        let (ready, prepared) = sync_channel(0);
++        let served = std::thread::spawn(move || {
++            for _ in 0..2 {
++                ready.send(()).unwrap();
++                let (mut stream, _) = session_note_request(&listener);
++                stream
++                    .set_write_timeout(Some(Duration::from_secs(2)))
++                    .unwrap();
++                stream.write_all(answer.as_bytes()).unwrap();
++            }
+         });
++        prepared
++            .recv_timeout(Duration::from_secs(5))
++            .expect("prepared fake memory ready for the person's request");
+         let told = hits_note(&socket, Some("p-1"), "how is my sister's job?", NOW, None).unwrap();
+         assert!(told.contains("Their sister lives in Hue."), "{told}");
+         assert!(!told.contains(HITS_ROOM_NOTE), "theirs, not the room's");
++        prepared
++            .recv_timeout(Duration::from_secs(5))
++            .expect("prepared fake memory ready for the room's request");
+         let room = hits_note(&socket, None, "the sister", NOW, None).unwrap();
+         assert!(room.ends_with(HITS_ROOM_NOTE), "{room}");
+         served.join().unwrap();
+diff --git a/lampOS/crates/voice/src/requested_audio/runtime.rs b/lampOS/crates/voice/src/requested_audio/runtime.rs
+index da9de12af2..b381548405 100644
+--- a/lampOS/crates/voice/src/requested_audio/runtime.rs
++++ b/lampOS/crates/voice/src/requested_audio/runtime.rs
+@@ -174,6 +174,8 @@ struct Shared {
+     samples: Mutex<Option<Vec<i16>>>,
+     #[cfg(test)]
+     changed: Condvar,
++    #[cfg(test)]
++    fixture_time: Option<Arc<FixtureTime>>,
+ }
+ 
+ impl Shared {
+@@ -182,7 +184,12 @@ impl Shared {
+             self.terminal
+                 .compare_exchange(ACTIVE, CANCELLED, Ordering::AcqRel, Ordering::Acquire);
+         #[cfg(test)]
+-        self.changed.notify_all();
++        {
++            self.changed.notify_all();
++            if let Some(time) = &self.fixture_time {
++                time.wake();
++            }
++        }
+     }
+ 
+     fn limit(&self, now_us: u64, playback: bool) -> Option<u64> {
+@@ -272,25 +279,41 @@ impl Ticket {
+             .compare_exchange(ACTIVE, COMPLETED, Ordering::AcqRel, Ordering::Acquire)
+             .is_ok();
+         #[cfg(test)]
+-        self.shared.changed.notify_all();
++        {
++            self.shared.changed.notify_all();
++            if let Some(time) = &self.shared.fixture_time {
++                time.wake();
++            }
++        }
+         completed
+     }
+ 
+     #[cfg(test)]
+     pub(crate) fn wait_ready(&self, timeout: Duration) -> bool {
++        let deadline = Instant::now() + timeout;
+         let Ok(samples) = self.shared.samples.lock() else {
+             return false;
+         };
+-        let Ok((samples, _)) =
+-            self.shared
+-                .changed
+-                .wait_timeout_while(samples, timeout, |samples| {
+-                    samples.is_none() && self.shared.terminal.load(Ordering::Acquire) == ACTIVE
+-                })
+-        else {
++        let Ok((samples, _)) = self.shared.changed.wait_timeout_while(
++            samples,
++            deadline.saturating_duration_since(Instant::now()),
++            |samples| samples.is_none() && self.shared.terminal.load(Ordering::Acquire) == ACTIVE,
++        ) else {
+             return false;
+         };
+-        samples.is_some() && self.live(lamp_ipc::monotonic_us())
++        let ready = samples.is_some();
++        drop(samples);
++        let now = if let Some(time) = &self.shared.fixture_time {
++            // Loading publishes samples before the worker checks permission
++            // again. Observe its park before the fixture reads the same cache.
++            if !time.wait_quiet(deadline.saturating_duration_since(Instant::now())) {
++                return false;
++            }
++            time.now_us()
++        } else {
++            lamp_ipc::monotonic_us()
++        };
++        ready && self.live(now)
+     }
+ }
+ 
+@@ -307,6 +330,8 @@ pub(crate) struct Service {
+     busy: Arc<Capacity>,
+     monitor: Thread,
+     worker: Thread,
++    #[cfg(test)]
++    fixture: Option<FixtureService>,
+ }
+ 
+ impl Service {
+@@ -404,6 +429,8 @@ impl Service {
+             busy,
+             monitor: monitor.thread().clone(),
+             worker: worker.thread().clone(),
++            #[cfg(test)]
++            fixture: None,
+         })
+     }
+ 
+@@ -411,6 +438,11 @@ impl Service {
+     /// channel. A second offer is refused rather than becoming a future sound.
+     pub(crate) fn offer(&self, offer: RequestedAudioOffer) -> Option<Ticket> {
+         let now_us = lamp_ipc::monotonic_us();
++        #[cfg(test)]
++        let now_us = self
++            .fixture
++            .as_ref()
++            .map_or(now_us, |fixture| fixture.time.now_us());
+         if offer.check().is_err() || !self.running.live() || now_us >= offer.start_before_us {
+             return None;
+         }
+@@ -442,6 +474,8 @@ impl Service {
+             samples: Mutex::new(None),
+             #[cfg(test)]
+             changed: Condvar::new(),
++            #[cfg(test)]
++            fixture_time: self.fixture.as_ref().map(|fixture| fixture.time.clone()),
+         });
+         if self.queue.try_send(shared.clone()).is_err() {
+             self.busy.release();
+@@ -455,6 +489,13 @@ impl Service {
+     /// context. This seam performs no action and is absent from runtime builds.
+     #[cfg(test)]
+     pub(crate) fn wait_cached(&self, timeout: Duration) -> bool {
++        if let Some(fixture) = &self.fixture {
++            if !self.observe_fixture(timeout) {
++                return false;
++            }
++            let now = fixture.time.now_us();
++            return self.speaker.cache.lock().unwrap().bind(now, now).is_some();
++        }
+         let Ok(cache) = self.speaker.cache.lock() else {
+             return false;
+         };
+@@ -503,6 +544,19 @@ impl Drop for Service {
+         self.running.stop.store(true, Ordering::Release);
+         self.monitor.unpark();
+         self.worker.unpark();
++        #[cfg(test)]
++        if let Some(fixture) = &mut self.fixture {
++            fixture.time.wake();
++            let done = fixture
++                .finished
++                .get_mut()
++                .unwrap()
++                .recv_timeout(Duration::from_secs(3));
++            if !thread::panicking() {
++                done.expect("requested audio fixture worker stopped");
++                fixture.worker.take().unwrap().join().unwrap();
++            }
++        }
+     }
+ }
+ 
+@@ -540,6 +594,206 @@ impl WorkerTime for RealWorkerTime {
+     }
+ }
+ 
++// The coordinator fixture drives the same worker and cache checks, but gives
++// each monitor observation and worker iteration an explicit logical instant.
++// Host scheduling cannot manufacture a stale cache or try_lock collision.
++#[cfg(test)]
++struct FixtureTime {
++    now_us: Arc<AtomicU64>,
++    busy: Arc<Capacity>,
++    running: Arc<Running>,
++    parked: AtomicBool,
++    wake: AtomicBool,
++}
++
++#[cfg(test)]
++impl FixtureTime {
++    fn wake(&self) {
++        let _held = self
++            .busy
++            .lock
++            .lock()
++            .unwrap_or_else(|error| error.into_inner());
++        self.parked.store(false, Ordering::Release);
++        self.wake.store(true, Ordering::Release);
++        self.busy.changed.notify_all();
++    }
++
++    fn wait_quiet(&self, timeout: Duration) -> bool {
++        let held = self.busy.lock.lock().unwrap();
++        let (_held, _) = self
++            .busy
++            .changed
++            .wait_timeout_while(held, timeout, |_| {
++                self.busy.active.load(Ordering::Acquire) && !self.parked.load(Ordering::Acquire)
++            })
++            .unwrap();
++        !self.busy.active.load(Ordering::Acquire) || self.parked.load(Ordering::Acquire)
++    }
++}
++
++#[cfg(test)]
++impl WorkerTime for FixtureTime {
++    fn now_us(&self) -> u64 {
++        self.now_us.load(Ordering::Acquire)
++    }
++
++    fn park(&self, interval: Duration) {
++        assert_eq!(interval, MONITOR_EVERY);
++        let held = self.busy.lock.lock().unwrap();
++        // A cancellation between the preceding limit check and this park must
++        // retain its wakeup, just like Thread::unpark's token.
++        if self.wake.swap(false, Ordering::AcqRel) {
++            return;
++        }
++        self.parked.store(true, Ordering::Release);
++        self.busy.changed.notify_all();
++        let (held, result) = self
++            .busy
++            .changed
++            .wait_timeout_while(held, Duration::from_secs(3), |_| {
++                !self.wake.load(Ordering::Acquire) && !self.running.stop.load(Ordering::Acquire)
++            })
++            .unwrap();
++        self.parked.store(false, Ordering::Release);
++        self.wake.store(false, Ordering::Release);
++        drop(held);
++        assert!(
++            !result.timed_out(),
++            "requested audio fixture worker was not stepped"
++        );
++    }
++}
++
++#[cfg(test)]
++struct FixtureService {
++    time: Arc<FixtureTime>,
++    bus: Bus,
++    clock_id: String,
++    state: Mutex<Option<SpeakerState>>,
++    finished: Mutex<Receiver<()>>,
++    worker: Option<thread::JoinHandle<()>>,
++}
++
++#[cfg(test)]
++impl Service {
++    /// Real WAV loading, Unix authorization and terminal receipts; only the
++    /// monitor schedule and worker clock belong to the fixture. Production
++    /// construction still starts both independent real-time workers above.
++    pub(crate) fn new_stepped(
++        bus: Bus,
++        skills: PathBuf,
++        clock_id: String,
++        now_us: Arc<AtomicU64>,
++    ) -> io::Result<Self> {
++        let socket = skills.join(crate::tools::CALL_SOCKET);
++        lamp_schedule::client::validate_socket(&socket).map_err(io::Error::other)?;
++        lamp_msgs::ClockStamp {
++            clock_id: clock_id.clone(),
++            at_us: 0,
++            sequence: 1,
++        }
++        .check()
++        .map_err(io::Error::other)?;
++        let speaker = Arc::new(Speaker::default());
++        let running = Arc::new(Running {
++            stop: AtomicBool::new(false),
++            monitor: AtomicBool::new(true),
++            worker: AtomicBool::new(true),
++        });
++        let busy = Arc::new(Capacity::default());
++        let time = Arc::new(FixtureTime {
++            now_us,
++            busy: busy.clone(),
++            running: running.clone(),
++            parked: AtomicBool::new(false),
++            wake: AtomicBool::new(false),
++        });
++        let (queue, receive) = mpsc::sync_channel(1);
++        let (done, finished) = mpsc::sync_channel(1);
++        let worker = {
++            let (running, busy, time) = (running.clone(), busy.clone(), time.clone());
++            thread::Builder::new()
++                .name("requested-audio-fixture".into())
++                .spawn(move || {
++                    let _alive = Alive(&running.worker);
++                    work(receive, &socket, &running, &busy, time.as_ref());
++                    let _ = done.send(());
++                })?
++        };
++        Ok(Self {
++            queue,
++            speaker,
++            running,
++            busy,
++            monitor: worker.thread().clone(),
++            worker: worker.thread().clone(),
++            fixture: Some(FixtureService {
++                time,
++                bus,
++                clock_id,
++                state: Mutex::new(None),
++                finished: Mutex::new(finished),
++                worker: Some(worker),
++            }),
++        })
++    }
++
++    /// Consume a real Bus publication at its fixture event, including envelope,
++    /// boot, sequence and mute-generation validation. Repeated monitor ticks
++    /// keep that observation's wire stamp and all original freshness bounds.
++    pub(crate) fn observe_fixture(&self, timeout: Duration) -> bool {
++        let fixture = self.fixture.as_ref().unwrap();
++        fixture.time.wait_quiet(timeout)
++            && self.drive_fixture(timeout, || fixture.time.now_us(), true)
++    }
++
++    pub(crate) fn step_fixture(&self, timeout: Duration, advance: impl FnOnce() -> u64) -> bool {
++        self.drive_fixture(timeout, advance, false)
++    }
++
++    fn drive_fixture(
++        &self,
++        timeout: Duration,
++        advance: impl FnOnce() -> u64,
++        observe: bool,
++    ) -> bool {
++        let fixture = self.fixture.as_ref().unwrap();
++        let held = self.busy.lock.lock().unwrap();
++        let active = self.busy.active.load(Ordering::Acquire);
++        if active && !fixture.time.parked.load(Ordering::Acquire) {
++            // A deliberately held Start can coexist with confirmation setup.
++            // Its pending I/O does not advance either side of the lease clock.
++            return !observe;
++        }
++        let now_us = advance();
++        fixture.time.now_us.store(now_us, Ordering::Release);
++        let mut state = fixture.state.lock().unwrap();
++        if observe {
++            let message = fixture.bus.latest(SpeakerState::TOPIC).ok().flatten();
++            let unix_ms = SystemTime::now()
++                .duration_since(UNIX_EPOCH)
++                .map_or(0, |age| age.as_millis().min(u128::from(u64::MAX)) as u64);
++            *state = message.as_ref().and_then(|message| {
++                SpeakerState::from_message(message, &fixture.clock_id, now_us, unix_ms).ok()
++            });
++        }
++        self.speaker
++            .cache
++            .lock()
++            .unwrap()
++            .observe(state.clone(), now_us);
++        drop(state);
++        if active {
++            fixture.time.parked.store(false, Ordering::Release);
++            fixture.time.wake.store(true, Ordering::Release);
++            self.busy.changed.notify_all();
++        }
++        drop(held);
++        !active || fixture.time.wait_quiet(timeout)
++    }
++}
++
+ fn exchange(socket: &Path, operation: &RequestedAudioOperation) -> Option<serde_json::Value> {
+     let value = serde_json::to_value(operation).ok()?;
+     let reply =
+@@ -735,6 +989,7 @@ mod tests {
+                 lease_until_us: AtomicU64::new(if ready { now_us + 500_000 } else { 0 }),
+                 samples: Mutex::new(ready.then(|| vec![100; 480])),
+                 changed: Condvar::new(),
++                fixture_time: None,
+             }),
+         }
+     }
+diff --git a/lampOS/crates/voice/src/second_provider/worker.rs b/lampOS/crates/voice/src/second_provider/worker.rs
+index 8e0ab06c74..55b882b7b0 100644
+--- a/lampOS/crates/voice/src/second_provider/worker.rs
++++ b/lampOS/crates/voice/src/second_provider/worker.rs
+@@ -11333,6 +11333,9 @@ mod tests {
+     }
+ 
+     fn check_stop_during_music_rpc(warm_stt: bool) {
++        // The real worker reads and writes the process's conversation too.
++        // Hold its fixture guard until the runtime stops and THREAD is restored.
++        let _one = crate::provider_worker::tests::one_thread();
+         use crate::second_provider::requested_audio_tests::{RecordingScript, offered};
+         use serde_json::json;
+         use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+diff --git a/lampOS/docs/realtime-tests.md b/lampOS/docs/realtime-tests.md
+index cf987fe24d..4f5de71bb9 100644
+--- a/lampOS/docs/realtime-tests.md
++++ b/lampOS/docs/realtime-tests.md
+@@ -1656,3 +1656,35 @@ Left as they are, for what each is there to show:
+ - `judges_program` keeps `--seconds 2`. The child's time starts at its
+   start, and inside it the test waits for the ready report, sends a line,
+   and waits for a decision with a 1 s deadline.
++
++## Voice fixtures under a full parallel library run (#1569, 22 October)
++
++The full x86 Voice library shares one process; passing a case alone does
++not establish that its fixtures are isolated. The requested-audio Skills
++fake and `DeclineMusic` now begin their original three-second accept
++watchdog at an explicit dispatch rendezvous. Time spent constructing the
++provider, or waiting for another fixture's guard, cannot use that watchdog.
++The long memory-hit fake prepares its 150-entry reply before either real
++60 ms call and acknowledges readiness separately for each request.
++
++The timer-following-answer and busy-room-reminder cases already wait for
++provider/Policy events. They now opt into the existing paused fixture
++clock, so host scheduling does not expire their original logical authority.
++The music-RPC Stop fixture takes the existing process conversation guard
++through worker shutdown and restoration; it cannot replace another test's
++stored question. Its Stop deadline and the own-answer assertions remain.
++
++The coordinator recording fixture drives the real loader and Skills socket
++worker with the existing scenario clock. It consumes each real Bus publication
++at an explicit observation event, then steps its original wire stamp and cache
++bounds together while the worker is parked. Production construction still
++starts its independent monitor; runtime tests still assert that cache contention
++cancels. Recording tests retain an independent real 250 ms handoff assertion
++alongside their logical receipt and trace checks.
++
++[The verification record](verification/voice-full-run-events-20261022/README.md)
++keeps the unchanged full-run failures, controlled before/after stalls,
++scheduled conversation overlap, negative controls and complete x86/ARM64
++counts. The injected stalls are reproduction patches only; no fixed sleep
++is added to the submitted tests. These are fixture measurements, not
++acoustic or device latency evidence.
