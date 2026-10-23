@@ -1,4 +1,4 @@
-## Current checkpoint: 2026-10-23 20:52 +07, corrected updater green and old helper exercised
+## Current checkpoint: 2026-10-23 21:09 +07, corrected updater green and old helper exercised
 
 Ready for lamp-voice: #3269 is ready for review; current reviewer dispositions remain required
 
@@ -8,8 +8,9 @@ Update is **371 / 0 / 4 ignored**, including 28 head-touch cases; formatting
 and strict Clippy pass. [Current official gates](verification/updater-head-touch-native-20261023/README.md)
 pass: ARM64 **11,067 / 0 / 69 skipped** with one passing leaky Voice case,
 docs **4 / 0**, process harness **12 / 0**, and Linux Clippy. The tested merge
-tree equals the authored head. Third and Reviewer-lead own their current-head
-reads; First owns merge. No review HOLD is lifted by this result.
+tree equals the authored head. Third independently passed all **28 / 0** transition cases and explicitly
+lifted both P2 HOLDs on this head at 21:01. Reviewer-lead owns its separate
+read; First owns merge. The native result itself does not lift review holds.
 
 [Actual old-helper evidence](verification/previous-helper-6408-20261023/README.md)
 passes **6 / 0**: four format/refusal/restore cases plus real old-helper
@@ -27,6 +28,12 @@ old-side recommendation. The prior 6408 results remain separate and intact.
 pass on the current Mac CLI with an unchanged temporary root: wrong-key ID
 refusal and signature refusal after a forged key label. Neither establishes
 positive signature trust; the actual public-key handoff remains required.
+
+[New #3271 setup diagnosis](verification/peer-room-setup-read-20261023/README.md)
+retains the failed native census and identifies a conditional timestamp-wrap
+window, without claiming the unrecorded host clock as its cause. The existing
+#3190 fixture covers that exact test; Tests owns diagnostic execution and
+Reviewer-two owns disposition. No test was rerun for this source read.
 
 The whole-lamp state inventory is published for #2809. #1812 still requires
 Migrate's trusted public key for fingerprint `54213f8d3aa2f241`. #2810 still

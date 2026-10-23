@@ -1,0 +1,6 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T13:52:22.0411244Z     Starting 7237 tests across 62 binaries (33 tests and 106 binaries skipped)
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T13:54:26.1845109Z     thread 'second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy' (35189) panicked at crates/voice/src/second_provider/worker.rs:8632:17:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T13:54:26.1845810Z     assertion `left == right` failed
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T13:54:26.1846049Z       left: Unknown
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T13:54:26.1846245Z      right: Quiet
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T13:54:27.1725388Z      Summary [ 125.132s] 5896/7237 tests run: 5895 passed (1 leaky), 1 failed, 33 skipped

@@ -1,0 +1,49 @@
+{
+  "classification": "source diagnosis and existing-output census only; no new runtime execution",
+  "head": "55f671b12ef08c93f11ae235980f69cf7059b7a8",
+  "base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+  "run": {
+    "databaseId": 39964412356,
+    "headSha": "55f671b12ef08c93f11ae235980f69cf7059b7a8",
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "failure",
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39964412356"
+  },
+  "selected": 7237,
+  "observed": 5896,
+  "pass_rows": 5894,
+  "leak_rows": 1,
+  "failed_rows": 1,
+  "summary_passed_including_leak": 5895,
+  "summary_skipped": 33,
+  "selected_unrun": 1341,
+  "failure": [
+    {
+      "status": "FAIL",
+      "duration": "0.005s",
+      "index": 5893,
+      "total": 7237,
+      "binary": "lamp-voice",
+      "name": "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy"
+    }
+  ],
+  "source_blobs": {
+    "lampOS/crates/voice/src/second_provider/worker.rs": "b4a80268976424bb08aa85065b61be164abe6c44",
+    "lampOS/crates/voice/src/room_told.rs": "06d7707ebeffa20d03b8838c76ed3d6ca5081cfa",
+    "lampOS/crates/ipc/src/lib.rs": "7b8f04f5ab480c998c4f932fd3d2a7571a2e26ab"
+  },
+  "raw_failed_step_log_sha256": "97965aa1a035ae51023aee5e0e9b42ebe47fd316df7dc7b77021e579352349f3",
+  "local_full_observed_census_sha256": "ece2a6eafda3b95b1f40374bbe240d35a755bd6f10e07a9b62717bc0fe376102",
+  "census_method": "Unique PASS/LEAK/FAIL result ordinals; asserted contiguous 1..5896 with identical duplicate result rows, denominator7237. Summary skips counted separately.",
+  "clock_cause_measured": false,
+  "new_tests_or_reruns": 0,
+  "missing_observations": [
+    "raw now_us",
+    "derived setup timestamps",
+    "first at() result",
+    "on/in_view iteration",
+    "effective overflow-check flags"
+  ],
+  "source_comparison": "Failed head changes only fixture_provider.rs and voice-test-fixtures.md; these three blobs equal base810e05109. Existing PR3190 explicitly scopes this exact test to600-second shared scenario time."
+}
