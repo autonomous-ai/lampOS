@@ -68,7 +68,7 @@ LABEL=${1:-}
 [[ -n $LABEL ]] || { echo "usage: desk-kit.sh LABEL   or   desk-kit.sh --dry [SCENARIO ...]" >&2; exit 2; }
 # shellcheck source=settings.sh
 . ./settings.sh
-if [[ $(date +%u) -le 5 && $(date +%H) -ge 12 && $(date +%H) -lt 14 && ${LAMP_PLAY_AT_LUNCH:-} != yes ]]; then
+if [[ $(date +%u) -le 5 && $((10#$(date +%H))) -ge 12 && $((10#$(date +%H))) -lt 14 && ${LAMP_PLAY_AT_LUNCH:-} != yes ]]; then
   echo "desk-kit.sh: not between 12:00 and 14:00 local, when the office rests" >&2
   exit 2
 fi
@@ -99,15 +99,19 @@ loan() { [[ -n $LOANS ]] && echo "$(date +%H:%M) $LOAN_NAME: $1" | "$LAMP_SSH" "
 FACE_PID=
 hide_face() { [[ -n $FACE_PID ]] && kill "$FACE_PID" 2>/dev/null; FACE_PID=; pkill -f "user-data-dir=$PROFILE" 2>/dev/null; true; }
 # The put-back touches only what this run made: the lamp's drop-in once OWNED (set just before this run's first write
-# of it), and then only while the file still holds this run's TOKEN, so a drop-in another run or person put there is
-# never removed and the voice never restarted for it (reviewer-two, #2964). Before that an interrupt leaves the lamp.
+# of it), and then only while the file's first line is still this run's TOKEN, so a drop-in another run or person put
+# there is never removed and the voice never restarted for it (reviewer-two, #2964). Before that an interrupt leaves
+# the lamp. Every write and the removal check the token under one lock on the lamp (LOCK), so no other writer slips
+# between the check and the write.
 TOKEN="# desk kit run $(hostname -s | tr -cd "A-Za-z0-9.-") pid $$ $(date +%s)"
+LOCK=/run/lock/desk-kit.lock
 OWNED= LOANED=
+ours="head -1 $DROPIN 2>/dev/null | grep -qxF '$TOKEN'"
 put_back() {
   trap '' INT TERM; trap - EXIT
   hide_face
   osascript -e "set volume output volume 50"
-  [[ -n $OWNED ]] && lamp "if sudo -n grep -qsxF '$TOKEN' $DROPIN; then sudo -n rm -f $DROPIN; sudo -n systemctl daemon-reload; sudo -n systemctl restart lamp-voice; fi; systemctl is-active lamp-voice"
+  [[ -n $OWNED ]] && lamp "if sudo -n flock $LOCK sh -c \"$ours && rm -f $DROPIN\"; then sudo -n systemctl daemon-reload; sudo -n systemctl restart lamp-voice; fi; systemctl is-active lamp-voice"
   [[ -n $LOANED ]] && loan "desk kit $LABEL done${OWNED:+, lamp-voice back without its $DROPIN}, face closed; loan ended"
   true
 }
@@ -158,11 +162,19 @@ arm() { # arm NAME:ENV=v,...
   envs=${envs//,/ }
   # An arm's value overrides BASE's for the same switch (systemd keeps the last), so only the last is checked.
   envs=$(printf '%s\n' $envs | awk -F= '{v[$1]=$0; if (!($1 in o)) {o[$1]=++n; k[n]=$1}} END{for (i=1;i<=n;i++) print v[k[i]]}' | tr '\n' ' ')
-  # The first arm creates the file only if none is there (set -C): one written meanwhile is not taken over.
-  local make="sudo -n sh -c 'set -C; cat > $DROPIN'"; [[ -n $OWNED ]] && make="sudo -n tee $DROPIN >/dev/null"
+  # The drop-in goes to a staging file first (a cut-off send leaves no empty drop-in), then, under the lock, onto the
+  # fixed name: on the first arm only if none is there, on a later arm only while the file is still this run's.
+  # Otherwise nothing is written and the kit stops (exit 3), leaving the file and the voice as they are.
+  local may="[ ! -e $DROPIN ]"; [[ -n $OWNED ]] && may=$ours
   OWNED=yes
-  { echo "$TOKEN"; dropin "$1" "$exec_line"; } | "$LAMP_SSH" "sudo -n mkdir -p ${DROPIN%/*} && $make && sudo -n systemctl daemon-reload && sudo -n systemctl restart lamp-voice" \
-    || { echo "desk-kit.sh: the drop-in could not be put on (sudo -n, or one is there already)" | tee -a "$LOG"; exit 4; }
+  { echo "$TOKEN"; dropin "$1" "$exec_line"; } | "$LAMP_SSH" "t=\$(mktemp) && cat > \$t && head -1 \$t | grep -qxF '$TOKEN' || { rm -f \$t; exit 4; }
+    sudo -n mkdir -p ${DROPIN%/*} && sudo -n flock $LOCK sh -c \"$may || exit 3; cat \$t > $DROPIN\"; r=\$?; rm -f \$t; [ \$r = 0 ] || exit \$r
+    sudo -n systemctl daemon-reload && sudo -n systemctl restart lamp-voice"
+  case $? in
+    0) ;;
+    3) echo "desk-kit.sh: the drop-in is not this run's (another run's or a person's); not writing it, stopping" | tee -a "$LOG"; exit 3;;
+    *) echo "desk-kit.sh: the drop-in could not be put on (sudo -n)" | tee -a "$LOG"; exit 4;;
+  esac
   sleep 20
   local names; names=$(for e in $envs; do printf '%s|' "${e%%=*}"; done)
   local got; got=$(lamp "p=\$(systemctl show -p MainPID --value lamp-voice); sudo -n readlink /proc/\$p/exe; sudo -n cat /proc/\$p/environ | tr '\\0' '\\n' | grep -E '^(${names%|})=' | sort | tr '\\n' ' '")
