@@ -1,5 +1,15 @@
 # Reviewer work log
 
+## 2026-10-24 (reviewer-two docs landing and next assignments at 06:31 +07)
+
+#3303 integrated by train #3304 at e7a1ccef72b8b31285a410eda9e1cd2218fa78b3 (bot Queue 6376734604, PR 6376733931). Full git diff against reviewed 792d142cda8e68b3621253cefe375782c7414dd6 is empty; parent df6830381. Root landing receipt 6376811591 and Queue next-work 6376811927. Current origin/lamp-voice has subsequently advanced to 846b3d203fc00ec3886d71f7673d8cc29cc4a634 with Welcome-back away-clock fix; build-rows.md unchanged. Own merge count remains ten.
+
+First assigned Seventh to carry stalled joint-deadband #3248 on its own branch, retaining original commits and fixing the red test, with reviewer-two to read the replacement PR (6376774049). Historical context audit started read-only; no claim or verdict on the old PR, no Cargo/device work. Added #3248 to addressed-reply watch. Reviewer-lead's #3107 comment 6376748092 confirms it waits for #3064's red-test fix, latest-base rebase and undraft, then Nine's hedge rebase and reviewer-two read. Sixth claimed the separate desk-talk task at 6376730273; the baseline measurement decision remains between Sixth and First (6376748342/6376768068). These future reads do not authorize root code edits or device access.
+
+Historical #3248 context report c3248-carry-review-context.md/json read in full. Old head 07f5cc66501b3f6b0b22ef555f20efa0c7f75ad6 retains First/Third HOLDs; exact-head ARM 39929628390 is failed per independently fetched metadata. Third reports five of six unchanged controls passing and all 95 late 300-to-130 stationary-retention rows failing. The lead's proposed still && !felt[index] condition at 6376738021 was independently read by root and remains unexecuted. The new carry must preserve held_from/left_by_goal/gave_first, sustained contact, prompt release, the 13-count limp control and untouched resting-jitter protection, with full current-head Body/native gates and Third's disposition. Default give-way/limp are on; First retains Body integration. The old unplug attribution was withdrawn and is not the current blocker. This is historical preparation, not a verdict or test run on the unposted carrier.
+
+Own prior log 47232d94af pushed; main inherited pr.json untouched. Next eligible ready head, new replies and the carried #3248 review. No manual merge, product or device/provider/model action; no local Cargo gate active.
+
 ## 2026-10-24 (reviewer-two build-row docs read at 06:23 +07)
 
 #3303 READ-OK 792d142cda8e68b3621253cefe375782c7414dd6 posted 6376720562, P1/P2 none, Queue 6376720849. First assigned at 6376670965; no existing reading claim, claimed 6376706478. Read the entire doc, two-line delta, PR body/metadata and referenced #2285 task. Timestamp becomes06:18 and talks-naturally0.90→0.92 citing #3296/train62/df6830381 merged behind its off switch. The claim is merged implementation progress, not a valid busy-room result; quality rows unchanged. Fresh fetch confirms exact head with current df683038187431159dd91083babdfd57205d2981 as parent; diff check passes.
