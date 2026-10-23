@@ -1,9 +1,10 @@
 //! A worker thread fed through one slot that holds only the newest item:
 //! the look offers and never waits, an item the worker has not taken yet is
 //! replaced by a newer one (dropped, never queued), and the worker's results
-//! come back on a short channel the look drains. The seems read (Face Mesh
-//! V2 then Blendshape V2, 85 ms on a big core and 290 ms on a small one under
-//! tract) runs here, off the look (the reviewer-lead's P2 on #2872).
+//! come back on a short channel the look drains. The seems read (Blendshape
+//! V2 on the look's mesh points, or Face Mesh V2 first on a crop the look did
+//! not mesh, 85 ms on a big core and 290 ms on a small one under tract) runs
+//! here, off the look (the reviewer-lead's P2 on #2872).
 use std::{
     io,
     sync::{

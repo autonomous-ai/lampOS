@@ -178,6 +178,28 @@ impl Reader {
     }
 }
 
+/// What the `eyes-seems` thread reads the near face from: the mesh's
+/// points of this look, when the look's mouth pass meshed that face, so one
+/// mesh a look serves both the speaking read and this one, else the face's
+/// crop (`mesh::crop`), for the thread's own mesh.
+pub enum Input {
+    Landmarks(Vec<f32>),
+    Crop(Vec<f32>),
+}
+
+/// The input for a seems read due on the face at `near`: the look's own
+/// `meshed` points if they are that face's, else its `crop`, if it has one.
+pub fn input(
+    meshed: Option<(usize, Vec<f32>)>,
+    near: usize,
+    crop: impl FnOnce() -> Option<Vec<f32>>,
+) -> Option<Input> {
+    match meshed {
+        Some((at, landmarks)) if at == near => Some(Input::Landmarks(landmarks)),
+        _ => crop().map(Input::Crop),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -345,5 +367,29 @@ mod tests {
                 .fold(0.0f32, f32::max);
             assert!(worst < 1e-4, "{worst}");
         }
+    }
+
+    /// With `--seems-blendshapes` the mouth's mesh stays on the look, one a
+    /// look as without it (lamp-52e6: 234 looks a minute, every one with
+    /// the lips, against 97 and 39 while the seems thread meshed every
+    /// look's crop): a seems read due on the face the look just meshed
+    /// takes those points and cuts no crop; only another face, or a look
+    /// with no mouth pass, sends its crop to the thread's own mesh.
+    #[test]
+    fn a_seems_read_takes_the_look_s_own_mesh_and_cuts_a_crop_only_for_another_face() {
+        let never = || -> Option<Vec<f32>> { panic!("the look's own points were there") };
+        assert!(matches!(
+            input(Some((1, vec![1.0; 6])), 1, never),
+            Some(Input::Landmarks(points)) if points == [1.0; 6]
+        ));
+        assert!(matches!(
+            input(Some((0, vec![1.0; 6])), 1, || Some(vec![2.0; 3])),
+            Some(Input::Crop(crop)) if crop == [2.0; 3]
+        ));
+        assert!(matches!(
+            input(None, 1, || Some(vec![2.0])),
+            Some(Input::Crop(_))
+        ));
+        assert!(input(None, 1, || None).is_none());
     }
 }
