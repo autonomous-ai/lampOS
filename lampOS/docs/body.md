@@ -2387,7 +2387,19 @@ still reads the hand (its load over the bound, or the joint moved off where
 it was put) keeps it held at least a second more, so one quiet read in
 between is not the hand gone: on lamp-52e6 on 2026-10-19 a base held gently
 read 172 to 196 with quieter reads between, was sent home into the hand
-every two seconds, and the person felt it stiffen and jerk (#1115). On lamp-52e6 the
+every two seconds, and the person felt it stiffen and jerk (#1115). The
+bound is the lower of the joint's own and 100 only once the joint is more
+than 15 counts from where its hold began (or where a hand left it, under
+`stay`); still within that, only its own bound counts, so a joint resting
+still at its own load over 100 is let go after its ease and goes back to
+its moods and home, as any eased joint does. On lamp-06c1 on 23 Oct the
+head pitch read 124 to 136 at rest, its position unmoving all night, and
+judged against 100 it was held for good, out of moods and home. On 22
+Oct it gave way because its goal wandered 20 to 25 counts off it while it
+never moved: its hold begins where it stood, not at that goal, unless it
+moved from where it last tracked, as a hand moves it. A hand
+that moves the joint, or presses past its own bound, still keeps it held.
+On lamp-52e6 the
 same morning, before this, a hand tilting the head took it 45 counts past
 where it had given way and the run ended on tracking, and the third such
 end in ten minutes left the lamp without a body. Under `--give-way` the
@@ -2400,7 +2412,7 @@ it as often as they like.
 **`stay`: moved by a hand, it stays where it was put.** As above, and:
 
 - In a hand for a second in a row (its load over its bound, or over 100
-  if that is lower, or it kept more than 15 counts off the goal it is held
+  if that is lower and it is off where its hold began, or it kept more than 15 counts off the goal it is held
   at), and it has been moved more than 15 counts from where it gave way
   (from its goal, for a joint that gave way because a hand had already
   moved it off it): a hand moved it. On lamp-52e6 a hand lifting the head

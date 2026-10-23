@@ -5141,6 +5141,131 @@ fn a_head_held_off_its_goal_by_a_hand_at_a_low_load_is_in_the_hand() {
     );
 }
 
+/// lamp-06c1, 23 Oct: a head pitch that reads 124 to 136 at its own rest,
+/// over `STALL_LOAD`, with nothing on it and its position unmoving all
+/// night. Given way to a short push, it is let go after its ease and is
+/// asked its moods again, not held for good.
+#[test]
+fn a_head_resting_still_at_its_own_load_over_100_is_let_go_after_its_ease() {
+    let ms = Duration::from_millis;
+    let (mut lamp, mut clock) = folded(Duration::from_secs(12));
+    lamp.strains = vec![
+        (ms(1_500), ms(2_000), PITCH, 300),
+        (ms(0), ms(12_000), PITCH, 130),
+    ];
+    let news = rest_then_listen(&clock.time);
+    let mut seen = Vec::new();
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        giving_way(GiveWay::Return),
+        None,
+        news,
+        |glimpse| seen.push(*glimpse),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.eased, [1, 0, 0], "{report:?}");
+    // Its ease of two seconds from the push's end, and a second more.
+    let late: Vec<_> = seen.iter().filter(|g| clock_of(g) >= ms(5_000)).collect();
+    assert!(
+        late.iter().all(|g| !g.hand),
+        "still held at {:?}",
+        late.iter().rev().find(|g| g.hand).map(|g| clock_of(g))
+    );
+    // Listening, from six seconds, lifts it 40 counts.
+    let listening = seen
+        .iter()
+        .rev()
+        .find(|g| clock_of(g) < ms(11_900))
+        .unwrap();
+    assert!(listening.goals[0].abs_diff(1_960) <= 2, "{listening:?}");
+}
+
+/// lamp-06c1, 22 Oct: the head pitch never moved (1,765 in every sample)
+/// while its goal wandered away from it, and its load rose with the gap (96
+/// to 112, once 192, all under its bound of 240). It gave way as a joint
+/// held off its goal does, where its goal was, not where it stood. Still
+/// where it stood, it is let go after its ease and asked its moods again.
+#[test]
+fn a_head_that_never_moves_while_its_goal_wanders_off_is_let_go_after_its_ease() {
+    let ms = Duration::from_millis;
+    let (mut lamp, mut clock) = folded(Duration::from_secs(12));
+    // The servo stays at 1,995 whatever its goal; listening asks 1,960.
+    lamp.hand = Some((ms(0), ms(12_000), PITCH, 1_995.0));
+    lamp.strains = vec![
+        (ms(2_000), ms(2_100), PITCH, 192),
+        (ms(0), ms(12_000), PITCH, 130),
+    ];
+    let news = || Some((Mood::Listening, 100));
+    let mut seen = Vec::new();
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        giving_way(GiveWay::Return),
+        None,
+        news,
+        |glimpse| seen.push(*glimpse),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.eased[0] >= 1, "{report:?}");
+    let first = seen.iter().find(|g| g.hand).map(clock_of).unwrap();
+    // Let go within its ease and a second of giving way, and asked toward
+    // listening's 1,960 again, not left at where it stands.
+    let let_go = seen
+        .iter()
+        .filter(|g| clock_of(g) > first)
+        .find(|g| !g.hand)
+        .map(clock_of);
+    assert!(
+        let_go.is_some_and(|at| at <= first + ms(3_000)),
+        "gave way at {first:?}, let go at {let_go:?}"
+    );
+    assert!(
+        seen.iter()
+            .filter(|g| clock_of(g) > let_go.unwrap())
+            .any(|g| g.goals[0] + 15 < 1_995),
+        "never asked its moods again"
+    );
+}
+
+/// What keeps a joint held over its own resting load: a hand that moved it
+/// 40 counts and holds it there at 120, or one pressing past the head's
+/// bound of 240 without moving it. Either keeps it held for as long as it
+/// stays.
+#[test]
+fn a_head_moved_and_held_or_pressed_past_its_bound_stays_held_while_the_hand_does() {
+    let ms = Duration::from_millis;
+    let ran = |moved: bool| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(12));
+        if moved {
+            lamp.hand = Some((ms(1_500), ms(10_000), PITCH, f32::from(HOME[0]) + 40.0));
+            lamp.strains = vec![(ms(1_500), ms(10_000), PITCH, 120)];
+        } else {
+            lamp.strains = vec![(ms(1_500), ms(10_000), PITCH, 300)];
+        }
+        let news = || Some((Mood::Listening, 100));
+        let mut seen = Vec::new();
+        let report = run(
+            &mut lamp,
+            &mut clock,
+            giving_way(GiveWay::Return),
+            None,
+            news,
+            |glimpse| seen.push(*glimpse),
+        );
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        assert!(report.eased[0] >= 1, "{report:?}");
+        let let_go = seen
+            .iter()
+            .filter(|g| (ms(3_000)..ms(10_000)).contains(&clock_of(g)))
+            .find(|g| !g.hand)
+            .map(clock_of);
+        assert_eq!(let_go, None, "moved {moved}");
+    };
+    ran(true);
+    ran(false);
+}
+
 /// A hand that takes the head past its reach leaves it at the edge of it.
 #[test]
 fn told_to_stay_a_head_pushed_past_its_reach_is_kept_at_the_edge() {
