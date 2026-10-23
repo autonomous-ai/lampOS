@@ -5,6 +5,17 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 23:00 — assigned cue and review correction pushed
+
+- #3275 is now `92088b7ea` on current `be16c3327`. The original three
+  commits are unchanged; two follow-ups add the local-system override
+  scan/regression and the assigned −20 dBFS shared cue default.
+- Final Mac Voice/Update gate **4,310/0/19 ignored**, formatting and strict
+  Clippy pass. The denied-socket attempt is retained separately. [Receipt](verification/head-touch-install-pair-20261023/followup.md).
+- The original head's ARM64 and Linux Clippy passed; fresh native checks,
+  Linux formatting and the two assigned reads now apply to the new head.
+  Continue watching. The first builder's HOLD remains; no lamp action.
+
 ## 2026-10-23 22:07 — combined carry pushed after host gates
 
 - First assigned the install preflight at 21:21. The complete carry is

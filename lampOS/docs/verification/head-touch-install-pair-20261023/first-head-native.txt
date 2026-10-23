@@ -1,0 +1,45 @@
+{"conclusion":"success","headSha":"413378623759a489a5eacd6072640a3e8038da3c","status":"completed"}
+{"conclusion":"success","headSha":"413378623759a489a5eacd6072640a3e8038da3c","status":"completed"}
+
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:09:46.1348585Z HEAD is now at 3b72fc4 Merge 413378623759a489a5eacd6072640a3e8038da3c into be16c3327524ccef8a1908a3b8ebf40c16efba8a
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:01.7143457Z         LEAK [   0.269s] ( 8925/11072) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3567837Z      Summary [ 198.056s] 11072 tests run: 11072 passed (1 leaky), 69 skipped
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3570478Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 5.01s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3572715Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 304 filtered out; finished in 3.61s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3578643Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 304 filtered out; finished in 1.11s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3588412Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 304 filtered out; finished in 4.52s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3593066Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 304 filtered out; finished in 0.92s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3601097Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 304 filtered out; finished in 1.74s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3611249Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3699 filtered out; finished in 3.02s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3617246Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3699 filtered out; finished in 2.73s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3619570Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3699 filtered out; finished in 1.30s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3622504Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.96s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3626943Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 1.55s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3630134Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.87s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3633818Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 1.01s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3636926Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 2.25s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3640202Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.80s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3643566Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 2.80s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3647746Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 2.81s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3651561Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 1.30s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3655003Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 2.31s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3657999Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 3.50s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3660633Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 7.91s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3664182Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 1.60s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3669358Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 2.51s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3673856Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3676180Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.07s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3678541Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.05s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3680876Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.40s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3683633Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.22s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3686025Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.66s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3688890Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.20s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3691185Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.24s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3693672Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.12s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3695973Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.11s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3698541Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.32s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:31.3701906Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 1.12s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:32.6491397Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:33.9505867Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:35.1364060Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T15:28:44.7371119Z test result: 12 passed; 0 failed

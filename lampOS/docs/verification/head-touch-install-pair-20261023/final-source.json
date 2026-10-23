@@ -1,0 +1,52 @@
+{
+  "parent": "413378623759a489a5eacd6072640a3e8038da3c",
+  "files": {
+    "lampOS/crates/update/src/head_touch.rs": "6b527828bae086fefa5c9bc23d5604a100294811209bd355e7317b0018ec4365",
+    "lampOS/crates/update/tests/install.rs": "7c446bfaae320d5d0271588735ecfd5bb9b907b988abfca2c8e6d21bbe008192",
+    "lampOS/crates/voice/src/coordinator/notices.rs": "f72aa7dd3a5e24a8ba48a443848203762885f821f431775f39a84a69bb0a2abb",
+    "lampOS/crates/voice/src/head_cue.rs": "b0f7f98883b84173d8c6925db665f2571314ed60bdd0bf622b7cb1c816f5acc1",
+    "lampOS/crates/voice/src/say.rs": "52e66278fc7da702b73fd3e7d19c00754bf6e62804f12ccfdbc04a2cf7ad129e",
+    "lampOS/docs/attention.md": "3bbd25efaa8633492a37abbb6cd829682c76e313feb94378902b868028f5aa70",
+    "lampOS/docs/install.md": "e7558430d6ce8a7428f72333b843796fd3a6d08f01eb9b07085f9edad2c34bd2",
+    "lampOS/docs/lamp-runs.md": "14e3d86e96961f31cc6a8578074c31fefa5586776bc6610328c9e562a8981ab0",
+    "lampOS/docs/speaking-first.md": "b19b10974132d6efd433e1c85cabfc2fa2ec7d647d9dac7c974243e99e295f97",
+    "lampOS/docs/switches.md": "d84b6369341506c91892a663ddcbed6682de5867ccc4330bebbca043c2a5a393"
+  },
+  "patch_sha256": "9fe4967db24aff9e686a2623922a6c3c1bd581198855d4e3730e436cac19e0ce",
+  "documentation_correction_during_tests": {
+    "lampOS/docs/lamp-runs.md": "1e1f988368ea47ff16c51b8aa9c3713487b5bbce0a965b9b90d2b029f4e691e8"
+  },
+  "head": "92088b7eaf1127cba12037399e7a8f7aef451846",
+  "tree": "fd526b051d729a6976b012aef342ab8a1db1d004",
+  "base": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+  "committed_files": {
+    "lampOS/crates/update/src/head_touch.rs": "6b527828bae086fefa5c9bc23d5604a100294811209bd355e7317b0018ec4365",
+    "lampOS/crates/update/tests/install.rs": "7c446bfaae320d5d0271588735ecfd5bb9b907b988abfca2c8e6d21bbe008192",
+    "lampOS/crates/voice/src/coordinator/notices.rs": "f72aa7dd3a5e24a8ba48a443848203762885f821f431775f39a84a69bb0a2abb",
+    "lampOS/crates/voice/src/head_cue.rs": "b0f7f98883b84173d8c6925db665f2571314ed60bdd0bf622b7cb1c816f5acc1",
+    "lampOS/crates/voice/src/say.rs": "52e66278fc7da702b73fd3e7d19c00754bf6e62804f12ccfdbc04a2cf7ad129e",
+    "lampOS/docs/attention.md": "3bbd25efaa8633492a37abbb6cd829682c76e313feb94378902b868028f5aa70",
+    "lampOS/docs/install.md": "e7558430d6ce8a7428f72333b843796fd3a6d08f01eb9b07085f9edad2c34bd2",
+    "lampOS/docs/lamp-runs.md": "1e1f988368ea47ff16c51b8aa9c3713487b5bbce0a965b9b90d2b029f4e691e8",
+    "lampOS/docs/speaking-first.md": "b19b10974132d6efd433e1c85cabfc2fa2ec7d647d9dac7c974243e99e295f97",
+    "lampOS/docs/switches.md": "d84b6369341506c91892a663ddcbed6682de5867ccc4330bebbca043c2a5a393"
+  },
+  "outputs": {
+    "final-host-tests.txt": "14db15e62c6220318ed53ecc7d9c1671e872750faaec02db169e6c5cd8f600bb",
+    "final-host-clippy.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cue-focused.txt": "147738e39720e429653dfacb81ad7efa6f634f5d0c7067cdc8b5b03b1d6d50a2",
+    "local-system-controls.txt": "c955ac13cef17041f66c4d247216d8d4bd979f8e8c38995ab6bba14b6a6903e2",
+    "sandbox-denials.txt": "64860d778fc8bc116d062d80c01b87f3f4d144d00bfdd422113ea628f8d226d2",
+    "followup-range-diff.txt": "5a142d9d339a14fcde7021ba4c9c3d2edd5b8f89544133e4c61359a52f921d7e"
+  },
+  "results": {
+    "test_exit": 0,
+    "clippy_exit": 0,
+    "fmt_exit": 0,
+    "full_passed": 4310,
+    "full_failed": 0,
+    "full_ignored": 19,
+    "cue_passed": 8,
+    "install_focused_passed": 5
+  }
+}

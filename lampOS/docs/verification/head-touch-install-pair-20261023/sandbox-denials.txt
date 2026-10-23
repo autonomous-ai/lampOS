@@ -1,0 +1,50 @@
+
+running 122 tests
+............................. 29/122
+fetch::tests::a_chunked_file_and_one_to_the_end --- FAILED
+fetch::tests::a_file_by_its_length_after_a_redirect --- FAILED
+..i. 35/122
+fetch::tests::missing_too_large_short_and_other_answers --- FAILED
+fetch::tests::no_network_is_unreachable --- FAILED
+........................................................i........................... 121/122
+world::tests::the_bus_hears_the_voice_and_not_an_old_state --- FAILED
+
+failures:
+
+---- fetch::tests::a_chunked_file_and_one_to_the_end stdout ----
+
+thread 'fetch::tests::a_chunked_file_and_one_to_the_end' (230679883) panicked at crates/update/src/fetch.rs:632:57:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- fetch::tests::a_file_by_its_length_after_a_redirect stdout ----
+
+thread 'fetch::tests::a_file_by_its_length_after_a_redirect' (230679884) panicked at crates/update/src/fetch.rs:632:57:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- fetch::tests::missing_too_large_short_and_other_answers stdout ----
+
+thread 'fetch::tests::missing_too_large_short_and_other_answers' (230680093) panicked at crates/update/src/fetch.rs:632:57:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- fetch::tests::no_network_is_unreachable stdout ----
+
+thread 'fetch::tests::no_network_is_unreachable' (230680094) panicked at crates/update/src/fetch.rs:752:61:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- world::tests::the_bus_hears_the_voice_and_not_an_old_state stdout ----
+
+thread 'world::tests::the_bus_hears_the_voice_and_not_an_old_state' (230680348) panicked at crates/update/src/world.rs:724:9:
+[]
+
+
+failures:
+    fetch::tests::a_chunked_file_and_one_to_the_end
+    fetch::tests::a_file_by_its_length_after_a_redirect
+    fetch::tests::missing_too_large_short_and_other_answers
+    fetch::tests::no_network_is_unreachable
+    world::tests::the_bus_hears_the_voice_and_not_an_old_state
+
+test result: FAILED. 115 passed; 5 failed; 2 ignored; 0 measured; 0 filtered out; finished in 8.70s
+
+error: test failed, to rerun pass `-p lamp-update --lib`

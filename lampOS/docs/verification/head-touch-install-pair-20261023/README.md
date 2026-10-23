@@ -1,5 +1,7 @@
 # Combined head-touch install carry
 
+The later cue/default and review correction is recorded in [the follow-up receipt](followup.md).
+
 Source `413378623759a489a5eacd6072640a3e8038da3c` on `be16c3327`.
 This carries #2948 onto the merged #3269 prerequisite and adds the assigned
 install preflight. [Source and output hashes](source.json).
