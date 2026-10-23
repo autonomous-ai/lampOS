@@ -7975,7 +7975,7 @@ active on #2856. The assigned #3233 relay-route PR merged while this
 session was unavailable; no Fourth review completion is claimed.
 No lamp access, installed build, physical proof or row-score increase.
 
-## 2026-10-23 17:29 +07: current carries, full-suite failure and Photo fences
+## 2026-10-23 17:25 +07: current carries, full-suite failure and Photo fences
 
 Ready for lamp-voice: no
 
@@ -8022,3 +8022,51 @@ decision; independent strict proof and cancellable exchange work continues.
 The current coordination tree and AGENTS.md match b5a199368. All Queue
 and own-PR comments through 17:20:57 were read. No lamp access, installed
 build, played proof or row-score increase is claimed.
+
+## 2026-10-23 18:25 +07: Peek privacy correction published and Common deadline gates
+
+Ready for lamp-voice: no, current native gate pending
+
+Peek #3211 is one commit at 3b1d83545 on 8e3eaa6c2. Shared event files
+now receive only fixed kinds, closed status lists and unsigned timing/count
+fields, projected before enqueue. All rotated segments exclude private text.
+Private/unset/failed-lookup/verified-rollback traces retain their old bytes.
+The actual coordinator and rotated-segment controls first reproduced 0/2
+on unchanged production. The corrected host source is tree 7d581fa61 on
+b5a199368; all eleven owned Rust blobs remain identical after the rebase.
+All fourteen intervening upstream paths were preserved. The range-diff from
+the tested commit is f9b939570 = 3b1d83545; from the old published commit
+it is f1c0eb7dd ! 3b1d83545.
+
+Mac and Linux formatting, strict workspace/all-target Clippy and workspace
+build passed, with source unchanged and cleanup verified. Mac: reader 4/0,
+ServiceTrace 6/0, SessionState 2/0, census 6/0, Records 182/0/1 ignored,
+Peek 26/0, private equivalence 1/0. Linux: reader 12/0/1 ignored,
+ServiceTrace 7/0, SessionState 2/0, census 6/0, Records 187/0/2 ignored,
+Peek 26/0, four privacy controls 1/0 each and same-binary repeats 1/0 each,
+plus separate dropped-identity access control 1/0. Groups overlap.
+Receipts: /private/tmp/fourth-peek-train43-{mac,linux}-checks-20261023/.
+Current-head Linux Clippy run 39944780666 passed; native ARM64 run
+39944780877 is running. The privacy finding owner posted READ-OK on
+3b1d83545; no old native count is presented as current qualification.
+The prior full Mac failures and corrected writer-completion fixture remain
+in the PR record. The producer-side metadata-only bus view and account
+installation are separate pieces awaiting the first builder's decision.
+
+Common's original response ceiling now also bounds initial, post-note,
+post-event and held-tool readiness. Both actual-answer regression tests
+failed 0/1 at their intended assertions before the correction. The final
+source is tree 2e7a1f08b on b5a199368. Its Mac gate passed all 32 stages:
+private-context 30/0, pending-note 8/0, remember 200/0/1 ignored,
+full Eyes 310/0/5 ignored, Skills 512/0/1 ignored and Update library
+120/0/2 ignored, plus the other focused controls and strict workspace
+Clippy/build. Linux has passed the two deadline tests, the five earlier
+event regressions and private-context 30/0; its remaining gate is running.
+The old full Mac Voice 4038/1/15 ignored remains a failure, with its
+accepted-socket nonblocking fixture cause demonstrated separately.
+
+Photo Eyes #3257 received READ-OK at feedb5039 after closed callers and
+unknown capture timestamps were fenced. Voice's original-capture channel
+decision remains with the first builder on #2856. Independent proof,
+retention, cancellation and neutral Cloud receipt controls are prepared,
+unrun. No product activation, lamp access or row-score increase is claimed.
