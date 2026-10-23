@@ -1,0 +1,557 @@
+{
+  "commands": [
+    {
+      "name": "source-before-head",
+      "command": [
+        "git",
+        "-C",
+        "/private/tmp/tests-codex-light-call-phase-20261023",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:53:09.343060+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 94250,
+      "sampled_process_group": 94250,
+      "finished_utc": "2026-10-23T15:53:09.390173+00:00",
+      "elapsed_seconds": 0.04715688619762659,
+      "stdout": {
+        "path": "source-before-head.stdout",
+        "bytes": 41,
+        "sha256": "2123f0bd6de6090f23df81412ceec8a564c8d239cdcc7bdf2c9e7a1306c05bc9"
+      },
+      "stderr": {
+        "path": "source-before-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "source-before-tracked",
+      "command": [
+        "git",
+        "-C",
+        "/private/tmp/tests-codex-light-call-phase-20261023",
+        "ls-files",
+        "-z"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:53:09.391872+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 94251,
+      "sampled_process_group": 94251,
+      "finished_utc": "2026-10-23T15:53:09.440778+00:00",
+      "elapsed_seconds": 0.048966644797474146,
+      "stdout": {
+        "path": "source-before-tracked.stdout",
+        "bytes": 637750,
+        "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+      },
+      "stderr": {
+        "path": "source-before-tracked.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "rustc-version",
+      "command": [
+        "rustc",
+        "-vV"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:53:09.469671+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 94252,
+      "sampled_process_group": 94252,
+      "finished_utc": "2026-10-23T15:53:09.522346+00:00",
+      "elapsed_seconds": 0.05273428000509739,
+      "stdout": {
+        "path": "rustc-version.stdout",
+        "bytes": 191,
+        "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+      },
+      "stderr": {
+        "path": "rustc-version.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "hardware-platform",
+      "command": [
+        "uname",
+        "-a"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:53:09.524834+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 94253,
+      "sampled_process_group": 94253,
+      "finished_utc": "2026-10-23T15:53:09.533345+00:00",
+      "elapsed_seconds": 0.008554822765290737,
+      "stdout": {
+        "path": "hardware-platform.stdout",
+        "bytes": 129,
+        "sha256": "204a83e2b8636953a75868a7fe8e89acf55106ebad3f52c033cd94f377dcf868"
+      },
+      "stderr": {
+        "path": "hardware-platform.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "cargo-version",
+      "command": [
+        "cargo",
+        "--version"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:53:09.534103+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 94254,
+      "sampled_process_group": 94254,
+      "finished_utc": "2026-10-23T15:53:09.583096+00:00",
+      "elapsed_seconds": 0.04903521575033665,
+      "stdout": {
+        "path": "cargo-version.stdout",
+        "bytes": 36,
+        "sha256": "b6ef6807dd96d18b833474ad68e7a23a29e562a29c67afa71a59fb9a73df0068"
+      },
+      "stderr": {
+        "path": "cargo-version.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "source-after-refresh-head",
+      "command": [
+        "git",
+        "-C",
+        "/private/tmp/tests-codex-light-call-phase-20261023",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:53:11.561959+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 94349,
+      "sampled_process_group": 94349,
+      "finished_utc": "2026-10-23T15:53:11.613166+00:00",
+      "elapsed_seconds": 0.051256828010082245,
+      "stdout": {
+        "path": "source-after-refresh-head.stdout",
+        "bytes": 41,
+        "sha256": "2123f0bd6de6090f23df81412ceec8a564c8d239cdcc7bdf2c9e7a1306c05bc9"
+      },
+      "stderr": {
+        "path": "source-after-refresh-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "source-after-refresh-tracked",
+      "command": [
+        "git",
+        "-C",
+        "/private/tmp/tests-codex-light-call-phase-20261023",
+        "ls-files",
+        "-z"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:53:11.614852+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 94350,
+      "sampled_process_group": 94350,
+      "finished_utc": "2026-10-23T15:53:11.664346+00:00",
+      "elapsed_seconds": 0.049539295956492424,
+      "stdout": {
+        "path": "source-after-refresh-tracked.stdout",
+        "bytes": 637750,
+        "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+      },
+      "stderr": {
+        "path": "source-after-refresh-tracked.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "compile",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--test",
+        "it",
+        "--offline",
+        "--locked",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:53:11.697585+00:00",
+      "timeout_seconds": 1200,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 94351,
+      "sampled_process_group": 94351,
+      "finished_utc": "2026-10-23T15:53:57.646441+00:00",
+      "elapsed_seconds": 45.949983153957874,
+      "stdout": {
+        "path": "compile.stdout",
+        "bytes": 252085,
+        "sha256": "22f48a55844fce6199908ac08ee45a341266ca8207e2a6b4db43f79d4003c831"
+      },
+      "stderr": {
+        "path": "compile.stderr",
+        "bytes": 2746,
+        "sha256": "0eb1a42cd8966cc16fab4d6ee47732934a34723f0241fc5d0fcd61834d30280a"
+      }
+    },
+    {
+      "name": "binary-file",
+      "command": [
+        "file",
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:53:58.116339+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 97842,
+      "sampled_process_group": 97842,
+      "finished_utc": "2026-10-23T15:53:58.132947+00:00",
+      "elapsed_seconds": 0.01666407100856304,
+      "stdout": {
+        "path": "binary-file.stdout",
+        "bytes": 101,
+        "sha256": "ffe6eb73f9fc834c3983a3dea33371d221dcb847ea31a79bb8cd0e054b104763"
+      },
+      "stderr": {
+        "path": "binary-file.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "binary-architecture",
+      "command": [
+        "lipo",
+        "-archs",
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:53:58.134183+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 97843,
+      "sampled_process_group": 97843,
+      "finished_utc": "2026-10-23T15:53:58.218247+00:00",
+      "elapsed_seconds": 0.08410752192139626,
+      "stdout": {
+        "path": "binary-architecture.stdout",
+        "bytes": 7,
+        "sha256": "aaf631698ae5160ceb04a97681a14887fdcab47cd6e0f163c87485b3b1340b62"
+      },
+      "stderr": {
+        "path": "binary-architecture.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "list-all",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:53:58.221174+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 97846,
+      "sampled_process_group": 97846,
+      "finished_utc": "2026-10-23T15:53:59.937202+00:00",
+      "elapsed_seconds": 1.7161299772560596,
+      "stdout": {
+        "path": "list-all.stdout",
+        "bytes": 22816,
+        "sha256": "a01042c2285c97806fc978b486484e9f84dfcee6cfea224378b477682b2b31ab"
+      },
+      "stderr": {
+        "path": "list-all.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "list-ignored",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+        "--list",
+        "--ignored",
+        "--format",
+        "terse"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:53:59.939943+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 97909,
+      "sampled_process_group": 97909,
+      "finished_utc": "2026-10-23T15:53:59.969219+00:00",
+      "elapsed_seconds": 0.02933483198285103,
+      "stdout": {
+        "path": "list-ignored.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "list-ignored.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "source-freeze-head",
+      "command": [
+        "git",
+        "-C",
+        "/private/tmp/tests-codex-light-call-phase-20261023",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:54:01.668330+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 97978,
+      "sampled_process_group": 97978,
+      "finished_utc": "2026-10-23T15:54:01.716321+00:00",
+      "elapsed_seconds": 0.04803032288327813,
+      "stdout": {
+        "path": "source-freeze-head.stdout",
+        "bytes": 41,
+        "sha256": "2123f0bd6de6090f23df81412ceec8a564c8d239cdcc7bdf2c9e7a1306c05bc9"
+      },
+      "stderr": {
+        "path": "source-freeze-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "source-freeze-tracked",
+      "command": [
+        "git",
+        "-C",
+        "/private/tmp/tests-codex-light-call-phase-20261023",
+        "ls-files",
+        "-z"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:54:01.717713+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 97980,
+      "sampled_process_group": 97980,
+      "finished_utc": "2026-10-23T15:54:01.764193+00:00",
+      "elapsed_seconds": 0.0465191169641912,
+      "stdout": {
+        "path": "source-freeze-tracked.stdout",
+        "bytes": 637750,
+        "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+      },
+      "stderr": {
+        "path": "source-freeze-tracked.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "integration-observation",
+      "command": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+        "--show-output"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:54:01.960942+00:00",
+      "timeout_seconds": 300,
+      "timed_out": false,
+      "exit_code": 101,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 97982,
+      "sampled_process_group": 97982,
+      "finished_utc": "2026-10-23T15:54:11.936438+00:00",
+      "elapsed_seconds": 9.97579411091283,
+      "stdout": {
+        "path": "integration-observation.stdout",
+        "bytes": 92944,
+        "sha256": "8a4c98dd08a7620af1da369035aa3fb6de0124bbb9e3692e2161a863b666bc25"
+      },
+      "stderr": {
+        "path": "integration-observation.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "source-final-head",
+      "command": [
+        "git",
+        "-C",
+        "/private/tmp/tests-codex-light-call-phase-20261023",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:54:13.637390+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 98571,
+      "sampled_process_group": 98571,
+      "finished_utc": "2026-10-23T15:54:13.686727+00:00",
+      "elapsed_seconds": 0.049377269111573696,
+      "stdout": {
+        "path": "source-final-head.stdout",
+        "bytes": 41,
+        "sha256": "2123f0bd6de6090f23df81412ceec8a564c8d239cdcc7bdf2c9e7a1306c05bc9"
+      },
+      "stderr": {
+        "path": "source-final-head.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "source-final-tracked",
+      "command": [
+        "git",
+        "-C",
+        "/private/tmp/tests-codex-light-call-phase-20261023",
+        "ls-files",
+        "-z"
+      ],
+      "cwd": "/private/tmp/tests-codex-light-call-phase-20261023/lampOS",
+      "started_utc": "2026-10-23T15:54:13.688356+00:00",
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "exit_code": 0,
+      "spawned": true,
+      "owned_child_reaped": true,
+      "state": "terminal",
+      "owned_group_cleanup": [],
+      "pid": 98573,
+      "sampled_process_group": 98573,
+      "finished_utc": "2026-10-23T15:54:13.736767+00:00",
+      "elapsed_seconds": 0.04845229769125581,
+      "stdout": {
+        "path": "source-final-tracked.stdout",
+        "bytes": 637750,
+        "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6"
+      },
+      "stderr": {
+        "path": "source-final-tracked.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "controller_exit": 101,
+  "actual_test_exit": 101,
+  "shell_environment_limit": "Inherited PATH and hostname omitted from publication. Exact original execution plan remains external with SHA256.",
+  "no_retries": true,
+  "CPU_MAIN_release": "Released to root immediately after session12422 terminal, before analysis and packaging."
+}

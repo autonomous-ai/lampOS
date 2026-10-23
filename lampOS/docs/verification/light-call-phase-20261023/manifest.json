@@ -1,0 +1,55 @@
+{
+  "scope": "All payloads except this manifest",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 3258,
+      "sha256": "108b80c14c57de1638ebf39eb6d5d0d2e483970d7b764a2eb276955034976566"
+    },
+    {
+      "path": "case-outcomes.json",
+      "bytes": 58275,
+      "sha256": "b1d234b33fa2b500d53ab815e59c4687e0bfb89dc8c137e07e45aac8ea42f686"
+    },
+    {
+      "path": "commands.json",
+      "bytes": 17845,
+      "sha256": "09111e5b6bef98652c779403d966f1144d6965e5e8e005f7e845a5dd5f273eb3"
+    },
+    {
+      "path": "diagnostic.patch.json",
+      "bytes": 9380,
+      "sha256": "5b85529be02dd37f2ea8bc71380874b14f097125320a4170706e4810f8a1b259"
+    },
+    {
+      "path": "external-raw-index.json",
+      "bytes": 13838,
+      "sha256": "8fda7ac5a13c1576960aa3e846efb31af2054dfc7621212ad670af0b7dfe300c"
+    },
+    {
+      "path": "observation.json",
+      "bytes": 2082,
+      "sha256": "b191077dcb82fa7e43dd082bba1e30ed8838cc3010a3d63c3d5ed9ee9a24a07b"
+    },
+    {
+      "path": "phase-observations.json",
+      "bytes": 58896,
+      "sha256": "ee21188ba3d427e5d1c9b91477eb72f75834defb9b73ab7922d390275df0e72b"
+    },
+    {
+      "path": "raw-streams.json",
+      "bytes": 134741,
+      "sha256": "d29656453bd9ece35a956083c90a1990d671b338b089bfc9e3801f2a7aa4524b"
+    },
+    {
+      "path": "source-binding.json",
+      "bytes": 4597,
+      "sha256": "4b897f329a8e1873ec538ef8d17dc5dd4f97e0137a10dd280c972d8fa5786f1d"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 2197,
+      "sha256": "8922b5939139c128a7151a72b68cecc2a680ed8a8202b3ed86817be0b3988596"
+    }
+  ]
+}

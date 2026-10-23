@@ -1,0 +1,2747 @@
+{
+  "ordered_calls": [
+    {
+      "call": 0,
+      "start_ns": 555441624,
+      "elapsed_ns": 3998319,
+      "done": true,
+      "elapsed_ms": 3.998319,
+      "there_ms": 0.085721,
+      "initial_shown_ms": 0.066191,
+      "ask_ms": 1.609676,
+      "confirmation_reads": 2,
+      "confirmation_shown_ms": 0.156372,
+      "confirmation_gaps_ms": [
+        2.056496
+      ],
+      "other_unobserved_ms": 0.023863,
+      "overlapping_ring_tick_ms": [
+        1.055025
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.180875,
+        2.961678
+      ]
+    },
+    {
+      "call": 1,
+      "start_ns": 559441407,
+      "elapsed_ns": 4038214,
+      "done": true,
+      "elapsed_ms": 4.038214,
+      "there_ms": 0.05877,
+      "initial_shown_ms": 0.068726,
+      "ask_ms": 0.729983,
+      "confirmation_reads": 2,
+      "confirmation_shown_ms": 0.133221,
+      "confirmation_gaps_ms": [
+        3.014149
+      ],
+      "other_unobserved_ms": 0.033365,
+      "overlapping_ring_tick_ms": [
+        0.471061
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.961678,
+        2.863735
+      ]
+    },
+    {
+      "call": 2,
+      "start_ns": 563480808,
+      "elapsed_ns": 2943552,
+      "done": true,
+      "elapsed_ms": 2.943552,
+      "there_ms": 0.052128,
+      "initial_shown_ms": 0.039505,
+      "ask_ms": 0.382089,
+      "confirmation_reads": 2,
+      "confirmation_shown_ms": 0.12742,
+      "confirmation_gaps_ms": [
+        2.330675
+      ],
+      "other_unobserved_ms": 0.011735,
+      "overlapping_ring_tick_ms": [
+        0.422213
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.863735,
+        2.055468
+      ]
+    },
+    {
+      "call": 3,
+      "start_ns": 566425069,
+      "elapsed_ns": 3780272,
+      "done": true,
+      "elapsed_ms": 3.780272,
+      "there_ms": 0.061993,
+      "initial_shown_ms": 0.042399,
+      "ask_ms": 0.524945,
+      "confirmation_reads": 2,
+      "confirmation_shown_ms": 0.129372,
+      "confirmation_gaps_ms": [
+        3.011867
+      ],
+      "other_unobserved_ms": 0.009696,
+      "overlapping_ring_tick_ms": [
+        0.4638,
+        0.007057
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.055468,
+        2.178059,
+        2.700099
+      ]
+    },
+    {
+      "call": 4,
+      "start_ns": 570206559,
+      "elapsed_ns": 3533785,
+      "done": true,
+      "elapsed_ms": 3.533785,
+      "there_ms": 0.041389,
+      "initial_shown_ms": 0.036943,
+      "ask_ms": 0.326208,
+      "confirmation_reads": 2,
+      "confirmation_shown_ms": 0.108661,
+      "confirmation_gaps_ms": [
+        3.011202
+      ],
+      "other_unobserved_ms": 0.009382,
+      "overlapping_ring_tick_ms": [
+        0.347487
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.700099,
+        2.015606
+      ]
+    },
+    {
+      "call": 5,
+      "start_ns": 573741243,
+      "elapsed_ns": 2649879,
+      "done": true,
+      "elapsed_ms": 2.649879,
+      "there_ms": 0.041365,
+      "initial_shown_ms": 0.040721,
+      "ask_ms": 0.39408,
+      "confirmation_reads": 2,
+      "confirmation_shown_ms": 0.149869,
+      "confirmation_gaps_ms": [
+        2.016144
+      ],
+      "other_unobserved_ms": 0.0077,
+      "overlapping_ring_tick_ms": [
+        0.457539
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.015606,
+        2.139732
+      ]
+    },
+    {
+      "call": 6,
+      "start_ns": 576392375,
+      "elapsed_ns": 3750097,
+      "done": true,
+      "elapsed_ms": 3.750097,
+      "there_ms": 0.058037,
+      "initial_shown_ms": 0.054953,
+      "ask_ms": 0.445587,
+      "confirmation_reads": 2,
+      "confirmation_shown_ms": 0.165579,
+      "confirmation_gaps_ms": [
+        3.013916
+      ],
+      "other_unobserved_ms": 0.012025,
+      "overlapping_ring_tick_ms": [
+        0.503157
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.139732,
+        2.871082
+      ]
+    },
+    {
+      "call": 7,
+      "start_ns": 580143397,
+      "elapsed_ns": 76760050,
+      "done": true,
+      "elapsed_ms": 76.76005,
+      "there_ms": 0.043235,
+      "initial_shown_ms": 0.036397,
+      "ask_ms": 76.599188,
+      "confirmation_reads": 1,
+      "confirmation_shown_ms": 0.070477,
+      "confirmation_gaps_ms": [],
+      "other_unobserved_ms": 0.010753,
+      "overlapping_ring_tick_ms": [
+        78.458209
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.871082
+      ]
+    },
+    {
+      "call": 8,
+      "start_ns": 656904522,
+      "elapsed_ns": 44488993,
+      "done": true,
+      "elapsed_ms": 44.488993,
+      "there_ms": 0.042426,
+      "initial_shown_ms": 0.035487,
+      "ask_ms": 21.079891,
+      "confirmation_reads": 3,
+      "confirmation_shown_ms": 18.792405,
+      "confirmation_gaps_ms": [
+        2.4827,
+        2.044548
+      ],
+      "other_unobserved_ms": 0.011536,
+      "overlapping_ring_tick_ms": [
+        78.458209,
+        37.697291
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.582492,
+        2.27846
+      ]
+    },
+    {
+      "call": 9,
+      "start_ns": 701395314,
+      "elapsed_ns": 35619366,
+      "done": true,
+      "elapsed_ms": 35.619366,
+      "there_ms": 0.053518,
+      "initial_shown_ms": 0.0576,
+      "ask_ms": 35.41491,
+      "confirmation_reads": 1,
+      "confirmation_shown_ms": 0.079294,
+      "confirmation_gaps_ms": [],
+      "other_unobserved_ms": 0.014044,
+      "overlapping_ring_tick_ms": [
+        0.096987,
+        33.061624
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.27846,
+        2.018926,
+        2.153426
+      ]
+    },
+    {
+      "call": 10,
+      "start_ns": 737015798,
+      "elapsed_ns": 94359556,
+      "done": true,
+      "elapsed_ms": 94.359556,
+      "there_ms": 0.056474,
+      "initial_shown_ms": 0.055486,
+      "ask_ms": 94.122056,
+      "confirmation_reads": 1,
+      "confirmation_shown_ms": 0.114547,
+      "confirmation_gaps_ms": [],
+      "other_unobserved_ms": 0.010993,
+      "overlapping_ring_tick_ms": [
+        92.381575
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.153426,
+        2.172636
+      ]
+    },
+    {
+      "call": 11,
+      "start_ns": 831376749,
+      "elapsed_ns": 73865302,
+      "done": true,
+      "elapsed_ms": 73.865302,
+      "there_ms": 0.062093,
+      "initial_shown_ms": 0.051331,
+      "ask_ms": 35.45193,
+      "confirmation_reads": 18,
+      "confirmation_shown_ms": 1.766938,
+      "confirmation_gaps_ms": [
+        2.39609,
+        2.381316,
+        2.584424,
+        2.12661,
+        2.153425,
+        2.032316,
+        2.033619,
+        2.047577,
+        2.041851,
+        2.015211,
+        2.092309,
+        2.036422,
+        2.106967,
+        2.068174,
+        2.157953,
+        2.098811,
+        2.143842
+      ],
+      "other_unobserved_ms": 0.016093,
+      "overlapping_ring_tick_ms": [
+        69.621221
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.172636,
+        2.506529
+      ]
+    },
+    {
+      "call": 12,
+      "start_ns": 905243065,
+      "elapsed_ns": 89581241,
+      "done": true,
+      "elapsed_ms": 89.581241,
+      "there_ms": 0.042021,
+      "initial_shown_ms": 0.036992,
+      "ask_ms": 89.391734,
+      "confirmation_reads": 1,
+      "confirmation_shown_ms": 0.09872,
+      "confirmation_gaps_ms": [],
+      "other_unobserved_ms": 0.011774,
+      "overlapping_ring_tick_ms": [
+        107.470451
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.506529
+      ]
+    },
+    {
+      "call": 13,
+      "start_ns": 994825129,
+      "elapsed_ns": 96811179,
+      "done": true,
+      "elapsed_ms": 96.811179,
+      "there_ms": 0.043045,
+      "initial_shown_ms": 0.038082,
+      "ask_ms": 37.446202,
+      "confirmation_reads": 11,
+      "confirmation_shown_ms": 36.456829,
+      "confirmation_gaps_ms": [
+        2.086759,
+        2.084091,
+        2.080059,
+        2.079515,
+        2.059379,
+        2.10509,
+        2.33462,
+        2.674193,
+        3.011802,
+        2.301543
+      ],
+      "other_unobserved_ms": 0.00997,
+      "overlapping_ring_tick_ms": [
+        107.470451,
+        39.625893,
+        0.009315,
+        0.006278,
+        0.006016,
+        0.026364,
+        0.015845,
+        0.005524,
+        0.00394,
+        0.005989,
+        0.006676,
+        0.005989,
+        0.007624,
+        0.020879,
+        0.009517,
+        0.006418,
+        0.006697
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.128134,
+        2.152271,
+        2.021598,
+        2.822532,
+        2.601536,
+        2.058593,
+        3.008034,
+        3.006179,
+        2.068988,
+        2.043711,
+        2.038359,
+        2.37775,
+        2.993684,
+        2.777437,
+        2.320877,
+        2.183844,
+        2.053832
+      ]
+    },
+    {
+      "call": 14,
+      "start_ns": 1091637574,
+      "elapsed_ns": 53314423,
+      "done": true,
+      "elapsed_ms": 53.314423,
+      "there_ms": 0.041794,
+      "initial_shown_ms": 0.036806,
+      "ask_ms": 53.108083,
+      "confirmation_reads": 1,
+      "confirmation_shown_ms": 0.114966,
+      "confirmation_gaps_ms": [],
+      "other_unobserved_ms": 0.012774,
+      "overlapping_ring_tick_ms": [
+        51.504036
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.053832,
+        2.786799
+      ]
+    },
+    {
+      "call": 15,
+      "start_ns": 1144953107,
+      "elapsed_ns": 97066042,
+      "done": true,
+      "elapsed_ms": 97.066042,
+      "there_ms": 0.089162,
+      "initial_shown_ms": 0.038315,
+      "ask_ms": 96.831544,
+      "confirmation_reads": 1,
+      "confirmation_shown_ms": 0.09789,
+      "confirmation_gaps_ms": [],
+      "other_unobserved_ms": 0.009131,
+      "overlapping_ring_tick_ms": [
+        94.207891
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.786799,
+        2.091223
+      ]
+    },
+    {
+      "call": 16,
+      "start_ns": 1242020298,
+      "elapsed_ns": 39191719,
+      "done": true,
+      "elapsed_ms": 39.191719,
+      "there_ms": 0.053082,
+      "initial_shown_ms": 0.039262,
+      "ask_ms": 39.00371,
+      "confirmation_reads": 1,
+      "confirmation_shown_ms": 0.086004,
+      "confirmation_gaps_ms": [],
+      "other_unobserved_ms": 0.009661,
+      "overlapping_ring_tick_ms": [
+        37.033089
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.091223,
+        2.357017
+      ]
+    },
+    {
+      "call": 17,
+      "start_ns": 1281214374,
+      "elapsed_ns": 97344684,
+      "done": true,
+      "elapsed_ms": 97.344684,
+      "there_ms": 0.083694,
+      "initial_shown_ms": 0.070684,
+      "ask_ms": 96.928774,
+      "confirmation_reads": 1,
+      "confirmation_shown_ms": 0.251154,
+      "confirmation_gaps_ms": [],
+      "other_unobserved_ms": 0.010378,
+      "overlapping_ring_tick_ms": [
+        76.503458,
+        0.068633,
+        0.017739,
+        0.006485,
+        0.006428,
+        0.009377,
+        0.006443,
+        0.007406
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.357017,
+        3.011899,
+        2.763472,
+        2.655512,
+        3.008885,
+        2.330168,
+        2.067402,
+        2.482732,
+        2.271138
+      ]
+    },
+    {
+      "call": 18,
+      "start_ns": 1378559981,
+      "elapsed_ns": 131204470,
+      "done": true,
+      "elapsed_ms": 131.20447,
+      "there_ms": 0.067556,
+      "initial_shown_ms": 0.058893,
+      "ask_ms": 130.933892,
+      "confirmation_reads": 1,
+      "confirmation_shown_ms": 0.130845,
+      "confirmation_gaps_ms": [],
+      "other_unobserved_ms": 0.013284,
+      "overlapping_ring_tick_ms": [
+        129.067415
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.271138,
+        2.043008
+      ]
+    },
+    {
+      "call": 19,
+      "start_ns": 1509765456,
+      "elapsed_ns": 61655394,
+      "done": true,
+      "elapsed_ms": 61.655394,
+      "there_ms": 0.045725,
+      "initial_shown_ms": 0.03799,
+      "ask_ms": 19.645812,
+      "confirmation_reads": 3,
+      "confirmation_shown_ms": 36.883057,
+      "confirmation_gaps_ms": [
+        2.014953,
+        3.013822
+      ],
+      "other_unobserved_ms": 0.014035,
+      "overlapping_ring_tick_ms": [
+        56.566453,
+        0.084428
+      ],
+      "overlapping_ring_sleep_ms": [
+        2.043008,
+        3.013322,
+        2.443098
+      ]
+    }
+  ],
+  "ring_intervals": {
+    "Tick": {
+      "all_recorded": {
+        "count": 62,
+        "minimum_ns": 3940,
+        "upper_middle_ns": 13895,
+        "maximum_ns": 129067415,
+        "at_or_above_25ms": 14
+      },
+      "fully_within_20_call_window": {
+        "count": 45,
+        "minimum_ns": 3940,
+        "upper_middle_ns": 68633,
+        "maximum_ns": 129067415,
+        "at_or_above_25ms": 13
+      }
+    },
+    "Sleep": {
+      "all_recorded": {
+        "count": 62,
+        "minimum_ns": 2015606,
+        "upper_middle_ns": 2278460,
+        "maximum_ns": 3027612,
+        "at_or_above_25ms": 0
+      },
+      "fully_within_20_call_window": {
+        "count": 44,
+        "minimum_ns": 2015606,
+        "upper_middle_ns": 2330168,
+        "maximum_ns": 3013322,
+        "at_or_above_25ms": 0
+      }
+    }
+  },
+  "pairing_validated": true,
+  "recorded_marks": 484,
+  "method_intervals": [
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 0,
+      "start_ns": 555451814,
+      "end_ns": 555537535,
+      "elapsed_ns": 85721,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 0,
+      "start_ns": 555545281,
+      "end_ns": 555611472,
+      "elapsed_ns": 66191,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 0,
+      "start_ns": 555614642,
+      "end_ns": 557224318,
+      "elapsed_ns": 1609676,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 0,
+      "start_ns": 557224716,
+      "end_ns": 557305072,
+      "elapsed_ns": 80356,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 0,
+      "start_ns": 559361568,
+      "end_ns": 559437584,
+      "elapsed_ns": 76016,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 1,
+      "start_ns": 559443697,
+      "end_ns": 559502467,
+      "elapsed_ns": 58770,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 1,
+      "start_ns": 559517264,
+      "end_ns": 559585990,
+      "elapsed_ns": 68726,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 1,
+      "start_ns": 559598511,
+      "end_ns": 560328494,
+      "elapsed_ns": 729983,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 1,
+      "start_ns": 560328800,
+      "end_ns": 560397633,
+      "elapsed_ns": 68833,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 1,
+      "start_ns": 563411782,
+      "end_ns": 563476170,
+      "elapsed_ns": 64388,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 2,
+      "start_ns": 563485407,
+      "end_ns": 563537535,
+      "elapsed_ns": 52128,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 2,
+      "start_ns": 563538864,
+      "end_ns": 563578369,
+      "elapsed_ns": 39505,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 2,
+      "start_ns": 563580769,
+      "end_ns": 563962858,
+      "elapsed_ns": 382089,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 2,
+      "start_ns": 563963142,
+      "end_ns": 564031239,
+      "elapsed_ns": 68097,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 2,
+      "start_ns": 566361914,
+      "end_ns": 566421237,
+      "elapsed_ns": 59323,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 3,
+      "start_ns": 566427562,
+      "end_ns": 566489555,
+      "elapsed_ns": 61993,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 3,
+      "start_ns": 566491333,
+      "end_ns": 566533732,
+      "elapsed_ns": 42399,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 3,
+      "start_ns": 566535653,
+      "end_ns": 567060598,
+      "elapsed_ns": 524945,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 3,
+      "start_ns": 567060905,
+      "end_ns": 567122499,
+      "elapsed_ns": 61594,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 3,
+      "start_ns": 570134366,
+      "end_ns": 570202144,
+      "elapsed_ns": 67778,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 4,
+      "start_ns": 570209689,
+      "end_ns": 570251078,
+      "elapsed_ns": 41389,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 4,
+      "start_ns": 570252163,
+      "end_ns": 570289106,
+      "elapsed_ns": 36943,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 4,
+      "start_ns": 570292087,
+      "end_ns": 570618295,
+      "elapsed_ns": 326208,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 4,
+      "start_ns": 570618551,
+      "end_ns": 570663002,
+      "elapsed_ns": 44451,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 4,
+      "start_ns": 573674204,
+      "end_ns": 573738414,
+      "elapsed_ns": 64210,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 5,
+      "start_ns": 573743156,
+      "end_ns": 573784521,
+      "elapsed_ns": 41365,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 5,
+      "start_ns": 573785331,
+      "end_ns": 573826052,
+      "elapsed_ns": 40721,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 5,
+      "start_ns": 573827646,
+      "end_ns": 574221726,
+      "elapsed_ns": 394080,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 5,
+      "start_ns": 574222074,
+      "end_ns": 574287408,
+      "elapsed_ns": 65334,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 5,
+      "start_ns": 576303552,
+      "end_ns": 576388087,
+      "elapsed_ns": 84535,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 6,
+      "start_ns": 576397071,
+      "end_ns": 576455108,
+      "elapsed_ns": 58037,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 6,
+      "start_ns": 576456625,
+      "end_ns": 576511578,
+      "elapsed_ns": 54953,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 6,
+      "start_ns": 576514497,
+      "end_ns": 576960084,
+      "elapsed_ns": 445587,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 6,
+      "start_ns": 576960441,
+      "end_ns": 577035179,
+      "elapsed_ns": 74738,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 6,
+      "start_ns": 580049095,
+      "end_ns": 580139936,
+      "elapsed_ns": 90841,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 7,
+      "start_ns": 580146119,
+      "end_ns": 580189354,
+      "elapsed_ns": 43235,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 7,
+      "start_ns": 580190415,
+      "end_ns": 580226812,
+      "elapsed_ns": 36397,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 7,
+      "start_ns": 580229328,
+      "end_ns": 656828516,
+      "elapsed_ns": 76599188,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 7,
+      "start_ns": 656829061,
+      "end_ns": 656899538,
+      "elapsed_ns": 70477,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 8,
+      "start_ns": 656908744,
+      "end_ns": 656951170,
+      "elapsed_ns": 42426,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 8,
+      "start_ns": 656952458,
+      "end_ns": 656987945,
+      "elapsed_ns": 35487,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 8,
+      "start_ns": 656990553,
+      "end_ns": 678070444,
+      "elapsed_ns": 21079891,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 8,
+      "start_ns": 678071033,
+      "end_ns": 678162609,
+      "elapsed_ns": 91576,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 8,
+      "start_ns": 680645309,
+      "end_ns": 699255632,
+      "elapsed_ns": 18610323,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 8,
+      "start_ns": 701300180,
+      "end_ns": 701390686,
+      "elapsed_ns": 90506,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 9,
+      "start_ns": 701399614,
+      "end_ns": 701453132,
+      "elapsed_ns": 53518,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 9,
+      "start_ns": 701455318,
+      "end_ns": 701512918,
+      "elapsed_ns": 57600,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 9,
+      "start_ns": 701516489,
+      "end_ns": 736931399,
+      "elapsed_ns": 35414910,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 9,
+      "start_ns": 736931887,
+      "end_ns": 737011181,
+      "elapsed_ns": 79294,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 10,
+      "start_ns": 737018333,
+      "end_ns": 737074807,
+      "elapsed_ns": 56474,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 10,
+      "start_ns": 737075903,
+      "end_ns": 737131389,
+      "elapsed_ns": 55486,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 10,
+      "start_ns": 737133455,
+      "end_ns": 831255511,
+      "elapsed_ns": 94122056,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 10,
+      "start_ns": 831256459,
+      "end_ns": 831371006,
+      "elapsed_ns": 114547,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 11,
+      "start_ns": 831383192,
+      "end_ns": 831445285,
+      "elapsed_ns": 62093,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 831447109,
+      "end_ns": 831498440,
+      "elapsed_ns": 51331,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 11,
+      "start_ns": 831502207,
+      "end_ns": 866954137,
+      "elapsed_ns": 35451930,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 866955117,
+      "end_ns": 867043704,
+      "elapsed_ns": 88587,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 869439794,
+      "end_ns": 869518822,
+      "elapsed_ns": 79028,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 871900138,
+      "end_ns": 871950405,
+      "elapsed_ns": 50267,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 874534829,
+      "end_ns": 874607686,
+      "elapsed_ns": 72857,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 876734296,
+      "end_ns": 876810452,
+      "elapsed_ns": 76156,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 878963877,
+      "end_ns": 879041589,
+      "elapsed_ns": 77712,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 881073905,
+      "end_ns": 881167775,
+      "elapsed_ns": 93870,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 883201394,
+      "end_ns": 883294174,
+      "elapsed_ns": 92780,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 885341751,
+      "end_ns": 885403929,
+      "elapsed_ns": 62178,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 887445780,
+      "end_ns": 887506260,
+      "elapsed_ns": 60480,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 889521471,
+      "end_ns": 889582720,
+      "elapsed_ns": 61249,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 891675029,
+      "end_ns": 891732805,
+      "elapsed_ns": 57776,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 893769227,
+      "end_ns": 893852109,
+      "elapsed_ns": 82882,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 895959076,
+      "end_ns": 896015344,
+      "elapsed_ns": 56268,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 898083518,
+      "end_ns": 898166144,
+      "elapsed_ns": 82626,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 900324097,
+      "end_ns": 900408606,
+      "elapsed_ns": 84509,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 902507417,
+      "end_ns": 903010665,
+      "elapsed_ns": 503248,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 11,
+      "start_ns": 905154507,
+      "end_ns": 905238972,
+      "elapsed_ns": 84465,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 12,
+      "start_ns": 905246883,
+      "end_ns": 905288904,
+      "elapsed_ns": 42021,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 12,
+      "start_ns": 905290183,
+      "end_ns": 905327175,
+      "elapsed_ns": 36992,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 12,
+      "start_ns": 905329956,
+      "end_ns": 994721690,
+      "elapsed_ns": 89391734,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 12,
+      "start_ns": 994722491,
+      "end_ns": 994821211,
+      "elapsed_ns": 98720,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 13,
+      "start_ns": 994827683,
+      "end_ns": 994870728,
+      "elapsed_ns": 43045,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 13,
+      "start_ns": 994871880,
+      "end_ns": 994909962,
+      "elapsed_ns": 38082,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 13,
+      "start_ns": 994912595,
+      "end_ns": 1032358797,
+      "elapsed_ns": 37446202,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 13,
+      "start_ns": 1032359418,
+      "end_ns": 1032461374,
+      "elapsed_ns": 101956,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 13,
+      "start_ns": 1034548133,
+      "end_ns": 1034609775,
+      "elapsed_ns": 61642,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 13,
+      "start_ns": 1036693866,
+      "end_ns": 1036752962,
+      "elapsed_ns": 59096,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 13,
+      "start_ns": 1038833021,
+      "end_ns": 1038912061,
+      "elapsed_ns": 79040,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 13,
+      "start_ns": 1040991576,
+      "end_ns": 1041048221,
+      "elapsed_ns": 56645,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 13,
+      "start_ns": 1043107600,
+      "end_ns": 1043158552,
+      "elapsed_ns": 50952,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 13,
+      "start_ns": 1045263642,
+      "end_ns": 1045322119,
+      "elapsed_ns": 58477,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 13,
+      "start_ns": 1047656739,
+      "end_ns": 1047756292,
+      "elapsed_ns": 99553,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 13,
+      "start_ns": 1050430485,
+      "end_ns": 1050535044,
+      "elapsed_ns": 104559,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 13,
+      "start_ns": 1053546846,
+      "end_ns": 1089247698,
+      "elapsed_ns": 35700852,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 13,
+      "start_ns": 1091549241,
+      "end_ns": 1091633298,
+      "elapsed_ns": 84057,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 14,
+      "start_ns": 1091642376,
+      "end_ns": 1091684170,
+      "elapsed_ns": 41794,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 14,
+      "start_ns": 1091685618,
+      "end_ns": 1091722424,
+      "elapsed_ns": 36806,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 14,
+      "start_ns": 1091725583,
+      "end_ns": 1144833666,
+      "elapsed_ns": 53108083,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 14,
+      "start_ns": 1144834208,
+      "end_ns": 1144949174,
+      "elapsed_ns": 114966,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 15,
+      "start_ns": 1144955768,
+      "end_ns": 1145044930,
+      "elapsed_ns": 89162,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 15,
+      "start_ns": 1145045819,
+      "end_ns": 1145084134,
+      "elapsed_ns": 38315,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 15,
+      "start_ns": 1145086005,
+      "end_ns": 1241917549,
+      "elapsed_ns": 96831544,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 15,
+      "start_ns": 1241918022,
+      "end_ns": 1242015912,
+      "elapsed_ns": 97890,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 16,
+      "start_ns": 1242022573,
+      "end_ns": 1242075655,
+      "elapsed_ns": 53082,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 16,
+      "start_ns": 1242076724,
+      "end_ns": 1242115986,
+      "elapsed_ns": 39262,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 16,
+      "start_ns": 1242117862,
+      "end_ns": 1281121572,
+      "elapsed_ns": 39003710,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 16,
+      "start_ns": 1281122109,
+      "end_ns": 1281208113,
+      "elapsed_ns": 86004,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 17,
+      "start_ns": 1281216751,
+      "end_ns": 1281300445,
+      "elapsed_ns": 83694,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 17,
+      "start_ns": 1281301688,
+      "end_ns": 1281372372,
+      "elapsed_ns": 70684,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 17,
+      "start_ns": 1281374969,
+      "end_ns": 1378303743,
+      "elapsed_ns": 96928774,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 17,
+      "start_ns": 1378304260,
+      "end_ns": 1378555414,
+      "elapsed_ns": 251154,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 18,
+      "start_ns": 1378564317,
+      "end_ns": 1378631873,
+      "elapsed_ns": 67556,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 18,
+      "start_ns": 1378633738,
+      "end_ns": 1378692631,
+      "elapsed_ns": 58893,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 18,
+      "start_ns": 1378695745,
+      "end_ns": 1509629637,
+      "elapsed_ns": 130933892,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 18,
+      "start_ns": 1509630336,
+      "end_ns": 1509761181,
+      "elapsed_ns": 130845,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "There",
+      "call": 19,
+      "start_ns": 1509770265,
+      "end_ns": 1509815990,
+      "elapsed_ns": 45725,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 19,
+      "start_ns": 1509817355,
+      "end_ns": 1509855345,
+      "elapsed_ns": 37990,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Ask",
+      "call": 19,
+      "start_ns": 1509858743,
+      "end_ns": 1529504555,
+      "elapsed_ns": 19645812,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 19,
+      "start_ns": 1529505139,
+      "end_ns": 1529642863,
+      "elapsed_ns": 137724,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 19,
+      "start_ns": 1531657816,
+      "end_ns": 1568330324,
+      "elapsed_ns": 36672508,
+      "exit_detail": 1
+    },
+    {
+      "lane": "caller",
+      "phase": "Shown",
+      "call": 19,
+      "start_ns": 1571344146,
+      "end_ns": 1571416971,
+      "elapsed_ns": 72825,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 495917558,
+      "end_ns": 533446232,
+      "elapsed_ns": 37528674,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 533447238,
+      "end_ns": 535776744,
+      "elapsed_ns": 2329506,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 535778066,
+      "end_ns": 535789803,
+      "elapsed_ns": 11737,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 535789890,
+      "end_ns": 537840567,
+      "elapsed_ns": 2050677,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 537841248,
+      "end_ns": 537848046,
+      "elapsed_ns": 6798,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 537848099,
+      "end_ns": 539877444,
+      "elapsed_ns": 2029345,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 539878014,
+      "end_ns": 539884614,
+      "elapsed_ns": 6600,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 539884667,
+      "end_ns": 542015053,
+      "elapsed_ns": 2130386,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 542015473,
+      "end_ns": 542021550,
+      "elapsed_ns": 6077,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 542021598,
+      "end_ns": 544550325,
+      "elapsed_ns": 2528727,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 544550808,
+      "end_ns": 544556550,
+      "elapsed_ns": 5742,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 544556604,
+      "end_ns": 546611975,
+      "elapsed_ns": 2055371,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 546612561,
+      "end_ns": 546619572,
+      "elapsed_ns": 7011,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 546619621,
+      "end_ns": 549631395,
+      "elapsed_ns": 3011774,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 549632334,
+      "end_ns": 549642020,
+      "elapsed_ns": 9686,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 549642079,
+      "end_ns": 551678233,
+      "elapsed_ns": 2036154,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 551679015,
+      "end_ns": 551687265,
+      "elapsed_ns": 8250,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 551687333,
+      "end_ns": 554714945,
+      "elapsed_ns": 3027612,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 554715785,
+      "end_ns": 554742585,
+      "elapsed_ns": 26800,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 554742806,
+      "end_ns": 556923681,
+      "elapsed_ns": 2180875,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 556924094,
+      "end_ns": 557979119,
+      "elapsed_ns": 1055025,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 557979406,
+      "end_ns": 560941084,
+      "elapsed_ns": 2961678,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 560941547,
+      "end_ns": 561412608,
+      "elapsed_ns": 471061,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 561412818,
+      "end_ns": 564276553,
+      "elapsed_ns": 2863735,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 564277192,
+      "end_ns": 564699405,
+      "elapsed_ns": 422213,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 564699667,
+      "end_ns": 566755135,
+      "elapsed_ns": 2055468,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 566755575,
+      "end_ns": 567219375,
+      "elapsed_ns": 463800,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 567219632,
+      "end_ns": 569397691,
+      "elapsed_ns": 2178059,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 569398145,
+      "end_ns": 569405202,
+      "elapsed_ns": 7057,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 569405261,
+      "end_ns": 572105360,
+      "elapsed_ns": 2700099,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 572105839,
+      "end_ns": 572453326,
+      "elapsed_ns": 347487,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 572453636,
+      "end_ns": 574469242,
+      "elapsed_ns": 2015606,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 574469766,
+      "end_ns": 574927305,
+      "elapsed_ns": 457539,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 574927584,
+      "end_ns": 577067316,
+      "elapsed_ns": 2139732,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 577067896,
+      "end_ns": 577571053,
+      "elapsed_ns": 503157,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 577571449,
+      "end_ns": 580442531,
+      "elapsed_ns": 2871082,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 580443051,
+      "end_ns": 658901260,
+      "elapsed_ns": 78458209,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 658901718,
+      "end_ns": 661484210,
+      "elapsed_ns": 2582492,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 661484763,
+      "end_ns": 699182054,
+      "elapsed_ns": 37697291,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 699182680,
+      "end_ns": 701461140,
+      "elapsed_ns": 2278460,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 701461710,
+      "end_ns": 701558697,
+      "elapsed_ns": 96987,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 701558962,
+      "end_ns": 703577888,
+      "elapsed_ns": 2018926,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 703578458,
+      "end_ns": 736640082,
+      "elapsed_ns": 33061624,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 736640561,
+      "end_ns": 738793987,
+      "elapsed_ns": 2153426,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 738794478,
+      "end_ns": 831176053,
+      "elapsed_ns": 92381575,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 831176699,
+      "end_ns": 833349335,
+      "elapsed_ns": 2172636,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 833350289,
+      "end_ns": 902971510,
+      "elapsed_ns": 69621221,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 902971857,
+      "end_ns": 905478386,
+      "elapsed_ns": 2506529,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 905478963,
+      "end_ns": 1012949414,
+      "elapsed_ns": 107470451,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1012949906,
+      "end_ns": 1015078040,
+      "elapsed_ns": 2128134,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1015078541,
+      "end_ns": 1054704434,
+      "elapsed_ns": 39625893,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1054704816,
+      "end_ns": 1056857087,
+      "elapsed_ns": 2152271,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1056857648,
+      "end_ns": 1056866963,
+      "elapsed_ns": 9315,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1056867026,
+      "end_ns": 1058888624,
+      "elapsed_ns": 2021598,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1058888984,
+      "end_ns": 1058895262,
+      "elapsed_ns": 6278,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1058895321,
+      "end_ns": 1061717853,
+      "elapsed_ns": 2822532,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1061718199,
+      "end_ns": 1061724215,
+      "elapsed_ns": 6016,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1061724268,
+      "end_ns": 1064325804,
+      "elapsed_ns": 2601536,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1064326241,
+      "end_ns": 1064352605,
+      "elapsed_ns": 26364,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1064352663,
+      "end_ns": 1066411256,
+      "elapsed_ns": 2058593,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1066411531,
+      "end_ns": 1066427376,
+      "elapsed_ns": 15845,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1066427553,
+      "end_ns": 1069435587,
+      "elapsed_ns": 3008034,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1069435875,
+      "end_ns": 1069441399,
+      "elapsed_ns": 5524,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1069441445,
+      "end_ns": 1072447624,
+      "elapsed_ns": 3006179,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1072447779,
+      "end_ns": 1072451719,
+      "elapsed_ns": 3940,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1072451765,
+      "end_ns": 1074520753,
+      "elapsed_ns": 2068988,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1074521371,
+      "end_ns": 1074527360,
+      "elapsed_ns": 5989,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1074527410,
+      "end_ns": 1076571121,
+      "elapsed_ns": 2043711,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1076571515,
+      "end_ns": 1076578191,
+      "elapsed_ns": 6676,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1076578271,
+      "end_ns": 1078616630,
+      "elapsed_ns": 2038359,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1078616993,
+      "end_ns": 1078622982,
+      "elapsed_ns": 5989,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1078623035,
+      "end_ns": 1081000785,
+      "elapsed_ns": 2377750,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1081001156,
+      "end_ns": 1081008780,
+      "elapsed_ns": 7624,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1081008979,
+      "end_ns": 1084002663,
+      "elapsed_ns": 2993684,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1084003265,
+      "end_ns": 1084024144,
+      "elapsed_ns": 20879,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1084024343,
+      "end_ns": 1086801780,
+      "elapsed_ns": 2777437,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1086802397,
+      "end_ns": 1086811914,
+      "elapsed_ns": 9517,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1086811962,
+      "end_ns": 1089132839,
+      "elapsed_ns": 2320877,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1089133149,
+      "end_ns": 1089139567,
+      "elapsed_ns": 6418,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1089139615,
+      "end_ns": 1091323459,
+      "elapsed_ns": 2183844,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1091323918,
+      "end_ns": 1091330615,
+      "elapsed_ns": 6697,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1091330674,
+      "end_ns": 1093384506,
+      "elapsed_ns": 2053832,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1093384908,
+      "end_ns": 1144888944,
+      "elapsed_ns": 51504036,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1144889304,
+      "end_ns": 1147676103,
+      "elapsed_ns": 2786799,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1147676848,
+      "end_ns": 1241884739,
+      "elapsed_ns": 94207891,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1241885160,
+      "end_ns": 1243976383,
+      "elapsed_ns": 2091223,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1243977234,
+      "end_ns": 1281010323,
+      "elapsed_ns": 37033089,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1281010738,
+      "end_ns": 1283367755,
+      "elapsed_ns": 2357017,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1283368381,
+      "end_ns": 1359871839,
+      "elapsed_ns": 76503458,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1359872263,
+      "end_ns": 1362884162,
+      "elapsed_ns": 3011899,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1362884622,
+      "end_ns": 1362953255,
+      "elapsed_ns": 68633,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1362953393,
+      "end_ns": 1365716865,
+      "elapsed_ns": 2763472,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1365717283,
+      "end_ns": 1365735022,
+      "elapsed_ns": 17739,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1365735083,
+      "end_ns": 1368390595,
+      "elapsed_ns": 2655512,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1368391006,
+      "end_ns": 1368397491,
+      "elapsed_ns": 6485,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1368397553,
+      "end_ns": 1371406438,
+      "elapsed_ns": 3008885,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1371406813,
+      "end_ns": 1371413241,
+      "elapsed_ns": 6428,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1371413290,
+      "end_ns": 1373743458,
+      "elapsed_ns": 2330168,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1373743845,
+      "end_ns": 1373753222,
+      "elapsed_ns": 9377,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1373753333,
+      "end_ns": 1375820735,
+      "elapsed_ns": 2067402,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1375821106,
+      "end_ns": 1375827549,
+      "elapsed_ns": 6443,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1375827599,
+      "end_ns": 1378310331,
+      "elapsed_ns": 2482732,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1378310745,
+      "end_ns": 1378318151,
+      "elapsed_ns": 7406,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1378318241,
+      "end_ns": 1380589379,
+      "elapsed_ns": 2271138,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1380589817,
+      "end_ns": 1509657232,
+      "elapsed_ns": 129067415,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1509658909,
+      "end_ns": 1511701917,
+      "elapsed_ns": 2043008,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1511702427,
+      "end_ns": 1568268880,
+      "elapsed_ns": 56566453,
+      "exit_detail": 1
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1568269431,
+      "end_ns": 1571282753,
+      "elapsed_ns": 3013322,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1571283341,
+      "end_ns": 1571367769,
+      "elapsed_ns": 84428,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1571367889,
+      "end_ns": 1573810987,
+      "elapsed_ns": 2443098,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1573811484,
+      "end_ns": 1573820364,
+      "elapsed_ns": 8880,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1573820415,
+      "end_ns": 1575854325,
+      "elapsed_ns": 2033910,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1575854715,
+      "end_ns": 1575863523,
+      "elapsed_ns": 8808,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1575863574,
+      "end_ns": 1578176161,
+      "elapsed_ns": 2312587,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1578176718,
+      "end_ns": 1578190613,
+      "elapsed_ns": 13895,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1578190796,
+      "end_ns": 1581058934,
+      "elapsed_ns": 2868138,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1581059510,
+      "end_ns": 1581070922,
+      "elapsed_ns": 11412,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1581071014,
+      "end_ns": 1583098872,
+      "elapsed_ns": 2027858,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1583099480,
+      "end_ns": 1583112402,
+      "elapsed_ns": 12922,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1583112494,
+      "end_ns": 1585270708,
+      "elapsed_ns": 2158214,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1585271497,
+      "end_ns": 1585285645,
+      "elapsed_ns": 14148,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1585285755,
+      "end_ns": 1587355735,
+      "elapsed_ns": 2069980,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Tick",
+      "call": 255,
+      "start_ns": 1587356576,
+      "end_ns": 1587369278,
+      "elapsed_ns": 12702,
+      "exit_detail": 0
+    },
+    {
+      "lane": "ring",
+      "phase": "Sleep",
+      "call": 255,
+      "start_ns": 1587369330,
+      "end_ns": 1589387315,
+      "elapsed_ns": 2017985,
+      "exit_detail": 0
+    }
+  ],
+  "interpretation": {
+    "first_seven_calls": "Calls0 through6:2.649879\u20134.038214ms; calls7 through19:35.619366\u2013131.204470ms.",
+    "enclosing_ask": "11 delegated ask intervals reached25ms; call18 ask took130.933892ms within131.204470ms total.",
+    "sleep": "All62 recorded ring sleep intervals were2.015606\u20133.027612ms. No recorded ring sleep reached25ms.",
+    "ring_ticks": "14 of62 recorded ticks reached25ms, including one before the first timed call;13 of45 ticks fully within the20-call window did so.",
+    "read_gaps": "The largest observed gap between successive outer confirmation reads was3.014149ms. This includes the production elapsed check, sleep, scheduling and trace overhead.",
+    "no_cause": "These enclosing wall-time intervals include descheduling and instrumentation overhead. They do not isolate syscalls, filesystem service time, CPU time or scheduler cause. Nested there/covered reads are not separately observed; overlapping ring durations must not be added to caller duration."
+  }
+}

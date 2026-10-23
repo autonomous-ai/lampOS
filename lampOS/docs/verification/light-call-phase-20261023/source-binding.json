@@ -1,0 +1,109 @@
+{
+  "source_head": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+  "integration_base": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+  "combined_source_kind": "4e8ea747cd plus two inherited peer overlays, followed by this separate scratch diagnostic only.",
+  "scratch_branch": "tests/1569-light-call-phase",
+  "diagnostic": {
+    "path": "lampOS/crates/voice/tests/it/light_call.rs",
+    "before_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+    "after_sha256": "d49f016a7bc2dbd39c3a48f9ddf04b8fa12b60aebb6e3daeea5082e54fd652de",
+    "patch_sha256": "2d0107321693244cbd16f1815602f8ed3574e9b3dfc22e7a59bdc6d18f0fe4a7"
+  },
+  "inherited_peer_overlays": [
+    {
+      "path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "snapshot": "candidate-0.txt",
+      "git_mode": "100644",
+      "base_sha256": "b50767957067efee6a502e372605a7bcc2b16e23097da1ddca85153cf966993a",
+      "candidate_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+      "candidate_bytes": 45782
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "snapshot": "candidate-1.txt",
+      "git_mode": "100644",
+      "base_sha256": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c",
+      "candidate_sha256": "77388c4a7523c56e20e5cbe9406f721e52db4463be34482ff831b6a0dd884615",
+      "candidate_bytes": 33187
+    }
+  ],
+  "preservation": {
+    "tracked_paths": 10055,
+    "lampOS_paths": 6709,
+    "three_original_assertions_token_identical": true,
+    "assertion_extraction": "Balanced assert! macro parentheses, retaining every string literal verbatim and comparing Rust-like lexical tokens; indentation is excluded.",
+    "original_sorted_tail_byte_identical": true,
+    "original_sorted_tail_sha256": "b2e1ed15091941e472e080c02c5f95a61b3e41180dc0fb69875fac3b5cd38bc6",
+    "existing_sleeps_and_timed_call_occurrences_preserved": true,
+    "one_underlying_call_per_wrapped_method": true,
+    "no_product_path_changed": true
+  },
+  "source_before": {
+    "head": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "095f326c4c57997e42c371239e4ec74453441e110f60ccc7a809762cfa4c8a22"
+  },
+  "source_after": {
+    "head": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+    "tracked_paths": 10055,
+    "all_bytes_modes_match": true,
+    "aggregate_sha256": "095f326c4c57997e42c371239e4ec74453441e110f60ccc7a809762cfa4c8a22"
+  },
+  "source_map_sha256": "6113c4b81b30f2cd3a311231475e841952ab4107e4939f00e699ad289262a9de",
+  "census_file_sha256": "3a0b8e79df7ebeac859b96402d0a81318a118fbc53ab1131d828fecf25e63d96",
+  "runner_sha256": "de1c71cce6487a8bdff29eecd19cb9f35d23d42bb110f5594bb80a7dd08e8ad5",
+  "plan_sha256": "072bf702f6d4c1319b330687d7404c06093aa9f77a98ba37955b6c1cdca9d97b",
+  "artifact": {
+    "sha256": "08ec01ce9d425efc183488e4ef6eec589526c6d00a65255d1158e628c610f699",
+    "bytes": 94215020,
+    "fresh_compiler_artifact": true,
+    "target": {
+      "name": "it",
+      "kind": [
+        "test"
+      ],
+      "package": "lamp-voice"
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": []
+  },
+  "environment_projection": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "RUST_BACKTRACE": "1",
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_TARGET_TMPDIR": null,
+    "RUSTC_WRAPPER": null,
+    "RUSTC_WORKSPACE_WRAPPER": null,
+    "LAMP_RELAY_PID_CONTROL_DIR": null
+  },
+  "PATH_projection": "Explicit Cargo bin prefix verified; inherited PATH retained only in external plan.",
+  "platform_projection": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "reported_machine": "x86_64",
+    "hostname_excluded": true,
+    "physical_isa_or_Rosetta_not_inferred": true
+  },
+  "whole_target_timeout_seconds": 300,
+  "compile_timeout_seconds": 1200,
+  "prior_integration_duration_seconds": 10.88,
+  "unexecuted_v1_archive_manifest_sha256": "94ca7c0a57fc4cc7b0fc5e3be064b4837ecc6a90f47b11212d95d6ad61474772",
+  "raw_guard_limit": "Complete tracked source maps and executable bytes remain external with hashes; local paths are not remote availability promises."
+}

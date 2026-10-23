@@ -1,0 +1,82 @@
+{
+  "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+  "native_tool_session": 12422,
+  "controller_exit_code": 101,
+  "actual_test_exit_code": 101,
+  "one_observation": true,
+  "observation_state": "terminal_test_outcome",
+  "summary": {
+    "raw": "test result: FAILED. 269 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.93s",
+    "status": "FAILED",
+    "passed": 269,
+    "failed": 1,
+    "ignored": 0,
+    "measured": 0,
+    "filtered": 0,
+    "seconds": 9.93
+  },
+  "counts": {
+    "passed": 269,
+    "failed": 1,
+    "ignored": 0
+  },
+  "validation_errors": [],
+  "ordered_sample_count": 20,
+  "original_Done_checks": 20,
+  "strict_upper_middle_limit_ns": 25000000,
+  "actual_upper_middle_ns": 53314423,
+  "original_sorted_samples_ns": [
+    2649879,
+    2943552,
+    3533785,
+    3750097,
+    3780272,
+    3998319,
+    4038214,
+    35619366,
+    39191719,
+    44488993,
+    53314423,
+    61655394,
+    73865302,
+    76760050,
+    89581241,
+    94359556,
+    96811179,
+    97066042,
+    97344684,
+    131204470
+  ],
+  "trace_headers": [
+    [
+      "caller",
+      "65536",
+      "236",
+      "0"
+    ],
+    [
+      "ring",
+      "65536",
+      "248",
+      "0"
+    ]
+  ],
+  "overflow_lost": 0,
+  "missing_trace": false,
+  "ring_join_ok": true,
+  "cleanup_ok": true,
+  "original_panic_before_final_assertion": false,
+  "owned_children_all_reaped": true,
+  "timeouts": false,
+  "interruptions": [],
+  "source_unchanged": true,
+  "artifact_unchanged": true,
+  "full_failure_span": {
+    "source": "raw-streams.json:integration-observation/stdout",
+    "original_byte_offset": 56020,
+    "bytes": 36724,
+    "sha256": "d0d73fa59c4f245c1278740fe97e56a6644e584339773494d2ff7fe3e9ea58ef"
+  },
+  "scope": "Full 270-case integration target only. The preceding library process, full-package history, earlier child cleanup and host load were not recreated.",
+  "limits": "Original clocks, both2ms intervals,600ms confirmation,20calls,Done checks and strict25ms assertion are unchanged. No retry and no gate waiver."
+}

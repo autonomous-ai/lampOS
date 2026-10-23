@@ -1,0 +1,296 @@
+{
+  "streams": [
+    {
+      "name": "source-before-head/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-before-head.stdout",
+      "bytes": 41,
+      "sha256": "2123f0bd6de6090f23df81412ceec8a564c8d239cdcc7bdf2c9e7a1306c05bc9",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "source-before-head/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-before-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "source-before-tracked/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-before-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "published_raw": false,
+      "reason": "Bulk tracked inventory, full Cargo JSON, or hostname-bearing raw platform response stays external."
+    },
+    {
+      "name": "source-before-tracked/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-before-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "rustc-version/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/rustc-version.stdout",
+      "bytes": 191,
+      "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "rustc-version/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/rustc-version.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "hardware-platform/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/hardware-platform.stdout",
+      "bytes": 129,
+      "sha256": "204a83e2b8636953a75868a7fe8e89acf55106ebad3f52c033cd94f377dcf868",
+      "published_raw": false,
+      "reason": "Bulk tracked inventory, full Cargo JSON, or hostname-bearing raw platform response stays external."
+    },
+    {
+      "name": "hardware-platform/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/hardware-platform.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "cargo-version/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/cargo-version.stdout",
+      "bytes": 36,
+      "sha256": "b6ef6807dd96d18b833474ad68e7a23a29e562a29c67afa71a59fb9a73df0068",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "cargo-version/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/cargo-version.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "source-after-refresh-head/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-after-refresh-head.stdout",
+      "bytes": 41,
+      "sha256": "2123f0bd6de6090f23df81412ceec8a564c8d239cdcc7bdf2c9e7a1306c05bc9",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "source-after-refresh-head/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-after-refresh-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "source-after-refresh-tracked/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-after-refresh-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "published_raw": false,
+      "reason": "Bulk tracked inventory, full Cargo JSON, or hostname-bearing raw platform response stays external."
+    },
+    {
+      "name": "source-after-refresh-tracked/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-after-refresh-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "compile/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/compile.stdout",
+      "bytes": 252085,
+      "sha256": "22f48a55844fce6199908ac08ee45a341266ca8207e2a6b4db43f79d4003c831",
+      "published_raw": false,
+      "reason": "Bulk tracked inventory, full Cargo JSON, or hostname-bearing raw platform response stays external."
+    },
+    {
+      "name": "compile/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/compile.stderr",
+      "bytes": 2746,
+      "sha256": "0eb1a42cd8966cc16fab4d6ee47732934a34723f0241fc5d0fcd61834d30280a",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "binary-file/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/binary-file.stdout",
+      "bytes": 101,
+      "sha256": "ffe6eb73f9fc834c3983a3dea33371d221dcb847ea31a79bb8cd0e054b104763",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "binary-file/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/binary-file.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "binary-architecture/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/binary-architecture.stdout",
+      "bytes": 7,
+      "sha256": "aaf631698ae5160ceb04a97681a14887fdcab47cd6e0f163c87485b3b1340b62",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "binary-architecture/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/binary-architecture.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "list-all/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/list-all.stdout",
+      "bytes": 22816,
+      "sha256": "a01042c2285c97806fc978b486484e9f84dfcee6cfea224378b477682b2b31ab",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "list-all/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/list-all.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "list-ignored/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/list-ignored.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "list-ignored/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/list-ignored.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "source-freeze-head/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-freeze-head.stdout",
+      "bytes": 41,
+      "sha256": "2123f0bd6de6090f23df81412ceec8a564c8d239cdcc7bdf2c9e7a1306c05bc9",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "source-freeze-head/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-freeze-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "source-freeze-tracked/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-freeze-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "published_raw": false,
+      "reason": "Bulk tracked inventory, full Cargo JSON, or hostname-bearing raw platform response stays external."
+    },
+    {
+      "name": "source-freeze-tracked/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-freeze-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "integration-observation/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/integration-observation.stdout",
+      "bytes": 92944,
+      "sha256": "8a4c98dd08a7620af1da369035aa3fb6de0124bbb9e3692e2161a863b666bc25",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "integration-observation/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/integration-observation.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "source-final-head/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-final-head.stdout",
+      "bytes": 41,
+      "sha256": "2123f0bd6de6090f23df81412ceec8a564c8d239cdcc7bdf2c9e7a1306c05bc9",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "source-final-head/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-final-head.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    },
+    {
+      "name": "source-final-tracked/stdout",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-final-tracked.stdout",
+      "bytes": 637750,
+      "sha256": "13c6f2a8ddd8c7f09d02d66043d31e084496ef8e88338ab8b43bbc1f63b884d6",
+      "published_raw": false,
+      "reason": "Bulk tracked inventory, full Cargo JSON, or hostname-bearing raw platform response stays external."
+    },
+    {
+      "name": "source-final-tracked/stderr",
+      "external_path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/source-final-tracked.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published_raw": true,
+      "encoding": "Exact UTF-8, no normalization"
+    }
+  ],
+  "raw_run_manifest_sha256": "9bfaaaa99b46f3ff4eec58d5dc47c725c10d1ca9ab19458fb6d9b9d4bb61f473",
+  "artifact": {
+    "path": "/private/tmp/tests-light-call-phase-20261023/run-20261023T155307.658663Z/voice-it.diagnostic",
+    "bytes": 94215020,
+    "sha256": "08ec01ce9d425efc183488e4ef6eec589526c6d00a65255d1158e628c610f699"
+  },
+  "source_map": {
+    "path": "/private/tmp/tests-light-call-phase-20261023/source-map.json",
+    "bytes": 2759039,
+    "sha256": "6113c4b81b30f2cd3a311231475e841952ab4107e4939f00e699ad289262a9de"
+  },
+  "plan": {
+    "path": "/private/tmp/tests-light-call-phase-20261023/plan.json",
+    "sha256": "072bf702f6d4c1319b330687d7404c06093aa9f77a98ba37955b6c1cdca9d97b"
+  },
+  "runner": {
+    "path": "/private/tmp/tests-light-call-phase-20261023/run.py",
+    "sha256": "de1c71cce6487a8bdff29eecd19cb9f35d23d42bb110f5594bb80a7dd08e8ad5"
+  },
+  "availability_limit": "Excluded local data is hash-bound, not guaranteed remotely available. Complete integration streams, compiled census and warning text are included; no scripts, executable, bulk inventory or full Cargo JSON is published."
+}

@@ -1,5 +1,26 @@
 # Tests work log
 
+## 2026-10-23 23:04 +0700 — one light-call phase observation complete
+
+Ready for lamp-voice: no; the original strict latency assertion still fails.
+
+The [single accepted local Mac diagnostic](verification/light-call-phase-20261023/)
+completed the full 270-case Voice integration target at 269/1/0, actual exit 101.
+All twenty light calls returned Done; the checked upper-middle latency was
+53.314423 ms against strict 25 ms. Original limits and assertions stayed intact.
+Both trace lanes are complete, with 484 marks and no lost records. Ring sleeps
+were 2.016–3.028 ms, while fourteen enclosing ticks reached 25 ms; eleven
+caller ask intervals did too. This locates wall time, not its scheduling or
+filesystem cause. Overlapping caller/ring intervals cannot be summed.
+
+Root verified ten payloads, twenty-eight exact raw streams, the full census,
+all phase pairs and the original failure slice. One unused-import warning is
+retained; no strict-Clippy pass is claimed for this scratch diagnostic.
+The full-package history was not recreated, instrumentation overhead is not
+isolated, and no earlier failure is waived. No retry or product change ran.
+CPU/MAIN was released before packaging. The additional privacy/search plans
+remain unrun pending review; the assigned Skills fixture repair is next.
+
 ## 2026-10-23 23:03 +0700 — combined head pushed and executed source preserved
 
 Ready for lamp-voice: no; nine local failures remain unwaived.
