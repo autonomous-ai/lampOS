@@ -34,7 +34,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub const MAX_PROMPT_BYTES: usize = 1000;
+pub const MAX_PROMPT_BYTES: usize = 2000;
 pub const MAX_ANSWER_BYTES: usize = 16 * 1024;
 pub const MAX_ASK_BYTES: usize = 4 * 1024;
 const STDOUT_LIMIT: usize = 64 * 1024;

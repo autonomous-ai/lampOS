@@ -579,7 +579,7 @@ fn input_limits_and_parser_ambiguity_are_refused_before_any_process() {
         "".into(),
         "--mode full".into(),
         "a\0b".into(),
-        "é".repeat(501),
+        "é".repeat(lamp_tasks::harness::MAX_PROMPT_BYTES / 2 + 1),
     ] {
         let mut request = launch();
         request.prompt = prompt;

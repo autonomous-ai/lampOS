@@ -12,7 +12,10 @@ use std::{collections::BTreeMap, fmt, io};
 
 pub const MAX_TASKS: usize = 16;
 pub const MAX_OBSERVATIONS: usize = 4;
-pub const MAX_PROMPT_BYTES: usize = 1000;
+/// A task's text, at most: 2,000 bytes, room for a made skill's brief, the
+/// person's request and the lamp's check of a first try (#2813, the first
+/// builder on #3126, 23 Oct 13:07). A spoken or typed ask never nears it.
+pub const MAX_PROMPT_BYTES: usize = 2000;
 pub const MAX_ANSWER_BYTES: usize = 16_384;
 pub const MAX_ASK_BYTES: usize = 4096;
 pub const MAX_SPEECH_BYTES: usize = 1000;
@@ -3891,7 +3894,7 @@ mod tests {
             String::new(),
             "--force".into(),
             "x".repeat(MAX_PROMPT_BYTES + 1),
-            "é".repeat(501),
+            "é".repeat(MAX_PROMPT_BYTES / 2 + 1),
         ] {
             assert_eq!(
                 engine
@@ -3901,6 +3904,15 @@ mod tests {
                 "bad_text"
             );
         }
+        // At the bound, in bytes, it is taken (2,000 since #2813).
+        assert_eq!(MAX_PROMPT_BYTES, 2000);
+        engine
+            .handle(
+                &preparation(&engine, &"é".repeat(MAX_PROMPT_BYTES / 2)),
+                &clock(0),
+                false,
+            )
+            .unwrap();
         let mut request = preparation(&engine, "safe text");
         if let Request::Prepare { target, .. } = &mut request {
             *target = "not-provisioned".into();
