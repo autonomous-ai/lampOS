@@ -1,0 +1,3 @@
+{
+  "first_attempt": "Stopped before rebase; a guessed test path was absent. The exact two authored paths were then read from git diff-tree. No Git or source mutation occurred in that failed preflight."
+}

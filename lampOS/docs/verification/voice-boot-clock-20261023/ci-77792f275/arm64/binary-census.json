@@ -1,0 +1,416 @@
+{
+  "binaries": [
+    {
+      "binary": "lamp-body",
+      "counts": {
+        "PASS": 432
+      },
+      "observed_cases": 432
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body",
+      "counts": {
+        "PASS": 32
+      },
+      "observed_cases": 32
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-inspect",
+      "counts": {
+        "PASS": 2
+      },
+      "observed_cases": 2
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-measure",
+      "counts": {
+        "PASS": 5
+      },
+      "observed_cases": 5
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-mood",
+      "counts": {
+        "PASS": 3
+      },
+      "observed_cases": 3
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-worker",
+      "counts": {
+        "PASS": 1
+      },
+      "observed_cases": 1
+    },
+    {
+      "binary": "lamp-body::it",
+      "counts": {
+        "PASS": 125
+      },
+      "observed_cases": 125
+    },
+    {
+      "binary": "lamp-cloud",
+      "counts": {
+        "PASS": 166
+      },
+      "observed_cases": 166
+    },
+    {
+      "binary": "lamp-cloud::it",
+      "counts": {
+        "PASS": 30
+      },
+      "observed_cases": 30
+    },
+    {
+      "binary": "lamp-expression",
+      "counts": {
+        "PASS": 27
+      },
+      "observed_cases": 27
+    },
+    {
+      "binary": "lamp-expression::bin/lamp-expression",
+      "counts": {
+        "PASS": 4
+      },
+      "observed_cases": 4
+    },
+    {
+      "binary": "lamp-expression::it",
+      "counts": {
+        "PASS": 280
+      },
+      "observed_cases": 280
+    },
+    {
+      "binary": "lamp-expression::runtime",
+      "counts": {
+        "PASS": 27
+      },
+      "observed_cases": 27
+    },
+    {
+      "binary": "lamp-keeper",
+      "counts": {
+        "PASS": 40
+      },
+      "observed_cases": 40
+    },
+    {
+      "binary": "lamp-keeper::bin/lamp-keeper",
+      "counts": {
+        "PASS": 2
+      },
+      "observed_cases": 2
+    },
+    {
+      "binary": "lamp-lean",
+      "counts": {
+        "PASS": 10
+      },
+      "observed_cases": 10
+    },
+    {
+      "binary": "lamp-lean::it",
+      "counts": {
+        "PASS": 51
+      },
+      "observed_cases": 51
+    },
+    {
+      "binary": "lamp-memory",
+      "counts": {
+        "PASS": 96
+      },
+      "observed_cases": 96
+    },
+    {
+      "binary": "lamp-memory::bin/lamp-memory",
+      "counts": {
+        "PASS": 8
+      },
+      "observed_cases": 8
+    },
+    {
+      "binary": "lamp-memory::bin/lamp-memory-eval",
+      "counts": {
+        "PASS": 8
+      },
+      "observed_cases": 8
+    },
+    {
+      "binary": "lamp-memory::forget_person",
+      "counts": {
+        "PASS": 3
+      },
+      "observed_cases": 3
+    },
+    {
+      "binary": "lamp-memory::forget_shared_exchange",
+      "counts": {
+        "PASS": 4
+      },
+      "observed_cases": 4
+    },
+    {
+      "binary": "lamp-memory::forgot",
+      "counts": {
+        "PASS": 1
+      },
+      "observed_cases": 1
+    },
+    {
+      "binary": "lamp-memory::health_control",
+      "counts": {
+        "PASS": 23
+      },
+      "observed_cases": 23
+    },
+    {
+      "binary": "lamp-memory::it",
+      "counts": {
+        "PASS": 154
+      },
+      "observed_cases": 154
+    },
+    {
+      "binary": "lamp-memory::paraphrase_fixture",
+      "counts": {
+        "PASS": 1
+      },
+      "observed_cases": 1
+    },
+    {
+      "binary": "lamp-memory::voice_early_words",
+      "counts": {
+        "PASS": 1
+      },
+      "observed_cases": 1
+    },
+    {
+      "binary": "lamp-memory::voice_follows_face",
+      "counts": {
+        "PASS": 1
+      },
+      "observed_cases": 1
+    },
+    {
+      "binary": "lamp-memory::voice_forget",
+      "counts": {
+        "PASS": 5
+      },
+      "observed_cases": 5
+    },
+    {
+      "binary": "lamp-memory::voice_forget_about",
+      "counts": {
+        "PASS": 2
+      },
+      "observed_cases": 2
+    },
+    {
+      "binary": "lamp-memory::voice_forget_named",
+      "counts": {
+        "PASS": 2
+      },
+      "observed_cases": 2
+    },
+    {
+      "binary": "lamp-memory::voice_link_used",
+      "counts": {
+        "PASS": 2
+      },
+      "observed_cases": 2
+    },
+    {
+      "binary": "lamp-memory::voice_observe",
+      "counts": {
+        "PASS": 1
+      },
+      "observed_cases": 1
+    },
+    {
+      "binary": "lamp-memory::voice_since_until",
+      "counts": {
+        "PASS": 2
+      },
+      "observed_cases": 2
+    },
+    {
+      "binary": "lamp-peek",
+      "counts": {
+        "PASS": 15
+      },
+      "observed_cases": 15
+    },
+    {
+      "binary": "lamp-peek::peek",
+      "counts": {
+        "PASS": 11
+      },
+      "observed_cases": 11
+    },
+    {
+      "binary": "lamp-setup",
+      "counts": {
+        "PASS": 16
+      },
+      "observed_cases": 16
+    },
+    {
+      "binary": "lamp-setup::it",
+      "counts": {
+        "PASS": 156
+      },
+      "observed_cases": 156
+    },
+    {
+      "binary": "lamp-setup::wake",
+      "counts": {
+        "PASS": 6
+      },
+      "observed_cases": 6
+    },
+    {
+      "binary": "lamp-skills",
+      "counts": {
+        "PASS": 157
+      },
+      "observed_cases": 157
+    },
+    {
+      "binary": "lamp-skills::bin/lamp-skills",
+      "counts": {
+        "PASS": 23
+      },
+      "observed_cases": 23
+    },
+    {
+      "binary": "lamp-skills::it",
+      "counts": {
+        "PASS": 304
+      },
+      "observed_cases": 304
+    },
+    {
+      "binary": "lamp-skills::requested_audio",
+      "counts": {
+        "PASS": 31
+      },
+      "observed_cases": 31
+    },
+    {
+      "binary": "lamp-update",
+      "counts": {
+        "PASS": 119
+      },
+      "observed_cases": 119
+    },
+    {
+      "binary": "lamp-update::functions",
+      "counts": {
+        "PASS": 4
+      },
+      "observed_cases": 4
+    },
+    {
+      "binary": "lamp-update::install",
+      "counts": {
+        "PASS": 81
+      },
+      "observed_cases": 81
+    },
+    {
+      "binary": "lamp-update::it",
+      "counts": {
+        "PASS": 12
+      },
+      "observed_cases": 12
+    },
+    {
+      "binary": "lamp-update::round",
+      "counts": {
+        "PASS": 123
+      },
+      "observed_cases": 123
+    },
+    {
+      "binary": "lamp-update::self-cli-exec",
+      "counts": {
+        "PASS": 1
+      },
+      "observed_cases": 1
+    },
+    {
+      "binary": "lamp-update::self-process-cuts",
+      "counts": {
+        "PASS": 1
+      },
+      "observed_cases": 1
+    },
+    {
+      "binary": "lamp-voice",
+      "counts": {
+        "PASS": 3626,
+        "LEAK": 1
+      },
+      "observed_cases": 3627
+    },
+    {
+      "binary": "lamp-voice-eval",
+      "counts": {
+        "PASS": 378
+      },
+      "observed_cases": 378
+    },
+    {
+      "binary": "lamp-voice-eval::bin/lamp-voice-eval",
+      "counts": {
+        "PASS": 7
+      },
+      "observed_cases": 7
+    },
+    {
+      "binary": "lamp-voice-eval::it",
+      "counts": {
+        "PASS": 238
+      },
+      "observed_cases": 238
+    },
+    {
+      "binary": "lamp-voice::bin/lamp-voice",
+      "counts": {
+        "PASS": 1
+      },
+      "observed_cases": 1
+    },
+    {
+      "binary": "lamp-voice::example/render_line_second",
+      "counts": {
+        "PASS": 4
+      },
+      "observed_cases": 4
+    },
+    {
+      "binary": "lamp-voice::example/stop_words_stt_replay",
+      "counts": {
+        "PASS": 6
+      },
+      "observed_cases": 6
+    },
+    {
+      "binary": "lamp-voice::it",
+      "counts": {
+        "PASS": 301
+      },
+      "observed_cases": 301
+    }
+  ],
+  "startup_binaries": 62,
+  "observed_terminal_binaries": 58,
+  "skipped_binaries": 106,
+  "raw_log_sha256": "99f7b34674ce3224981c7b80d70393c8a344fb5e9abd327243c3b6e5dec88b54",
+  "limit": "Log does not enumerate skipped identities or starting binaries without terminal rows; no identities or skip causes guessed."
+}

@@ -1,0 +1,95 @@
+{
+  "base": "62b1120fc1af5462529f0c76089a322500e30929",
+  "candidate_commit": null,
+  "candidate_files": {
+    "lampOS/crates/voice-eval/tests/it/relay_hardening.rs": {
+      "base_sha256": "94cb3ff48b5973b1e9ba05dd144f452288a6b3d652980df10e0e76f8419d8e4a",
+      "candidate_sha256": "1e7c96209b10b70e2ffe13b60ee4b7402ba848b65f94096539b508ef3ec51c9c",
+      "base_bytes": 10853,
+      "candidate_bytes": 10942
+    },
+    "lampOS/docs/voice-eval.md": {
+      "base_sha256": "fc997a6203a710668cbf3d1e157f390ed53ec0384587eb56d91c2341329acbe9",
+      "candidate_sha256": "edc5696aead036e33f0736038bf2f87844849b999412ccd3035dfb9a992ef800",
+      "base_bytes": 63284,
+      "candidate_bytes": 63400
+    }
+  },
+  "assertion_preservation": {
+    "original_assertion_count": 6,
+    "original_assertion_tail_sha256": "ec2e6df05a2238103459ef8bdef0fd6d6a8b7c4c24c1416a7d0d70a089c91b3c",
+    "entire_original_assertion_tail_byte_identical": true,
+    "candidate_all_code_outside_named_case_byte_identical": true,
+    "unchanged_deadlines_and_polling": "4-second assertion, 5-second closer watchdog with 5ms polling, 5-second session and allowance, 3-second/20ms worker-absence check; read_pid unchanged."
+  },
+  "scope": "Only the named integration test and one English documentation sentence; no production source changed.",
+  "tracked_repository_files": 10002,
+  "tracked_lampOS_files": 6656,
+  "source_maps": {
+    "base": {
+      "file": "base-source-map.json",
+      "sha256": "e0d44363480845fd5589d9a5dffb2b67b0fcdf3b50e1b6b88bfd769ac3c9b9ca",
+      "source_aggregate_sha256": "15865a841f1621735b19cb06c5227d3d263c2b52c31f286831dce4caca64f609"
+    },
+    "before": {
+      "file": "before-source-map.json",
+      "sha256": "104e732d76813e302df0e274fde94b3b83a25c363150b00627db018816ba0222",
+      "source_aggregate_sha256": "8f9fe5ef5036e2c1b95112697c7305e38062e205729ac1747ca665eba14affdd"
+    },
+    "after": {
+      "file": "after-source-map.json",
+      "sha256": "8536f6067913ae7ee6a6b814febff96b60b3dfc34a6080709f7bcb96518d1ad0",
+      "source_aggregate_sha256": "245d8816ad1397102a4f2289ea5e601648dfe0d81257f22eb7b7537c1a5a9cf9"
+    },
+    "candidate": {
+      "file": "candidate-source-map.json",
+      "sha256": "703dbc81615c83654b2b67186747f2ed692e5bc00f41823a7d1dcd5fd3857e5e",
+      "source_aggregate_sha256": "cb4f7f12cec1f2f7283d89d34af2afea9bc957335054bc78b6b5a9b62c5d4b9b"
+    }
+  },
+  "aggregate_method": "SHA256 of sorted tracked path NUL, Git mode NUL, byte length as 8-byte big-endian, then exact bytes; symlink bytes are literal targets.",
+  "freshness": {
+    "before": {
+      "tracked_paths_refreshed": 10002,
+      "mtime_ns": 1792734201803328000,
+      "source_before_sha256": "8f9fe5ef5036e2c1b95112697c7305e38062e205729ac1747ca665eba14affdd",
+      "source_after_sha256": "8f9fe5ef5036e2c1b95112697c7305e38062e205729ac1747ca665eba14affdd",
+      "all_tracked_repository_inputs_including_docs": true,
+      "source_bytes_changed": false
+    },
+    "after": {
+      "tracked_paths_refreshed": 10002,
+      "mtime_ns": 1792734364611897000,
+      "source_before_sha256": "245d8816ad1397102a4f2289ea5e601648dfe0d81257f22eb7b7537c1a5a9cf9",
+      "source_after_sha256": "245d8816ad1397102a4f2289ea5e601648dfe0d81257f22eb7b7537c1a5a9cf9",
+      "all_tracked_repository_inputs_including_docs": true,
+      "source_bytes_changed": false
+    },
+    "candidate": {
+      "tracked_paths_refreshed": 10002,
+      "mtime_ns": 1792734472697342000,
+      "source_before_sha256": "cb4f7f12cec1f2f7283d89d34af2afea9bc957335054bc78b6b5a9b62c5d4b9b",
+      "source_after_sha256": "cb4f7f12cec1f2f7283d89d34af2afea9bc957335054bc78b6b5a9b62c5d4b9b",
+      "all_tracked_repository_inputs_including_docs": true,
+      "source_bytes_changed": false
+    }
+  },
+  "restorations": {
+    "before": {
+      "source_aggregate_sha256": "15865a841f1621735b19cb06c5227d3d263c2b52c31f286831dce4caca64f609",
+      "clean_original_base": true
+    },
+    "after": {
+      "source_aggregate_sha256": "15865a841f1621735b19cb06c5227d3d263c2b52c31f286831dce4caca64f609",
+      "clean_original_base": true
+    }
+  },
+  "final_source_aggregate_sha256": "cb4f7f12cec1f2f7283d89d34af2afea9bc957335054bc78b6b5a9b62c5d4b9b",
+  "controls_and_sources_frozen_before_execution": {
+    "runner_sha256": "d2b5a33d1bb5ac94b30c74638245f3104033e2d973273980cc964884212ee60b",
+    "source_proof_sha256": "a9c4fcc877dae3603051415fc4b531ce0dc9f3093d8809a0e77235390b8bd2d7",
+    "execution_plan_sha256": "6f6436e89ecb952131f233e4f16b84e17acc9779116b55b4dad6f70275659b90",
+    "orchestrator_sha256": "77e7e6638fe9445041c0aafb9b2eddf0ef15a7ba79096d2c9e62adf8a2e7f91f"
+  },
+  "full_source_maps_availability": "Preserved externally at the recorded paths; bulk tracked-file inventories are not included in this compact publication."
+}

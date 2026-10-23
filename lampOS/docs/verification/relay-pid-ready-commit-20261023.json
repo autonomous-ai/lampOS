@@ -1,0 +1,8 @@
+{
+  "qualified_commit": "7f2f0eeccd71166043d09099bf35d21bb6cb1295",
+  "qualified_base": "62b1120fc1af5462529f0c76089a322500e30929",
+  "head": "e228f645212fa32d6e9c1446f6d01621fe2c563d",
+  "base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+  "range_diff": "1:  7f2f0eeccd = 1:  e228f64521 lampOS: wait for the relay worker PID write before closing transport\n",
+  "full_current_base_gate": "pending"
+}

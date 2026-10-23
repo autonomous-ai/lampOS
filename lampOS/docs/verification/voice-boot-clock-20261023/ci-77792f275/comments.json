@@ -1,0 +1,140 @@
+{
+  "issue-comments": [
+    {
+      "id": 6356250638,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6356250638",
+      "created_at": "2026-10-23T02:54:13Z",
+      "updated_at": "2026-10-23T02:54:13Z"
+    },
+    {
+      "id": 6356343122,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6356343122",
+      "created_at": "2026-10-23T03:01:49Z",
+      "updated_at": "2026-10-23T03:01:49Z"
+    },
+    {
+      "id": 6356354585,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6356354585",
+      "created_at": "2026-10-23T03:02:45Z",
+      "updated_at": "2026-10-23T03:02:45Z"
+    },
+    {
+      "id": 6356515295,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6356515295",
+      "created_at": "2026-10-23T03:15:33Z",
+      "updated_at": "2026-10-23T03:16:15Z"
+    },
+    {
+      "id": 6356694854,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6356694854",
+      "created_at": "2026-10-23T03:30:28Z",
+      "updated_at": "2026-10-23T03:30:28Z"
+    },
+    {
+      "id": 6356701215,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6356701215",
+      "created_at": "2026-10-23T03:31:00Z",
+      "updated_at": "2026-10-23T03:31:00Z"
+    },
+    {
+      "id": 6356773602,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6356773602",
+      "created_at": "2026-10-23T03:37:06Z",
+      "updated_at": "2026-10-23T03:37:06Z"
+    },
+    {
+      "id": 6356843817,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6356843817",
+      "created_at": "2026-10-23T03:43:03Z",
+      "updated_at": "2026-10-23T03:43:03Z"
+    },
+    {
+      "id": 6356913549,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6356913549",
+      "created_at": "2026-10-23T03:48:56Z",
+      "updated_at": "2026-10-23T03:48:56Z"
+    },
+    {
+      "id": 6356925581,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6356925581",
+      "created_at": "2026-10-23T03:50:00Z",
+      "updated_at": "2026-10-23T03:50:00Z"
+    },
+    {
+      "id": 6357231105,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6357231105",
+      "created_at": "2026-10-23T04:15:27Z",
+      "updated_at": "2026-10-23T04:15:27Z"
+    },
+    {
+      "id": 6357387060,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6357387060",
+      "created_at": "2026-10-23T04:28:15Z",
+      "updated_at": "2026-10-23T04:28:15Z"
+    },
+    {
+      "id": 6357500573,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6357500573",
+      "created_at": "2026-10-23T04:37:49Z",
+      "updated_at": "2026-10-23T04:37:49Z"
+    },
+    {
+      "id": 6357564418,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6357564418",
+      "created_at": "2026-10-23T04:43:09Z",
+      "updated_at": "2026-10-23T04:43:09Z"
+    },
+    {
+      "id": 6357567998,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6357567998",
+      "created_at": "2026-10-23T04:43:27Z",
+      "updated_at": "2026-10-23T04:43:27Z"
+    },
+    {
+      "id": 6357654567,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6357654567",
+      "created_at": "2026-10-23T04:50:43Z",
+      "updated_at": "2026-10-23T04:50:43Z"
+    },
+    {
+      "id": 6358384689,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6358384689",
+      "created_at": "2026-10-23T05:48:50Z",
+      "updated_at": "2026-10-23T05:48:50Z"
+    }
+  ],
+  "reviews": [],
+  "review-comments": [],
+  "observed_at": "2026-10-23T05:56:25.460568+00:00",
+  "pr": {
+    "number": 3190,
+    "state": "open",
+    "draft": true,
+    "mergeable": true,
+    "mergeable_state": "clean",
+    "html_url": "https://github.com/autonomous-ai/lampOS/pull/3190",
+    "head": {
+      "ref": "tests/1569-boot-clock-current",
+      "sha": "77792f2753b4fb97f4a078897cdf52e1bbd24362"
+    },
+    "base": {
+      "ref": "lamp-voice",
+      "sha": "be698e83a7956ff048261918fa274d964c1dff27"
+    }
+  },
+  "review_thread_count": 0,
+  "findings": [
+    {
+      "url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6357387060",
+      "finding": "Loading-child result did not establish actual startup/held loading.",
+      "current_source_response": "Head777 requires complete PID and successive live FIFO acknowledgements before and after the three original line checks, then release and supervisor reaping. This new loading-child case is separate from the 86 clock cases.",
+      "clearance": "No clearance inferred from implementation or this CI receipt."
+    },
+    {
+      "url": "https://github.com/autonomous-ai/lampOS/pull/3190#issuecomment-6357654567",
+      "finding": "Execution HOLD retained: reader empty-PID parse occurs before worker-exit check; narrow PID-ready correction/current-base qualification requested.",
+      "disposition": "Separate fixture correction and reviewer disposition remain outside this receipt; original failures are not waived."
+    }
+  ],
+  "scope": "Complete comments/reviews/threads were read through the recorded timestamp. Newer parent coordination or later reviews require their own read. This receipt does not advance readiness."
+}

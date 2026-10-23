@@ -1,0 +1,13 @@
+{
+  "old_head": "47adb38fd0f61dfbfc1172e9a668d54c43983794",
+  "old_base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "head": "430af78c0a1a785c2f422fc62d7bbdcc80103d4d",
+  "base": "6b52c916a3cfcc26a2c97670b1a9ebab4c84d174",
+  "tree": "f6d053a93e642389a1a5d5bcca21180c4bd6e5e0",
+  "range_diff": "1:  47adb38fd0 = 1:  430af78c0a lampOS: wait for the phone-news round before timing text preemption\n",
+  "authored_files_unchanged": {
+    "lampOS/crates/voice/src/messages.rs": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+    "lampOS/docs/messages.md": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3"
+  },
+  "source_qualification": "Earlier execution remains bound to the prior head. New CI and full local qualification are pending; this carry does not waive any earlier failed gate."
+}

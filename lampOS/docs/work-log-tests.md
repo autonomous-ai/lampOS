@@ -1,5 +1,30 @@
 # Tests work log
 
+## 2026-10-23 16:49 +0700 — relay fix pushed and current qualification resumed
+
+Ready for lamp-voice: no (#3255, #3190 and #3218 remain draft).
+
+The [relay control and complete native gate](verification/relay-pid-ready-native-20261023/)
+show the old fixture failing the empty-PID parse and the corrected fixture
+passing all six original assertions. Both processes were absent afterward.
+The full package passed **623 / 0 / 0**; formatting, strict VoiceEval Clippy
+and workspace build passed. The exact two-file source is committed and
+carried with an equal range-diff to #3255 at `e228f6452` on `cf462adb0`.
+Its new-base full gate is running; old execution is not relabelled.
+
+The [preceding #3190 native receipt](verification/voice-boot-clock-20261023/ci-77792f275/)
+reports **7,173 passed (one leaky), 0 failed, 32 skipped**, with all 86
+clock cases and the loading-child case passing; strict Linux Clippy passed.
+The checked merge and selected 12-package scope are explicit. The earlier
+equal [clock carry](verification/voice-boot-clock-20261023/carry-6b52c916a/) and
+[phone carry](verification/phone-news-start-20261023/carry-6b52c916a/) remain
+recorded. #3218 now has a further equal carry to `4e1e00e52` on `cf462adb0`;
+new qualification follows. Reviewer-two's #3190 execution HOLD stands.
+
+The interrupted 0c2 Linux-formatting preparation timed out while creating
+its source archive at 60 seconds; no formatter ran and no success is claimed.
+Original records remain external. No ARM build or lamp use occurred locally.
+
 ## 2026-10-23 12:42 +0700 — phone native CI and controlled loading-child startup
 
 Ready for lamp-voice: no (#3218 local failures and #3190 execution HOLD remain).

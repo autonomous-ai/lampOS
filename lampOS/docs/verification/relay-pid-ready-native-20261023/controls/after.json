@@ -1,0 +1,114 @@
+{
+  "command": {
+    "variant": "after",
+    "command": [
+      "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/after/it-control",
+      "relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers",
+      "--exact",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-relay-control-after-20261023/lampOS",
+    "base": "62b1120fc1af5462529f0c76089a322500e30929",
+    "source_sha256": "53f6db87ad48f47124558557f70d4060ef3181454fb8e219b3eb133e38ab4cd4",
+    "documentation_sha256": "edc5696aead036e33f0736038bf2f87844849b999412ccd3035dfb9a992ef800",
+    "binary": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/after/it-control",
+    "binary_bytes": 15774328,
+    "binary_sha256": "e8f1e817026f06c0c4713e74a88200962f3913f11940c531499019c64142671f",
+    "binary_file_identity": "Mach-O 64-bit executable x86_64",
+    "runner_sha256": "d2b5a33d1bb5ac94b30c74638245f3104033e2d973273980cc964884212ee60b",
+    "source_proof_sha256": "a9c4fcc877dae3603051415fc4b531ce0dc9f3093d8809a0e77235390b8bd2d7",
+    "external_watchdog_seconds": 20,
+    "execution_count": 1,
+    "started_utc": "2026-10-23T05:47:42.373633+00:00",
+    "controlled_environment": {
+      "LAMP_RELAY_PID_CONTROL_DIR": "/private/tmp/tests-relay-pid-ready-controls-20261023/runs/after",
+      "RUST_TEST_THREADS": "unset",
+      "RUST_BACKTRACE": "0"
+    },
+    "test_pid": 27624,
+    "test_process_group": 27624
+  },
+  "result": {
+    "variant": "after",
+    "test_exit_code": 0,
+    "timed_out": false,
+    "elapsed_seconds": 0.649555535055697,
+    "finished_utc": "2026-10-23T05:47:43.054204+00:00",
+    "expected_control_outcome": true,
+    "classification": "all original assertions passed after FIFO handoff",
+    "fixture_processes": {
+      "runtime_pid": 27672,
+      "worker_pid": 27676
+    },
+    "markers": {
+      "opened": [
+        [
+          "27672",
+          "27676"
+        ]
+      ],
+      "waits": [
+        "worker.ready"
+      ],
+      "release_count": 1,
+      "closes": [
+        [
+          "true",
+          "6",
+          "true"
+        ]
+      ]
+    },
+    "cleanup_signals": [],
+    "timeout_runtime_ownership_inspection": null,
+    "post_exit_process_absence": {
+      "proven": true,
+      "deadline_seconds": 3,
+      "poll_period_seconds": 0.02,
+      "polls": 1,
+      "elapsed_seconds": 2.7668196707963943e-05,
+      "transitions": [
+        {
+          "elapsed_seconds": 2.1928921341896057e-05,
+          "states": {
+            "runtime_pid": "absent",
+            "worker_pid": "absent"
+          }
+        }
+      ],
+      "final_states": {
+        "runtime_pid": "absent",
+        "worker_pid": "absent"
+      },
+      "signals_sent": false
+    },
+    "source_unchanged": true,
+    "binary_unchanged": true,
+    "stdout": {
+      "bytes": 203,
+      "sha256": "6c83b6e2ea703773acc6b8489fceb2cc12c226ce1e61ad777c56466a33fba6e9"
+    },
+    "stderr": {
+      "bytes": 160,
+      "sha256": "94c74f24f2b50c05d84b035c11cc4b7a4ff567e29fbf884dbb80a36007bd15ad"
+    }
+  },
+  "streams": {
+    "stdout": {
+      "source_external_path": "/private/tmp/tests-relay-pid-ready-controls-20261023/runs/after/stdout",
+      "original_bytes": 203,
+      "original_sha256": "6c83b6e2ea703773acc6b8489fceb2cc12c226ce1e61ad777c56466a33fba6e9",
+      "encoding": "UTF-8; exact decoded bytes, no normalization",
+      "utf8": "\nrunning 1 test\ntest relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 237 filtered out; finished in 0.03s\n\n"
+    },
+    "stderr": {
+      "source_external_path": "/private/tmp/tests-relay-pid-ready-controls-20261023/runs/after/stderr",
+      "original_bytes": 160,
+      "original_sha256": "94c74f24f2b50c05d84b035c11cc4b7a4ff567e29fbf884dbb80a36007bd15ad",
+      "encoding": "UTF-8; exact decoded bytes, no normalization",
+      "utf8": "RELAY_PID_CONTROL OPENED 27672 27676\nRELAY_PID_CONTROL WAIT worker.ready\nRELAY_PID_CONTROL RELEASE\nRELAY_PID_CONTROL CLOSE ready=true pid_bytes=6 released=true\n"
+    }
+  },
+  "source_control_patch": "../patches/after-control.patch.json",
+  "execution_count": 1
+}

@@ -1,0 +1,680 @@
+[
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/affected-case-scope.json",
+    "bytes": 29675,
+    "sha256": "313466a439540ce972c0ba9c872b82d71b052f056bc5ace8bb1e10efc0f72ebd",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/affected-census.json",
+    "bytes": 79382,
+    "sha256": "ab2a87ce34c75c4efb43dab6e0702e43af86eb89aaf42d20551744c0bed11c4c",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/binary-census.json",
+    "bytes": 7772,
+    "sha256": "8ade98717f0b48c4d603c0f093c07caa226daa36f6e6bda807ac795be74deaf0",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/final-jobs.json",
+    "bytes": 7021,
+    "sha256": "2276a563ed9b6ecb77e39b616a7c86c312cfacfc35efff2a4bdef1efd3be124b",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/final-jobs.json.command.json",
+    "bytes": 490,
+    "sha256": "019dfa428713e9066e2d263e2b5c97b3f01b1c948901a38e1881e94e33b1fdcb",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/final-jobs.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/final-run.json",
+    "bytes": 12743,
+    "sha256": "54b5c65bfce1c1d6feda00737ee2adb305e641862a7987889ba1ab7c2172fefb",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/final-run.json.command.json",
+    "bytes": 473,
+    "sha256": "ab355ed518ce6efdda42e0cb68e283e9a3ff3288b43b16ed69a3a5e32a1445fd",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/final-run.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/initial-jobs.json",
+    "bytes": 4737,
+    "sha256": "fdb1c96e63d90a0ae9c1e6d3cde6210efdf5286583689de6fd1e6a24e5333f80",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/initial-jobs.json.command.json",
+    "bytes": 490,
+    "sha256": "0188264d351b2a8bbadc43f626dd3266fa49a501d88c0e16d09c12997baa9a8e",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/initial-jobs.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/initial-run.json",
+    "bytes": 12740,
+    "sha256": "c60bbbf317a2232c4bf2d96ed4e9db92f618bb23af468be200d8a2f81e97d62f",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/initial-run.json.command.json",
+    "bytes": 473,
+    "sha256": "6ea05cec15974c1303d38e587396654ba7362551ff2c49224a4d2c4fa3eb33bc",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/initial-run.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/job.log",
+    "bytes": 1265616,
+    "sha256": "99f7b34674ce3224981c7b80d70393c8a344fb5e9abd327243c3b6e5dec88b54",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/job.log.command.json",
+    "bytes": 481,
+    "sha256": "b3f1a7df2f1b2fb76d5195b9618b87319aa740876809b9e3aa5283b83920e18d",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/job.log.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/receipt.json",
+    "bytes": 40261,
+    "sha256": "7589aeca97cc32ed8ae6232fece6c746d2ff5c6389e5b29c0d82d44b7a7ec6e4",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/separate-harnesses.json",
+    "bytes": 9935,
+    "sha256": "50cda71a6d4d75da954b873f6d62ad80ed21c5b7325a46a368b35e776ebb437d",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/terminal-cases.json",
+    "bytes": 1730527,
+    "sha256": "9471133108680886788578487748cfd41aadf2149ee1b9a3cc803fafba214464",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64/unique-terminal-cases.json",
+    "bytes": 1722245,
+    "sha256": "0fcca259bf38dae2f2b3f2fe0fff64f4997921e1c30028209a20a5f7a9937f30",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64-watch.result.json",
+    "bytes": 727,
+    "sha256": "7ae143402f5e3a166417af88cfe1ad6d658224552da3d63f514c5efb76075323",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64-watch.started.json",
+    "bytes": 384,
+    "sha256": "99b0440ccf893bf453d19a10614be88740118548e85af1d7627a262f2bc5adfa",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64-watch.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/arm64-watch.stdout.txt",
+    "bytes": 18016,
+    "sha256": "525927f50bb37c92a95cfd8a7d4d6537c208fef3a89bc28d168fc59b620d53db",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/clippy/final-jobs.json",
+    "bytes": 2635,
+    "sha256": "77af5210381b415f995ba51a299e7b4db6185bff362b969969d172ee2a598eaf",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/clippy/final-jobs.json.command.json",
+    "bytes": 490,
+    "sha256": "fd9a1b473ed2438e7e3ff01a34d2b9b8413b842c4ee74dedb920de5f2ae66178",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/clippy/final-jobs.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/clippy/final-run.json",
+    "bytes": 12742,
+    "sha256": "9e86193b6714461247a354c5ca5dbcfccc4eda34553dcdb8cf9326bb7b376f76",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/clippy/final-run.json.command.json",
+    "bytes": 473,
+    "sha256": "cbfb77bdc0bb43a87745518a216df1b673cd8fb2b33683591c7b581422d83da5",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/clippy/final-run.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/clippy/job.log",
+    "bytes": 38940,
+    "sha256": "677964640de2a131eaef8a09fc67886b2658be334f896da5656e719e12490a11",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/clippy/job.log.command.json",
+    "bytes": 478,
+    "sha256": "4627056c1189380dc537aa1b5d3b4d2fef7ff347b5eb51b75a90001bc71ca737",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/clippy/job.log.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/clippy/receipt.json",
+    "bytes": 4034,
+    "sha256": "81de7c1f874ce9a079cbdcc84105df74532702ea7a0ac136556aade7020ada68",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/issue-comments-final.json",
+    "bytes": 43776,
+    "sha256": "009bbaac7b13318324467ece9db6b58b5ab0a767da48a6bbecb886a8b9ba6f66",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/issue-comments-final.json.command.json",
+    "bytes": 515,
+    "sha256": "46f436f8d91bf4b0b314fc7804e532529a4681e52fbed8825090291d8b876771",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/issue-comments-final.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/issue-comments-initial.json",
+    "bytes": 41337,
+    "sha256": "62fcb133bdeec908a9861ef7db1d95e38b4be35c643eca71303d2d48c0ac4f9c",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/issue-comments-initial.json.command.json",
+    "bytes": 515,
+    "sha256": "9eaeceb5df4ac5fefcc3ccb9217a77e0c3cc044563d550d364e235633f581594",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/issue-comments-initial.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/pr-final.json",
+    "bytes": 26104,
+    "sha256": "942e74f4b1526084634c2fc44e4cc105540e517e720f3a42c7c092c8d0816eaf",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/pr-final.json.command.json",
+    "bytes": 459,
+    "sha256": "25fcf6c2c49aed6fc53d739f335de9c9da89820f69e0eaeaaa72f9fe70ecd6c5",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/pr-final.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/pr-initial.json",
+    "bytes": 25443,
+    "sha256": "270386e5fd0c8690b1a8fc00de9cfe41fdfaac67881452bb3412c2d5ad8d9cd8",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/pr-initial.json.command.json",
+    "bytes": 459,
+    "sha256": "6d8b8b2db90b6134d9c3e90b3fd546a5f9a209d41191bb90536ffdb8b0ec46a6",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/pr-initial.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/review-comments-final.json",
+    "bytes": 4,
+    "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/review-comments-final.json.command.json",
+    "bytes": 510,
+    "sha256": "8b6b40aaf35459e1f11c966c950e699b84304d0fbbc6ce788316948782016dca",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/review-comments-final.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/review-comments-initial.json",
+    "bytes": 4,
+    "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/review-comments-initial.json.command.json",
+    "bytes": 510,
+    "sha256": "cbf85b0fbb5f207e1684d73a07e03164bd10c4ce44cb4b2c6320bc3b33848ac9",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/review-comments-initial.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/reviews-final.json",
+    "bytes": 4,
+    "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/reviews-final.json.command.json",
+    "bytes": 508,
+    "sha256": "03cbd5558a444f3d5d8bff5fe74ce877791165605f891566ccee72878008ffb1",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/reviews-final.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/reviews-initial.json",
+    "bytes": 4,
+    "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/reviews-initial.json.command.json",
+    "bytes": 509,
+    "sha256": "f5a83d87db85d104b1d9192bb77270b39f07d43b2ece8cd6c689d7d6124643aa",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/reviews-initial.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/threads-final.json",
+    "bytes": 135,
+    "sha256": "b7d2accee34d7a7fd9354c630e40ba3b856015467aaf9791631673527fac0e4c",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/threads-final.json.command.json",
+    "bytes": 751,
+    "sha256": "68f3fc7b4544d3306dd59fabe1e356d51b8821300065f32f2967a65b51f0dac7",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/threads-final.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/threads-initial.json",
+    "bytes": 135,
+    "sha256": "b7d2accee34d7a7fd9354c630e40ba3b856015467aaf9791631673527fac0e4c",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/threads-initial.json.command.json",
+    "bytes": 751,
+    "sha256": "675df4b4609bff1fc0d005afbd3e1ddd40034eda38f425d32ed774f626455f5a",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/comments/threads-initial.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-0.json",
+    "bytes": 26380,
+    "sha256": "6ad5319cf871259ff007fa2b8537988f4f72155baebd6e409c90a9216fa7bc7b",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-0.json.command.json",
+    "bytes": 537,
+    "sha256": "7d720414a182454e3d1c721fee988bdd797fecc38780a6ac10f7371c52288b0a",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-0.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-1.json",
+    "bytes": 6902,
+    "sha256": "7d042003b79eece4d0ee6a4665cc7588c47e5f555e1ce6977477957597395281",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-1.json.command.json",
+    "bytes": 537,
+    "sha256": "31549e51d7b5a43f1e59c832d61141bd9217214fc4883c84f9d2b24b80c09598",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-1.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-10.json",
+    "bytes": 165504,
+    "sha256": "1a67ca860072734598f30068a8b9bad2f43789d23cf53d287f53f7443a59d8db",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-10.json.command.json",
+    "bytes": 541,
+    "sha256": "ae60b82317f5775a8677ec54813b6a46365036f2c959d4169aae4f642d8496d6",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-10.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-11.json",
+    "bytes": 45916,
+    "sha256": "6f0fd262cff149b839503c282fcd8b34c944d8722923938e61990c55c9c4414c",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-11.json.command.json",
+    "bytes": 537,
+    "sha256": "7b857ce12002e0341a8688e707cc82807920c48c66957b294d624431b6d2e0ec",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-11.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-2.json",
+    "bytes": 8698,
+    "sha256": "7cfb1a73ce137b6b4d777bbeda29dc4fa640a1b9bce692b4b17e7adf022a6a96",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-2.json.command.json",
+    "bytes": 536,
+    "sha256": "105a4d0db0384709eb5ce8a127c51139b194a6c6cdff1cf54ec9c2c9d34771ae",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-2.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-3.json",
+    "bytes": 8179,
+    "sha256": "cfc83064b5a7aa7f83167f98fded8ffee27b2889614511a3cb841f6bcec33b4b",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-3.json.command.json",
+    "bytes": 529,
+    "sha256": "983a6c7c076a1cd83f3d4e71323b9deb43257a649f8e8d8d85b63f7dafac562e",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-3.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-4.json",
+    "bytes": 106241,
+    "sha256": "dffef60392604485eb440d90456d9eaac2c0f8a22fabb1861572e933717ea83e",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-4.json.command.json",
+    "bytes": 549,
+    "sha256": "6b97692a81f390ebc60cf437990bd3cee12d913bfc357bdd081cafcfcb41e4d5",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-4.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-5.json",
+    "bytes": 184781,
+    "sha256": "74b2a6d7f69b4eaf13eef5651b3bdbd1868c42b9da7df3d26b4dfd69c0260e72",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-5.json.command.json",
+    "bytes": 562,
+    "sha256": "0fbcb60bb7c9b96aad34a82af7b090c9e8467defc6eeb81192c8c680f6ab7adc",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-5.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-6.json",
+    "bytes": 152015,
+    "sha256": "eb2bf64923f7807ddf7364882eba1a76817f72c61cdb7a79f2c68df1f149cec5",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-6.json.command.json",
+    "bytes": 560,
+    "sha256": "c63b8773e2a78da2a2448c856b810ba6157558fb0453752461d5b0383f51878e",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-6.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-7.json",
+    "bytes": 112546,
+    "sha256": "b52d597df171281883de3b7990e265c0d6e018a1dfcbfeed0971e58a39b87bad",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-7.json.command.json",
+    "bytes": 562,
+    "sha256": "148496738d0a179c0f986018c6db7573c0f586db7ca5ac50e75fb58d86237699",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-7.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-8.json",
+    "bytes": 28117,
+    "sha256": "547f303eeb07f084185f4a6c079538c8d37d93092ee2760f22ff3f74aafcb100",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-8.json.command.json",
+    "bytes": 544,
+    "sha256": "7751695df8f994e123ec3cf099c301bc7a73f7efdaa57103c501c1dbbc155bec",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-8.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-9.json",
+    "bytes": 1064058,
+    "sha256": "d59af16907d3cfe020165b2bd181ca85924fa9523e11ae9ab2917fa7a81e084d",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-9.json.command.json",
+    "bytes": 554,
+    "sha256": "cda78b2cdc0939599eaf048812802e63c96a4b788c1cfba4c4d13687c43c5e54",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/content-9.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/head-comparison.json",
+    "bytes": 3332,
+    "sha256": "6d139d10b4c72d4e1c32456dd2b0961d36960c5ccded609ca28dbde4a3d8ea50",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/merge-commit.json",
+    "bytes": 2603,
+    "sha256": "a46b441f6889e1ce2f0afdfa94015e90d97ee6c59f9f0da064006ca642f16bea",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/merge-commit.json.command.json",
+    "bytes": 500,
+    "sha256": "fe09770b38ae32cccc09ea9aef75e500c18a6e7429b3a0a64b48fd601fc0a2d6",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/merge-commit.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/merge-root-tree.json",
+    "bytes": 5120,
+    "sha256": "74c0742ae016cb792301ada72e53e7e6170d932a8b418b2dd4b8a84e469d7201",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/merge-root-tree.json.command.json",
+    "bytes": 497,
+    "sha256": "b709219e8408eb91554b06d2eb77053e5d2cafdbe37549f5e09f2120e9f9cf66",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/merge-root-tree.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/source-binding.initial.json",
+    "bytes": 1387230,
+    "sha256": "e6b5d69736fc59d42563f7f2a8cfe184a76742593747b0f7e399a2b96d9fefe2",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/identity/source-snapshots.json",
+    "bytes": 1420715,
+    "sha256": "56a060c8c838a71ecb1213914f7e25087355cee2b49d1065c36aa77e0ad72af6",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/summary.json",
+    "bytes": 4084,
+    "sha256": "d1e6dc1f1010d1f7ca604d686d3336284c7858626d2744ef4c61db8b9c94ed8e",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  },
+  {
+    "path": "/private/tmp/tests-3190-777-ci-20261023/watch-progress-snapshot.json",
+    "bytes": 1616,
+    "sha256": "c2cdb4d84594acdfddb8888fc9fcf4eb6608415e4991f599378b8c279f3cb8bc",
+    "reason": "Frozen original read-only collection, source snapshot or parsed evidence; external duplicate retained."
+  }
+]

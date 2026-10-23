@@ -1,0 +1,206 @@
+{
+  "status": "passed",
+  "frozen_execution_result_sha256": "19c6357ed6d1f76131f32756a252a5d2742cc529c1fd2ad6c29c1662ad6fe9de",
+  "method": {
+    "source": "Captured run metadata, immutable snapshots and map hashes only; current candidate worktree never read.",
+    "streams": "Every exact UTF-8 wrapper decoded and compared byte-for-byte to its original; every projection reconstructed from recorded source byte ranges; all byte lengths and SHA256 verified.",
+    "census": "All 623 compiled case names equal terminal actual names; all seven relay rows ok; controls each one execution and actual process absence proved.",
+    "links": "All Markdown relative links and structured control-patch links resolve inside this bundle.",
+    "whitespace": "git diff --no-index --check /dev/null file: no stdout/stderr diagnostics; 1 is accepted as the ordinary new-file difference status in this environment, not represented as command exit 0. Independent trailing-whitespace, final-newline and blank-EOF checks also passed."
+  },
+  "prior_seal_note": "The initial payload was retained without manifest/validation. Its sealing code required a zero no-index diff status; the resumed check observed status 1 with empty diagnostic streams for every valid new file. Only evidence sealing resumed; no tests or gates were repeated.",
+  "gate_or_test_retries": 0,
+  "current_worktree_reads": 0,
+  "source_or_target_mutation": false,
+  "checks": {
+    "json_files": [
+      "census-and-outcomes.json",
+      "command-results.json",
+      "controls/after.json",
+      "controls/before.json",
+      "external-raw-index.json",
+      "native-streams.json",
+      "patches/after-control.patch.json",
+      "patches/before-control.patch.json",
+      "patches/candidate.patch.json",
+      "preexecution-source-proof.json",
+      "source-and-restoration.json"
+    ],
+    "exact_utf8_wrappers": [
+      "census-and-outcomes.json/targets/0/file_identity",
+      "census-and-outcomes.json/targets/1/file_identity",
+      "census-and-outcomes.json/targets/2/file_identity",
+      "controls/after.json/streams/stdout",
+      "controls/after.json/streams/stderr",
+      "controls/before.json/streams/stdout",
+      "controls/before.json/streams/stderr",
+      "native-streams.json/steps/rustc-identity/stdout",
+      "native-streams.json/steps/rustc-identity/stderr",
+      "native-streams.json/steps/before-compile/stderr",
+      "native-streams.json/steps/before-control/stdout",
+      "native-streams.json/steps/before-control/stderr",
+      "native-streams.json/steps/after-compile/stderr",
+      "native-streams.json/steps/after-control/stdout",
+      "native-streams.json/steps/after-control/stderr",
+      "native-streams.json/steps/full-voice-eval/stderr",
+      "native-streams.json/steps/fmt/stderr",
+      "native-streams.json/steps/clippy/stderr",
+      "native-streams.json/steps/workspace-build/stderr",
+      "native-streams.json/steps/diff-check/stdout",
+      "native-streams.json/steps/diff-check/stderr",
+      "patches/after-control.patch.json",
+      "patches/before-control.patch.json",
+      "patches/candidate.patch.json"
+    ],
+    "projected_streams": [
+      "native-streams.json/steps/before-compile/stdout",
+      "native-streams.json/steps/after-compile/stdout",
+      "native-streams.json/steps/full-voice-eval/stdout",
+      "native-streams.json/steps/fmt/stdout",
+      "native-streams.json/steps/clippy/stdout",
+      "native-streams.json/steps/workspace-build/stdout"
+    ],
+    "source_maps": [
+      {
+        "arm": "base",
+        "external_sha256": "e0d44363480845fd5589d9a5dffb2b67b0fcdf3b50e1b6b88bfd769ac3c9b9ca"
+      },
+      {
+        "arm": "before",
+        "external_sha256": "104e732d76813e302df0e274fde94b3b83a25c363150b00627db018816ba0222"
+      },
+      {
+        "arm": "after",
+        "external_sha256": "8536f6067913ae7ee6a6b814febff96b60b3dfc34a6080709f7bcb96518d1ad0"
+      },
+      {
+        "arm": "candidate",
+        "external_sha256": "703dbc81615c83654b2b67186747f2ed692e5bc00f41823a7d1dcd5fd3857e5e"
+      }
+    ],
+    "links": [
+      {
+        "source": "controls/before.json",
+        "target": "patches/before-control.patch.json"
+      },
+      {
+        "source": "controls/after.json",
+        "target": "patches/after-control.patch.json"
+      },
+      {
+        "source": "README.md",
+        "target": "source-and-restoration.json"
+      },
+      {
+        "source": "README.md",
+        "target": "controls/before.json"
+      },
+      {
+        "source": "README.md",
+        "target": "controls/after.json"
+      },
+      {
+        "source": "README.md",
+        "target": "census-and-outcomes.json"
+      },
+      {
+        "source": "README.md",
+        "target": "command-results.json"
+      },
+      {
+        "source": "README.md",
+        "target": "patches/candidate.patch.json"
+      },
+      {
+        "source": "README.md",
+        "target": "preexecution-source-proof.json"
+      },
+      {
+        "source": "README.md",
+        "target": "native-streams.json"
+      },
+      {
+        "source": "README.md",
+        "target": "manifest.json"
+      },
+      {
+        "source": "README.md",
+        "target": "validation.json"
+      }
+    ],
+    "whitespace": [
+      {
+        "file": "README.md",
+        "command_exit": 1,
+        "stdout_bytes": 0,
+        "stderr_bytes": 0
+      },
+      {
+        "file": "census-and-outcomes.json",
+        "command_exit": 1,
+        "stdout_bytes": 0,
+        "stderr_bytes": 0
+      },
+      {
+        "file": "command-results.json",
+        "command_exit": 1,
+        "stdout_bytes": 0,
+        "stderr_bytes": 0
+      },
+      {
+        "file": "controls/after.json",
+        "command_exit": 1,
+        "stdout_bytes": 0,
+        "stderr_bytes": 0
+      },
+      {
+        "file": "controls/before.json",
+        "command_exit": 1,
+        "stdout_bytes": 0,
+        "stderr_bytes": 0
+      },
+      {
+        "file": "external-raw-index.json",
+        "command_exit": 1,
+        "stdout_bytes": 0,
+        "stderr_bytes": 0
+      },
+      {
+        "file": "native-streams.json",
+        "command_exit": 1,
+        "stdout_bytes": 0,
+        "stderr_bytes": 0
+      },
+      {
+        "file": "patches/after-control.patch.json",
+        "command_exit": 1,
+        "stdout_bytes": 0,
+        "stderr_bytes": 0
+      },
+      {
+        "file": "patches/before-control.patch.json",
+        "command_exit": 1,
+        "stdout_bytes": 0,
+        "stderr_bytes": 0
+      },
+      {
+        "file": "patches/candidate.patch.json",
+        "command_exit": 1,
+        "stdout_bytes": 0,
+        "stderr_bytes": 0
+      },
+      {
+        "file": "preexecution-source-proof.json",
+        "command_exit": 1,
+        "stdout_bytes": 0,
+        "stderr_bytes": 0
+      },
+      {
+        "file": "source-and-restoration.json",
+        "command_exit": 1,
+        "stdout_bytes": 0,
+        "stderr_bytes": 0
+      }
+    ]
+  }
+}

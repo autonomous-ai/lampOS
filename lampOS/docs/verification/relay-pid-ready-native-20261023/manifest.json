@@ -1,0 +1,72 @@
+{
+  "format": 1,
+  "scope": "Every payload file except this manifest.",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 7340,
+      "sha256": "8a8d324906e4c860d6517c2895e9de93ee42e4c389c4e676db5666f4d5a0a7fd"
+    },
+    {
+      "path": "census-and-outcomes.json",
+      "bytes": 156118,
+      "sha256": "5018a03bcdb444c290d1409890a23823bfd534961fb4688307704bed6578a4f5"
+    },
+    {
+      "path": "command-results.json",
+      "bytes": 10378,
+      "sha256": "cd8d11f3f737e3f9f3691139b9e23a6ffaadb56af51f1df9e1a34ce934b6a8ed"
+    },
+    {
+      "path": "controls/after.json",
+      "bytes": 4231,
+      "sha256": "5370d7f8d80bda8a948570aede82bf4b193feddd4b75dfa05b07f00226cbecd3"
+    },
+    {
+      "path": "controls/before.json",
+      "bytes": 4582,
+      "sha256": "c31b91e5dd7f23da0a57aeecb91b608dd62d1574d08e8e3273df34a5464a5475"
+    },
+    {
+      "path": "external-raw-index.json",
+      "bytes": 7726,
+      "sha256": "494141c28ded837f6894e2423bd0f1cbf41701f516ad658af08c96b5efb5763c"
+    },
+    {
+      "path": "native-streams.json",
+      "bytes": 95907,
+      "sha256": "a4005760a7a02e9aaa19c33bbadfe88d76b4be7c4a55cd49eedf4ff01c24471c"
+    },
+    {
+      "path": "patches/after-control.patch.json",
+      "bytes": 4753,
+      "sha256": "d5ad3fc8f294dd7e7c8aa7653fe459b5ce71283a918653888dc596ee252c743d"
+    },
+    {
+      "path": "patches/before-control.patch.json",
+      "bytes": 4726,
+      "sha256": "c488d67cd05a4c8d1a8ae49571e46affdfec575b8d45248da367b4cc7269d007"
+    },
+    {
+      "path": "patches/candidate.patch.json",
+      "bytes": 2056,
+      "sha256": "8f4013ade5be160e29716b1c8e46bbc00374e5f8065a4a2d937f3f2375146db8"
+    },
+    {
+      "path": "preexecution-source-proof.json",
+      "bytes": 3511,
+      "sha256": "a9c4fcc877dae3603051415fc4b531ce0dc9f3093d8809a0e77235390b8bd2d7"
+    },
+    {
+      "path": "source-and-restoration.json",
+      "bytes": 4789,
+      "sha256": "878f873070701c6cc946881fee485ae88dda4fcbb43c810b76641635a2d6cfdb"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 6920,
+      "sha256": "8075dbba33f7899731b024c83802d64a2409edacb706428b789dbc48d071b05f"
+    }
+  ],
+  "total_payload_bytes": 313037
+}

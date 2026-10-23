@@ -1,0 +1,112 @@
+{
+  "command": {
+    "variant": "before",
+    "command": [
+      "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/before/it-control",
+      "relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers",
+      "--exact",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/tests-codex-relay-control-before-20261023/lampOS",
+    "base": "62b1120fc1af5462529f0c76089a322500e30929",
+    "source_sha256": "4f31cb5a0154ac439bcf7a67c9bc13dbaa86a19d08455bdca2c128909d7a3088",
+    "documentation_sha256": "fc997a6203a710668cbf3d1e157f390ed53ec0384587eb56d91c2341329acbe9",
+    "binary": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/before/it-control",
+    "binary_bytes": 15774264,
+    "binary_sha256": "dda0bf4169a4be0cec3c50b77eceab367ea2b36a732d58f10f6f6d843ca384c2",
+    "binary_file_identity": "Mach-O 64-bit executable x86_64",
+    "runner_sha256": "d2b5a33d1bb5ac94b30c74638245f3104033e2d973273980cc964884212ee60b",
+    "source_proof_sha256": "a9c4fcc877dae3603051415fc4b531ce0dc9f3093d8809a0e77235390b8bd2d7",
+    "external_watchdog_seconds": 20,
+    "execution_count": 1,
+    "started_utc": "2026-10-23T05:45:51.172661+00:00",
+    "controlled_environment": {
+      "LAMP_RELAY_PID_CONTROL_DIR": "/private/tmp/tests-relay-pid-ready-controls-20261023/runs/before",
+      "RUST_TEST_THREADS": "unset",
+      "RUST_BACKTRACE": "0"
+    },
+    "test_pid": 19537,
+    "test_process_group": 19537
+  },
+  "result": {
+    "variant": "before",
+    "test_exit_code": 101,
+    "timed_out": false,
+    "elapsed_seconds": 1.4019206971861422,
+    "finished_utc": "2026-10-23T05:45:52.655614+00:00",
+    "expected_control_outcome": true,
+    "classification": "controlled original empty-PID parse failure",
+    "fixture_processes": {
+      "runtime_pid": 20503,
+      "worker_pid": 20513
+    },
+    "markers": {
+      "opened": [
+        [
+          "20503",
+          "20513"
+        ]
+      ],
+      "waits": [],
+      "release_count": 0,
+      "closes": [
+        [
+          "true",
+          "0",
+          "false"
+        ]
+      ]
+    },
+    "cleanup_signals": [],
+    "timeout_runtime_ownership_inspection": null,
+    "post_exit_process_absence": {
+      "proven": true,
+      "deadline_seconds": 3,
+      "poll_period_seconds": 0.02,
+      "polls": 1,
+      "elapsed_seconds": 2.908799797296524e-05,
+      "transitions": [
+        {
+          "elapsed_seconds": 2.3031141608953476e-05,
+          "states": {
+            "runtime_pid": "absent",
+            "worker_pid": "absent"
+          }
+        }
+      ],
+      "final_states": {
+        "runtime_pid": "absent",
+        "worker_pid": "absent"
+      },
+      "signals_sent": false
+    },
+    "source_unchanged": true,
+    "binary_unchanged": true,
+    "stdout": {
+      "bytes": 314,
+      "sha256": "64585314d3dd178e570cf139929679ce30f639a5509e1be269b932bbf94e767b"
+    },
+    "stderr": {
+      "bytes": 417,
+      "sha256": "2efe2bd052865b49a61215f6e4ff35816d42a817eae8db0fe56948e0f7796e6d"
+    }
+  },
+  "streams": {
+    "stdout": {
+      "source_external_path": "/private/tmp/tests-relay-pid-ready-controls-20261023/runs/before/stdout",
+      "original_bytes": 314,
+      "original_sha256": "64585314d3dd178e570cf139929679ce30f639a5509e1be269b932bbf94e767b",
+      "encoding": "UTF-8; exact decoded bytes, no normalization",
+      "utf8": "\nrunning 1 test\ntest relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers ... FAILED\n\nfailures:\n\nfailures:\n    relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 237 filtered out; finished in 0.58s\n\n"
+    },
+    "stderr": {
+      "source_external_path": "/private/tmp/tests-relay-pid-ready-controls-20261023/runs/before/stderr",
+      "original_bytes": 417,
+      "original_sha256": "2efe2bd052865b49a61215f6e4ff35816d42a817eae8db0fe56948e0f7796e6d",
+      "encoding": "UTF-8; exact decoded bytes, no normalization",
+      "utf8": "RELAY_PID_CONTROL OPENED 20503 20513\nRELAY_PID_CONTROL CLOSE ready=true pid_bytes=0 released=false\n\nthread 'relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers' (707035924) panicked at crates/voice-eval/tests/it/relay_hardening.rs:166:54:\ncalled `Result::unwrap()` on an `Err` value: ParseIntError { kind: Empty }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+    }
+  },
+  "source_control_patch": "../patches/before-control.patch.json",
+  "execution_count": 1
+}

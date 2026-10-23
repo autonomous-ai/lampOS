@@ -1,0 +1,60 @@
+{
+  "base": "62b1120fc1af5462529f0c76089a322500e30929",
+  "case": "relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers",
+  "candidate_files": {
+    "lampOS/crates/voice-eval/tests/it/relay_hardening.rs": {
+      "base_sha256": "94cb3ff48b5973b1e9ba05dd144f452288a6b3d652980df10e0e76f8419d8e4a",
+      "candidate_sha256": "1e7c96209b10b70e2ffe13b60ee4b7402ba848b65f94096539b508ef3ec51c9c",
+      "base_bytes": 10853,
+      "candidate_bytes": 10942
+    },
+    "lampOS/docs/voice-eval.md": {
+      "base_sha256": "fc997a6203a710668cbf3d1e157f390ed53ec0384587eb56d91c2341329acbe9",
+      "candidate_sha256": "edc5696aead036e33f0736038bf2f87844849b999412ccd3035dfb9a992ef800",
+      "base_bytes": 63284,
+      "candidate_bytes": 63400
+    }
+  },
+  "original_assertion_count": 6,
+  "original_assertion_tail_sha256": "ec2e6df05a2238103459ef8bdef0fd6d6a8b7c4c24c1416a7d0d70a089c91b3c",
+  "entire_original_assertion_tail_byte_identical": true,
+  "candidate_all_code_outside_named_case_byte_identical": true,
+  "unchanged_deadlines_and_polling": "4-second assertion, 5-second closer watchdog with 5ms polling, 5-second session and allowance, 3-second/20ms worker-absence check; read_pid unchanged.",
+  "prepared_only": true,
+  "control_execution_count": 0,
+  "controls": {
+    "before": {
+      "unmodified_source_sha256": "94cb3ff48b5973b1e9ba05dd144f452288a6b3d652980df10e0e76f8419d8e4a",
+      "controlled_source_sha256": "4f31cb5a0154ac439bcf7a67c9bc13dbaa86a19d08455bdca2c128909d7a3088",
+      "patch_sha256": "7805e998a932e0d3c46e404846c49227fc184439277a13e39d8619e6e907581a",
+      "patch_apply_check_exit": 0,
+      "original_assertion_tail_sha256": "ec2e6df05a2238103459ef8bdef0fd6d6a8b7c4c24c1416a7d0d70a089c91b3c",
+      "expected": "original read_pid Empty parse panic, exit101; no WAIT or RELEASE"
+    },
+    "after": {
+      "unmodified_source_sha256": "1e7c96209b10b70e2ffe13b60ee4b7402ba848b65f94096539b508ef3ec51c9c",
+      "controlled_source_sha256": "53f6db87ad48f47124558557f70d4060ef3181454fb8e219b3eb133e38ab4cd4",
+      "patch_sha256": "94ab8b96d80954faf62d7d79642655bc53bcaf84164d79a8efc6792974e07740",
+      "patch_apply_check_exit": 0,
+      "original_assertion_tail_sha256": "ec2e6df05a2238103459ef8bdef0fd6d6a8b7c4c24c1416a7d0d70a089c91b3c",
+      "expected": "all original assertions pass, exit0; WAIT then RELEASE then CLOSE with nonempty PID"
+    }
+  },
+  "candidate_patch_sha256": "a23a90b36eebedca2f51a665b22d3ade371511bcd959e610c1c83d6300f803fd",
+  "runner_sha256": "d2b5a33d1bb5ac94b30c74638245f3104033e2d973273980cc964884212ee60b",
+  "control_external_watchdog_seconds": 20,
+  "control_fifo_wait_deadline": "Original closer deadline, not a new allowance",
+  "controlled_run_source_mode": "Already-compiled binaries from isolated before/after worktrees; no source mutation by the control runner",
+  "source_freeze_verified": true,
+  "previous_unexecuted_runner_sha256": "0f5ac170bc59d5036af3caa702446b9dbff3d1b317d3dc9c9a675edbb757ad4b",
+  "control_post_exit_absence": {
+    "both_recorded_pids": true,
+    "watchdog_seconds": 3,
+    "poll_period_seconds": 0.02,
+    "requires_ESRCH_for_both": true,
+    "signals_on_normal_exit": false,
+    "unproven_cleanup_invalidates_control": true
+  },
+  "control_timeout_ownership": "One targeted ps parent-PID inspection; runtime must still be a direct child of the live owned test Popen and leader of its recorded group, or signaling is skipped and ownership remains unknown.",
+  "control_test_threads_override": null
+}

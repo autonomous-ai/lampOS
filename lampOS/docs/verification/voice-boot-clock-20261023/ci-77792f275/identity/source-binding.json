@@ -1,0 +1,89 @@
+{
+  "pr": 3190,
+  "authored_head": "77792f2753b4fb97f4a078897cdf52e1bbd24362",
+  "authored_head_parent": "62b1120fc1af5462529f0c76089a322500e30929",
+  "authored_head_tree": "24f40f1f8f9c36a935922b5caab5f965e14ff49e",
+  "checked_merge": "6f79eb02a934a5c885a8e5ff63aa1a31eaa072ee",
+  "checked_merge_parents": [
+    "be698e83a7956ff048261918fa274d964c1dff27",
+    "77792f2753b4fb97f4a078897cdf52e1bbd24362"
+  ],
+  "checked_merge_tree": "17d080487cd5f88f4911b3be4413ddb05f1f156b",
+  "all_eight_authored_files_and_four_configs_match": true,
+  "files": [
+    {
+      "path": ".github/workflows/lampos-arm64.yml",
+      "checked_merge_sha256": "ad1a4cd650db5f2a721b510263ff5c1697b09f872646395fb4cab6173f8757f9",
+      "authored_head_sha256": "ad1a4cd650db5f2a721b510263ff5c1697b09f872646395fb4cab6173f8757f9",
+      "equal": true
+    },
+    {
+      "path": ".github/workflows/lampos-clippy.yml",
+      "checked_merge_sha256": "2b41648cade7109e94995fd076f638166345867600e38e5e9aa9438a9b18c9ac",
+      "authored_head_sha256": "2b41648cade7109e94995fd076f638166345867600e38e5e9aa9438a9b18c9ac",
+      "equal": true
+    },
+    {
+      "path": ".github/scripts/lampos-pr-crates.py",
+      "checked_merge_sha256": "c89f3cc802c1f385793f7a800142ae235ef7b09c00e38f1661427eecffcf2671",
+      "authored_head_sha256": "c89f3cc802c1f385793f7a800142ae235ef7b09c00e38f1661427eecffcf2671",
+      "equal": true
+    },
+    {
+      "path": "lampOS/.config/nextest.toml",
+      "checked_merge_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+      "authored_head_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/second.rs",
+      "checked_merge_sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+      "authored_head_sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "checked_merge_sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+      "authored_head_sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "checked_merge_sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "authored_head_sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "checked_merge_sha256": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+      "authored_head_sha256": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/scenario_clock.rs",
+      "checked_merge_sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "authored_head_sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "checked_merge_sha256": "46e713ebe324dacaec852709e0fac1847da832b64e619795da1125ad0f4d4a04",
+      "authored_head_sha256": "46e713ebe324dacaec852709e0fac1847da832b64e619795da1125ad0f4d4a04",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/stop_words.rs",
+      "checked_merge_sha256": "5524521c56061be6af4b8ee95d52ecc3b9b1d3c3ee4a2344db4fa75dbf4f9a0f",
+      "authored_head_sha256": "5524521c56061be6af4b8ee95d52ecc3b9b1d3c3ee4a2344db4fa75dbf4f9a0f",
+      "equal": true
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "checked_merge_sha256": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c",
+      "authored_head_sha256": "c2ba285050e9e6f707908d3e1dc412efbddc04937b32cb76db98813bfaa15c3c",
+      "equal": true
+    }
+  ],
+  "scope": "Both jobs check the synthetic merge on be698e83a, while own head777 has parent62b1120fc. The eight authored complete files and four captured CI configurations are byte-identical to head777; the whole merge tree is different. No local exact-whole-tree qualification is implied.",
+  "whole_merge_tree_equals_authored_head": false
+}

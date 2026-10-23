@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "both_workflow_and_actual_job_terminal": true,
+  "actual_head": "77792f2753b4fb97f4a078897cdf52e1bbd24362",
+  "same_checked_merge": "6f79eb02a934a5c885a8e5ff63aa1a31eaa072ee",
+  "authored_files_equal": 8,
+  "CI_configuration_files_equal": 4,
+  "complete_raw_logs_lossless": 2,
+  "unique_terminal_ordinals": 7173,
+  "summary_and_status_counts_match": true,
+  "affected_scope_expected": 86,
+  "affected_scope_observed": 86,
+  "loading_child_case_separate": true,
+  "source_census_is_not_full_execution_census": true,
+  "separate_harnesses_not_added": true,
+  "all_comments_paginated_and_review_threads_checked": true,
+  "JSON_links_raw_hashes_whitespace": "passed",
+  "attribution_objects_omitted": true,
+  "raw_log_redactions": 0,
+  "readiness_not_advanced": true
+}

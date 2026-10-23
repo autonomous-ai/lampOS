@@ -1,0 +1,494 @@
+{
+  "raw_log_sha256": "99f7b34674ce3224981c7b80d70393c8a344fb5e9abd327243c3b6e5dec88b54",
+  "boundary": {
+    "first_raw_line": 8299,
+    "last_raw_line": 8608
+  },
+  "doctest_targets": [
+    {
+      "target": "lamp_actions",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8310
+    },
+    {
+      "target": "lamp_addons",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8316
+    },
+    {
+      "target": "lamp_air",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8322
+    },
+    {
+      "target": "lamp_audio",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8328
+    },
+    {
+      "target": "lamp_body",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8334
+    },
+    {
+      "target": "lamp_bus",
+      "result": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8342
+    },
+    {
+      "target": "lamp_camera",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8349
+    },
+    {
+      "target": "lamp_cloud",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8355
+    },
+    {
+      "target": "lamp_controls",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8361
+    },
+    {
+      "target": "lamp_ears",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8367
+    },
+    {
+      "target": "lamp_environment",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8373
+    },
+    {
+      "target": "lamp_expression",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8379
+    },
+    {
+      "target": "lamp_eyes",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8385
+    },
+    {
+      "target": "lamp_gemini",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8391
+    },
+    {
+      "target": "lamp_health",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8397
+    },
+    {
+      "target": "lamp_ipc",
+      "result": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8404
+    },
+    {
+      "target": "lamp_keeper",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8411
+    },
+    {
+      "target": "lamp_lean",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8417
+    },
+    {
+      "target": "lamp_local_time",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8423
+    },
+    {
+      "target": "lamp_memory",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8429
+    },
+    {
+      "target": "lamp_mood",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8435
+    },
+    {
+      "target": "lamp_msgs",
+      "result": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8442
+    },
+    {
+      "target": "lamp_name",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8449
+    },
+    {
+      "target": "lamp_near_call",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8455
+    },
+    {
+      "target": "lamp_observer",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8461
+    },
+    {
+      "target": "lamp_peek",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8467
+    },
+    {
+      "target": "lamp_policy",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8473
+    },
+    {
+      "target": "lamp_records",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8479
+    },
+    {
+      "target": "lamp_ring",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8485
+    },
+    {
+      "target": "lamp_same_voice",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8491
+    },
+    {
+      "target": "lamp_schedule",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8497
+    },
+    {
+      "target": "lamp_selftest",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8503
+    },
+    {
+      "target": "lamp_settings",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8509
+    },
+    {
+      "target": "lamp_setup",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8515
+    },
+    {
+      "target": "lamp_skills",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8521
+    },
+    {
+      "target": "lamp_sound_fixtures",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8527
+    },
+    {
+      "target": "lamp_station",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8533
+    },
+    {
+      "target": "lamp_surround",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8539
+    },
+    {
+      "target": "lamp_tasks",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8545
+    },
+    {
+      "target": "lamp_turn_end",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8551
+    },
+    {
+      "target": "lamp_turn_end_wire",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8557
+    },
+    {
+      "target": "lamp_turn_owner",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8563
+    },
+    {
+      "target": "lamp_update",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8569
+    },
+    {
+      "target": "lamp_voice",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8575
+    },
+    {
+      "target": "lamp_voice_eval",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8581
+    },
+    {
+      "target": "lamp_voice_processes",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_line": 8587
+    }
+  ],
+  "doctest_totals": {
+    "targets": 46,
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0
+  },
+  "process_cases": [
+    {
+      "name": "an_idle_worker_stays_ready_across_a_long_quiet",
+      "status": "ok",
+      "milliseconds": 2009,
+      "raw_line": 8595
+    },
+    {
+      "name": "a_worker_reporting_another_model_is_refused_before_any_request",
+      "status": "ok",
+      "milliseconds": 2,
+      "raw_line": 8596
+    },
+    {
+      "name": "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way",
+      "status": "ok",
+      "milliseconds": 4,
+      "raw_line": 8597
+    },
+    {
+      "name": "verdict_carries_identity_and_one_request_at_a_time",
+      "status": "ok",
+      "milliseconds": 56,
+      "raw_line": 8598
+    },
+    {
+      "name": "missing_model_is_final_and_never_restarted",
+      "status": "ok",
+      "milliseconds": 162,
+      "raw_line": 8599
+    },
+    {
+      "name": "missing_executable_fails_at_once",
+      "status": "ok",
+      "milliseconds": 2,
+      "raw_line": 8600
+    },
+    {
+      "name": "startup_failures_are_final",
+      "status": "ok",
+      "milliseconds": 409,
+      "raw_line": 8601
+    },
+    {
+      "name": "serving_failures_are_replaced_within_budget",
+      "status": "ok",
+      "milliseconds": 514,
+      "raw_line": 8602
+    },
+    {
+      "name": "protocol_violations_are_replaced",
+      "status": "ok",
+      "milliseconds": 177,
+      "raw_line": 8603
+    },
+    {
+      "name": "cancelled_answers_are_never_delivered",
+      "status": "ok",
+      "milliseconds": 155,
+      "raw_line": 8604
+    },
+    {
+      "name": "close_during_inference_never_waits",
+      "status": "ok",
+      "milliseconds": 233,
+      "raw_line": 8605
+    },
+    {
+      "name": "sustained_requests_stay_bounded",
+      "status": "ok",
+      "milliseconds": 693,
+      "raw_line": 8607
+    }
+  ],
+  "process_totals": {
+    "ok": 12
+  },
+  "relay_signals": [
+    {
+      "raw_line": 8591,
+      "text": "2026-10-23T05:54:23.7509730Z relay_signals: ok"
+    }
+  ],
+  "relay_numeric_count": null,
+  "offline_publication_checks": [
+    {
+      "script": "lampos-publish-test.py",
+      "count": 35,
+      "result": "OK",
+      "first_raw_line": 294,
+      "last_raw_line": 337,
+      "summary": "2026-10-23T05:34:52.5750354Z Ran 35 tests in 0.238s"
+    },
+    {
+      "script": "lampos-publish-artifact-test.py",
+      "count": 12,
+      "result": "OK",
+      "first_raw_line": 387,
+      "last_raw_line": 407,
+      "summary": "2026-10-23T05:35:00.9497467Z Ran 12 tests in 1.212s"
+    },
+    {
+      "script": "lampos-publish-cli-test.py",
+      "count": 7,
+      "result": "OK",
+      "first_raw_line": 635,
+      "last_raw_line": 650,
+      "summary": "2026-10-23T05:40:01.1438756Z Ran 7 tests in 0.412s"
+    }
+  ],
+  "counting_rule": "Separate commands only; captured summaries reprinted by nextest before this step are not extra executions. No harness count is added to nextest totals."
+}

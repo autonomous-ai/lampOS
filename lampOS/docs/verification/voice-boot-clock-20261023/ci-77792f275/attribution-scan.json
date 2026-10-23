@@ -1,0 +1,11 @@
+{
+  "captured_tokens_checked": 3,
+  "token_sha256": [
+    "cdf02b27b16e175786c14aaa8b36c01666d0abc7361a5d5bb5fd92fa2b0b0955",
+    "3684d6e399bedce8744344af0523163448bf0f8beb983f801009949710cfa55b",
+    "34f0bc2f01b52c83923f28c18f8de42ad6f771e0b8a0e3638e5489e81f8e53e4"
+  ],
+  "matches": [],
+  "raw_log_redactions": 0,
+  "limitation": "Only captured human attribution tokens are checked, not every possible personal name in arbitrary test content."
+}

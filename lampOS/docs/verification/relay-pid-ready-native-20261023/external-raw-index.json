@@ -1,0 +1,154 @@
+{
+  "raw_streams": [
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/rustc-identity.stdout.txt",
+      "bytes": 191,
+      "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+      "publication": "rustc-identity/stdout",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/rustc-identity.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publication": "rustc-identity/stderr",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/before/before-compile.stdout.txt",
+      "bytes": 276703,
+      "sha256": "dcc7abc8f023f9fae622b557d7deb47b6b70562776e11db0a9d03fc40208671f",
+      "publication": "before-compile/stdout",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/before/before-compile.stderr.txt",
+      "bytes": 3440,
+      "sha256": "b50a90a67c86bbf43a520efa323fbb49c6deca8b6eb58909456760e069aad2d2",
+      "publication": "before-compile/stderr",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/before/before-control.stdout.txt",
+      "bytes": 1130,
+      "sha256": "51bc5cbca12826b8cefe4d5a13d3e5f2915ae73bee195409a7e329ef10ccad34",
+      "publication": "before-control/stdout",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/before/before-control.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publication": "before-control/stderr",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/after/after-compile.stdout.txt",
+      "bytes": 276603,
+      "sha256": "091b8765836a5b0b5387cb0d781d05ec3748902ad143b7f8fdc8dc3552ebd8cc",
+      "publication": "after-compile/stdout",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/after/after-compile.stderr.txt",
+      "bytes": 3410,
+      "sha256": "7b1a11131998885e7093bf396d028a7a58ffa1df5835e39b6523240c54dbc29a",
+      "publication": "after-compile/stderr",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/after/after-control.stdout.txt",
+      "bytes": 1146,
+      "sha256": "0bbdea004536acae6f7976315cbcae0335a2248f5cee337593de7c94b50a8020",
+      "publication": "after-control/stdout",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/after/after-control.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publication": "after-control/stderr",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/candidate/full-voice-eval/full-voice-eval.stdout.txt",
+      "bytes": 342800,
+      "sha256": "3551625e60e48a55fdddb7bf4d2aa3d3336305aa146d5c27383734034430cf25",
+      "publication": "full-voice-eval/stdout",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/candidate/full-voice-eval/full-voice-eval.stderr.txt",
+      "bytes": 3654,
+      "sha256": "58bca20171427c957107aa56871aeeac33081e67274e44e1fd5b87a75b472682",
+      "publication": "full-voice-eval/stderr",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/candidate/fmt/fmt.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publication": "fmt/stdout",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/candidate/fmt/fmt.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publication": "fmt/stderr",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/candidate/clippy/clippy.stdout.txt",
+      "bytes": 264510,
+      "sha256": "799e136f2a09220b516534727834deac1b443d78595925f8ddddcf57b8901ab5",
+      "publication": "clippy/stdout",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/candidate/clippy/clippy.stderr.txt",
+      "bytes": 3289,
+      "sha256": "ab57dbe85b235a911d152b5a242a95662e11a5e3dfaa30a26349f23353f5ff8f",
+      "publication": "clippy/stderr",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/candidate/workspace-build/workspace-build.stdout.txt",
+      "bytes": 363464,
+      "sha256": "4aee16067d720e13f5312157673710d2a31f8f4c4c992356cfe38849b52a59b5",
+      "publication": "workspace-build/stdout",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/candidate/workspace-build/workspace-build.stderr.txt",
+      "bytes": 5046,
+      "sha256": "36c4171604804f211b343c348dce611902fbd0fbf19a0feced582079a27f5386",
+      "publication": "workspace-build/stderr",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/candidate/diff-check.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publication": "diff-check/stdout",
+      "complete_raw_preserved_externally": true
+    },
+    {
+      "path": "/private/tmp/tests-relay-pid-ready-controls-20261023/execution/run-20261023T054308.281095Z/candidate/diff-check.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publication": "diff-check/stderr",
+      "complete_raw_preserved_externally": true
+    }
+  ],
+  "complete_source_maps": "execution/*-source-map.json (hashes in source-and-restoration.json)",
+  "saved_control_binaries": "execution/run-20261023T054308.281095Z/{before,after}/it-control; external only",
+  "omitted_publication_artifacts": [
+    "Python orchestration",
+    "complete Cargo JSON stdout",
+    "binaries",
+    "whole source exports",
+    "complete tracked-file maps"
+  ],
+  "availability_limit": "Complete originals are retained at local external evidence paths. Their presence is not a claim that those local paths are available to remote readers; all controlled failure bytes and retained test result bytes are included here."
+}
