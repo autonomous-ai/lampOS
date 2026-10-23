@@ -226,7 +226,11 @@ gives the app one narrow call for it and no read access.
   every rule in their `r-` scope in **one SQLite transaction**, the same
   erase as `forget_all` of each: entries, their search rows, links,
   follow-ups, jobs, session notes (emptied and invalidated), and the
-  skipped count; a set-aside newer database goes too (#2067). The person's
+  skipped count; a set-aside newer database goes too (#2067). In the same
+  transaction their id comes off every room line they were seen saying
+  (`speakers`, `LAMP_MEMORY_ROOM_SPEAKER`), so no one later remembered by
+  the same name takes those lines over; the lines stay, as they did before
+  that table (reviewer-three's P2 on #3213). The person's
   row keeps its id high-water mark, so a stale reference never names a new
   entry. The legacy store removes the person's directory, then the `r-`
   one's; asking again finishes a removal a failure stopped half way. Such

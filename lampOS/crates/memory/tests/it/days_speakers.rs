@@ -598,3 +598,31 @@ fn the_build_before_opens_a_store_with_speakers_and_keeps_what_it_held() {
     let (line, _) = ask(&mut store, json!({"op":"forget_said","speaker":MAI}), NOW);
     assert_eq!(line, json!({"ok":true,"removed":1}));
 }
+
+/// Reviewer-three's P2 on #3213: the app's removal of a person
+/// (`forget_person`) also takes their id off every room line they were seen
+/// saying, so no one later remembered by the same name takes those lines
+/// over. The lines themselves stay, as before the speakers table, and so
+/// does anyone else's id.
+#[test]
+fn removing_a_person_takes_their_id_off_the_rooms_lines() {
+    let scratch = Scratch::new("forget-person-speakers");
+    let mut store = scratch.open(30, NOW);
+    let hers = id(
+        &mut store,
+        json!({"op":"append","at_unix_ms":NOW,"heard":"The plant needs water on Fridays","speaker":MAI}),
+    );
+    let his = id(
+        &mut store,
+        json!({"op":"append","at_unix_ms":NOW,"heard":"The bins go out on Monday","speaker":LAN}),
+    );
+    assert_eq!(
+        scratch.speakers(),
+        (vec![room(hers, MAI), room(his, LAN)], 0)
+    );
+    let (line, _) = ask(&mut store, json!({"op":"forget_person","person":MAI}), NOW);
+    assert_eq!(line["ok"], true, "{line}");
+    assert_eq!(scratch.speakers(), (vec![room(his, LAN)], 0));
+    assert!(exists(&store, "everyone", hers));
+    assert!(exists(&store, "everyone", his));
+}
