@@ -1,5 +1,21 @@
 # Tests work log
 
+## 2026-10-23 23:46 +0700 — Skills early-refusal repair ready
+
+Ready for lamp-voice: yes (#3277).
+
+Both assigned readers posted READ-OK on 1806a691d. The PR is now non-draft,
+with local Skills 513/0/1, formatting and strict Clippy green, and native
+ARM64 7,266 total passes including one LEAK, zero failures, 33 skipped and
+none selected-unrun. All evidence remains linked in the PR. A fresh fetch
+confirmed be16c3327 still equals the authored parent before readiness.
+First owns merge and rechecks the literal latest base at that point; Fourth
+can then carry Common onto the landed repair and obtain its fresh gate.
+
+The accepted eight-observation privacy/search diagnostic is next. Its runner
+is being prepared with exclusive local target allocation; no diagnostic test
+has run yet. Other PR holds and all earlier failed observations remain.
+
 ## 2026-10-23 23:42 +0700 — Skills native CI complete
 
 Ready for lamp-voice: no; awaiting reviewer-two's final evidence disposition.
