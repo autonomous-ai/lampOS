@@ -8,7 +8,7 @@
 //! my face" in one private file on the lamp, and nobody else's: until
 //! someone asks, nobody is recognised. No picture is kept, and no print
 //! leaves the lamp.
-use crate::picture::{HEIGHT, Picture, WIDTH};
+use crate::picture::{Frame, HEIGHT, Picture, WIDTH};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -218,12 +218,42 @@ fn similarity(from: &[(f32, f32); 5], to: &[(f32, f32); 5]) -> Option<(f32, f32,
 /// planes, each value 0 to 255, as the recogniser takes them. Outside the
 /// frame is black. `None` for marks that are all one point.
 pub fn align(picture: &Picture, marks: &[(f32, f32); 5]) -> Option<Vec<f32>> {
+    let plane = WIDTH * HEIGHT;
+    // The picture's planes are blue, green, red; the recogniser's are red,
+    // green, blue.
+    align_with(marks, picture.filled, |colour, u, v| {
+        picture.planes[(2 - colour) * plane + v * WIDTH + u]
+    })
+}
+
+/// As [`align`], but cut from the frame at its own size (`LAMP_FACE_FULL_CROP`):
+/// the marks, found in the shrunk picture, are carried back to the frame, and
+/// only the 112 by 112 face is read from it, so a face 30 pixels tall in the
+/// picture is cut from the 120 the camera saw, not stretched from 30.
+pub fn align_full(frame: &Frame, marks: &[(f32, f32); 5]) -> Option<Vec<f32>> {
+    if frame.width == 0 || frame.height == 0 || frame.rgb.len() != frame.width * frame.height * 3 {
+        return None;
+    }
+    // A picture pixel's centre, in the frame's pixels.
+    let back = |p: f32| (p + 0.5) / frame.scale - 0.5;
+    let marks = marks.map(|(x, y)| (back(x), back(y)));
+    align_with(&marks, (frame.width, frame.height), |colour, u, v| {
+        f32::from(frame.rgb[(v * frame.width + u) * 3 + colour])
+    })
+}
+
+/// The 112 by 112 face from a frame `filled` across and down, read pixel by
+/// pixel through `at(colour, x, y)`, colour 0 red, 1 green, 2 blue.
+fn align_with(
+    marks: &[(f32, f32); 5],
+    filled: (usize, usize),
+    at: impl Fn(usize, usize, usize) -> f32,
+) -> Option<Vec<f32>> {
     let (a, b, x, y) = similarity(marks, &REFERENCE)?;
     // Back from the recogniser's picture to the frame.
     let scale = a * a + b * b;
     let (ia, ib) = (a / scale, -b / scale);
-    let (filled_x, filled_y) = (picture.filled.0 as f32, picture.filled.1 as f32);
-    let plane = WIDTH * HEIGHT;
+    let (filled_x, filled_y) = (filled.0 as f32, filled.1 as f32);
     let mut out = vec![0.0f32; 3 * SIDE * SIDE];
     for row in 0..SIDE {
         for column in 0..SIDE {
@@ -234,20 +264,14 @@ pub fn align(picture: &Picture, marks: &[(f32, f32); 5]) -> Option<Vec<f32>> {
                 continue;
             }
             let (u0, v0) = (u.floor() as usize, v.floor() as usize);
-            let (u1, v1) = (
-                (u0 + 1).min(picture.filled.0 - 1),
-                (v0 + 1).min(picture.filled.1 - 1),
-            );
+            let (u1, v1) = ((u0 + 1).min(filled.0 - 1), (v0 + 1).min(filled.1 - 1));
             let (du, dv) = (u - u0 as f32, v - v0 as f32);
-            let at = |c: usize, uu: usize, vv: usize| picture.planes[c * plane + vv * WIDTH + uu];
-            // The picture's planes are blue, green, red; the recogniser's are
-            // red, green, blue.
-            for (to, from) in [(0usize, 2usize), (1, 1), (2, 0)] {
-                let value = at(from, u0, v0) * (1.0 - du) * (1.0 - dv)
-                    + at(from, u1, v0) * du * (1.0 - dv)
-                    + at(from, u0, v1) * (1.0 - du) * dv
-                    + at(from, u1, v1) * du * dv;
-                out[to * SIDE * SIDE + row * SIDE + column] = value;
+            for colour in 0..3 {
+                let value = at(colour, u0, v0) * (1.0 - du) * (1.0 - dv)
+                    + at(colour, u1, v0) * du * (1.0 - dv)
+                    + at(colour, u0, v1) * (1.0 - du) * dv
+                    + at(colour, u1, v1) * du * dv;
+                out[colour * SIDE * SIDE + row * SIDE + column] = value;
             }
         }
     }
@@ -873,6 +897,17 @@ impl People {
         self.save(&next)?;
         self.people = next;
         Ok(true)
+    }
+
+    /// How alike this print is to the nearest of anyone's kept prints,
+    /// whether or not it reaches [`SAME_PERSON`]; `None` with nobody kept. For the
+    /// journal's line on each check: a number, never a name.
+    pub fn best_likeness(&self, print: &[f32]) -> Option<f32> {
+        self.people
+            .iter()
+            .flat_map(|person| &person.prints)
+            .map(|kept| likeness(kept, print))
+            .reduce(f32::max)
     }
 
     /// Whose print this is, and how alike: the best match at or over
@@ -1615,6 +1650,62 @@ pub const NOBODY_FOR_US: u64 = 1_500_000;
 /// tenth of a second or more on the lamp.
 pub const RECOGNISE_EVERY: Duration = Duration::from_secs(2);
 
+/// Off unless `LAMP_FACE_FULL_CROP=on` on lamp-eyes: faces are recognised
+/// and remembered from the frame at its own size ([`align_full`]), and the
+/// known person is held through a short miss ([`Held`]).
+pub const FULL_CROP_ENVIRONMENT: &str = "LAMP_FACE_FULL_CROP";
+
+pub fn full_crop_on() -> bool {
+    std::env::var(FULL_CROP_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// With [`FULL_CROP_ENVIRONMENT`] on, a known person stays known through
+/// checks that find nobody for this long after they last matched: one
+/// missed check (they come every [`RECOGNISE_EVERY`]) keeps them, a second
+/// lets them go. On lamp-4ace the same face scored either side of
+/// [`SAME_PERSON`] look to look, and each miss took their name away.
+pub const KNOWN_HOLD: Duration = Duration::from_secs(4);
+
+/// When the known person last matched, to hold them through a short miss.
+/// Off, nobody is ever held: each miss lets go, as before.
+#[derive(Debug)]
+pub struct Held {
+    on: bool,
+    matched_at: Option<Instant>,
+}
+
+impl Held {
+    pub fn new(on: bool) -> Self {
+        Self {
+            on,
+            matched_at: None,
+        }
+    }
+
+    pub fn on(&self) -> bool {
+        self.on
+    }
+
+    /// A check matched someone.
+    pub fn matched(&mut self, now: Instant) {
+        self.matched_at = Some(now);
+    }
+
+    /// Whether a check that found nobody keeps the one known: only within
+    /// [`KNOWN_HOLD`] of their last match.
+    pub fn keeps(&self, now: Instant) -> bool {
+        self.on
+            && self
+                .matched_at
+                .is_some_and(|at| now.saturating_duration_since(at) < KNOWN_HOLD)
+    }
+
+    /// Let go at once: the camera closed, or the check let them go.
+    pub fn let_go(&mut self) {
+        self.matched_at = None;
+    }
+}
+
 /// Whether this look asks whose the near face is: at every look while
 /// someone is being remembered, else once `RECOGNISE_EVERY` has passed.
 pub fn recognise_due(looked_for: Option<Instant>, taking: bool, now: Instant) -> bool {
@@ -2243,6 +2334,106 @@ mod tests {
         assert!(a.abs() < 1e-4 && (b + 1.0).abs() < 1e-4, "{a} {b}");
         // Marks that are one point are no face.
         assert!(align(&gradient(), &[(5.0, 5.0); 5]).is_none());
+    }
+
+    /// A 1280 by 960 frame, as `--full-look 1280x960` gives, with its
+    /// picture, as the look decodes them.
+    fn full_frame(rgb_at: impl Fn(usize, usize) -> [u8; 3]) -> (Picture, Frame) {
+        let (width, height) = (1_280, 960);
+        let mut rgb = Vec::with_capacity(width * height * 3);
+        for y in 0..height {
+            for x in 0..width {
+                rgb.extend(rgb_at(x, y));
+            }
+        }
+        let picture = Picture::from_rgb(&rgb, width, height).unwrap();
+        let scale = picture.filled.0 as f32 / width as f32;
+        (
+            picture,
+            Frame {
+                rgb,
+                width,
+                height,
+                scale,
+            },
+        )
+    }
+
+    #[test]
+    fn a_full_crop_reads_the_frame_where_the_shrunk_picture_has_the_face() {
+        // Red rises across the frame and green down it, one step a 6 pixels.
+        let (picture, frame) = full_frame(|x, y| [(x / 6) as u8, (y / 6) as u8, 0]);
+        assert_eq!(picture.filled, (320, 240));
+        // A face 28 pixels across in the picture: 112 in the frame.
+        let marks = REFERENCE.map(|(x, y)| (x / 4.0 + 100.0, y / 4.0 + 80.0));
+        let aligned = align_full(&frame, &marks).unwrap();
+        for (row, column) in [(0usize, 0usize), (30, 70), (111, 111)] {
+            let at = row * SIDE + column;
+            // A picture pixel's centre, carried back to the frame.
+            let (x, y) = (column as f32 + 401.5, row as f32 + 321.5);
+            assert!((aligned[at] - x / 6.0).abs() < 1.0, "red at {row},{column}");
+            assert!((aligned[SIDE * SIDE + at] - y / 6.0).abs() < 1.0, "green");
+            assert_eq!(aligned[2 * SIDE * SIDE + at], 0.0, "blue");
+        }
+        // Not a frame: no face.
+        let broken = Frame {
+            rgb: vec![0; 10],
+            ..frame
+        };
+        assert!(align_full(&broken, &marks).is_none());
+    }
+
+    #[test]
+    fn a_full_crop_keeps_the_detail_the_shrunk_picture_drops() {
+        // Stripes one pixel wide: every fourth column, which is all the
+        // shrunk picture keeps, is the same, so its face is flat.
+        let (picture, frame) = full_frame(|x, _| [if x % 2 == 0 { 0 } else { 255 }; 3]);
+        // Placed so the face's pixels fall on the frame's, not between two.
+        let marks = REFERENCE.map(|(x, y)| (x / 4.0 + 100.125, y / 4.0 + 80.0));
+        let spread = |aligned: Vec<f32>| {
+            let red = &aligned[..SIDE * SIDE];
+            red.iter().copied().fold(f32::MIN, f32::max)
+                - red.iter().copied().fold(f32::MAX, f32::min)
+        };
+        assert_eq!(spread(align(&picture, &marks).unwrap()), 0.0);
+        assert!(spread(align_full(&frame, &marks).unwrap()) > 200.0);
+    }
+
+    #[test]
+    fn a_held_person_stays_through_one_miss_and_goes_after_the_hold() {
+        let start = Instant::now();
+        let mut held = Held::new(true);
+        // Nobody matched yet: nobody to hold.
+        assert!(!held.keeps(start));
+        held.matched(start);
+        // The next check, two seconds on, finds nobody: still them.
+        assert!(held.keeps(start + RECOGNISE_EVERY));
+        // The check after that finds nobody: let go.
+        assert!(!held.keeps(start + 2 * RECOGNISE_EVERY));
+        assert!(!held.keeps(start + KNOWN_HOLD));
+        // A match renews the hold.
+        held.matched(start + 2 * RECOGNISE_EVERY);
+        assert!(held.keeps(start + 3 * RECOGNISE_EVERY));
+    }
+
+    #[test]
+    fn a_camera_closed_lets_a_held_person_go_at_once() {
+        let start = Instant::now();
+        let mut held = Held::new(true);
+        held.matched(start);
+        held.let_go();
+        assert!(!held.keeps(start));
+        assert!(!held.keeps(start + Duration::from_millis(1)));
+    }
+
+    #[test]
+    fn without_the_switch_nobody_is_held() {
+        let start = Instant::now();
+        let mut held = Held::new(false);
+        held.matched(start);
+        assert!(!held.on());
+        assert!(!held.keeps(start));
+        assert!(!held.keeps(start + RECOGNISE_EVERY));
     }
 
     fn print(seed: f32) -> Vec<f32> {
@@ -3138,6 +3329,7 @@ mod tests {
         let path = file("forget");
         let mut people = People::open(path.clone()).unwrap();
         assert_eq!(people.who(&print(0.3)), None);
+        assert_eq!(people.best_likeness(&print(0.3)), None);
         let kept = people
             .remember("  A  ", vec![print(0.3), print(0.31)], 1)
             .unwrap();
@@ -3145,6 +3337,10 @@ mod tests {
         let (name, how) = people.who(&print(0.3)).unwrap();
         assert_eq!(name, "A");
         assert!(how > 0.99);
+        // The journal's number: the best likeness, matched or not.
+        assert_eq!(people.best_likeness(&print(0.3)), Some(how));
+        let far = people.best_likeness(&print(1.7)).unwrap();
+        assert!(far < SAME_PERSON, "{far}");
         // Someone else is nobody.
         assert_eq!(people.who(&print(1.7)), None);
         // Kept across a restart, private.

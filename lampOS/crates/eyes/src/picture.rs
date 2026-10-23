@@ -32,9 +32,7 @@ impl Picture {
         {
             return Err("a frame of no size, too large, or not three bytes a pixel");
         }
-        let scale = (WIDTH as f32 / width as f32)
-            .min(HEIGHT as f32 / height as f32)
-            .min(1.0);
+        let scale = fit_scale(width, height);
         let filled = (
             ((width as f32 * scale) as usize).clamp(1, WIDTH),
             ((height as f32 * scale) as usize).clamp(1, HEIGHT),
@@ -55,6 +53,13 @@ impl Picture {
 
     /// From one JPEG, as the camera gives them.
     pub fn from_jpeg(bytes: &[u8]) -> Result<Self, String> {
+        Self::from_jpeg_full(bytes).map(|(picture, _)| picture)
+    }
+
+    /// As [`Picture::from_jpeg`], with the decoded frame kept at its own
+    /// size beside it: the decode's own buffer, held for the look, never
+    /// copied or written anywhere (`LAMP_FACE_FULL_CROP`, `who::align_full`).
+    pub fn from_jpeg_full(bytes: &[u8]) -> Result<(Self, Frame), String> {
         let options = DecoderOptions::default()
             .set_max_width(MAX_SIDE)
             .set_max_height(MAX_SIDE)
@@ -64,8 +69,31 @@ impl Picture {
             .decode()
             .map_err(|error| format!("jpeg: {error:?}"))?;
         let (width, height) = decoder.dimensions().ok_or("a jpeg without a size")?;
-        Self::from_rgb(&rgb, width, height).map_err(Into::into)
+        let picture = Self::from_rgb(&rgb, width, height)?;
+        let frame = Frame {
+            rgb,
+            width,
+            height,
+            scale: fit_scale(width, height),
+        };
+        Ok((picture, frame))
     }
+}
+
+/// The decoded frame at its own size: red, green and blue bytes, row by row,
+/// and the scale its [`Picture`] was shrunk by.
+pub struct Frame {
+    pub rgb: Vec<u8>,
+    pub width: usize,
+    pub height: usize,
+    pub scale: f32,
+}
+
+/// How much a frame this size is shrunk to fit, never enlarged.
+fn fit_scale(width: usize, height: usize) -> f32 {
+    (WIDTH as f32 / width as f32)
+        .min(HEIGHT as f32 / height as f32)
+        .min(1.0)
 }
 
 #[cfg(test)]
