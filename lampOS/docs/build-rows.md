@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-23 17:06 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-23 18:58 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 92.5% over 70 rows. Quality 65.0% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
+**Build 92.3% over 70 rows. Quality 63.4% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -16,7 +16,7 @@ Written by the first builder from the team's review page at 2026-10-23 17:06 (+0
 | Speed: tool turns and comma pauses | 1.00 | #799 #782 | second, fourth |  |
 | Who is talking, and when not to answer | 1.00 | #753 #792 #800 | fourth, second | #800 behind switches |
 | Privacy switch closes both microphones | 1.00 | #795 | — |  |
-| Faces: remember, hello by name | 1.00 | #759 #775 | first, seventh | Untried with a real face |
+| Faces: remember, hello by name | 0.90 | #759 #775 | first, seventh | 23 Oct 18:5x, down from 1.0: the owner’s own try on lamp-4ace found two faults. |
 | Hand work to Claude Code or Codex, and its news | 1.00 | #751 #765 #798 #733 | seventh |  |
 | Backup voice when Gemini is down | 1.00 | #778 #754 | sixth | The relay chat it uses has been down since 02:29 |
 | Gives way to a hand; wakes after power | 1.00 | #780 #790 #702 #703 #701 | fifth | Arm-goal guard merged (#1192) |
@@ -43,7 +43,7 @@ Written by the first builder from the team's review page at 2026-10-23 17:06 (+0
 | A voice cheaper than Gemini Live, as fast and as good | 1.00 | #754 #1686 #1712 #1973 #2135 #2136 | sixth, first, fourth, ten, backend, third, eighth, twelve | 20 Oct 10:1x, built, by the lead’s rule (it works and it is fast enough are separate): on the main line since #1973, on lamp-4ace, and 32 of 32 answered for the lead on lamp-52e6. |
 | A person brings their own DeepSeek and Deepgram keys, in setup or the app | 0.90 | #2094 #2845 #2846 | el, fourteen | 22 Oct 18:0x, up from 0.8: setup’s own-keys step passed on a freshly reset lamp-06c1 (El, #2845 closed). |
 | Lamp 2 in the Autonomous app | 1.00 | #1396 | ten, mobile, backend | 20 Oct 11:4x, built: the app's Skills page and name and time zone (ecm-sds-mobile#8, #9) merged into the app's v3 after their tries on lamp-0c89. |
-| Talks with you naturally: turns, answers, web answers, the time | 1.00 | #694 | second, nine | Built (the conversation itself); |
+| Talks with you naturally: turns, answers, web answers, the time | 0.90 | #694 | second, nine | 23 Oct 18:5x, down from 1.0: with the owner in a quiet office after colleagues left, each conversation ended after two turns: the room stayed “busy” and held follow-ups and a face turned to the lamp (Thirteen’s P1). |
 | Hears its name, a bare “Lamp” too | 1.00 | #694 #725 | second, nine | Built; |
 | Eye contact: turns to you and to its name, looks away to think, nods | 1.00 | #715 | fifth | Built |
 | Always alive: breathing, small drift, a glance at a bang | 1.00 | #710 #714 #715 | fifth, second | Built |
@@ -79,7 +79,7 @@ Written by the first builder from the team's review page at 2026-10-23 17:06 (+0
 | Guard mode, an installable skill | 0.85 | #2562 #2827 #2828 | jarvis | 22 Oct 15:1x, up from 0.75: merged, each off unless set: it names only a known person who said yes to being named (LAMP_GUARD_NAMES, #2562, 645d2f554), and it reads a return or a thank-you as off (LAMP_GUARD_WORDS_V2, #2… |
 | “Was anyone here while I was out?”, an installable skill | 1.00 | #1989 #2019 | nine, tests | 20 Oct 10:1x, built by the lead’s rule (merged and tried on lamp-4ace at 03:3x); |
 | Music to relax, an installable skill | 0.45 | #1685 #2792 #2793 | second, sixth, first | 22 Oct 11:35, up from 0.4: while requested music plays, the lamp shows it is busy, never resting (Second, #2879). |
-| Faces from a photo and “who is this?”, an installable skill | 0.85 | #2854 #2855 #2856 | mobile, ten | 22 Oct 15:1x, up from 0.8: a face from a photo is kept on its yes with the prints the lamp took of it, not the selfie’s alone, so it is named away from the middle too (Mobile, #2854, dda47c270). |
+| Faces from a photo and “who is this?”, an installable skill | 0.88 | #2854 #2855 #2856 | mobile, ten | 23 Oct 18:5x, up from 0.85: the eyes’ half of a photo subject’s own yes is merged, off by default (LAMP_PHOTO_SPEAKER, Sixth, train 46). |
 | Light shows and effects, a core skill | 1.00 | #1730 #2028 | twelve, nine | Built and merged (#1730): party, music and calm, under a minute, no flashing, stopping within 0.2 s when someone speaks. |
 | “I’m unplugging you”: it folds safely first, a core skill | 1.00 | #1699 #2478 | fifth | 21 Oct 11:30, built: #1699 merged as #2478 after its rebase, and Prepare to unplug is in every lamp’s default skills. |
 | Smoke and bad-air alerts, a core skill | 1.00 | — | — | 20 Oct 11:42, built: tried on lamp-52e6 with the lead (row 18): a smoke reading said once, the head lifted a little, an amber breath. |
@@ -98,8 +98,8 @@ Written by the first builder from the team's review page at 2026-10-23 17:06 (+0
 | Several people | 0.70 | 0.85 | 23 Oct 11:2x, up from 0.65: a follow-up is asked only of the person who told it. |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.80 | 0.85 | 18 Oct 15:39, everything the lamp said unasked since midnight (Jarvis’s readout, 14 sessions): 17 reminders and timers, a median 0.98 s after they were due (16 within 5 s, one held back by the link), and 17 pieces of tas… |
-| Remembers you: your name and what you told it | 0.60 | 0.90 | 23 Oct 10:1x, up from 0.55: a real person’s name came back from their face (asked “What is my name?”, the lamp said it) nine minutes after “remember my face”, with LAMP_SECOND_FACE_NAME on; |
-| A good companion | 0.65 | 0.90 | 22 Oct 17:4x, up from 0.6: in the owner’s try the weather was looked up for Hanoi and then the lamp’s place, tomorrow, and the time called for London: the functions the bound had left out are back (#2961, merged a0705aee… |
+| Remembers you: your name and what you told it | 0.45 | 0.90 | 23 Oct 18:5x, down from 0.6: the owner’s own try: a face the lamp said it remembered was never saved, and one saved by hand wasn’t recognised. |
+| A good companion | 0.55 | 0.90 | 23 Oct 18:5x, down from 0.65: the owner couldn’t hold a back-and-forth past two turns tonight. |
 | Both microphones | 0.65 | 0.80 | 22 Oct 06:41, up from 0.6: step 4 passed on lamp-75c9 from the privacy test input (Nine, #694, the lead’s 05:5x ruling): after the switch closes, the room microphone stops within one 100 ms level period and gives nothing… |
 | Body | 0.70 | 0.80 | 17 Oct: the guarded body (#1192) on lamp-4ace since 07:34: stands for a question, turns to the voice, gestures and folds, with no refused or bad-read stop; |
 | Head and eye | 0.65 | 0.80 | 23 Oct 11:2x, up from 0.6: head touch passed with the lead’s own hand on lamp-52e6: a tap, a stroke, a 3 s hold that put it to sleep, a tap that woke it, and nothing with hands away (#2857 closed). |
