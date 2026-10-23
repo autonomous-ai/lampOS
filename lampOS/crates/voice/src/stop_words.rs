@@ -1213,6 +1213,9 @@ struct Live {
     holding_words: std::sync::atomic::AtomicBool,
     #[cfg(test)]
     over: std::sync::atomic::AtomicBool,
+    /// Shared with the real worker, only for an explicitly dated fixture.
+    #[cfg(test)]
+    fixture_clock: std::sync::OnceLock<(u64, std::time::Instant)>,
 }
 
 impl Live {
@@ -1228,6 +1231,8 @@ impl Live {
             holding_words: std::sync::atomic::AtomicBool::new(false),
             #[cfg(test)]
             over: std::sync::atomic::AtomicBool::new(false),
+            #[cfg(test)]
+            fixture_clock: std::sync::OnceLock::new(),
         }
     }
 
@@ -1237,6 +1242,15 @@ impl Live {
 
     fn now(&self) -> u64 {
         *self.number()
+    }
+
+    #[cfg(test)]
+    fn fixture_now_us(&self) -> u64 {
+        self.fixture_clock
+            .get()
+            .map_or_else(lamp_ipc::monotonic_us, |(base, began)| {
+                base + u64::try_from(began.elapsed().as_micros()).expect("bounded fixture time")
+            })
     }
 
     /// Nothing of the yield in force goes on, from now: the next has a new
@@ -1261,9 +1275,13 @@ impl Live {
     /// `stream` if that yield is in force and the block is not too old:
     /// checked and handed under the lock a revocation takes.
     fn hand(&self, of: u64, captured_at_us: u64, samples: &[i16], stream: &SttStream) -> bool {
+        #[cfg(not(test))]
+        let clock = lamp_ipc::monotonic_us;
+        #[cfg(test)]
+        let clock = || self.fixture_now_us();
         let number = self.number();
         *number == of
-            && lamp_ipc::monotonic_us().saturating_sub(captured_at_us) <= MOST_AGE_US
+            && clock().saturating_sub(captured_at_us) <= MOST_AGE_US
             && stream.send(samples).is_ok()
     }
 }
@@ -2733,10 +2751,14 @@ mod tests {
         // Too old: captured 4 s ago, it never goes; the block after it does.
         let service = Service::new(&[]);
         let mut ears = RelayEars::with(false, None, None, service.connect()).unwrap();
+        ears.live
+            .fixture_clock
+            .set((600_000_000, std::time::Instant::now()))
+            .unwrap();
         ears.ready();
         until("a stream is asked for", || service.connections() == 1);
-        ears.hear(lamp_ipc::monotonic_us() - 4_000_000, &[1; 160]);
-        ears.hear(lamp_ipc::monotonic_us(), &[1; 160]);
+        ears.hear(ears.live.fixture_now_us() - 4_000_000, &[1; 160]);
+        ears.hear(ears.live.fixture_now_us(), &[1; 160]);
         until("the fresh block goes", || service.audio() >= 320);
         std::thread::sleep(Duration::from_millis(50));
         assert_eq!(service.audio(), 320);

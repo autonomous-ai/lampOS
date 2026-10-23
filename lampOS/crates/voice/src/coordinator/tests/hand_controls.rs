@@ -1517,14 +1517,20 @@ fn run_loop_ringed(
             height: 240,
             max_frame_bytes: 128 * 1024,
         };
-        (
-            // Opening for the whole run: the side never answers a start.
-            Some(OptionalCamera::new(worker, source).opening_until(u64::MAX)),
-            Some((false, peer, input)),
-        )
+        (Some((worker, source)), Some((false, peer, input)))
     } else {
         (None, None)
     };
+    // Every child has crossed its real readiness barrier. Enter the scenario
+    // before any runtime message is queued or any observer samples its clock:
+    // the first provider fault and the camera must share the loop's epoch too.
+    let mut scope = (clocking == Clocking::Stepped).then(|| {
+        crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap()
+    });
+    let camera = camera.map(|(worker, source)| {
+        // Opening for the whole run: the side never answers a start.
+        OptionalCamera::new(worker, source).opening_until(u64::MAX)
+    });
     let mut rig = Rig {
         expression_out: None,
         second: None,
@@ -1586,11 +1592,8 @@ fn run_loop_ringed(
     .chain(ring_peer)
     .chain(camera_peer)
     .collect::<Vec<_>>();
-    let (mut threads, mut stepped, mut scope) = (Vec::new(), None, None);
-    if clocking == Clocking::Stepped {
-        // Every child has crossed its readiness barrier: the loop, its
-        // controls and these peers share the scenario clock from here.
-        let clock = crate::scenario_clock::Scope::enter(Duration::from_secs(10)).unwrap();
+    let (mut threads, mut stepped) = (Vec::new(), None);
+    if let Some(clock) = scope.as_ref() {
         let shared = Rc::new(RefCell::new(
             peers
                 .into_iter()
@@ -1644,7 +1647,7 @@ fn run_loop_ringed(
                 Ok(())
             })
             .unwrap();
-        (stepped, scope) = (Some(shared), Some(clock));
+        stepped = Some(shared);
     } else {
         threads = peers
             .into_iter()
@@ -2034,6 +2037,8 @@ fn a_tap_while_muted_gets_the_asleep_face_once() {
 /// is the one that lets it hear, and gets none.
 #[test]
 fn the_muted_waits_own_closures_count_the_slide_for_a_taps_face() {
+    let _clock =
+        crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
     use crate::privacy::PrivacyState;
     use crate::ring_asleep::{Asleep, TapFace};
     use crate::service_privacy::WaitOutcome;
@@ -2255,6 +2260,8 @@ fn the_muted_wait_shows_a_hands_sleep_and_gives_the_ring_to_the_closed_slide() {
 /// it can be read, so the wait shows outside the journal.
 #[test]
 fn the_muted_wait_says_the_switch_cannot_be_read_while_workers_end_at_start() {
+    let _clock =
+        crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
     use crate::privacy::PrivacyState;
     use crate::service_privacy::WaitOutcome;
     use lamp_msgs::{Diagnostic, Level};
