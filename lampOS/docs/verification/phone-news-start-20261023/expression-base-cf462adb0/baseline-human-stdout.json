@@ -1,0 +1,17 @@
+{
+  "source": "/private/tmp/tests-expression-runtime-base-cf462-20261023/run-2026-10-23T105938.741834Z/expression-runtime/expression-runtime.stdout.txt",
+  "source_bytes": 66463,
+  "source_sha256": "c27dbe817a10eec405ea8940f7ff0ce1dc201cbe6a57cbdca57111a3cdd9d2fc",
+  "projection": "Preserve every non-Cargo-message line byte-for-byte, in source order; valid JSON lines carrying a string reason field stay in the external full raw stream. No human output is normalized.",
+  "ranges": [
+    {
+      "offset": 64394,
+      "bytes": 2069,
+      "text": "\nrunning 27 tests\ntest boot_identity_cannot_be_empty_or_a_path ... ok\ntest a_note_about_one_turn_is_not_a_warning_and_a_fault_or_a_lacking_input_is ... ok\ntest older_topics_are_aged_by_wall_time_not_private_publisher_time ... ok\ntest a_saved_light_setting_remains_valid_after_days_without_a_change ... ok\ntest sleep_name::activity_adaptation_keeps_the_source_clock_and_owner ... ok\ntest sleep_name::name_adaptation_keeps_publication_delay_and_ago_ms ... ok\ntest a_full_output_record_stops_growing_and_counts_loss ... ok\ntest offline_face_reads_only_a_fresh_offline_from_lamp_online ... ok\ntest the_liveliness_taken_is_said_and_nothing_with_mood_off ... ok\ntest mood_in_reads_only_a_fresh_valid_state_from_mood ... ok\ntest the_heads_topics_are_read_only_with_head_touch ... ok\ntest shadow_mode_has_diagnostics_but_never_an_actuator_request ... ok\ntest slow_input_draining_does_not_make_old_joints_fresh ... ok\ntest typed_timing_keeps_its_shared_stamp_and_bad_inputs_are_counted ... ok\ntest two_expression_processes_cannot_own_one_bus ... ok\ntest enabled_output_uses_a_new_session_and_expires_after_input_loss ... ok\ntest a_closed_switch_reads_from_the_last_privacy_lease_said ... ok\ntest only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline ... ok\ntest sleep_name::the_switch_closed_mid_look_ends_it ... ok\ntest without_a_pause_said_expression_asks_exactly_as_before ... ok\ntest sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up ... ok\ntest paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed ... ok\ntest sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus ... ok\ntest sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus ... ok\ntest sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service ... ok\ntest sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had ... ok\ntest sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does ... ok\n\ntest result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.45s\n\n",
+      "sha256": "b64fec9243d490c885b2d863753aef89c0e4383ad46b72a87e2689516155136f"
+    }
+  ],
+  "omitted_Cargo_message_lines": 89,
+  "omitted_bytes": 64394,
+  "complete_raw_external": true
+}

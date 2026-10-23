@@ -1,0 +1,52 @@
+{
+  "identity": {
+    "head": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+    "tree": "4c5c6894939372cd0979c773898a80b5f3904d09",
+    "worktree": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023",
+    "branch": "tests/1569-boot-clock-base-cf462-20261023",
+    "source_aggregate_sha256": "84f9f5274db3fde4e47c376493b6e5eb935f5bf35433b2c86e75c0372643cef4",
+    "tracked_repository_paths": 10026,
+    "tracked_lampOS_paths": 6680,
+    "source_map_sha256": "9fe9ef5df3cc3e6c2572a914550534ad01c611121df37613d9e0ded69536d5a0",
+    "candidate_head": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e",
+    "candidate_source_aggregate_sha256": "8f8bd4d3e9d9b5c3aba92f3df242444c6f43acb79007a0b6926db57285df1efd",
+    "exact_authored_delta_paths": [
+      "lampOS/crates/voice/src/messages.rs",
+      "lampOS/docs/messages.md"
+    ],
+    "expression_tree_base_and_candidate": "4739bc460f8036bb8a32b946ab9a3c5f2ae6f37b"
+  },
+  "source_before_sha256": "84f9f5274db3fde4e47c376493b6e5eb935f5bf35433b2c86e75c0372643cef4",
+  "source_after_sha256": "84f9f5274db3fde4e47c376493b6e5eb935f5bf35433b2c86e75c0372643cef4",
+  "source_unchanged": true,
+  "freshness": {
+    "paths": 10026,
+    "mtime_ns": 1792753182791054000,
+    "before_sha256": "84f9f5274db3fde4e47c376493b6e5eb935f5bf35433b2c86e75c0372643cef4",
+    "after_sha256": "84f9f5274db3fde4e47c376493b6e5eb935f5bf35433b2c86e75c0372643cef4",
+    "identical_bytes_modes_symlinks": true
+  },
+  "source_map_external_sha256": "9fe9ef5df3cc3e6c2572a914550534ad01c611121df37613d9e0ded69536d5a0",
+  "socket_preflight": "AF_UNIX datagram and IPv4 loopback listener passed before Cargo",
+  "declared_environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_BUILD_TARGET": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_TARGET_TMPDIR": null,
+    "CARGO_TERM_COLOR": "never",
+    "LAMP_RELAY_PID_CONTROL_DIR": null,
+    "PATH": "/Users/autonomous/.cargo/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/usr/local/go/bin:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/Users/autonomous/.codex/tmp/arg0-macos/codex-arg0TYuE1D:/Users/autonomous/.harness/runtime/grid-0.3.59-darwin-x64/bin:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin",
+    "RUSTFLAGS": null,
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "RUST_BACKTRACE": "0",
+    "RUST_TEST_THREADS": null
+  },
+  "toolchain_equal_to_candidate": true,
+  "source_content_changes": false,
+  "qualification": "All10,026 tracked repository bytes, executable/symlink modes and literal symlink targets were checked; mtime refresh is recorded separately."
+}

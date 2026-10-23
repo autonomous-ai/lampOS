@@ -1,0 +1,98 @@
+[
+  {
+    "path": "/private/tmp/tests-expression-runtime-base-cf462-20261023/run.py",
+    "bytes": 10912,
+    "sha256": "8bb4e50073cbda0d1553460d71a73db0e1659f70ac04e8d1142ac58088f61d81",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-expression-runtime-base-cf462-20261023/support.py",
+    "bytes": 3285,
+    "sha256": "6ec612d0d37f6d92ea4ba0ed80d45160565164c2f627a1052a823f728bead964",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-expression-runtime-base-cf462-20261023/census.py",
+    "bytes": 12378,
+    "sha256": "dd391e4c2e056eee18eca7c3c311b644d3a0e65a8d2203ad8b42b28bfd082ea1",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-expression-runtime-base-cf462-20261023/source-map.json",
+    "bytes": 2139488,
+    "sha256": "9fe9ef5df3cc3e6c2572a914550534ad01c611121df37613d9e0ded69536d5a0",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-expression-runtime-base-cf462-20261023/candidate-binding.json",
+    "bytes": 15192,
+    "sha256": "183f98e3ba509cb069cf13a3cba0694f01f8bcb4b8369c5112cf59d61bc7c447",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-expression-runtime-base-cf462-20261023/candidate-feature-records.json",
+    "bytes": 183998,
+    "sha256": "4cc9ea4e17582612b5cc87444faff5b6b5854f4bd5e5efa4739098130b05df66",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-expression-runtime-base-cf462-20261023/SHA256SUMS",
+    "bytes": 1065,
+    "sha256": "2785b112f74ea50a35e9fca49f357bfb1df730caa0aa6cd1e2274dc1cc238554",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-expression-runtime-base-cf462-20261023/run-2026-10-23T105938.741834Z/results.json",
+    "bytes": 6675,
+    "sha256": "d03065d4a571a27e5733b5d8bbd51711700b776ca8f38fa39c2e2c048fd67fa0",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-expression-runtime-base-cf462-20261023/run-2026-10-23T105938.741834Z/expression-runtime/expression-runtime.stdout.txt",
+    "bytes": 66463,
+    "sha256": "c27dbe817a10eec405ea8940f7ff0ce1dc201cbe6a57cbdca57111a3cdd9d2fc",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-expression-runtime-base-cf462-20261023/run-2026-10-23T105938.741834Z/expression-runtime/compiled-artifacts.json",
+    "bytes": 2801,
+    "sha256": "0ff34f2fb2f2e8b91cc79fa60350b382fe87c7122d8d16cb789b06e8d2b694a9",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-expression-runtime-base-cf462-20261023/run-2026-10-23T105938.741834Z/expression-runtime/compiled-census.json",
+    "bytes": 2631,
+    "sha256": "6fc92c11898d3638fbd205b217e95a548264dbba4bb694d6657a1d75968fabb1",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+    "bytes": 653859,
+    "sha256": "86a4e0643644051a1dc9b6786d1d5a43ced7bfb133fefba16e147cf021cee213",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/readers-default-parallel/readers-default-parallel.stderr.txt",
+    "bytes": 61166,
+    "sha256": "6ebf0b4b9528484be834de6d06aa9ae31b4020eec4d7b3400906e4c8dd9d9459",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/readers-default-parallel/compiled-artifacts.json",
+    "bytes": 112893,
+    "sha256": "1761e47b71d323d641ecfcefcbfc5dcb40ea3ddb8f5de6cfcc470a0465167b0e",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/readers-default-parallel/compiled-census.json",
+    "bytes": 314224,
+    "sha256": "da51ef93bcda539af1ab15ea153b04d071f71aec133f567809bb3da2ad7ff500",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  },
+  {
+    "path": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/readers-default-parallel/target-outcomes.json",
+    "bytes": 864595,
+    "sha256": "9d5f20142767e72aa3e1c095c952c2f30037f66a9db6972cbfb7f140457c005c",
+    "reason": "Complete external source/command/metadata record retained by digest; no executable, measuring script or Cargo message stream copied into publication."
+  }
+]

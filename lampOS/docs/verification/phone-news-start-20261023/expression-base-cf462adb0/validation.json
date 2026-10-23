@@ -1,0 +1,30 @@
+{
+  "passed": true,
+  "terminal_exit_zero_verified": true,
+  "actual_baseline_counts": {
+    "passed": 27,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "actual_candidate_counts": {
+    "passed": 25,
+    "failed": 2,
+    "ignored": 0,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "full_case_census_equal": true,
+  "artifact_SHA256_equal": true,
+  "feature_profile_comparison": {
+    "baseline_records": 75,
+    "candidate_records": 418,
+    "mismatches": 0
+  },
+  "source_guard_passed": true,
+  "all_embedded_raw_lengths_hashes_offsets_verified": true,
+  "source_audit_copied_unchanged": true,
+  "source_audit_original_manifest_sha256": "c41da142e1ef3ec75a33e34a1d883d80a98b37b630c0fa1f15ef86bbc036c307",
+  "shared_target_read_during_packaging": false
+}

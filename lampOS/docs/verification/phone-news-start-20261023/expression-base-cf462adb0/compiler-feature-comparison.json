@@ -1,0 +1,1711 @@
+{
+  "baseline_records": [
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#digest@0.10.7",
+      "target": {
+        "name": "digest",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "block-buffer",
+        "core-api",
+        "default",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#serde@1.0.229",
+      "target": {
+        "name": "build-script-build",
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "default",
+        "derive",
+        "serde_derive",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#serde@1.0.229",
+      "target": {
+        "name": "serde",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "default",
+        "derive",
+        "serde_derive",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#ring@0.17.14",
+      "target": {
+        "name": "build-script-build",
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "default",
+        "dev_urandom_fallback"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#ring@0.17.14",
+      "target": {
+        "name": "ring",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "default",
+        "dev_urandom_fallback"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#rustix@1.1.5",
+      "target": {
+        "name": "build-script-build",
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "default",
+        "event",
+        "fs",
+        "net",
+        "pipe",
+        "process",
+        "std",
+        "stdio",
+        "system",
+        "thread",
+        "time"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#rustix@1.1.5",
+      "target": {
+        "name": "rustix",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "default",
+        "event",
+        "fs",
+        "net",
+        "pipe",
+        "process",
+        "std",
+        "stdio",
+        "system",
+        "thread",
+        "time"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#jiff@0.2.38",
+      "target": {
+        "name": "jiff",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "default",
+        "perf-inline",
+        "serde",
+        "std",
+        "tz-fat",
+        "tz-system",
+        "tzdb-bundle-always",
+        "tzdb-bundle-platform",
+        "tzdb-concatenated",
+        "tzdb-zoneinfo"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#once_cell@1.21.4",
+      "target": {
+        "name": "once_cell",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "default",
+        "race",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#serde_core@1.0.229",
+      "target": {
+        "name": "build-script-build",
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "default",
+        "result",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#serde_core@1.0.229",
+      "target": {
+        "name": "serde_core",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "default",
+        "result",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1",
+      "target": {
+        "name": "base64",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "default",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#memchr@2.8.3",
+      "target": {
+        "name": "memchr",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "default",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#rustls-pki-types@1.15.1",
+      "target": {
+        "name": "rustls_pki_types",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "default",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#zeroize@1.9.1",
+      "target": {
+        "name": "zeroize",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "default"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#rustls-webpki@0.103.15",
+      "target": {
+        "name": "webpki",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "ring",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#serde_spanned@1.1.2",
+      "target": {
+        "name": "serde_spanned",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "serde",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#toml_datetime@1.1.2+spec-1.1.0",
+      "target": {
+        "name": "toml_datetime",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "serde",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#jiff-core@0.1.1",
+      "target": {
+        "name": "jiff_core",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "std",
+        "tz-fat"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#toml_parser@1.1.5+spec-1.1.0",
+      "target": {
+        "name": "toml_parser",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "alloc",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#syn@3.0.7",
+      "target": {
+        "name": "syn",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "clone-impls",
+        "default",
+        "derive",
+        "extra-traits",
+        "fold",
+        "full",
+        "parsing",
+        "printing",
+        "proc-macro",
+        "visit"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#typenum@1.20.1",
+      "target": {
+        "name": "typenum",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "const-generics"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#libc@0.2.190",
+      "target": {
+        "name": "build-script-build",
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default",
+        "extra_traits",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#libc@0.2.190",
+      "target": {
+        "name": "libc",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default",
+        "extra_traits",
+        "std"
+      ]
+    },
+    {
+      "package_id": "path+file://<workspace>/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "target": {
+        "name": "lamp_keeper",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default",
+        "prepare"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.107",
+      "target": {
+        "name": "build-script-build",
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default",
+        "proc-macro"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.107",
+      "target": {
+        "name": "proc_macro2",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default",
+        "proc-macro"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#quote@1.0.47",
+      "target": {
+        "name": "build-script-build",
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default",
+        "proc-macro"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#quote@1.0.47",
+      "target": {
+        "name": "quote",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default",
+        "proc-macro"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.151",
+      "target": {
+        "name": "build-script-build",
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default",
+        "raw_value",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.151",
+      "target": {
+        "name": "serde_json",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default",
+        "raw_value",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#errno@0.3.14",
+      "target": {
+        "name": "errno",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#httparse@1.10.1",
+      "target": {
+        "name": "build-script-build",
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#httparse@1.10.1",
+      "target": {
+        "name": "httparse",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#sha2@0.10.9",
+      "target": {
+        "name": "sha2",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#shlex@2.0.1",
+      "target": {
+        "name": "shlex",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#serde_derive@1.0.229",
+      "target": {
+        "name": "serde_derive",
+        "kind": [
+          "proc-macro"
+        ],
+        "crate_types": [
+          "proc-macro"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#glam@0.33.12",
+      "target": {
+        "name": "glam",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "f64",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#generic-array@0.14.7",
+      "target": {
+        "name": "build-script-build",
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "more_lengths"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#generic-array@0.14.7",
+      "target": {
+        "name": "generic_array",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "more_lengths"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#toml@1.1.8+spec-1.1.0",
+      "target": {
+        "name": "toml",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "parse",
+        "serde",
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#nix@0.29.0",
+      "target": {
+        "name": "build-script-build",
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "process",
+        "signal"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#nix@0.29.0",
+      "target": {
+        "name": "nix",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "process",
+        "signal"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#rustls@0.23.45",
+      "target": {
+        "name": "build-script-build",
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "ring",
+        "std",
+        "tls12"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#rustls@0.23.45",
+      "target": {
+        "name": "rustls",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "ring",
+        "std",
+        "tls12"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#bitflags@2.13.2",
+      "target": {
+        "name": "bitflags",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "std"
+      ]
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#crypto-common@0.1.7",
+      "target": {
+        "name": "crypto_common",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "std"
+      ]
+    },
+    {
+      "package_id": "path+file://<workspace>/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp_body",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "path+file://<workspace>/lampOS/crates/bus#lamp-bus@0.1.0",
+      "target": {
+        "name": "lamp_bus",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "path+file://<workspace>/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "lamp-expression",
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "path+file://<workspace>/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "lamp_expression",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "path+file://<workspace>/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "runtime",
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": []
+    },
+    {
+      "package_id": "path+file://<workspace>/lampOS/crates/ipc#lamp-ipc@0.1.0",
+      "target": {
+        "name": "lamp_ipc",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "path+file://<workspace>/lampOS/crates/lean#lamp-lean@0.1.0",
+      "target": {
+        "name": "lamp_lean",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "path+file://<workspace>/lampOS/crates/local-time#lamp-local-time@0.1.0",
+      "target": {
+        "name": "lamp_local_time",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "path+file://<workspace>/lampOS/crates/msgs#lamp-msgs@0.1.0",
+      "target": {
+        "name": "lamp_msgs",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "path+file://<workspace>/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+      "target": {
+        "name": "lamp_turn_owner",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "path+file://<workspace>/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "lamp_update",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#block-buffer@0.10.4",
+      "target": {
+        "name": "block_buffer",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#cc@1.7.0",
+      "target": {
+        "name": "cc",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#cfg-if@1.0.5",
+      "target": {
+        "name": "cfg_if",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#cfg_aliases@0.2.2",
+      "target": {
+        "name": "cfg_aliases",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#cpufeatures@0.2.17",
+      "target": {
+        "name": "cpufeatures",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#find-msvc-tools@0.1.14",
+      "target": {
+        "name": "find_msvc_tools",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#getrandom@0.2.17",
+      "target": {
+        "name": "getrandom",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#itoa@1.0.18",
+      "target": {
+        "name": "itoa",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#jiff-tzdb@0.1.9",
+      "target": {
+        "name": "jiff_tzdb",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#subtle@2.6.1",
+      "target": {
+        "name": "subtle",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#unicode-ident@1.0.26",
+      "target": {
+        "name": "unicode_ident",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#untrusted@0.9.0",
+      "target": {
+        "name": "untrusted",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#version_check@0.9.5",
+      "target": {
+        "name": "version_check",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#webpki-roots@1.0.9",
+      "target": {
+        "name": "webpki_roots",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#winnow@1.0.4",
+      "target": {
+        "name": "winnow",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#zmij@1.0.23",
+      "target": {
+        "name": "build-script-build",
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    },
+    {
+      "package_id": "registry+https://github.com/rust-lang/crates.io-index#zmij@1.0.23",
+      "target": {
+        "name": "zmij",
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ]
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": []
+    }
+  ],
+  "candidate_record_count": 418,
+  "baseline_records_absent_from_candidate": [],
+  "all_observed_baseline_feature_profile_signatures_match_candidate": true,
+  "qualification": "Compiler-artifact feature/profile comparison, not a complete resolver graph or causal proof. Any mismatch limits the comparison."
+}

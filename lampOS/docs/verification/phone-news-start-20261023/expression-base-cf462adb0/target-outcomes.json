@@ -1,0 +1,266 @@
+{
+  "targets": [
+    {
+      "kind": "executable",
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/runtime-8ba534de81614d18",
+      "sha256": "3a7c9e37eef9dff82b667a4641229e9428c4dbc702efad308caecab1c3205286",
+      "name": "lamp-expression:test:runtime",
+      "result": "ok",
+      "counts": {
+        "passed": 27,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "raw_test_rows": [
+        [
+          "boot_identity_cannot_be_empty_or_a_path",
+          "ok"
+        ],
+        [
+          "a_note_about_one_turn_is_not_a_warning_and_a_fault_or_a_lacking_input_is",
+          "ok"
+        ],
+        [
+          "older_topics_are_aged_by_wall_time_not_private_publisher_time",
+          "ok"
+        ],
+        [
+          "a_saved_light_setting_remains_valid_after_days_without_a_change",
+          "ok"
+        ],
+        [
+          "sleep_name::activity_adaptation_keeps_the_source_clock_and_owner",
+          "ok"
+        ],
+        [
+          "sleep_name::name_adaptation_keeps_publication_delay_and_ago_ms",
+          "ok"
+        ],
+        [
+          "a_full_output_record_stops_growing_and_counts_loss",
+          "ok"
+        ],
+        [
+          "offline_face_reads_only_a_fresh_offline_from_lamp_online",
+          "ok"
+        ],
+        [
+          "the_liveliness_taken_is_said_and_nothing_with_mood_off",
+          "ok"
+        ],
+        [
+          "mood_in_reads_only_a_fresh_valid_state_from_mood",
+          "ok"
+        ],
+        [
+          "the_heads_topics_are_read_only_with_head_touch",
+          "ok"
+        ],
+        [
+          "shadow_mode_has_diagnostics_but_never_an_actuator_request",
+          "ok"
+        ],
+        [
+          "slow_input_draining_does_not_make_old_joints_fresh",
+          "ok"
+        ],
+        [
+          "typed_timing_keeps_its_shared_stamp_and_bad_inputs_are_counted",
+          "ok"
+        ],
+        [
+          "two_expression_processes_cannot_own_one_bus",
+          "ok"
+        ],
+        [
+          "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+          "ok"
+        ],
+        [
+          "a_closed_switch_reads_from_the_last_privacy_lease_said",
+          "ok"
+        ],
+        [
+          "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+          "ok"
+        ],
+        [
+          "sleep_name::the_switch_closed_mid_look_ends_it",
+          "ok"
+        ],
+        [
+          "without_a_pause_said_expression_asks_exactly_as_before",
+          "ok"
+        ],
+        [
+          "sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up",
+          "ok"
+        ],
+        [
+          "paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed",
+          "ok"
+        ],
+        [
+          "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+          "ok"
+        ],
+        [
+          "sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus",
+          "ok"
+        ],
+        [
+          "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+          "ok"
+        ],
+        [
+          "sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had",
+          "ok"
+        ],
+        [
+          "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+          "ok"
+        ]
+      ],
+      "test_rows": [
+        [
+          "boot_identity_cannot_be_empty_or_a_path",
+          "ok"
+        ],
+        [
+          "a_note_about_one_turn_is_not_a_warning_and_a_fault_or_a_lacking_input_is",
+          "ok"
+        ],
+        [
+          "older_topics_are_aged_by_wall_time_not_private_publisher_time",
+          "ok"
+        ],
+        [
+          "a_saved_light_setting_remains_valid_after_days_without_a_change",
+          "ok"
+        ],
+        [
+          "sleep_name::activity_adaptation_keeps_the_source_clock_and_owner",
+          "ok"
+        ],
+        [
+          "sleep_name::name_adaptation_keeps_publication_delay_and_ago_ms",
+          "ok"
+        ],
+        [
+          "a_full_output_record_stops_growing_and_counts_loss",
+          "ok"
+        ],
+        [
+          "offline_face_reads_only_a_fresh_offline_from_lamp_online",
+          "ok"
+        ],
+        [
+          "the_liveliness_taken_is_said_and_nothing_with_mood_off",
+          "ok"
+        ],
+        [
+          "mood_in_reads_only_a_fresh_valid_state_from_mood",
+          "ok"
+        ],
+        [
+          "the_heads_topics_are_read_only_with_head_touch",
+          "ok"
+        ],
+        [
+          "shadow_mode_has_diagnostics_but_never_an_actuator_request",
+          "ok"
+        ],
+        [
+          "slow_input_draining_does_not_make_old_joints_fresh",
+          "ok"
+        ],
+        [
+          "typed_timing_keeps_its_shared_stamp_and_bad_inputs_are_counted",
+          "ok"
+        ],
+        [
+          "two_expression_processes_cannot_own_one_bus",
+          "ok"
+        ],
+        [
+          "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+          "ok"
+        ],
+        [
+          "a_closed_switch_reads_from_the_last_privacy_lease_said",
+          "ok"
+        ],
+        [
+          "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+          "ok"
+        ],
+        [
+          "sleep_name::the_switch_closed_mid_look_ends_it",
+          "ok"
+        ],
+        [
+          "without_a_pause_said_expression_asks_exactly_as_before",
+          "ok"
+        ],
+        [
+          "sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up",
+          "ok"
+        ],
+        [
+          "paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed",
+          "ok"
+        ],
+        [
+          "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+          "ok"
+        ],
+        [
+          "sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus",
+          "ok"
+        ],
+        [
+          "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+          "ok"
+        ],
+        [
+          "sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had",
+          "ok"
+        ],
+        [
+          "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+          "ok"
+        ]
+      ],
+      "display_annotation_mapping": []
+    }
+  ],
+  "completed_targets": [
+    "lamp-expression:test:runtime"
+  ],
+  "passed_targets": [
+    "lamp-expression:test:runtime"
+  ],
+  "failed_targets": [],
+  "unrun_targets": [],
+  "incomplete_targets": [],
+  "binding_errors": [],
+  "compiler_census_is_execution": false,
+  "complete_binding": true
+}

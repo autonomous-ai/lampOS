@@ -1,0 +1,35 @@
+{
+  "base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+  "candidate": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e",
+  "baseline_exit": 0,
+  "baseline_counts": {
+    "passed": 27,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "candidate_counts": {
+    "passed": 25,
+    "failed": 2,
+    "ignored": 0,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "baseline_full_target_census_bound": true,
+  "candidate_full_target_census_bound": true,
+  "baseline_command_wall_seconds": 20.321162,
+  "baseline_libtest_seconds": 3.45,
+  "binary_SHA256_equal": true,
+  "runtime_SHA256": "3a7c9e37eef9dff82b667a4641229e9428c4dbc702efad308caecab1c3205286",
+  "baseline_feature_profile_signatures": 75,
+  "candidate_feature_profile_signatures": 418,
+  "observed_baseline_signatures_absent_from_candidate": 0,
+  "feature_comparison_is_full_resolver_graph": false,
+  "source_before_after_equal": true,
+  "source_aggregate_sha256": "84f9f5274db3fde4e47c376493b6e5eb935f5bf35433b2c86e75c0372643cef4",
+  "MAIN_released_after_terminal": true,
+  "candidate_failed_gate_unwaived": true,
+  "cause_established": false,
+  "completed_at": "2026-10-23T11:00:10.175977+00:00"
+}

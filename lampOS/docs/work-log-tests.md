@@ -1,5 +1,26 @@
 # Tests work log
 
+## 2026-10-23 18:05 +0700 — Expression full-target baseline comparison
+
+Ready for lamp-voice: no (#3218 execution HOLD remains with Reviewer-two).
+
+The [clean-base Expression runtime comparison](verification/phone-news-start-20261023/expression-base-cf462adb0/)
+passed **27 / 0 / 0**, versus the candidate target's retained **25 / 2 / 0**.
+The same eleven packages were selected and only the complete runtime target
+ran, with no case filter or retry. The actual executable is byte-identical;
+all 75 observed compiler feature/profile signatures match entries in the
+candidate's 418 records. Both 27-case inventories match.
+
+The source audit identifies possible real-wall bus-admission expiry during
+setup, distinct from the fixed service-step clock. No observed age or counters
+establish that cause. Equal executables and a passing baseline do not recreate
+prior suite history or host scheduling. Both failed candidate cases remain
+explicit, with their original output and all baseline human output published.
+
+The prepared phone comparisons are complete. Reviewer-two owns the execution
+HOLD disposition; First owns the relay merge in train 45. Boot-clock reader
+qualification follows that merged dependency and a latest-base carry.
+
 ## 2026-10-23 18:03 +0700 — clarify phone receipt timing metadata
 
 Ready for lamp-voice: no (#3218 execution HOLD remains).

@@ -1,0 +1,121 @@
+{
+  "schema": 1,
+  "scope": "Read-only source audit; no test execution, source edits, target reads or causality classification.",
+  "base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+  "candidate": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e",
+  "changed_paths": [
+    "lampOS/crates/voice/src/messages.rs",
+    "lampOS/docs/messages.md"
+  ],
+  "equal_source_files": [
+    {
+      "path": "lampOS/crates/expression/tests/runtime.rs",
+      "both_sha256": "ed1ed5d64f6338357b25bdcbda739985b1c68c501695d20d9bf2e374ce6318e4",
+      "bytes": 47583
+    },
+    {
+      "path": "lampOS/crates/expression/src/runtime.rs",
+      "both_sha256": "0227019579cd7194d2cac559297e6db49d42e76735565ac1f9dbfd1299417732",
+      "bytes": 51319
+    },
+    {
+      "path": "lampOS/crates/expression/Cargo.toml",
+      "both_sha256": "2c0dd67e2a2c85585b029bf807fc102ecdc375bc607ddd97fde3d514e6cf5cf4",
+      "bytes": 745
+    },
+    {
+      "path": "lampOS/crates/bus/src/subscribe.rs",
+      "both_sha256": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+      "bytes": 38012
+    },
+    {
+      "path": "lampOS/crates/bus/src/wire.rs",
+      "both_sha256": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920",
+      "bytes": 13555
+    },
+    {
+      "path": "lampOS/crates/msgs/src/expression.rs",
+      "both_sha256": "81e4f7638b56a66ec99fe713546e7c3b7e2b1bbe3253dba05765867cb7f48def",
+      "bytes": 33975
+    },
+    {
+      "path": "lampOS/Cargo.toml",
+      "both_sha256": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+      "bytes": 1424
+    },
+    {
+      "path": "lampOS/Cargo.lock",
+      "both_sha256": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c",
+      "bytes": 118267
+    }
+  ],
+  "captured_runtime_artifact": {
+    "executable": "/private/tmp/tests-codex-1569-target/debug/deps/runtime-8ba534de81614d18",
+    "sha256": "3a7c9e37eef9dff82b667a4641229e9428c4dbc702efad308caecab1c3205286",
+    "bytes": 6631448,
+    "source_aggregate_sha256": "8f8bd4d3e9d9b5c3aba92f3df242444c6f43acb79007a0b6926db57285df1efd",
+    "features": [],
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "fresh": false
+  },
+  "captured_artifact_metadata": {
+    "path": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/readers-default-parallel/compiled-artifacts.json",
+    "sha256": "1761e47b71d323d641ecfcefcbfc5dcb40ea3ddb8f5de6cfcc470a0465167b0e"
+  },
+  "failures": [
+    {
+      "name": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "source": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+      "source_sha256": "86a4e0643644051a1dc9b6786d1d5a43ced7bfb133fefba16e147cf021cee213",
+      "offset": 453999,
+      "bytes": 243,
+      "sha256": "82f04017598477d6ee9c2d6fda9b31ea190e7207f49e48069b2e60335f3063ab",
+      "utf8": "---- enabled_output_uses_a_new_session_and_expires_after_input_loss stdout ----\n\nthread 'enabled_output_uses_a_new_session_and_expires_after_input_loss' (709222552) panicked at crates/expression/tests/runtime.rs:127:28:\nfresh voice and joints\n"
+    },
+    {
+      "name": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "source": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+      "source_sha256": "86a4e0643644051a1dc9b6786d1d5a43ced7bfb133fefba16e147cf021cee213",
+      "offset": 454243,
+      "bytes": 346,
+      "sha256": "30a1dcd407d25eae58e0d6ac16e837c968516876045e3547155524e93842c6cd",
+      "utf8": "---- only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline stdout ----\n\nthread 'only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline' (709222556) panicked at crates/expression/tests/runtime.rs:1048:14:\na light request\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n"
+    }
+  ],
+  "boundaries": [
+    {
+      "case": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "assertion": "crates/expression/tests/runtime.rs:127 body.expect(\"fresh voice and joints\")",
+      "observation": "One synchronous Service.step after populate and Service::new returned body=None. Failure precedes body/light lease checks, expiry, restart and fresh session assertions."
+    },
+    {
+      "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "assertion": "crates/expression/tests/runtime.rs:1048 light.expect(\"a light request\")",
+      "observation": "One synchronous Service.step returned light=None before expected face comparison. The captured panic does not identify the offline_face closure arm."
+    }
+  ],
+  "clock_boundary": {
+    "fixture": "populate publishes retained inputs and then returns real runtime::unix_ms; Service.step uses fixed monotonic10_000_000 and captured wall.",
+    "service": "input_from_message checks input age with the injected wall; it does not override Subscriber admission wall.",
+    "bus": "Subscriber::admit reads real wire::unix_ms. VoiceTiming declaration lasts500ms; Header::expired_at permits50ms grace, then drops expired input before service parsing.",
+    "source_locations": [
+      "crates/expression/tests/runtime.rs:49-77",
+      "crates/expression/src/runtime.rs:234-262,766-814",
+      "crates/bus/src/subscribe.rs:528-552",
+      "crates/bus/src/wire.rs:30,75-82",
+      "crates/msgs/src/expression.rs:369-373"
+    ],
+    "limit": "Possible expiry during setup/admission is a source hypothesis only: neither failure supplies observed message age, bus expiry counts, service state, or refusal diagnostics."
+  },
+  "comparison_limits": [
+    "All changed candidate bytes are in one Voice test source and its documentation; direct source equality is not compiled executable equality.",
+    "Captured runtime artifact is from the full eleven-reader Cargo feature graph. A later Expression-only build may differ for graph/path reasons; compare actual artifacts and do not infer source causality from differing hashes alone.",
+    "No test source/assertion/timeout changed; both failures remain failures. Whole runtime-target clean-base observation is a separate planned control."
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "runtime.stderr": {
+    "encoding": "UTF-8",
+    "bytes": 1277,
+    "sha256": "f7f2837996d281326dcc5906e3b2a2487917ce0326be25cf7f1acb56c10fab50",
+    "text": "   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/bus)\n   Compiling lamp-ipc v0.1.0 (/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/ipc)\n   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/turn-owner)\n   Compiling lamp-local-time v0.1.0 (/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/local-time)\n   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/msgs)\n   Compiling lamp-update v0.1.0 (/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/update)\n   Compiling lamp-lean v0.1.0 (/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/lean)\n   Compiling lamp-keeper v0.1.0 (/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/keeper)\n   Compiling lamp-body v0.1.0 (/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/body)\n   Compiling lamp-expression v0.1.0 (/private/tmp/tests-codex-boot-clock-base-cf462-20261023/lampOS/crates/expression)\n    Finished `test` profile [unoptimized] target(s) in 15.83s\n     Running tests/runtime.rs (/private/tmp/tests-codex-1569-target/debug/deps/runtime-8ba534de81614d18)\n"
+  },
+  "rustc.stdout": {
+    "encoding": "UTF-8",
+    "bytes": 191,
+    "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+    "text": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2\n"
+  },
+  "rustc.stderr": {
+    "encoding": "UTF-8",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "census.file.stdout": {
+    "encoding": "UTF-8",
+    "bytes": 106,
+    "sha256": "db0c245fdb4fea68d82f8db6a17eea3f04685f1058dd4b24ef4e3adfceac55c5",
+    "text": "/private/tmp/tests-codex-1569-target/debug/deps/runtime-8ba534de81614d18: Mach-O 64-bit executable x86_64\n"
+  },
+  "census.file.stderr": {
+    "encoding": "UTF-8",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "census.all.stdout": {
+    "encoding": "UTF-8",
+    "bytes": 1792,
+    "sha256": "de7efe0fa806e04d1bdf40df5fac23874d637caac75133ac9b5dd01c3c919abd",
+    "text": "a_closed_switch_reads_from_the_last_privacy_lease_said: test\na_full_output_record_stops_growing_and_counts_loss: test\na_note_about_one_turn_is_not_a_warning_and_a_fault_or_a_lacking_input_is: test\na_saved_light_setting_remains_valid_after_days_without_a_change: test\nboot_identity_cannot_be_empty_or_a_path: test\nenabled_output_uses_a_new_session_and_expires_after_input_loss: test\nmood_in_reads_only_a_fresh_valid_state_from_mood: test\noffline_face_reads_only_a_fresh_offline_from_lamp_online: test\nolder_topics_are_aged_by_wall_time_not_private_publisher_time: test\nonly_a_service_with_the_offline_face_draws_listening_unavailable_when_offline: test\npaused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed: test\nshadow_mode_has_diagnostics_but_never_an_actuator_request: test\nsleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had: test\nsleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does: test\nsleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up: test\nsleep_name::activity_adaptation_keeps_the_source_clock_and_owner: test\nsleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service: test\nsleep_name::name_adaptation_keeps_publication_delay_and_ago_ms: test\nsleep_name::sleeping_name_requires_validated_speech_through_the_local_bus: test\nsleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus: test\nsleep_name::the_switch_closed_mid_look_ends_it: test\nslow_input_draining_does_not_make_old_joints_fresh: test\nthe_heads_topics_are_read_only_with_head_touch: test\nthe_liveliness_taken_is_said_and_nothing_with_mood_off: test\ntwo_expression_processes_cannot_own_one_bus: test\ntyped_timing_keeps_its_shared_stamp_and_bad_inputs_are_counted: test\nwithout_a_pause_said_expression_asks_exactly_as_before: test\n"
+  },
+  "census.all.stderr": {
+    "encoding": "UTF-8",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "census.ignored.stdout": {
+    "encoding": "UTF-8",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  },
+  "census.ignored.stderr": {
+    "encoding": "UTF-8",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "text": ""
+  }
+}
