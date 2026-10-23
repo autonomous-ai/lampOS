@@ -4,7 +4,8 @@
 //!
 //! First's limits (#711, 2026-10-15 21:24): rare, at most one in 30 s; well
 //! under the voice, starting about 15 dB below its speech, to be tuned by
-//! ear on a lamp; under 150 ms from the tap to the first sample; and only
+//! ear on a lamp (the measured default below supersedes that starting level);
+//! under 150 ms from the tap to the first sample; and only
 //! when the lamp is quiet, listening is ready and no reply is owed.
 //!
 //! A hand's sleep (#1362) has two more of the lamp's own sounds, as quiet:
@@ -28,9 +29,11 @@ pub const BETWEEN_MS: u32 = 30;
 pub const GLIDE: f64 = 0.04;
 /// Fade in and out of each tone, so neither starts or ends with a click.
 pub const FADE_MS: u32 = 25;
-/// How loud while it sounds, as RMS: the lamp's speech taken as about
-/// -20 dBFS, less 15 dB. Not yet measured against a lamp's own speech.
-pub const DBFS: f64 = -35.0;
+/// How loud while it sounds, as RMS. The lamp-c0a4 hand trial found
+/// -30 audible only at the lamp, -25 faint and -20 clear at the product
+/// speaker level; the 23 October decision selects -20 (#849). The same
+/// default feeds the sleep breath and other hums; that trial heard taps.
+pub const DBFS: f64 = -20.0;
 /// `LAMP_HEAD_TAP_CUE_DBFS` replaces [`DBFS`] for tuning by ear, within
 /// these bounds; anything else is refused at start.
 pub const DBFS_ENVIRONMENT: &str = "LAMP_HEAD_TAP_CUE_DBFS";
@@ -283,6 +286,7 @@ mod tests {
 
     #[test]
     fn the_hum_is_two_quiet_rising_tones_in_whole_chunks_with_no_click() {
+        assert_eq!(DBFS, -20.0, "the measured tap default");
         let hum = hum(DBFS);
         assert_eq!(hum.len() % CHUNK, 0);
         // 110 + 30 + 160 ms of sound, then silence to the chunk's end.
@@ -301,7 +305,7 @@ mod tests {
         assert!(hum[0].abs() <= 1 && hum[sounding - 1].abs() <= 1);
         let peak = hum.iter().map(|s| s.unsigned_abs()).max().unwrap();
         assert!(
-            f64::from(peak) < 32_767.0 * 10f64.powf(-20.0 / 20.0),
+            f64::from(peak) < 32_767.0 * 10f64.powf((DBFS + 15.0) / 20.0),
             "{peak}"
         );
         // The second tone is higher: count its zero crossings.
@@ -461,7 +465,7 @@ mod tests {
 
     /// #1362: the sigh is about 0.9 s of breath in whole chunks, at the
     /// hum's level at its loudest, starting and ending from nothing, under
-    /// the speech's level, and falling: quieter and darker as it goes. The
+    /// its peak ceiling, and falling: quieter and darker as it goes. The
     /// same every time.
     #[test]
     fn the_breath_is_a_quiet_falling_sigh_in_whole_chunks() {
@@ -479,7 +483,7 @@ mod tests {
         assert!((loudest - DBFS).abs() < 0.5, "{loudest}");
         let peak = sigh.iter().map(|s| s.unsigned_abs()).max().unwrap();
         assert!(
-            f64::from(peak) < 32_767.0 * 10f64.powf(-20.0 / 20.0),
+            f64::from(peak) < 32_767.0 * 10f64.powf((DBFS + 15.0) / 20.0),
             "{peak}"
         );
         // Falling: its second half quieter than its first by far, and its

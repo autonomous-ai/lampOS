@@ -50,7 +50,7 @@
 //!   for one: the socket's peer is root ([`Caller`], by `SO_PEERCRED`), so
 //!   a skill cannot say there is no Wi-Fi while the lamp is online.
 //! - **A built-in cue**: `cue: "hum"` makes the existing short hum at its
-//!   fixed -35 dBFS default on the client's thread, without a file or model
+//!   fixed -20 dBFS default on the client's thread, without a file or model
 //!   request. It is a sound through the same queue, quiet, rarity, privacy
 //!   and playback gates. Head-tap tuning does not change this cue.
 //! - **An existing start deadline**: optional `start_before_us` is an
@@ -1402,7 +1402,8 @@ pub const SOUND_MOST_FRAMES: u32 = SOUND_RATE * 3;
 /// and room for a few small chunks beside them.
 pub const SOUND_MOST_BYTES: u64 = 44 + 2 * SOUND_MOST_FRAMES as u64 + 4_096;
 /// No 10 ms of it louder than this, as RMS: well under the lamp's speech
-/// (about -20 dBFS), near the head tap's "hm?" (-35 dBFS, `crate::head_cue`).
+/// (about -20 dBFS). This file-sound limit is independent of the built-in
+/// head tap's "hm?" default (`crate::head_cue`).
 pub const SOUND_LOUDEST_DBFS: f64 = -30.0;
 /// No sample of it past this: a train of full-scale clicks is quiet as RMS
 /// and still a crack from the speaker.
