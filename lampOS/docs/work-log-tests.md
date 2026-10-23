@@ -1,5 +1,26 @@
 # Tests work log
 
+## 2026-10-23 19:17 +0700 — cue peer-closure controls completed
+
+Ready for lamp-voice: no (full gates remain).
+
+The [fixed cue fixture controls](verification/cue-peer-closure-20261023/)
+each ran once. An acknowledged retained receiver makes the old fixture fail
+its original final scan assertion. The new fixture passes after its first
+live-probe event releases and joins that receiver. Holding the receiver
+throughout fails the five-second setup watchdog before any final scan; cleanup
+still succeeds. The unchanged candidate exact case passes. All four compiled
+inventories contain the same 270 cases, with only the selected case executed.
+
+The candidate's five assertions, stale half, trace, timestamps and single
+product scan are unchanged; its new helper observes actual endpoint closure.
+Product source is unchanged. The exact candidate was restored between controls
+and at terminal. These controls establish the socket-lifetime boundary, not
+the cause of the old full-run failure. Root verified all 44 published streams,
+eight external compile streams and four lossless patch envelopes against their
+originals. Full package/reader gates and native Linux qualification remain;
+phone current-base qualification presently owns the shared target.
+
 ## 2026-10-23 19:10 +0700 — claim Expression fresh setup follow-up
 
 Ready for lamp-voice: no (claimed before code).

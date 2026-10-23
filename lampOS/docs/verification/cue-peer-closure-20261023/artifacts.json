@@ -1,0 +1,186 @@
+[
+  {
+    "variant": "01-old-held-copy",
+    "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+    "sha256": "724712ba94272f7168bc0d0863e9fb8c7d6f29949dfefe637eb14c0a4ff4e185",
+    "bytes": 94225364,
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428"
+      ],
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+      "fresh": false
+    },
+    "source_aggregate_sha256": "47d84868e03aed22a5081c2e32be82c1c1fddf65ec5df265a2300321a64a8e2b",
+    "build_finished": [
+      {
+        "reason": "build-finished",
+        "success": true
+      }
+    ],
+    "compiler_errors": []
+  },
+  {
+    "variant": "02-new-live-then-release",
+    "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+    "sha256": "9ac0822ac0745a272a905311e5c471b8c859c87157f240a5f643df75523ec7e1",
+    "bytes": 94225516,
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428"
+      ],
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+      "fresh": false
+    },
+    "source_aggregate_sha256": "dde62c86aec7431b746b792fb0efea2ba5afd424314a8a59f663cffccd7bcfdf",
+    "build_finished": [
+      {
+        "reason": "build-finished",
+        "success": true
+      }
+    ],
+    "compiler_errors": []
+  },
+  {
+    "variant": "03-new-held-copy-watchdog",
+    "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+    "sha256": "a488dc3c39ae83ea6d230bb1a89b227efa881744dcca8025c1a2ea662a2ac56e",
+    "bytes": 94225564,
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428"
+      ],
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+      "fresh": false
+    },
+    "source_aggregate_sha256": "ba8253bc1661d6426de5495155fe66f980e406f072fedd65f43524d6fc4440bb",
+    "build_finished": [
+      {
+        "reason": "build-finished",
+        "success": true
+      }
+    ],
+    "compiler_errors": []
+  },
+  {
+    "variant": "04-unmodified-candidate",
+    "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+    "sha256": "cad08a88aaca6cb6dd5077d18a16d13cb6f96196973400cce85925edcb837c91",
+    "bytes": 94198908,
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428"
+      ],
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+      "fresh": false
+    },
+    "source_aggregate_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+    "build_finished": [
+      {
+        "reason": "build-finished",
+        "success": true
+      }
+    ],
+    "compiler_errors": []
+  }
+]

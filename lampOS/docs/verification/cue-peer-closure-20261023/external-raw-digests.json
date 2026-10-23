@@ -1,0 +1,50 @@
+[
+  {
+    "path": "/private/tmp/tests-cue-peer-closed-execution-20261023/run-2026-10-23T120536.569682Z/01-old-held-copy/compile.stdout.txt",
+    "bytes": 250609,
+    "sha256": "1340571c492bbce06b20ac9b55ad14788bcc98fcd9324d708c40ec69cca1ffeb",
+    "reason": "Complete successful Cargo compilation stream retained externally; stdout contains Cargo JSON."
+  },
+  {
+    "path": "/private/tmp/tests-cue-peer-closed-execution-20261023/run-2026-10-23T120536.569682Z/01-old-held-copy/compile.stderr.txt",
+    "bytes": 2721,
+    "sha256": "9c75d510b7ec5cae09183a8750b376466c68e94f98b20ca041479c9f35941c28",
+    "reason": "Complete successful Cargo compilation stream retained externally; stdout contains Cargo JSON."
+  },
+  {
+    "path": "/private/tmp/tests-cue-peer-closed-execution-20261023/run-2026-10-23T120536.569682Z/02-new-live-then-release/compile.stdout.txt",
+    "bytes": 250582,
+    "sha256": "d0f33cff73125c1da71ad452c4ba84e8cbf52595c43b33111fe34661f9a596d1",
+    "reason": "Complete successful Cargo compilation stream retained externally; stdout contains Cargo JSON."
+  },
+  {
+    "path": "/private/tmp/tests-cue-peer-closed-execution-20261023/run-2026-10-23T120536.569682Z/02-new-live-then-release/compile.stderr.txt",
+    "bytes": 164,
+    "sha256": "f88a3e3ef62fb003773b448e726b9f1bacf5864665fb3b0e153194af75da60e3",
+    "reason": "Complete successful Cargo compilation stream retained externally; stdout contains Cargo JSON."
+  },
+  {
+    "path": "/private/tmp/tests-cue-peer-closed-execution-20261023/run-2026-10-23T120536.569682Z/03-new-held-copy-watchdog/compile.stdout.txt",
+    "bytes": 250582,
+    "sha256": "13c5ccf58cb42e28fbaed303a19c326dd4228786e35ba81d56b69a0754727fa8",
+    "reason": "Complete successful Cargo compilation stream retained externally; stdout contains Cargo JSON."
+  },
+  {
+    "path": "/private/tmp/tests-cue-peer-closed-execution-20261023/run-2026-10-23T120536.569682Z/03-new-held-copy-watchdog/compile.stderr.txt",
+    "bytes": 164,
+    "sha256": "0d6472909eee8393a828dc5272075d090d87b38f7fe99858379579a5be90d380",
+    "reason": "Complete successful Cargo compilation stream retained externally; stdout contains Cargo JSON."
+  },
+  {
+    "path": "/private/tmp/tests-cue-peer-closed-execution-20261023/run-2026-10-23T120536.569682Z/04-unmodified-candidate/compile.stdout.txt",
+    "bytes": 250582,
+    "sha256": "1c430e69247034d9332e7ef7f968825431cb1cdcdc65f870b31db44521c42236",
+    "reason": "Complete successful Cargo compilation stream retained externally; stdout contains Cargo JSON."
+  },
+  {
+    "path": "/private/tmp/tests-cue-peer-closed-execution-20261023/run-2026-10-23T120536.569682Z/04-unmodified-candidate/compile.stderr.txt",
+    "bytes": 164,
+    "sha256": "2d7df35ff966d3d682b9a48a47a8e474d13ecd39d05ac10d8dd8db2aaa5e32bd",
+    "reason": "Complete successful Cargo compilation stream retained externally; stdout contains Cargo JSON."
+  }
+]

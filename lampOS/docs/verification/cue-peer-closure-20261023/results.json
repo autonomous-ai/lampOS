@@ -1,0 +1,472 @@
+{
+  "status": "All three frozen controls produced their expected observations; unmodified candidate case passed once",
+  "source": {
+    "worktree": "/private/tmp/tests-codex-cue-peer-closed-20261023",
+    "head": "3e75cc3cbe4c544dee433fb8a81dc3b06daf688d",
+    "base_tree": "0af3ca0dc1c800eeb442b9b856c144d41ee85f3f",
+    "branch": "tests/1569-cue-peer-closed",
+    "tracked_paths": 10028,
+    "lampos_paths": 6682,
+    "source_aggregate_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+    "owned_paths": [
+      "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "source_map_sha256": "c089689090e18f38d2dce9732d55ffaa444489da05060116936cb0483252158f",
+    "only_owned_files_differ_from_base": true
+  },
+  "source_before_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+  "environment": {
+    "PATH": "/Users/autonomous/.cargo/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/usr/local/go/bin:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/Users/autonomous/.codex/tmp/arg0-macos/codex-arg0TYuE1D:/Users/autonomous/.harness/runtime/grid-0.3.59-darwin-x64/bin:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.96.0",
+    "RUST_BACKTRACE": "1",
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null
+  },
+  "removed_environment_keys": [],
+  "variants": [
+    {
+      "id": "01-old-held-copy",
+      "state": "expected observation obtained once",
+      "expected_process_exit": 101,
+      "source_aggregate_sha256": "47d84868e03aed22a5081c2e32be82c1c1fddf65ec5df265a2300321a64a8e2b",
+      "fixture_sha256": "d70722b5c3454e0c562c0c7189b9c79a25830c2944afbdda36eed619811d5960",
+      "compile": {
+        "command": [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-voice",
+          "--test",
+          "it",
+          "--no-run",
+          "--message-format=json-render-diagnostics"
+        ],
+        "cwd": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS",
+        "started_at": "2026-10-23T12:05:48.025149+00:00",
+        "timeout_seconds": 1800,
+        "stdout": "compile.stdout.txt",
+        "stderr": "compile.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 73430,
+        "owned_process_group": 73430,
+        "exit_code": 0,
+        "wall_seconds": 53.094795,
+        "finished_at": "2026-10-23T12:06:41.119455+00:00",
+        "stdout_sha256": "1340571c492bbce06b20ac9b55ad14788bcc98fcd9324d708c40ec69cca1ffeb",
+        "stdout_bytes": 250609,
+        "stderr_sha256": "9c75d510b7ec5cae09183a8750b376466c68e94f98b20ca041479c9f35941c28",
+        "stderr_bytes": 2721
+      },
+      "artifact": {
+        "sha256": "724712ba94272f7168bc0d0863e9fb8c7d6f29949dfefe637eb14c0a4ff4e185",
+        "bytes": 94225364,
+        "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428"
+      },
+      "compiled_case_count": 270,
+      "case_census_equal_to_first_variant": true,
+      "case_execution_attempted": true,
+      "execution": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+          "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+          "--exact",
+          "--nocapture"
+        ],
+        "cwd": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice",
+        "started_at": "2026-10-23T12:06:46.157733+00:00",
+        "timeout_seconds": 120,
+        "stdout": "case.stdout.txt",
+        "stderr": "case.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 76598,
+        "owned_process_group": 76598,
+        "exit_code": 101,
+        "wall_seconds": 0.096068,
+        "finished_at": "2026-10-23T12:06:46.254208+00:00",
+        "stdout_sha256": "25d35adfe604c472bbf61e6cb49cb11e67d2af24bba022b2f48be8be95e2fd4a",
+        "stdout_bytes": 330,
+        "stderr_sha256": "4b671ad198da0301c243ca5ec5d96a7cec6df13e17513910238d0e70fbb449ea",
+        "stderr_bytes": 1189
+      },
+      "observed": {
+        "counts": {
+          "passed": 0,
+          "failed": 1,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 269
+        },
+        "raw_summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.04s",
+        "raw_rows": [
+          [
+            "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+            "FAILED"
+          ]
+        ],
+        "expected_observation_obtained": true,
+        "negative_control": true,
+        "actual_failure_remains_failure": true,
+        "cleanup_marker_required": true
+      },
+      "restoration": {
+        "candidate_fixture_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+        "source_aggregate_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+        "exact_saved_bytes_restored": true
+      }
+    },
+    {
+      "id": "02-new-live-then-release",
+      "state": "expected observation obtained once",
+      "expected_process_exit": 0,
+      "source_aggregate_sha256": "dde62c86aec7431b746b792fb0efea2ba5afd424314a8a59f663cffccd7bcfdf",
+      "fixture_sha256": "07dd0704e2d54acbdf0a3381c66b2ffd0f6ea56557ed4be7404437a46d02fd92",
+      "compile": {
+        "command": [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-voice",
+          "--test",
+          "it",
+          "--no-run",
+          "--message-format=json-render-diagnostics"
+        ],
+        "cwd": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS",
+        "started_at": "2026-10-23T12:06:57.003725+00:00",
+        "timeout_seconds": 1800,
+        "stdout": "compile.stdout.txt",
+        "stderr": "compile.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 76905,
+        "owned_process_group": 76905,
+        "exit_code": 0,
+        "wall_seconds": 7.287958,
+        "finished_at": "2026-10-23T12:07:04.292154+00:00",
+        "stdout_sha256": "d0f33cff73125c1da71ad452c4ba84e8cbf52595c43b33111fe34661f9a596d1",
+        "stdout_bytes": 250582,
+        "stderr_sha256": "f88a3e3ef62fb003773b448e726b9f1bacf5864665fb3b0e153194af75da60e3",
+        "stderr_bytes": 164
+      },
+      "artifact": {
+        "sha256": "9ac0822ac0745a272a905311e5c471b8c859c87157f240a5f643df75523ec7e1",
+        "bytes": 94225516,
+        "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428"
+      },
+      "compiled_case_count": 270,
+      "case_census_equal_to_first_variant": true,
+      "case_execution_attempted": true,
+      "execution": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+          "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+          "--exact",
+          "--nocapture"
+        ],
+        "cwd": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice",
+        "started_at": "2026-10-23T12:07:09.345420+00:00",
+        "timeout_seconds": 120,
+        "stdout": "case.stdout.txt",
+        "stderr": "case.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 77164,
+        "owned_process_group": 77164,
+        "exit_code": 0,
+        "wall_seconds": 0.044194,
+        "finished_at": "2026-10-23T12:07:09.389958+00:00",
+        "stdout_sha256": "02bb3b53784abe2933db3b5d606c9854569b24093ed4d611a450f89711c648b4",
+        "stdout_bytes": 211,
+        "stderr_sha256": "7ca6747ad50b7b0fa3abbbf7beb350caca848ec3a7739c4f07110a1aafe3334c",
+        "stderr_bytes": 179
+      },
+      "observed": {
+        "counts": {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 269
+        },
+        "raw_summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.00s",
+        "raw_rows": [
+          [
+            "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+            "ok"
+          ]
+        ],
+        "expected_observation_obtained": true,
+        "negative_control": false,
+        "actual_failure_remains_failure": false,
+        "cleanup_marker_required": true
+      },
+      "restoration": {
+        "candidate_fixture_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+        "source_aggregate_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+        "exact_saved_bytes_restored": true
+      }
+    },
+    {
+      "id": "03-new-held-copy-watchdog",
+      "state": "expected observation obtained once",
+      "expected_process_exit": 101,
+      "source_aggregate_sha256": "ba8253bc1661d6426de5495155fe66f980e406f072fedd65f43524d6fc4440bb",
+      "fixture_sha256": "306d89ed79cf506fa2403826dd9e66cb361096690b325878b87b99c9f98d8dab",
+      "compile": {
+        "command": [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-voice",
+          "--test",
+          "it",
+          "--no-run",
+          "--message-format=json-render-diagnostics"
+        ],
+        "cwd": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS",
+        "started_at": "2026-10-23T12:07:19.660372+00:00",
+        "timeout_seconds": 1800,
+        "stdout": "compile.stdout.txt",
+        "stderr": "compile.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 78082,
+        "owned_process_group": 78082,
+        "exit_code": 0,
+        "wall_seconds": 7.288627,
+        "finished_at": "2026-10-23T12:07:26.949419+00:00",
+        "stdout_sha256": "13c5ccf58cb42e28fbaed303a19c326dd4228786e35ba81d56b69a0754727fa8",
+        "stdout_bytes": 250582,
+        "stderr_sha256": "0d6472909eee8393a828dc5272075d090d87b38f7fe99858379579a5be90d380",
+        "stderr_bytes": 164
+      },
+      "artifact": {
+        "sha256": "a488dc3c39ae83ea6d230bb1a89b227efa881744dcca8025c1a2ea662a2ac56e",
+        "bytes": 94225564,
+        "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428"
+      },
+      "compiled_case_count": 270,
+      "case_census_equal_to_first_variant": true,
+      "case_execution_attempted": true,
+      "execution": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+          "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+          "--exact",
+          "--nocapture"
+        ],
+        "cwd": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice",
+        "started_at": "2026-10-23T12:07:37.215728+00:00",
+        "timeout_seconds": 120,
+        "stdout": "case.stdout.txt",
+        "stderr": "case.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 80479,
+        "owned_process_group": 80479,
+        "exit_code": 101,
+        "wall_seconds": 5.146759,
+        "finished_at": "2026-10-23T12:07:42.362850+00:00",
+        "stdout_sha256": "521ce770cd39de9d3e1b3cf9f604c2734b5de86778f979325ab45285c529275a",
+        "stdout_bytes": 330,
+        "stderr_sha256": "b420b04244000e8308c581a16f24f7fb305e149c55ae862c3ac605278dde3c3f",
+        "stderr_bytes": 1196
+      },
+      "observed": {
+        "counts": {
+          "passed": 0,
+          "failed": 1,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 269
+        },
+        "raw_summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 269 filtered out; finished in 5.05s",
+        "raw_rows": [
+          [
+            "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+            "FAILED"
+          ]
+        ],
+        "expected_observation_obtained": true,
+        "negative_control": true,
+        "actual_failure_remains_failure": true,
+        "cleanup_marker_required": true
+      },
+      "restoration": {
+        "candidate_fixture_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+        "source_aggregate_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+        "exact_saved_bytes_restored": true
+      }
+    },
+    {
+      "id": "04-unmodified-candidate",
+      "state": "expected observation obtained once",
+      "expected_process_exit": 0,
+      "source_aggregate_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+      "fixture_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+      "compile": {
+        "command": [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-voice",
+          "--test",
+          "it",
+          "--no-run",
+          "--message-format=json-render-diagnostics"
+        ],
+        "cwd": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS",
+        "started_at": "2026-10-23T12:07:53.660429+00:00",
+        "timeout_seconds": 1800,
+        "stdout": "compile.stdout.txt",
+        "stderr": "compile.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 83388,
+        "owned_process_group": 83388,
+        "exit_code": 0,
+        "wall_seconds": 5.963454,
+        "finished_at": "2026-10-23T12:07:59.624325+00:00",
+        "stdout_sha256": "1c430e69247034d9332e7ef7f968825431cb1cdcdc65f870b31db44521c42236",
+        "stdout_bytes": 250582,
+        "stderr_sha256": "2d7df35ff966d3d682b9a48a47a8e474d13ecd39d05ac10d8dd8db2aaa5e32bd",
+        "stderr_bytes": 164
+      },
+      "artifact": {
+        "sha256": "cad08a88aaca6cb6dd5077d18a16d13cb6f96196973400cce85925edcb837c91",
+        "bytes": 94198908,
+        "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428"
+      },
+      "compiled_case_count": 270,
+      "case_census_equal_to_first_variant": true,
+      "case_execution_attempted": true,
+      "execution": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+          "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+          "--exact",
+          "--nocapture"
+        ],
+        "cwd": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice",
+        "started_at": "2026-10-23T12:08:04.404739+00:00",
+        "timeout_seconds": 120,
+        "stdout": "case.stdout.txt",
+        "stderr": "case.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 84204,
+        "owned_process_group": 84204,
+        "exit_code": 0,
+        "wall_seconds": 0.044035,
+        "finished_at": "2026-10-23T12:08:04.449106+00:00",
+        "stdout_sha256": "02bb3b53784abe2933db3b5d606c9854569b24093ed4d611a450f89711c648b4",
+        "stdout_bytes": 211,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "observed": {
+        "counts": {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 269
+        },
+        "raw_summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.00s",
+        "raw_rows": [
+          [
+            "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+            "ok"
+          ]
+        ],
+        "expected_observation_obtained": true,
+        "negative_control": false,
+        "actual_failure_remains_failure": false,
+        "cleanup_marker_required": false
+      },
+      "restoration": {
+        "candidate_fixture_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+        "source_aggregate_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+        "exact_saved_bytes_restored": true
+      }
+    }
+  ],
+  "unrun_variants": [],
+  "candidate_restored": true,
+  "gate_commands_executed": false,
+  "socket_preflight": "AF_UNIX datagram and IPv4 loopback listener succeeded before Cargo",
+  "rustc": {
+    "command": [
+      "rustc",
+      "-vV"
+    ],
+    "cwd": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS",
+    "started_at": "2026-10-23T12:05:36.590348+00:00",
+    "timeout_seconds": 60,
+    "stdout": "rustc.stdout.txt",
+    "stderr": "rustc.stderr.txt",
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "owned_pid": 73034,
+    "owned_process_group": 73034,
+    "exit_code": 0,
+    "wall_seconds": 0.0898,
+    "finished_at": "2026-10-23T12:05:36.687643+00:00",
+    "stdout_sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+    "stdout_bytes": 191,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0
+  },
+  "cargo": {
+    "command": [
+      "cargo",
+      "-V"
+    ],
+    "cwd": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS",
+    "started_at": "2026-10-23T12:05:36.695750+00:00",
+    "timeout_seconds": 60,
+    "stdout": "cargo.stdout.txt",
+    "stderr": "cargo.stderr.txt",
+    "timed_out": false,
+    "timeout_cleanup": [],
+    "owned_pid": 73039,
+    "owned_process_group": 73039,
+    "exit_code": 0,
+    "wall_seconds": 0.082487,
+    "finished_at": "2026-10-23T12:05:36.783909+00:00",
+    "stdout_sha256": "b6ef6807dd96d18b833474ad68e7a23a29e562a29c67afa71a59fb9a73df0068",
+    "stdout_bytes": 36,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0
+  },
+  "freshness": {
+    "mtime_ns": 1792757136790064000,
+    "paths": 10028,
+    "before_aggregate_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+    "after_aggregate_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+    "bytes_modes_symlinks_identical": true
+  },
+  "source_after_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+  "finished_at": "2026-10-23T12:08:12.384465+00:00",
+  "runner_exit_code": 0
+}

@@ -1,0 +1,33 @@
+{
+  "note": "Historical execution-plan patch paths remain unchanged and name original external files. These public envelopes retain those exact bytes; reconstruct the original paths only in a scratch checkout before replay. No execution or result was changed.",
+  "mapping": [
+    {
+      "original_relative_path": "candidate.patch",
+      "bytes": 3380,
+      "sha256": "0688625440c18c28d53aef11b8f2794aca1dacbf908e0e061a2eca20a423666f",
+      "public_envelope": "candidate.patch.json",
+      "text_field": "text"
+    },
+    {
+      "original_relative_path": "controls/01-old-held-copy.patch",
+      "bytes": 4729,
+      "sha256": "ebcf8f13d53b054219df2f060e654682475d5adfb330420de700ca71b8493acb",
+      "public_envelope": "controls/01-old-held-copy.patch.json",
+      "text_field": "text"
+    },
+    {
+      "original_relative_path": "controls/02-new-live-then-release.patch",
+      "bytes": 3776,
+      "sha256": "3be627bddae03c05c4f68f4485414777e344ef9c2ec8d7876b17468bd65aa1d1",
+      "public_envelope": "controls/02-new-live-then-release.patch.json",
+      "text_field": "text"
+    },
+    {
+      "original_relative_path": "controls/03-new-held-copy-watchdog.patch",
+      "bytes": 3061,
+      "sha256": "9528f46fd12a2228a75b32d9c11af46ca9ff3338b9495195fa411829c48215d8",
+      "public_envelope": "controls/03-new-held-copy-watchdog.patch.json",
+      "text_field": "text"
+    }
+  ]
+}

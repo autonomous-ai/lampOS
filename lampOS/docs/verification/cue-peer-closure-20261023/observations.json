@@ -1,0 +1,118 @@
+[
+  {
+    "variant": "01-old-held-copy",
+    "actual_process_exit": 101,
+    "process_wall_seconds": 0.096068,
+    "compile_wall_seconds": 53.094795,
+    "source_restoration": {
+      "candidate_fixture_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+      "source_aggregate_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+      "exact_saved_bytes_restored": true
+    },
+    "counts": {
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 269
+    },
+    "raw_summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.04s",
+    "raw_rows": [
+      [
+        "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+        "FAILED"
+      ]
+    ],
+    "expected_observation_obtained": true,
+    "negative_control": true,
+    "actual_failure_remains_failure": true,
+    "cleanup_marker_required": true
+  },
+  {
+    "variant": "02-new-live-then-release",
+    "actual_process_exit": 0,
+    "process_wall_seconds": 0.044194,
+    "compile_wall_seconds": 7.287958,
+    "source_restoration": {
+      "candidate_fixture_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+      "source_aggregate_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+      "exact_saved_bytes_restored": true
+    },
+    "counts": {
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 269
+    },
+    "raw_summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.00s",
+    "raw_rows": [
+      [
+        "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+        "ok"
+      ]
+    ],
+    "expected_observation_obtained": true,
+    "negative_control": false,
+    "actual_failure_remains_failure": false,
+    "cleanup_marker_required": true
+  },
+  {
+    "variant": "03-new-held-copy-watchdog",
+    "actual_process_exit": 101,
+    "process_wall_seconds": 5.146759,
+    "compile_wall_seconds": 7.288627,
+    "source_restoration": {
+      "candidate_fixture_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+      "source_aggregate_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+      "exact_saved_bytes_restored": true
+    },
+    "counts": {
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 269
+    },
+    "raw_summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 269 filtered out; finished in 5.05s",
+    "raw_rows": [
+      [
+        "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+        "FAILED"
+      ]
+    ],
+    "expected_observation_obtained": true,
+    "negative_control": true,
+    "actual_failure_remains_failure": true,
+    "cleanup_marker_required": true
+  },
+  {
+    "variant": "04-unmodified-candidate",
+    "actual_process_exit": 0,
+    "process_wall_seconds": 0.044035,
+    "compile_wall_seconds": 5.963454,
+    "source_restoration": {
+      "candidate_fixture_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+      "source_aggregate_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+      "exact_saved_bytes_restored": true
+    },
+    "counts": {
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 269
+    },
+    "raw_summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.00s",
+    "raw_rows": [
+      [
+        "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+        "ok"
+      ]
+    ],
+    "expected_observation_obtained": true,
+    "negative_control": false,
+    "actual_failure_remains_failure": false,
+    "cleanup_marker_required": false
+  }
+]

@@ -1,0 +1,79 @@
+{
+  "source": {
+    "worktree": "/private/tmp/tests-codex-cue-peer-closed-20261023",
+    "head": "3e75cc3cbe4c544dee433fb8a81dc3b06daf688d",
+    "base_tree": "0af3ca0dc1c800eeb442b9b856c144d41ee85f3f",
+    "branch": "tests/1569-cue-peer-closed",
+    "tracked_paths": 10028,
+    "lampos_paths": 6682,
+    "source_aggregate_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+    "owned_paths": [
+      "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "source_map_sha256": "c089689090e18f38d2dce9732d55ffaa444489da05060116936cb0483252158f",
+    "only_owned_files_differ_from_base": true
+  },
+  "candidate_fixture_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+  "candidate_doc_sha256": "f28c90d1963e99f731c2457783d298750b10ee434b1163efbb719f6e0c65b0ee",
+  "approved_original_plan_sha256": "d4d3efad858bb0a61465b6ce0a2f4ea5431d88fd65cb798dc0f452f13233cc8c",
+  "candidate_patch_sha256": "0688625440c18c28d53aef11b8f2794aca1dacbf908e0e061a2eca20a423666f",
+  "mutations": [
+    {
+      "id": "01-old-held-copy",
+      "source_sha256": "d70722b5c3454e0c562c0c7189b9c79a25830c2944afbdda36eed619811d5960",
+      "source_file": "controls/01-old-held-copy.rs"
+    },
+    {
+      "id": "02-new-live-then-release",
+      "source_sha256": "07dd0704e2d54acbdf0a3381c66b2ffd0f6ea56557ed4be7404437a46d02fd92",
+      "source_file": "controls/02-new-live-then-release.rs"
+    },
+    {
+      "id": "03-new-held-copy-watchdog",
+      "source_sha256": "306d89ed79cf506fa2403826dd9e66cb361096690b325878b87b99c9f98d8dab",
+      "source_file": "controls/03-new-held-copy-watchdog.rs"
+    },
+    {
+      "id": "04-unmodified-candidate",
+      "source_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+      "source_file": "candidate-fixture_provider.rs"
+    }
+  ],
+  "product_source": [
+    {
+      "path": "lampOS/crates/voice/src/fixture_provider.rs",
+      "sha256": "3a5e2c9bdda813b394d10591d5b3ac79d2abd810c2dbeb3f837712d73ed42cbb",
+      "bytes": 64141,
+      "equal_to_base": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/process.rs",
+      "sha256": "21d090b1f6fdfbfc29928da66ac3494062fe51c440cfc5569181a7f6f06c8d7b",
+      "bytes": 104845,
+      "equal_to_base": true
+    }
+  ],
+  "assertion_preservation": {
+    "target_case_equal_after_removing_only_wait_call": true,
+    "original_assertion_macros": 5,
+    "peer_loss_scan_count": 1,
+    "stale_half_unchanged": true,
+    "AT_and_trace_unchanged": true
+  },
+  "source_map_external": {
+    "path": "/private/tmp/tests-cue-peer-closed-execution-20261023/source-map.json",
+    "bytes": 2751555,
+    "sha256": "c089689090e18f38d2dce9732d55ffaa444489da05060116936cb0483252158f"
+  },
+  "runner_external": {
+    "path": "/private/tmp/tests-cue-peer-closed-execution-20261023/run.py",
+    "sha256": "72c9b89580d28a180f25c54d52224423252b44a8158c13b43646d94f0e811c41"
+  },
+  "frozen_input_manifest_external": {
+    "path": "/private/tmp/tests-cue-peer-closed-execution-20261023/SHA256SUMS",
+    "sha256": "0a850f50a5d2013ad7d0dba31c9aafc641ca77719f4bc9cb515fce9a68ebd4d8"
+  },
+  "prepared_source_has_no_commit": true,
+  "base_commit_is_not_candidate_commit": true
+}

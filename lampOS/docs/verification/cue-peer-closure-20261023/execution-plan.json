@@ -1,0 +1,180 @@
+{
+  "status": "Prepared, unexecuted; parent CPU/MAIN grant required",
+  "approved_control_plan_sha256": "d4d3efad858bb0a61465b6ce0a2f4ea5431d88fd65cb798dc0f452f13233cc8c",
+  "source": {
+    "worktree": "/private/tmp/tests-codex-cue-peer-closed-20261023",
+    "head": "3e75cc3cbe4c544dee433fb8a81dc3b06daf688d",
+    "base_tree": "0af3ca0dc1c800eeb442b9b856c144d41ee85f3f",
+    "branch": "tests/1569-cue-peer-closed",
+    "tracked_paths": 10028,
+    "lampos_paths": 6682,
+    "source_aggregate_sha256": "25253cdcfe6c0c5e60023458eaf33373df95009ea1ac16040c31e4bf386fe3a2",
+    "owned_paths": [
+      "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "source_map_sha256": "c089689090e18f38d2dce9732d55ffaa444489da05060116936cb0483252158f",
+    "only_owned_files_differ_from_base": true
+  },
+  "candidate_source_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+  "candidate_doc_sha256": "f28c90d1963e99f731c2457783d298750b10ee434b1163efbb719f6e0c65b0ee",
+  "case": "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+  "environment": {
+    "PATH": "/Users/autonomous/.cargo/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/usr/local/go/bin:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/Users/autonomous/.codex/tmp/arg0-macos/codex-arg0TYuE1D:/Users/autonomous/.harness/runtime/grid-0.3.59-darwin-x64/bin:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.96.0",
+    "RUST_BACKTRACE": "1",
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null
+  },
+  "clear_environment_prefixes": [
+    "CARGO_TARGET_AARCH64_",
+    "CARGO_TARGET_ARM_"
+  ],
+  "compile_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-voice",
+    "--test",
+    "it",
+    "--no-run",
+    "--message-format=json-render-diagnostics"
+  ],
+  "compile_timeout_seconds": 1800,
+  "test_timeout_seconds": 120,
+  "inventory_timeout_seconds": 60,
+  "test_arguments": [
+    "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+    "--exact",
+    "--nocapture"
+  ],
+  "test_working_directory": "/private/tmp/tests-codex-cue-peer-closed-20261023/lampOS/crates/voice",
+  "variants": [
+    {
+      "id": "01-old-held-copy",
+      "patch": "controls/01-old-held-copy.patch",
+      "patch_sha256": "ebcf8f13d53b054219df2f060e654682475d5adfb330420de700ca71b8493acb",
+      "mutated_source_sha256": "d70722b5c3454e0c562c0c7189b9c79a25830c2944afbdda36eed619811d5960",
+      "mutated_source_bytes": 47033,
+      "expected_cargo_exit": 101,
+      "expected_passed": 0,
+      "expected_failed": 1,
+      "expected_ignored": 0,
+      "required_failure_substring": "assertion failed: sink.scan(&trace, AT).is_some()",
+      "required_output_substrings": [
+        "cue_control: live copy observed; entering original single scan",
+        "cue_copy_cleanup: explicit_release=true joined=true"
+      ],
+      "forbidden_output_substrings": [],
+      "patch_check": {
+        "command": [
+          "git",
+          "apply",
+          "--check",
+          "/private/tmp/tests-cue-peer-closed-evidence-20261023/controls/01-old-held-copy.patch"
+        ],
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "execution": "not run",
+      "source_file": "controls/01-old-held-copy.rs",
+      "source_sha256": "d70722b5c3454e0c562c0c7189b9c79a25830c2944afbdda36eed619811d5960",
+      "expected_process_exit": 101
+    },
+    {
+      "id": "02-new-live-then-release",
+      "patch": "controls/02-new-live-then-release.patch",
+      "patch_sha256": "3be627bddae03c05c4f68f4485414777e344ef9c2ec8d7876b17468bd65aa1d1",
+      "mutated_source_sha256": "07dd0704e2d54acbdf0a3381c66b2ffd0f6ea56557ed4be7404437a46d02fd92",
+      "mutated_source_bytes": 48383,
+      "expected_cargo_exit": 0,
+      "expected_passed": 1,
+      "expected_failed": 0,
+      "expected_ignored": 0,
+      "required_failure_substring": null,
+      "required_output_substrings": [
+        "cue_control: live copy observed; explicitly releasing and joining",
+        "cue_control: closure observed; entering original single scan",
+        "cue_copy_cleanup: explicit_release=true joined=true"
+      ],
+      "forbidden_output_substrings": [],
+      "patch_check": {
+        "command": [
+          "git",
+          "apply",
+          "--check",
+          "/private/tmp/tests-cue-peer-closed-evidence-20261023/controls/02-new-live-then-release.patch"
+        ],
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "execution": "not run",
+      "source_file": "controls/02-new-live-then-release.rs",
+      "source_sha256": "07dd0704e2d54acbdf0a3381c66b2ffd0f6ea56557ed4be7404437a46d02fd92",
+      "expected_process_exit": 0
+    },
+    {
+      "id": "03-new-held-copy-watchdog",
+      "patch": "controls/03-new-held-copy-watchdog.patch",
+      "patch_sha256": "9528f46fd12a2228a75b32d9c11af46ca9ff3338b9495195fa411829c48215d8",
+      "mutated_source_sha256": "306d89ed79cf506fa2403826dd9e66cb361096690b325878b87b99c9f98d8dab",
+      "mutated_source_bytes": 48130,
+      "expected_cargo_exit": 101,
+      "expected_passed": 0,
+      "expected_failed": 1,
+      "expected_ignored": 0,
+      "required_failure_substring": "cue peer closure was not observed within 5 s:",
+      "required_output_substrings": [
+        "cue_copy_cleanup: explicit_release=true joined=true"
+      ],
+      "forbidden_output_substrings": [
+        "cue_control: unexpectedly entering original single scan"
+      ],
+      "patch_check": {
+        "command": [
+          "git",
+          "apply",
+          "--check",
+          "/private/tmp/tests-cue-peer-closed-evidence-20261023/controls/03-new-held-copy-watchdog.patch"
+        ],
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "execution": "not run",
+      "source_file": "controls/03-new-held-copy-watchdog.rs",
+      "source_sha256": "306d89ed79cf506fa2403826dd9e66cb361096690b325878b87b99c9f98d8dab",
+      "expected_process_exit": 101
+    },
+    {
+      "id": "04-unmodified-candidate",
+      "source_file": "candidate-fixture_provider.rs",
+      "source_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+      "expected_process_exit": 0,
+      "expected_passed": 1,
+      "expected_failed": 0,
+      "expected_ignored": 0,
+      "required_failure_substring": null,
+      "required_output_substrings": [],
+      "forbidden_output_substrings": []
+    }
+  ],
+  "order": "Each fixed control once in listed order, then one unchanged candidate exact-case run. Stop unexpected outcome; no retries.",
+  "source_protocol": "Full tracked-repository bytes/modes/symlinks pinned. Freshen all tracked mtimes once before Cargo and prove identical aggregate. Each variant changes only the owned integration fixture, restores exact saved candidate bytes in finally, then verifies the entire source map.",
+  "artifact_protocol": "Compile must succeed; one emitted lamp-voice it executable, inside fixed MAIN, is hashed and inventoried before running. Complete integration inventory must match across variants, selected case must occur exactly once and not be ignored. Hash executable again after run.",
+  "result_protocol": "Exact one-case actual libtest row and summary, expected process exit/panic/cleanup markers. Timeout/abort/compile/source/census/cleanup failure is invalid even if a panic substring appears. All failed/unrun phases retained.",
+  "signals": "Only runner-owned child process groups can be terminated on timeout/interrupt. Python finally restores on caught exceptions/SIGINT/SIGTERM; uncatchable SIGKILL or machine loss cannot guarantee finally."
+}
