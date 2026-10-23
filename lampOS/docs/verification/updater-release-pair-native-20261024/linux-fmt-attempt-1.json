@@ -1,0 +1,9 @@
+{
+  "name": "second-pair-fmt-8d9b6c9f80a8",
+  "image": "sha256:7dc3bb4b3b88bb00e16e37eeb5c98a74f9d926f956584eb8c009c9ca86023cd2",
+  "head": "d5d4d048b0b7fc850abc49d38c9964eaf03ac780",
+  "source_tar_sha256": "f74d938ccaae102c694bc427cc3581eefeeaa1999f37c659d9dc6216ac5b1c9b",
+  "removed": true,
+  "result": "setup failed before cargo: docker cp - to read-only container returned 1; stderr was captured but not retained",
+  "gate_executed": false
+}
