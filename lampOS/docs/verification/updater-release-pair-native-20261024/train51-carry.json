@@ -1,0 +1,17 @@
+{
+  "previous_head": "7ebb876be004a84981cc71bf8b01e3eb3a06eb4c",
+  "head": "baed91ead4cc9712ad053090fa2724b05897e2ce",
+  "base": "1291ef1f43b0c16135766a56859c21b02fdf5dd6",
+  "pr_paths": 255,
+  "changed_pr_paths": [],
+  "whole_tree_delta": [
+    "lampOS/crates/eyes/Cargo.toml",
+    "lampOS/crates/eyes/src/main.rs",
+    "lampOS/crates/eyes/src/photo.rs",
+    "lampOS/crates/eyes/src/who.rs",
+    "lampOS/docs/eyes.md"
+  ],
+  "range_diff": "1:  7ebb876be = 1:  baed91ead lampOS: exercise recovery across published updater versions",
+  "repository_tree": "642c8009948a5ecd7af819a49226c9f450d762a2",
+  "lampOS_tree": "d096e2379cdb46ac8ce4c97569c7ddfb4d2a0d5f"
+}
