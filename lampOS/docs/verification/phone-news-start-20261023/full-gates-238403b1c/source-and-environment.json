@@ -1,0 +1,118 @@
+{
+  "identity": {
+    "head": "238403b1c5959fe8834aba09cfbbf24f03b6d893",
+    "base": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+    "candidate_commit": "238403b1c5959fe8834aba09cfbbf24f03b6d893",
+    "candidate_kind": "exact clean committed phone fixture head",
+    "tree": "f4017e5b0cfad4c6f4571a5106cb1baf62369faf",
+    "parents": [
+      "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850"
+    ],
+    "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+    "base_source_aggregate_sha256": "c0c566499c2aa0c50f659af10c237c4d982337e0806c89b8a47eeb2d013c7a35",
+    "source_map_sha256": "5ab0a1e700884ffed5d64d35ed3ac73abb3fcc9300c6edfa84388cc39c41cbfa",
+    "base_source_map_sha256": "98b2e21be8885b084c00b293698f52f63bb52f448c51d66da0450ddcc72c1b81",
+    "changed_paths": [
+      "lampOS/crates/voice/src/messages.rs",
+      "lampOS/docs/messages.md"
+    ],
+    "owned_file_sha256": {
+      "lampOS/crates/voice/src/messages.rs": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "lampOS/docs/messages.md": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3"
+    },
+    "patch_sha256": "6a85e3205664487c98f2aced6fb303315cc6af39079f17f91bcdc5ee7d7c0e65",
+    "repository_paths": 10028,
+    "lampOS_paths": 6682,
+    "source_preparation": "Immutable complete Git objects; initial live metadata proved exact clean HEAD/branch only. No target read or Cargo invocation.",
+    "rules_sha256": {
+      "lampOS/builders/tests.md": "5ce0cdc9d36cc6723655b1f0246751276025c044adfc71a3fdf7c804f18cbcac",
+      "lampOS/docs/joining.md": "afe79f105530d5de5384c860840d682936ff8056a75b4f4c0b20ed2d78edbede",
+      "lampOS/AGENTS.md": "0954b38728a27cbe4413e5a2b8898ad8a5b1fad83f594ffabcaa81c18a7f1dad"
+    }
+  },
+  "freshness": {
+    "tracked_files": 10028,
+    "mtime_ns": 1792757410931272000,
+    "before_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+    "after_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+    "identical_bytes": true,
+    "algorithm": "sorted path + NUL + Git mode + NUL + u64 big-endian length + exact bytes; symlinks use literal target bytes"
+  },
+  "final_source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+  "source_bytes_unchanged": true,
+  "per_step_source_aggregates": [
+    {
+      "step": "fmt",
+      "source_aggregate_sha256_after": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290"
+    },
+    {
+      "step": "clippy",
+      "source_aggregate_sha256_after": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290"
+    },
+    {
+      "step": "voice-default-parallel",
+      "source_aggregate_sha256_after": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290"
+    },
+    {
+      "step": "readers-default-parallel",
+      "source_aggregate_sha256_after": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290"
+    },
+    {
+      "step": "workspace-build",
+      "source_aggregate_sha256_after": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290"
+    },
+    {
+      "step": "diff-check",
+      "source_aggregate_sha256_after": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290"
+    }
+  ],
+  "controlled_environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_BUILD_TARGET": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_TARGET_TMPDIR": null,
+    "CARGO_TERM_COLOR": "never",
+    "LAMP_RELAY_PID_CONTROL_DIR": null,
+    "RUSTFLAGS": null,
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "RUST_BACKTRACE": "0",
+    "RUST_TEST_THREADS": null
+  },
+  "PATH_prefix": "/Users/autonomous/.cargo/bin:",
+  "platform_projection": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "kernel": "Darwin Kernel Version 25.6.0: Fri Jul 31 19:11:49 PDT 2026; root:xnu-12377.161.14~5/RELEASE_X86_64",
+    "reported_machine": "x86_64",
+    "physical_hardware_architecture": "not independently measured"
+  },
+  "projection_note": "Hostname and complete inherited PATH omitted; raw original results JSON remains external and hashed.",
+  "socket_preflight": {
+    "unix_datagram": "bind passed",
+    "unix_path_removed": true,
+    "loopback_tcp": {
+      "status": "bind and listen passed",
+      "address": [
+        "127.0.0.1",
+        52029
+      ]
+    },
+    "completed_before_Cargo": true
+  },
+  "launch_permissions": "require_escalated, as explicitly authorized; both local preflights completed before Cargo",
+  "source_map": {
+    "external_file": "/private/tmp/tests-phone-news-start-238403b1c-gates-20261023/source-map.json",
+    "sha256": "5ab0a1e700884ffed5d64d35ed3ac73abb3fcc9300c6edfa84388cc39c41cbfa"
+  },
+  "source_map_availability": "Complete immutable tracked map remains external. This publication includes its hash/count/aggregate and all compiled artifact/case identities, not a bulk whole-repository map.",
+  "original_results_json": {
+    "external_file": "/private/tmp/tests-phone-news-start-238403b1c-gates-20261023/gates-20261023T121004.929022Z/results.json",
+    "bytes": 43298,
+    "sha256": "00023d4da377f00cb53f6110d815212fffbfb2d4231517768b8121bdd3fab5d2"
+  }
+}

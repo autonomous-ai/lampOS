@@ -1,0 +1,1604 @@
+{
+  "source": "Actual Cargo artifact records, digested before shared target reuse.",
+  "records": [
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f",
+      "sha256": "47089f2e8f1fb102d13988d65c1a4ae66bdd355aa148a92a2d2d86a67497b96c",
+      "bytes": 1435696,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "render_line_second",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+      "sha256": "ab88db9184f7bdaf2ad63b2995167065dd942653440ffafc365a03bcaa0f7d59",
+      "bytes": 1119920,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "lamp-voice",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+      "sha256": "fcdc94afefce77a2eb42a4821a8f5440969ce4831524144344e7d30fb7720468",
+      "bytes": 2728480,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "stop_words_stt_replay",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/head_qualification_operator",
+      "sha256": "9db965a6c470f6463d615de4899db129503bf626ecda857fc4e190070625425d",
+      "bytes": 1410400,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "head_qualification_operator",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/ring_process_probe",
+      "sha256": "d6e3309ec98e123173b571144b03c5327fa83307e4a84d8a008f74eb6bac0263",
+      "bytes": 5617736,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "ring_process_probe",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/admission_latency",
+      "sha256": "6053a11e4c5c374262d5dabefa8bc19a65aa8bd2675369e2ce7dc436c34be8db",
+      "bytes": 895832,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "admission_latency",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/hearing_replay",
+      "sha256": "1c65c6ed01d723ab419cfd3458a75c79fefd239ee79a74a73106cd102c35a20f",
+      "bytes": 1608344,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "hearing_replay",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/probe_handover",
+      "sha256": "08f076450a0ce3f8eb9d7915fa0257a070bedad22b5764165893024e24bce95e",
+      "bytes": 12629832,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "probe_handover",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/reference_pace",
+      "sha256": "a88687e5a50e4ea4e82f145c420ef9cb659684c2bd5a064be355cff002da74b3",
+      "bytes": 3775248,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "reference_pace",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/duplex_lab",
+      "sha256": "6d9232b238369c4d8a192e71ae1db6e26a3de3fb50b823b383777ac9a63bc454",
+      "bytes": 2898808,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "duplex_lab",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-voice",
+      "sha256": "2dde3de84488746ee2b9706b051244b263471374118dd687e8f7d42b60fe392b",
+      "bytes": 40039232,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "lamp-voice",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+      "sha256": "0eb10bacb1d3c95f97e47ba684b69aaa34b6c6453e5855b4556354e099adea43",
+      "bytes": 94198604,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "sha256": "c78135041fa8164bc529bef04cef3f87adc5d4340e5b5d4a2e9f0d014062e632",
+      "bytes": 113311528,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "lamp_voice",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_setup-7641d9289b7af3f6",
+      "sha256": "9a2fffb65103aab9ba27ec6cbed1fa4791ba2b745762f0c7e81ef37344b62304",
+      "bytes": 941832,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "name": "lamp-setup",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-setup",
+      "sha256": "a6f21118f88e5c5e31ba4a2cfd9baa7930c61ad019f2a5d87c319eb9a2945b0d",
+      "bytes": 15567784,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "name": "lamp-setup",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/wake-1879b0f98b9c49a0",
+      "sha256": "a86421823f7cf04b5aa29e6446721b6541a4a284e081607e93c75b9b7297a490",
+      "bytes": 1480288,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "name": "wake",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/head_plan",
+      "sha256": "f44113acea162573906c2397b1479479ecc52bf62be65a95dea5f3384b1a23ff",
+      "bytes": 1410832,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "head_plan",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_inspect-637ece4159665738",
+      "sha256": "ecb5f3466257499f92175e0ad18ec66ab31d34fda869a7392e44327e101ac581",
+      "bytes": 1161944,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-inspect",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_measure-7f0ba0e9571da263",
+      "sha256": "6d3a11e57f2167b90a46de35a467fe528b0002b31f75663d914066d97f12f96c",
+      "bytes": 1296112,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-measure",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-body-inspect",
+      "sha256": "9a654827ab2552fc740567b96ba9ddff05081e6e27fefedc279d72aa4872be6b",
+      "bytes": 597368,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-inspect",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/check",
+      "sha256": "fd034e14cbfb3c836e0f6a051d907ee0d585690cec973ea7bd050ddc6c099c12",
+      "bytes": 2156688,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/lean#lamp-lean@0.1.0",
+      "target": {
+        "name": "check",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-71b3c4366a177b0c",
+      "sha256": "f8becdbfd4860eea0767a4c83d628dbe14ef66bbe97bd2afc5bc87f45eb5505e",
+      "bytes": 3124816,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/lean#lamp-lean@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/recent_playout_cost",
+      "sha256": "7795ec4e3915889398df2dac2ad057a6128e471fae3dd8a322863ce615acb44a",
+      "bytes": 3952984,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "recent_playout_cost",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-expression",
+      "sha256": "621ad68e106b0c5d30d9f475163ec27c98d8016c96f5d1be36726d0e05fed967",
+      "bytes": 8537328,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "lamp-expression",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-c5f75c9d30c5f818",
+      "sha256": "6b8d71f2072ee9880e6fddedb50536dbbf4c6d5e1a8e923b1f58626b93b8e798",
+      "bytes": 12495796,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/rest_cost",
+      "sha256": "46317183f324f096fd7e39e6614b31aeab6bd2d8cd58afcc4579255c8b3bdae6",
+      "bytes": 3958704,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "rest_cost",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_expression-367629d2b98fd09c",
+      "sha256": "865f51ae808cd443f3c7b9444d3b28a2af1ffb91877a6b28d93f1217fe4143e1",
+      "bytes": 2443008,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "lamp-expression",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/replay_cost",
+      "sha256": "aac43b72b0cc98a760e7e7451131451a1a60b1451a3890cc9555949d7c571912",
+      "bytes": 3939952,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "replay_cost",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_lean-bf9e165f7a87ea41",
+      "sha256": "44abcfe6641114b9f49709c85f63f32b0775ac8427602ef1b6f001d168e229e4",
+      "bytes": 1054320,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/lean#lamp-lean@0.1.0",
+      "target": {
+        "name": "lamp_lean",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-body-measure",
+      "sha256": "d5a0ede887521a6b17ed77fd3ea125991831b41dfaa810ff9430fec6299e1e7b",
+      "bytes": 782416,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-measure",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/runtime-8ba534de81614d18",
+      "sha256": "3a7c9e37eef9dff82b667a4641229e9428c4dbc702efad308caecab1c3205286",
+      "bytes": 6631448,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "runtime",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-body-worker",
+      "sha256": "f78f7b35ead08e75b95361b5f2308b0ef9c360832658c652c5801451f47ce0a4",
+      "bytes": 634784,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-worker",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_mood-30267137783a16a9",
+      "sha256": "00ae69951be577363805fcb11bc35055693003f668525e290557543577b08054",
+      "bytes": 1031256,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-mood",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body-9ff199928743cc99",
+      "sha256": "7d770002b1829508f7c16b88a9f3972e33cb1be705e14c12fb202db77d8ea6a1",
+      "bytes": 2509168,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_worker-29a1b45163b9be85",
+      "sha256": "b16ab5bbb3c8e37e5ed856f6fbdbf922e5d067c939b32e5dec9b2e0b54f90abe",
+      "bytes": 1179112,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-worker",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-d30071be32c9fc43",
+      "sha256": "a9812cb1397e146d3d3daa2abf0af6be39a8a982d3f87e27ed7c0ef2fd5ec2f6",
+      "bytes": 12995976,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-body",
+      "sha256": "08f72ff5d2996bf696a2d829a5edb4a3bd9f4c2b8f3d541e6acdc67eebaa5de1",
+      "bytes": 910368,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/expression_ask",
+      "sha256": "fa6126cb3ab2e4ae9f02e489840eb60d26aa4b073a2f70bb18c478f246b5408b",
+      "bytes": 1254816,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "expression_ask",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-body-mood",
+      "sha256": "ae2bcf2f7a24926170bcbbe7bb433fc9f5021bd655d1769b7821c3a89ee709eb",
+      "bytes": 473720,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-mood",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-peek",
+      "sha256": "42013515bc12650b9ad5352d1e1126c495ae0705e7ce538e446d5945ba47a056",
+      "bytes": 5960464,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "name": "lamp-peek",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_peek-bb7b8ca29d47dc1f",
+      "sha256": "e5b27000ff1b55d47a399f9a0b8deeda8b5a8c20f304febc709b29610e9b3064",
+      "bytes": 941832,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "name": "lamp-peek",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-8bf4d1aea99732a6",
+      "sha256": "84c32992bf2af8154da6ea378d5d05a4ff9ea7e834b00d055af530d9d77c7d3a",
+      "bytes": 5774296,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/peek-c90c67e1b5376e51",
+      "sha256": "b6471fbbad5447a40963db3368b1c694ee7c4493db4b6d2d05802f88e1270db6",
+      "bytes": 6829976,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "name": "peek",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-update",
+      "sha256": "9ed2b7cc9216b2ae7a7f8ff664ca229f8359703c0bd73cf1e4f173a667147c1c",
+      "bytes": 10595220,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "lamp-update",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_keeper-a9f34008275109b0",
+      "sha256": "d56d3ffe968cc22ca92bd5a70b1ce848abe4ce7d4c24cfd86ca0bac36735dbc1",
+      "bytes": 1706112,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "target": {
+        "name": "lamp-keeper",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_expression-9c5b6f2fc96ff8fb",
+      "sha256": "d0556db436aca827a7d0fe4df817c740d78996bc87c6dba23b7a2043f5a98acb",
+      "bytes": 6022328,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "lamp_expression",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_setup-b7eab6c6ff05712c",
+      "sha256": "45ca37d6435478a461d90c7478d5dd996ce409f166f4ff45c9f24fa51784e494",
+      "bytes": 10849816,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "name": "lamp_setup",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_keeper-d493629e7c7f7339",
+      "sha256": "f17b3658bfed09a5c0e163298ddbb5d30c4351f54f614969e007eb2281b680ad",
+      "bytes": 2583056,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "target": {
+        "name": "lamp_keeper",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-memory",
+      "sha256": "bcc837356c4b865d483305f5a65869fd5171df3e8155fa076be00c79f90042f3",
+      "bytes": 7454660,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp-memory",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_peek-2fa9472102c7793a",
+      "sha256": "3ffb5527a366fd62ab910e113a8aacff248500591a6fe058f8fe171fb61b9a14",
+      "bytes": 3255888,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "name": "lamp_peek",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-memory-fixture",
+      "sha256": "52ea05994521e3f56d5848c617774b77ff54fa3c9f3fd40d6570ca2223554c88",
+      "bytes": 7712852,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp-memory-fixture",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-memory-eval",
+      "sha256": "7d13c4a78686f470327ae0c494185022d5cb3fa7facefc01eb2ae87566b81dad",
+      "bytes": 4017004,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp-memory-eval",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_observe-f06824b26415b941",
+      "sha256": "2e0741ee49eb8a0d610f4da207fd2a7f5771145bf30edff90b9431accd31f74f",
+      "bytes": 8457660,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_observe",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/functions-a019e8e3d9f18c56",
+      "sha256": "19511913a6e7284654611a6440c78b2c9e0b79fff797492eb0106ff7e619c8c2",
+      "bytes": 18461280,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "functions",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-e433beab2fb911b9",
+      "sha256": "2192f91fd59a325b26b22647fe45ed50f3179bdd89bb2ad661ca8e5a6a51b3c5",
+      "bytes": 13210892,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "lamp-skills",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/forgot-0205b773d3329302",
+      "sha256": "a2983846c1027c104f3808fcd2125ffbfac164d413e959276f2e0b1cc055b60e",
+      "bytes": 4141328,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "forgot",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+      "sha256": "bebe679f9ed2af4d133185b9105b594f671157b69f812d5c3f16626d1de1a680",
+      "bytes": 15363596,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "round",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/health_control-ac8c12dcd2c7ad1a",
+      "sha256": "9013675e0b0488d5ee81774c91b88e3b0dc2c0175cbb32f2400a8bc7fd0e3051",
+      "bytes": 2012704,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "health_control",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_since_until-4fd3a6b392a7d272",
+      "sha256": "836957fe646ec882e7830cfca201e0704ecdf0036fd63b3eaa14164fb54eb6d9",
+      "bytes": 9036676,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_since_until",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-b9e503bdd61f7e70",
+      "sha256": "02ed03e635811b095b350df563f53b2de2d75d9a93733a30953dd03728f901fe",
+      "bytes": 9952540,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp_memory",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-2daae09844723b26",
+      "sha256": "c2fdb33513fc7a181fc353f7c36a20136dfd0d8d13b1172ea893d92cbe772c8e",
+      "bytes": 20853292,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-44d498984d4c09df",
+      "sha256": "20d2cdd3ae4846c362caa471cd28af8abb7e10f97d7e7d6985c2dbe464933478",
+      "bytes": 941832,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "name": "lamp-cloud",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/requested_audio-6d30f8c0024b0543",
+      "sha256": "9c4a48efdb2354817b1ade9cbcce63df3f605aa0494aa4e41391584765d672ba",
+      "bytes": 13134116,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "requested_audio",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-bed542c0cfe5e8a7",
+      "sha256": "8d5f5c1fa1d4448ff70924187b566e7f718eec09ede8a0c9efa19da41c3432d0",
+      "bytes": 1655392,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-b2f0ae0b3b02a39a",
+      "sha256": "86068249656904ab79e6e797d75401f3f7e8df8c17c2af208012a88e44fc1ddc",
+      "bytes": 13776684,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "lamp_skills",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-dda903a1250bc605",
+      "sha256": "ead8b1b2e66ee8b6eb5d95cad52a6f03c6f0a19a7bb1e4cd1857a8795d8cfa1c",
+      "bytes": 11099108,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "lamp_update",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/self_process_cuts-225e6342b519b0b0",
+      "sha256": "72da66f3abf7322c2d7347e3ffec4110c2ca72f4ef6a0d1bc557db722401d07c",
+      "bytes": 473944,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "self-process-cuts",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/forget_shared_exchange-14fe9e8e0d114920",
+      "sha256": "929da592b6c969f83fc285d524fb2fc5d290a0268ed32ffe25e6d6ceedb1bc72",
+      "bytes": 5544324,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "forget_shared_exchange",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-baf52b4e33708f12",
+      "sha256": "663c570ad064dbb88e88610d4ec8c69fcfcaf7cf9ea96164b9e7c6d95aa36a23",
+      "bytes": 15428348,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_forget-74ce451f0225a361",
+      "sha256": "de80f15b51d8ab1af5743a8f282e341d9b49bba3bdb0f8c143a35f5aaaddab24",
+      "bytes": 9440820,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_forget",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice_eval-390c3d26497b9ea4",
+      "sha256": "2e424e9496fb61047171f2ff7d4b36a0ac71289cef59b1be3b46816962a264b8",
+      "bytes": 6357124,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "lamp-voice-eval",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/paraphrase_fixture-18e0766b1f009ff2",
+      "sha256": "a90b3281f7cf102673fb19257be347639ed9bbfd5acc7e5e24a9b72bf9305a54",
+      "bytes": 1480240,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "paraphrase_fixture",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/turn_end_replay",
+      "sha256": "6ff25b80def946dd909b2fc37c749b4027acc0ba30312a4e2fce67a50c28412e",
+      "bytes": 75422936,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "turn_end_replay",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/self_cli_exec-bc85a62cb2f27284",
+      "sha256": "61fb91665424db76a38946ae2172748ca2164d95891ecb58cead4186fa5bbca8",
+      "bytes": 474024,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "self-cli-exec",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_link_used-caa8157749a15aa8",
+      "sha256": "7536be74201a36bae15e9d8771d6563dfb2940bb599bf81de7aad77c15f6eb39",
+      "bytes": 9187676,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_link_used",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+      "sha256": "3c4ea363858d950ef3a34e50bf06b4749aacd39fc32a920a172a65208007d19a",
+      "bytes": 14458604,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_forget_about-8f04a42ed8e04aa3",
+      "sha256": "c88ad8f3cc08dc367603a90399a8a7626440502cd05374e8e5eac85974dff24d",
+      "bytes": 9028532,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_forget_about",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_early_words-ac6d63cbcd0176af",
+      "sha256": "494506edb25a9de96aae2500322393e6011788dded47309a815391926bde2fb1",
+      "bytes": 9250932,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_early_words",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-f337388f4e72a80e",
+      "sha256": "e95cfdde53653a14df02d05f9506349072c447744e963e5b14cfe528493c4e2b",
+      "bytes": 15907128,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body-3bda0a619327d99b",
+      "sha256": "91201e780ad4f6bacaeba360971a5ff47ea1d92eebe2897aa6bcd894325c8a22",
+      "bytes": 116329248,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp_body",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_follows_face-2d49a4baff95c2cd",
+      "sha256": "30a7c2469a7e202069091ae020be04770d0167c4fd2c2d137362a12e9c703e7a",
+      "bytes": 9196620,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_follows_face",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/forget_person-8deb8a5a5a1bec4c",
+      "sha256": "e29eb66b34b46b9969f811582004e80925e5861d816d0f236f200274a405e6a2",
+      "bytes": 7893860,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "forget_person",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/install-8ab651138ba2189d",
+      "sha256": "720aa1f688154e19654723b60e0e56cb1e75a7309aa80e3de83c63c86e3261ad",
+      "bytes": 13117900,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "install",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/render_relaxing_music",
+      "sha256": "415fa68842419fdddf7ebcf955d6f0846b4a947fb1739842e0a763dd5af63bb0",
+      "bytes": 548504,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "render_relaxing_music",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory_eval-297b5b933d9c5e5c",
+      "sha256": "131320525e495d543c333105277264b0fcc67c9aa8a3ea3c18fb0937f521f773",
+      "bytes": 1785048,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp-memory-eval",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-voice-eval",
+      "sha256": "b271ad93fd16523a50f5d98af0c983f049440b300f2d744dd962151bb1b36d3a",
+      "bytes": 28878368,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "lamp-voice-eval",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice_eval-dbe254449ccce883",
+      "sha256": "a7cfcad3326c3e6f80152311db09cf9760588978c3a0184975e793ef9f221fbd",
+      "bytes": 24505140,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "lamp_voice_eval",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_forget_named-b3b64eb830ff6b4b",
+      "sha256": "7396861ec883e19c906e05395531ae77991587dadfb061bd00a8d64774c83e50",
+      "bytes": 9108700,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_forget_named",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-14b8d1ecc993e2b4",
+      "sha256": "5cc505414d37cd4395b51709a7bc191fe02bd1f7c48f26f7746a850ffa2496c4",
+      "bytes": 29241808,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "name": "lamp_cloud",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-skills",
+      "sha256": "aab8b8c56e3754f2a26a63297f893f1c0720168e084c49b20b9f5af7a91c784b",
+      "bytes": 20175076,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "lamp-skills",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-aaea79408ab23117",
+      "sha256": "8ca372c7d8dc5e4f979c8859870eee3b05ba72f4a376510786fbedb5a122904d",
+      "bytes": 941840,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "lamp-update",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-cloud",
+      "sha256": "133b3b9296f7bbb2eab63e5dfd07157268521f5882cca2ea8a6eff884b07c1d8",
+      "bytes": 23494048,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "name": "lamp-cloud",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-3e6428a6ad440a7c",
+      "sha256": "721c0bc4019717b69df2eb15380df697c764a72cbc6697c8ea78be7709a7673c",
+      "bytes": 7763996,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp-memory",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/same_voice_pairs",
+      "sha256": "679c4a33965b02ac44bae3edbf60a17df876c143cf1c285dce8f5b2a1ac50820",
+      "bytes": 75511632,
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "package_id": "path+file:///private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "same_voice_pairs",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    }
+  ],
+  "availability": "Full build JSON and saved raw artifact metadata remain external. Binaries are not published, and no claim is made that MAIN paths remain available after release."
+}

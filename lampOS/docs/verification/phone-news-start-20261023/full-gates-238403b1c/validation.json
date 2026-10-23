@@ -1,0 +1,209 @@
+{
+  "status": "passed",
+  "combined_actual_counts": {
+    "passed": 7156,
+    "failed": 3,
+    "ignored": 32,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "completed_target_summaries_bound": 74,
+  "case_inventory_is_execution": false,
+  "no_test_or_gate_retry": true,
+  "final_original_result_sha256": "00023d4da377f00cb53f6110d815212fffbfb2d4231517768b8121bdd3fab5d2",
+  "source_or_target_reads_during_packaging": "None; captured external evidence only.",
+  "method": "Parse JSON; verify all exact stream wrappers and projected retained ranges against original raw bytes; verify all artifact/case matrices, all actual failure blocks, per-step source identity, relative links and no whitespace diagnostics.",
+  "whitespace_status_note": "No-index diff status 1 with no diagnostics is ordinary new-file difference; not relabeled exit 0.",
+  "checks": {
+    "JSON": [
+      "artifact-bindings.json",
+      "authored.patch.json",
+      "census-and-outcomes.json",
+      "command-results.json",
+      "dependency-closure.json",
+      "external-raw-index.json",
+      "failures.json",
+      "gate-plan.json",
+      "native-streams.json",
+      "owned-phone-case.json",
+      "runner-provenance.json",
+      "source-and-environment.json",
+      "update-round-comparison.json"
+    ],
+    "links": [
+      "census-and-outcomes.json",
+      "owned-phone-case.json",
+      "failures.json",
+      "update-round-comparison.json",
+      "command-results.json",
+      "gate-plan.json",
+      "source-and-environment.json",
+      "authored.patch.json",
+      "dependency-closure.json",
+      "runner-provenance.json",
+      "native-streams.json",
+      "artifact-bindings.json",
+      "external-raw-index.json",
+      "validation.json",
+      "manifest.json"
+    ],
+    "whitespace": [
+      {
+        "file": "README.md",
+        "no_index_diff_exit": 1,
+        "diagnostics_bytes": 0
+      },
+      {
+        "file": "artifact-bindings.json",
+        "no_index_diff_exit": 1,
+        "diagnostics_bytes": 0
+      },
+      {
+        "file": "authored.patch.json",
+        "no_index_diff_exit": 1,
+        "diagnostics_bytes": 0
+      },
+      {
+        "file": "census-and-outcomes.json",
+        "no_index_diff_exit": 1,
+        "diagnostics_bytes": 0
+      },
+      {
+        "file": "command-results.json",
+        "no_index_diff_exit": 1,
+        "diagnostics_bytes": 0
+      },
+      {
+        "file": "dependency-closure.json",
+        "no_index_diff_exit": 1,
+        "diagnostics_bytes": 0
+      },
+      {
+        "file": "external-raw-index.json",
+        "no_index_diff_exit": 1,
+        "diagnostics_bytes": 0
+      },
+      {
+        "file": "failures.json",
+        "no_index_diff_exit": 1,
+        "diagnostics_bytes": 0
+      },
+      {
+        "file": "gate-plan.json",
+        "no_index_diff_exit": 1,
+        "diagnostics_bytes": 0
+      },
+      {
+        "file": "native-streams.json",
+        "no_index_diff_exit": 1,
+        "diagnostics_bytes": 0
+      },
+      {
+        "file": "owned-phone-case.json",
+        "no_index_diff_exit": 1,
+        "diagnostics_bytes": 0
+      },
+      {
+        "file": "runner-provenance.json",
+        "no_index_diff_exit": 1,
+        "diagnostics_bytes": 0
+      },
+      {
+        "file": "source-and-environment.json",
+        "no_index_diff_exit": 1,
+        "diagnostics_bytes": 0
+      },
+      {
+        "file": "update-round-comparison.json",
+        "no_index_diff_exit": 1,
+        "diagnostics_bytes": 0
+      }
+    ],
+    "exact_wrappers": [
+      "authored.patch.json",
+      "census-and-outcomes.json/phases/voice-default-parallel/targets/0/file_identity",
+      "census-and-outcomes.json/phases/voice-default-parallel/targets/1/file_identity",
+      "census-and-outcomes.json/phases/voice-default-parallel/targets/2/file_identity",
+      "census-and-outcomes.json/phases/voice-default-parallel/targets/3/file_identity",
+      "census-and-outcomes.json/phases/voice-default-parallel/targets/4/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/0/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/1/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/2/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/3/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/4/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/5/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/6/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/7/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/8/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/9/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/10/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/11/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/12/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/13/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/14/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/15/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/16/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/17/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/18/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/19/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/20/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/21/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/22/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/23/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/24/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/25/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/26/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/27/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/28/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/29/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/30/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/31/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/32/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/33/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/34/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/35/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/36/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/37/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/38/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/39/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/40/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/41/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/42/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/43/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/44/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/45/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/46/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/47/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/48/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/49/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/50/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/51/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/52/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/53/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/54/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/55/file_identity",
+      "census-and-outcomes.json/phases/readers-default-parallel/targets/56/file_identity",
+      "failures.json/failures/0/diagnostic",
+      "failures.json/failures/1/diagnostic",
+      "failures.json/failures/2/diagnostic",
+      "native-streams.json/steps/rustc/stdout",
+      "native-streams.json/steps/rustc/stderr",
+      "native-streams.json/steps/fmt/stderr",
+      "native-streams.json/steps/clippy/stderr",
+      "native-streams.json/steps/voice-default-parallel/stderr",
+      "native-streams.json/steps/readers-default-parallel/stderr",
+      "native-streams.json/steps/workspace-build/stderr",
+      "native-streams.json/steps/diff-check/stdout",
+      "native-streams.json/steps/diff-check/stderr"
+    ],
+    "projections": [
+      "native-streams.json/steps/fmt/stdout",
+      "native-streams.json/steps/clippy/stdout",
+      "native-streams.json/steps/voice-default-parallel/stdout",
+      "native-streams.json/steps/readers-default-parallel/stdout",
+      "native-streams.json/steps/workspace-build/stdout"
+    ]
+  },
+  "default_scratch_index_diff_check_exit_code": 0,
+  "update_comparison_limits": "Source rows match common parent; selected artifact profile/features match between recorded runs. No compiled baseline at the parent is claimed."
+}

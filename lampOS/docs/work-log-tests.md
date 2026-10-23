@@ -1,5 +1,30 @@
 # Tests work log
 
+## 2026-10-23 19:53 +0700 — phone current-base gate completed
+
+Ready for lamp-voice: no (#3218 execution HOLD remains).
+
+The [single full gate](verification/phone-news-start-20261023/full-gates-238403b1c/)
+on `238403b1c`, parent `8e3eaa6c2`, completed **7,156 / 3 / 32**:
+Voice **3,927 / 1 / 15**, eleven readers **3,229 / 2 / 17**. The owned phone
+case passed. All 74 targets completed; formatting, strict twelve-package
+Clippy, workspace build and diff checks passed. No test was retried.
+
+Light-call failed its unchanged 25 ms check (upper-middle 38.345769 ms).
+Two Update round cases failed the initial OLD-script executable check in
+prepared(), before their switch/put-back assertions, at the existing two-second
+exit watchdog. Both owned children were killed and reaped. Every original
+failure and cleanup diagnostic is retained. The companion boot gate's 123-case
+Round census and relevant sources match, but executable hashes differ; no
+compiled-independence, failure-cause or waiver claim follows. Memory completed
+154 / 0 / 5, including all three earlier boot-failure cases.
+
+Root verified all fourteen stream projections and all three failure blocks
+against the captured originals. Latest-base carries and fresh native checks
+are next; these results remain bound to their recorded head. The Expression
+candidate's six controls have completed as planned, and the approved Memory
+fixture diagnostic is being prepared before the two new fixture gates.
+
 ## 2026-10-23 19:31 +0700 — claim bounded Memory phase diagnostic
 
 Ready for lamp-voice: no (#3190 execution HOLD remains).

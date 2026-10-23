@@ -1,0 +1,96 @@
+{
+  "head": "238403b1c5959fe8834aba09cfbbf24f03b6d893",
+  "count": 3,
+  "failures": [
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:test:it",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "actual_status": "FAILED",
+      "binary_sha256": "0eb10bacb1d3c95f97e47ba684b69aaa34b6c6453e5855b4556354e099adea43",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-phone-news-start-238403b1c-gates-20261023/gates-20261023T121004.929022Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 649300,
+        "original_stream_sha256": "8cd9fb0354b311845c8cc49344bc4148885f2a26516245acd16aaeed53e774c5",
+        "byte_offset": 647234,
+        "bytes": 880,
+        "sha256": "b57c017980ef62ee8b908c1adfd6b04603f64bd6e9a1d710edc5e03a16278eaa",
+        "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [1.092569ms, 2.530504ms, 2.568681ms, 2.622596ms, 2.653059ms, 2.677144ms, 2.752979ms, 3.330635ms, 5.661251ms, 22.75962ms, 38.345769ms, 39.244717ms, 44.498749ms, 55.451213ms, 61.188714ms, 110.915648ms, 112.44042ms, 115.333262ms, 118.370972ms, 131.975258ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (710417216) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[1.092569ms, 2.530504ms, 2.568681ms, 2.622596ms, 2.653059ms, 2.677144ms, 2.752979ms, 3.330635ms, 5.661251ms, 22.75962ms, 38.345769ms, 39.244717ms, 44.498749ms, 55.451213ms, 61.188714ms, 110.915648ms, 112.44042ms, 115.333262ms, 118.370972ms, 131.975258ms]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-update:test:round",
+      "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "actual_status": "FAILED",
+      "binary_sha256": "bebe679f9ed2af4d133185b9105b594f671157b69f812d5c3f16626d1de1a680",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-phone-news-start-238403b1c-gates-20261023/gates-20261023T121004.929022Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 654566,
+        "original_stream_sha256": "715fb41dd33d786a013d1d22570c05122bb528afb0dd59dfb138168f06ccfdcb",
+        "byte_offset": 588065,
+        "bytes": 676,
+        "sha256": "f0246359f1204763d3bf39aadc5ca9a3ca2f14ff89c04b1d7ea832117aa1a995",
+        "utf8": "---- self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart stdout ----\n\nthread 'self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart' (710579355) panicked at crates/update/tests/round/self_cuts.rs:336:20:\nupdater fixture did not exit: check=1 caller=crates/update/tests/round/self_cuts.rs:336:20 path=/var/folders/qg/lhfdx6q166z5cj705q22mh480000gn/T/.tmp1rz0Z8/opt/lampOS/update/current/lamp-update expected=old sha256=464cef54a392e0ee63a30123bda2ca3e5e63254a71659bfd7afd60f124900fe7; pid=60269 elapsed=2.001963797s polls=353 last_poll=2.001961045s..2.001963077s final_status=Ok(None) (diagnostic only; timeout still fails)\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-update:test:round",
+      "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "actual_status": "FAILED",
+      "binary_sha256": "bebe679f9ed2af4d133185b9105b594f671157b69f812d5c3f16626d1de1a680",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-phone-news-start-238403b1c-gates-20261023/gates-20261023T121004.929022Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 654566,
+        "original_stream_sha256": "715fb41dd33d786a013d1d22570c05122bb528afb0dd59dfb138168f06ccfdcb",
+        "byte_offset": 588741,
+        "bytes": 681,
+        "sha256": "62ed7e495e4afa54ab1d41a02eaff6bbd573a2a78de309b6da95a2700b3924cc",
+        "utf8": "---- self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart stdout ----\n\nthread 'self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart' (710580183) panicked at crates/update/tests/round/self_cuts.rs:348:20:\nupdater fixture did not exit: check=1 caller=crates/update/tests/round/self_cuts.rs:348:20 path=/var/folders/qg/lhfdx6q166z5cj705q22mh480000gn/T/.tmphVNBML/opt/lampOS/update/current/lamp-update expected=old sha256=464cef54a392e0ee63a30123bda2ca3e5e63254a71659bfd7afd60f124900fe7; pid=60794 elapsed=2.005626478s polls=344 last_poll=2.005622918s..2.005625079s final_status=Ok(None) (diagnostic only; timeout still fails)\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    }
+  ],
+  "light_call_checked_statistic": {
+    "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+    "file": "lampOS/crates/voice/tests/it/light_call.rs",
+    "assertion_line": 90,
+    "values_ms": [
+      1.092569,
+      2.530504,
+      2.568681,
+      2.622596,
+      2.653059,
+      2.677144,
+      2.752979,
+      3.330635,
+      5.661251,
+      22.75962,
+      38.345769,
+      39.244717,
+      44.498749,
+      55.451213,
+      61.188714,
+      110.915648,
+      112.44042,
+      115.333262,
+      118.370972,
+      131.975258
+    ],
+    "sorted": true,
+    "sample_count": 20,
+    "checked_index": 10,
+    "checked_upper_middle_ms": 38.345769,
+    "strict_limit_ms": 25,
+    "maximum_ms_context_only": 131.975258,
+    "source_byte_equal_to_parent": true,
+    "source_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+    "meaning": "Every preceding Outcome::Done assertion and cleanup completed before the original upper-middle latency assertion. A failed latency observation remains failed; source equality does not establish cause.",
+    "paired_current_base_execution_in_this_plan": false
+  },
+  "paired_baseline_run_in_this_plan": false,
+  "failed_candidate_runs_repeated": false
+}

@@ -1,0 +1,260 @@
+{
+  "scope": "Read-only comparison of retained full-gate artifacts/outcomes and immutable captured source maps. No target-file access, compilation or test execution.",
+  "records": {
+    "phone": {
+      "head": "238403b1c5959fe8834aba09cfbbf24f03b6d893",
+      "base": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+      "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+      "round_executable": {
+        "executable": "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+        "sha256": "bebe679f9ed2af4d133185b9105b594f671157b69f812d5c3f16626d1de1a680",
+        "bytes": 15363596
+      },
+      "actual_target_result": "FAILED",
+      "actual_counts": {
+        "passed": 121,
+        "failed": 2,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled_case_count": 123,
+      "compiled_ignored_count": 0,
+      "canonical_sorted_names_sha256": "9ae02066ecb0e59988c2e22cfcf240a052d6831b801578e0138fb6e34459bc43",
+      "actual_rows_sha256": "49d8a31af028f82e77d9333ff368ba15a4dab13a3431aab02731cae1e42100fd",
+      "compile_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "compile_features": [],
+      "compile_manifest_path": "/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/update/Cargo.toml",
+      "source_metadata": [
+        {
+          "external_file": "/private/tmp/tests-phone-news-start-238403b1c-gates-20261023/source-identity.json",
+          "bytes": 1693,
+          "sha256": "216a17b5b11f3b140f0acef3f3a514edd7fdc71fabdc60863eb68433fef9c98e"
+        },
+        {
+          "external_file": "/private/tmp/tests-phone-news-start-238403b1c-gates-20261023/source-map.json",
+          "bytes": 2741527,
+          "sha256": "5ab0a1e700884ffed5d64d35ed3ac73abb3fcc9300c6edfa84388cc39c41cbfa"
+        },
+        {
+          "external_file": "/private/tmp/tests-phone-news-start-238403b1c-gates-20261023/base-source-map.json",
+          "bytes": 2741527,
+          "sha256": "98b2e21be8885b084c00b293698f52f63bb52f448c51d66da0450ddcc72c1b81"
+        }
+      ],
+      "captured_artifact_metadata": {
+        "external_file": "/private/tmp/tests-phone-news-start-238403b1c-gates-20261023/gates-20261023T121004.929022Z/readers-default-parallel/compiled-artifacts.json",
+        "bytes": 112893,
+        "sha256": "87807b57b844e978865bea6403f5498f219a5a0683c5a3f846ac92c8f5066ff6"
+      },
+      "captured_census": {
+        "external_file": "/private/tmp/tests-phone-news-start-238403b1c-gates-20261023/gates-20261023T121004.929022Z/readers-default-parallel/compiled-census.json",
+        "bytes": 314390,
+        "sha256": "166962dfdad6fd405337ad1659697392c785b8c63db0f79c6793030a318ec22f"
+      },
+      "captured_actual_outcomes": {
+        "external_file": "/private/tmp/tests-phone-news-start-238403b1c-gates-20261023/gates-20261023T121004.929022Z/readers-default-parallel/target-outcomes.json",
+        "bytes": 865087,
+        "sha256": "1ab66f44380916b446d2b7cbcbe25e5a53bdeaca38ef9389ebe222b6768690b3"
+      },
+      "rustc_stdout_sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+    },
+    "boot": {
+      "head": "4b92b677d379b6ac1dadbd9e306320a04af48672",
+      "base": "8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850",
+      "source_aggregate_sha256": "288a2d090b2690b9b4dd28d96ae16eb3a6202f493b2b72e4ab4df9a9b65fa1d2",
+      "round_executable": {
+        "executable": "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+        "sha256": "9dbaac7d3f29921539a4bc515ac3059d61d4aaae0c23987c3ed583e21bb111ec",
+        "bytes": 15363596
+      },
+      "actual_target_result": "ok",
+      "actual_counts": {
+        "passed": 123,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled_case_count": 123,
+      "compiled_ignored_count": 0,
+      "canonical_sorted_names_sha256": "9ae02066ecb0e59988c2e22cfcf240a052d6831b801578e0138fb6e34459bc43",
+      "actual_rows_sha256": "791598136fe54078ae0ca84e08fae5631e02341c5e72cc594d2deb462f269a14",
+      "compile_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "compile_features": [],
+      "compile_manifest_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/update/Cargo.toml",
+      "source_metadata": [
+        {
+          "external_file": "/private/tmp/tests-3190-train45-gates-20261023/source-identity.json",
+          "bytes": 2842,
+          "sha256": "fc42fcc30894c49b256dd285d129f16d4de083675af84892a758aa30187e959c"
+        },
+        {
+          "external_file": "/private/tmp/tests-3190-train45-gates-20261023/source-map.json",
+          "bytes": 2741527,
+          "sha256": "5407c4cafa142f8e5b3ff7fe0e63b9647ec20903ee803c5402b7250807248298"
+        },
+        {
+          "external_file": "/private/tmp/tests-3190-train45-gates-20261023/base-source-map.json",
+          "bytes": 2741527,
+          "sha256": "98b2e21be8885b084c00b293698f52f63bb52f448c51d66da0450ddcc72c1b81"
+        }
+      ],
+      "captured_artifact_metadata": {
+        "external_file": "/private/tmp/tests-3190-train45-gates-20261023/gates-20261023T112335.655651Z/readers-default-parallel/compiled-artifacts.json",
+        "bytes": 113379,
+        "sha256": "bb66ab344c7cf700798602872bd0a0de9bbb5e4a6b109be2928b5220d9005b47"
+      },
+      "captured_census": {
+        "external_file": "/private/tmp/tests-3190-train45-gates-20261023/gates-20261023T112335.655651Z/readers-default-parallel/compiled-census.json",
+        "bytes": 314504,
+        "sha256": "d6a7c36299d5069264ef523cf8c96c71dbdfbf6b8f6e65d46b7fbe88575c73ba"
+      },
+      "captured_actual_outcomes": {
+        "external_file": "/private/tmp/tests-3190-train45-gates-20261023/gates-20261023T112335.655651Z/readers-default-parallel/target-outcomes.json",
+        "bytes": 865209,
+        "sha256": "1c837864d339701d2d03479fd8d72e20bb4e1a79e27b1c129fea69aa7f02ad05"
+      },
+      "rustc_stdout_sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281"
+    }
+  },
+  "equality": {
+    "round_binary_sha256_equal": false,
+    "compiled_case_names_equal": true,
+    "compiled_case_name_difference": [],
+    "compiled_ignored_names_equal": true,
+    "selected_artifact_profile_equal": true,
+    "selected_artifact_features_equal": true,
+    "rustc_vV_stdout_equal": true,
+    "common_parent_source_maps_equal": true,
+    "all_update_crate_paths_equal_to_common_parent_and_each_other": true,
+    "update_crate_path_count": 44,
+    "update_crate_source_rows_canonical_sha256": "14ee14cd0316e23bde480d8bfe2c28745a692a5cdfefa233cf3db21759f19152"
+  },
+  "relevant_source_rows_equal_across_all_three": [
+    {
+      "path": "lampOS/Cargo.toml",
+      "git_mode": "100644",
+      "git_blob": "7416fa9986f29ce44496e9e74b550780b7780b24",
+      "bytes": 1424,
+      "sha256": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7"
+    },
+    {
+      "path": "lampOS/Cargo.lock",
+      "git_mode": "100644",
+      "git_blob": "0c5fb9f3e386b0666966ca09d850186037741d8f",
+      "bytes": 118267,
+      "sha256": "5c6e3643c72bfabb1962b223298964022b39d4081ae8dac6059459bbf4339f4c"
+    },
+    {
+      "path": "lampOS/rust-toolchain.toml",
+      "git_mode": "100644",
+      "git_blob": "e3b40113e65befef4d5d198284b99c78c27136f0",
+      "bytes": 86,
+      "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+    },
+    {
+      "path": "lampOS/crates/update/Cargo.toml",
+      "git_mode": "100644",
+      "git_blob": "08b298c07a5481a1a771c6a9aea8beee739986db",
+      "bytes": 2158,
+      "sha256": "2e791c3e5eb8fc99f4ade7a0a6c484c60a0f988a5bf25c37a25176c6bf7a7792"
+    },
+    {
+      "path": "lampOS/crates/update/tests/round.rs",
+      "git_mode": "100644",
+      "git_blob": "0c70c783f5a2cf6f3b8da907dabd07b2597760aa",
+      "bytes": 179116,
+      "sha256": "4bcec0291665c3804e2a33bd35e7119ebb4ada9288e321b6be4c56c68dfc7141"
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/self_cuts.rs",
+      "git_mode": "100644",
+      "git_blob": "363578108de41c41b1cc8360622fe26029d90d0a",
+      "bytes": 15165,
+      "sha256": "9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013"
+    },
+    {
+      "path": "lampOS/deploy/product/lamp-voice.service",
+      "git_mode": "100644",
+      "git_blob": "63530f921327f4f765f039636e15461be5f35060",
+      "bytes": 13890,
+      "sha256": "e2793a2e3a31471089a4925f24c79950087d5c145337d1d9e4bcab9f8013b04e"
+    },
+    {
+      "path": "lampOS/crates/update/tests/fixtures/reset-plan-4de8ebe1c.json",
+      "git_mode": "100644",
+      "git_blob": "515fd80f858a751b579c74b45d3f01661c03ed86",
+      "bytes": 1466,
+      "sha256": "5dff6f81202528430637a63818bb7f159a912fb4c83dcde6386d56ab9ac4e3d4"
+    },
+    {
+      "path": "lampOS/crates/update/tests/fixtures/reset-plan-ef6a2b9a7.json",
+      "git_mode": "100644",
+      "git_blob": "51392d18f3c8b1bd86c1f0afe411ed6d62d3322a",
+      "bytes": 1681,
+      "sha256": "de872e78cb60d724ce35d49ebff92be6cfba6caf5e38824c1e5d06cca60e7506"
+    }
+  ],
+  "selected_actual_rows": [
+    {
+      "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "boot": "ok",
+      "phone": "FAILED"
+    },
+    {
+      "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "boot": "ok",
+      "phone": "FAILED"
+    }
+  ],
+  "failure_boundary": {
+    "fixture_source": "lampOS/crates/update/tests/round/self_cuts.rs",
+    "case_entry_lines": [
+      336,
+      348
+    ],
+    "phase": "Both stopped in prepared() at the first executable check of OLD, before switch() and before the cases' intended confirmation/put-back assertions.",
+    "child_script": "#!/bin/sh\nprintf 'old-updater\\n'\n",
+    "expected_script_sha256": "464cef54a392e0ee63a30123bda2ca3e5e63254a71659bfd7afd60f124900fe7",
+    "deadline_seconds_unchanged": 2,
+    "last_observation": "Both final_status=Ok(None); complete panic diagnostics retained in failures.json and the full stream.",
+    "cleanup_original_stderr": {
+      "external_file": "/private/tmp/tests-phone-news-start-238403b1c-gates-20261023/gates-20261023T121004.929022Z/readers-default-parallel/readers-default-parallel.stderr.txt",
+      "bytes": 60772,
+      "sha256": "39548fcdbf12cf50c31a4d94af99e6a62498ee7bb59ccdde94675dc50b17f59a"
+    },
+    "cleanup_rows": [
+      {
+        "byte_offset": 59586,
+        "bytes": 106,
+        "sha256": "fc0c83f56cc33a0091364f5d5ec6c3ddb6baeffe2863f949ce0901dd62bfcbb4",
+        "utf8": "updater fixture cleanup: pid=60269 kill=Ok(()) reap=Ok(ExitStatus(unix_wait_status(9))) elapsed=92.822µs\n"
+      },
+      {
+        "byte_offset": 59692,
+        "bytes": 106,
+        "sha256": "e97ab92ff45d4077a432c47b6347c6ea774358e45b6ab26c3e1a9ff6244d54ac",
+        "utf8": "updater fixture cleanup: pid=60794 kill=Ok(()) reap=Ok(ExitStatus(unix_wait_status(9))) elapsed=83.868µs\n"
+      }
+    ]
+  },
+  "compile_path_limit": {
+    "source_location": "lampOS/crates/update/tests/round.rs:2126",
+    "source_expression": "Path::new(env!(\"CARGO_MANIFEST_DIR\"))",
+    "observation": "The two recorded manifest paths are different. This source uses a compile-time worktree path, so identical Rust source does not guarantee identical executable bytes across these worktrees. No binary-difference localization was performed; this is a limitation, not a proven explanation of the unequal hashes."
+  },
+  "conclusion": "The captured Round executables differ, although their 123 compiled identities, selected artifact profile/features, compiler identity and every Update crate source row agree. Boot passed 123/0/0; phone failed 121/2/0. Neither source equality nor the passing companion observation establishes cause or waives either failure."
+}

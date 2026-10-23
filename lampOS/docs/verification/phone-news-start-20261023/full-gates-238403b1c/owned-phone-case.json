@@ -1,0 +1,8 @@
+{
+  "name": "messages::tests::a_text_never_waits_on_the_news_for_the_phone",
+  "actual_result": "ok",
+  "compiled_ignored": false,
+  "library_sha256": "c78135041fa8164bc529bef04cef3f87adc5d4340e5b5d4a2e9f0d014062e632",
+  "source_aggregate_sha256": "d3085323677a3f773df6f870d83e2abd688ae4a9946c0a6ed4d1824ae2ab7290",
+  "qualification": "Actual full-Voice row. Any failure remains failed; listing is not execution."
+}

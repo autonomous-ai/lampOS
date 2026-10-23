@@ -1,0 +1,82 @@
+{
+  "format": 1,
+  "scope": "Every payload except manifest itself.",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 7484,
+      "sha256": "6d76fb75ffefaac940b72cec6b0db6853bdb717612257edc27b7babdc4f04609"
+    },
+    {
+      "path": "artifact-bindings.json",
+      "bytes": 64309,
+      "sha256": "8dfb076daf76efe3c358e95dd692a36997dab9b1db3f38f0f3389e0ac5b00092"
+    },
+    {
+      "path": "authored.patch.json",
+      "bytes": 3511,
+      "sha256": "73945b4420e8f98cc01f4c8c6b9261a089ea101ccaa8cc116bfba219033c0cc6"
+    },
+    {
+      "path": "census-and-outcomes.json",
+      "bytes": 1243316,
+      "sha256": "da6b1f7c511d76b9567b5f7799b4e48c18f089bb0d89f73a1cf2c52c824c70b6"
+    },
+    {
+      "path": "command-results.json",
+      "bytes": 7766,
+      "sha256": "df49ca6ebce98ba84554883388357c1eb00a46357f74456334e081b5f6f217ac"
+    },
+    {
+      "path": "dependency-closure.json",
+      "bytes": 31212,
+      "sha256": "6bbe708ce4d18738a154b46c1e1a1f1a773f58437362314b9b614012c3336c1e"
+    },
+    {
+      "path": "external-raw-index.json",
+      "bytes": 90186,
+      "sha256": "5ad1e0495853db1497c37d34066e5e97e617324bdeb45e4c8aee9c27e36c71cc"
+    },
+    {
+      "path": "failures.json",
+      "bytes": 6396,
+      "sha256": "421e4838cbf00cd067a757fb6aaf988286cc1c346a157810cbb11d55adb30723"
+    },
+    {
+      "path": "gate-plan.json",
+      "bytes": 7447,
+      "sha256": "6b8d86231f2f033867db36e911b8c0eabbe3303c2cc3e32136115ce203eb6ee0"
+    },
+    {
+      "path": "native-streams.json",
+      "bytes": 779798,
+      "sha256": "3cd5345821e634ab248bfd78bfca445504a321d9d2c8423475fe3b1c50717d24"
+    },
+    {
+      "path": "owned-phone-case.json",
+      "bytes": 416,
+      "sha256": "d88a9f3dd38fe217dd41b9fef907f143862bb4f7ba12f5948f54ef07f0dd5fdb"
+    },
+    {
+      "path": "runner-provenance.json",
+      "bytes": 1086,
+      "sha256": "441528e3bed65b3a7a55b4ce8a5bc3af6af3cd734400a706ad69810f95b7b946"
+    },
+    {
+      "path": "source-and-environment.json",
+      "bytes": 5371,
+      "sha256": "b13ca1a2ba4af1487e3cdab5af89fad0d2c9d34b62317900128465b9188bca98"
+    },
+    {
+      "path": "update-round-comparison.json",
+      "bytes": 12004,
+      "sha256": "1ca1813c18c518785f1533566d5c422a764702638375408812a8b9069facc3b3"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 10321,
+      "sha256": "8ab4980541c7654d316ce600a6de1640a1184f5a28bad0127f4cdfae58aac386"
+    }
+  ],
+  "total_payload_bytes": 2270623
+}

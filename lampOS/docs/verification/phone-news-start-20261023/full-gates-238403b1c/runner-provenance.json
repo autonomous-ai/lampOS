@@ -1,0 +1,14 @@
+{
+  "preparation_only": true,
+  "old_completed_runner": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/run-gates.py",
+  "old_completed_runner_sha256": "dd2bf48b896d4f4f6ed06cb3b48fb7c9b22dd85fbdadd97912ba8338ac4ddad3",
+  "new_runner_sha256": "dd2bf48b896d4f4f6ed06cb3b48fb7c9b22dd85fbdadd97912ba8338ac4ddad3",
+  "runner_bytes_equal": true,
+  "old_support_sha256": "0e241c543189d5c1947e2ce678d80e0cd35e5391e7254993b03d00f902d8a63e",
+  "new_support_sha256": "0e241c543189d5c1947e2ce678d80e0cd35e5391e7254993b03d00f902d8a63e",
+  "old_gate_plan_sha256": "d901dbb771dfcab55070e55aa916c8cba54d6fea7d3e8df0c7f03b4c1d25bb1a",
+  "no_Cargo_or_target_access": true,
+  "execution_marker_present": false,
+  "generated_runner_retained": "/private/tmp/tests-phone-news-start-238403b1c-gates-20261023/run-gates.generated-before-final-runner.py",
+  "note": "Current source identity and complete maps freshly derived from immutable Git blobs. Final completed4e1 runner copied byte-exactly, preserving explicit Unix datagram and loopback TCP preflights; no earlier result counts copied."
+}
