@@ -188,7 +188,9 @@ ended mid-word.
 `lamp/pause`, a latched topic ([msgs.md](msgs.md)); `lamp-keeper resume`
 says false. The value is kept on the bus until the next, so a part reads it
 whenever it looks, and a part started while the lamp is paused starts
-paused. `/run` is not kept, so a power-up is never paused. `lamp-keeper stop
+paused. `/run` is not kept, so a power-up is never paused. The factory's steps end a passed self-test with `lamp-keeper pause`, so a
+lamp leaves them folded and resting until it is next started (install.md,
+#2818). `lamp-keeper stop
 lamp` pauses, waits up to 45 s for `voice/state` to say resting, stops
 `lampos.target`, and then clears the pause, so that the lamp is not paused
 when it is next started.
