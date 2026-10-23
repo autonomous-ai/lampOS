@@ -8273,18 +8273,40 @@ on train 50. The memory row stays 0.45 and physical acceptance stays with First.
 
 Ready for lamp-voice: no (fresh native, Mac package and reviewer holds)
 
-Common #3064 is pushed as4d634474e, one commit on be16c3327, with exact
-lease00c790722. Range-diff is equal; all35Common file contents/modes remain
+Common #3064 is pushed as 4d634474e, one commit on be16c3327, with exact
+lease 00c790722. Range-diff is equal; all 35 Common file contents/modes remain
 unchanged. Public parity/range record:
-verification/common-train50-carry-20261023/README.md. The final tree137baf4f7
-adds only the merged build-row table edit to checked runtime tree624aff2b9.
+verification/common-train50-carry-20261023/README.md. The final tree 137baf4f7
+adds only the merged build-row table edit to checked runtime tree 624aff2b9.
 
 Linux is terminal green: fmt, strict workspace/all-target Clippy, workspace
-build, Update374/0/2 with41required identities and privacy9/0/0. Cleanup
+build, Update 374/0/2 with 41 required identities and privacy 9/0/0. Cleanup
 and source/index/mode/mtime guards pass. Mac fmt/Clippy/build pass; its
-original fullUpdate run is active and not called passed. All28head-touch
+original full Update run is active and not called passed. All 28 head-touch
 cases have passed; a slow real-install case advanced after a bounded sample
 observed durable file writes. No restart or assertion/fixture change occurred.
-Fresh nativeCI starts in parallel with that long Mac run, keeping acceptance
-held. Current PR/Queue records are6368484522/6368485085. Photo/Name remain
+Fresh native CI starts in parallel with that long Mac run, keeping acceptance
+held. Current PR/Queue records are 6368484522/6368485085. Photo/Name remain
 held for Common-first routing and their stated source/physical limits.
+
+## 2026-10-23 22:45 +07: Common host carry complete
+
+Ready for lamp-voice: no (fresh ARM64 and current reviewer/physical holds)
+
+Both host gates are terminal 0 on frozen train-50 source. Mac Update passes
+372/0/4, Linux 374/0/2; privacy passes 9/0/0 on each. Formatting, strict
+workspace/all-target Clippy and workspace build pass on both. All 41 named
+Update identities passed once within each package run. All 10,065 source
+files/modes/mtimes and semantic index remained unchanged; cleanup passed and
+both targets are released. The Mac run took 2982.418 seconds for Update;
+it completed without restart or assertion changes. Its two extra ignores
+are Linux-only standalone process controls. The public host receipt is
+verification/common-train50-carry-20261023/host-receipt.json.
+
+The final published tree 137baf4f7 differs only by the upstream-reviewed
+build-row table edit, as the parity receipt records. Fresh Clippy 39978630861
+passes on exact published tree, merge efd5080ba; ARM64 39978630852 is still
+running. Current native verification includes 80 Common and 41 Update
+controls, with one overlap, so 120 distinct identities must pass. Photo and
+Name publication remains held for Common landing/routing and their stated
+contract, timing and physical acceptance limits. No score or device claim.

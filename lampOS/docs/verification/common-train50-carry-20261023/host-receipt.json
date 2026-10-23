@@ -1,0 +1,862 @@
+{
+  "kind": "Common train50 bounded host carry checks",
+  "generated_utc": "2026-10-23T15:43:48.296934+00:00",
+  "tested_base": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+  "tested_tree": "624aff2b962c67634512dd6d8f4e136ecf02cd48",
+  "own_changed_paths": 35,
+  "platforms": {
+    "mac": {
+      "terminal_exit": 0,
+      "stages": [
+        {
+          "stage": "fmt",
+          "cargo_command": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "exit": 0,
+          "elapsed_seconds": 12.565,
+          "summaries": [],
+          "cleanup_confirmed": true
+        },
+        {
+          "stage": "clippy",
+          "cargo_command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "--offline",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "elapsed_seconds": 174.922,
+          "summaries": [],
+          "cleanup_confirmed": true
+        },
+        {
+          "stage": "workspace-build",
+          "cargo_command": [
+            "cargo",
+            "build",
+            "-q",
+            "--offline",
+            "--locked",
+            "--workspace"
+          ],
+          "exit": 0,
+          "elapsed_seconds": 146.845,
+          "summaries": [],
+          "cleanup_confirmed": true
+        },
+        {
+          "stage": "full-update",
+          "cargo_command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "--no-fail-fast",
+            "-p",
+            "lamp-update",
+            "--",
+            "--format",
+            "pretty",
+            "--test-threads=1"
+          ],
+          "exit": 0,
+          "elapsed_seconds": 2982.418,
+          "summaries": [
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 2,
+              "measured": 0,
+              "passed": 121,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 0,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 5,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 82,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 13,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 151,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 1,
+              "measured": 0,
+              "passed": 0,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 1,
+              "measured": 0,
+              "passed": 0,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 0,
+              "status": "ok"
+            }
+          ],
+          "cleanup_confirmed": true
+        },
+        {
+          "stage": "common-privacy",
+          "cargo_command": [
+            "cargo",
+            "test",
+            "-q",
+            "--offline",
+            "--locked",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "second_provider::worker::kept_name_callback::privacy::",
+            "--",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "exit": 0,
+          "elapsed_seconds": 166.8,
+          "summaries": [
+            {
+              "failed": 0,
+              "filtered": 3776,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 9,
+              "status": "ok"
+            }
+          ],
+          "cleanup_confirmed": true
+        }
+      ],
+      "Update": {
+        "targets": [
+          {
+            "target": "unittests src/lib.rs",
+            "status": "ok",
+            "passed": 121,
+            "failed": 0,
+            "ignored": 2,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "unittests src/main.rs",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "tests/functions.rs",
+            "status": "ok",
+            "passed": 5,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "tests/install.rs",
+            "status": "ok",
+            "passed": 82,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "tests/it/main.rs",
+            "status": "ok",
+            "passed": 13,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "tests/round.rs",
+            "status": "ok",
+            "passed": 151,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "tests/self_cli_exec.rs",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 1,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "tests/self_process_cuts.rs",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 1,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "Doc-tests lamp_update",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ],
+        "passed": 372,
+        "failed": 0,
+        "ignored": 4,
+        "raw_log_sha256": "7a95632a8e86766080ab839f836c9e302643502549a06e9d324c1a9da6d89832"
+      },
+      "Common_privacy": {
+        "passed": 9,
+        "failed": 0,
+        "ignored": 0
+      },
+      "source_guard": {
+        "tracked_files": 10065,
+        "bytes_modes_mtimes_and_semantic_index_unchanged": true,
+        "raw_index_stat_cache_only_change": false
+      },
+      "cleanup": {
+        "all_commands_terminal": true,
+        "all_stage_cleanup_confirmed": true,
+        "target_released": true
+      }
+    },
+    "linux": {
+      "terminal_exit": 0,
+      "stages": [
+        {
+          "stage": "fmt",
+          "cargo_command": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "exit": 0,
+          "elapsed_seconds": 13.589,
+          "summaries": [],
+          "cleanup_confirmed": true
+        },
+        {
+          "stage": "clippy",
+          "cargo_command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "--offline",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "elapsed_seconds": 393.906,
+          "summaries": [],
+          "cleanup_confirmed": true
+        },
+        {
+          "stage": "workspace-build",
+          "cargo_command": [
+            "cargo",
+            "build",
+            "-q",
+            "--offline",
+            "--locked",
+            "--workspace"
+          ],
+          "exit": 0,
+          "elapsed_seconds": 234.484,
+          "summaries": [],
+          "cleanup_confirmed": true
+        },
+        {
+          "stage": "full-update",
+          "cargo_command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "--no-fail-fast",
+            "-p",
+            "lamp-update",
+            "--",
+            "--format",
+            "pretty",
+            "--test-threads=1"
+          ],
+          "exit": 0,
+          "elapsed_seconds": 324.937,
+          "summaries": [
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 2,
+              "measured": 0,
+              "passed": 121,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 0,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 5,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 82,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 13,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 151,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 1,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 1,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 0,
+              "status": "ok"
+            }
+          ],
+          "cleanup_confirmed": true
+        },
+        {
+          "stage": "common-privacy",
+          "cargo_command": [
+            "cargo",
+            "test",
+            "-q",
+            "--offline",
+            "--locked",
+            "-p",
+            "lamp-voice",
+            "--lib",
+            "second_provider::worker::kept_name_callback::privacy::",
+            "--",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "exit": 0,
+          "elapsed_seconds": 237.767,
+          "summaries": [
+            {
+              "failed": 0,
+              "filtered": 3808,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 9,
+              "status": "ok"
+            }
+          ],
+          "cleanup_confirmed": true
+        }
+      ],
+      "Update": {
+        "targets": [
+          {
+            "target": "unittests src/lib.rs",
+            "status": "ok",
+            "passed": 121,
+            "failed": 0,
+            "ignored": 2,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "unittests src/main.rs",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "tests/functions.rs",
+            "status": "ok",
+            "passed": 5,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "tests/install.rs",
+            "status": "ok",
+            "passed": 82,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "tests/it/main.rs",
+            "status": "ok",
+            "passed": 13,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "tests/round.rs",
+            "status": "ok",
+            "passed": 151,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "tests/self_cli_exec.rs",
+            "status": "ok",
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "tests/self_process_cuts.rs",
+            "status": "ok",
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          },
+          {
+            "target": "Doc-tests lamp_update",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered": 0
+          }
+        ],
+        "passed": 374,
+        "failed": 0,
+        "ignored": 2,
+        "raw_log_sha256": "a16267f47ea1f8c2f51acf6835ddb1ec48835ea6d5a5703af67b96ddc6ae4c51"
+      },
+      "Common_privacy": {
+        "passed": 9,
+        "failed": 0,
+        "ignored": 0
+      },
+      "source_guard": {
+        "tracked_files": 10065,
+        "bytes_modes_mtimes_and_semantic_index_unchanged": true,
+        "raw_index_stat_cache_only_change": false
+      },
+      "cleanup": {
+        "all_commands_terminal": true,
+        "all_stage_cleanup_confirmed": true,
+        "target_released": true,
+        "containers_explicitly_removed": 5,
+        "all_containers_removed": true
+      }
+    }
+  },
+  "required_Update_named_subset": {
+    "count": 41,
+    "identities": [
+      {
+        "target": "round",
+        "test": "head_touch::pr2948_settings_off_preserves_the_old_head_reader",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::pr2948_settings_on_keeps_a_head_reader_available",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::paired_head_readers_disable_legacy_even_when_signed_pins_enable_it",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::mixed_head_readers_are_refused_before_settings_or_units_are_written",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::paired_head_readers_without_controls_mute_are_refused_before_writes",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::settings_off_refuses_paired_head_readers_with_legacy_pins",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::custom_head_wiring_is_kept_or_the_reader_transition_is_refused",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::failed_head_reader_candidate_restores_exact_old_pins_and_units",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::old_apply_helper_pins_mismatch_is_put_back_before_readers_restart",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::cut_after_pins_apply_restarts_unchanged_controls_after_restoring_old_pins",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::head_reader_mode_overrides_are_not_guessed_from_base_units",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::repeated_projected_pins_keep_their_actual_hash_without_restarting_controls",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::invalid_mute_path_and_unknown_reader_are_refused",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::head_pins_cannot_change_without_restarting_their_controls_reader",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::isolated_voice_controls_bus_is_refused_before_any_write",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::expression_or_controls_bus_mismatch_is_refused_before_any_write",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::matching_explicit_or_default_head_bus_roots_allow_the_paired_transition",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::absent_unused_product_pins_do_not_block_active_build_pins_updates",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::stale_unused_product_pins_do_not_block_active_build_pins_updates",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::custom_active_pins_are_kept_and_checked_against_the_reader_pair",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::environment_only_head_bus_mismatch_is_refused_before_any_write",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::head_bus_root_dropins_are_not_guessed_from_base_units",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::third_review_paired_head_readers_on_different_buses_are_refused",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::third_review_binary_update_checks_active_build_local_head_pins",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::semantic_head_reader_paths_cannot_expand_invocation_variables",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::textually_equal_expanded_head_bus_roots_are_not_a_verified_pair",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "round",
+        "test": "head_touch::malformed_environment_quotes_are_not_reader_evidence",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "lib",
+        "test": "unit::tests::the_generic_voice_runs_the_ring_as_the_product_does",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "lib",
+        "test": "unit::tests::the_generic_voice_says_its_failures_as_the_product_does",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "lib",
+        "test": "unit::tests::the_generic_voice_has_the_product_clock_and_session_context",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "lib",
+        "test": "unit::tests::the_generic_voice_answers_whom_the_product_does",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "lib",
+        "test": "unit::tests::the_generic_package_sets_up_and_resets_as_the_product_does",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "lib",
+        "test": "unit::tests::lamp_4aces_own_units_are_read",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "lib",
+        "test": "unit::tests::lamp_4aces_private_memory_has_matching_authority_and_speaking_sources",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "lib",
+        "test": "unit::tests::a_new_build_is_written_everywhere_the_folder_is_named",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "lib",
+        "test": "unit::tests::only_a_part_installed_by_build_is_a_program",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "lib",
+        "test": "unit::tests::comments_do_not_make_a_unit_another",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "install",
+        "test": "the_product_sees_who_speaks",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "it",
+        "test": "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+        "mac": "PASS",
+        "linux": "PASS"
+      },
+      {
+        "target": "it",
+        "test": "scratch_paths::the_names_read_are_the_scratch_folders_only",
+        "mac": "PASS",
+        "linux": "PASS"
+      }
+    ],
+    "counts_are_within_Update_totals_not_added_executions": true
+  },
+  "approved_source_unchanged_from_prior_Common": "All 35 authored blobs/modes equal Common 00c790722; updater train50 code is retained.",
+  "final_docs_carry": {
+    "final_docs_base": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+    "final_docs_tree": "137baf4f76e4caf0af5bb436c4e102943b4b0721",
+    "only_changed_path": "lampOS/docs/build-rows.md",
+    "changes": {
+      "added_lines": 3,
+      "removed_lines": 3
+    },
+    "all_other_tracked_blobs_modes_exact": true,
+    "direct_crate_tool_CI_consumers_found": false,
+    "diff_check_pass": true,
+    "fresh_final_head_native_required": true
+  },
+  "environment": {
+    "Mac": {
+      "build_jobs": 2,
+      "incremental": false,
+      "serial_tests": true,
+      "authorized_local_socket_fixtures": true
+    },
+    "Linux": {
+      "build_jobs": 1,
+      "incremental": false,
+      "serial_tests": true,
+      "offline": true,
+      "uid_gid": "1000:1000",
+      "source_and_robot_fixtures_read_only": true,
+      "network": "none",
+      "capabilities": "dropped",
+      "source_mount": "unique train50 container source root"
+    }
+  },
+  "limits": [
+    "Full lamp-update package executed once per host; its41 named subset is not an extra test run. Only Common privacy 9 ran outside that package; no broad Voice/Eyes/Cloud/Skills repeat.",
+    "The full Update process ceiling is 5400s; existing product/test deadlines and assertions were unchanged. Workspace build precedes integration readers.",
+    "Local results stay attached to 09f8/tree624; final 137 differs only by 3 replaced prose rows with no direct crate/tool/CI consumer. No unchanged local runtime suite is repeated for that prose.",
+    "Fresh native ARM64/strict CI on Root final published head remains required. No current final-head native pass is inferred here.",
+    "Original observations/failures stay source-specific. First review, physical person/privacy acceptance and routing/original-capture/product holds remain.",
+    "Stage durations include compilation; no model, lamp, installation, interaction-latency or score claim."
+  ]
+}
