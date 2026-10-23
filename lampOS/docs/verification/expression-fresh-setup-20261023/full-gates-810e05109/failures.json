@@ -1,0 +1,68 @@
+{
+  "head": "810e05109bced3beca88a5b602930cfed5fba4e5",
+  "count": 1,
+  "failures": [
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-voice:test:it",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "actual_status": "FAILED",
+      "binary_sha256": "b55e6d62e6e06f97ccf0573bbfe8e4fd6b7f260c27fe6e289db9c986a2d48e93",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 1020441,
+        "original_stream_sha256": "6d41b419c9bfd7989e4a49d572490f8228e08a3a6a1589c187053bfafe771983",
+        "byte_offset": 953993,
+        "bytes": 884,
+        "sha256": "fafab4396592afee84d8eec72112ec353f1786c28c098ac7594a7b597b963f3c",
+        "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [2.55667ms, 2.738481ms, 2.769296ms, 3.328234ms, 3.940418ms, 20.177303ms, 21.464986ms, 25.858571ms, 39.020419ms, 40.029549ms, 40.232748ms, 54.264022ms, 56.24253ms, 58.601261ms, 77.411505ms, 82.215403ms, 87.196286ms, 113.815319ms, 114.789114ms, 129.488155ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (711459243) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[2.55667ms, 2.738481ms, 2.769296ms, 3.328234ms, 3.940418ms, 20.177303ms, 21.464986ms, 25.858571ms, 39.020419ms, 40.029549ms, 40.232748ms, 54.264022ms, 56.24253ms, 58.601261ms, 77.411505ms, 82.215403ms, 87.196286ms, 113.815319ms, 114.789114ms, 129.488155ms]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    }
+  ],
+  "light_call_checked_statistic": {
+    "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+    "actual_values_ms": [
+      2.55667,
+      2.738481,
+      2.769296,
+      3.328234,
+      3.940418,
+      20.177303,
+      21.464986,
+      25.858571,
+      39.020419,
+      40.029549,
+      40.232748,
+      54.264022,
+      56.24253,
+      58.601261,
+      77.411505,
+      82.215403,
+      87.196286,
+      113.815319,
+      114.789114,
+      129.488155
+    ],
+    "checked_index": 10,
+    "checked_middle_ms": 40.232748,
+    "strict_bound_ms": 25,
+    "assertion": "middle < Duration::from_millis(25)",
+    "maximum_ms_context_only": 129.488155,
+    "failure_site": "crates/voice/tests/it/light_call.rs:90",
+    "source": {
+      "path": "lampOS/crates/voice/tests/it/light_call.rs",
+      "base_and_candidate_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+      "base_and_candidate_git_blob": "2827452b9b6336d505c82219f036424858626ee5",
+      "unchanged_authored_path": true
+    },
+    "source_inference": "The observed original latency assertion occurs after all 20 Outcome::Done assertions and stop/join/remove cleanup in this unchanged source. This is not a cause finding.",
+    "raw_stream_sha256": "6d41b419c9bfd7989e4a49d572490f8228e08a3a6a1589c187053bfafe771983",
+    "diagnostic_offset": 953993,
+    "diagnostic_bytes": 884,
+    "diagnostic_sha256": "fafab4396592afee84d8eec72112ec353f1786c28c098ac7594a7b597b963f3c",
+    "no_waiver_or_retry": true
+  },
+  "paired_baseline_run_in_this_plan": false,
+  "failed_candidate_runs_repeated": false
+}

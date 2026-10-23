@@ -1,0 +1,77 @@
+{
+  "format": 1,
+  "scope": "Every payload except manifest itself.",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 4431,
+      "sha256": "91e2cc56804f4bf24b4fc2af044e569b41e0b34581a05c23021ee5ad99802784"
+    },
+    {
+      "path": "affected-cases.json",
+      "bytes": 1522,
+      "sha256": "8288811034b93a0bed001df337cc843d0f867fb6174d6dc0d9974734e7143b95"
+    },
+    {
+      "path": "artifact-bindings.json",
+      "bytes": 64923,
+      "sha256": "5d13dcfb1136074d4a494d99af84295dcf6bcb8be8d0edddfbf40e8fcebbd632"
+    },
+    {
+      "path": "authored.patch.json",
+      "bytes": 4083,
+      "sha256": "e61f5f99c08c1a363e9ee1f5edb0b3025f547189508b87cca38c2f3f90b2b231"
+    },
+    {
+      "path": "census-and-outcomes.json",
+      "bytes": 1243162,
+      "sha256": "ee284d137a9d35c865ca9b84800f08d0bf171f489ee4f1cdd56cda9040da0409"
+    },
+    {
+      "path": "command-results.json",
+      "bytes": 7830,
+      "sha256": "77530f3bd1f2c17a531f019281fafdddd9c15404432e06970240579ee67c1da9"
+    },
+    {
+      "path": "dependency-closure.json",
+      "bytes": 29740,
+      "sha256": "4bd2e9c772cf4d2efcd8f7d70d96d35828b0a8aaa13916f090a0f401aa593983"
+    },
+    {
+      "path": "external-raw-index.json",
+      "bytes": 88732,
+      "sha256": "abb9f247fc5a61fcf91a491752fcde5f816ec2333cc1ec4c848a2a84d6bd6566"
+    },
+    {
+      "path": "failures.json",
+      "bytes": 3532,
+      "sha256": "e74d97213f955bdfe9f4059f942a7df8512e5d11610763e59b84a5577f4a2ebc"
+    },
+    {
+      "path": "gate-plan.json",
+      "bytes": 7106,
+      "sha256": "689298a9b571909b901330feff3e6933e77c321f12a9b827d05916483f7a76c0"
+    },
+    {
+      "path": "native-streams.json",
+      "bytes": 777854,
+      "sha256": "98dff5eee8881cc099ca29b73b774833fe41600398667886a32aafadae8edb4a"
+    },
+    {
+      "path": "preparation-checks.json",
+      "bytes": 661,
+      "sha256": "1ac05c747729bd3c2c3926cfefb7a2932127d5819f5bc812c23158bc153d810b"
+    },
+    {
+      "path": "source-and-environment.json",
+      "bytes": 5874,
+      "sha256": "9b2b63705d5855ceca4c0aaa9d8b85308b1f3069ed2a68ec36825b28d0fd89a1"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 9828,
+      "sha256": "d7aa8c7e89b135c773340de637a1361eadfb326ac68d63f7325665993d06fa69"
+    }
+  ],
+  "total_payload_bytes": 2249278
+}

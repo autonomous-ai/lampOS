@@ -1,0 +1,127 @@
+{
+  "identity": {
+    "head": "810e05109bced3beca88a5b602930cfed5fba4e5",
+    "base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+    "candidate_commit": null,
+    "candidate_kind": "Frozen uncommitted two-file fixture overlay on exact base",
+    "tree": "6e25adfa7d21377d28f31b2fcaac6f9497de26d5",
+    "parents": [
+      "2615c87b636d8e39d8df9548b00af7ed4e164f70"
+    ],
+    "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+    "base_source_aggregate_sha256": "e8c23c19c18497b69c45dc5d7662a6a50b49ee401264135f290967b0ccb5d2ea",
+    "source_map_sha256": "8b3f117bf0d98fb3f332101180e5465bb867d3b2758c0617fd04f827884f3403",
+    "base_source_map_sha256": "8cf2468b359ff28ac46b83b4fed052e1f2143d9bd66f6c01f60a8a895d087d77",
+    "changed_paths": [
+      "lampOS/crates/expression/tests/runtime.rs",
+      "lampOS/docs/expression.md"
+    ],
+    "owned_file_sha256": {
+      "lampOS/crates/expression/tests/runtime.rs": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95",
+      "lampOS/docs/expression.md": "3a430011794fb6fd1768a92beca373c4c8276d1273a0bc69a20b2c385d623bc8"
+    },
+    "patch_sha256": "9bc2076d4daa8ac8f596aca7ee6c59595da313c8b71485db55d46acd0c2419df",
+    "repository_paths": 10033,
+    "lampOS_paths": 6687,
+    "expected_status": " M lampOS/crates/expression/tests/runtime.rs\n M lampOS/docs/expression.md\n",
+    "source_preparation": "Complete immutable Git base objects plus exact two external snapshots, checked against the live owned branch. No target or Cargo access.",
+    "rules_sha256": {
+      "lampOS/builders/tests.md": "5ce0cdc9d36cc6723655b1f0246751276025c044adfc71a3fdf7c804f18cbcac",
+      "lampOS/AGENTS.md": "0954b38728a27cbe4413e5a2b8898ad8a5b1fad83f594ffabcaa81c18a7f1dad",
+      "lampOS/docs/joining.md": "afe79f105530d5de5384c860840d682936ff8056a75b4f4c0b20ed2d78edbede"
+    },
+    "historical_controls": {
+      "base": "2615c87b636d8e39d8df9548b00af7ed4e164f70",
+      "manifest_sha256": "c7f247faa86a0efdf4377b6fdbb563d54148605543440b828900b6ce37b6ccfb",
+      "requalification": false
+    },
+    "carry_proof_sha256": "6d7689f2b4543b139107ceae9cd154de2d7042d359974644a40c89e924adc276"
+  },
+  "freshness": {
+    "tracked_files": 10033,
+    "mtime_ns": 1792763198351827000,
+    "before_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+    "after_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+    "identical_bytes": true,
+    "algorithm": "sorted path + NUL + Git mode + NUL + u64 big-endian length + exact bytes; symlinks use literal target bytes"
+  },
+  "final_source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+  "source_bytes_unchanged": true,
+  "per_step_source_aggregates": [
+    {
+      "step": "fmt",
+      "source_aggregate_sha256_after": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e"
+    },
+    {
+      "step": "clippy",
+      "source_aggregate_sha256_after": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e"
+    },
+    {
+      "step": "expression-default-parallel",
+      "source_aggregate_sha256_after": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e"
+    },
+    {
+      "step": "readers-default-parallel",
+      "source_aggregate_sha256_after": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e"
+    },
+    {
+      "step": "workspace-build",
+      "source_aggregate_sha256_after": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e"
+    },
+    {
+      "step": "diff-check",
+      "source_aggregate_sha256_after": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e"
+    }
+  ],
+  "controlled_environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_BUILD_TARGET": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_TARGET_TMPDIR": null,
+    "CARGO_TERM_COLOR": "never",
+    "LAMP_EXPRESSION_FIXTURE_CONTROL": null,
+    "LAMP_EXPRESSION_FIXTURE_VARIANT": null,
+    "LAMP_RELAY_PID_CONTROL_DIR": null,
+    "RUSTFLAGS": null,
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "RUST_BACKTRACE": "0",
+    "RUST_TEST_THREADS": null
+  },
+  "PATH_prefix": "/Users/autonomous/.cargo/bin:",
+  "platform_projection": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "kernel": "Darwin Kernel Version 25.6.0: Fri Jul 31 19:11:49 PDT 2026; root:xnu-12377.161.14~5/RELEASE_X86_64",
+    "reported_machine": "x86_64",
+    "physical_hardware_architecture": "not independently measured"
+  },
+  "projection_note": "Hostname and complete inherited PATH omitted; raw original results JSON remains external and hashed.",
+  "socket_preflight": {
+    "unix_datagram": "bind passed",
+    "unix_path_removed": true,
+    "loopback_tcp": {
+      "status": "bind and listen passed",
+      "address": [
+        "127.0.0.1",
+        53898
+      ]
+    },
+    "completed_before_Cargo": true
+  },
+  "launch_permissions": "require_escalated, as explicitly authorized; both local preflights completed before Cargo",
+  "source_map": {
+    "external_file": "/private/tmp/tests-expression-810e05109-gates-20261023/source-map.json",
+    "sha256": "8b3f117bf0d98fb3f332101180e5465bb867d3b2758c0617fd04f827884f3403"
+  },
+  "source_map_availability": "Complete immutable tracked map remains external. This publication includes its hash/count/aggregate and all compiled artifact/case identities, not a bulk whole-repository map.",
+  "original_results_json": {
+    "external_file": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/results.json",
+    "bytes": 43406,
+    "sha256": "74ebbf0836b253001c16e43c9145aec0248bfa2e10a7826c8182aa3dcbca7e6f"
+  }
+}

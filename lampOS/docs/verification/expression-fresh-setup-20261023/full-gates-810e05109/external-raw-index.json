@@ -1,0 +1,1587 @@
+{
+  "complete_raw_streams": [
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/rustc.stdout.txt",
+      "bytes": 191,
+      "sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+      "stream": "rustc/stdout"
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/rustc.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stream": "rustc/stderr"
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/fmt/fmt.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stream": "fmt/stdout"
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/fmt/fmt.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stream": "fmt/stderr"
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/clippy/clippy.stdout.txt",
+      "bytes": 350732,
+      "sha256": "f7b8ec98fa38de3a05bcd25c060597332a78d9fa6de9390b1e5882729808ba30",
+      "stream": "clippy/stdout"
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/clippy/clippy.stderr.txt",
+      "bytes": 4159,
+      "sha256": "52ee631261f68d7686a13ebda31499101789e27f233dc586e5ec67673e40b5f4",
+      "stream": "clippy/stderr"
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/expression-default-parallel.stdout.txt",
+      "bytes": 84077,
+      "sha256": "b722fc45d0f79f3eadfda6c3c7989991a29a64bf101a58adadc9a210b73af082",
+      "stream": "expression-default-parallel/stdout"
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/expression-default-parallel.stderr.txt",
+      "bytes": 1539,
+      "sha256": "267cb00d35627652050fd1effdcc945a69e86368c7d063304030dc5052cf0fd8",
+      "stream": "expression-default-parallel/stderr"
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+      "bytes": 1020441,
+      "sha256": "6d41b419c9bfd7989e4a49d572490f8228e08a3a6a1589c187053bfafe771983",
+      "stream": "readers-default-parallel/stdout"
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/readers-default-parallel.stderr.txt",
+      "bytes": 61858,
+      "sha256": "1c3e93ee40c6a4d054959a62b5bc581634e76752a50a92c2b25e89128f061970",
+      "stream": "readers-default-parallel/stderr"
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/workspace-build/workspace-build.stdout.txt",
+      "bytes": 365484,
+      "sha256": "c0fcf0e7a1e8306efcda1ca67a8e228edf536fc096ead56eaf916bfca02d6673",
+      "stream": "workspace-build/stdout"
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/workspace-build/workspace-build.stderr.txt",
+      "bytes": 5129,
+      "sha256": "16f4adf8ec6a3c8de8c4060b1cb09203d7eec68e59ac72d88106bbe658f70c0f",
+      "stream": "workspace-build/stderr"
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/diff-check/diff-check.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stream": "diff-check/stdout"
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/diff-check/diff-check.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stream": "diff-check/stderr"
+    }
+  ],
+  "complete_raw_census_streams": [
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-lamp_expression-111820e113/all.stdout.txt",
+      "bytes": 2325,
+      "sha256": "34cef1e037f52a0b4b1610c00e236954880e2e11697845960c13728c4d1d0e75",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-lamp_expression-111820e113/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-lamp_expression-111820e113/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-lamp_expression-111820e113/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-lamp-expression-1b05449a91/all.stdout.txt",
+      "bytes": 252,
+      "sha256": "879f18a41c1bf6a82b6acf717f37cd966f9699b768e46b4bf09556221be3ca27",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-lamp-expression-1b05449a91/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-lamp-expression-1b05449a91/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-lamp-expression-1b05449a91/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-it-730abf0b64/all.stdout.txt",
+      "bytes": 23406,
+      "sha256": "415f1cf0e5d0725e2f7d157193f049aa26d2d0d91de8196ad56e4c6ec427a2a6",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-it-730abf0b64/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-it-730abf0b64/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-it-730abf0b64/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-runtime-ea308cd2ef/all.stdout.txt",
+      "bytes": 1792,
+      "sha256": "de7efe0fa806e04d1bdf40df5fac23874d637caac75133ac9b5dd01c3c919abd",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-runtime-ea308cd2ef/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-runtime-ea308cd2ef/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/expression-default-parallel/compiled-census/lamp-expression-runtime-ea308cd2ef/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp_body-91201e780a/all.stdout.txt",
+      "bytes": 35084,
+      "sha256": "6f53c686cba479fc72343695469fcc0625947d80fc82f9295f7b34cd26d56558",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp_body-91201e780a/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp_body-91201e780a/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp_body-91201e780a/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-8c5566ce79/all.stdout.txt",
+      "bytes": 2147,
+      "sha256": "6647795d10431733ca6a1e5c8e346ee281ab8fd013de46f3c1210197ee8dff68",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-8c5566ce79/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-8c5566ce79/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-8c5566ce79/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-inspect-ecb5f34662/all.stdout.txt",
+      "bytes": 140,
+      "sha256": "f948d790b56e45720dee8985090774d1a045824cc57ed457a16568cdb34c7f08",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-inspect-ecb5f34662/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-inspect-ecb5f34662/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-inspect-ecb5f34662/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-measure-6d3a11e57f/all.stdout.txt",
+      "bytes": 295,
+      "sha256": "d755cac4ac681b8b119586fbc0b0b69df7d3cc94d5a9c1023f31a2ae3360dee9",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-measure-6d3a11e57f/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-measure-6d3a11e57f/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-measure-6d3a11e57f/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-mood-00ae69951b/all.stdout.txt",
+      "bytes": 146,
+      "sha256": "60b7b0c061888bf71088b734d6c52cef293337793fdc9b986804187f7c738069",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-mood-00ae69951b/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-mood-00ae69951b/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-mood-00ae69951b/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-worker-b16ab5bbb3/all.stdout.txt",
+      "bytes": 52,
+      "sha256": "026a5cb2a3cf9cf9b7a96635782dffaf2438ef6000412532af66300ebfda204d",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-worker-b16ab5bbb3/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-worker-b16ab5bbb3/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-worker-b16ab5bbb3/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-it-84c32992bf/all.stdout.txt",
+      "bytes": 10122,
+      "sha256": "5866b1cdca5f7e15fab4ee3e3c723f321fc28fa71a10b9dd463955327aaaf378",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-it-84c32992bf/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-it-84c32992bf/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-body-it-84c32992bf/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-cloud-lamp_cloud-6f69828da3/all.stdout.txt",
+      "bytes": 12562,
+      "sha256": "65a1af78f7f5a5f4fae11cb562ec4172cb0283c09005f24b8c238aa3caaca0eb",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-cloud-lamp_cloud-6f69828da3/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-cloud-lamp_cloud-6f69828da3/ignored.stdout.txt",
+      "bytes": 92,
+      "sha256": "c6bbe827c7ed16a7e17edb8410f049b4b86009a136c1bc67aaf0fead4a41af21",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-cloud-lamp_cloud-6f69828da3/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-cloud-lamp-cloud-554b220f10/all.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-cloud-lamp-cloud-554b220f10/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-cloud-lamp-cloud-554b220f10/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-cloud-lamp-cloud-554b220f10/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-cloud-it-71652a29fe/all.stdout.txt",
+      "bytes": 2362,
+      "sha256": "fc341fc3b369cb62574795fb53824c4c9a475b11373aabd723a6689e13762b3a",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-cloud-it-71652a29fe/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-cloud-it-71652a29fe/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-cloud-it-71652a29fe/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-keeper-lamp_keeper-f17b3658bf/all.stdout.txt",
+      "bytes": 2819,
+      "sha256": "2e4591cf36f94bb3cbc3d75561bb9b6476d3fbaf634b058d2a82ed66ec21fd3d",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-keeper-lamp_keeper-f17b3658bf/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-keeper-lamp_keeper-f17b3658bf/ignored.stdout.txt",
+      "bytes": 49,
+      "sha256": "004cc930537bae0f6e4aea018876ecab6479c14f8972a9b7f011cdbfc114a425",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-keeper-lamp_keeper-f17b3658bf/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-keeper-lamp-keeper-d56d3ffe96/all.stdout.txt",
+      "bytes": 117,
+      "sha256": "3ddacae3f1c526eec18f154149c362316af37c1a1c0227537143935f60a30162",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-keeper-lamp-keeper-d56d3ffe96/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-keeper-lamp-keeper-d56d3ffe96/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-keeper-lamp-keeper-d56d3ffe96/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-lean-lamp_lean-44abcfe664/all.stdout.txt",
+      "bytes": 725,
+      "sha256": "8062296d7efa345c868aa9aeb7464ba5f391c132654aec11b980023bd381c19e",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-lean-lamp_lean-44abcfe664/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-lean-lamp_lean-44abcfe664/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-lean-lamp_lean-44abcfe664/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-lean-it-f8becdbfd4/all.stdout.txt",
+      "bytes": 4034,
+      "sha256": "f27dafdc40c0e3562fa5f17350d5575bc38de846d6ad88a5605fbd1bf0d0b893",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-lean-it-f8becdbfd4/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-lean-it-f8becdbfd4/ignored.stdout.txt",
+      "bytes": 58,
+      "sha256": "42ed561c7f28d0bed5d81a3e99531ab158df915aedfc8c4f0e50be05032e40a2",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-lean-it-f8becdbfd4/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-lamp_memory-9b814ab02b/all.stdout.txt",
+      "bytes": 8368,
+      "sha256": "0e44a0294b28733ba6e5e5d3af26aaeadfe966b464ca04a97a34e1219b1fccca",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-lamp_memory-9b814ab02b/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-lamp_memory-9b814ab02b/ignored.stdout.txt",
+      "bytes": 76,
+      "sha256": "8964966b0ba39baeee0d1bbda243723c8f7fb433747388793f9faf71966d5c0c",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-lamp_memory-9b814ab02b/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-lamp-memory-3146758736/all.stdout.txt",
+      "bytes": 664,
+      "sha256": "e230054ebdad4f645caf7e6948773c77de31914e0050ae7c350875a4cb6b42cd",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-lamp-memory-3146758736/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-lamp-memory-3146758736/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-lamp-memory-3146758736/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-lamp-memory-eval-92c131996b/all.stdout.txt",
+      "bytes": 561,
+      "sha256": "1548e653eb304ea561ae66fd3c8753403bb2a8b228705af376451a83adcf0028",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-lamp-memory-eval-92c131996b/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-lamp-memory-eval-92c131996b/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-lamp-memory-eval-92c131996b/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-forget_person-25ba06cf31/all.stdout.txt",
+      "bytes": 262,
+      "sha256": "11d3ccea5fc5d3d4d30199793f24842a1e5428e14ca2b0e68651b594b5f420db",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-forget_person-25ba06cf31/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-forget_person-25ba06cf31/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-forget_person-25ba06cf31/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-forget_shared_exchange-d19942f38d/all.stdout.txt",
+      "bytes": 292,
+      "sha256": "a3fe8867c9b8329eaf959605709da341313a4cfc2b03d9ffa1752c64ab4c0a90",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-forget_shared_exchange-d19942f38d/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-forget_shared_exchange-d19942f38d/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-forget_shared_exchange-d19942f38d/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-forgot-3bef75f88f/all.stdout.txt",
+      "bytes": 85,
+      "sha256": "f19803f12df615b76712e88e8b714e9f4bec95d9abe648e35768ba06643acaf4",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-forgot-3bef75f88f/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-forgot-3bef75f88f/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-forgot-3bef75f88f/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-health_control-a821fa0981/all.stdout.txt",
+      "bytes": 1475,
+      "sha256": "d70324e408f730535964c3ed40895c219da2cce3a012a7ef302168872b8158d8",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-health_control-a821fa0981/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-health_control-a821fa0981/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-health_control-a821fa0981/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-it-ec9ad15a3a/all.stdout.txt",
+      "bytes": 12659,
+      "sha256": "a8b2a2751f331d1f349801feb708e83c57a1e2e9044917f3cbde88037ddc5582",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-it-ec9ad15a3a/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-it-ec9ad15a3a/ignored.stdout.txt",
+      "bytes": 355,
+      "sha256": "1464fe30badbad989476eff83279c5f510934b883ca5efae66c8ca2c11a82de4",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-it-ec9ad15a3a/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-paraphrase_fixture-f592647d55/all.stdout.txt",
+      "bytes": 39,
+      "sha256": "4802e7e066d8334b479e30dd35329a036e3997f6fe3219b737bc0b3885e9b5cb",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-paraphrase_fixture-f592647d55/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-paraphrase_fixture-f592647d55/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-paraphrase_fixture-f592647d55/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_early_words-35af54f5ce/all.stdout.txt",
+      "bytes": 81,
+      "sha256": "606ef84f3d1a5b6a00ff48f077ac845ae59a2672b10b079d4a217b1d62f82c4f",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_early_words-35af54f5ce/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_early_words-35af54f5ce/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_early_words-35af54f5ce/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_follows_face-8797197f42/all.stdout.txt",
+      "bytes": 85,
+      "sha256": "6ee67dc9b22ed4e8656175b527181bb5f0303df7c4dd9c407b894d9bf02ca0b7",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_follows_face-8797197f42/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_follows_face-8797197f42/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_follows_face-8797197f42/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget-b0902f6ff6/all.stdout.txt",
+      "bytes": 340,
+      "sha256": "f56c417dd9fc870f58ce18c822ef86e1df4db8857fd5d4970f7442b855e98395",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget-b0902f6ff6/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget-b0902f6ff6/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget-b0902f6ff6/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget_about-3a090e992d/all.stdout.txt",
+      "bytes": 153,
+      "sha256": "1860b7cb69830638041e0804ffe08ee4d0486d8499c731e2e84e3dc872528ef5",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget_about-3a090e992d/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget_about-3a090e992d/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget_about-3a090e992d/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget_named-59c471980d/all.stdout.txt",
+      "bytes": 166,
+      "sha256": "502371a94d348eaacc0c80809994620f19644491fc08703ba164e6d2ee45e461",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget_named-59c471980d/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget_named-59c471980d/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget_named-59c471980d/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_link_used-18badb2dab/all.stdout.txt",
+      "bytes": 117,
+      "sha256": "481207ee1c2f5c971ce68c79508f5eb78a49ab8a15591f6f8bd0be1f07fcd6f2",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_link_used-18badb2dab/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_link_used-18badb2dab/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_link_used-18badb2dab/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_observe-b94cbb61e4/all.stdout.txt",
+      "bytes": 82,
+      "sha256": "ee3e6e18f7012693fd723dea3add0a80849be303659914a9e93971118faa5c67",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_observe-b94cbb61e4/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_observe-b94cbb61e4/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_observe-b94cbb61e4/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_since_until-ea31ad4685/all.stdout.txt",
+      "bytes": 111,
+      "sha256": "0fe5ad0ca785fe2b48a2a27690ad8e09b0bd8a7d6d7d890f9495c2d78c524887",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_since_until-ea31ad4685/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_since_until-ea31ad4685/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-memory-voice_since_until-ea31ad4685/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-peek-lamp_peek-4f95e3c7a2/all.stdout.txt",
+      "bytes": 1060,
+      "sha256": "7922c76e2cf7f5220b934020f4adf19b44353a39766b14e3350187142067d5ee",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-peek-lamp_peek-4f95e3c7a2/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-peek-lamp_peek-4f95e3c7a2/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-peek-lamp_peek-4f95e3c7a2/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-peek-lamp-peek-c1c4ed3067/all.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-peek-lamp-peek-c1c4ed3067/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-peek-lamp-peek-c1c4ed3067/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-peek-lamp-peek-c1c4ed3067/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-peek-peek-439b9b59bb/all.stdout.txt",
+      "bytes": 603,
+      "sha256": "51fa417c55e5b4c13b78d412d074169e878752a5e2fba36bea4ec305ae392d83",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-peek-peek-439b9b59bb/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-peek-peek-439b9b59bb/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-peek-peek-439b9b59bb/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-lamp_setup-a9c38f860c/all.stdout.txt",
+      "bytes": 1073,
+      "sha256": "9e55733d54f242c443a09d9e59fbe326a206f882fe76a3663a9d904dcda66b25",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-lamp_setup-a9c38f860c/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-lamp_setup-a9c38f860c/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-lamp_setup-a9c38f860c/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-lamp-setup-1a6a90f5cd/all.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-lamp-setup-1a6a90f5cd/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-lamp-setup-1a6a90f5cd/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-lamp-setup-1a6a90f5cd/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-it-45c2d151c3/all.stdout.txt",
+      "bytes": 11252,
+      "sha256": "496453d5a9c0bb5302a776802853b2a52e72afe9ce3fdcbc47792c116aa7dc69",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-it-45c2d151c3/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-it-45c2d151c3/ignored.stdout.txt",
+      "bytes": 44,
+      "sha256": "0878c01d3e3575a6590bc204c68c407c6aee4d7f49aa223c1c2639701387a325",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-it-45c2d151c3/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-wake-bb0f409315/all.stdout.txt",
+      "bytes": 396,
+      "sha256": "149791ca9f2cbec35c011115d131f43e23c85b268ffda223186336ff63971926",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-wake-bb0f409315/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-wake-bb0f409315/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-setup-wake-bb0f409315/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-lamp_skills-401280cd26/all.stdout.txt",
+      "bytes": 12253,
+      "sha256": "42ec6d2276d6dca2b3df1444b38a68a1787d0171a08a4d867f3df284b550a10e",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-lamp_skills-401280cd26/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-lamp_skills-401280cd26/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-lamp_skills-401280cd26/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-lamp-skills-abf6f0ac05/all.stdout.txt",
+      "bytes": 1406,
+      "sha256": "068898e2448ab71f7375db9a79d2cffab7b5ea923d6b27776e4ffb5670d3f45b",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-lamp-skills-abf6f0ac05/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-lamp-skills-abf6f0ac05/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-lamp-skills-abf6f0ac05/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-it-ff56e6b74f/all.stdout.txt",
+      "bytes": 23145,
+      "sha256": "860349c8ce330105ef4d0aa0068a368fb2cbba8e88c1933da1bb5853ae68a292",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-it-ff56e6b74f/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-it-ff56e6b74f/ignored.stdout.txt",
+      "bytes": 35,
+      "sha256": "163d33ee43b30a5a7645433ba3a13e9da5256f58bd03c729b798fc95ae23396c",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-it-ff56e6b74f/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-requested_audio-090bc0a541/all.stdout.txt",
+      "bytes": 2099,
+      "sha256": "776d471b3008d3d5429b0a7c738dfff7d036ab9972b872199d16b1c870f378fa",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-requested_audio-090bc0a541/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-requested_audio-090bc0a541/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-skills-requested_audio-090bc0a541/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-lamp_update-b22c4d1a52/all.stdout.txt",
+      "bytes": 9102,
+      "sha256": "73d4b7a0b6ae252fd4b922d473f624f10d072e717b667fd3b573bf2fbb3f7f24",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-lamp_update-b22c4d1a52/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-lamp_update-b22c4d1a52/ignored.stdout.txt",
+      "bytes": 92,
+      "sha256": "bc91a05483d02d07eac64b1dfbfc89be9ee76b939b7cbdf10473700665cba987",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-lamp_update-b22c4d1a52/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-lamp-update-51c6f6ba7f/all.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-lamp-update-51c6f6ba7f/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-lamp-update-51c6f6ba7f/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-lamp-update-51c6f6ba7f/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-functions-8f5b7e0192/all.stdout.txt",
+      "bytes": 314,
+      "sha256": "e646864d91e3a0e969823165f0300cb29d827a9f3f2e4630badfc24b9df3f594",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-functions-8f5b7e0192/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-functions-8f5b7e0192/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-functions-8f5b7e0192/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-install-fbdf99b816/all.stdout.txt",
+      "bytes": 5361,
+      "sha256": "44081175eb6026139662777a2d0e8ea42f7c4be6a6ad323672233954eaa7afb9",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-install-fbdf99b816/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-install-fbdf99b816/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-install-fbdf99b816/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-it-2a38511029/all.stdout.txt",
+      "bytes": 897,
+      "sha256": "baddc58d8487566c4ab3bb050066f6f2725ff6b2b1be4e9de23aba32cef9ada6",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-it-2a38511029/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-it-2a38511029/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-it-2a38511029/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-round-1c83cdb5b4/all.stdout.txt",
+      "bytes": 8843,
+      "sha256": "4b987cb72080b12282faa9fde70ce97fb14243efb5ab26ce0c7631ed9e08b356",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-round-1c83cdb5b4/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-round-1c83cdb5b4/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-round-1c83cdb5b4/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-self-cli-exec-39bef2a1fe/all.stdout.txt",
+      "bytes": 53,
+      "sha256": "635e634394d967384e42754cf17d0a7b33ba13614d6169cb8ba9d8ee2a6da7cd",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-self-cli-exec-39bef2a1fe/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-self-cli-exec-39bef2a1fe/ignored.stdout.txt",
+      "bytes": 53,
+      "sha256": "635e634394d967384e42754cf17d0a7b33ba13614d6169cb8ba9d8ee2a6da7cd",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-self-cli-exec-39bef2a1fe/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-self-process-cuts-72cf15b10c/all.stdout.txt",
+      "bytes": 46,
+      "sha256": "902aefa939fe0a67e5b85cc08b264e25ed9ae462a25569e46159c9a20f948c17",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-self-process-cuts-72cf15b10c/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-self-process-cuts-72cf15b10c/ignored.stdout.txt",
+      "bytes": 46,
+      "sha256": "902aefa939fe0a67e5b85cc08b264e25ed9ae462a25569e46159c9a20f948c17",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-update-self-process-cuts-72cf15b10c/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-lamp_voice-12cfcf6a66/all.stdout.txt",
+      "bytes": 340576,
+      "sha256": "b37e82a6580250cecc4fdd2b397f58fca43c0e6c394eaf460c6de94daa3d8d79",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-lamp_voice-12cfcf6a66/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-lamp_voice-12cfcf6a66/ignored.stdout.txt",
+      "bytes": 1015,
+      "sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-lamp_voice-12cfcf6a66/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-lamp-voice-dfa3ff7af2/all.stdout.txt",
+      "bytes": 81,
+      "sha256": "06a935bb8d90864f89135737bc24cdf47eebc2877cf4d6fea3636c41aa298f9a",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-lamp-voice-dfa3ff7af2/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-lamp-voice-dfa3ff7af2/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-lamp-voice-dfa3ff7af2/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-it-b55e6d62e6/all.stdout.txt",
+      "bytes": 22816,
+      "sha256": "a01042c2285c97806fc978b486484e9f84dfcee6cfea224378b477682b2b31ab",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-it-b55e6d62e6/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-it-b55e6d62e6/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-it-b55e6d62e6/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-render_line_second-9b28e3ce00/all.stdout.txt",
+      "bytes": 235,
+      "sha256": "b1ee3badf01c038fa473c3e33bad4fcf667022e6141fca493ddd991bca28c774",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-render_line_second-9b28e3ce00/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-render_line_second-9b28e3ce00/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-render_line_second-9b28e3ce00/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-1beb1a2819/all.stdout.txt",
+      "bytes": 353,
+      "sha256": "6a80518e733a17dba4e8f03aa0c1609cc558aa7acf343d72b208f132784a5e28",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-1beb1a2819/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-1beb1a2819/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-1beb1a2819/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-eval-lamp_voice_eval-2c3d97c3ee/all.stdout.txt",
+      "bytes": 38504,
+      "sha256": "d48193bedf4b6a16d908580f393acf605bfa1de16ecd9ea867a59d9481a737c2",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-eval-lamp_voice_eval-2c3d97c3ee/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-eval-lamp_voice_eval-2c3d97c3ee/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-eval-lamp_voice_eval-2c3d97c3ee/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-eval-lamp-voice-eval-bd3c38c696/all.stdout.txt",
+      "bytes": 565,
+      "sha256": "651c0d94b911f0e7f3aafab4d76fbe653387a2ceb7174d4a9d58cea911608cf9",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-eval-lamp-voice-eval-bd3c38c696/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-eval-lamp-voice-eval-bd3c38c696/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-eval-lamp-voice-eval-bd3c38c696/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-eval-it-42b39763e6/all.stdout.txt",
+      "bytes": 20010,
+      "sha256": "146189c334547c5280ded4eb5f24ef0e706606e57258d6ca905d49164050b2dc",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-eval-it-42b39763e6/all.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-eval-it-42b39763e6/ignored.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    },
+    {
+      "path": "/private/tmp/tests-expression-810e05109-gates-20261023/gates-20261023T134636.025577Z/readers-default-parallel/compiled-census/lamp-voice-eval-it-42b39763e6/ignored.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata_only": true
+    }
+  ],
+  "original_full_results_json_sha256": "74ebbf0836b253001c16e43c9145aec0248bfa2e10a7826c8182aa3dcbca7e6f",
+  "availability_limit": "Original full streams and raw inventories remain at these local external paths. Local paths are not a remote availability promise; exact failure blocks and the complete retained test streams/case matrix are included in this publication.",
+  "not_published": [
+    "executables",
+    "Python scripts",
+    "complete Cargo JSON streams",
+    "whole source exports",
+    "whole tracked-repository hash maps"
+  ]
+}

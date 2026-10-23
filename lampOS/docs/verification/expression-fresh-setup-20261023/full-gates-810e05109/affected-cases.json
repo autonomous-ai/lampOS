@@ -1,0 +1,37 @@
+{
+  "selection": {
+    "names": [
+      "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline"
+    ],
+    "package": "lamp-expression",
+    "target_name": "runtime",
+    "target_kind": "test",
+    "source_path": "lampOS/crates/expression/tests/runtime.rs",
+    "source_sha256": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95",
+    "assertion_preservation_proof_sha256": "35b95a392af319aa4385f6a6f9471723bcf5d949d7ab59bf7acf51f68c142982",
+    "qualification": "Bind these names to the new actual compiled runtime census and complete full-run rows. No prior package/test total constraint."
+  },
+  "observed": {
+    "selection_file_sha256": "d9b18e4742f512385ca750a135db4d42436c04b35042d5e3bb6549de1eedbab8",
+    "compiled_selected_count": 2,
+    "actual_rows": [
+      [
+        "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+        "ok"
+      ],
+      [
+        "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+        "ok"
+      ]
+    ],
+    "actual_counts": {
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0
+    },
+    "runtime_artifact_sha256": "ea308cd2ef1e1b3271e17d8de410155d9a59e9ae35f099b091a5cb1358650a42",
+    "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+    "qualification": "Current actual full-Expression rows; failures stay failed and no previous total constrains this head."
+  }
+}

@@ -1,0 +1,207 @@
+{
+  "status": "Prepared and unexecuted; explicit ROOT CPU/MAIN execution grant required",
+  "base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+  "worktree": "/private/tmp/tests-codex-expression-fresh-setup-20261023",
+  "source_identity": "source-identity.json",
+  "all_tracked_source_map": "source-map.json",
+  "dependency_proof": "gate-dependencies.json",
+  "packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "readers": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "steps": [
+    {
+      "id": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-expression",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-lean",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-peek",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "timeout_seconds": 2400
+    },
+    {
+      "id": "expression-default-parallel",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-expression",
+        "--no-fail-fast",
+        "--message-format=json-render-diagnostics"
+      ],
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "readers-default-parallel",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-lean",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-peek",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--no-fail-fast",
+        "--message-format=json-render-diagnostics"
+      ],
+      "timeout_seconds": 7200
+    },
+    {
+      "id": "workspace-build",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--message-format=json-render-diagnostics"
+      ],
+      "timeout_seconds": 2400
+    },
+    {
+      "id": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "repository",
+      "timeout_seconds": 60
+    }
+  ],
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_BACKTRACE": "0",
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin"
+  },
+  "clear_environment": [
+    "CARGO_BUILD_TARGET",
+    "RUST_TEST_THREADS",
+    "RUSTFLAGS",
+    "CARGO_ENCODED_RUSTFLAGS",
+    "CARGO_TARGET_TMPDIR",
+    "LAMP_RELAY_PID_CONTROL_DIR",
+    "LAMP_EXPRESSION_FIXTURE_CONTROL",
+    "LAMP_EXPRESSION_FIXTURE_VARIANT"
+  ],
+  "native_platform": "Rust host must be x86_64-apple-darwin; actual artifact ISA recorded independently of machine identity",
+  "source_snapshot": "Frozen uncommitted two-file fixture overlay on exact base",
+  "freshness": "Refresh mtimes of all tracked repository paths after proving modes and exact bytes; touch symlinks without following them. Record equal before/after aggregates. Includes docs, deployment and root robots/lamp fixtures read by Update tests.",
+  "failure_policy": "Each command runs once. A test command with exit 101, actual FAILED summaries, successful Cargo compilation, complete source/artifact/case-census binding and no timeout remains FAILED but permits independent later gates. Compilation, infrastructure, timeout, source or census failure stops later commands. Any failed step makes final gate status FAILED and exit nonzero, never waived; preserve completed/passed/failed/unrun/incomplete target names. No retry.",
+  "reader_execution": "All 11 reader packages, including Voice, use the literal default-concurrency cargo test invocation with --no-fail-fast. RUST_TEST_THREADS is unset.",
+  "case_census": "After a non-timeout test command with exit 0 or 101 and successful Cargo compilation, read --list and --ignored --list from actual libtest artifacts and the two source-audited Update custom entrypoints. Bind every Cargo target launch and its actual test rows/summary to that census; enumerate expected doctests from manifests. Census is never passing execution.",
+  "timing_samples": "No separate case rerun. Actual full-run rows bind the two changed runtime cases.",
+  "coverage_limits": [
+    "Mac gates only; native Linux formatting/Clippy and ARM64 workspace CI remain separate",
+    "No device or product latency claim",
+    "No compiled-identity claim across baseline/candidate without matching recorded artifact hashes"
+  ],
+  "source_scope_counts": {
+    "repository_tracked_paths": 10033,
+    "lampOS_tracked_paths": 6687,
+    "tracked_symlinks": 1
+  },
+  "ordinary_failure_continuation": "A fully bound ordinary test failure, including any affected case, stays failed while independent gates continue. Final exit remains nonzero. No known-flake or inherited-failure waiver.",
+  "head": "810e05109bced3beca88a5b602930cfed5fba4e5",
+  "prior_gate_limit": "Historical six controls remain on 2615; this is a fresh current-base full candidate gate. No older total constrains this inventory.",
+  "candidate_commit": null,
+  "expected_branch": "tests/1806-expression-fresh-setup",
+  "owned_paths": [
+    "lampOS/crates/expression/tests/runtime.rs",
+    "lampOS/docs/expression.md"
+  ],
+  "source_preparation": "Complete immutable Git base objects plus exact two external snapshots, checked against the live owned branch. No target or Cargo access.",
+  "baseline_requirement": "None: this is candidate qualification, not a causal comparison.",
+  "launch_permissions": "The tool launch MUST use sandbox_permissions=require_escalated for local Unix-socket and loopback TCP fixtures. Permission is supplied by the tool invocation, not inferred from a runner flag.",
+  "socket_preflight": "Before any Cargo invocation, bind one private AF_UNIX SOCK_DGRAM socket and remove its path; bind/listen AF_INET SOCK_STREAM on 127.0.0.1 port 0 then close it. Failure stops the gate without a retry and leaves all Cargo steps unrun.",
+  "affected_selection": "selected-cases.json"
+}

@@ -1,5 +1,24 @@
 # Tests work log
 
+## 2026-10-23 21:20 +0700 — Expression full local gate complete
+
+Ready for lamp-voice: no; native PR checks and review remain required.
+
+The [Expression fixture gate](verification/expression-fresh-setup-20261023/full-gates-810e05109/)
+on 810e05109 plus its two frozen files completed 7,164 / 1 / 32 across all
+74 targets. Full Expression: 338 / 0 / 0, both changed runtime cases passed.
+Eleven readers: 6,826 / 1 / 32. The only failure is light-call's unchanged
+25 ms bound, with upper-middle 40.232748 ms; the complete twenty-sample
+output and original assertion are retained. Formatting, strict 12-package
+Clippy, workspace build and diff check passed. Linux formatting and the
+six mechanism controls are already published with their own source identities.
+No failed case or full gate was repeated; no failure waiver is inferred.
+
+Root verified all 14 stream projections and the sole complete failure block
+against captured originals. The exact candidate is proceeding to commit,
+push and its own draft PR after the single latest-base check. The released
+shared target now belongs to the approved bounded Update stdout diagnostic.
+
 ## 2026-10-23 21:13 +0700 — peer ARM failure and clock comparison
 
 Ready for lamp-voice: no; #3271 remains draft/HOLD.

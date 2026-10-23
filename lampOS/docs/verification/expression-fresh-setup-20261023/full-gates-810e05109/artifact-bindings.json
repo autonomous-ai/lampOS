@@ -1,0 +1,1604 @@
+{
+  "source": "Actual Cargo artifact records, digested before shared target reuse.",
+  "records": [
+    {
+      "phase": "expression-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_expression-97b0d6d78b5cc498",
+      "sha256": "111820e11391832edad167a0f318e82420482000ac4e6b4eebfcd00b8ff07e4e",
+      "bytes": 5784680,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "lamp_expression",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "expression-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/replay_cost",
+      "sha256": "3beffc7337fdc2269610df92fab2375d076ec0cfc67256bf6145d11db16649f0",
+      "bytes": 3714656,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "replay_cost",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "expression-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/rest_cost",
+      "sha256": "b1396ab3d027b9e43fa38e11d1a580e7ea3375bba6da9678448d2af2889be93f",
+      "bytes": 3737448,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "rest_cost",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "expression-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/runtime-f9b92bb4002b831f",
+      "sha256": "ea308cd2ef1e1b3271e17d8de410155d9a59e9ae35f099b091a5cb1358650a42",
+      "bytes": 6368392,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "runtime",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "expression-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-expression",
+      "sha256": "80a6e5234b3ca74c2aa349314cfb6ff6311064359e218819cfe86957527564a6",
+      "bytes": 8269016,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "lamp-expression",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "expression-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/recent_playout_cost",
+      "sha256": "581e77db6218bd3e768744b53e03e20e431a491c29d2a5ec762cb82b585a403d",
+      "bytes": 3732272,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "recent_playout_cost",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "expression-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_expression-7d5e7ac9619c42c0",
+      "sha256": "1b05449a91524ce71041be318fe7890a3c1a2c376453dd440650614b6827437b",
+      "bytes": 2299560,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "lamp-expression",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "expression-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-707453661fb429d2",
+      "sha256": "730abf0b649b0cc9cadc3887feef1fc21f65238a1eb97c730afc55ff8fa54dde",
+      "bytes": 12645112,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/wake-dabb3abe438bd29a",
+      "sha256": "bb0f409315192725a7f13c3fbbd3f7e5222947baf8d9000e2a5db00ad2df14fb",
+      "bytes": 1480880,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "name": "wake",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-setup",
+      "sha256": "d3770cde19e38586385a7719309f7f5184deabee9e704b0ca5480bd2231a5a25",
+      "bytes": 15577144,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "name": "lamp-setup",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_peek-85e82104b44dcbfe",
+      "sha256": "c1c4ed3067597b36f3ef572129e8ae7f1dd13bb69597c408c94fe6f650a6937f",
+      "bytes": 941832,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "name": "lamp-peek",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/peek-dd79617fbcee49da",
+      "sha256": "439b9b59bb468e4a8fe7184eb2c3e442d3e3aef606ea03a7cfd9b77cffe99edf",
+      "bytes": 6819608,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "name": "peek",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_setup-37b78ede12db928c",
+      "sha256": "1a6a90f5cd7e071738e27de5003a38b0dd9bdc9b1bd8da06e0a56a26b2444fd5",
+      "bytes": 941832,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "name": "lamp-setup",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-peek",
+      "sha256": "e4bf463a32239f02bf8123dda85b8de8576b61c220aeebcb76eaf9a0b00ccb8f",
+      "bytes": 5946512,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "name": "lamp-peek",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_peek-2ef69e5ef2913106",
+      "sha256": "4f95e3c7a2beb0447a0b460d491fab4630fb4224c681ffcce28a071fbcc46720",
+      "bytes": 3259232,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "name": "lamp_peek",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_setup-d3cdaa1c4f394e26",
+      "sha256": "a9c38f860cb50ea98361532648efbc47d15620d65d78c31aa9805507e7d8ea3d",
+      "bytes": 10860664,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "name": "lamp_setup",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-dd5d708f0033e1f2",
+      "sha256": "45c2d151c30db5ebac2d9e8443be667d3e2ee3f6ef42d1251585d0a46bde9faa",
+      "bytes": 12485540,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_lean-bf9e165f7a87ea41",
+      "sha256": "44abcfe6641114b9f49709c85f63f32b0775ac8427602ef1b6f001d168e229e4",
+      "bytes": 1054320,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/lean#lamp-lean@0.1.0",
+      "target": {
+        "name": "lamp_lean",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/check",
+      "sha256": "fd034e14cbfb3c836e0f6a051d907ee0d585690cec973ea7bd050ddc6c099c12",
+      "bytes": 2156688,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/lean#lamp-lean@0.1.0",
+      "target": {
+        "name": "check",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-71b3c4366a177b0c",
+      "sha256": "f8becdbfd4860eea0767a4c83d628dbe14ef66bbe97bd2afc5bc87f45eb5505e",
+      "bytes": 3124816,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/lean#lamp-lean@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-memory",
+      "sha256": "bcc837356c4b865d483305f5a65869fd5171df3e8155fa076be00c79f90042f3",
+      "bytes": 7454660,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp-memory",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-memory-eval",
+      "sha256": "7d13c4a78686f470327ae0c494185022d5cb3fa7facefc01eb2ae87566b81dad",
+      "bytes": 4017004,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp-memory-eval",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-memory-fixture",
+      "sha256": "52ea05994521e3f56d5848c617774b77ff54fa3c9f3fd40d6570ca2223554c88",
+      "bytes": 7712852,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp-memory-fixture",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_inspect-637ece4159665738",
+      "sha256": "ecb5f3466257499f92175e0ad18ec66ab31d34fda869a7392e44327e101ac581",
+      "bytes": 1161944,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-inspect",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/head_plan",
+      "sha256": "f44113acea162573906c2397b1479479ecc52bf62be65a95dea5f3384b1a23ff",
+      "bytes": 1410832,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "head_plan",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_measure-7f0ba0e9571da263",
+      "sha256": "6d3a11e57f2167b90a46de35a467fe528b0002b31f75663d914066d97f12f96c",
+      "bytes": 1296112,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-measure",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/expression_ask",
+      "sha256": "fa6126cb3ab2e4ae9f02e489840eb60d26aa4b073a2f70bb18c478f246b5408b",
+      "bytes": 1254816,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "expression_ask",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body-9ff199928743cc99",
+      "sha256": "8c5566ce794c34205ad0ad6738b459fd8ce75a926a445d0ca7dc34c016d80f16",
+      "bytes": 2509168,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-body",
+      "sha256": "08f72ff5d2996bf696a2d829a5edb4a3bd9f4c2b8f3d541e6acdc67eebaa5de1",
+      "bytes": 910368,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-body-inspect",
+      "sha256": "9a654827ab2552fc740567b96ba9ddff05081e6e27fefedc279d72aa4872be6b",
+      "bytes": 597368,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-inspect",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-body-measure",
+      "sha256": "d5a0ede887521a6b17ed77fd3ea125991831b41dfaa810ff9430fec6299e1e7b",
+      "bytes": 782416,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-measure",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-body-worker",
+      "sha256": "f78f7b35ead08e75b95361b5f2308b0ef9c360832658c652c5801451f47ce0a4",
+      "bytes": 634784,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-worker",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_worker-29a1b45163b9be85",
+      "sha256": "b16ab5bbb3c8e37e5ed856f6fbdbf922e5d067c939b32e5dec9b2e0b54f90abe",
+      "bytes": 1179112,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-worker",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-body-mood",
+      "sha256": "ae2bcf2f7a24926170bcbbe7bb433fc9f5021bd655d1769b7821c3a89ee709eb",
+      "bytes": 473720,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-mood",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_mood-30267137783a16a9",
+      "sha256": "00ae69951be577363805fcb11bc35055693003f668525e290557543577b08054",
+      "bytes": 1031256,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-mood",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_keeper-a9f34008275109b0",
+      "sha256": "d56d3ffe968cc22ca92bd5a70b1ce848abe4ce7d4c24cfd86ca0bac36735dbc1",
+      "bytes": 1706112,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "target": {
+        "name": "lamp-keeper",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_keeper-d493629e7c7f7339",
+      "sha256": "f17b3658bfed09a5c0e163298ddbb5d30c4351f54f614969e007eb2281b680ad",
+      "bytes": 2583056,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "target": {
+        "name": "lamp_keeper",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-update",
+      "sha256": "9ed2b7cc9216b2ae7a7f8ff664ca229f8359703c0bd73cf1e4f173a667147c1c",
+      "bytes": 10595220,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "lamp-update",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-8bf4d1aea99732a6",
+      "sha256": "84c32992bf2af8154da6ea378d5d05a4ff9ea7e834b00d055af530d9d77c7d3a",
+      "bytes": 5774296,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/paraphrase_fixture-1ab158fe737ddfa1",
+      "sha256": "f592647d55eb5a3cad95f6a0971c5a69a015a56334ec67777785a497f8c66fb4",
+      "bytes": 1480240,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "paraphrase_fixture",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-2d0e36e5d853a2d4",
+      "sha256": "1beb1a281939e21272560ffcc4c7c719af44caaf6d84de81cdf7e28b36d7fc80",
+      "bytes": 2742264,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "stop_words_stt_replay",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-cloud",
+      "sha256": "ee27403f5feb306e865304fe84ad486e8f5254004f30cfca11a1747386b41505",
+      "bytes": 23570360,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "name": "lamp-cloud",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-ec55a9cccd50d91b",
+      "sha256": "554b220f106fdfe5dc62b2d55de36ecc07b52a856d3c6074d21a3347d95da71a",
+      "bytes": 941832,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "name": "lamp-cloud",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-f79cb3cb89d2ed6d",
+      "sha256": "71652a29fef205eb8a84f0fa44c0a98e3e419293164fca99eebf38f06456d723",
+      "bytes": 15507124,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/same_voice_pairs",
+      "sha256": "e49fb6171e23ea10ba7dc51dce454baf46fd5132e8311286821a86074a5f8a78",
+      "bytes": 75583744,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "same_voice_pairs",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/round-b56855d52eb918f5",
+      "sha256": "1c83cdb5b45d65cd33882b8aab3ffc94cebbedc4b94eb839b3a08586f8b1899d",
+      "bytes": 15441772,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "round",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-voice-eval",
+      "sha256": "5c9095a5c9377e0daf82a3d11a7c8bf6c7d36c3005d7e757787906119df4f170",
+      "bytes": 28913768,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "lamp-voice-eval",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_early_words-03a1719782c5bbcf",
+      "sha256": "35af54f5ce797d3df025d1e3ef8f8dd40e3384990ae0bf6896e7a4be9e2a338a",
+      "bytes": 9297932,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_early_words",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-d234ff01061c9264",
+      "sha256": "ff56e6b74fbaaa8e3634eb94bdab2f41e779d3a297a3d20a51087bbbba5869b9",
+      "bytes": 20929580,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_follows_face-60853cffd855bd29",
+      "sha256": "8797197f42336c1b76b71465c048d34629fcd363a519bfa3b33f48041d8b2572",
+      "bytes": 9243652,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_follows_face",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/install-1ac5cd8688fb5552",
+      "sha256": "fbdf99b816c4f4cd461344737ac83e47298adb739491d3975c15fbd4e121ecc2",
+      "bytes": 13177124,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "install",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-c5860a8fe305ff34",
+      "sha256": "9b28e3ce003c1ab86575dbd4ccabdc6f6d213d3cabac2ed9f1fa54814e5aae64",
+      "bytes": 1442560,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "render_line_second",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/hearing_replay",
+      "sha256": "f94a7369ed4036790bd38a165812bd869b38a29a3d51ab8222ddb2834f47ec62",
+      "bytes": 1646016,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "hearing_replay",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_link_used-04635e47dc2694ae",
+      "sha256": "18badb2dabe935a5071a62f8b83e032ac4581aa7f9a5f6648f912568d23a5f0f",
+      "bytes": 9231356,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_link_used",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-skills",
+      "sha256": "d01628e6817196baa574ad35d236e475f56d686f403a93364299f50845080e87",
+      "bytes": 20251164,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "lamp-skills",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/reference_pace",
+      "sha256": "5a90251fcd7177cc8b54900fdfbb75c2b6b3fb0525ad84b2a273cd0aa62b42d2",
+      "bytes": 3848696,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "reference_pace",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/self_cli_exec-a3a314412b3d0408",
+      "sha256": "39bef2a1fe4b85c74e968d83f2cf7530dba0b7e05b4a831a0b2143d9486bb9c0",
+      "bytes": 473952,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "self-cli-exec",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice_eval-8f91f7c6d8f2bad9",
+      "sha256": "bd3c38c696dd39433ee1c28d76402c3d871e9522fdd82c47522221cb0ca259f8",
+      "bytes": 6361732,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "lamp-voice-eval",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/self_process_cuts-3d0129dfb728f659",
+      "sha256": "72cf15b10cf66ba04e9d48a00efd4a13e352b1885ccc398dbc4b08bc44842909",
+      "bytes": 473944,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "self-process-cuts",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_forget-2c647d569acd794e",
+      "sha256": "b0902f6ff678fa09c6b8a1c8c9f69cc6941b6d29b690b1becccf67d84dc5c4a8",
+      "bytes": 9484460,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_forget",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/requested_audio-4f27b5daa1cf4165",
+      "sha256": "090bc0a541ac70fbf95e138e3790692d9292d0aea40d32ad1a9b3d59664267fb",
+      "bytes": 13177572,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "requested_audio",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-9340d957f69b21c9",
+      "sha256": "401280cd269d2f657abe3d9cca0dd5c7eedbbbb60b60ba1b9861e316eb378b47",
+      "bytes": 13867364,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "lamp_skills",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-9d3c31ca873cd5b8",
+      "sha256": "6f69828da39c9008a626346098992ef7bf7cf903061eaefd39a79b3a7642f566",
+      "bytes": 29320856,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "name": "lamp_cloud",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/functions-5a0d370af5f450e7",
+      "sha256": "8f5b7e01923e58cfabfce4cbbb5b4b18e3ab8ab58943f7ff9711374cc84f4eeb",
+      "bytes": 18482240,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "functions",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-65aa47887fbec9c4",
+      "sha256": "abf6f0ac057c3aede7567608fb141b0926d361ff880565220c1456bc081e0722",
+      "bytes": 13289660,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "lamp-skills",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_forget_named-940b56ba6fb85449",
+      "sha256": "59c471980d34aa8869d146d40c0261b5685c872fba31e92bce0b5844b181bdd3",
+      "bytes": 9155836,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_forget_named",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory_eval-d99c5dad98adec59",
+      "sha256": "92c131996b016e9fd87e5a181d74510689f139519ece0661ee89aff0fa8fb77c",
+      "bytes": 1784968,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp-memory-eval",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-8cfde8964d02dd84",
+      "sha256": "b22c4d1a52400a039d28a2084caa0b16d72202aba38a08d4f748b9b1a053b2d6",
+      "bytes": 11099220,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "lamp_update",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_since_until-6f91fd9d551f6455",
+      "sha256": "ea31ad46852ae906928d3445b0dede31472ba92190881b9ca1475a323cce0383",
+      "bytes": 9079724,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_since_until",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/probe_handover",
+      "sha256": "2c9d7a3fa99c44a9d1e4ac7ae1108eea787e851d3bfe0a6b9e142e880742ac09",
+      "bytes": 12732776,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "probe_handover",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-917370f90cac6422",
+      "sha256": "42b39763e6c0159152bf566e65dbf79ae1fcb7bde180cc49d11cfe62e8cc0d01",
+      "bytes": 15926856,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-f14d800ac4c692fa",
+      "sha256": "2a3851102956463571cd18e701031d97dab776b081c62babeb9b7af4c8b7a813",
+      "bytes": 1655352,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_observe-0d58d8932b7b1e0c",
+      "sha256": "b94cbb61e42bfe3529f17f74fd668a97b3c764ea94021ad1701b437813652b66",
+      "bytes": 8494484,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_observe",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-8d23626e029fe965",
+      "sha256": "51c6f6ba7f59be2ea8406d86a5f35e8f61b4fbf714e6d943acc3e4d47e5a84b0",
+      "bytes": 941840,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "lamp-update",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-7b478dca3b6d9aaf",
+      "sha256": "dfa3ff7af23e24e70923b42ca41b8695edfceb150f4e4981f0829f2f48aca069",
+      "bytes": 1120408,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "lamp-voice",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/health_control-b4454d213a3bb8e6",
+      "sha256": "a821fa098138bf0fca2189053df7a3810485976014e517b607ea0e0425958fee",
+      "bytes": 2012824,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "health_control",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/ring_process_probe",
+      "sha256": "9d3ce3ddddf7392e2f93ef6c6714352090b41ecb6284c0bba79c0dc2e7056024",
+      "bytes": 5691512,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "ring_process_probe",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/forget_person-48c3fe3ff9906b32",
+      "sha256": "25ba06cf31ad055aa9b3ade65f6e95716ee996f923cde059ce91d06872a751d8",
+      "bytes": 7893860,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "forget_person",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/turn_end_replay",
+      "sha256": "05dadc814690f721745824e6d71789806465044a2792a3040fa8968a30e47d52",
+      "bytes": 75425400,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "turn_end_replay",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-cb83294ccc4832ad",
+      "sha256": "ec9ad15a3ab0901a5e2f62fb1d4bda49e2d42e6b0208ab86155a730da53b55b0",
+      "bytes": 14527124,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-voice",
+      "sha256": "50fd02db4cd6de8f771039c3b491869a8b69eedc5ac0bc35bcba5799f43cedce",
+      "bytes": 40093880,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "lamp-voice",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_forget_about-6b03356fa90a08a3",
+      "sha256": "3a090e992d1818ef1da9fbffb2aa713ae7f76aa67d313bf0c9200fbd5e3fd5bd",
+      "bytes": 9071572,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_forget_about",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/forget_shared_exchange-ec60dcd1d8a12661",
+      "sha256": "d19942f38d8dd5c364f3735573220aafbaecdb789b143dcbce8d6a2811e0b557",
+      "bytes": 5544324,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "forget_shared_exchange",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/forgot-c03399e1f88b611c",
+      "sha256": "3bef75f88ffc71ca13c629f955eba7aec7cdac3b75448cc5378cce90e125bc4e",
+      "bytes": 4141328,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "forgot",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/admission_latency",
+      "sha256": "8fd6b4ef66c63b7261701e006385a5835059f22ad452fcd15f1c40c7785e33d0",
+      "bytes": 895840,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "admission_latency",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/render_relaxing_music",
+      "sha256": "99e02c791293bc711743c4a7c5fd33a5d51dee12878303935559e610dff288f4",
+      "bytes": 548496,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "render_relaxing_music",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-49555a3a077e26f6",
+      "sha256": "3146758736c7a0a75b94a0aade33d2e8b5300e808ac693b85a46fdce24ae59f8",
+      "bytes": 7763988,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp-memory",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-45a1046acddcb43e",
+      "sha256": "b55e6d62e6e06f97ccf0573bbfe8e4fd6b7f260c27fe6e289db9c986a2d48e93",
+      "bytes": 94322636,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-82fda6e861160c1c",
+      "sha256": "9b814ab02b5103f70292c755ffff854a628303efc3400b6850fe930eade25c38",
+      "bytes": 9952356,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp_memory",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/duplex_lab",
+      "sha256": "544c3f2c0ee756fb67dd6d10e17244daec9403add66427d7180e1475529c6b35",
+      "bytes": 2923904,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "duplex_lab",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/head_qualification_operator",
+      "sha256": "c5cc57c9afe85c34c6f0c3513c7dcb016406e7aa992d6ab6e9de9b16dd2f8bce",
+      "bytes": 1460688,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "head_qualification_operator",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": false,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice_eval-950f5ab79bd5b913",
+      "sha256": "2c3d97c3eea83e013cb6a4ed91d16dbd449329eaca2c101064bacdf521fd5299",
+      "bytes": 24528156,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "lamp_voice_eval",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body-3bda0a619327d99b",
+      "sha256": "91201e780ad4f6bacaeba360971a5ff47ea1d92eebe2897aa6bcd894325c8a22",
+      "bytes": 116329248,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp_body",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-e58141fb20c66240",
+      "sha256": "12cfcf6a66c47e40390580e1b9a7a59887e1bbc2e46bf3e6d3a48d15f2931bab",
+      "bytes": 113451864,
+      "source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+      "package_id": "path+file:///private/tmp/tests-codex-expression-fresh-setup-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "lamp_voice",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "test_profile": true,
+      "missing_after_command": false
+    }
+  ],
+  "availability": "Full build JSON and saved raw artifact metadata remain external. Binaries are not published, and no claim is made that MAIN paths remain available after release."
+}

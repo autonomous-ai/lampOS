@@ -1,0 +1,22 @@
+{
+  "cargo_container_target_access": false,
+  "current_closure_count": 12,
+  "workspace_packages": 46,
+  "closure_delta": {
+    "added": [],
+    "removed": []
+  },
+  "proof_functions_AST_identical": [
+    "package_name",
+    "artifacts",
+    "execution_summary",
+    "compile_outcome",
+    "target_outcomes",
+    "case_census"
+  ],
+  "support_byte_identical": true,
+  "old_runner_sha256": "aa43862bbb53a40f6d7d59e5b27a9d5beef659bc582e8b321cb3ec30ba281e49",
+  "old_gate_plan_sha256": "26e26e5028cc6722f16fa78400737ff61df070f96705682deb26d73729e062ac",
+  "authored_patch_byte_identical_to_historical_controls": true,
+  "no_previous_case_total_constraint": true
+}
