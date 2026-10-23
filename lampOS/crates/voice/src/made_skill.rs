@@ -518,10 +518,23 @@ const MOST_REASON_CHARS: usize = 200;
 /// reviewer on #2011), so anything in quotes, the skill's own name and its
 /// folder are left out, and the line is cut short.
 fn check_reason(said: &str, folder: &Path, name: &str) -> String {
-    let Some(line) = said.lines().map(str::trim).find(|line| !line.is_empty()) else {
+    let mut lines = said.lines().map(str::trim).filter(|line| !line.is_empty());
+    let Some(line) = lines.next() else {
         return "it said nothing".into();
     };
     let line = line.strip_prefix("lamp-skills: ").unwrap_or(line);
+    // A TOML parse error says where on its first line and why after the
+    // quoted source ("unknown field `name`", Mobile's #2813 rerun): the
+    // first line that is not the source or its marks is added.
+    let because = if line.contains("TOML parse error") {
+        lines.find(|line| !line.starts_with('|') && !line.starts_with(|c: char| c.is_ascii_digit()))
+    } else {
+        None
+    };
+    let line = match because {
+        Some(because) => format!("{line}: {because}"),
+        None => line.to_owned(),
+    };
     let line = line.replace(&*folder.to_string_lossy(), "<folder>");
     let chars: Vec<char> = line.chars().collect();
     let word = |at: Option<&char>| at.is_some_and(|c| c.is_alphanumeric());
@@ -532,8 +545,13 @@ fn check_reason(said: &str, folder: &Path, name: &str) -> String {
         // An apostrophe in a word ("skill's", "don't") neither opens nor
         // closes a quote.
         let in_word = word(before) && word(chars.get(at + 1));
+        // A quote escaped inside a value printed with `{:?}` ("say \"hi\"")
+        // neither closes nor opens one (the reviewer-lead's P3 on #3225).
+        let escaped = before == Some(&'\\');
         match open {
-            Some(quote) if !in_word && c == if quote == '“' { '”' } else { quote } => {
+            Some(quote)
+                if !in_word && !escaped && c == if quote == '“' { '”' } else { quote } =>
+            {
                 kept.push('…');
                 kept.push(c);
                 open = None;
@@ -1140,13 +1158,27 @@ light = { dim = 1 }
             "not packed: <skill>'s skill.toml says no version: a package carries one"
         );
         assert_eq!(
-            reason("gesture 'wave to Lan' isn't one of `nod`, “curious”"),
+            reason("gesture 'wave to the cat' isn't one of `nod`, “curious”"),
             "gesture '…' isn't one of `…`, “…”"
         );
         // An apostrophe inside a quote doesn't end it early.
         assert_eq!(reason("said 'don't wake me' at 7"), "said '…' at 7");
+        // A TOML parse error gives its why after the quoted source, which is
+        // left out.
+        assert_eq!(
+            reason(
+                "lamp-skills: not packed: skill.toml: TOML parse error at line 1, column 1\n  |\n\
+                 1 | name = \"evening-dim\"\n  | ^^^^\nunknown field `name`, expected one of `kind`\n"
+            ),
+            "not packed: skill.toml: TOML parse error at line 1, column 1: unknown field `…`, expected one of `…`"
+        );
+        // Nor does one escaped in a `{:?}` value.
+        assert_eq!(
+            reason(r#"unknown say "call \"home\" now" in [[do]]"#),
+            r#"unknown say "…" in [[do]]"#
+        );
         // A quote never closed hides the rest.
-        assert_eq!(reason("bad value \"call Lan at"), "bad value \"…");
+        assert_eq!(reason("bad value \"call home at"), "bad value \"…");
         assert_eq!(reason("\n  \n"), "it said nothing");
         let long = reason(&"word ".repeat(100));
         assert!(long.chars().count() <= MOST_REASON_CHARS + 1, "{long}");
