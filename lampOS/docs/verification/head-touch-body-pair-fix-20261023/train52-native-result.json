@@ -1,0 +1,45 @@
+{
+  "runs": [
+    {
+      "id": 39996802080,
+      "name": "lampOS on ARM64",
+      "head_sha": "ff99df2881a7ce3fded9f3da4aaa4747c89cc259",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39996802080",
+      "created_at": "2026-10-23T17:39:01Z",
+      "updated_at": "2026-10-23T18:00:36Z"
+    },
+    {
+      "id": 39996802014,
+      "name": "lampOS clippy",
+      "head_sha": "ff99df2881a7ce3fded9f3da4aaa4747c89cc259",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39996802014",
+      "created_at": "2026-10-23T17:39:01Z",
+      "updated_at": "2026-10-23T17:42:06Z"
+    }
+  ],
+  "authored_head": "ff99df2881a7ce3fded9f3da4aaa4747c89cc259",
+  "tested_merge": "77ea36f0d6e8a8dcc28ee279c86ced9a98105102",
+  "equal_repository_tree": "a0362293d824167b5512ac5aea04e603a9181c1c",
+  "lampOS_tree": "ade0cc783ced13eeea4d495bf1719edb1181dc85",
+  "arm64_primary_log_sha256": "558c7566c0cae04f3948bb11ca8c3d831074fa209025531582074cc89b9267ab",
+  "nextest": {
+    "passed": 11083,
+    "failed": 0,
+    "skipped": 71,
+    "reported_leaky": 1
+  },
+  "doc_tests": {
+    "passed": 4,
+    "failed": 0
+  },
+  "process_checks": {
+    "passed": 12,
+    "failed": 0
+  }
+}

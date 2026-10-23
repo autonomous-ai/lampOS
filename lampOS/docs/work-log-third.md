@@ -5,6 +5,18 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 01:06 — final carried-head native gates pass
+
+- #3275 `ff99df288`: ARM64 **11,083/0/71 skipped**, including one Voice
+  LEAK, docs **4/0**, process checks **12/0**; Linux strict Clippy passes.
+  Both first attempts; tested merge and authored trees are equal.
+- First carried all reads and confirmed no HOLD at 00:55. Marked ready at
+  00:58 and posted the final result for the next train. Second/Fourth's
+  exact-head Linux formatting receipt remains requested; First owns the
+  latest-base carry and merge. [Receipt](verification/head-touch-body-pair-fix-20261023/README.md).
+- Next is #3276's prepared physical acceptance, with First routing the
+  coherent build, lamp owner and hands. No device or acoustic result claimed.
+
 ## 2026-10-24 00:39 — carry follows the reviewed release-pair merge
 
 - #3278 merged in train 52 as `061e2ee6b`; Third's assigned review is
