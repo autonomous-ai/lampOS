@@ -1501,6 +1501,7 @@ fn second_route_worker_environment(
         // Read by the second route's same-voice check (#2602).
         crate::same_voice::CALLER_ONLY_ENVIRONMENT,
         crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
+        crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
         crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
         crate::second_provider::CUE_AFTER_ENVIRONMENT,
@@ -1584,6 +1585,7 @@ mod tests {
             crate::second_provider::OWN_ECHO_ENVIRONMENT,
             crate::second_provider::FACE_NAME_ENVIRONMENT,
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
+            crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
             crate::second_provider::LOOK_WALK_ENVIRONMENT,
             crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT,
@@ -2170,6 +2172,7 @@ mod tests {
                     || name == crate::second_provider::OWN_ECHO_ENVIRONMENT
                     || name == crate::second_provider::FACE_NAME_ENVIRONMENT
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
+                    || name == crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
                     || name == crate::second_provider::LOOK_WALK_ENVIRONMENT
                     || name == crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT
@@ -2286,6 +2289,7 @@ mod tests {
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
                     "LAMP_RELAY_ROUTES=on",
+                    "LAMP_SAME_SPEAKER_CARRIES=on",
                     "LAMP_SAME_VOICE_CALLER_ONLY=on",
                     "LAMP_SECOND_CHAT_KEPT=on",
                     "LAMP_SECOND_CHAT_WARM=on",

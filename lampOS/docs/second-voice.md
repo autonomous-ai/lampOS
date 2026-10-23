@@ -3051,6 +3051,49 @@ after a take-over, but now for every turn:
   (`RoomTold::end_busy_once_answered`, which this route never turned on
   before; Live turns it on with `LAMP_GOING_ON_ASKS`). attention.md, "A
   busy room ends a minute after its talk".
+- **The one it answered goes on, busy room or not**
+  (`LAMP_SAME_SPEAKER_CARRIES=on`; with `--attention` and
+  `LAMP_NAME_OR_FOLLOW_UP`; the owner's P1 on Queue #3126). On lamp-4ace on
+  23 Oct (build G, `LAMP_SPOKEN_TO`, `LAMP_BUSY_ENDS_SOONER`,
+  `LAMP_NAME_OR_FOLLOW_UP`) every conversation ended after two turns: the
+  third line's short print read "another voice" (0.27 from 1.8 s), the lines
+  after it, 11 to 22 s after the lamp's words, missed the busy room's 8 s
+  follow-up, and the owner's own held lines kept the room busy (22 holds,
+  18:40 to 18:55). With the switch, in a busy room, a line begun within
+  20 s (`worker::SAME_SPEAKER_CARRIES_FOR`) of the end of the lamp's last
+  words, by its start (a line begun inside may be judged after it), goes on
+  as the conversation, past the 8 s and past talk past the lamp, when
+  `Heeding::carried_by_the_same_speaker` finds the one it answered: the
+  caller's face alone seen speaking it turned to the lamp, or the
+  conversation's voice at `same_voice::SAME_FROM` (0.70) or over. Each
+  answer renews the 20 s. It is let out as the conversation going on,
+  before `busy_bar`, so a short line that is no question is still held
+  (`BUSY_SHORT`). Another face seen speaking it, or a sure other voice
+  (under 0.30 from `CARRY_SURE_OTHER_SPEECH_SAMPLES`, 2.5 s of speech, the
+  0.3 s pre-roll not counted, `Voices::usable_speech`), ends the carry until
+  the lamp answers again, and the caller's identity is not reused without a
+  new answer; a stop (`Did::Stopped`, from the next line's `after_stop`) and
+  a privacy change end it, and a forgetting leaves no words to carry from.
+  The caller's own face seen speaking turned away from the lamp is someone
+  talking to a colleague: held, the carry standing (reviewer-two at 03:01).
+  A line with no sure sign either way, a print not back, a short print
+  under 0.70, no face seen speaking or only before the line, is held and
+  ends nothing. Re-sliced as the code cuts them, that set's short clips of
+  one synthetic voice (three clips of 0.93 to 1.45 s against seven
+  references: 21 correlated pairs) read 0.11 to 0.50 against it, and four
+  clips of another voice (1.43 to 1.45 s) 0.09 to 0.26
+  (`docs/verification/same-voice-early-20261018`, reviewer-two at 03:17):
+  a reason for caution about a short print's "another voice", not a
+  calibration, so the 2.5 s is provisional; every print is asked
+  at 1.5 s of speech, so today no voice ends a carry, and with short lines
+  the face carries it, not the voice. A print come late is unsure the same
+  way (`Voices::sure_of_another_only`), and a late other of a line older
+  than the newest one carried by a sure sign ends nothing. A carried line
+  the model leaves unanswered is no talk (`RoomTold::carried`): it neither
+  ends the conversation nor keeps the room busy. The 2.5 s and the 0.30
+  under it are to be set from a CAM++ measurement of longer prints. Tests
+  only (`worker.rs`, `CarryDesk`); off until a played five-turn
+  back-and-forth on lamp-52e6 or lamp-75c9, quiet and with desk talk.
 - **A busy room's call by the text, narrowed** (`LAMP_BUSY_CALLED_STRICT=on`;
   with `--attention`). On #1712's branch the busy room let out "Man, that
   meeting ran long.", "Plan the sprint for tomorrow.", "Mom, can you pick me

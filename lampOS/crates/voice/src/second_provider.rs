@@ -480,6 +480,13 @@ pub const JOIN_CUT_WORDS_ENVIRONMENT: &str = "LAMP_JOIN_CUT_WORDS";
 /// `room_told::RoomTold::end_busy_once_answered`).
 pub const BUSY_ENDS_SOONER_ENVIRONMENT: &str = "LAMP_BUSY_ENDS_SOONER";
 
+/// Where the worker reads whether, in a busy room, the one the lamp answered
+/// goes on talking with it by their own voice or face for
+/// `worker::SAME_SPEAKER_CARRIES_FOR` after each answer, past a follow-up's
+/// 8 s (`LAMP_NAME_OR_FOLLOW_UP`) and talk past the lamp: `on`, and nothing
+/// else (the owner's P1 on Queue #3126, `worker::Heeding::carrying_the_same_speaker`).
+pub const SAME_SPEAKER_CARRIES_ENVIRONMENT: &str = "LAMP_SAME_SPEAKER_CARRIES";
+
 /// What a `not_for_me` is answered in a turn named to a face
 /// ([`NAMED_ALWAYS_ENVIRONMENT`]): the model is asked once more.
 pub(crate) const NAMED_TO_A_FACE_ANSWER: &str =
@@ -671,6 +678,10 @@ pub enum Did {
     /// answer began (#1712, the first builder at 19:21). The first field is
     /// the request its words answer (`LAMP_GOING_ON_NOT_OWN`).
     Said(u64, u64),
+    /// A line began right after a stop (its Start's `after_stop`): what the
+    /// lamp was saying was stopped, and a conversation carried for the one
+    /// it answered is over (`LAMP_SAME_SPEAKER_CARRIES`).
+    Stopped,
 }
 /// Where the engine says what the lamp did.
 pub type LampDid = Arc<dyn Fn(Did) + Send + Sync>;
@@ -2894,6 +2905,10 @@ impl Engine {
                 // asked again, in its place or joined to it.
                 if after_stop {
                     self.let_go_cut(&format!("request {request} is the first line after a stop"));
+                    // The rule hears of it before this line is judged.
+                    if let Some(did) = &self.shared.did {
+                        did(Did::Stopped);
+                    }
                 }
                 // The lamp's name said alone just before, its answer waiting
                 // for this line (`LAMP_SECOND_NAME_CARRIES`): begin dropped
