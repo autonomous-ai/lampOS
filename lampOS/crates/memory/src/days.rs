@@ -1939,8 +1939,11 @@ impl Days {
 /// nothing in the room's lines, since "the meeting in June", "the plumber
 /// will come" or Vietnamese "chiều mai" (tomorrow afternoon) would go
 /// (reviewer-three's P1 and Eighth's P2 on #3143, the first builder's
-/// decision 06:34). Months, weekdays, and a few names that are words.
-/// Short on purpose: the capital ([`names`]) keeps most words out.
+/// decision 06:34). Months, weekdays, a few names that are words, and
+/// names that often open a sentence, where the capital can't tell them from
+/// a word ("Long walks help everyone sleep", "Hai đứa trẻ thích vẽ";
+/// reviewer-three's P3 on #3143). Short on purpose: the capital
+/// ([`names`]) keeps most words out.
 pub const COMMON_WORDS: &[&str] = &[
     "january",
     "february",
@@ -1975,6 +1978,13 @@ pub const COMMON_WORDS: &[&str] = &[
     "an",
     "mai",
     "hoa",
+    "long",
+    "max",
+    "summer",
+    "sunny",
+    "hai",
+    "nam",
+    "sang",
 ];
 
 /// What a [`Days::forget_naming`] did: the rows removed, or nothing
@@ -2622,11 +2632,18 @@ mod tests {
             "Ask An about the keys",
             "Will's bike is blue",
             "I saw Mai today",
+            "Long walks help everyone sleep",
+            "Max volume is too loud after ten",
+            "Summer holidays start in June",
+            "Sunny mornings are for the balcony",
+            "Hai đứa trẻ thích vẽ",
         ]
         .iter()
         .map(|text| store.remember(&room, now, text).unwrap())
         .collect();
-        for name in ["An", "Will", "Mai", "may", "JUNE", "Friday"] {
+        for name in [
+            "An", "Will", "Mai", "may", "JUNE", "Friday", "Long", "Max", "Summer", "Sunny", "Hai",
+        ] {
             assert_eq!(
                 store.forget_naming(name).unwrap(),
                 Naming::CommonWord,
