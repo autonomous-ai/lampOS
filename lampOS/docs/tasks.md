@@ -272,6 +272,18 @@ and whitespace around a project are refused. Text is at most 1,000 UTF-8
 bytes, nonempty, without NUL and not beginning with `--`, which the inspected
 CLI parser treats as another option. The confirmed text is never rewritten.
 
+A name's folder is made by Harness on its first `new` (`~/harnesses/<name>`),
+and every later `new` on that name is refused for it before anything starts:
+"“NAME” already exists on COMPUTER: FOLDER. Choose another name …", FOLDER as
+that computer reports it: `~/harnesses/NAME` from Harness 0.4.55 (Mobile on
+lamp-0c89, 23 October), or its absolute path (openharness `newCommand.ts`,
+for another machine). On that refusal alone, with a FOLDER that ends in that
+name, `lamp-tasks` asks the same `new` once more in exactly that FOLDER, and
+its journal says so (`tasks: lamp-task-N: Harness
+made the folder … so it starts there`, with no ask's words). A folder target,
+any other refusal, a timeout or a second refusal is never asked again,
+so nothing can start twice, and a named target's hand-overs all start.
+
 The executable is resolved once to an absolute canonical regular file, owned
 by the service user or root, executable, without group/other write or set-ID
 bits. Its identity, size, modification time, mode and owner are checked again
