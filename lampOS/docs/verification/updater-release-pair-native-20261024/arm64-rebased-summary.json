@@ -1,0 +1,32 @@
+{
+  "run": 39992469455,
+  "head": "7ebb876be004a84981cc71bf8b01e3eb3a06eb4c",
+  "ci_merge": "88771df4e1de4dd0ce8b316a6b1ca7bf9764ccde",
+  "status": "completed",
+  "conclusion": "success",
+  "nextest": {
+    "passed": 11068,
+    "failed": 0,
+    "skipped": 71,
+    "leaky_passes": 1,
+    "leaky_test": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+    "duration_seconds": 200.549
+  },
+  "doc_tests": {
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0
+  },
+  "own_harness": {
+    "relay_signals": "ok",
+    "turn_end_wire_process": {
+      "passed": 12,
+      "failed": 0
+    }
+  },
+  "artifact_downloaded": false,
+  "artifact_metadata": "arm64-rebased-artifacts.json",
+  "full_log_sha256": "8813bb0ba906d52c2fcf989eaf001c869b8e8bcc41a46902030902a66df81e84",
+  "excerpt_sha256": "a910a2cae8b2351cc56ee80b014a2171b4fac7807c85aedadaf2cc19ff72611e",
+  "scope": "Whole-workspace PR profile selected by the existing workflow because of retained JSON evidence under docs; realtime/ignored cases remain skipped; no local full gate."
+}

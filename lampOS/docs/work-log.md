@@ -1,6 +1,28 @@
-## Current checkpoint: 2026-10-24 00:15 +07, rebased release-pair checks
+## Current checkpoint: 2026-10-24 00:23 +07, train 51 carry and Body repair read
 
-Ready for lamp-voice: no (#3278 awaits ARM64 and both assigned readers)
+Ready for lamp-voice: no (#3278 latest-base native gates and two reads pending)
+
+#3278 is now `baed91ead` on latest `1291ef1f4`; all 255 PR paths remain
+identical by bytes and modes, with range-diff `=`. Only five upstream Eyes
+paths differ. Fresh Linux source-only formatting passes with 6,963 files
+unchanged. ARM64 **39993981374** and Linux Clippy **39993981366** are running.
+The earlier head's green native results and the original manual **2 / 0 / 0**
+remain bound separately in the [receipt](verification/updater-release-pair-native-20261024/README.md).
+Reviewer's source-after timeline P3 is explicitly qualified there; no new
+execution or reconstructed timestamp is claimed.
+
+Third pushed #3275's Body admission repair `a449e539f`. Second's scoped source
+read finds the original P2 addressed and no new P1/P2; one execution of the
+original refusal regression is in progress. Its first shell setup found no
+Cargo on PATH before execution; that output is retained separately. Third
+needs the train 51 carry before final qualification; Second offered exact-head
+Linux formatting once that head is pushed. No device action.
+
+---
+
+## Current checkpoint: 2026-10-24 00:17 +07, rebased release-pair native gates green
+
+Ready for lamp-voice: #3278 gates green; both assigned reads and First merge remain
 
 #3278 is now `7ebb876be`, based on latest `822efff7c`. Range-diff is unchanged;
 all 255 authored paths keep identical bytes and modes. Only the two upstream
@@ -9,7 +31,8 @@ Mac Update **371 / 0 / 6 ignored** keep their original source binding.
 
 Fresh source-only Linux formatting passes with all 6,963 files unchanged,
 and strict Linux Clippy **39992469415** passes. CI merge `88771df4e` has the
-same repository tree as the PR head. ARM64 **39992469455** is still running.
+same repository tree as the PR head. ARM64 **39992469455** passes **11,068 / 0 / 71 skipped**, with one passing
+Voice test marked leaky, retained in the receipt. Both exact-head gates are green.
 [Carry and native evidence](verification/updater-release-pair-native-20261024/README.md).
 Reviewer-two confirms the new base and unchanged source; evidence read and
 Third's second read remain pending. First owns merge; train #3280 is open.

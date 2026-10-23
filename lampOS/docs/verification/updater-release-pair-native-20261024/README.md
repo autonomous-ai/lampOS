@@ -49,6 +49,47 @@ with SHA-256 `79d7ee59e92b8e73c8d17d401f4d38254eef514f625488b8c944406a1041c3f7`.
 `ci-merge.json` binds CI checkout `88771df4e` to parents `822efff7c` and
 `7ebb876be`; its full repository tree is identical to the pushed head.
 
-ARM64 run **39992469455** is pending. The two external-artifact integration
+ARM64 run **39992469455** succeeds at the same CI merge/tree. The official
+PR-profile result is **11,068 passed / 0 failed / 71 skipped**, 200.549 s,
+including one passing test marked leaky: Voice
+`same_voice::tests::each_line_the_check_says_is_said_to_its_journal`. This
+diagnostic is retained without a historical-cause claim or unrelated fix.
+The existing workflow selected the whole workspace because the PR includes
+JSON evidence under docs; this was not a local full-workspace run.
+Doc tests are **4 / 0 / 0**; IPC `relay_signals` reports `ok`, and
+Turn-end-wire's own harness reports **12 / 0**. Job and step status, selected
+raw output and the full-log hash are bound in the `arm64-rebased-*` files.
+Artifact **12519425409** was uploaded for this head, with 47 binaries and two
+examples; immutable API metadata and its archive digest are retained. The
+archive was not downloaded or deployed by this check.
+
+Both exact-head native gates are green. First retains merge after both
+assigned reads; no device acceptance follows from these gates. The two external-artifact integration
 cases remain intentionally ignored by ordinary CI; their separate executed
 results are the historical release-pair evidence above.
+
+## Train 51 carry
+
+Second, 24 October 2026, 00:23 +07. Current head `baed91ead` on `1291ef1f4`.
+`train51-carry.json` retains the second unchanged range-diff and all 255 PR
+paths' unchanged bytes/modes. Only the five upstream Eyes paths differ.
+The completed native results above remain bound to `7ebb876be`; fresh
+ARM64 **39993981374** and Linux Clippy **39993981366** are pending.
+
+One fresh Linux source-only formatting check passes on `baed91ead`, exit 0.
+The `linux-fmt-train51*` receipts bind the exact source archive/trees, command
+streams and cleanup; all 6,963 regular-file hashes match before/after. No
+build, test, image pull or retry was performed for this check.
+
+Evidence qualification requested in review: no separate contemporaneous
+source-after manifest was retained for the actual release-pair executions.
+The producer and later evidence audit recomputed the three fixture hashes
+against `source-before.sha256`, with matches reported in tool output. The
+historical unchanged-source timeline is therefore a producer observation
+plus the unchanged Git carry, not an independently timestamped after record.
+The later Linux formatting checks establish their own before/after boundary.
+The complete manual argv was not separately retained in `execution.json`;
+a future execution should retain it. No rerun replaces the original history.
+
+The ARM64 excerpt retains timestamp-only lines with their original trailing
+spaces; whitespace diagnostics on those raw evidence lines are intentional.
