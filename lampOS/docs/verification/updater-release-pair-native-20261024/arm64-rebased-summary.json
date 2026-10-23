@@ -28,5 +28,5 @@
   "artifact_metadata": "arm64-rebased-artifacts.json",
   "full_log_sha256": "8813bb0ba906d52c2fcf989eaf001c869b8e8bcc41a46902030902a66df81e84",
   "excerpt_sha256": "a910a2cae8b2351cc56ee80b014a2171b4fac7807c85aedadaf2cc19ff72611e",
-  "scope": "Whole-workspace PR profile selected by the existing workflow because of retained JSON evidence under docs; realtime/ignored cases remain skipped; no local full gate."
+  "scope": "Whole-workspace PR profile selected by the existing workflow because of retained JSON evidence under docs; ignored cases remain skipped; the realtime group ran (default filter all()); no local full gate."
 }

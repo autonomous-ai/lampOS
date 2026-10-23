@@ -1,3 +1,25 @@
+## Current checkpoint: 2026-10-24 00:28 +07, release-pair native gates green and Body read complete
+
+Ready for lamp-voice: #3278 `baed91ead` gates green; assigned readers and First own disposition
+
+#3278 contains latest `1291ef1f4`. Both authored carries are unchanged.
+ARM64 **39993981374** passes **11,069 / 0 / 71 skipped**, including one
+passing Voice test marked leaky. Doc tests **4 / 0 / 0**, IPC own harness
+`ok`, and Turn-end-wire **12 / 0**. Linux Clippy **39993981366** and exact-head
+Linux formatting pass. CI merge `663798449` has the same repository tree.
+[Current native/provenance receipt](verification/updater-release-pair-native-20261024/README.md).
+Reviewer-two and Third found no source P1/P2; their final current-head
+qualification remains. The requested public manifest comparison is retained,
+and the realtime-group wording is corrected without altering raw evidence.
+
+#3275 Body repair READ-OK is posted at `06ae9205f`: original refusal control
+**1 / 0 / 0** at its source-identical predecessor, fresh Linux formatting at
+the current head, original failure retained. Third owns native gates and
+First final disposition. No device or independent signature acceptance.
+Next: complete #3278 ready/review handoff and act on any current-head feedback.
+
+---
+
 ## Current checkpoint: 2026-10-24 00:23 +07, train 51 carry and Body repair read
 
 Ready for lamp-voice: no (#3278 latest-base native gates and two reads pending)

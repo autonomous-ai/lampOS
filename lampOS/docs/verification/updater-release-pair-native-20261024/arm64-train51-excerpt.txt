@@ -1,0 +1,156 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:19:17.0659257Z HEAD is now at 6637984 Merge baed91ead4cc9712ad053090fa2724b05897e2ce into 1291ef1f43b0c16135766a56859c21b02fdf5dd6
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:21:16.5292871Z The whole workspace: `lampOS/docs/verification/updater-release-pair-20261023/6408-to-6449/files.json` (lampOS/docs, read by tests this can't see).
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:22:00.5086976Z         PASS [   3.019s] ( 1313/11069) lamp-voice coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:22:05.5094898Z         PASS [   0.960s] ( 1336/11069) lamp-voice::it capture_hold_worker::a_microphone_busy_for_a_moment_at_start_is_opened_once_it_is_free
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:22:07.0702275Z         PASS [   1.561s] ( 1493/11069) lamp-voice::it capture_hold_worker::a_microphone_gone_for_a_moment_at_start_is_opened_once_it_is_back
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:22:07.9464083Z         PASS [   0.876s] ( 1494/11069) lamp-voice::it capture_hold_worker::a_mute_while_a_busy_microphone_is_waited_for_opens_nothing
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:22:08.9582650Z         PASS [   1.012s] ( 1496/11069) lamp-voice::it capture_hold_worker::a_mute_while_the_microphone_is_waited_for_opens_nothing
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:22:11.2118153Z         PASS [   2.253s] ( 1653/11069) lamp-voice::it capture_hold_worker::a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:22:12.0203744Z         PASS [   0.808s] ( 1785/11069) lamp-voice::it capture_hold_worker::a_stop_is_read_though_the_worker_has_gone_when_authority_falls_due
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:22:14.8302236Z         PASS [   2.810s] ( 2183/11069) lamp-voice::it capture_hold_worker::another_microphone_is_handed_on_at_once_and_its_early_sound_is_not_accounted_for
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:22:17.6406763Z         PASS [   2.810s] ( 2457/11069) lamp-voice::it capture_hold_worker::mic1_frames_wait_four_blocks_with_their_own_times_and_a_stop_drops_what_is_held
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:22:18.9487737Z         PASS [   1.308s] ( 2555/11069) lamp-voice::it capture_hold_worker::mic1_muted_while_frames_are_held_hands_none_of_them_on
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:22:21.2626527Z         PASS [   2.314s] ( 2757/11069) lamp-voice::it capture_hold_worker::mic1_with_a_recording_keeps_the_held_steps_before_the_first_block
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:22:24.7692160Z         PASS [   3.506s] ( 2851/11069) lamp-voice::it capture_hold_worker::stalls_in_a_row_each_reopen_the_microphone_while_the_reference_goes_on
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:22:32.6836660Z         PASS [   7.914s] ( 3300/11069) lamp-voice::it capture_hold_worker::stop_words_blocks_carry_what_was_asked_only_when_asked
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:22:34.2850812Z         PASS [   1.601s] ( 3371/11069) lamp-voice::it capture_hold_worker::the_loop_waits_on_the_microphone_only_with_the_switch
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:22:36.7979313Z         PASS [   2.513s] ( 3437/11069) lamp-voice::it capture_hold_worker::with_the_render_5_ms_after_each_block_all_but_a_few_blocks_are_read_within_a_ms
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:24:31.3744627Z         LEAK [   0.242s] ( 8922/11069) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4096614Z      Summary [ 200.874s] 11069 tests run: 11069 passed (1 leaky), 71 skipped
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4139427Z         PASS [   3.019s] ( 1313/11069) lamp-voice coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4141340Z     test coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff ... ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4143134Z     thread 'coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff' (14654) panicked at crates/voice/src/coordinator/tests/endpoint_session.rs:1421:13:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4145009Z     thread 'coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff' (14654) panicked at crates/voice/src/coordinator/tests/endpoint_session.rs:1392:9:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4151807Z         PASS [   0.960s] ( 1336/11069) lamp-voice::it capture_hold_worker::a_microphone_busy_for_a_moment_at_start_is_opened_once_it_is_free
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4152940Z     test capture_hold_worker::a_microphone_busy_for_a_moment_at_start_is_opened_once_it_is_free ... ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4156020Z         PASS [   1.561s] ( 1493/11069) lamp-voice::it capture_hold_worker::a_microphone_gone_for_a_moment_at_start_is_opened_once_it_is_back
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4157105Z     test capture_hold_worker::a_microphone_gone_for_a_moment_at_start_is_opened_once_it_is_back ... ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4159639Z         PASS [   0.876s] ( 1494/11069) lamp-voice::it capture_hold_worker::a_mute_while_a_busy_microphone_is_waited_for_opens_nothing
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4160857Z     test capture_hold_worker::a_mute_while_a_busy_microphone_is_waited_for_opens_nothing ... ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4163462Z         PASS [   1.012s] ( 1496/11069) lamp-voice::it capture_hold_worker::a_mute_while_the_microphone_is_waited_for_opens_nothing
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4164741Z     test capture_hold_worker::a_mute_while_the_microphone_is_waited_for_opens_nothing ... ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4166492Z         PASS [   2.253s] ( 1653/11069) lamp-voice::it capture_hold_worker::a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4167832Z     test capture_hold_worker::a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded ... ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4169842Z         PASS [   0.808s] ( 1785/11069) lamp-voice::it capture_hold_worker::a_stop_is_read_though_the_worker_has_gone_when_authority_falls_due
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4171198Z     test capture_hold_worker::a_stop_is_read_though_the_worker_has_gone_when_authority_falls_due ... ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4172979Z         PASS [   2.810s] ( 2183/11069) lamp-voice::it capture_hold_worker::another_microphone_is_handed_on_at_once_and_its_early_sound_is_not_accounted_for
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4174165Z     test capture_hold_worker::another_microphone_is_handed_on_at_once_and_its_early_sound_is_not_accounted_for ... ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4177506Z         PASS [   2.810s] ( 2457/11069) lamp-voice::it capture_hold_worker::mic1_frames_wait_four_blocks_with_their_own_times_and_a_stop_drops_what_is_held
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4178691Z     test capture_hold_worker::mic1_frames_wait_four_blocks_with_their_own_times_and_a_stop_drops_what_is_held ... ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4181824Z         PASS [   1.308s] ( 2555/11069) lamp-voice::it capture_hold_worker::mic1_muted_while_frames_are_held_hands_none_of_them_on
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4183166Z     test capture_hold_worker::mic1_muted_while_frames_are_held_hands_none_of_them_on ... ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4184851Z         PASS [   2.314s] ( 2757/11069) lamp-voice::it capture_hold_worker::mic1_with_a_recording_keeps_the_held_steps_before_the_first_block
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4185928Z     test capture_hold_worker::mic1_with_a_recording_keeps_the_held_steps_before_the_first_block ... ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4187767Z         PASS [   3.506s] ( 2851/11069) lamp-voice::it capture_hold_worker::stalls_in_a_row_each_reopen_the_microphone_while_the_reference_goes_on
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4188886Z     test capture_hold_worker::stalls_in_a_row_each_reopen_the_microphone_while_the_reference_goes_on ... ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4190844Z         PASS [   7.914s] ( 3300/11069) lamp-voice::it capture_hold_worker::stop_words_blocks_carry_what_was_asked_only_when_asked
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4191934Z     test capture_hold_worker::stop_words_blocks_carry_what_was_asked_only_when_asked ... ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4194578Z         PASS [   1.601s] ( 3371/11069) lamp-voice::it capture_hold_worker::the_loop_waits_on_the_microphone_only_with_the_switch
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4195601Z     test capture_hold_worker::the_loop_waits_on_the_microphone_only_with_the_switch ... ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4199786Z         PASS [   2.513s] ( 3437/11069) lamp-voice::it capture_hold_worker::with_the_render_5_ms_after_each_block_all_but_a_few_blocks_are_read_within_a_ms
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4201154Z     test capture_hold_worker::with_the_render_5_ms_after_each_block_all_but_a_few_blocks_are_read_within_a_ms ... ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4273147Z ##[group]Run cargo test --locked --release --workspace --doc -- --test-threads=1
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4273754Z [36;1mcargo test --locked --release --workspace --doc -- --test-threads=1[0m
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4274227Z [36;1mcargo test --locked --release -p lamp-ipc --test relay_signals[0m
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.4274678Z [36;1mcargo test --locked --release -p lamp-turn-end-wire --test process[0m
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.6760176Z     Finished `release` profile [optimized] target(s) in 0.22s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.6888127Z    Doc-tests lamp_actions
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.7830435Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.7859296Z    Doc-tests lamp_addons
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.8169952Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.8195376Z    Doc-tests lamp_air
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.8431714Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:01.8457351Z    Doc-tests lamp_audio
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:02.0109062Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:02.0137347Z    Doc-tests lamp_body
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:02.3712245Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:02.3744855Z    Doc-tests lamp_bus
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:02.8030164Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:02.8071283Z    Doc-tests lamp_camera
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:02.9159075Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:02.9186026Z    Doc-tests lamp_cloud
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.0708240Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.0739456Z    Doc-tests lamp_controls
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.3065453Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.3092131Z    Doc-tests lamp_ears
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.3464870Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.3491692Z    Doc-tests lamp_environment
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.3741225Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.3766287Z    Doc-tests lamp_expression
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.5431050Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.5458268Z    Doc-tests lamp_eyes
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.7051221Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.7078603Z    Doc-tests lamp_gemini
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.8177045Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.8205349Z    Doc-tests lamp_health
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.8641742Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:03.8669112Z    Doc-tests lamp_ipc
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:04.2034964Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:04.2078150Z    Doc-tests lamp_keeper
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:04.2474711Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:04.2499901Z    Doc-tests lamp_lean
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:04.2926204Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:04.2951978Z    Doc-tests lamp_local_time
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:04.3137437Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:04.3159350Z    Doc-tests lamp_memory
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:04.4587453Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:04.4613424Z    Doc-tests lamp_mood
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:04.5231461Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:04.5257975Z    Doc-tests lamp_msgs
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.4433942Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.4481632Z    Doc-tests lamp_name
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.4815139Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.4840739Z    Doc-tests lamp_near_call
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.5090266Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.5113875Z    Doc-tests lamp_observer
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.5490058Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.5515903Z    Doc-tests lamp_peek
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.5922620Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.5948377Z    Doc-tests lamp_policy
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.8210070Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.8247573Z    Doc-tests lamp_records
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.9269238Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.9297347Z    Doc-tests lamp_ring
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.9754624Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:05.9785212Z    Doc-tests lamp_same_voice
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.0067947Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.0095883Z    Doc-tests lamp_schedule
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.2402817Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.2431346Z    Doc-tests lamp_selftest
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.2919485Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.2945703Z    Doc-tests lamp_settings
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.3690954Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.3719310Z    Doc-tests lamp_setup
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.4732936Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.4764197Z    Doc-tests lamp_skills
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.7745046Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.7781455Z    Doc-tests lamp_sound_fixtures
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.8302189Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.8328452Z    Doc-tests lamp_station
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.9458079Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:06.9487552Z    Doc-tests lamp_surround
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:07.3795677Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:07.3828175Z    Doc-tests lamp_tasks
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:07.6043547Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:07.6072554Z    Doc-tests lamp_turn_end
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:07.6429135Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:07.6458781Z    Doc-tests lamp_turn_end_wire
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:07.6727831Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:07.6753771Z    Doc-tests lamp_turn_owner
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:07.7337708Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:07.7364014Z    Doc-tests lamp_update
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:07.9496927Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:07.9524240Z    Doc-tests lamp_voice
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:09.9103206Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:09.9147393Z    Doc-tests lamp_voice_eval
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:10.4856807Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:10.4888940Z    Doc-tests lamp_voice_processes
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:10.5059323Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:10.6363965Z     Finished `release` profile [optimized] target(s) in 0.09s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:10.6387052Z      Running tests/relay_signals.rs (target/release/deps/relay_signals-2d7abb229f8ee97a)
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:10.6406237Z relay_signals: ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:15.1951575Z test result: 12 passed; 0 failed
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:15.7842439Z Packaged 47 current workspace binaries and 2 selected examples with complete SHA256SUMS
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:23.0438396Z Artifact lampos-arm64-baed91ead4cc9712ad053090fa2724b05897e2ce.zip successfully finalized. Artifact ID 12518384306
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:23.0439394Z Artifact lampos-arm64-baed91ead4cc9712ad053090fa2724b05897e2ce has been successfully uploaded! Final size is 115882771 bytes. Artifact ID is 12518384306
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-23T17:25:23.0447578Z Artifact download URL: https://github.com/autonomous-ai/lampOS/actions/runs/39993981374/artifacts/12518384306
