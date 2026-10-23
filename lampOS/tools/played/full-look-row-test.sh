@@ -20,14 +20,22 @@ running() { if [[ -s $FAKE_DIR/dropin ]]; then cat "$FAKE_DIR/dropin"; else echo
 case "$*" in
   "ls /run/systemd/system/lamp-eyes.service.d 2>/dev/null") [[ -n ${FAKE_OTHER_DROPIN:-} ]] && echo other.conf; true ;;
   *"grep \"^ExecStart=\""*) echo "$LINE" ;;
-  *"cat > /tmp/zz-look-row.conf"*) sed -n 's/^ExecStart=\(.\)/\1/p' >"$FAKE_DIR/dropin" ;;
+  *"cat > /tmp/zz-look-row.conf"*)
+    sed -n 's/^ExecStart=\(.\)/\1/p' >"$FAKE_DIR/dropin"
+    # The lamp's own guard: armed with the drop-in, to take it off unaided.
+    if [[ "$*" == *"systemd-run --unit=zz-look-row-guard --on-active="*"rm -f /run/systemd/system/lamp-eyes.service.d/zz-look-row.conf"*"restart lamp-eyes"* ]]; then
+      echo armed >"$FAKE_DIR/guard"
+    fi ;;
   *"systemctl is-active lamp-eyes; tr"*) echo active; running ;;
   *"tr \"\\0\""*) running ;;
   "date +%s") echo 1000 ;;
   *"journalctl -u lamp-eyes"*)
+    # The Mac goes to sleep mid-arm: the script dies with no trap run.
+    [[ -n ${FAKE_DIE:-} ]] && pkill -KILL -f "[f]ull-look-row.sh t-die"
     for n in 1 2 3; do echo "lamp-eyes: 69 frames, looked at 16, a face in 0, 0 unreadable, 13$n ms a look, 2 of them unchanged and not detected, 140 ms a detected look; ms a look: sight file 8.$n, decode 22.$n, grid 1.0"; done ;;
   *"rm -f /run/systemd/system/lamp-eyes.service.d/zz-look-row.conf"*)
     echo restore >>"$FAKE_DIR/restores"
+    [[ "$*" == *"systemctl stop zz-look-row-guard.timer"* ]] && echo stopped >"$FAKE_DIR/guard"
     if [[ $(wc -l <"$FAKE_DIR/restores") -le ${FAKE_RESTORE_FAILS:-0} ]]; then exit 1; fi
     rm -f "$FAKE_DIR/dropin" ;;
   *"/run/lampos-eyes/present"*)
@@ -77,6 +85,7 @@ check() { # check NAME WHAT CONDITION...
 exit_is() { [[ $(cat "$T/$1.exit") == "$2" ]]; }
 asks() { cat "$T/fake/asks" 2>/dev/null || echo 0; }
 no_dropin() { [[ ! -s $T/fake/dropin ]]; }
+guard_is() { [[ $(cat "$T/fake/guard" 2>/dev/null) == "$1" ]]; }
 
 run healthy
 check healthy "exits 0" exit_is healthy 0
@@ -86,8 +95,11 @@ check healthy "both arms put on" grep -q "sight-from-look on: 3 lines" "$T/healt
 check healthy "each ask's two sounds" grep -q "ask 10: first sound 1.40 s, second 5.80 s; said: Let me look. | A desk with a laptop on it." "$T/healthy.out"
 check healthy "the drop-in is off after" no_dropin
 check healthy "quiet before each eyes change and each ask" test "$(wc -l <"$T/fake/quiets")" -ge 13
+check healthy "the lamp's guard was armed with each drop-in" test "$(grep -c 'systemd-run --unit=zz-look-row-guard' "$T/fake/calls")" = 2
+check healthy "the put-back stopped the guard" guard_is stopped
 
 run loud FAKE_NOT_QUIET=1 QUIET_MAX=20
+check loud "no guard was armed" test ! -e "$T/fake/guard"
 check loud "stops (exit 5)" exit_is loud 5
 check loud "nothing played" test "$(asks)" = 0
 check loud "the eyes never changed" bash -c "! grep -q 'cat > /tmp/zz-look-row.conf' '$T/fake/calls'"
@@ -107,6 +119,12 @@ run restore-never FAKE_RESTORE_FAILS=99
 check restore-never "stops (exit 6)" exit_is restore-never 6
 check restore-never "nothing played" test "$(asks)" = 0
 check restore-never "says what to do by hand" grep -q "take it off and restart lamp-eyes by hand" "$T/restore-never.out"
+
+run die FAKE_DIE=1
+check die "the script died mid-arm (no exit 0)" bash -c "! grep -qx 0 '$T/die.exit'"
+check die "no put-back ran" test ! -e "$T/fake/restores"
+check die "the drop-in is still on" test -s "$T/fake/dropin"
+check die "but the lamp's guard is armed to take it off" guard_is armed
 
 run scene-fails FAKE_SCENE_FAIL=1
 check scene-fails "stops (exit 7)" exit_is scene-fails 7
