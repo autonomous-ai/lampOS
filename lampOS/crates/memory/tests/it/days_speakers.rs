@@ -266,9 +266,10 @@ fn forget_said_removes_exactly_that_speakers_room_lines_and_their_versions() {
 /// when every one of its sources is among them; one also made from someone
 /// else's words, or from a line nobody was seen saying, stays, and so does
 /// that other line: nothing climbs, no sibling goes (the #3127 shape). A
-/// kept thing with a speaker of its own that isn't theirs stays though its
-/// sources are all theirs; one with no sources at all is not "made from"
-/// their lines and stays.
+/// kept thing goes only when it is named, by its own speakers row (#3113,
+/// Friday's P1 on #3213): one whose sources are all theirs but that nobody
+/// was seen saying (with `LAMP_MEMORY_FORGET_ALL` a room `remember` carries
+/// its conversation's exchanges) stays, and so does one someone else said.
 #[test]
 fn a_thing_made_from_their_lines_goes_only_when_every_source_is_theirs() {
     let scratch = Scratch::new("mixed-sources");
@@ -307,19 +308,85 @@ fn a_thing_made_from_their_lines_goes_only_when_every_source_is_theirs() {
     let (gone, _) = ask(&mut store, json!({"op":"forget_said","speaker":MAI}), NOW);
     assert_eq!(
         gone,
-        json!({"ok":true,"removed":4}),
-        "m1, m2 and two made only of them"
+        json!({"ok":true,"removed":3}),
+        "m1, m2 and the observation made only of them"
     );
-    for id in [m1, m2, only_hers, kept_from_hers] {
+    for id in [m1, m2, only_hers] {
         assert!(!exists(&store, "everyone", id), "{id} should go");
     }
-    for id in [l1, u1, with_lans, with_nobodys, lans_from_hers, unsourced] {
+    for id in [
+        l1,
+        u1,
+        with_lans,
+        with_nobodys,
+        kept_from_hers,
+        lans_from_hers,
+        unsourced,
+    ] {
         assert!(exists(&store, "everyone", id), "{id} should stay");
     }
     assert_eq!(
         scratch.speakers(),
         (vec![room(l1, LAN), room(lans_from_hers, LAN)], 0)
     );
+}
+
+/// A version someone else was seen saying is their words (Friday's P2 on
+/// #3213): Mai's room kept thing corrected by Lan keeps Lan's correction
+/// when Mai's said lines are forgotten, and Lan's corrected by Mai keeps
+/// Lan's original; the version nobody was seen saying beyond Lan's stays
+/// too, the walk stopping at Lan's. Mai's own versions go.
+#[test]
+fn forget_said_leaves_a_version_someone_else_said() {
+    let scratch = Scratch::new("versions-other");
+    let mut store = scratch.open(30, NOW);
+    let keep = |store: &mut Days, at: u64, text: &str, speaker: &str, replaces: Option<u64>| {
+        let mut request = json!({"op":"remember","at_unix_ms":at,"text":text,"speaker":speaker});
+        if let Some(old) = replaces {
+            request["replaces"] = json!(old);
+            request["shown"] = json!([old]);
+        }
+        let (line, _) = ask(store, request.clone(), at);
+        line["id"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("{request}: {line}"))
+    };
+    // Mai's, corrected by Lan, then corrected again by nobody seen.
+    let hers = keep(&mut store, NOW, "The vet is on Tuesday", MAI, None);
+    let lans_fix = keep(
+        &mut store,
+        NOW + 1,
+        "The vet is on Wednesday",
+        LAN,
+        Some(hers),
+    );
+    let (later, _) = ask(
+        &mut store,
+        json!({"op":"remember","at_unix_ms":NOW+2,"text":"The vet is on Thursday","replaces":lans_fix,"shown":[lans_fix]}),
+        NOW + 2,
+    );
+    let later = later["id"].as_u64().unwrap();
+    // Lan's, corrected by Mai.
+    let lans = keep(&mut store, NOW, "Bins go out on Monday", LAN, None);
+    let her_fix = keep(
+        &mut store,
+        NOW + 1,
+        "Bins go out on Tuesday",
+        MAI,
+        Some(lans),
+    );
+    let (gone, _) = ask(
+        &mut store,
+        json!({"op":"forget_said","speaker":MAI}),
+        NOW + 3,
+    );
+    assert_eq!(gone, json!({"ok":true,"removed":2}), "her two lines only");
+    for id in [hers, her_fix] {
+        assert!(!exists(&store, "everyone", id), "{id} should go");
+    }
+    for id in [lans_fix, later, lans] {
+        assert!(exists(&store, "everyone", id), "{id} should stay");
+    }
 }
 
 /// `forget_said` is the room's alone: a person's scope, a rules scope or
