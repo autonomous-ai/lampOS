@@ -1787,10 +1787,22 @@ newest, whichever reader that was.
   small one, 33 under `--mouth-runtime`), and the next look takes the read
   and says it, stamped with when its face was seen, so it lasts its 5 s
   from then. The journal's minute line says the longest is off the look.
-- **So the mouth's per-look pass doesn't run.** With `--seems-blendshapes`
-  the look loop has no mesh, and the speaking read judges from the corners,
-  as the product did before #2872. `--mouth-model` alone keeps its pass on
-  the look for the speaking read's lips, as below.
+- **The mouth is read on the same thread, each look** (#720, the first
+  builder on #3126). With `--seems-blendshapes` the look loop has no mesh:
+  each look offers the thread one crop, the seems read's face when a read
+  is due, else the largest face's (only while a line is heard with
+  `--mouth-on-heard on`). The thread runs the mesh on it and gives back how
+  open its mouth is (`blendshapes::read_crop`), and runs the blendshapes
+  only on a due crop, from the same points: one mesh pass a look, as with
+  `--mouth-model` alone, but off the look. A mouth's crop never replaces a
+  seems read's the thread hasn't taken yet (`Latest::waiting`). The next look takes that
+  openness for its own largest face, one look late, and only from the crop
+  the look before offered of its largest face: a read later than that is
+  dropped, and the window it leaves a gap in is judged by the corners
+  (under tract on a small core, 290 ms, every other look). Before this
+  change the speaking read judged from the corners with the flag on, and
+  `mouth_open` was empty in every look (#720, 23 Oct). `--mouth-model`
+  alone keeps its pass on the look, as below.
 - **One reader a look.** With `--seems` beside it, a look where one reader
   has read leaves the other for the next look.
 - **FER+ as before:** a face it can't cut out upright is not read, and its
@@ -2068,8 +2080,8 @@ is chosen and converted (Face Mesh V2, `models/mouth/SOURCE.md`).
 given, #720).** Install places the pinned model at
 `/opt/lampOS/eyes/models/face_mesh_v2.onnx` (`deploy/product/models.json`),
 and the product's unit passes it, for Blendshape V2 (#2799), whose mesh
-runs on its own thread off the look, so the product's speaking read stays on
-the corners. With it alone, the largest face in each look is cut out of the
+runs on its own thread off the look and reads the largest face's mouth
+there each look, for the speaking read one look late (above). With it alone, the largest face in each look is cut out of the
 same 320 by 240 look: its box, widened by a quarter on every side and
 turned so the eyes are level, made 256 pixels square (`src/mesh.rs`).
 The mesh reads it under tract, and with `--mouth-diagnostics on` (never in

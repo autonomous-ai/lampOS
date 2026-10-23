@@ -27,10 +27,10 @@ const MARGIN: f32 = 0.25;
 /// The landmarks it gives, each x, y and z.
 pub const LANDMARKS: usize = 478;
 /// The inner lips' middle, upper and lower, and the face's top and chin.
-const UPPER_LIP: usize = 13;
-const LOWER_LIP: usize = 14;
-const BROW: usize = 10;
-const CHIN: usize = 152;
+pub(crate) const UPPER_LIP: usize = 13;
+pub(crate) const LOWER_LIP: usize = 14;
+pub(crate) const BROW: usize = 10;
+pub(crate) const CHIN: usize = 152;
 
 /// The eye line's angle in the frame, as its sine and cosine: what [`crop`]
 /// turns the face by. `None` for eyes on one point.
