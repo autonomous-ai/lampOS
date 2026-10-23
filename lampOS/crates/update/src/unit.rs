@@ -12,6 +12,9 @@
 //! `/opt/lampOS/<folder>/current/<binary>`, `current` naming the build's
 //! folder. Changing its build is replacing the link; its unit stays as it is.
 
+mod restart_order;
+pub(crate) use restart_order::start_order;
+
 /// Where every part is installed.
 pub const INSTALLED: &str = "/opt/lampOS/";
 /// The link a product part is started through.

@@ -352,7 +352,12 @@ workflow change.
 1. **A switch cut short is put back.** If the journal of a switch is there
    (the program stopped, or the lamp lost power, after the units were
    written), every unit it names that differs from how it was is written
-   back and restarted, and that build is refused.
+   back, and those recorded as running are restarted in the saved old
+   units' startup order. Already-restored units and units that were inactive
+   gain no restart. The graph is checked before any restoration write: a
+   cycle or unsupported ordering syntax leaves the journal and the existing
+   recovery prefix in place for another attempt. A completed put-back
+   refuses the build.
 2. **The channel.** `lampos-manifest.json` is read from `--channel-url`.
    No network: `nothing changed: the channel cannot be reached: ...`, status
    3. Nothing published: `nothing changed: the channel has published no
@@ -412,6 +417,19 @@ workflow change.
      `<sha256>  <name>` line each, sorted, as `SHA256SUMS` writes them.
    - A part whose folder and unit (comments and blank lines aside) are the
      same is left alone.
+
+   **Restart order** comes from `[Unit]` `After=` and `Before=` in the
+   candidate unit files (`unit/restart_order.rs`), with all managed installed
+   services in the graph, including unchanged and inactive ones. This keeps
+   a dependency path through an unchanged service without restarting it.
+   Prerequisites come first; where several services can go next, name order
+   breaks the tie. The old installed graph is also checked here, for
+   rollback. A cycle in either graph refuses the build before installing
+   or switching files. Ordering names must be literal: quoted names, escapes
+   and specifiers are refused. Repeated directives accumulate; an empty one
+   does not clear earlier edges, and continued lines are joined.
+   `Wants=`, `Requires=` and `PartOf=` do not themselves establish order.
+   This orders restart calls, not service readiness or health (step 9).
 5. **Room.** The disk `/opt/lampOS` is on must hold every file of every
    new folder, counted whole as if nothing could be linked, plus
    `--keep-free-mb` (256). Otherwise refused, before anything is written:
@@ -462,25 +480,34 @@ workflow change.
    someone spoke meanwhile, the old units go back and nothing is restarted.
    Then the build's product skills are written (planned again first, as the
    lamp may have changed a file while the round waited; each file's bytes
-   before are in the journal, written with it). Then each changed unit that was running is restarted: the voice first,
-   at the quiet moment itself; the body; then the rest by name. A unit that
-   was not running is switched without being started.
+   before are in the journal, written with it). Each changed unit that was
+   running is then restarted in the candidate graph's startup order. A unit
+   that was not running is switched without being started. At the voice's
+   own restart boundary, queued speech is read and the 45 s quiet gate is
+   checked again: a prerequisite's restart may have taken time. If no quiet
+   moment arrives within `--quiet-wait-s`, the changes are put back,
+   including parts already restarted; the voice has not been restarted.
 9. **Watch.** Every second for `--watch-s` (60): each restarted unit must
    not fail, stop, be in `auto-restart`, be started again by systemd
    (`NRestarts`) or change process (`MainPID`). At the end it must be
    running, and if it was in `lamp/health` before the switch it must be
    there again, not stale, and not in error unless it was before. A part
    that never reported is judged by systemd alone.
-10. **Back.** A part not well: every changed unit is written back as it
-    was, reloaded, every moved link named its old build again (replaced
+10. **Back.** A part not well: the old startup graph is reconstructed from
+    the saved unit declarations and unchanged installed units. It must be
+    valid before any restoration write; otherwise the journal and recovery
+    prefix are kept. Every changed unit is then written back as it was,
+    reloaded, every moved link named its old build again (replaced
     whole, as at the switch), each product skill's file the switch wrote put
     back as it was (or removed, with any folder made for it if still empty;
     a file the lamp changed since it was written is left, and said), and
-    those restarted are restarted again in the reverse
-    order: the voice last, and, unless the voice is what failed, only
-    between two turns (resting, nothing heard or said for 5 s; at once if
-    its state cannot be seen). They are watched again, the outcome says how
-    the previous build is, and the build is refused from then on.
+    those restarted are restarted again in the old graph's startup order.
+    Unless the voice is what failed, queued speech is read at its own
+    restart boundary and the between-turn wait runs there (resting, nothing
+    heard or said for 5 s; at once if its state cannot be seen). If that
+    bounded wait expires, the voice is put back anyway and this is said.
+    They are watched again, the outcome says how the previous build is,
+    and the build is refused from then on.
     **What a part not well said of itself goes into the outcome** (#1505):
     the unit that failed on the new build (read before it is put back), and
     the first unit found not well on the old one (the watch stops there),
@@ -1185,9 +1212,9 @@ path it doesn't know, and ignores a field it doesn't know.
   when it opens its devices. A round writes it only after the switch's
   quiet gate (`quiet.rs`: nobody heard or answered and the voice resting
   for 45 s), the gate every switch of the voice passes. With no quiet
-  moment within `--quiet-wait-s`, nothing is written or restarted, the
-  round ends `not-quiet`, and the next round tries again. A lamp's own
-  `asound.conf`, kept, restarts nothing.
+  moment within the initial `--quiet-wait-s`, nothing is written or
+  restarted, the round ends `not-quiet`, and the next round tries again.
+  A lamp's own `asound.conf`, kept, restarts nothing.
 - **Older lamp-update-back.** A lamp installed before this has a
   lamp-update-back that ignores `image`: nothing of it is written, the
   round says so (`this lamp's lamp-update-back is older than them, so
@@ -1676,17 +1703,24 @@ test does (#1512):
   `d628ed1d`; `lamp-voice.service` names `c8ccd3dd...`). The build is
   written into a carried unit, so a stale build there does no harm; a stale
   option or `Environment=` line does. A drop-in (`lamp-voice.service.d/`)
-  is not read and still overrides. A unit the build carries for a part not
-  installed is not added, and a part's new unit is never enabled: adding
-  a part to a lamp stays the first builder's.
+  is not read and still overrides. Restart ordering reads these managed
+  base service files, not systemd's effective graph: unit aliases and
+  symlinked unit files are not resolved, and `.socket` units and external
+  services are not graph nodes or directly restarted. The parser recognizes
+  `Sockets=` as an ordering declaration, but the current managed inventory
+  contains only services. The product Eyes and Skills units declare `After=` Voice;
+  their order follows those files too. A unit the build carries for a part
+  not installed is not added, and a part's new unit is never enabled:
+  adding a part to a lamp stays the first builder's.
 - **The disk holding two copies.** lamp-4ace's board said 14% free on
   2026-10-14 (health.md); the disk's size is not in the repository. The
   check counts every new file whole, and `/opt/lampOS/releases/` already
   holds every voice installed by hand, which lamp-update never removes.
 - **The quiet moment.** It needs the voice on the bus (`LAMP_BUS=on`, as on
   lamp-4ace). In an office the 45 s may come only at night. The check is
-  made again right after the units are written, but someone who starts
-  speaking in the second before the restart is cut off: the voice has no
+  made again right after the units are written and, after reading queued
+  speech, at the voice's own restart boundary. Someone can still start a
+  turn after the last check and before systemd stops the voice: it has no
   pause that closes it to new turns yet.
 - **Switching parts from the updater's sandbox.** The 19 October
   parts trial ran `once` directly; the 20 October service trial switched

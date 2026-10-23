@@ -38,6 +38,10 @@ use std::{
 #[path = "round/process_cuts.rs"]
 pub(crate) mod process_cuts;
 
+#[path = "round/restart_order.rs"]
+mod restart_order;
+#[path = "round/restart_quiet.rs"]
+mod restart_quiet;
 #[path = "round/self_cuts.rs"]
 mod self_cuts;
 #[path = "round/self_recovery.rs"]
@@ -880,14 +884,14 @@ fn a_part_that_dies_is_put_back_and_its_build_refused() {
     assert_eq!(*sequence, 2);
     assert!(why.contains("lamp-voice.service ended"), "{why}");
     assert_eq!(after, &Ok(()));
-    // Switched voice first, then the body; put back the body first, then
-    // the voice (which failed, so without waiting).
+    // These fixture units declare no ordering edge: both directions use
+    // name order. The failed voice is put back without waiting.
     assert_eq!(
         lamp.calls(),
         [
             "reload",
-            "restart lamp-voice.service",
             "restart lamp-body.service",
+            "restart lamp-voice.service",
             "reload",
             "restart lamp-body.service",
             "restart lamp-voice.service",
@@ -1537,13 +1541,14 @@ fn both_kinds_of_part_switch_in_one_round_each_its_own_way() {
     assert_eq!(lamp.eyes_link(), sha("eyes 2"));
     assert_eq!(lamp.read("/opt/lampOS/eyes/current/lamp-eyes"), "eyes 2");
     assert!(lamp.exists(&format!("/opt/lampOS/eyes/{}/lamp-eyes", sha("eyes 1"))));
-    // The voice first, then the rest by name; one reload for the voice's unit.
+    // No ordering edge in these fixtures: name order, with one reload for
+    // the voice's unit. Real product declarations are covered separately.
     assert_eq!(
         lamp.calls(),
         [
             "reload",
-            "restart lamp-voice.service",
-            "restart lamp-eyes.service"
+            "restart lamp-eyes.service",
+            "restart lamp-voice.service"
         ]
     );
     // The way back by hand: the link and the build it named.
