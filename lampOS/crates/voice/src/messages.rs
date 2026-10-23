@@ -901,7 +901,9 @@ mod tests {
     #[tokio::test]
     async fn a_text_never_waits_on_the_news_for_the_phone() {
         /// Slow for the news for the phone, at once for a text.
-        struct SlowForThePhone;
+        struct SlowForThePhone {
+            began: std::sync::Arc<tokio::sync::Notify>,
+        }
         impl Model for SlowForThePhone {
             fn round<'a>(
                 &'a self,
@@ -910,6 +912,7 @@ mod tests {
             ) -> BoxFuture<'a, Result<Vec<ToolCall>, String>> {
                 Box::pin(async move {
                     if format!("{:?}", messages.last()).contains("Nobody wrote just now") {
+                        self.began.notify_one();
                         tokio::time::sleep(Duration::from_secs(30)).await;
                         text("Codex finished, says the phone.");
                     } else {
@@ -932,8 +935,11 @@ mod tests {
             .lock()
             .unwrap()
             .push(news("s1:4:1", "(Nobody has spoken. Codex finished.)"));
+        let began = std::sync::Arc::new(tokio::sync::Notify::new());
         let worker = tokio::spawn(serve_with(
-            SlowForThePhone,
+            SlowForThePhone {
+                began: began.clone(),
+            },
             system(),
             no_tools(),
             Box::new(waiting),
@@ -943,8 +949,10 @@ mod tests {
         let mut sends = bus
             .publisher_declared(ChatIn::TOPIC, &ChatIn::declaration(), "cloud")
             .unwrap();
-        // The round for the phone has begun by now (it's due at once).
-        tokio::time::sleep(UNASKED_LOOK_EVERY + Duration::from_millis(300)).await;
+        // The slow phone round must be polled before the text is timed.
+        tokio::time::timeout(Duration::from_secs(5), began.notified())
+            .await
+            .expect("phone-news round did not begin");
         let sent_at = Instant::now();
         let until = sent_at + Duration::from_secs(5);
         while sends
