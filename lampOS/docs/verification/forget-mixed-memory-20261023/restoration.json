@@ -1,0 +1,22 @@
+{
+  "head": "8dd86272e9f9bfec63e1c62df2d6a06c714e75b3",
+  "files": {
+    "lampOS/crates/memory/tests/it/voice.rs": {
+      "restored": true,
+      "sha256": "ca9953baf19bc084392f23a9363965e0478cf84a349e20d40372d1105a4bd406"
+    },
+    "lampOS/crates/memory/src/days.rs": {
+      "restored": true,
+      "sha256": "29ffaac589c1542cce4214c5ae6c03ce7c87ca1ebdd96ffad96b9b6bad0ff75e"
+    },
+    "lampOS/crates/memory/src/days_protocol.rs": {
+      "restored": true,
+      "sha256": "546a2e5467e5686aee9d62c0f6a684c925e63c85cb46cdf4928a764e2c61a068"
+    },
+    "lampOS/crates/memory/src/protocol.rs": {
+      "restored": true,
+      "sha256": "0f6bec303716fb4b00c0843eec0f0a39114466de4e98009e7bf4ce5b86035061"
+    }
+  },
+  "git_status": ""
+}

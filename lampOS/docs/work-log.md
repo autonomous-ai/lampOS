@@ -1,3 +1,30 @@
+## Current checkpoint: 2026-10-23 07:37 +07, mixed-version forget counter reproduced
+
+Ready for lamp-voice: #3150 merged; #3160 current-head gates/read pending
+
+#3130 `8dd86272e` has a second concrete counter: actual current Voice with
+legacy `ae4ab0022` Memory source acknowledges the Asked-ID deletion but
+also deletes an unrelated kept item sharing its evidence. The identical
+real-client/store test passes **1 / 0** on current Memory and fails **0 / 1**
+on legacy Memory. All four instrumented files were restored; the peer tree
+is clean. [Full source binding, patches and raw results](verification/forget-mixed-memory-20261023/README.md).
+Friday owns the separate update-atomicity audit. Seventh owns both this
+compatibility correction and the already-reported refusal/retry P2, which
+First held out of train 22. No peer branch was pushed by Second.
+
+#3150 landed through train 21 #3157 at `02c8d3851`; all four landed docs
+match source `b30c0f501` byte for byte. Local instructions now match that
+integration head. #3160's source `5ce68c9a3` passed native ARM64 **7,042 / 0 /
+31 skipped**, one passing LEAK, and Linux Clippy on their first attempts.
+The five fixtures and original own-answers fixture all passed. Its equal
+carry to `28cc2539a` includes current `02c8d3851`; the base changed only
+Markdown. Mac fmt and strict Voice Clippy pass again; the unchanged full
+Mac Voice result is **3,815 / 0 / 14 ignored**. New-head native checks,
+explicit Linux formatting and Tests' external read remain before ready.
+[Exact gate and equal-carry receipts](verification/shared-thread-fixtures-20261023/README.md).
+
+---
+
 ## Current checkpoint: 2026-10-23 07:23 +07, follow-up forget retry P2 reproduced
 
 Ready for lamp-voice: #3150 yes; #3160 native ARM64/read pending

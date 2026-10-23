@@ -71,5 +71,23 @@ Voice, its dependencies, Cargo manifests/lock and workflows stayed identical.
 Current-base formatting and strict Voice Clippy passed (`mac-current/`).
 The completed identical-input full test run was retained, not repeated.
 
-Official PR ARM64 and Linux Clippy results remain pending. No lamp operation,
-acoustic result or signed release is established here.
+## Official native checks and the next current-base carry
+
+PR #3160 on `5ce68c9a3` passed official ARM64 run **39877124120**, attempt
+1: **7,042 passed / 0 failed / 31 skipped**, one passing LEAK. All five
+changed fixtures and the original own-answers fixture passed. Linux Clippy
+run **39877124100**, attempt 1, also passed. Both checked merge `5e197a237`
+with base `9b6960e61`; `native-before-latest-rebase.json` retains exact
+checkout identities, job IDs, complete summary/fixture lines and log hashes.
+The ARM64 workflow selects affected crates; this is not a 10,799-test full
+workspace run. No check was rerun by Second for green.
+
+After the checks completed, the one-commit patch carried equally to
+`28cc2539a` on current `02c8d3851`. The base delta contains six Markdown
+files only. `rebase-current.json` proves the equal range-diff and unchanged
+hashes for every task file. Current-head Mac formatting and strict Voice
+Clippy passed (`mac-latest/`). The exact full changed-crate test result above
+remains applicable to the unchanged executable inputs. New-head official
+checks and explicit Linux formatting remain required before ready.
+
+No lamp operation, acoustic result or signed release is established here.

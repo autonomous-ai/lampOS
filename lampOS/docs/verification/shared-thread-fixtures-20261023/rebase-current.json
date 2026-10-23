@@ -1,0 +1,23 @@
+{
+  "old_head": "5ce68c9a32de89abb8a52ac73698a791df972ebf",
+  "old_base": "9b6960e61e5758bb745c6e4d7ad043cc725cd018",
+  "head": "28cc2539ace71321dddfe89e37af3809a960bff1",
+  "base": "02c8d38513c1d2fc3181fe0c6495067b59d484e2",
+  "base_changed_paths": [
+    "lampOS/AGENTS.md",
+    "lampOS/builders/TEMPLATE.md",
+    "lampOS/builders/second.md",
+    "lampOS/docs/build-rows.md",
+    "lampOS/docs/joining.md",
+    "lampOS/docs/verification/wake-hum-permission-20261022/README.md"
+  ],
+  "range_diff": "1:  5ce68c9a3 = 1:  28cc2539a lampOS: guard the additional shared conversation fixtures",
+  "changed_file_hashes": {
+    "lampOS/crates/voice/src/provider_worker.rs": "fd0d0a3c6b3ff47b3eae544c4bd610475e5655f26e61171f0c17928efe5f9680",
+    "lampOS/crates/voice/src/remember.rs": "dc0bd9436e39fe675d8a83ec74726122d6405aacc3282b3f8ae897531bc83181",
+    "lampOS/crates/voice/src/second_provider/tests.rs": "5210b260510ab3fb16a4be2c1eb463d8478c2708d53fe195e05c43eaf4e06949",
+    "lampOS/docs/verification/shared-thread-fixtures-20261023/README.md": "2abb65a8c9467899ff4039f4fedc9d44f8cffb237ab26563ab1e6de402726bf0"
+  },
+  "changed_files_byte_identical": true,
+  "git_status": ""
+}
