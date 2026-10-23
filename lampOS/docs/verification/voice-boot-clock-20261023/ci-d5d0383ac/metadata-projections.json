@@ -1,0 +1,59 @@
+{
+  "policy": "Person/account attribution omitted from portable API metadata by allowlist; raw log bytes unchanged.",
+  "sources": {
+    "arm64/final-run.json": {
+      "path": "/private/tmp/tests-3190-d5-ci-20261023/arm64/final-run.json",
+      "bytes": 12743,
+      "sha256": "e57074f371e948807970dbba91f5101312b492beb4995e50c518f8b1b3f4414e",
+      "reason": "Full external API response retained; portable explicit projection omits actor/account/runner attribution."
+    },
+    "arm64/final-jobs.json": {
+      "path": "/private/tmp/tests-3190-d5-ci-20261023/arm64/final-jobs.json",
+      "bytes": 7021,
+      "sha256": "f23f6c295da756f2b65e231bb7abf470f5d2111fd0e8ea30010ea37001f8c03c",
+      "reason": "Full external API response retained; portable explicit projection omits actor/account/runner attribution."
+    },
+    "clippy/final-run.json": {
+      "path": "/private/tmp/tests-3190-d5-ci-20261023/clippy/final-run.json",
+      "bytes": 12742,
+      "sha256": "039d92448f683582f9d5c9e8f56bea26e748158f891a756d312bec72e87205e3",
+      "reason": "Full external API response retained; portable explicit projection omits actor/account/runner attribution."
+    },
+    "clippy/final-jobs.json": {
+      "path": "/private/tmp/tests-3190-d5-ci-20261023/clippy/final-jobs.json",
+      "bytes": 2635,
+      "sha256": "bc3cb526c9e34ea9909a70852d4a33de368d5f377b6a98e432d56d007254d120",
+      "reason": "Full external API response retained; portable explicit projection omits actor/account/runner attribution."
+    },
+    "identity/merge.json": {
+      "path": "/private/tmp/tests-3190-d5-ci-20261023/identity/merge-commit.json",
+      "bytes": 2603,
+      "sha256": "6b2dbacfcfd43935467f0f172ead36f6568d815aa554248223108982555dae03",
+      "reason": "Author/committer identity and message stay external; immutable commit/tree/parents/dates retained."
+    },
+    "comments/issue-comments": {
+      "path": "/private/tmp/tests-3190-d5-ci-20261023/comments/issue-comments-final.json",
+      "bytes": 48719,
+      "sha256": "f5db26084bda3a34081cff9279cd24f5b759a142d4381f70967126a37f0ab269",
+      "reason": "Complete paginated bodies remain external; portable links/state/times omit user objects."
+    },
+    "comments/reviews": {
+      "path": "/private/tmp/tests-3190-d5-ci-20261023/comments/reviews-final.json",
+      "bytes": 4,
+      "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+      "reason": "Complete paginated bodies remain external; portable links/state/times omit user objects."
+    },
+    "comments/review-comments": {
+      "path": "/private/tmp/tests-3190-d5-ci-20261023/comments/review-comments-final.json",
+      "bytes": 4,
+      "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+      "reason": "Complete paginated bodies remain external; portable links/state/times omit user objects."
+    },
+    "comments/pr": {
+      "path": "/private/tmp/tests-3190-d5-ci-20261023/comments/pr-final.json",
+      "bytes": 26724,
+      "sha256": "05fffdc54b32d1019f7732f8d3632fd1790366e97a9b9af7544a52f987b7a3b3",
+      "reason": "Full PR body/account metadata external; portable state/head/base/time snapshot only."
+    }
+  }
+}

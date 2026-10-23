@@ -1,0 +1,49 @@
+{
+  "issue-comments": [
+    {
+      "id": 6357949456,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3218#issuecomment-6357949456",
+      "created_at": "2026-10-23T05:14:42Z",
+      "updated_at": "2026-10-23T05:14:42Z"
+    },
+    {
+      "id": 6358385354,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3218#issuecomment-6358385354",
+      "created_at": "2026-10-23T05:48:53Z",
+      "updated_at": "2026-10-23T05:48:53Z"
+    },
+    {
+      "id": 6358450518,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3218#issuecomment-6358450518",
+      "created_at": "2026-10-23T05:54:02Z",
+      "updated_at": "2026-10-23T05:54:02Z"
+    },
+    {
+      "id": 6362138305,
+      "html_url": "https://github.com/autonomous-ai/lampOS/pull/3218#issuecomment-6362138305",
+      "created_at": "2026-10-23T09:47:31Z",
+      "updated_at": "2026-10-23T09:47:31Z"
+    }
+  ],
+  "reviews": [],
+  "review-comments": [],
+  "observed_at": "2026-10-23T10:04:08.023229+00:00",
+  "pr": {
+    "number": 3218,
+    "state": "open",
+    "draft": true,
+    "mergeable": null,
+    "mergeable_state": "unknown",
+    "html_url": "https://github.com/autonomous-ai/lampOS/pull/3218",
+    "head": {
+      "ref": "tests/1806-phone-news-start",
+      "sha": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e"
+    },
+    "base": {
+      "ref": "lamp-voice",
+      "sha": "cf462adb04f64d699c226dd3b1781c0ad927068f"
+    }
+  },
+  "review_thread_count": 0,
+  "findings": "Only Tests status/carry comments are newly observed; no formal review, inline finding or review thread. Historical local failures remain unwaived and readiness is not advanced."
+}

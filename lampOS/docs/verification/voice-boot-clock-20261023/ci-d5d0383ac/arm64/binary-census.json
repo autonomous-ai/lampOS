@@ -1,0 +1,415 @@
+{
+  "binaries": [
+    {
+      "binary": "lamp-body",
+      "outcomes": {
+        "PASS": 436
+      },
+      "cases": 436
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body",
+      "outcomes": {
+        "PASS": 32
+      },
+      "cases": 32
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-inspect",
+      "outcomes": {
+        "PASS": 2
+      },
+      "cases": 2
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-measure",
+      "outcomes": {
+        "PASS": 5
+      },
+      "cases": 5
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-mood",
+      "outcomes": {
+        "PASS": 3
+      },
+      "cases": 3
+    },
+    {
+      "binary": "lamp-body::bin/lamp-body-worker",
+      "outcomes": {
+        "PASS": 1
+      },
+      "cases": 1
+    },
+    {
+      "binary": "lamp-body::it",
+      "outcomes": {
+        "PASS": 125
+      },
+      "cases": 125
+    },
+    {
+      "binary": "lamp-cloud",
+      "outcomes": {
+        "PASS": 166
+      },
+      "cases": 166
+    },
+    {
+      "binary": "lamp-cloud::it",
+      "outcomes": {
+        "PASS": 30
+      },
+      "cases": 30
+    },
+    {
+      "binary": "lamp-expression",
+      "outcomes": {
+        "PASS": 27
+      },
+      "cases": 27
+    },
+    {
+      "binary": "lamp-expression::bin/lamp-expression",
+      "outcomes": {
+        "PASS": 4
+      },
+      "cases": 4
+    },
+    {
+      "binary": "lamp-expression::it",
+      "outcomes": {
+        "PASS": 280
+      },
+      "cases": 280
+    },
+    {
+      "binary": "lamp-expression::runtime",
+      "outcomes": {
+        "PASS": 27
+      },
+      "cases": 27
+    },
+    {
+      "binary": "lamp-keeper",
+      "outcomes": {
+        "PASS": 40
+      },
+      "cases": 40
+    },
+    {
+      "binary": "lamp-keeper::bin/lamp-keeper",
+      "outcomes": {
+        "PASS": 2
+      },
+      "cases": 2
+    },
+    {
+      "binary": "lamp-lean",
+      "outcomes": {
+        "PASS": 10
+      },
+      "cases": 10
+    },
+    {
+      "binary": "lamp-lean::it",
+      "outcomes": {
+        "PASS": 51
+      },
+      "cases": 51
+    },
+    {
+      "binary": "lamp-memory",
+      "outcomes": {
+        "PASS": 96
+      },
+      "cases": 96
+    },
+    {
+      "binary": "lamp-memory::bin/lamp-memory",
+      "outcomes": {
+        "PASS": 8
+      },
+      "cases": 8
+    },
+    {
+      "binary": "lamp-memory::bin/lamp-memory-eval",
+      "outcomes": {
+        "PASS": 8
+      },
+      "cases": 8
+    },
+    {
+      "binary": "lamp-memory::forget_person",
+      "outcomes": {
+        "PASS": 3
+      },
+      "cases": 3
+    },
+    {
+      "binary": "lamp-memory::forget_shared_exchange",
+      "outcomes": {
+        "PASS": 4
+      },
+      "cases": 4
+    },
+    {
+      "binary": "lamp-memory::forgot",
+      "outcomes": {
+        "PASS": 1
+      },
+      "cases": 1
+    },
+    {
+      "binary": "lamp-memory::health_control",
+      "outcomes": {
+        "PASS": 23
+      },
+      "cases": 23
+    },
+    {
+      "binary": "lamp-memory::it",
+      "outcomes": {
+        "PASS": 154
+      },
+      "cases": 154
+    },
+    {
+      "binary": "lamp-memory::paraphrase_fixture",
+      "outcomes": {
+        "PASS": 1
+      },
+      "cases": 1
+    },
+    {
+      "binary": "lamp-memory::voice_early_words",
+      "outcomes": {
+        "PASS": 1
+      },
+      "cases": 1
+    },
+    {
+      "binary": "lamp-memory::voice_follows_face",
+      "outcomes": {
+        "PASS": 1
+      },
+      "cases": 1
+    },
+    {
+      "binary": "lamp-memory::voice_forget",
+      "outcomes": {
+        "PASS": 5
+      },
+      "cases": 5
+    },
+    {
+      "binary": "lamp-memory::voice_forget_about",
+      "outcomes": {
+        "PASS": 2
+      },
+      "cases": 2
+    },
+    {
+      "binary": "lamp-memory::voice_forget_named",
+      "outcomes": {
+        "PASS": 2
+      },
+      "cases": 2
+    },
+    {
+      "binary": "lamp-memory::voice_link_used",
+      "outcomes": {
+        "PASS": 2
+      },
+      "cases": 2
+    },
+    {
+      "binary": "lamp-memory::voice_observe",
+      "outcomes": {
+        "PASS": 1
+      },
+      "cases": 1
+    },
+    {
+      "binary": "lamp-memory::voice_since_until",
+      "outcomes": {
+        "PASS": 2
+      },
+      "cases": 2
+    },
+    {
+      "binary": "lamp-peek",
+      "outcomes": {
+        "PASS": 15
+      },
+      "cases": 15
+    },
+    {
+      "binary": "lamp-peek::peek",
+      "outcomes": {
+        "PASS": 11
+      },
+      "cases": 11
+    },
+    {
+      "binary": "lamp-setup",
+      "outcomes": {
+        "PASS": 16
+      },
+      "cases": 16
+    },
+    {
+      "binary": "lamp-setup::it",
+      "outcomes": {
+        "PASS": 156
+      },
+      "cases": 156
+    },
+    {
+      "binary": "lamp-setup::wake",
+      "outcomes": {
+        "PASS": 6
+      },
+      "cases": 6
+    },
+    {
+      "binary": "lamp-skills",
+      "outcomes": {
+        "PASS": 157
+      },
+      "cases": 157
+    },
+    {
+      "binary": "lamp-skills::bin/lamp-skills",
+      "outcomes": {
+        "PASS": 23
+      },
+      "cases": 23
+    },
+    {
+      "binary": "lamp-skills::it",
+      "outcomes": {
+        "PASS": 304
+      },
+      "cases": 304
+    },
+    {
+      "binary": "lamp-skills::requested_audio",
+      "outcomes": {
+        "PASS": 31
+      },
+      "cases": 31
+    },
+    {
+      "binary": "lamp-update",
+      "outcomes": {
+        "PASS": 119
+      },
+      "cases": 119
+    },
+    {
+      "binary": "lamp-update::functions",
+      "outcomes": {
+        "PASS": 4
+      },
+      "cases": 4
+    },
+    {
+      "binary": "lamp-update::install",
+      "outcomes": {
+        "PASS": 82
+      },
+      "cases": 82
+    },
+    {
+      "binary": "lamp-update::it",
+      "outcomes": {
+        "PASS": 13
+      },
+      "cases": 13
+    },
+    {
+      "binary": "lamp-update::round",
+      "outcomes": {
+        "PASS": 123
+      },
+      "cases": 123
+    },
+    {
+      "binary": "lamp-update::self-cli-exec",
+      "outcomes": {
+        "PASS": 1
+      },
+      "cases": 1
+    },
+    {
+      "binary": "lamp-update::self-process-cuts",
+      "outcomes": {
+        "PASS": 1
+      },
+      "cases": 1
+    },
+    {
+      "binary": "lamp-voice",
+      "outcomes": {
+        "PASS": 3662,
+        "LEAK": 1
+      },
+      "cases": 3663
+    },
+    {
+      "binary": "lamp-voice-eval",
+      "outcomes": {
+        "PASS": 378
+      },
+      "cases": 378
+    },
+    {
+      "binary": "lamp-voice-eval::bin/lamp-voice-eval",
+      "outcomes": {
+        "PASS": 7
+      },
+      "cases": 7
+    },
+    {
+      "binary": "lamp-voice-eval::it",
+      "outcomes": {
+        "PASS": 238
+      },
+      "cases": 238
+    },
+    {
+      "binary": "lamp-voice::bin/lamp-voice",
+      "outcomes": {
+        "PASS": 1
+      },
+      "cases": 1
+    },
+    {
+      "binary": "lamp-voice::example/render_line_second",
+      "outcomes": {
+        "PASS": 4
+      },
+      "cases": 4
+    },
+    {
+      "binary": "lamp-voice::example/stop_words_stt_replay",
+      "outcomes": {
+        "PASS": 6
+      },
+      "cases": 6
+    },
+    {
+      "binary": "lamp-voice::it",
+      "outcomes": {
+        "PASS": 301
+      },
+      "cases": 301
+    }
+  ],
+  "startup_binaries": 62,
+  "terminal_binaries": 58,
+  "skipped_binaries": 106,
+  "limit": "No skipped identities/reasons or zero-row starting binary identities are guessed."
+}

@@ -1,0 +1,383 @@
+{
+  "configuration": {
+    "pr": 3218,
+    "head": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e",
+    "runs": {
+      "arm64": {
+        "run": 39934343361,
+        "job": 120350080186,
+        "workflow": "success",
+        "job_result": "success",
+        "checkout": "1d7c72f982316caa302dc8f402c5bada7935c951"
+      },
+      "clippy": {
+        "run": 39934343300,
+        "job": 120350079856,
+        "workflow": "success",
+        "job_result": "success",
+        "checkout": "1d7c72f982316caa302dc8f402c5bada7935c951"
+      }
+    },
+    "status": "terminal workflow and job capture; no watch or execution necessary",
+    "finished_at": "2026-10-23T10:04:08.023591+00:00"
+  },
+  "native_watch": {
+    "pr": 3218,
+    "expected_head": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e",
+    "command": [
+      "gh",
+      "run",
+      "watch",
+      "39934343361",
+      "--repo",
+      "autonomous-ai/lampOS",
+      "--interval",
+      "45",
+      "--exit-status"
+    ],
+    "started_at": "2026-10-23T09:57:33.009453+00:00",
+    "timeout_seconds": 5400,
+    "timed_out": false,
+    "exit_code": 0,
+    "finished_at": "2026-10-23T09:59:57.699490+00:00",
+    "wall_seconds": 144.69248251104727,
+    "stdout": {
+      "bytes": 5864,
+      "sha256": "f6c3acd5e252eb6910f1caaac8dfb0cb449e2f3ca88f5e85412ae0770a1c4d7a"
+    },
+    "stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "native_watch_streams_external": [
+    {
+      "path": "/private/tmp/tests-cf-carries-ci-20261023/3218/watch.stdout.txt",
+      "bytes": 5864,
+      "sha256": "f6c3acd5e252eb6910f1caaac8dfb0cb449e2f3ca88f5e85412ae0770a1c4d7a",
+      "reason": "Full native watcher stream retained externally; completed job logs are portable below."
+    },
+    {
+      "path": "/private/tmp/tests-cf-carries-ci-20261023/3218/watch.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reason": "Full native watcher stream retained externally; completed job logs are portable below."
+    }
+  ],
+  "commands": [
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/actions/runs/39934343361/jobs?per_page=100"
+      ],
+      "started_at": "2026-10-23T10:03:50.836912+00:00",
+      "finished_at": "2026-10-23T10:03:51.484850+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.648003,
+      "stdout_bytes": 7015,
+      "stdout_sha256": "8bf5325dcff17d20c327d01d75070ce8bbd5a429068b6c60b7e0141209bc0f33",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/actions/runs/39934343361"
+      ],
+      "started_at": "2026-10-23T10:03:50.215018+00:00",
+      "finished_at": "2026-10-23T10:03:50.836235+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.620868,
+      "stdout_bytes": 12735,
+      "stdout_sha256": "b2b01395f05ed2d62984474fe23629ed30564782e3f27c23f9ca7e04a481fa76",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/actions/jobs/120350080186/logs"
+      ],
+      "started_at": "2026-10-23T10:03:51.503252+00:00",
+      "finished_at": "2026-10-23T10:03:54.541040+00:00",
+      "exit_code": 0,
+      "wall_seconds": 3.037868,
+      "stdout_bytes": 1271723,
+      "stdout_sha256": "dccfadd74e6660dc8e0d7d7a54e00f4e179bad46ea33544070d47c0f81f98209",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/actions/runs/39934343300/jobs?per_page=100"
+      ],
+      "started_at": "2026-10-23T10:03:55.344393+00:00",
+      "finished_at": "2026-10-23T10:03:56.017636+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.673274,
+      "stdout_bytes": 2633,
+      "stdout_sha256": "eb813c3a2e365febda18c1e03d3b166f7e3617daaaf1f414b0dc82ffc8d66cb9",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/actions/runs/39934343300"
+      ],
+      "started_at": "2026-10-23T10:03:54.653130+00:00",
+      "finished_at": "2026-10-23T10:03:55.322521+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.669413,
+      "stdout_bytes": 12734,
+      "stdout_sha256": "96d1d0450d92681f754a58c3a7616e72d7c3395b775067049bda251a774757b9",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/actions/jobs/120350079856/logs"
+      ],
+      "started_at": "2026-10-23T10:03:56.078807+00:00",
+      "finished_at": "2026-10-23T10:03:58.092504+00:00",
+      "exit_code": 0,
+      "wall_seconds": 2.01377,
+      "stdout_bytes": 39140,
+      "stdout_sha256": "387ef9109347a9184b6ae5c6f5e629fe3d109f637b362ec7559b8910f62e30e7",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/issues/3218/comments?per_page=100",
+        "--paginate",
+        "--slurp"
+      ],
+      "started_at": "2026-10-23T10:04:05.630801+00:00",
+      "finished_at": "2026-10-23T10:04:06.251439+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.620665,
+      "stdout_bytes": 8551,
+      "stdout_sha256": "9b290375baf2386e536aee997a9025702dd138931c9aec52ab1c6063c32cd6dd",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/pulls/3218"
+      ],
+      "started_at": "2026-10-23T10:04:04.736947+00:00",
+      "finished_at": "2026-10-23T10:04:05.555249+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.818312,
+      "stdout_bytes": 21902,
+      "stdout_sha256": "0d74493ddcdd69d8ab6de53e8ee69de39f218694d919dad6ee7e1ec272039656",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/pulls/3218/comments?per_page=100",
+        "--paginate",
+        "--slurp"
+      ],
+      "started_at": "2026-10-23T10:04:06.894787+00:00",
+      "finished_at": "2026-10-23T10:04:07.422561+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.527808,
+      "stdout_bytes": 4,
+      "stdout_sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/pulls/3218/reviews?per_page=100",
+        "--paginate",
+        "--slurp"
+      ],
+      "started_at": "2026-10-23T10:04:06.309179+00:00",
+      "finished_at": "2026-10-23T10:04:06.893964+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.584815,
+      "stdout_bytes": 4,
+      "stdout_sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "graphql",
+        "-f",
+        "query=query {repository(owner:\"autonomous-ai\",name:\"lampOS\"){pullRequest(number:3218){reviewThreads(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id isResolved isOutdated path line comments(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id body url createdAt updatedAt}}}}}}}"
+      ],
+      "started_at": "2026-10-23T10:04:07.423215+00:00",
+      "finished_at": "2026-10-23T10:04:08.023229+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.60004,
+      "stdout_bytes": 135,
+      "stdout_sha256": "b7d2accee34d7a7fd9354c630e40ba3b856015467aaf9791631673527fac0e4c",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/contents/.github/workflows/lampos-arm64.yml?ref=1d7c72f982316caa302dc8f402c5bada7935c951"
+      ],
+      "started_at": "2026-10-23T10:03:59.673140+00:00",
+      "finished_at": "2026-10-23T10:04:00.836559+00:00",
+      "exit_code": 0,
+      "wall_seconds": 1.163456,
+      "stdout_bytes": 26380,
+      "stdout_sha256": "88e5fc7630e3df238ebd514806a8affb776623b7a4004e8ac7d29dde8f092afc",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/contents/.github/workflows/lampos-clippy.yml?ref=1d7c72f982316caa302dc8f402c5bada7935c951"
+      ],
+      "started_at": "2026-10-23T10:04:00.944306+00:00",
+      "finished_at": "2026-10-23T10:04:01.548196+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.603902,
+      "stdout_bytes": 6902,
+      "stdout_sha256": "69d3c5c915c397ed2e685363fa0152b40478859a020042437d750a664a7250e4",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/contents/.github/scripts/lampos-pr-crates.py?ref=1d7c72f982316caa302dc8f402c5bada7935c951"
+      ],
+      "started_at": "2026-10-23T10:04:01.675070+00:00",
+      "finished_at": "2026-10-23T10:04:02.234112+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.559064,
+      "stdout_bytes": 8698,
+      "stdout_sha256": "dd65432007d4c75daa2404a82f861ad683fac51384b97e4f4a807afe15863e7f",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/contents/lampOS/.config/nextest.toml?ref=1d7c72f982316caa302dc8f402c5bada7935c951"
+      ],
+      "started_at": "2026-10-23T10:04:02.354180+00:00",
+      "finished_at": "2026-10-23T10:04:02.927058+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.572898,
+      "stdout_bytes": 8179,
+      "stdout_sha256": "99314a798c6987dfe6dca1ca4d00176d00101cea23c8a99c500d6bdb3d606158",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/contents/lampOS/crates/voice/src/messages.rs?ref=1d7c72f982316caa302dc8f402c5bada7935c951"
+      ],
+      "started_at": "2026-10-23T10:04:03.060491+00:00",
+      "finished_at": "2026-10-23T10:04:03.721941+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.661489,
+      "stdout_bytes": 72397,
+      "stdout_sha256": "0cae710f263477165ec9ec549c040d9f6f89fe6dd63bf6ce463b71e4f11fe1ef",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/contents/lampOS/docs/messages.md?ref=1d7c72f982316caa302dc8f402c5bada7935c951"
+      ],
+      "started_at": "2026-10-23T10:04:03.796280+00:00",
+      "finished_at": "2026-10-23T10:04:04.438446+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.642187,
+      "stdout_bytes": 33505,
+      "stdout_sha256": "159b18233579f0d76293dfcdd7d9c628a7d6545cb5da5365632edcadb2286383",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/git/commits/1d7c72f982316caa302dc8f402c5bada7935c951"
+      ],
+      "started_at": "2026-10-23T10:03:58.207506+00:00",
+      "finished_at": "2026-10-23T10:03:58.867817+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.660331,
+      "stdout_bytes": 2603,
+      "stdout_sha256": "4a2c3ca4e384ac6e16a114584ecc282f38ce96b9a4fd2603100775484cad6a1e",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/autonomous-ai/lampOS/git/trees/e7e1a36bd1fdcf7eb7ac0fb47ff2205ace97ef04"
+      ],
+      "started_at": "2026-10-23T10:03:58.961443+00:00",
+      "finished_at": "2026-10-23T10:03:59.585074+00:00",
+      "exit_code": 0,
+      "wall_seconds": 0.623686,
+      "stdout_bytes": 5120,
+      "stdout_sha256": "5351a0783f0195d6ab762ae6b4803e35116563876e73ae88a3211a970f827057",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "collector_correction": {
+    "corrected_at": "2026-10-23T09:48:10.489995+00:00",
+    "initial_script_sha256": "dc3e464468845403be1b8f917ee2f8020f8a8d13f655f8d83dc076420c26fe58",
+    "corrected_script_sha256": "f831d0d6c1bbffaf76ad7c4262389d6dd1f19a2a576d462e5e72fbaf649bf3b1",
+    "initial_result": "Both collectors stopped with AssertionError at job selection before downloading any log: a broad lampOS prefix also selected the skipped sign-and-publish job.",
+    "correction": "Select the exact required build/test or clippy job name. Preserve every returned job and reuse the already captured terminal run/jobs bytes after command/hash verification; no job or workflow rerun.",
+    "affected_roots": [
+      "/private/tmp/tests-3190-0c2-ci-20261023",
+      "/private/tmp/tests-3218-430-ci-20261023"
+    ],
+    "classification": "Collection parser error, not a CI/test failure."
+  },
+  "doctest_parser_correction": {
+    "old_parser_sha256": "18b0ecb8e2705e2f7357ab868d9a7a0fb9074c393c3ac2e11a86086f59e8f9e8",
+    "new_parser_sha256": "843d66ec327f9b86396b7395dafe9c2e5ef2c6bc4682eb7a80ab0a140d166fe2",
+    "finding": "Phone log observer header precedes peek header, then two zero-test summaries appear. A single current-target variable dropped the observer summary.",
+    "correction": "Preserve all target labels and result summaries in sequence, including raw lines; aggregate all46 rather than inferring45 from immediate adjacency. Actual log unchanged; no execution."
+  },
+  "no_workflow_run_retry_dispatch": true,
+  "no_local_Cargo_build_test_container_or_target_access": true,
+  "no_repo_mutation_or_post": true
+}

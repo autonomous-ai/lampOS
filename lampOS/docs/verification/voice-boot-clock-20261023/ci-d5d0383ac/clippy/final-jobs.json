@@ -1,0 +1,102 @@
+{
+  "total_count": 1,
+  "jobs": [
+    {
+      "id": 120350713300,
+      "run_id": 39934531599,
+      "run_attempt": 1,
+      "head_sha": "d5d0383accafac8aa54c352eba65b1b0d5a44d9d",
+      "name": "lampOS — clippy, every crate and target (x86 Linux)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T09:48:28Z",
+      "completed_at": "2026-10-23T09:51:02Z",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39934531599/job/120350713300",
+      "labels": [
+        "ubuntu-22.04"
+      ],
+      "steps": [
+        {
+          "name": "Set up job",
+          "number": 1,
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-23T09:48:29Z",
+          "completed_at": "2026-10-23T09:48:29Z"
+        },
+        {
+          "name": "system packages",
+          "number": 2,
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-23T09:48:29Z",
+          "completed_at": "2026-10-23T09:48:47Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "number": 3,
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-23T09:48:47Z",
+          "completed_at": "2026-10-23T09:48:52Z"
+        },
+        {
+          "name": "Rust 1.96.0",
+          "number": 4,
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-23T09:48:52Z",
+          "completed_at": "2026-10-23T09:48:59Z"
+        },
+        {
+          "name": "restore the cache",
+          "number": 5,
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-23T09:48:59Z",
+          "completed_at": "2026-10-23T09:49:46Z"
+        },
+        {
+          "name": "unchanged source files get the cached build's times back",
+          "number": 6,
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-23T09:49:46Z",
+          "completed_at": "2026-10-23T09:49:46Z"
+        },
+        {
+          "name": "clippy (every crate and target, warnings as errors)",
+          "number": 7,
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-23T09:49:46Z",
+          "completed_at": "2026-10-23T09:51:00Z"
+        },
+        {
+          "name": "save the cache",
+          "number": 8,
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-10-23T09:51:00Z",
+          "completed_at": "2026-10-23T09:51:00Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "number": 16,
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-23T09:51:00Z",
+          "completed_at": "2026-10-23T09:51:00Z"
+        },
+        {
+          "name": "Complete job",
+          "number": 17,
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-23T09:51:00Z",
+          "completed_at": "2026-10-23T09:51:00Z"
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,24 @@
 # Tests work log
 
+## 2026-10-23 17:09 +0700 — latest Voice native gates and retained parallel failures
+
+Ready for lamp-voice: no (#3190 and #3218 remain draft).
+
+[Clock/P3 head d5](verification/voice-boot-clock-20261023/ci-d5d0383ac/) and
+[phone head 4e1](verification/phone-news-start-20261023/ci-4e1e00e52/) each passed
+ARM64 **7,215 / 0 / 32**, including one leaky pass, across 12/46 selected
+packages; strict Linux Clippy and exact-head Linux formatting also passed.
+Each tested merge tree equals its authored head on `cf462adb0`. All 86 clock
+cases, LoadingChild and the phone case passed in their respective native run.
+
+#3190's one full default-parallel Mac Voice gate is terminal **3,921 / 3 / 15**
+(library 3,642/1/15, integration 268/2/0), with six targets completely bound
+and all 87 changed-fixture cases passing. Formatting and strict Voice Clippy
+pass. The three retained failures are held-consent report state, first stale-cue
+scan and light-call latency; exact diagnostics and clean-base comparison are
+being sealed. No candidate retry or inherited-failure waiver is claimed.
+#3218's current full Voice/readers gate starts next on the same exclusive target.
+
 ## 2026-10-23 17:06 +0700 — relay review provenance clarification
 
 Ready for lamp-voice: yes (#3255; reviewer gate remains).
