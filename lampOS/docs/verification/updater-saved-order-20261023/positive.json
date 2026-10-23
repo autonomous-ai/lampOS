@@ -1,0 +1,32 @@
+{
+  "head": "b3a1ece0b1b9db75098335ad80da14f5a3183883",
+  "runtime_unchanged": false,
+  "host": "Darwin arm64; Rust 1.96.0",
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-update",
+    "--test",
+    "round",
+    "restart_order::",
+    "--",
+    "--nocapture",
+    "--test-threads=2"
+  ],
+  "started_at_utc": "2026-10-23T02:19:04.239698+00:00",
+  "elapsed_seconds": 25.315,
+  "exit_code": 0,
+  "bound_files": 6652,
+  "inputs_unchanged": true,
+  "test_patch_sha256": "61f620b1643dc4845122d20c173903b7903e2adee5259150aa11378870d2924a",
+  "log_sha256": "5a7363dee5e556c1332e680aa4d7b11f9bd66b7be61e4b4e62feeb46c620a898",
+  "result_lines": [
+    "thread 'restart_order::a_cut_at_reload_saves_the_full_old_projection_before_recovery' (68107568) panicked at crates/update/tests/round.rs:282:13:",
+    "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 109 filtered out; finished in 1.59s"
+  ]
+}

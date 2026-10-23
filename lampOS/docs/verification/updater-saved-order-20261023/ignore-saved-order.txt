@@ -1,0 +1,16 @@
+
+running 1 test
+
+thread 'restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit' (68150709) panicked at crates/update/tests/round/restart_order.rs:467:5:
+RolledBack { sequence: 2, why: "zulu says it is in error: it says it is unwell", after: Err("the restoration's unit order cannot be read: stream did not contain valid UTF-8"), told: Told { new: "", old: "" } }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit --- FAILED
+
+failures:
+
+failures:
+    restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 122 filtered out; finished in 0.10s
+
+error: test failed, to rerun pass `-p lamp-update --test round`

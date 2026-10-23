@@ -1,0 +1,33 @@
+{
+  "head": "b3a1ece0b1b9db75098335ad80da14f5a3183883",
+  "host": "Darwin arm64; Rust 1.96.0",
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-update",
+    "--test",
+    "round",
+    "restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit",
+    "--",
+    "--exact",
+    "--nocapture"
+  ],
+  "started_at_utc": "2026-10-23T02:26:17.526883+00:00",
+  "elapsed_seconds": 9.338,
+  "exit_code": 101,
+  "bound_files": 6654,
+  "inputs_unchanged": true,
+  "log_sha256": "1e40698695e6a2a2be96a31a014fcd4d533e8e2fdfadb10d0b75eabf9e095e96",
+  "result_lines": [
+    "thread 'restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit' (68150709) panicked at crates/update/tests/round/restart_order.rs:467:5:",
+    "RolledBack { sequence: 2, why: \"zulu says it is in error: it says it is unwell\", after: Err(\"the restoration's unit order cannot be read: stream did not contain valid UTF-8\"), told: Told { new: \"\", old: \"\" } }",
+    "restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit --- FAILED",
+    "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 122 filtered out; finished in 0.10s",
+    "error: test failed, to rerun pass `-p lamp-update --test round`"
+  ]
+}

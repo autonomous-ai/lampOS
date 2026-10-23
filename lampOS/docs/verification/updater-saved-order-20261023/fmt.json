@@ -1,0 +1,18 @@
+{
+  "head": "b3a1ece0b1b9db75098335ad80da14f5a3183883",
+  "host": "Darwin arm64; Rust 1.96.0",
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "fmt",
+    "--all",
+    "--check"
+  ],
+  "started_at_utc": "2026-10-23T02:26:27.721978+00:00",
+  "elapsed_seconds": 6.076,
+  "exit_code": 0,
+  "bound_files": 6654,
+  "inputs_unchanged": true,
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "result_lines": []
+}
