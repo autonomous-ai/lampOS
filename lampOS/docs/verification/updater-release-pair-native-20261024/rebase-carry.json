@@ -1,0 +1,15 @@
+{
+  "original_head": "d5d4d048b0b7fc850abc49d38c9964eaf03ac780",
+  "rebased_head": "7ebb876be004a84981cc71bf8b01e3eb3a06eb4c",
+  "base": "822efff7c154e3e4e41390d99cf795b765321daf",
+  "original_base": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+  "original_pr_paths": 255,
+  "changed_pr_paths": [],
+  "whole_tree_delta": [
+    "lampOS/crates/skills/tests/it/package.rs",
+    "lampOS/docs/skills.md"
+  ],
+  "range_diff": "1:  d5d4d048b = 1:  7ebb876be lampOS: exercise recovery across published updater versions",
+  "repository_tree": "0701c61c8109074ec25bb4c9e3c5c6bad3111991",
+  "lampOS_tree": "9b0beadba123e31af031f5979a52cc2ec25d5469"
+}

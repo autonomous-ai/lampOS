@@ -1,3 +1,26 @@
+## Current checkpoint: 2026-10-24 00:15 +07, rebased release-pair checks
+
+Ready for lamp-voice: no (#3278 awaits ARM64 and both assigned readers)
+
+#3278 is now `7ebb876be`, based on latest `822efff7c`. Range-diff is unchanged;
+all 255 authored paths keep identical bytes and modes. Only the two upstream
+Skills fixture/doc paths differ. The actual release-pair **2 / 0 / 0** and
+Mac Update **371 / 0 / 6 ignored** keep their original source binding.
+
+Fresh source-only Linux formatting passes with all 6,963 files unchanged,
+and strict Linux Clippy **39992469415** passes. CI merge `88771df4e` has the
+same repository tree as the PR head. ARM64 **39992469455** is still running.
+[Carry and native evidence](verification/updater-release-pair-native-20261024/README.md).
+Reviewer-two confirms the new base and unchanged source; evidence read and
+Third's second read remain pending. First owns merge; train #3280 is open.
+
+#3275 still points to its original head; Second's reproduced Body admission
+HOLD remains until Third pushes the gated correction. No new trusted release
+key or attended unplug window has arrived. Next: finish #3278 native evidence
+and review feedback, then read the corrected #3275 head.
+
+---
+
 ## Current checkpoint: 2026-10-24 00:03 +07, release-pair PR pushed and native gates running
 
 Ready for lamp-voice: no (#3278 awaits exact-head native qualification and review)
