@@ -168,6 +168,11 @@ struct Unconfirmed {
     /// The voice has asked them, in this meeting.
     #[serde(default)]
     asked: bool,
+    /// This record's number in memory, never in the file: a face added
+    /// again under the name is another record, so a yes waiting for the
+    /// last one keeps nothing ([`PendingYes`], #2856).
+    #[serde(skip)]
+    record: u64,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -188,6 +193,8 @@ pub struct Unconfirmeds {
     /// memory only, never in the file, kept with its photo's on a yes and
     /// gone with it otherwise.
     seen: Vec<(String, Vec<Vec<f32>>)>,
+    /// The last record's number given ([`Unconfirmed::record`]).
+    records: u64,
 }
 
 impl Unconfirmeds {
@@ -217,11 +224,27 @@ impl Unconfirmeds {
             },
             Err(_) => Vec::new(),
         };
-        Self {
+        let mut faces = Self {
             path,
             kept,
             seen: Vec::new(),
+            records: 0,
+        };
+        for at in 0..faces.kept.len() {
+            faces.kept[at].record = faces.next_record();
         }
+        faces
+    }
+
+    fn next_record(&mut self) -> u64 {
+        self.records += 1;
+        self.records
+    }
+
+    /// The record kept for `name` now, if any: another after it is let go
+    /// and added again ([`Unconfirmed::record`]).
+    pub fn record_of(&self, name: &str) -> Option<u64> {
+        self.find(name).map(|at| self.kept[at].record)
     }
 
     fn save(&self) -> io::Result<()> {
@@ -251,11 +274,13 @@ impl Unconfirmeds {
         if next.len() >= MOST_UNCONFIRMED {
             return Err(io::Error::other("too many faces from photos"));
         }
+        let record = self.next_record();
         next.push(Unconfirmed {
             name: name.to_owned(),
             print,
             added_unix_s: now_unix_s,
             asked: false,
+            record,
         });
         let before = std::mem::replace(&mut self.kept, next);
         self.save().inspect_err(|_| self.kept = before)?;
@@ -487,6 +512,104 @@ pub fn yes_after_look(
     yes_face: Option<&str>,
 ) -> bool {
     print_is_photos(name, matched) && is_that_face(face_now, yes_face)
+}
+
+/// With [`SPEAKER_ENVIRONMENT`] on, the one yes that passed and waits for a
+/// look forced after it (#2856). It pins what it answers: the unconfirmed
+/// record (`Unconfirmeds::record_of`), the camera permission's hold
+/// (`permit::Permit::held`) and when it reached the eyes. The loop asks it
+/// at every turn ([`Self::checked`]) and at each look ([`Self::looked`]).
+pub struct PendingYes<C> {
+    name: String,
+    face: Option<String>,
+    caller: C,
+    record: u64,
+    hold: u64,
+    arrived_us: u64,
+}
+
+/// What a waiting yes ends as: kept, with its name and caller, or not, with
+/// the caller and the error to answer.
+#[derive(Debug, PartialEq)]
+pub enum YesEnded<C> {
+    Keep(String, C),
+    Refuse(C, &'static str),
+}
+
+/// A look's part in a waiting yes: when its frame was captured, the
+/// permission's hold and the record of the yes's name now, and the near
+/// face's match and passing id ([`yes_after_look`]).
+pub struct YesLook<'a> {
+    pub frame_us: u64,
+    pub now_us: u64,
+    pub hold: Option<u64>,
+    pub record: Option<u64>,
+    pub matched: Option<&'a str>,
+    pub face: Option<&'a str>,
+}
+
+impl<C> PendingYes<C> {
+    pub fn new(
+        name: String,
+        face: Option<String>,
+        caller: C,
+        record: u64,
+        hold: u64,
+        arrived_us: u64,
+    ) -> Self {
+        Self {
+            name,
+            face,
+            caller,
+            record,
+            hold,
+            arrived_us,
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Every turn: past [`YES_LOOK_WITHIN`] it is `not_that_face`; under
+    /// another hold, or none, the camera was shut meanwhile and it is
+    /// `eyes_shut`, for good, though the camera opens again. Else it waits.
+    pub fn checked(self, now_us: u64, hold: Option<u64>) -> Result<YesEnded<C>, Self> {
+        if now_us >= self.arrived_us + YES_LOOK_WITHIN.as_micros() as u64 {
+            Ok(YesEnded::Refuse(self.caller, "not_that_face"))
+        } else if hold != Some(self.hold) {
+            Ok(YesEnded::Refuse(self.caller, "eyes_shut"))
+        } else {
+            Err(self)
+        }
+    }
+
+    /// At a look, as it ends, so nothing between the frame and the keep is
+    /// unchecked: first [`Self::checked`]; a frame captured before the yes
+    /// leaves it waiting; another record under its name (added again, let
+    /// go, forgotten or a no) is `not_unconfirmed`; and it is kept only if
+    /// the near face is the photo's and the one that said it
+    /// ([`yes_after_look`]).
+    pub fn looked(self, look: &YesLook) -> Result<YesEnded<C>, Self> {
+        let pending = match self.checked(look.now_us, look.hold) {
+            Ok(ended) => return Ok(ended),
+            Err(pending) => pending,
+        };
+        if look.frame_us < pending.arrived_us {
+            Err(pending)
+        } else if look.record != Some(pending.record) {
+            Ok(YesEnded::Refuse(pending.caller, "not_unconfirmed"))
+        } else if yes_after_look(
+            &pending.name,
+            look.matched,
+            look.face,
+            pending.face.as_deref(),
+        ) {
+            Ok(YesEnded::Keep(pending.name, pending.caller))
+        } else {
+            Ok(YesEnded::Refuse(pending.caller, "not_that_face"))
+        }
+    }
 }
 
 /// The eyes' answer to `{"photo_here":true}`: the face from a photo seen at
@@ -907,6 +1030,133 @@ mod tests {
             Some("b1/f1"),
             Some("b1/f1")
         ));
+    }
+
+    /// The waiting yes's caller, a number here; its arrival at 1 s.
+    const ARRIVED_US: u64 = 1_000_000;
+
+    fn pending(record: u64) -> PendingYes<u32> {
+        PendingYes::new(
+            "Mirel".into(),
+            Some("b1/f1".into()),
+            7,
+            record,
+            3,
+            ARRIVED_US,
+        )
+    }
+
+    /// A look at `frame_us`, ending at `now_us`, under hold 3 with record 1,
+    /// whose near face is the photo's and the one that said yes.
+    fn look(frame_us: u64, now_us: u64) -> YesLook<'static> {
+        YesLook {
+            frame_us,
+            now_us,
+            hold: Some(3),
+            record: Some(1),
+            matched: Some("Mirel"),
+            face: Some("b1/f1"),
+        }
+    }
+
+    /// Fourth's first P2 on #2856: a frame buffered before the yes, though
+    /// it matches, leaves it waiting; no newer frame, and its deadline ends
+    /// it; a newer frame that isn't the photo's ends it too.
+    #[test]
+    fn a_yes_is_looked_at_only_on_a_frame_captured_after_it() {
+        let Err(waiting) = pending(1).looked(&look(ARRIVED_US - 40_000, ARRIVED_US + 50_000))
+        else {
+            panic!("a frame from before the yes was looked at");
+        };
+        let Err(waiting) = waiting.checked(ARRIVED_US + 999_999, Some(3)) else {
+            panic!("ended before its deadline");
+        };
+        assert_eq!(
+            waiting.checked(ARRIVED_US + 1_000_000, Some(3)).ok(),
+            Some(YesEnded::Refuse(7, "not_that_face"))
+        );
+        let Err(waiting) = pending(1).looked(&look(ARRIVED_US - 40_000, ARRIVED_US + 50_000))
+        else {
+            panic!("a frame from before the yes was looked at");
+        };
+        let other = YesLook {
+            matched: None,
+            ..look(ARRIVED_US + 60_000, ARRIVED_US + 120_000)
+        };
+        assert_eq!(
+            waiting.looked(&other).ok(),
+            Some(YesEnded::Refuse(7, "not_that_face"))
+        );
+        // A frame captured after it, the photo's face that said it: kept.
+        assert_eq!(
+            pending(1)
+                .looked(&look(ARRIVED_US, ARRIVED_US + 120_000))
+                .ok(),
+            Some(YesEnded::Keep("Mirel".into(), 7))
+        );
+    }
+
+    /// Fourth's second P2 on #2856: the deadline and the camera's hold are
+    /// checked as it is kept. A look that ends late, a camera shut during it,
+    /// or shut and open again, keeps nothing; shut between looks, it ends at
+    /// the next turn, and a hold given again doesn't bring it back.
+    #[test]
+    fn a_yes_ends_past_its_deadline_or_once_the_camera_is_shut() {
+        assert_eq!(
+            pending(1)
+                .looked(&look(ARRIVED_US + 900_000, ARRIVED_US + 1_000_000))
+                .ok(),
+            Some(YesEnded::Refuse(7, "not_that_face"))
+        );
+        for hold in [None, Some(4)] {
+            let shut = YesLook {
+                hold,
+                ..look(ARRIVED_US + 60_000, ARRIVED_US + 120_000)
+            };
+            assert_eq!(
+                pending(1).looked(&shut).ok(),
+                Some(YesEnded::Refuse(7, "eyes_shut"))
+            );
+            assert_eq!(
+                pending(1).checked(ARRIVED_US + 60_000, hold).ok(),
+                Some(YesEnded::Refuse(7, "eyes_shut"))
+            );
+        }
+        assert!(pending(1).checked(ARRIVED_US + 60_000, Some(3)).is_err());
+    }
+
+    /// Fourth's third P2 on #2856: a face added again under the name before
+    /// the forced look, let go or forgotten, is another record (or none),
+    /// and the yes waiting for the last keeps nothing.
+    #[test]
+    fn a_yes_for_a_face_added_again_under_its_name_is_not_kept() {
+        let dir = folder("pending-yes");
+        let mut faces = Unconfirmeds::open(dir.join("people.json.from-photos"));
+        faces.add("Mirel", unit(3), 1_000).unwrap();
+        assert!(faces.asked("Mirel").unwrap());
+        let record = faces.record_of("Mirel").unwrap();
+        let later = |faces: &Unconfirmeds| YesLook {
+            record: faces.record_of("Mirel"),
+            ..look(ARRIVED_US + 60_000, ARRIVED_US + 120_000)
+        };
+        assert_eq!(
+            pending(record).looked(&later(&faces)).ok(),
+            Some(YesEnded::Keep("Mirel".into(), 7))
+        );
+        // The same name, from another photo, in the same batch.
+        faces.add("mirel", unit(4), 1_001).unwrap();
+        assert_ne!(faces.record_of("Mirel"), Some(record));
+        assert_eq!(
+            pending(record).looked(&later(&faces)).ok(),
+            Some(YesEnded::Refuse(7, "not_unconfirmed"))
+        );
+        // Let go (a no, or forgotten): no record.
+        assert!(faces.let_go("Mirel").unwrap());
+        assert_eq!(
+            pending(record).looked(&later(&faces)).ok(),
+            Some(YesEnded::Refuse(7, "not_unconfirmed"))
+        );
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     /// A look whose near print isn't the photo's drops `photo_here`.

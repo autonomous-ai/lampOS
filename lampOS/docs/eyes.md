@@ -1528,13 +1528,23 @@ kept **unconfirmed**, until its person says yes at the lamp:
     the face stays unconfirmed. A passing id can't tell two people apart:
     another face in the same place within 1.5 s takes it
     (`bus_out::Ids::of`; reviewer-three's P2). So a yes that passes is not
-    kept at once: the eyes force one look, from a frame read after the yes
-    reached them, and keep it only if that look's near face has the yes's
-    id and prints as the photo's face (`photo::yes_after_look`). No face,
-    no print, another print or another id is `not_that_face`, nothing
-    kept; no such look within `photo::YES_LOOK_WITHIN` (1 s) is
-    `not_that_face` too, so the yes is answered within about a second, inside
-    the voice's 6 s. One yes waits at a time: another meanwhile is `busy`.
+    kept at once: it waits (`photo::PendingYes`), pinned to the name's
+    unconfirmed record (`Unconfirmeds::record_of`), the camera permission's
+    hold (`permit::Permit::held`) and when it reached the eyes, and the eyes
+    force one look. That look counts only on a frame captured after the yes
+    (the driver's monotonic time, or when the frame was read without one): a
+    frame buffered before it leaves the yes waiting. It is kept only if that
+    look's near face has the yes's id and prints as the photo's face
+    (`photo::yes_after_look`). No face, no print, another print or another
+    id is `not_that_face`, nothing kept. Checked where it is kept, after the
+    look, and at every turn of the loop: past `photo::YES_LOOK_WITHIN` (1 s)
+    from its arrival, a slow look included, it is `not_that_face`, so the
+    yes is answered within about a second, inside the voice's 6 s; the camera
+    shut meanwhile, by a `{"camera":false}` or a permission run out, though
+    it opens again, is `eyes_shut`, and the yes is gone for good; the name
+    added again from another photo, let go, forgotten or answered no is
+    another record or none, `not_unconfirmed` (Fourth's three P2s on
+    #2856). One yes waits at a time: another meanwhile is `busy`.
     And a look whose near print isn't the photo's drops the face from
     `photo_here` at once (`photo::print_is_photos`), rather than leaving it
     there for `KNOWN_FOR`. The id is held in memory only, beside the
