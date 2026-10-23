@@ -1,0 +1,19 @@
+
+running 1 test
+lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)
+lamp-voice provider: a bare forget after a follow-up forgets entry 12
+lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+
+thread 'remember::tests::a_refused_follow_up_forget_never_retries_as_an_unrelated_last_keep' (67119939) panicked at crates/voice/src/remember.rs:9555:9:
+a refused follow-up forget deleted an unrelated last keep: [Object {"id": Number(12), "op": String("forget"), "person": String("p-be9688998f085098")}, Object {"kind": String("kept"), "op": String("forget_last"), "person": String("p-be9688998f085098")}]; retry=(Object {"forgotten": Bool(true)}, true)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+remember::tests::a_refused_follow_up_forget_never_retries_as_an_unrelated_last_keep --- FAILED
+
+failures:
+
+failures:
+    remember::tests::a_refused_follow_up_forget_never_retries_as_an_unrelated_last_keep
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3560 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

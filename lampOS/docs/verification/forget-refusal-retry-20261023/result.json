@@ -1,0 +1,33 @@
+{
+  "head": "8dd86272e9f9bfec63e1c62df2d6a06c714e75b3",
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "remember::tests::a_refused_follow_up_forget_never_retries_as_an_unrelated_last_keep",
+    "--",
+    "--exact",
+    "--nocapture"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 60.201,
+  "host": "Darwin arm64; Rust 1.96.0",
+  "patch_sha256": "7a6bd87e46d6929650acd6e8004c786a702f50850f64965352c56f2ac4903f25",
+  "original_source_sha256": "7acc96f8e0796655ca34e8b3fa8fd5185f24da171715ca44640d246dcedaf975",
+  "counter_source_sha256": "90bd6eeda3bdb408043b8cb52bc8133d69fbd1cc0f63a2d41cb5aaaca064ad23",
+  "bound_files": 6520,
+  "inputs_unchanged": true,
+  "input_manifest_sha256": "ae9f210039a1d5c7d9832f0db4ded2a84179db369efc1f86022f75ee189aa757",
+  "log_bytes": 1158,
+  "log_sha256": "2111979267b6bea6705cca401c460dce5f9f79e814c86a03c06121ee3013e1bc",
+  "result_lines": [
+    "thread 'remember::tests::a_refused_follow_up_forget_never_retries_as_an_unrelated_last_keep' (67119939) panicked at crates/voice/src/remember.rs:9555:9:",
+    "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3560 filtered out; finished in 0.02s"
+  ]
+}

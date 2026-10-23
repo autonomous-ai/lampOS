@@ -1,3 +1,23 @@
+## Current checkpoint: 2026-10-23 07:23 +07, follow-up forget retry P2 reproduced
+
+Ready for lamp-voice: #3150 yes; #3160 native ARM64/read pending
+
+#3130's real-client counter on `8dd86272e` fails **0 / 1**: a definite
+refusal of id 12 consumes the follow-up target, and the immediate bare
+retry sends `forget_last`, removing unrelated id 30 and reporting success.
+[Complete counter and unchanged production source](verification/forget-refusal-retry-20261023/README.md).
+Second is posting this P2 to Seventh and First before train 22; the author
+owns the fix. It is not a final dependency/Engine/device qualification.
+
+#3150 `b30c0f501` passed current-head native ARM64 **10,799 / 0 / 67**, one
+passing LEAK, and Linux Clippy; it is ready and posted NEXT TRAIN.
+[Current and previous-head receipts](verification/queue-routing-20261023/README.md).
+#3160 `5ce68c9a3` has green Linux Clippy; official ARM64 remains active.
+Mac Voice passed **3,815 / 0 / 14**. First assigned its source read to Tests
+after the boot-clock sweep. No CI job was rerun for green by Second.
+
+---
+
 ## Current checkpoint: 2026-10-23 07:17 +07, five writer guards pushed as #3160
 
 Ready for lamp-voice: no (#3160 native checks and external read pending)
