@@ -1062,9 +1062,13 @@ impl Days {
     /// The room's lines `speaker` said (#2849, the voice's
     /// `LAMP_MEMORY_ROOM_SPEAKER`, after that person's own `forget_all`):
     /// the room's (`everyone`) exchanges and kept things whose `speakers`
-    /// row is theirs, with their versions; and an observation or kept thing
-    /// of the room's made only from those, every one of its sources among
-    /// them and no speaker of its own but theirs. One also made from anyone
+    /// row is theirs, with their versions but for a version someone else
+    /// was seen saying (a correction of theirs by another, or theirs of
+    /// another's: those words are the other's); and an observation of the
+    /// room's made only from those, every one of its sources among them.
+    /// A kept thing goes only when it is named, here by its own speakers
+    /// row (#3113, Friday's P1 on #3213): one kept in a conversation they
+    /// spoke in, said by someone unseen, stays. One also made from anyone
     /// else's line stays, and so does that line: the walk never climbs from
     /// what goes to its other sources, and takes no sibling (the #3127
     /// shape). Nothing of any person's own scope is reached. How many went.
@@ -1078,12 +1082,18 @@ impl Days {
             "INSERT INTO doomed SELECT e.rid FROM speakers s JOIN entries e ON e.rid=s.rid WHERE s.speaker=?1 AND e.person=?2",
             params![speaker, Person::EVERYONE],
         )?;
-        versions(&tx)?;
+        // Their versions, both ways, stopping at one someone else was seen
+        // saying: it stays, and so does what lies past it (Friday's P2 on
+        // #3213).
+        tx.execute(
+            "WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid WHERE NOT EXISTS (SELECT 1 FROM speakers p WHERE p.rid=r.newer AND p.speaker!=?1) UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid WHERE NOT EXISTS (SELECT 1 FROM speakers p WHERE p.rid=r.older AND p.speaker!=?1)) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",
+            [speaker],
+        )?;
         // One step down from what is named, never up: only what has at
         // least one source and none outside it, read whole before any of
         // it joins, so nothing goes for having come from what goes this way.
         let made: Vec<i64> = tx
-            .prepare("SELECT e.rid FROM entries e WHERE e.person=?2 AND e.kind IN ('observation','kept') AND e.rid NOT IN (SELECT rid FROM doomed) AND EXISTS (SELECT 1 FROM sources s WHERE s.child=e.rid) AND NOT EXISTS (SELECT 1 FROM sources s WHERE s.child=e.rid AND s.parent NOT IN (SELECT rid FROM doomed)) AND NOT EXISTS (SELECT 1 FROM speakers p WHERE p.rid=e.rid AND p.speaker!=?1)")?
+            .prepare("SELECT e.rid FROM entries e WHERE e.person=?2 AND e.kind='observation' AND e.rid NOT IN (SELECT rid FROM doomed) AND EXISTS (SELECT 1 FROM sources s WHERE s.child=e.rid) AND NOT EXISTS (SELECT 1 FROM sources s WHERE s.child=e.rid AND s.parent NOT IN (SELECT rid FROM doomed)) AND NOT EXISTS (SELECT 1 FROM speakers p WHERE p.rid=e.rid AND p.speaker!=?1)")?
             .query_map(params![speaker, Person::EVERYONE], |r| r.get(0))?
             .collect::<rusqlite::Result<_>>()?;
         for rid in made {
