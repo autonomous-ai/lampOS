@@ -1,0 +1,1195 @@
+diff --git a/lampOS/crates/update/src/round.rs b/lampOS/crates/update/src/round.rs
+index b09feefee..07ad22db7 100644
+--- a/lampOS/crates/update/src/round.rs
++++ b/lampOS/crates/update/src/round.rs
+@@ -57,9 +57,9 @@ use std::{
+ 
+ /// This program's own unit, which it never switches.
+ pub const OWN_UNIT: &str = "lamp-update.service";
+-/// The voice: switched only at a quiet moment, and first.
++/// The voice: its restart boundary must still be quiet.
+ pub const VOICE_UNIT: &str = "lamp-voice.service";
+-/// The body: switched right after the voice, before the other parts.
++/// The body; its unit declarations determine its restart order.
+ pub const BODY_UNIT: &str = "lamp-body.service";
+ /// How often the world is looked at while waiting and watching.
+ const LOOK_EVERY: Duration = Duration::from_secs(1);
+@@ -371,16 +371,6 @@ impl Placing {
+     }
+ }
+ 
+-/// The order of a switch: the voice first, at the quiet moment itself;
+-/// then the body; then the rest by name. Going back is the reverse.
+-fn order(unit: &str) -> (u8, &str) {
+-    match unit {
+-        VOICE_UNIT => (0, unit),
+-        BODY_UNIT => (1, unit),
+-        _ => (2, unit),
+-    }
+-}
+-
+ /// One round. What goes wrong in the world is the outcome, never a panic.
+ pub fn round(config: &Config, world: &mut World) -> Outcome {
+     let records = Records::new(config.on(&config.records));
+@@ -1871,6 +1861,15 @@ impl Run<'_, '_> {
+             if !backs[at].was_active || unrestarted.contains(&backs[at].unit) {
+                 continue;
+             }
++            if backs[at].unit == VOICE_UNIT {
++                // A prerequisite's restart can take time. Drain speech
++                // queued during it and judge quiet at Voice's own boundary,
++                // before marking it restarted or stopping its old process.
++                self.listen(Duration::ZERO);
++                if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false) {
++                    return self.put_back(state, &build, &backs, None, why, String::new());
++                }
++            }
+             backs[at].restarted = true;
+             let back = &backs[at];
+             if let Err(why) = self.world.systemd.restart(&back.unit) {
+@@ -2039,10 +2038,11 @@ impl Run<'_, '_> {
+     }
+ 
+     /// The units written back, then those restarted on the new build
+-    /// restarted again, in the reverse order of a switch: the voice last,
+-    /// and between two turns unless the voice itself is what failed. Then
+-    /// watched. Every unit is tried, whatever happens to one, and the parts
+-    /// are restarted even when a file could not be put back.
++    /// restarted again in the saved old units' startup dependency order.
++    /// Voice waits for two turns' gap unless it is what failed. Every unit
++    /// is tried, whatever happens to one, and parts are restarted even when
++    /// a file could not be put back. An invalid ordering is refused before
++    /// any restoration write, retaining the journal and its recovery prefix.
+     /// With what the first unit found not well said of itself ([`Told`]),
+     /// and whether every file is as it was.
+     fn restore(
+@@ -2050,6 +2050,10 @@ impl Run<'_, '_> {
+         backs: &[Back],
+         failed: Option<&str>,
+     ) -> (Result<(), String>, String, bool) {
++        let again = match self.restore_order(backs) {
++            Ok(again) => again,
++            Err(why) => return (Err(why), String::new(), false),
++        };
+         // The product skills' files first, before lamp-skills is started
+         // again on the old build.
+         let skills = std::mem::take(&mut self.skills_back);
+@@ -2063,12 +2067,11 @@ impl Run<'_, '_> {
+             }
+         };
+         troubles.extend(skills.err());
+-        let mut again: Vec<&Back> = backs.iter().filter(|back| back.restarted).collect();
+-        again.sort_by(|a, b| order(&b.unit).cmp(&order(&a.unit)));
+         let mut watches = Vec::new();
+         for back in again {
+             if back.unit == VOICE_UNIT && failed != Some(VOICE_UNIT) {
+                 // A voice that is well is not cut off mid-sentence.
++                self.listen(Duration::ZERO);
+                 let within = self.config.quiet_wait;
+                 if let Err(why) = self.wait_quiet(BETWEEN_TURNS, within, true) {
+                     self.say(&format!("the voice is put back all the same: {why}"));
+@@ -2094,6 +2097,35 @@ impl Run<'_, '_> {
+         }
+     }
+ 
++    /// Reconstruct the old startup graph without depending on journal order
++    /// or the channel. Unchanged installed units retain transitive edges;
++    /// exact saved text replaces every changed unit. Already-restored and
++    /// inactive members do not gain a restart merely by being in the graph.
++    fn restore_order<'a>(&self, backs: &'a [Back]) -> Result<Vec<&'a Back>, String> {
++        let mut texts: BTreeMap<String, String> = installed_units(self.config)
++            .map_err(|error| format!("the restoration's unit order cannot be read: {error}"))?
++            .into_iter()
++            .map(|part| (part.unit, part.text))
++            .collect();
++        for back in backs {
++            texts.insert(back.unit.clone(), back.text.clone());
++        }
++        let order = unit::start_order(
++            texts
++                .iter()
++                .map(|(name, text)| (name.as_str(), text.as_str())),
++        )
++        .map_err(|why| format!("the restoration's unit order is refused: {why}"))?;
++        Ok(order
++            .iter()
++            .filter_map(|name| {
++                backs
++                    .iter()
++                    .find(|back| back.restarted && back.unit == *name)
++            })
++            .collect())
++    }
++
+     /// Step 1: a switch the last run did not finish is put back.
+     fn recover(&mut self, journal: Journal) -> Outcome {
+         let why =
+@@ -2750,7 +2782,24 @@ fn plan(
+             link,
+         });
+     }
+-    changes.sort_by(|a, b| order(&a.unit).cmp(&order(&b.unit)));
++    // Refuse a graph with no safe order before installing or switching
++    // anything. The old graph must also be usable if this build is put back.
++    let mut texts: BTreeMap<&str, &str> = installed
++        .iter()
++        .map(|part| (part.unit.as_str(), part.text.as_str()))
++        .collect();
++    unit::start_order(texts.iter().map(|(name, text)| (*name, *text)))
++        .map_err(|why| format!("the rollback unit order is refused: {why}"))?;
++    for change in &changes {
++        texts.insert(&change.unit, &change.after);
++    }
++    let order = unit::start_order(texts.iter().map(|(name, text)| (*name, *text)))?;
++    let positions: BTreeMap<&str, usize> = order
++        .iter()
++        .enumerate()
++        .map(|(position, name)| (name.as_str(), position))
++        .collect();
++    changes.sort_by_key(|change| positions[change.unit.as_str()]);
+     Ok(changes)
+ }
+ 
+diff --git a/lampOS/crates/update/src/unit.rs b/lampOS/crates/update/src/unit.rs
+index b0f6b0e7e..05a183a35 100644
+--- a/lampOS/crates/update/src/unit.rs
++++ b/lampOS/crates/update/src/unit.rs
+@@ -12,6 +12,9 @@
+ //! `/opt/lampOS/<folder>/current/<binary>`, `current` naming the build's
+ //! folder. Changing its build is replacing the link; its unit stays as it is.
+ 
++mod restart_order;
++pub(crate) use restart_order::start_order;
++
+ /// Where every part is installed.
+ pub const INSTALLED: &str = "/opt/lampOS/";
+ /// The link a product part is started through.
+diff --git a/lampOS/crates/update/src/unit/restart_order.rs b/lampOS/crates/update/src/unit/restart_order.rs
+new file mode 100644
+index 000000000..817fecd24
+--- /dev/null
++++ b/lampOS/crates/update/src/unit/restart_order.rs
+@@ -0,0 +1,226 @@
++//! Startup ordering of managed unit files, in either direction of an update.
++//! This reads declarations, not effective systemd state or service readiness.
++use std::collections::{BTreeMap, BTreeSet};
++
++/// Put prerequisites before callers; units without an ordering relation use
++/// name order. Include unchanged managed units so a path through one still
++/// orders two changed units. External units are not added or started.
++pub(crate) fn start_order<'a>(
++    units: impl IntoIterator<Item = (&'a str, &'a str)>,
++) -> Result<Vec<String>, String> {
++    let units: BTreeMap<&str, &str> = units.into_iter().collect();
++    let mut needs: BTreeMap<&str, BTreeSet<&str>> =
++        units.keys().map(|name| (*name, BTreeSet::new())).collect();
++    for (name, text) in &units {
++        for (before, dependency) in declarations(text).map_err(|why| format!("{name}: {why}"))? {
++            let Some((dependency, _)) = units.get_key_value(dependency.as_str()) else {
++                continue;
++            };
++            let (caller, prerequisite) = if before {
++                (*dependency, *name)
++            } else {
++                (*name, *dependency)
++            };
++            needs.get_mut(caller).unwrap().insert(prerequisite);
++        }
++    }
++    let mut ordered = Vec::with_capacity(needs.len());
++    while !needs.is_empty() {
++        let Some(name) = needs
++            .iter()
++            .find_map(|(name, dependencies)| dependencies.is_empty().then_some(*name))
++        else {
++            return Err(format!(
++                "unit startup ordering has a cycle: {}",
++                needs.keys().copied().collect::<Vec<_>>().join(", ")
++            ));
++        };
++        needs.remove(name);
++        ordered.push(name.to_owned());
++        for dependencies in needs.values_mut() {
++            dependencies.remove(name);
++        }
++    }
++    Ok(ordered)
++}
++
++/// Repeated ordering directives accumulate, including an empty assignment.
++/// Sockets= adds After= edges; Wants=/Requires=/PartOf= do not imply order.
++fn declarations(text: &str) -> Result<Vec<(bool, String)>, String> {
++    let mut section = String::new();
++    let mut folded = String::new();
++    let mut edges = Vec::new();
++    for line in text.lines().map(str::trim) {
++        if line.is_empty() || line.starts_with(['#', ';']) {
++            continue;
++        }
++        if let Some(line) = line.strip_suffix('\\') {
++            folded.push_str(line);
++            folded.push(' ');
++            continue;
++        }
++        folded.push_str(line);
++        let line = std::mem::take(&mut folded);
++        let line = line.trim();
++        if let Some(name) = line
++            .strip_prefix('[')
++            .and_then(|line| line.strip_suffix(']'))
++        {
++            section = name.to_owned();
++            continue;
++        }
++        let Some((key, value)) = line.split_once('=') else {
++            continue;
++        };
++        let before = match (section.as_str(), key.trim()) {
++            ("Unit", "After") | ("Service", "Sockets") => false,
++            ("Unit", "Before") => true,
++            _ => continue,
++        };
++        edges.extend(words(value)?.into_iter().map(|name| (before, name)));
++    }
++    if !folded.is_empty() {
++        return Err("unit ordering ends with an unfinished continuation".into());
++    }
++    Ok(edges)
++}
++
++/// Managed lamp units have literal names. Refuse quoting, escapes or
++/// specifiers rather than inventing an edge or silently losing one that
++/// systemd could expand to another managed unit.
++fn words(value: &str) -> Result<Vec<String>, String> {
++    let mut words = Vec::new();
++    let mut word = String::new();
++    for character in value.chars() {
++        match character {
++            '\\' | '%' | '\'' | '"' => {
++                return Err(
++                    "unit ordering with quoting, escapes or specifiers is not supported".into(),
++                );
++            }
++            character if character.is_whitespace() => {
++                if !word.is_empty() {
++                    words.push(std::mem::take(&mut word));
++                }
++            }
++            character => word.push(character),
++        }
++    }
++    if !word.is_empty() {
++        words.push(word);
++    }
++    Ok(words)
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn the_shipped_managed_services_have_a_valid_startup_graph() {
++        let units: Vec<_> = crate::install::PRODUCT
++            .iter()
++            .copied()
++            .filter(|(name, text)| {
++                *name != crate::round::OWN_UNIT
++                    && crate::manifest::is_unit_name(name)
++                    && crate::unit::linked(text).is_some()
++            })
++            .collect();
++        assert!(
++            units
++                .iter()
++                .any(|(name, _)| *name == crate::round::VOICE_UNIT)
++        );
++        assert_eq!(
++            start_order(units.iter().copied()).unwrap().len(),
++            units.len()
++        );
++    }
++
++    #[test]
++    fn repeated_and_folded_declarations_keep_each_edge() {
++        let units = [
++            (
++                "a.service",
++                "[Unit]\n After = b.service \\\n# a comment between continued lines\n c.service\nAfter=b.service\nAfter=\n",
++            ),
++            ("b.service", "[Unit]\nBefore=a.service\n"),
++            ("c.service", "[Unit]\nBefore=b.service\n"),
++        ];
++        assert_eq!(
++            start_order(units).unwrap(),
++            ["c.service", "b.service", "a.service"]
++        );
++    }
++
++    #[test]
++    fn requirements_and_directives_in_other_sections_do_not_order_units() {
++        let units = [
++            (
++                "a.service",
++                "[Unit]\nWants=b.service\nRequires=b.service\nPartOf=b.service\nAfter=external.target\n[Service]\nAfter=b.service\n[Install]\nBefore=b.service\n",
++            ),
++            (
++                "b.service",
++                "[Unit]\n# Before=a.service\n; Before=a.service\n",
++            ),
++        ];
++        assert_eq!(start_order(units).unwrap(), ["a.service", "b.service"]);
++    }
++
++    #[test]
++    fn a_declared_socket_precedes_its_service() {
++        assert_eq!(
++            start_order([
++                ("a.service", "[Service]\nSockets=z.socket\nSockets=\n"),
++                ("z.socket", "[Socket]\nListenStream=/run/synthetic\n"),
++            ])
++            .unwrap(),
++            ["z.socket", "a.service"]
++        );
++    }
++
++    #[test]
++    fn a_path_through_an_unchanged_unit_still_orders_its_ends() {
++        let order = start_order([
++            ("a.service", "[Unit]\nAfter=b.service\n"),
++            ("b.service", "[Unit]\nAfter=z.service\n"),
++            ("z.service", ""),
++        ])
++        .unwrap();
++        let changed: Vec<_> = order
++            .iter()
++            .filter(|name| name.as_str() != "b.service")
++            .collect();
++        assert_eq!(changed, [&"z.service".to_owned(), &"a.service".to_owned()]);
++    }
++
++    #[test]
++    fn cycles_including_self_edges_are_refused() {
++        for units in [
++            vec![("a.service", "[Unit]\nAfter=a.service\n")],
++            vec![
++                ("a.service", "[Unit]\nAfter=b.service\n"),
++                ("b.service", "[Unit]\nAfter=a.service\n"),
++            ],
++        ] {
++            assert!(start_order(units).unwrap_err().contains("cycle"));
++        }
++    }
++
++    #[test]
++    fn unsupported_ordering_cannot_silently_lose_a_dependency() {
++        for declaration in [
++            "After=%n",
++            "After=lamp-\\x6demory.service",
++            "After='b.service",
++            "After='b.service'",
++            "After=b.service \\",
++        ] {
++            assert!(
++                start_order([("a.service", format!("[Unit]\n{declaration}\n").as_str())]).is_err()
++            );
++        }
++    }
++}
+diff --git a/lampOS/crates/update/tests/round.rs b/lampOS/crates/update/tests/round.rs
+index b82187684..0c70c783f 100644
+--- a/lampOS/crates/update/tests/round.rs
++++ b/lampOS/crates/update/tests/round.rs
+@@ -38,6 +38,10 @@ use std::{
+ #[path = "round/process_cuts.rs"]
+ pub(crate) mod process_cuts;
+ 
++#[path = "round/restart_order.rs"]
++mod restart_order;
++#[path = "round/restart_quiet.rs"]
++mod restart_quiet;
+ #[path = "round/self_cuts.rs"]
+ mod self_cuts;
+ #[path = "round/self_recovery.rs"]
+@@ -880,14 +884,14 @@ fn a_part_that_dies_is_put_back_and_its_build_refused() {
+     assert_eq!(*sequence, 2);
+     assert!(why.contains("lamp-voice.service ended"), "{why}");
+     assert_eq!(after, &Ok(()));
+-    // Switched voice first, then the body; put back the body first, then
+-    // the voice (which failed, so without waiting).
++    // These fixture units declare no ordering edge: both directions use
++    // name order. The failed voice is put back without waiting.
+     assert_eq!(
+         lamp.calls(),
+         [
+             "reload",
+-            "restart lamp-voice.service",
+             "restart lamp-body.service",
++            "restart lamp-voice.service",
+             "reload",
+             "restart lamp-body.service",
+             "restart lamp-voice.service",
+@@ -1537,13 +1541,14 @@ fn both_kinds_of_part_switch_in_one_round_each_its_own_way() {
+     assert_eq!(lamp.eyes_link(), sha("eyes 2"));
+     assert_eq!(lamp.read("/opt/lampOS/eyes/current/lamp-eyes"), "eyes 2");
+     assert!(lamp.exists(&format!("/opt/lampOS/eyes/{}/lamp-eyes", sha("eyes 1"))));
+-    // The voice first, then the rest by name; one reload for the voice's unit.
++    // No ordering edge in these fixtures: name order, with one reload for
++    // the voice's unit. Real product declarations are covered separately.
+     assert_eq!(
+         lamp.calls(),
+         [
+             "reload",
+-            "restart lamp-voice.service",
+-            "restart lamp-eyes.service"
++            "restart lamp-eyes.service",
++            "restart lamp-voice.service"
+         ]
+     );
+     // The way back by hand: the link and the build it named.
+diff --git a/lampOS/crates/update/tests/round/restart_order.rs b/lampOS/crates/update/tests/round/restart_order.rs
+new file mode 100644
+index 000000000..208d06394
+--- /dev/null
++++ b/lampOS/crates/update/tests/round/restart_order.rs
+@@ -0,0 +1,406 @@
++//! Restart order comes from the units being started, including the saved
++//! units on a put-back. Binaries are text interpreted only by FakeSystemd.
++use super::*;
++
++fn name(part: &str) -> String {
++    format!("lamp-{part}.service")
++}
++
++fn text(part: &str, binary: &str, declarations: &str) -> String {
++    format!(
++        "[Unit]\n{declarations}\n[Service]\nExecStart=/opt/lampOS/{part}/{}/lamp-{part}\nRestart=on-failure\n",
++        sha(binary)
++    )
++}
++
++fn install_part(lamp: &mut Lamp, part: &str, binary: &str, declarations: &str, active: bool) {
++    // The real updater can execute Skills to validate its catalogue. These
++    // fixtures exercise ordering only and must never supply a fake Skills.
++    assert_ne!(part, "skills");
++    let folder = lamp.root.join(format!("opt/lampOS/{part}/{}", sha(binary)));
++    fs::create_dir_all(&folder).unwrap();
++    fs::write(folder.join(format!("lamp-{part}")), binary).unwrap();
++    fs::write(
++        lamp.root.join("etc/systemd/system").join(name(part)),
++        text(part, binary, declarations),
++    )
++    .unwrap();
++    if active {
++        lamp.systemd.start(&name(part));
++    } else {
++        lamp.systemd.units.remove(&name(part));
++    }
++}
++
++fn publish_parts(lamp: &mut Lamp, parts: &[(&str, &str, &str)]) {
++    let binaries: Vec<_> = parts
++        .iter()
++        .map(|(part, binary, _)| (format!("lamp-{part}"), *binary))
++        .collect();
++    let units: Vec<_> = parts
++        .iter()
++        .map(|(part, binary, declarations)| (name(part), text(part, binary, declarations)))
++        .collect();
++    lamp.publish(
++        2,
++        &binaries
++            .iter()
++            .map(|(name, binary)| (name.as_str(), *binary))
++            .collect::<Vec<_>>(),
++        &units
++            .iter()
++            .map(|(name, text)| (name.as_str(), text.as_str()))
++            .collect::<Vec<_>>(),
++    );
++}
++
++fn restarts(lamp: &Lamp) -> Vec<String> {
++    lamp.calls()
++        .into_iter()
++        .filter_map(|call| call.strip_prefix("restart ").map(str::to_owned))
++        .collect()
++}
++
++/// Only a literal section of the checked-in product fixture, independently
++/// of the updater's ordering parser. It contains no folded lines today.
++fn unit_section(text: &str) -> String {
++    let mut inside = false;
++    let mut lines = Vec::new();
++    for line in text.lines() {
++        let trimmed = line.trim();
++        if trimmed.starts_with('[') {
++            inside = trimmed == "[Unit]";
++        } else if inside {
++            assert!(
++                !trimmed.ends_with('\\'),
++                "extend this fixture for a folded line"
++            );
++            lines.push(line);
++        }
++    }
++    assert!(
++        !lines.is_empty(),
++        "the product fixture has no [Unit] section"
++    );
++    lines.join("\n")
++}
++
++#[test]
++fn after_and_before_order_the_forward_restarts_instead_of_unit_names() {
++    let mut lamp = Lamp::new();
++    for part in ["alpha", "middle", "zulu"] {
++        install_part(&mut lamp, part, &format!("{part} 1"), "", true);
++    }
++    publish_parts(
++        &mut lamp,
++        &[
++            ("alpha", "alpha 2", "After=lamp-middle.service"),
++            ("middle", "middle 2", ""),
++            ("zulu", "zulu 2", "Before=lamp-middle.service"),
++        ],
++    );
++    assert_eq!(lamp.round(), Outcome::Switched(2));
++    assert_eq!(
++        restarts(&lamp),
++        [name("zulu"), name("middle"), name("alpha")]
++    );
++}
++
++#[test]
++fn the_product_voices_declared_managed_prerequisites_restart_before_it() {
++    let product = lamp_update::install::PRODUCT;
++    let voice = product
++        .iter()
++        .find(|(name, _)| *name == "lamp-voice.service")
++        .unwrap()
++        .1;
++    let declarations = unit_section(voice);
++    let mut prerequisites: Vec<&str> = declarations
++        .lines()
++        .filter_map(|line| line.trim().strip_prefix("After="))
++        .flat_map(str::split_whitespace)
++        .filter(|wanted| {
++            product
++                .iter()
++                .any(|(name, text)| name == wanted && unit::linked(text).is_some())
++        })
++        .collect();
++    prerequisites.sort_unstable();
++    prerequisites.dedup();
++    assert!(!prerequisites.is_empty());
++
++    let mut lamp = Lamp::new();
++    let mut parts = Vec::new();
++    for unit in prerequisites.iter().copied().chain(["lamp-voice.service"]) {
++        let part = unit
++            .strip_prefix("lamp-")
++            .unwrap()
++            .strip_suffix(".service")
++            .unwrap();
++        let product_text = product.iter().find(|(name, _)| *name == unit).unwrap().1;
++        let declarations = unit_section(product_text);
++        install_part(&mut lamp, part, &format!("{part} 1"), &declarations, true);
++        parts.push((part, format!("{part} 2"), declarations));
++    }
++    publish_parts(
++        &mut lamp,
++        &parts
++            .iter()
++            .map(|(part, binary, declarations)| (*part, binary.as_str(), declarations.as_str()))
++            .collect::<Vec<_>>(),
++    );
++    assert_eq!(lamp.round(), Outcome::Switched(2));
++    let restarted = restarts(&lamp);
++    assert_eq!(restarted.len(), prerequisites.len() + 1, "{restarted:?}");
++    let voice_at = restarted
++        .iter()
++        .position(|unit| unit == "lamp-voice.service")
++        .unwrap();
++    for prerequisite in prerequisites {
++        let at = restarted
++            .iter()
++            .position(|unit| unit == prerequisite)
++            .unwrap();
++        assert!(
++            at < voice_at,
++            "{prerequisite} must precede Voice: {restarted:?}"
++        );
++    }
++}
++
++#[test]
++fn rollback_uses_the_saved_old_dependencies_not_the_new_graph_or_its_reverse() {
++    let mut lamp = Lamp::new();
++    // Old startup: alpha, zulu, middle. New startup: middle, alpha, zulu.
++    // Neither reversing the new graph nor sorting names gives the old one.
++    for (part, declarations) in [
++        ("alpha", "Before=lamp-zulu.service"),
++        ("middle", "After=lamp-zulu.service"),
++        ("zulu", ""),
++    ] {
++        install_part(&mut lamp, part, &format!("{part} 1"), declarations, true);
++    }
++    let before = lamp.lamp_files();
++    publish_parts(
++        &mut lamp,
++        &[
++            ("alpha", "alpha 2", "After=lamp-middle.service"),
++            ("middle", "middle 2", ""),
++            ("zulu", "zulu 2, unwell", "After=lamp-alpha.service"),
++        ],
++    );
++    let outcome = lamp.round();
++    assert!(
++        matches!(&outcome, Outcome::RolledBack { after: Ok(()), .. }),
++        "{outcome:?}"
++    );
++    assert_eq!(
++        restarts(&lamp),
++        [
++            name("middle"),
++            name("alpha"),
++            name("zulu"),
++            name("alpha"),
++            name("zulu"),
++            name("middle")
++        ]
++    );
++    assert_eq!(lamp.lamp_files(), before);
++    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
++}
++
++/// Reconstruct the documented persisted prefix after unit writes, without
++/// claiming a physical power cut. `switched` can omit an already-restored
++/// unit; inactive members stay in the journal but must not be started.
++fn interrupted(
++    lamp: &mut Lamp,
++    old: &[(&str, &str)],
++    switched: &[(&str, &str)],
++    inactive: &[&str],
++    journal_order: &[&str],
++) -> BTreeMap<String, String> {
++    let mut saved = BTreeMap::new();
++    for (part, declarations) in old {
++        install_part(
++            lamp,
++            part,
++            &format!("{part} 1"),
++            declarations,
++            !inactive.contains(part),
++        );
++        saved.insert(
++            name(part),
++            lamp.read(&format!("/etc/systemd/system/{}", name(part))),
++        );
++    }
++    let records = lamp.root.join("var/lib/lampos-update");
++    fs::create_dir_all(records.join("previous")).unwrap();
++    for (name, text) in &saved {
++        fs::write(records.join("previous").join(name), text).unwrap();
++    }
++    assert_eq!(journal_order.len(), saved.len());
++    let units: Vec<_> = journal_order
++        .iter()
++        .map(|part| {
++            assert!(saved.contains_key(&name(part)));
++            serde_json::json!({"unit":name(part),"was_active":!inactive.contains(part)})
++        })
++        .collect();
++    fs::write(
++        records.join("journal.json"),
++        serde_json::to_vec(&serde_json::json!({
++            "build":{"sequence":2,"commit":"2".repeat(40)},
++            "units":units
++        }))
++        .unwrap(),
++    )
++    .unwrap();
++    for (part, declarations) in switched {
++        install_part(
++            lamp,
++            part,
++            &format!("{part} 2"),
++            declarations,
++            !inactive.contains(part),
++        );
++    }
++    lamp.channel.offline = true;
++    saved
++}
++
++#[test]
++fn interrupted_recovery_orders_saved_units_despite_a_shuffled_partial_journal() {
++    let mut lamp = Lamp::new();
++    let saved = interrupted(
++        &mut lamp,
++        &[
++            ("alpha", "Before=lamp-zulu.service"),
++            ("middle", "After=lamp-zulu.service"),
++            ("zulu", ""),
++            ("sleeping", "Before=lamp-alpha.service"),
++            ("steady", "Before=lamp-zulu.service"),
++        ],
++        &[
++            ("alpha", "After=lamp-middle.service"),
++            ("middle", ""),
++            ("zulu", "After=lamp-alpha.service"),
++            ("sleeping", ""),
++        ],
++        &["sleeping"],
++        &["middle", "steady", "sleeping", "alpha", "zulu"],
++    );
++    let steady_pid = lamp.systemd.units[&name("steady")].pid;
++    let outcome = lamp.round();
++    assert!(
++        matches!(&outcome, Outcome::RolledBack { after: Ok(()), .. }),
++        "{outcome:?}"
++    );
++    assert_eq!(
++        restarts(&lamp),
++        [name("alpha"), name("zulu"), name("middle")]
++    );
++    for (name, text) in saved {
++        assert_eq!(lamp.read(&format!("/etc/systemd/system/{name}")), text);
++    }
++    assert_eq!(lamp.systemd.units[&name("steady")].pid, steady_pid);
++    assert!(!lamp.systemd.units.contains_key(&name("sleeping")));
++    assert!(
++        lamp.channel.fetched.is_empty(),
++        "recovery must not depend on the channel"
++    );
++    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
++}
++
++#[test]
++fn ordering_does_not_start_inactive_or_restart_unchanged_dependencies() {
++    let mut lamp = Lamp::new();
++    let declarations =
++        "After=lamp-middle.service lamp-zulu.service lamp-omega.service outside.service";
++    install_part(&mut lamp, "alpha", "alpha 1", declarations, true);
++    install_part(&mut lamp, "middle", "middle 1", "", false);
++    install_part(&mut lamp, "omega", "omega 1", "", true);
++    install_part(&mut lamp, "zulu", "zulu 1", "", true);
++    let unchanged_pid = lamp.systemd.units[&name("zulu")].pid;
++    publish_parts(
++        &mut lamp,
++        &[
++            ("alpha", "alpha 2", declarations),
++            ("middle", "middle 2", ""),
++            ("omega", "omega 2", ""),
++            ("zulu", "zulu 1", ""),
++        ],
++    );
++    assert_eq!(lamp.round(), Outcome::Switched(2));
++    assert_eq!(restarts(&lamp), [name("omega"), name("alpha")]);
++    assert!(!lamp.systemd.units.contains_key(&name("middle")));
++    assert_eq!(lamp.systemd.units[&name("zulu")].pid, unchanged_pid);
++    assert_eq!(
++        lamp.read(&format!(
++            "/opt/lampOS/middle/{}/lamp-middle",
++            sha("middle 2")
++        )),
++        "middle 2",
++        "the inactive part is updated without being started"
++    );
++}
++
++#[test]
++fn a_cycle_in_either_candidate_or_rollback_plan_refuses_before_mutation() {
++    for old_is_cyclic in [false, true] {
++        let mut lamp = Lamp::new();
++        let cyclic = ["After=lamp-middle.service", "After=lamp-alpha.service"];
++        let acyclic = ["", "After=lamp-alpha.service"];
++        let old = if old_is_cyclic { cyclic } else { acyclic };
++        let new = if old_is_cyclic { acyclic } else { cyclic };
++        install_part(&mut lamp, "alpha", "alpha 1", old[0], true);
++        install_part(&mut lamp, "middle", "middle 1", old[1], true);
++        let before = lamp.lamp_files();
++        publish_parts(
++            &mut lamp,
++            &[("alpha", "alpha 2", new[0]), ("middle", "middle 2", new[1])],
++        );
++        let outcome = lamp.round();
++        assert!(
++            matches!(&outcome, Outcome::Refused(_)),
++            "old cycle {old_is_cyclic}: {outcome:?}"
++        );
++        assert_eq!(lamp.lamp_files(), before, "old cycle {old_is_cyclic}");
++        assert!(
++            lamp.calls().is_empty(),
++            "old cycle {old_is_cyclic}: {:?}",
++            lamp.calls()
++        );
++        assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
++    }
++}
++
++#[test]
++fn a_cycle_in_an_older_recovery_journal_is_retained_without_arbitrary_restarts() {
++    let mut lamp = Lamp::new();
++    interrupted(
++        &mut lamp,
++        &[
++            ("alpha", "After=lamp-middle.service"),
++            ("middle", "After=lamp-alpha.service"),
++        ],
++        &[("alpha", ""), ("middle", "")],
++        &[],
++        &["middle", "alpha"],
++    );
++    let journal = lamp.read("/var/lib/lampos-update/journal.json");
++    let outcome = lamp.round();
++    assert!(
++        matches!(
++            &outcome,
++            Outcome::Failed(_) | Outcome::RolledBack { after: Err(_), .. }
++        ),
++        "an unresolved recovery order must not report success: {outcome:?}"
++    );
++    assert!(
++        lamp.exists("/var/lib/lampos-update/journal.json"),
++        "{outcome:?}"
++    );
++    assert_eq!(lamp.read("/var/lib/lampos-update/journal.json"), journal);
++    assert!(restarts(&lamp).is_empty(), "{:?}", lamp.calls());
++    assert!(lamp.channel.fetched.is_empty());
++}
+diff --git a/lampOS/crates/update/tests/round/restart_quiet.rs b/lampOS/crates/update/tests/round/restart_quiet.rs
+new file mode 100644
+index 000000000..07dba33b3
+--- /dev/null
++++ b/lampOS/crates/update/tests/round/restart_quiet.rs
+@@ -0,0 +1,157 @@
++//! A prerequisite can finish restarting just as someone begins a sentence.
++//! Its queued speech must reach the quiet guard before Voice is restarted.
++use super::*;
++
++const MEMORY: &str = "lamp-memory.service";
++const VOICE: &str = "lamp-voice.service";
++
++struct SpeechDuringRestart<'a> {
++    systemd: &'a mut FakeSystemd,
++    queued: Rc<Cell<bool>>,
++    began: Rc<Cell<Option<u64>>>,
++}
++
++impl Systemd for SpeechDuringRestart<'_> {
++    fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String> {
++        self.systemd.states(units)
++    }
++
++    fn self_recovery_ready(&mut self) -> Result<(), String> {
++        self.systemd.self_recovery_ready()
++    }
++
++    fn reload(&mut self) -> Result<(), String> {
++        self.systemd.reload()
++    }
++
++    fn restart(&mut self, unit: &str) -> Result<(), String> {
++        let result = self.systemd.restart(unit);
++        if unit == MEMORY && result.is_ok() && self.began.get().is_none() {
++            self.began.set(Some(self.systemd.now.get()));
++            self.queued.set(true);
++        }
++        result
++    }
++
++    fn last_line(&mut self, unit: &str) -> Option<String> {
++        self.systemd.last_line(unit)
++    }
++}
++
++struct QueuedSpeech {
++    ears: FakeEars,
++    queued: Rc<Cell<bool>>,
++}
++
++impl Ears for QueuedSpeech {
++    fn listen(&mut self, wait: Duration) -> Vec<Heard> {
++        let mut heard = Vec::new();
++        if self.queued.replace(false) {
++            heard.extend([Heard::Speech, Heard::State(Voice::Speaking)]);
++        }
++        heard.extend(self.ears.listen(wait));
++        heard
++    }
++
++    fn health(&mut self) -> Option<Health> {
++        self.ears.health()
++    }
++}
++
++fn a_sentence_during_the_prerequisite(never_quiet: bool) {
++    let mut lamp = Lamp::new();
++    let old_memory = sha("memory 1");
++    let folder = lamp.root.join(format!("opt/lampOS/memory/{old_memory}"));
++    fs::create_dir_all(&folder).unwrap();
++    fs::write(folder.join("lamp-memory"), "memory 1").unwrap();
++    fs::write(
++        lamp.root.join("etc/systemd/system").join(MEMORY),
++        format!("[Service]\nExecStart=/opt/lampOS/memory/{old_memory}/lamp-memory\n"),
++    )
++    .unwrap();
++    let voice =
++        voice_unit(&sha("voice 1")).replace("[Unit]\n", &format!("[Unit]\nAfter={MEMORY}\n"));
++    fs::write(lamp.root.join("etc/systemd/system").join(VOICE), voice).unwrap();
++    lamp.systemd.start(MEMORY);
++    lamp.publish(
++        2,
++        &[
++            ("lamp-voice", "voice 2"),
++            ("lamp-turn-end", "turn-end 1"),
++            ("lamp-memory", "memory 2"),
++        ],
++        &[],
++    );
++    let before = lamp.lamp_files();
++    let queued = Rc::new(Cell::new(false));
++    let began = Rc::new(Cell::new(None::<u64>));
++    let talking_began = Rc::clone(&began);
++    let mut ears = QueuedSpeech {
++        ears: FakeEars {
++            now: Rc::clone(&lamp.now),
++            root: lamp.root.clone(),
++            talking: Box::new(move |now| {
++                talking_began
++                    .get()
++                    .is_some_and(|at| never_quiet || now <= at + 5_000)
++            }),
++        },
++        queued: Rc::clone(&queued),
++    };
++    let clock = FakeClock(Rc::clone(&lamp.now));
++    let disk = FakeDisk(lamp.free);
++    let outcome = {
++        let _rounding = rounding();
++        let mut systemd = SpeechDuringRestart {
++            systemd: &mut lamp.systemd,
++            queued,
++            began: Rc::clone(&began),
++        };
++        round(
++            &lamp.config,
++            &mut World {
++                channel: &mut lamp.channel,
++                systemd: &mut systemd,
++                ears: &mut ears,
++                disk: &disk,
++                clock: &clock,
++                say: &mut |line| lamp.said.push(line.to_owned()),
++                phase: &mut |phase| lamp.phases.push(phase),
++            },
++        )
++    };
++    let began = began.get().expect("the prerequisite must restart");
++    let voice_restarts: Vec<u64> = lamp
++        .systemd
++        .restarted_at
++        .iter()
++        .filter_map(|(unit, at)| (unit == VOICE).then_some(*at))
++        .collect();
++    if never_quiet {
++        assert!(
++            matches!(outcome, Outcome::RolledBack { after: Ok(()), .. }),
++            "{outcome:?}"
++        );
++        assert!(voice_restarts.is_empty(), "{voice_restarts:?}");
++        assert_eq!(lamp.lamp_files(), before);
++        assert!(lamp.now.get() <= began + 665_000, "the wait stays bounded");
++    } else {
++        assert_eq!(outcome, Outcome::Switched(2), "{:?}", lamp.said);
++        assert_eq!(voice_restarts.len(), 1);
++        assert!(
++            (began + 50_000..=began + 52_000).contains(&voice_restarts[0]),
++            "Voice restarted at {:?}; speech began at {began}",
++            voice_restarts
++        );
++    }
++}
++
++#[test]
++fn queued_speech_during_a_prerequisite_is_heard_before_restarting_voice() {
++    a_sentence_during_the_prerequisite(false);
++}
++
++#[test]
++fn continuous_speech_puts_prerequisites_back_without_restarting_voice() {
++    a_sentence_during_the_prerequisite(true);
++}
+diff --git a/lampOS/docs/updates.md b/lampOS/docs/updates.md
+index 7912f675f..4f1e0effd 100644
+--- a/lampOS/docs/updates.md
++++ b/lampOS/docs/updates.md
+@@ -352,7 +352,12 @@ workflow change.
+ 1. **A switch cut short is put back.** If the journal of a switch is there
+    (the program stopped, or the lamp lost power, after the units were
+    written), every unit it names that differs from how it was is written
+-   back and restarted, and that build is refused.
++   back, and those recorded as running are restarted in the saved old
++   units' startup order. Already-restored units and units that were inactive
++   gain no restart. The graph is checked before any restoration write: a
++   cycle or unsupported ordering syntax leaves the journal and the existing
++   recovery prefix in place for another attempt. A completed put-back
++   refuses the build.
+ 2. **The channel.** `lampos-manifest.json` is read from `--channel-url`.
+    No network: `nothing changed: the channel cannot be reached: ...`, status
+    3. Nothing published: `nothing changed: the channel has published no
+@@ -412,6 +417,19 @@ workflow change.
+      `<sha256>  <name>` line each, sorted, as `SHA256SUMS` writes them.
+    - A part whose folder and unit (comments and blank lines aside) are the
+      same is left alone.
++
++   **Restart order** comes from `[Unit]` `After=` and `Before=` in the
++   candidate unit files (`unit/restart_order.rs`), with all managed installed
++   services in the graph, including unchanged and inactive ones. This keeps
++   a dependency path through an unchanged service without restarting it.
++   Prerequisites come first; where several services can go next, name order
++   breaks the tie. The old installed graph is also checked here, for
++   rollback. A cycle in either graph refuses the build before installing
++   or switching files. Ordering names must be literal: quoted names, escapes
++   and specifiers are refused. Repeated directives accumulate; an empty one
++   does not clear earlier edges, and continued lines are joined.
++   `Wants=`, `Requires=` and `PartOf=` do not themselves establish order.
++   This orders restart calls, not service readiness or health (step 9).
+ 5. **Room.** The disk `/opt/lampOS` is on must hold every file of every
+    new folder, counted whole as if nothing could be linked, plus
+    `--keep-free-mb` (256). Otherwise refused, before anything is written:
+@@ -462,25 +480,34 @@ workflow change.
+    someone spoke meanwhile, the old units go back and nothing is restarted.
+    Then the build's product skills are written (planned again first, as the
+    lamp may have changed a file while the round waited; each file's bytes
+-   before are in the journal, written with it). Then each changed unit that was running is restarted: the voice first,
+-   at the quiet moment itself; the body; then the rest by name. A unit that
+-   was not running is switched without being started.
++   before are in the journal, written with it). Each changed unit that was
++   running is then restarted in the candidate graph's startup order. A unit
++   that was not running is switched without being started. At the voice's
++   own restart boundary, queued speech is read and the 45 s quiet gate is
++   checked again: a prerequisite's restart may have taken time. If no quiet
++   moment arrives within `--quiet-wait-s`, the changes are put back,
++   including parts already restarted; the voice has not been restarted.
+ 9. **Watch.** Every second for `--watch-s` (60): each restarted unit must
+    not fail, stop, be in `auto-restart`, be started again by systemd
+    (`NRestarts`) or change process (`MainPID`). At the end it must be
+    running, and if it was in `lamp/health` before the switch it must be
+    there again, not stale, and not in error unless it was before. A part
+    that never reported is judged by systemd alone.
+-10. **Back.** A part not well: every changed unit is written back as it
+-    was, reloaded, every moved link named its old build again (replaced
++10. **Back.** A part not well: the old startup graph is reconstructed from
++    the saved unit declarations and unchanged installed units. It must be
++    valid before any restoration write; otherwise the journal and recovery
++    prefix are kept. Every changed unit is then written back as it was,
++    reloaded, every moved link named its old build again (replaced
+     whole, as at the switch), each product skill's file the switch wrote put
+     back as it was (or removed, with any folder made for it if still empty;
+     a file the lamp changed since it was written is left, and said), and
+-    those restarted are restarted again in the reverse
+-    order: the voice last, and, unless the voice is what failed, only
+-    between two turns (resting, nothing heard or said for 5 s; at once if
+-    its state cannot be seen). They are watched again, the outcome says how
+-    the previous build is, and the build is refused from then on.
++    those restarted are restarted again in the old graph's startup order.
++    Unless the voice is what failed, queued speech is read at its own
++    restart boundary and the between-turn wait runs there (resting, nothing
++    heard or said for 5 s; at once if its state cannot be seen). If that
++    bounded wait expires, the voice is put back anyway and this is said.
++    They are watched again, the outcome says how the previous build is,
++    and the build is refused from then on.
+     **What a part not well said of itself goes into the outcome** (#1505):
+     the unit that failed on the new build (read before it is put back), and
+     the first unit found not well on the old one (the watch stops there),
+@@ -1185,9 +1212,9 @@ path it doesn't know, and ignores a field it doesn't know.
+   when it opens its devices. A round writes it only after the switch's
+   quiet gate (`quiet.rs`: nobody heard or answered and the voice resting
+   for 45 s), the gate every switch of the voice passes. With no quiet
+-  moment within `--quiet-wait-s`, nothing is written or restarted, the
+-  round ends `not-quiet`, and the next round tries again. A lamp's own
+-  `asound.conf`, kept, restarts nothing.
++  moment within the initial `--quiet-wait-s`, nothing is written or
++  restarted, the round ends `not-quiet`, and the next round tries again.
++  A lamp's own `asound.conf`, kept, restarts nothing.
+ - **Older lamp-update-back.** A lamp installed before this has a
+   lamp-update-back that ignores `image`: nothing of it is written, the
+   round says so (`this lamp's lamp-update-back is older than them, so
+@@ -1635,17 +1662,24 @@ test does (#1512):
+   `d628ed1d`; `lamp-voice.service` names `c8ccd3dd...`). The build is
+   written into a carried unit, so a stale build there does no harm; a stale
+   option or `Environment=` line does. A drop-in (`lamp-voice.service.d/`)
+-  is not read and still overrides. A unit the build carries for a part not
+-  installed is not added, and a part's new unit is never enabled: adding
+-  a part to a lamp stays the first builder's.
++  is not read and still overrides. Restart ordering reads these managed
++  base service files, not systemd's effective graph: unit aliases and
++  symlinked unit files are not resolved, and `.socket` units and external
++  services are not graph nodes or directly restarted. The parser recognizes
++  `Sockets=` as an ordering declaration, but the current managed inventory
++  contains only services. The product Eyes and Skills units declare `After=` Voice;
++  their order follows those files too. A unit the build carries for a part
++  not installed is not added, and a part's new unit is never enabled:
++  adding a part to a lamp stays the first builder's.
+ - **The disk holding two copies.** lamp-4ace's board said 14% free on
+   2026-10-14 (health.md); the disk's size is not in the repository. The
+   check counts every new file whole, and `/opt/lampOS/releases/` already
+   holds every voice installed by hand, which lamp-update never removes.
+ - **The quiet moment.** It needs the voice on the bus (`LAMP_BUS=on`, as on
+   lamp-4ace). In an office the 45 s may come only at night. The check is
+-  made again right after the units are written, but someone who starts
+-  speaking in the second before the restart is cut off: the voice has no
++  made again right after the units are written and, after reading queued
++  speech, at the voice's own restart boundary. Someone can still start a
++  turn after the last check and before systemd stops the voice: it has no
+   pause that closes it to new turns yet.
+ - **Switching parts from the updater's sandbox.** The 19 October
+   parts trial ran `once` directly; the 20 October service trial switched
+diff --git a/lampOS/docs/verification/updater-restart-order-20261023/README.md b/lampOS/docs/verification/updater-restart-order-20261023/README.md
+new file mode 100644
+index 000000000..acafd3cd0
+--- /dev/null
++++ b/lampOS/docs/verification/updater-restart-order-20261023/README.md
+@@ -0,0 +1,39 @@
++# Dependency-ordered updater restarts
++
++Forward restart calls follow the candidate managed unit graph. Rollback and
++interrupted recovery reconstruct the saved old graph in startup order.
++Unchanged and inactive services participate in ordering but gain no restart.
++Voice drains queued speech and checks quiet at its own restart boundary.
++
++The nine integration regressions were written first on unchanged
++`f477d6c49`: **0 passed / 9 failed**, all behavioral assertions. With the fix,
++all nine pass. Removing only the Voice boundary block while retaining the
++new order makes both speech cases fail again, **0 / 2**; the source was
++restored exactly. Seven parser cases include the shipped managed graph,
++transitive dependencies, repeated/folded declarations and cycle refusal.
++
++Final Mac gate, Rust 1.96.0:
++
++```
++cargo +1.96.0 fmt --all --check
++cargo +1.96.0 clippy -q --locked --offline -p lamp-update --all-targets --message-format=short -- -D warnings
++cargo +1.96.0 test -q --locked --offline -p lamp-update --no-fail-fast -- --test-threads=2
++```
++
++**325 passed / 0 failed / 4 ignored**; formatting and strict Clippy pass.
++Two ignored cases are the manual fixture writer and live GitHub download;
++the other two need Linux tracing. The PR's official ARM64 workflow is the native gate. No local ARM64 build
++or test run was substituted. Grep finds the changed ordering helpers and
++callers only in `lamp-update`; no public API or dependent crate is changed.
++
++[Complete raw failures, controls, source binding and gate receipts](https://github.com/autonomous-ai/lampOS/blob/lamp-second/lampOS/docs/verification/updater-restart-order-20261023/README.md)
++retain the first full gate's two failures too: old tests asserted Voice-first
++order for fixtures with no dependency declarations. Only their restart
++lists/comments changed to name-order ties; all outcome/file/refusal checks
++remain. The final gate ran after those corrections.
++
++This is simulated-systemd and fake-clock evidence, not a lamp result.
++Ordering does not establish readiness or make an update atomic. Drop-ins,
++aliases, symlinked units and external/socket nodes are not resolved. A turn
++can still begin after the final quiet check but before systemd stops Voice.
++No device, physical cut, acoustic latency or real-key release was exercised.

@@ -1,0 +1,26 @@
+{
+  "base": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+  "host": "Darwin arm64; Rust 1.96.0",
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-update",
+    "--lib",
+    "unit::restart_order::",
+    "--",
+    "--nocapture",
+    "--test-threads=2"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 3.517,
+  "inputs_unchanged": true,
+  "log_sha256": "9d0330622272ee186cbab84e33130ec8f59ef7a992783071474a45a8e9a4c2f0",
+  "result_lines": [
+    "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 114 filtered out; finished in 0.00s"
+  ]
+}

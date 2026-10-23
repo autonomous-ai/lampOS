@@ -1,0 +1,5 @@
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 109 filtered out; finished in 0.72s
+

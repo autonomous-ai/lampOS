@@ -140,3 +140,14 @@ the original README and omitted the later receipts. The index is now
 regenerated over every current evidence file except itself, including all
 newer carries and complete manifests. The individual command receipts and
 raw output are unchanged.
+
+## Current-head official results
+
+`96fa27cdf` passed ARM64 **39882577059 / 120183188209**, attempt 1:
+**7,063 passed / 0 failed / 31 skipped**, one passing LEAK. All five changed
+fixtures and the original own-answers fixture pass. Linux Clippy
+**39882577264 / 120183189145**, attempt 1, also passes. Both checked merge
+`83a69470a` with base `b7700b7c2`. Exact identities and log hashes are in
+`native-96fa27cdf.json`. Reviewer-two posted READ-OK for this equal carry
+at 08:22; its checksum P3 was corrected separately. The source stays fixed
+for the merge owner's next current-base train.

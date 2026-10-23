@@ -1,0 +1,73 @@
+
+running 120 tests
+.................................i..................................................... 87/120
+......i..........................
+test result: ok. 118 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 2.76s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+
+running 78 tests
+..............................................................................
+test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 112.20s
+
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+
+running 116 tests
+................................... 35/116
+a_part_that_dies_is_put_back_and_its_build_refused --- FAILED
+................................ 68/116
+both_kinds_of_part_switch_in_one_round_each_its_own_way --- FAILED
+...............................................
+failures:
+
+---- a_part_that_dies_is_put_back_and_its_build_refused stdout ----
+
+thread 'a_part_that_dies_is_put_back_and_its_build_refused' (67583470) panicked at crates/update/tests/round.rs:889:5:
+assertion `left == right` failed
+  left: ["reload", "restart lamp-body.service", "restart lamp-voice.service", "reload", "restart lamp-body.service", "restart lamp-voice.service"]
+ right: ["reload", "restart lamp-voice.service", "restart lamp-body.service", "reload", "restart lamp-body.service", "restart lamp-voice.service"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- both_kinds_of_part_switch_in_one_round_each_its_own_way stdout ----
+
+thread 'both_kinds_of_part_switch_in_one_round_each_its_own_way' (67591589) panicked at crates/update/tests/round.rs:1545:5:
+assertion `left == right` failed
+  left: ["reload", "restart lamp-eyes.service", "restart lamp-voice.service"]
+ right: ["reload", "restart lamp-voice.service", "restart lamp-eyes.service"]
+
+
+failures:
+    a_part_that_dies_is_put_back_and_its_build_refused
+    both_kinds_of_part_switch_in_one_round_each_its_own_way
+
+test result: FAILED. 114 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 139.37s
+
+error: test failed, to rerun pass `-p lamp-update --test round`
+running 1 test
+test actual_cli_exec_confirms_before_the_next_round ... ignored, requires Linux ARM64/x86-64 ptrace
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out
+running 1 test
+test persisted_self_switches_survive_sigkill ... ignored, requires Linux syscall tracing
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: 1 target failed:
+    `-p lamp-update --test round`

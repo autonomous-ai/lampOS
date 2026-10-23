@@ -1,3 +1,26 @@
+## Current checkpoint: 2026-10-23 08:29 +07, updater fix gated and guard PR native green
+
+Ready for lamp-voice: #3160 yes; updater correction local gate passed, PR opening
+
+The updater correction is one commit `ef85204dd` on `7bfcb31b8`. Mac Update
+**325 passed / 0 failed / 4 ignored**, fmt and strict all-target Clippy pass.
+All nine test-first failures now pass; removing the Voice restart-boundary
+guard alone makes both speech tests fail. Mac/Linux formatting passes on
+the exact carried commit. [Complete evidence](verification/updater-restart-order-20261023/README.md)
+keeps original failures, deliberate control, full final gate and all source
+bindings. Nine owns the external read. First's general off-switch decision
+is explicitly pending for this default correctness correction; no lamp or
+real-release action was taken. The official PR gate is next.
+
+#3160 `96fa27cdf` now passes its own-head ARM64 **7,063 / 0 / 31 skipped**,
+one passing LEAK, and Linux Clippy, both first attempts. Tests and
+reviewer-two posted READ-OK. The latter's checksum-index P3 is fixed and
+all current evidence entries rehashed. [Native receipt](verification/shared-thread-fixtures-20261023/native-96fa27cdf.json).
+Source stays fixed for the merge owner's next train. #3130 still awaits
+Seventh's new push; both demonstrated data-loss findings remain held.
+
+---
+
 ## Current checkpoint: 2026-10-23 08:14 +07, updater counters pass and guard PR ready
 
 Ready for lamp-voice: #3160 read clean, new-head native checks running; updater gate in progress

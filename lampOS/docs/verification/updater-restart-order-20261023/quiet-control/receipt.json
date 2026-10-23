@@ -1,0 +1,32 @@
+{
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-update",
+    "--test",
+    "round",
+    "restart_quiet::",
+    "--",
+    "--nocapture",
+    "--test-threads=2"
+  ],
+  "change": "Only remove the forward Voice quiet-boundary block; dependency ordering remains enabled.",
+  "candidate_source_sha256": "381bad5d69e30f524db8a6663ee4ff782a42c6038c5664d77618922706304c0b",
+  "control_source_sha256": "34e3a8541e2f7572e2c655b2aa755d6145b4703cef21480e82f5f7de76a3c631",
+  "test_sha256": "29b5404b6b61cfa8b44199dc06a7781bd18748d756e7b5a253d5c943993e9c73",
+  "exit_code": 101,
+  "elapsed_seconds": 7.176,
+  "log_sha256": "644a15385ea60cb4d1f279e42cbef2cd433c575b22cf9a1cea47f2667b07d72b",
+  "result_lines": [
+    "thread 'restart_quiet::queued_speech_during_a_prerequisite_is_heard_before_restarting_voice' (67542375) panicked at crates/update/tests/round/restart_quiet.rs:141:9:",
+    "thread 'restart_quiet::continuous_speech_puts_prerequisites_back_without_restarting_voice' (67542374) panicked at crates/update/tests/round/restart_quiet.rs:131:9:",
+    "test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 114 filtered out; finished in 0.22s",
+    "error: test failed, to rerun pass `-p lamp-update --test round`"
+  ],
+  "source_restored": true
+}

@@ -1,0 +1,9 @@
+            if backs[at].unit == VOICE_UNIT {
+                // A prerequisite's restart can take time. Drain speech
+                // queued during it and judge quiet at Voice's own boundary,
+                // before marking it restarted or stopping its old process.
+                self.listen(Duration::ZERO);
+                if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false) {
+                    return self.put_back(state, &build, &backs, None, why, String::new());
+                }
+            }
