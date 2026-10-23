@@ -2286,6 +2286,7 @@ pub fn serve(
     // A held line's `reports_stop` is done, its answer kept held, as on the
     // Live route (`crate::attention::DONE_THOUGH_HELD`), with LAMP_REPORTS=on.
     let though_held = tools.reports_stop;
+    let photo_faces = tools.photo_faces;
     // The weather's call is answered before any of these, as the search's
     // is inside them, with LAMP_SECOND_WEATHER=on.
     let audio_runner = tools.requested_audio.then(|| {
@@ -2315,6 +2316,7 @@ pub fn serve(
         },
         runner.clone(),
     )
+    .replying_to_photos(photo_faces)
     .with_memory_scope(boot, face_cache.clone(), scoped_runner, scoped_system)
     .guarding_private_context(Arc::new(move |lease| {
         private_context_state(private_who.as_deref(), lease)
@@ -3714,7 +3716,11 @@ fn with_name_signal(
 fn with_held_forgets(
     declare: crate::second_provider::net::Declare,
 ) -> crate::second_provider::net::Declare {
-    Arc::new(move || crate::remember::held_forgets_described(declare()))
+    Arc::new(move || {
+        crate::photo_faces::scope_forget_description(crate::remember::held_forgets_described(
+            declare(),
+        ))
+    })
 }
 
 /// The model said it heard its name in `request`: answered, nothing done,

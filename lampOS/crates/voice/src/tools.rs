@@ -44,6 +44,10 @@ use std::{
 #[path = "tools/schedule_integration_tests.rs"]
 mod schedule_integration_tests;
 
+#[cfg(test)]
+#[path = "tools/photo_exchange_tests.rs"]
+mod photo_exchange_tests;
+
 /// Where the coordinator reads whether the model may say a thing was not
 /// for it. `on` only.
 pub const ENVIRONMENT: &str = "LAMP_TOOLS";
@@ -694,10 +698,6 @@ fn core_tools(settings: &Settings) -> Vec<Tool> {
     }
     if settings.who.is_some() {
         tools.extend(crate::known_faces::tools_for(face_switches(settings)));
-        // A face added from a photo, asked about at the lamp (#1968).
-        if settings.photo_faces {
-            tools.extend(crate::photo_faces::tools());
-        }
     }
     if settings.mark.is_some() {
         tools.push(crate::marked::tool());
@@ -887,6 +887,7 @@ fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
     crate::known_faces::FaceSwitches {
         checked: settings.names_checked,
         visits: settings.who_visits && settings.memory.is_some(),
+        photos: settings.photo_faces,
     }
 }
 
@@ -911,6 +912,9 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     }
     if crate::agent_tasks::is_tool(name) {
         return settings.tasks.clone().map_or(Route::Nobody, Route::Tasks);
+    }
+    if crate::photo_faces::is_tool(name) && !settings.photo_faces {
+        return Route::Nobody;
     }
     if crate::known_faces::is_tool(name) || crate::photo_faces::is_tool(name) {
         return settings.who.clone().map_or(Route::Nobody, |socket| {
@@ -1513,12 +1517,22 @@ fn run_call_with_scope(
         // may keep or forget one, never a request the lamp wrote or a text
         // from the app (the reviewer on #1713), as for marks.
         Route::Faces(..) if !heard => ("the eyes", (json!({"error": FACES_IN_PERSON}), false)),
-        Route::Faces(socket, _) if crate::photo_faces::is_tool(&call.name) => {
-            ("the eyes", crate::photo_faces::run(socket, call))
-        }
+        Route::Faces(socket, switches) if crate::photo_faces::is_tool(&call.name) => (
+            "the eyes",
+            if switches.photos {
+                crate::photo_faces::run_for(socket, call, request, lease)
+            } else {
+                (unavailable(), false)
+            },
+        ),
         // A yes to being named is taken only from the line's own admitted
         // scope, the named person's (#1997): none, revoked or narrowed to
         // the room is nobody's.
+        Route::Faces(socket, switches) if crate::photo_faces::requested(call) => (
+            "the eyes",
+            crate::photo_faces::dispatch(socket, call, switches.photos, request, lease)
+                .unwrap_or_else(|| (unavailable(), false)),
+        ),
         Route::Faces(socket, switches) => {
             let person = lease
                 .and_then(|lease| lease.scope())
@@ -1718,7 +1732,142 @@ pub const MAX_TASKS_ANSWER_BYTES: u64 = 65_536;
 pub fn exchange_up_to(socket: &Path, line: &Value, deadline: Duration, most: u64) -> Option<Value> {
     // A local socket connects at once or not at all: there is no wait to
     // bound here that the deadlines below do not bound.
-    exchange_on(UnixStream::connect(socket).ok()?, line, deadline, most)
+    exchange_on(
+        UnixStream::connect(socket).ok()?,
+        line,
+        deadline,
+        most,
+        || true,
+    )
+}
+
+/// The same bounded exchange, with authority rechecked after connecting and
+/// serialization, immediately before any operation is written to the socket.
+pub(crate) fn exchange_if(
+    socket: &Path,
+    line: &Value,
+    deadline: Duration,
+    current: impl Fn() -> bool,
+) -> Option<Value> {
+    if !current() {
+        return None;
+    }
+    exchange_on(
+        UnixStream::connect(socket).ok()?,
+        line,
+        deadline,
+        MAX_ANSWER_BYTES,
+        current,
+    )
+}
+
+/// Photo Yes only: one connection and one absolute deadline, with permission
+/// rechecked during partial writes/reads and at most 20 ms apart while polling.
+/// Loss closes this connection and discards any reply; it cannot retract bytes
+/// already sent or undo a mutation the eyes committed. Never retry the Yes here.
+/// `current` must return promptly. Ordinary exchanges retain their own behavior.
+pub(crate) fn photo_exchange_if(
+    socket: &Path,
+    line: &Value,
+    deadline: Duration,
+    current: impl Fn() -> bool,
+) -> Option<Value> {
+    use rustix::event::{PollFd, PollFlags, Timespec, poll};
+    let until = Instant::now().checked_add(deadline)?;
+    let permitted = || current() && Instant::now() < until;
+    if !permitted() {
+        return None;
+    }
+    let mut out = serde_json::to_vec(line).ok()?;
+    out.push(b'\n');
+    let address = rustix::net::SocketAddrUnix::new(socket).ok()?;
+    let descriptor = rustix::net::socket(
+        rustix::net::AddressFamily::UNIX,
+        rustix::net::SocketType::STREAM,
+        None,
+    )
+    .ok()?;
+    rustix::io::fcntl_setfd(&descriptor, rustix::io::FdFlags::CLOEXEC).ok()?;
+    let mut stream = UnixStream::from(descriptor);
+    stream.set_nonblocking(true).ok()?;
+    let wait = |stream: &UnixStream, interest| -> Option<()> {
+        loop {
+            if !permitted() {
+                return None;
+            }
+            let left = until.checked_duration_since(Instant::now())?;
+            let timeout = Timespec::try_from(left.min(Duration::from_millis(20))).ok()?;
+            let mut descriptors = [PollFd::new(stream, interest)];
+            match poll(&mut descriptors, Some(&timeout)) {
+                Ok(0) | Err(rustix::io::Errno::INTR) => continue,
+                Ok(_)
+                    if descriptors[0]
+                        .revents()
+                        .intersects(interest | PollFlags::HUP | PollFlags::ERR) =>
+                {
+                    return permitted().then_some(());
+                }
+                _ => return None,
+            }
+        }
+    };
+    if !permitted() {
+        return None;
+    }
+    match rustix::net::connect(&stream, &address) {
+        Ok(()) => {}
+        Err(rustix::io::Errno::INPROGRESS) => {
+            wait(&stream, PollFlags::OUT)?;
+            if stream.take_error().ok()?.is_some() || stream.peer_addr().is_err() {
+                return None;
+            }
+        }
+        // A full Unix backlog's AGAIN is not a pending connection.
+        Err(_) => return None,
+    }
+    let mut written = 0;
+    while written < out.len() {
+        if !permitted() {
+            return None;
+        }
+        match stream.write(&out[written..]) {
+            Ok(0) => return None,
+            Ok(count) => written += count,
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                wait(&stream, PollFlags::OUT)?;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(_) => return None,
+        }
+    }
+    let mut answer = Vec::new();
+    let mut bytes = [0; 1024];
+    loop {
+        if !permitted() {
+            return None;
+        }
+        let room = (MAX_ANSWER_BYTES as usize).checked_sub(answer.len())?;
+        if room == 0 {
+            return None;
+        }
+        let chunk = &mut bytes[..room.min(1024)];
+        match stream.read(chunk) {
+            Ok(0) => return None,
+            Ok(count) => {
+                let end = chunk[..count].iter().position(|byte| *byte == b'\n');
+                answer.extend_from_slice(&chunk[..end.map_or(count, |at| at + 1)]);
+                if end.is_some() {
+                    let parsed = serde_json::from_slice(&answer).ok()?;
+                    return permitted().then_some(parsed);
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                wait(&stream, PollFlags::IN)?;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(_) => return None,
+        }
+    }
 }
 
 /// [`exchange`], told apart: `None` for a socket that can't be connected
@@ -1726,7 +1875,13 @@ pub fn exchange_up_to(socket: &Path, line: &Value, deadline: Duration, most: u64
 /// that gave no answer in time.
 pub fn reached(socket: &Path, line: &Value, deadline: Duration) -> Option<Option<Value>> {
     let stream = UnixStream::connect(socket).ok()?;
-    Some(exchange_on(stream, line, deadline, MAX_ANSWER_BYTES))
+    Some(exchange_on(
+        stream,
+        line,
+        deadline,
+        MAX_ANSWER_BYTES,
+        || true,
+    ))
 }
 
 fn exchange_on(
@@ -1734,6 +1889,7 @@ fn exchange_on(
     line: &Value,
     deadline: Duration,
     most: u64,
+    current: impl FnOnce() -> bool,
 ) -> Option<Value> {
     let started = Instant::now();
     let left = || {
@@ -1744,6 +1900,9 @@ fn exchange_on(
     stream.set_write_timeout(Some(left()?)).ok()?;
     let mut out = serde_json::to_vec(line).ok()?;
     out.push(b'\n');
+    if !current() {
+        return None;
+    }
     stream.write_all(&out).ok()?;
     read_answer(&stream, most, left)
 }
@@ -1984,6 +2143,7 @@ mod tests {
         let on = FaceSwitches {
             checked: false,
             visits: true,
+            photos: false,
         };
         let route = Route::Faces(socket.clone(), on);
         let call = |name: &str| ToolCall {
@@ -4579,3 +4739,6 @@ mod tests {
         assert!(started.elapsed() < Duration::from_millis(1_200), "bounded");
     }
 }
+
+#[cfg(test)]
+mod photo_replies;

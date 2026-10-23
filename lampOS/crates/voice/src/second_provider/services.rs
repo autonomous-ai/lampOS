@@ -173,6 +173,28 @@ pub trait Services: Send + Sync + 'static {
         };
         while_chat_permitted(chat, permitted)
     }
+    /// A gap-held chat may retain only the pending-photo form of forget.
+    /// Services without schema overrides keep the stricter old withholding.
+    fn chat_held(
+        &self,
+        messages: Vec<Message>,
+        without: &'static [&'static str],
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        self.chat_without(messages, without)
+    }
+    /// The same held-photo selection with the request-owned sticky guard.
+    /// Backends with deferred sends must check it at each actual send too.
+    fn chat_held_guarded(
+        &self,
+        messages: Vec<Message>,
+        without: &'static [&'static str],
+        permitted: ChatPermission,
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        if permitted() == PermissionState::Lost {
+            return stream::empty().boxed();
+        }
+        while_chat_permitted(self.chat_held(messages, without), permitted)
+    }
     /// Whether a chat on `messages`, told without the functions named in
     /// `without`, declares the function `name` ([`Self::chat_without`]), for
     /// a turn's journal line (`LAMP_MEMORY_REPLACES`, #2510). None, from
@@ -1065,6 +1087,45 @@ impl Services for Net {
         permitted: ChatPermission,
     ) -> BoxStream<'static, net::Result<ChatEvent>> {
         self.chat_selected(messages, functions, Some(permitted))
+    }
+
+    fn chat_held(
+        &self,
+        messages: Vec<Message>,
+        without: &'static [&'static str],
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        let chat = self.chat.clone();
+        stream::once(async move { chat.send_held(&messages, without).await })
+            .map_ok(|answer| {
+                stream::try_unfold(answer, |mut answer| async move {
+                    Ok(answer.next().await?.map(|event| (event, answer)))
+                })
+            })
+            .try_flatten()
+            .boxed()
+    }
+
+    fn chat_held_guarded(
+        &self,
+        messages: Vec<Message>,
+        without: &'static [&'static str],
+        permitted: ChatPermission,
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        let chat = self.chat.clone();
+        let sending = permitted.clone();
+        let answer = stream::once(async move {
+            if !wait_permitted(&sending).await {
+                return Ok(stream::empty().boxed());
+            }
+            let answer = chat.send_held(&messages, without).await?;
+            Ok(stream::try_unfold(answer, |mut answer| async move {
+                Ok(answer.next().await?.map(|event| (event, answer)))
+            })
+            .boxed())
+        })
+        .try_flatten()
+        .boxed();
+        while_chat_permitted(answer, permitted)
     }
 
     fn declares(&self, messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
@@ -2185,6 +2246,340 @@ pub(crate) mod tests {
         task.abort();
     }
 
+    /// A real known-speaker file and owner-sealed proof, not a model argument.
+    struct HeldPhotoProof {
+        owner: crate::memory_scope::RequestScope,
+        directory: std::path::PathBuf,
+        private: bool,
+    }
+
+    impl HeldPhotoProof {
+        fn new(private: bool) -> Self {
+            use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+            use std::sync::atomic::{AtomicU64, Ordering};
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let sequence = NEXT.fetch_add(1, Ordering::Relaxed) + 1;
+            let directory = std::env::temp_dir().join(format!(
+                "lamp-held-photo-proof-{}-{sequence}",
+                std::process::id()
+            ));
+            std::fs::create_dir(&directory).unwrap();
+            let key = RequestKey {
+                worker: lamp_turn_owner::BootId::new([47; 16]).unwrap(),
+                session: 1,
+                request: sequence,
+            };
+            let mut owner = RequestScope::new(
+                key,
+                if private {
+                    ScopeSnapshot::of("Synthetic photo owner")
+                } else {
+                    ScopeSnapshot::room()
+                },
+            );
+            if private {
+                assert!(owner.speaker_recorder().unwrap().seal(
+                    key,
+                    &["0123456789abcdef/f7".into()],
+                    std::time::Instant::now() + std::time::Duration::from_secs(5),
+                ));
+            }
+            let proof = Self {
+                owner,
+                directory,
+                private,
+            };
+            proof.restore();
+            assert_eq!(
+                proof.permission()(),
+                PermissionState::Ready,
+                "initial actual proof must agree"
+            );
+            proof
+        }
+
+        fn restore(&self) {
+            std::fs::write(
+                crate::speaking_faces::known_speaker_of(&self.directory.join("known")),
+                serde_json::json!({
+                    "name":"Synthetic photo owner", "id":null,
+                    "boot":"0123456789abcdef", "face":"f7"
+                })
+                .to_string(),
+            )
+            .unwrap();
+        }
+
+        fn lose(&self) {
+            std::fs::remove_file(crate::speaking_faces::known_speaker_of(
+                &self.directory.join("known"),
+            ))
+            .unwrap();
+        }
+
+        fn permission(&self) -> ChatPermission {
+            let lease = self.owner.lease();
+            let known = self.directory.join("known");
+            let private = self.private;
+            Arc::new(move || {
+                if !lease.is_current() {
+                    PermissionState::Lost
+                } else if private {
+                    crate::second_provider::worker::private_context_state(Some(&known), &lease)
+                } else {
+                    PermissionState::Ready
+                }
+            })
+        }
+    }
+
+    impl Drop for HeldPhotoProof {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.directory);
+        }
+    }
+
+    fn held_photo_declarations() -> net::Declare {
+        Arc::new(|| {
+            crate::known_faces::tools_for(crate::known_faces::FaceSwitches {
+                checked: true,
+                visits: false,
+                photos: true,
+            })
+        })
+    }
+
+    /// Full body of the actual HTTP request, bounded independently of its reply.
+    async fn held_photo_body(socket: &mut tokio::net::TcpStream, key: &str) -> serde_json::Value {
+        let mut raw = head_of(socket).await.expect("complete HTTP head");
+        let end = raw.windows(4).position(|w| w == b"\r\n\r\n").unwrap() + 4;
+        let headers = String::from_utf8_lossy(&raw[..end]);
+        assert!(headers.contains(key));
+        let length: usize = headers
+            .lines()
+            .find_map(|line| {
+                line.to_ascii_lowercase()
+                    .strip_prefix("content-length:")
+                    .map(|n| n.trim().parse().unwrap())
+            })
+            .unwrap();
+        assert!(length < 64 * 1024);
+        while raw.len() - end < length {
+            let mut chunk = [0; 4096];
+            let n = socket.read(&mut chunk).await.unwrap();
+            assert!(n > 0);
+            raw.extend_from_slice(&chunk[..n]);
+        }
+        serde_json::from_slice(&raw[end..end + length]).unwrap()
+    }
+
+    fn held_photo_schema(body: &serde_json::Value) {
+        let tools = body["tools"].as_array().unwrap();
+        assert_eq!(tools.len(), 1, "all other face functions stay withheld");
+        let function = &tools[0]["function"];
+        assert_eq!(function["name"], crate::known_faces::FORGET);
+        assert_eq!(
+            function["parameters"],
+            serde_json::json!({
+                "type":"object", "properties":{"photo_reply":{"type":"boolean", "enum":[true]}},
+                "required":["photo_reply"], "additionalProperties":false
+            })
+        );
+        assert!(
+            function["description"]
+                .as_str()
+                .unwrap()
+                .contains("cannot forget any known face")
+        );
+    }
+
+    const HELD_WITHOUT: &[&str] = &[crate::known_faces::REMEMBER, crate::known_faces::FORGET];
+
+    #[tokio::test]
+    async fn guarded_held_photo_http_checks_actual_proof_before_send_and_never_revives() {
+        use std::time::Duration;
+        for mode in ["alive", "proof-lost", "scope-revoked", "room"] {
+            let proof = HeldPhotoProof::new(mode != "room");
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let url = format!("http://{}", listener.local_addr().unwrap());
+            let key = "k-held-photo-before-send";
+            let configured = tokio::spawn(async move {
+                tokio::time::timeout(Duration::from_millis(500), async {
+                    let (mut socket, _) = listener.accept().await.unwrap();
+                    let body = held_photo_body(&mut socket, key).await;
+                    let (head, answer) = answered("held answer").unwrap();
+                    socket.write_all(head.as_bytes()).await.unwrap();
+                    socket.write_all(&answer).await.unwrap();
+                    body
+                })
+                .await
+                .ok()
+            });
+            let net = Net::new(
+                config_at(&format!("held-before-{mode}"), key, &url, &url),
+                held_photo_declarations(),
+            )
+            .unwrap();
+            let mut chat =
+                net.chat_held_guarded(vec![Message::user("No.")], HELD_WITHOUT, proof.permission());
+            match mode {
+                "proof-lost" | "room" => proof.lose(),
+                "scope-revoked" => proof.owner.revoke(),
+                _ => {}
+            }
+            let allowed = matches!(mode, "alive" | "room");
+            let (events, text) = tokio::time::timeout(Duration::from_secs(2), async {
+                let mut count = 0;
+                let mut text = String::new();
+                while let Some(event) = chat.next().await {
+                    if let ChatEvent::Text(words) = event.unwrap() {
+                        text.push_str(&words);
+                    }
+                    count += 1;
+                }
+                (count, text)
+            })
+            .await
+            .unwrap();
+            assert_eq!(events > 0, allowed, "{mode}");
+            assert_eq!(text, if allowed { "held answer" } else { "" }, "{mode}");
+            let received = configured.await.unwrap();
+            assert_eq!(
+                usize::from(received.is_some()),
+                usize::from(allowed),
+                "{mode}"
+            );
+            if let Some(body) = received {
+                held_photo_schema(&body);
+            }
+            if mode == "proof-lost" {
+                assert!(proof.owner.lease().is_current());
+                assert!(proof.owner.lease().private_context_lost());
+                proof.restore();
+            }
+            assert!(
+                chat.next().await.is_none(),
+                "terminated held stream cannot revive: {mode}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn guarded_held_photo_http_rechecks_actual_proof_after_pending_reply() {
+        use std::time::Duration;
+        for mode in ["alive", "proof-lost", "scope-revoked", "room"] {
+            let proof = HeldPhotoProof::new(mode != "room");
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let url = format!("http://{}", listener.local_addr().unwrap());
+            let key = "k-held-photo-pending-reply";
+            let (arrived, arrival) = tokio::sync::oneshot::channel();
+            let (release, released) = tokio::sync::oneshot::channel();
+            let configured = tokio::spawn(async move {
+                tokio::time::timeout(Duration::from_secs(2), async {
+                    let (mut socket, _) = listener.accept().await.unwrap();
+                    let body = held_photo_body(&mut socket, key).await;
+                    arrived.send(body).unwrap();
+                    released.await.unwrap();
+                    let (head, answer) = answered("PRIVATE_HELD_OUTPUT_CANARY").unwrap();
+                    // Cancellation may close the actual socket before it replies.
+                    let _ = socket.write_all(head.as_bytes()).await;
+                    let _ = socket.write_all(&answer).await;
+                    1
+                })
+                .await
+                .unwrap()
+            });
+            let net = Net::new(
+                config_at(&format!("held-pending-{mode}"), key, &url, &url),
+                held_photo_declarations(),
+            )
+            .unwrap();
+            let mut chat =
+                net.chat_held_guarded(vec![Message::user("No.")], HELD_WITHOUT, proof.permission());
+            let waiting = tokio::spawn(async move {
+                let event = chat.next().await;
+                (event, chat)
+            });
+            let body = tokio::time::timeout(Duration::from_secs(2), arrival)
+                .await
+                .unwrap()
+                .unwrap();
+            held_photo_schema(&body);
+            match mode {
+                "proof-lost" | "room" => proof.lose(),
+                "scope-revoked" => proof.owner.revoke(),
+                _ => {}
+            }
+            release.send(()).unwrap();
+            let (event, mut chat) = tokio::time::timeout(Duration::from_secs(2), waiting)
+                .await
+                .unwrap()
+                .unwrap();
+            let allowed = matches!(mode, "alive" | "room");
+            assert_eq!(
+                event.is_some(),
+                allowed,
+                "private pending output escaped: {mode}"
+            );
+            if allowed {
+                assert!(matches!(event, Some(Ok(ChatEvent::Text(ref text)))
+                    if text == "PRIVATE_HELD_OUTPUT_CANARY"));
+            }
+            if mode == "proof-lost" {
+                assert!(proof.owner.lease().is_current());
+                assert!(proof.owner.lease().private_context_lost());
+                proof.restore();
+            }
+            if !allowed {
+                assert!(chat.next().await.is_none(), "cannot revive: {mode}");
+            }
+            assert_eq!(
+                configured.await.unwrap(),
+                1,
+                "exactly one configured send: {mode}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn guarded_held_photo_http_keeps_the_single_configured_endpoint_on_401_and_503() {
+        use std::time::Duration;
+        for status in [UNAUTHORIZED, UNAVAILABLE] {
+            let key = "k-held-photo-no-fallback";
+            let configured = stub(key, vec![(CHAT, Some((status, Vec::new())))]).await;
+            let near = stub(key, vec![(CHAT, answered("must not reach near"))]).await;
+            let relay = stub(key, vec![(CHAT, answered("must not reach relay"))]).await;
+            let net = Net::new(
+                config_at("held-no-fallback", key, &configured.url, &configured.url),
+                held_photo_declarations(),
+            )
+            .unwrap()
+            .routing_through_the_relay(THREE)
+            .falling_back_to_the_relay(
+                &relay.url,
+                Arc::new(|_| panic!("held never uses key fallback")),
+            )
+            .unwrap();
+            kept(&net).set(near_chat(&near));
+            net.turn_begins();
+            let proof = HeldPhotoProof::new(true);
+            let mut chat =
+                net.chat_held_guarded(vec![Message::user("No.")], HELD_WITHOUT, proof.permission());
+            let event = tokio::time::timeout(Duration::from_secs(2), chat.next())
+                .await
+                .unwrap();
+            assert!(matches!(event, Some(Err(net::Error::Status(401 | 503)))));
+            assert!(chat.next().await.is_none());
+            assert_eq!(configured.asked(CHAT), 1);
+            assert_eq!(near.asked(CHAT), 0, "held selection must not use near");
+            assert_eq!(
+                relay.asked(CHAT),
+                0,
+                "held selection must not use key-refusal relay"
+            );
+        }
+    }
+
     /// Actual Net HTTP fallback happens inside the first
     /// stream poll, before Prepared gets an event to recheck private authority.
     #[tokio::test]
@@ -2752,6 +3147,493 @@ pub(crate) mod tests {
             assert!(events.iter().all(Result::is_ok));
             value.store(0, Ordering::Release);
             assert_eq!(relay.asked(CHAT), usize::from(resume));
+        }
+    }
+    // Typed continuation is established before the first permission read. The
+    // original constructor above deliberately remains a legacy-source control.
+    impl HeldPhotoProof {
+        fn typed(deadline: std::time::Instant) -> Self {
+            use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+            use std::sync::atomic::{AtomicU64, Ordering};
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let sequence = NEXT.fetch_add(1, Ordering::Relaxed) + 1;
+            let directory = std::env::temp_dir().join(format!(
+                "lamp-held-photo-typed-{}-{sequence}",
+                std::process::id()
+            ));
+            std::fs::create_dir(&directory).unwrap();
+            let key = RequestKey {
+                worker: lamp_turn_owner::BootId::new([48; 16]).unwrap(),
+                session: 1,
+                request: sequence,
+            };
+            let mut owner = RequestScope::new(key, ScopeSnapshot::of("Synthetic photo owner"));
+            assert!(owner.speaker_recorder().unwrap().seal(
+                key,
+                &["0123456789abcdef/f7".into()],
+                deadline,
+            ));
+            let proof = Self {
+                owner,
+                directory,
+                private: true,
+            };
+            proof.publish_typed("seen").unwrap();
+            assert_eq!(proof.permission()(), PermissionState::Ready);
+            proof
+        }
+
+        fn publish_typed(&self, state: &str) -> std::io::Result<()> {
+            publish_held_photo_source(&self.directory.join("known"), state)
+        }
+    }
+
+    fn publish_held_photo_source(known: &std::path::Path, state: &str) -> std::io::Result<()> {
+        let value = match state {
+            "seen" => serde_json::json!({
+                "state":"seen", "name":"Synthetic photo owner", "id":null,
+                "boot":"0123456789abcdef", "face":"f7",
+                "publisher":"0123456789abcdef0123456789abcdef", "generation":1
+            }),
+            "checking" => serde_json::json!({
+                "state":"checking", "boot":"0123456789abcdef",
+                "publisher":"0123456789abcdef0123456789abcdef", "generation":1
+            }),
+            "revoked" => serde_json::json!({
+                "state":"revoked", "boot":"0123456789abcdef",
+                "publisher":"0123456789abcdef0123456789abcdef", "generation":2
+            }),
+            _ => return Err(std::io::Error::other("unsupported fixture source state")),
+        };
+        let path = crate::speaking_faces::known_speaker_of(known);
+        let temporary = path.with_extension("pending");
+        std::fs::write(&temporary, value.to_string())?;
+        std::fs::rename(temporary, path)
+    }
+
+    fn observed_held_photo_permission(
+        proof: &HeldPhotoProof,
+    ) -> (
+        ChatPermission,
+        Arc<std::sync::atomic::AtomicUsize>,
+        Arc<tokio::sync::Notify>,
+    ) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let permission = proof.permission();
+        let pending = Arc::new(AtomicUsize::new(0));
+        let changed = Arc::new(tokio::sync::Notify::new());
+        let (count, notify) = (pending.clone(), changed.clone());
+        let observed = Arc::new(move || {
+            let state = permission();
+            if state == PermissionState::Pending {
+                count.fetch_add(1, Ordering::AcqRel);
+                notify.notify_one();
+            }
+            state
+        });
+        (observed, pending, changed)
+    }
+
+    async fn held_photo_pending_observed(
+        pending: &std::sync::atomic::AtomicUsize,
+        changed: &tokio::sync::Notify,
+    ) -> bool {
+        use std::sync::atomic::Ordering;
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                let notified = changed.notified();
+                if pending.load(Ordering::Acquire) >= 3 {
+                    return;
+                }
+                notified.await;
+            }
+        })
+        .await
+        .is_ok()
+    }
+
+    // Every spawned task has its own absolute bound. Even a failed observation
+    // is followed by release and join before any assertion on its outcome.
+    async fn join_held_photo<T>(mut task: tokio::task::JoinHandle<T>) -> Result<T, String> {
+        match tokio::time::timeout(std::time::Duration::from_secs(6), &mut task).await {
+            Ok(result) => result.map_err(|error| error.to_string()),
+            Err(_) => {
+                task.abort();
+                let joined = tokio::time::timeout(std::time::Duration::from_secs(1), task).await;
+                Err(format!(
+                    "bounded photo task expired; aborted task joined: {}",
+                    joined.is_ok()
+                ))
+            }
+        }
+    }
+
+    type HeldPhotoHttp = (
+        String,
+        Arc<std::sync::atomic::AtomicUsize>,
+        tokio::sync::oneshot::Sender<()>,
+        BoxFuture<'static, Vec<serde_json::Value>>,
+    );
+
+    async fn held_photo_http(key: &'static str) -> HeldPhotoHttp {
+        use futures_util::FutureExt;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let count = Arc::new(AtomicUsize::new(0));
+        let recorded = count.clone();
+        let (finish, mut finished) = tokio::sync::oneshot::channel();
+        let server = async move {
+            tokio::time::timeout(std::time::Duration::from_secs(5), async move {
+                let mut bodies = Vec::new();
+                loop {
+                    // Drain queued connections ahead of a completion receipt,
+                    // so a forbidden extra request is visible, not hidden by
+                    // a fixture which shut its listener after the first one.
+                    tokio::select! {
+                        biased;
+                        accepted = listener.accept() => {
+                            let (mut socket, _) = accepted.unwrap();
+                            let body = tokio::time::timeout(
+                                std::time::Duration::from_secs(1),
+                                held_photo_body(&mut socket, key),
+                            ).await.expect("bounded complete HTTP body");
+                            recorded.fetch_add(1, Ordering::AcqRel);
+                            bodies.push(body);
+                            let (head, reply) = answered("HELD_PENDING_HTTP_CANARY").unwrap();
+                            let _ = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+                                socket.write_all(head.as_bytes()).await?;
+                                socket.write_all(&reply).await
+                            }).await;
+                        }
+                        _ = &mut finished => return bodies,
+                    }
+                }
+            })
+            .await
+            .expect("bounded photo HTTP owner")
+        }
+        .boxed();
+        (url, count, finish, server)
+    }
+
+    #[tokio::test]
+    async fn held_photo_pending_before_http_dispatch_waits_or_ends_without_sending() {
+        use std::{
+            sync::atomic::Ordering,
+            time::{Duration, Instant},
+        };
+        for mode in ["ready", "revoked", "expired"] {
+            let original_deadline = Instant::now()
+                + if mode == "expired" {
+                    Duration::from_secs(2)
+                } else {
+                    Duration::from_secs(10)
+                };
+            let proof = HeldPhotoProof::typed(original_deadline);
+            proof.publish_typed("checking").unwrap();
+            assert_eq!(proof.permission()(), PermissionState::Pending);
+            let (url, requests, finish, server) = held_photo_http("k-photo-typed-before").await;
+            let net = Net::new(
+                config_at("photo-typed-before", "k-photo-typed-before", &url, &url),
+                held_photo_declarations(),
+            )
+            .unwrap();
+            let (permission, pending, changed) = observed_held_photo_permission(&proof);
+            let mut chat =
+                net.chat_held_guarded(vec![Message::user("No.")], HELD_WITHOUT, permission);
+            let server = tokio::spawn(server);
+            let caller = tokio::spawn(async move {
+                tokio::time::timeout(Duration::from_secs(4), async move {
+                    let mut events = Vec::new();
+                    while let Some(event) = chat.next().await {
+                        events.push(event);
+                    }
+                    events
+                })
+                .await
+            });
+            let observed_pending = held_photo_pending_observed(&pending, &changed).await;
+            let sent_before_release = requests.load(Ordering::Acquire);
+            let transition = match mode {
+                "ready" => proof.publish_typed("seen"),
+                "revoked" => proof.publish_typed("revoked"),
+                _ => Ok(()), // The owner's original deadline is never renewed.
+            };
+            let result = join_held_photo(caller).await;
+            let _ = finish.send(());
+            let server_result = join_held_photo(server).await;
+            // All assertions after release/join preserve cleanup on failures.
+            assert!(
+                observed_pending,
+                "no repeated actual Pending observation: {mode}"
+            );
+            assert_eq!(
+                sent_before_release, 0,
+                "private HTTP request while Checking: {mode}"
+            );
+            transition.unwrap();
+            let events = result.unwrap().expect("original request bound");
+            let bodies = server_result.unwrap();
+            assert_eq!(bodies.len(), usize::from(mode == "ready"));
+            for body in &bodies {
+                held_photo_schema(body);
+            }
+            if mode == "ready" {
+                let text = events
+                    .into_iter()
+                    .filter_map(|event| match event.unwrap() {
+                        ChatEvent::Text(text) => Some(text),
+                        _ => None,
+                    })
+                    .collect::<String>();
+                assert_eq!(text, "HELD_PENDING_HTTP_CANARY");
+            } else {
+                assert!(events.is_empty(), "terminal request sent output: {mode}");
+                assert!(proof.owner.lease().is_current(), "mic owner is independent");
+                assert!(proof.owner.lease().private_context_lost());
+                if mode == "expired" {
+                    assert!(Instant::now() >= original_deadline);
+                }
+                proof.publish_typed("seen").unwrap();
+                assert_eq!(
+                    proof.permission()(),
+                    PermissionState::Lost,
+                    "no revival: {mode}"
+                );
+            }
+        }
+    }
+
+    // This adapter changes the real file while delivering the first real HTTP
+    // event, precisely before the shared default guard's post-poll validation.
+    // It is not an assertion that external scheduling reproduced Net's own
+    // post-poll race; direct Net dispatch is tested separately above.
+    struct PendingHeldHttp {
+        net: Net,
+        known: std::path::PathBuf,
+        polls: Arc<std::sync::atomic::AtomicUsize>,
+        event_poll: Arc<std::sync::atomic::AtomicUsize>,
+        publication_error: Arc<Mutex<Option<String>>>,
+    }
+    impl Services for PendingHeldHttp {
+        fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+            Box::pin(async { Err(net::Error::Protocol("no microphone in HTTP control")) })
+        }
+        fn chat(&self, _: Vec<Message>) -> BoxStream<'static, net::Result<ChatEvent>> {
+            panic!("held control must preserve the held selection")
+        }
+        fn chat_held(
+            &self,
+            messages: Vec<Message>,
+            without: &'static [&'static str],
+        ) -> BoxStream<'static, net::Result<ChatEvent>> {
+            use std::{sync::atomic::Ordering, task::Poll};
+            let mut inner = self.net.chat_held(messages, without);
+            let (polls, event_poll, errors, known) = (
+                self.polls.clone(),
+                self.event_poll.clone(),
+                self.publication_error.clone(),
+                self.known.clone(),
+            );
+            let mut first = true;
+            stream::poll_fn(move |cx| {
+                let count = polls.fetch_add(1, Ordering::AcqRel) + 1;
+                let event = inner.as_mut().poll_next(cx);
+                if matches!(&event, Poll::Ready(Some(_))) && first {
+                    first = false;
+                    if let Err(error) = publish_held_photo_source(&known, "checking") {
+                        *errors.lock().unwrap() = Some(error.to_string());
+                    }
+                    event_poll.store(count, Ordering::Release);
+                }
+                event
+            })
+            .boxed()
+        }
+        fn speak(&self, _: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
+            stream::empty().boxed()
+        }
+    }
+
+    #[tokio::test]
+    async fn held_photo_pending_after_real_http_event_retains_it_without_another_rpc() {
+        use std::{
+            sync::atomic::{AtomicUsize, Ordering},
+            time::{Duration, Instant},
+        };
+        for resume in [true, false] {
+            let proof = HeldPhotoProof::typed(Instant::now() + Duration::from_secs(10));
+            let (url, requests, finish, server) = held_photo_http("k-photo-typed-event").await;
+            let services = PendingHeldHttp {
+                net: Net::new(
+                    config_at("photo-typed-event", "k-photo-typed-event", &url, &url),
+                    held_photo_declarations(),
+                )
+                .unwrap(),
+                known: proof.directory.join("known"),
+                polls: Arc::new(AtomicUsize::new(0)),
+                event_poll: Arc::new(AtomicUsize::new(0)),
+                publication_error: Arc::new(Mutex::new(None)),
+            };
+            let (permission, pending, changed) = observed_held_photo_permission(&proof);
+            let mut chat =
+                services.chat_held_guarded(vec![Message::user("No.")], HELD_WITHOUT, permission);
+            let server = tokio::spawn(server);
+            let caller = tokio::spawn(async move {
+                tokio::time::timeout(Duration::from_secs(4), async move {
+                    let event = chat.next().await;
+                    (event, chat)
+                })
+                .await
+            });
+            let observed_pending = held_photo_pending_observed(&pending, &changed).await;
+            let polls_at_pause = services.polls.load(Ordering::Acquire);
+            let event_poll = services.event_poll.load(Ordering::Acquire);
+            let completed_while_pending = caller.is_finished();
+            let sent_before_resume = requests.load(Ordering::Acquire);
+            let transition = proof.publish_typed(if resume { "seen" } else { "revoked" });
+            let result = join_held_photo(caller).await;
+            let mut first = None;
+            let mut remainder = Vec::new();
+            let mut caller_error = None;
+            match result {
+                Ok(Ok((event, mut chat))) => {
+                    first = event;
+                    if !resume && let Err(error) = proof.publish_typed("seen") {
+                        caller_error = Some(error.to_string());
+                    }
+                    match tokio::time::timeout(Duration::from_secs(1), async move {
+                        let mut events = Vec::new();
+                        while let Some(event) = chat.next().await {
+                            events.push(event);
+                        }
+                        events
+                    })
+                    .await
+                    {
+                        Ok(events) => remainder = events,
+                        Err(error) => caller_error = Some(error.to_string()),
+                    }
+                }
+                other => caller_error = Some(format!("caller did not finish: {}", other.is_ok())),
+            }
+            let _ = finish.send(());
+            let server_result = join_held_photo(server).await;
+            assert!(observed_pending, "actual typed Checking was never observed");
+            assert!(
+                !completed_while_pending,
+                "event escaped or was lost while Checking"
+            );
+            assert!(event_poll > 0, "the adapter saw no real HTTP event");
+            assert_eq!(
+                polls_at_pause, event_poll,
+                "held result repolled its HTTP child"
+            );
+            assert_eq!(sent_before_resume, 1);
+            transition.unwrap();
+            assert!(caller_error.is_none(), "{caller_error:?}");
+            assert!(services.publication_error.lock().unwrap().is_none());
+            let bodies = server_result.unwrap();
+            assert_eq!(bodies.len(), 1, "no retry/reread after recognition");
+            held_photo_schema(&bodies[0]);
+            if resume {
+                assert!(
+                    matches!(first, Some(Ok(ChatEvent::Text(ref text))) if text == "HELD_PENDING_HTTP_CANARY")
+                );
+                assert!(!remainder.into_iter().any(|event|
+                    matches!(event.unwrap(), ChatEvent::Text(ref text) if text.contains("HELD_PENDING_HTTP_CANARY"))));
+            } else {
+                assert!(first.is_none());
+                assert!(remainder.is_empty());
+                assert_eq!(proof.permission()(), PermissionState::Lost);
+            }
+        }
+    }
+
+    struct DefaultHeldSelection {
+        selected: Arc<Mutex<Vec<Vec<&'static str>>>>,
+        polls: Arc<std::sync::atomic::AtomicUsize>,
+    }
+    impl Services for DefaultHeldSelection {
+        fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+            Box::pin(async { Err(net::Error::Protocol("no microphone in selection control")) })
+        }
+        fn chat(&self, _: Vec<Message>) -> BoxStream<'static, net::Result<ChatEvent>> {
+            panic!("default held selection became an unrestricted chat")
+        }
+        fn chat_without(
+            &self,
+            _: Vec<Message>,
+            without: &'static [&'static str],
+        ) -> BoxStream<'static, net::Result<ChatEvent>> {
+            use std::sync::atomic::Ordering;
+            self.selected.lock().unwrap().push(without.to_vec());
+            let polls = self.polls.clone();
+            stream::poll_fn(move |_| {
+                let count = polls.fetch_add(1, Ordering::AcqRel);
+                std::task::Poll::Ready(
+                    (count == 0).then(|| Ok(ChatEvent::Text("held child".into()))),
+                )
+            })
+            .boxed()
+        }
+        fn speak(&self, _: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
+            stream::empty().boxed()
+        }
+    }
+
+    #[tokio::test]
+    async fn held_photo_default_services_pending_preserves_selection_and_never_polls_child() {
+        use std::{
+            future::Future,
+            sync::atomic::{AtomicUsize, Ordering},
+            task::Poll,
+            time::{Duration, Instant},
+        };
+        for resume in [true, false] {
+            let proof = HeldPhotoProof::typed(Instant::now() + Duration::from_secs(10));
+            proof.publish_typed("checking").unwrap();
+            assert_eq!(proof.permission()(), PermissionState::Pending);
+            let services = DefaultHeldSelection {
+                selected: Arc::new(Mutex::new(Vec::new())),
+                polls: Arc::new(AtomicUsize::new(0)),
+            };
+            let mut chat = services.chat_held_guarded(
+                vec![Message::user("No.")],
+                HELD_WITHOUT,
+                proof.permission(),
+            );
+            let mut next = Box::pin(chat.next());
+            assert!(
+                std::future::poll_fn(|cx| Poll::Ready(next.as_mut().poll(cx)))
+                    .await
+                    .is_pending()
+            );
+            assert_eq!(services.polls.load(Ordering::Acquire), 0);
+            assert_eq!(*services.selected.lock().unwrap(), [HELD_WITHOUT.to_vec()]);
+            proof
+                .publish_typed(if resume { "seen" } else { "revoked" })
+                .unwrap();
+            let first = tokio::time::timeout(Duration::from_secs(1), next)
+                .await
+                .unwrap();
+            if resume {
+                assert!(
+                    matches!(first, Some(Ok(ChatEvent::Text(ref text))) if text == "held child")
+                );
+                assert_eq!(services.polls.load(Ordering::Acquire), 1);
+            } else {
+                assert!(first.is_none());
+                proof.publish_typed("seen").unwrap();
+                assert_eq!(services.polls.load(Ordering::Acquire), 0);
+            }
+            assert!(chat.next().await.is_none());
+            assert_eq!(
+                services.polls.load(Ordering::Acquire),
+                if resume { 2 } else { 0 }
+            );
+            assert_eq!(*services.selected.lock().unwrap(), [HELD_WITHOUT.to_vec()]);
         }
     }
 }

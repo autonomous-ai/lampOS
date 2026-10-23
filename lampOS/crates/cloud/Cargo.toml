@@ -31,6 +31,8 @@ lamp-skills = { path = "../skills" }
 # A photo from the app, base64 in its JSON (`faces.add_photo`, #1968), as the
 # voice decodes a look's picture.
 base64 = "=0.22.1"
+# Descriptor-relative startup cleanup never follows a photo-folder symlink.
+rustix = { version = "1", features = ["fs"] }
 # The app's `system.reboot` (#2193): the keeper's restart request, its socket
 # and its answer, without lamp-update (the library only).
 lamp-keeper = { path = "../keeper", default-features = false }

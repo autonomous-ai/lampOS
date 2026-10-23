@@ -1799,6 +1799,7 @@ dependencies = [
  "reqwest",
  "ring",
  "rumqttc",
+ "rustix",
  "rustls",
  "serde",
  "serde_json",

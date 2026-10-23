@@ -270,6 +270,84 @@ fn a_product_chat_request_offers_dance_at_the_bound() {
     assert_eq!(chat[..declared.len()], declared[..]);
 }
 
+/// Photo consent reuses the existing face functions. Pin the measured
+/// pre-activation lists, not just the cap or the link's rejection list:
+/// earlier Voice admission can cut a function before the link sees it.
+#[test]
+fn photo_consent_keeps_both_product_function_lists_exactly() {
+    assert!(
+        voice_environment(VOICE)
+            .iter()
+            .any(|(name, value)| { name == lamp_voice::photo_faces::ENVIRONMENT && value == "on" })
+    );
+    let live: Vec<String> = [
+        "not_for_me",
+        "the_time",
+        "remember",
+        "recall",
+        "forget",
+        "keep_rule",
+        "forget_rule",
+        "list_rules",
+        "start_agent_task",
+        "confirm_agent_task",
+        "check_agent_task",
+        "remember_my_face",
+        "forget_my_face",
+        "volume_up",
+        "volume_down",
+        "volume_mute",
+        "volume_unmute",
+        "light_on",
+        "light_off",
+        "light_colour",
+        "light_brighter",
+        "light_dimmer",
+        "light_warmer",
+        "light_cooler",
+        "set_timer",
+        "set_reminder",
+        "repeat_reminder",
+        "list_reminders",
+        "cancel_reminder",
+        "snooze_reminder",
+        "dance",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect();
+    let mut chat = live.clone();
+    chat.push("web_search".to_owned());
+    chat.push("fetch_page".to_owned());
+    chat.push(lamp_voice::second_provider::LOOK_CALL.to_owned());
+    for (case, extra) in [
+        ("installed", Vec::new()),
+        (
+            "explicit off",
+            vec![(lamp_voice::photo_faces::ENVIRONMENT, "off")],
+        ),
+        (
+            "explicit on",
+            vec![(lamp_voice::photo_faces::ENVIRONMENT, "on")],
+        ),
+    ] {
+        let product = product_with(&extra);
+        assert_eq!(product.declared, live, "{case}: Live functions changed");
+        assert_eq!(product.chat, chat, "{case}: Second functions changed");
+        assert!(
+            product.left_out.is_empty(),
+            "{case}: {:?}",
+            product.left_out
+        );
+        assert_eq!(product.errors, "", "{case}: no admission cut is allowed");
+        println!(
+            "{case}: Live{}, Second{}, exact pre-activation lists; no cut",
+            live.len(),
+            chat.len()
+        );
+    }
+}
+
 /// The reviewer's P3 on #1906: with `LAMP_REPORTS=on` the product voice
 /// declares its two reports functions too, `reports_stop` and
 /// `reports_state`, before the actions part's and the skills'. Then the
