@@ -1,5 +1,17 @@
 # Tests work log
 
+## 2026-10-23 07:17 +0700 — claim the Surround nonblocking status fixture
+
+Taken: [#1339](https://github.com/autonomous-ai/lampOS/issues/1339#issuecomment-6354242978),
+first piece only, on `tests/1339-surround-status-lock` from `9b6960e61`.
+The existing fixture measures a 20 ms host stopwatch around a status read while
+JoinWifi remains pending. The planned test-only change waits for the pending
+adapter's first poll, then attempts the status read lock without blocking.
+The real 45-second join deadline, its logical 46-second expiration step and
+its original task watchdog remain unchanged. The correction must survive a
+400 ms host stall and reject a deliberately held status lock. No execution
+or result is claimed yet. Other #1339 crates remain separate pieces.
+
 ## 2026-10-23 07:14 +0700 — Eyes and Voice current-head Linux checks pass
 
 Ready for lamp-voice: **source read pending** for
