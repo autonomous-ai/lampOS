@@ -2347,10 +2347,18 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                         near_id.as_deref(),
                                     );
                                 }
-                            } else if who.known.is_some() && who.held.keeps(Instant::now()) {
-                                // Nobody near, within the hold
+                            } else if who.known.is_some()
+                                && who.held.keeps_unprinted(
+                                    Instant::now(),
+                                    near.is_some(),
+                                    near_id.as_deref(),
+                                )
+                            {
+                                // No print, within the hold
                                 // (`LAMP_FACE_FULL_CROP=on`): the one known
-                                // stays, as they were.
+                                // stays, as they were, only if nobody is near
+                                // or the near face has their passing id
+                                // (`who::Held::keeps_unprinted`, #3285).
                                 if let Some(known) = who.known.as_mut() {
                                     known.2 = Instant::now();
                                 }
