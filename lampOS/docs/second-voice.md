@@ -2072,7 +2072,9 @@ the lamp already has:
   Since #2978 the voice takes that address itself from `llm_base_url` on the
   company relay, so the product unit no longer sets
   `LAMP_SECOND_DEEPSEEK_BASE_URL`, and the relay's routes may route the chat
-  (#2882).
+  (#2882). Nor do lamp-4ace's, lamp-52e6's or the 4ace pilot's units: an
+  address a unit gives is never routed (Queue #3126: lamp-4ace's r11 without
+  it, 0.39 s off the median, every chat begun before the wait sound).
 - Speech to text and the voice fall back to the text model's base and key,
   as on V1.
 
