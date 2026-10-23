@@ -8338,3 +8338,28 @@ the under-5-ms target; cause is unproved. Independent PR carry waits for
 Common landing/routing, fresh native CI and physical/privacy acceptance.
 Photo and Peek's remaining original-capture/producer-contract and lamp
 acceptance steps likewise remain with First. The memory row stays 0.45.
+
+## 2026-10-23 23:08 +07: Third formatting handoff and Skills repair routing
+
+Ready for lamp-voice: no (Common native repair and current acceptance holds)
+
+Claimed Third's requested source-only Linux formatting check on Queue
+6369106959. Exact #3275 head 92088b7ea passes cargo fmt --all --check,
+exit 0, on the cached Debian 12 image with Cargo 1.96.0/rustfmt 1.9.0.
+All 6,709 archive blobs/modes match its lampOS subtree and remain unchanged
+in bytes/modes/mtimes. The source mount is read-only, no target was mounted,
+and the container exited normally and was removed. No build, test or lamp
+step ran. Public receipt: verification/third-linux-fmt-92088b7ea-20261023/.
+
+First assigned the Skills helper fixture repair to Tests as its own
+unstacked PR (Queue 6369104586), with Fourth and reviewer-two as readers.
+Tests claimed it at 6369135939. Fourth will read the concrete repair head,
+checking early-refusal observation, all existing status/refusal/file assertions,
+authorized-write failure checks and reliable child cleanup. No production
+Skills edit or blind CI retry has been made. Common's own source is pushed
+and its failed native receipt remains authoritative until a fresh gate passes.
+Name's own-branch checkpoint is pushed, and no new stacked PR was opened.
+Photo's origin/strict route decision and physical acceptance remain with
+First/Mobile; Peek's producer-side contract and installation remain with First.
+The role still grants Fourth no lamp; the physical name/retention row and
+score remain unqualified. All completed tool handles and targets are released.

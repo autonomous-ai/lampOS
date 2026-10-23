@@ -1,0 +1,66 @@
+{
+  "check": "Linux source-only formatting",
+  "command": [
+    "cargo",
+    "fmt",
+    "--all",
+    "--check"
+  ],
+  "execution": {
+    "capabilities": "all dropped",
+    "container_removal_confirmed": true,
+    "container_root": "read-only",
+    "elapsed_seconds": 14.741983970161527,
+    "network": "none",
+    "no_build_or_test": true,
+    "no_new_privileges": true,
+    "no_target_cache_mounted": true,
+    "normal_process_exit": true,
+    "source_mount": "read-only isolated git archive",
+    "timeout_seconds": 120,
+    "user": "1000:1000"
+  },
+  "exit": 0,
+  "fmt_log_bytes": 0,
+  "hashes": {
+    "archive_sha256": "edeecee8c803a12ee25a53a69cd13b2399ff542092352341d52edd73ca67a5e2",
+    "cargo_version_sha256": "6bb5814aca363d7424cf9180530e5c7dc3112661763c96cb011f204998db4a90",
+    "container_process_receipt_sha256": "862ff11240d7911f2ab245cbb1b6fcd20e5692181555d6bd84ca4e432b50a4c7",
+    "fmt_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rustfmt_version_sha256": "58e77f09cbe97eb2d0ab9174e5523494d03814f2879c8e187ed66370320abc7c",
+    "source_guard_sha256": "a4ef51b59607829fec54996d6793ab6ee423c8388f89a1c2121d5556e46b526e"
+  },
+  "head": "92088b7eaf1127cba12037399e7a8f7aef451846",
+  "image": {
+    "architecture": "amd64",
+    "configured_user": "1000:1000",
+    "id": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+    "no_pull": true,
+    "os": "linux",
+    "repo_digests": [
+      "localhost/lampos-fourth-native-user-check@sha256:340a3bdf76419083569becb186cae71d5c97cb46b24314c917a0305b322162a9"
+    ]
+  },
+  "lampOS_subtree": "7f160fbc9efb075676ae15041e7ef6acc489ffad",
+  "limits": "Formatting only; no compilation, Clippy, tests, dependency/build validation, device access or readiness claim.",
+  "outcome": "PASS",
+  "pull_request": 3275,
+  "repository": "autonomous-ai/lampOS",
+  "repository_tree": "fd526b051d729a6976b012aef342ab8a1db1d004",
+  "source": {
+    "Third_branch_or_worktree_mutated": false,
+    "after_manifest_sha256": "1f6119b42bac062c655447e84fdea101aeb8c4e257437b2c36cb713e39d1aa48",
+    "all_bytes_modes_mtimes_and_paths_unchanged": true,
+    "all_git_blobs_and_modes_match_requested_subtree": true,
+    "before_manifest_sha256": "1f6119b42bac062c655447e84fdea101aeb8c4e257437b2c36cb713e39d1aa48",
+    "files": 6709,
+    "worktree_or_index_used": false
+  },
+  "source_receipt_sha256": "17508850820af51fa14e29bf88cd527ee4bb431795c7d2f45351846661d15be3",
+  "started_utc": "2026-10-23T16:04:59.141992+00:00",
+  "toolchain_pin": "[toolchain]\nchannel = \"1.96.0\"\nprofile = \"minimal\"\ncomponents = [\"clippy\", \"rustfmt\"]",
+  "versions": {
+    "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)\nrelease: 1.96.0\ncommit-hash: 30a34c6821b57de0aaec83a901aca39f88f6778c\ncommit-date: 2026-05-25\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.19.0-DEV (sys:0.4.87+curl-8.19.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Debian 12.0.0 [64-bit]",
+    "rustfmt": "rustfmt 1.9.0-stable (ac68faa20c 2026-05-25)"
+  }
+}
