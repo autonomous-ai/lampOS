@@ -1,0 +1,13 @@
+{
+  "all_JSON_valid": true,
+  "all_original_failure_streams_lossless": true,
+  "all_public_text_whitespace_valid": true,
+  "case_rows_reconciled": true,
+  "complete_compile_line_partition_verified": true,
+  "full_source_restoration_guard_passed": true,
+  "local_links_verified": true,
+  "no_post_execution_target_access": true,
+  "patch_applies_to_original_and_recreates_instrumented_hash": true,
+  "raw_decoded_bytes_and_hashes_verified": true,
+  "scratch_git_default_cached_diff_check_exit": 0
+}

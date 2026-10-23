@@ -1,0 +1,69 @@
+{
+  "MAIN_released_before_packaging": true,
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_BUILD_TARGET": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_TARGET_TMPDIR": null,
+    "CARGO_TERM_COLOR": "never",
+    "EXPRESSION_ADMISSION_PROBE": null,
+    "LAMP_RELAY_PID_CONTROL_DIR": null,
+    "RUSTFLAGS": null,
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "RUST_BACKTRACE": "0",
+    "RUST_TEST_THREADS": null
+  },
+  "external_files": [
+    {
+      "availability": "Retained on the original execution host; not independently portable from this folder.",
+      "bytes": 13591,
+      "path": "/private/tmp/tests-expression-admission-diagnostic-20261023/run.py",
+      "sha256": "e4668a9d5e478615dbb165ab572d3c940efafead2d0a75369160619b3b7f5875"
+    },
+    {
+      "availability": "Retained on the original execution host; not independently portable from this folder.",
+      "bytes": 1842,
+      "path": "/private/tmp/tests-expression-admission-diagnostic-20261023/PLAN.md",
+      "sha256": "ca4e447a2ccd2cd437741580780cbc8cc2252c1ffe1c9c7272bc677edc4b9b5f"
+    },
+    {
+      "availability": "Retained on the original execution host; not independently portable from this folder.",
+      "bytes": 3213,
+      "path": "/private/tmp/tests-expression-admission-diagnostic-20261023/plan.json",
+      "sha256": "423f364e972ae0cac123ee999aaf9ba91fa65467f8f313efd998cc5ecf5ba307"
+    },
+    {
+      "availability": "Retained on the original execution host; not independently portable from this folder.",
+      "bytes": 1529,
+      "path": "/private/tmp/tests-expression-admission-diagnostic-20261023/SHA256SUMS",
+      "sha256": "e20cf0ac42f3771a6a5f503d26c1868a4c2c0e2b25723b84d570c834857547ad"
+    },
+    {
+      "availability": "Retained on the original execution host; not independently portable from this folder.",
+      "bytes": 133,
+      "path": "/private/tmp/tests-expression-admission-diagnostic-20261023/execution-start.json",
+      "sha256": "18dc954a08e2aaa68a51bc937895d90d64a12cab4d77c9ec27d7882ade8c4cca"
+    },
+    {
+      "availability": "Retained on the original execution host; not independently portable from this folder.",
+      "bytes": 8326,
+      "path": "/private/tmp/tests-expression-admission-diagnostic-20261023/run-2026-10-23T120056.306856+0000/results.json",
+      "sha256": "c7e13bbfc9c468b54986514544c2262c8e3818bbb1d011a3ffe2ca8eb08d946d"
+    }
+  ],
+  "finished_at": "2026-10-23T12:01:40.756953+00:00",
+  "no_retries": true,
+  "observations_completed": 3,
+  "omitted_environment": "PATH is omitted to avoid publishing unrelated personal/host directory data. Exact PATH remains in the external results; explicit RUSTUP_TOOLCHAIN and captured rustc -vV bind the compiler used.",
+  "run_folder": "/private/tmp/tests-expression-admission-diagnostic-20261023/run-2026-10-23T120056.306856+0000",
+  "scope": "One diagnostic-only compile and three fixed observations; no product fix, full PR qualification or waiver.",
+  "socket_preflight": "Unix datagram and IPv4 loopback listener passed before Cargo",
+  "terminal_runner_exit": 0,
+  "unexpected_setup_or_control_failures": 0,
+  "unrun_observations": []
+}

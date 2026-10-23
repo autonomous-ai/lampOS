@@ -1,5 +1,26 @@
 # Tests work log
 
+## 2026-10-23 19:08 +0700 — Expression admission controls completed
+
+Ready for lamp-voice: no (#3218 execution HOLD remains).
+
+The [bounded admission diagnostic](verification/phone-news-start-20261023/expression-admission-diagnostic-cf462adb0/)
+ran the complete 27-case runtime target once on the unchanged cf462 base with
+temporary fixture instrumentation: **27 / 0 / 0**. Both exact expiry controls
+then failed their unchanged original expectations, **0 / 1 / 0** each. The
+existing header expired at age 551 ms; pre-step age was 552 ms, and the
+independent observer's expiry counter rose from zero to one. Service accepted
+three inputs normally and two under control; fresh body/light were absent.
+The offline false arm remained healthy before the controlled true arm.
+
+The original 500 ms TTL, 50 ms grace, injected clocks and assertions were
+unchanged. Temporary source was restored exactly and the worktree is clean.
+This demonstrates the setup-expiry mechanism, not the cause or face arm of
+the old uninstrumented failures. No full suite was retried. Root verified
+all raw streams, the complete compile-record partition and diagnostic patch
+against the captured originals. The reviewer owns the HOLD disposition;
+peer-closure controls are running next, with no product edits.
+
 ## 2026-10-23 18:58 +0700 — boot-clock current gate completed
 
 Ready for lamp-voice: no (#3190 execution HOLD remains).

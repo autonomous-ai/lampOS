@@ -1,0 +1,513 @@
+{
+  "counter_fields": [
+    "accepted",
+    "refused",
+    "input_errors",
+    "output_errors",
+    "dropped",
+    "steps",
+    "longest_step_us",
+    "records_lost"
+  ],
+  "limitations": [
+    "Raw phase/header/counter JSON is retained in full stderr strings. Header age is retrospective from the retained header and saved phase clocks, not direct sampling inside the private admission implementation.",
+    "Expiry counts belong to the independent observer only; private service subscriber counters were not exposed.",
+    "The forced-expiry controls demonstrate this failure route. Historical unscheduled failures had no phase ages or closure-arm marker and remain causally unresolved."
+  ],
+  "observations": [
+    {
+      "actual_rows": [
+        [
+          "boot_identity_cannot_be_empty_or_a_path",
+          "ok"
+        ],
+        [
+          "a_note_about_one_turn_is_not_a_warning_and_a_fault_or_a_lacking_input_is",
+          "ok"
+        ],
+        [
+          "older_topics_are_aged_by_wall_time_not_private_publisher_time",
+          "ok"
+        ],
+        [
+          "a_saved_light_setting_remains_valid_after_days_without_a_change",
+          "ok"
+        ],
+        [
+          "sleep_name::activity_adaptation_keeps_the_source_clock_and_owner",
+          "ok"
+        ],
+        [
+          "sleep_name::name_adaptation_keeps_publication_delay_and_ago_ms",
+          "ok"
+        ],
+        [
+          "a_full_output_record_stops_growing_and_counts_loss",
+          "ok"
+        ],
+        [
+          "mood_in_reads_only_a_fresh_valid_state_from_mood",
+          "ok"
+        ],
+        [
+          "the_liveliness_taken_is_said_and_nothing_with_mood_off",
+          "ok"
+        ],
+        [
+          "offline_face_reads_only_a_fresh_offline_from_lamp_online",
+          "ok"
+        ],
+        [
+          "shadow_mode_has_diagnostics_but_never_an_actuator_request",
+          "ok"
+        ],
+        [
+          "the_heads_topics_are_read_only_with_head_touch",
+          "ok"
+        ],
+        [
+          "typed_timing_keeps_its_shared_stamp_and_bad_inputs_are_counted",
+          "ok"
+        ],
+        [
+          "slow_input_draining_does_not_make_old_joints_fresh",
+          "ok"
+        ],
+        [
+          "two_expression_processes_cannot_own_one_bus",
+          "ok"
+        ],
+        [
+          "a_closed_switch_reads_from_the_last_privacy_lease_said",
+          "ok"
+        ],
+        [
+          "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+          "ok"
+        ],
+        [
+          "sleep_name::the_switch_closed_mid_look_ends_it",
+          "ok"
+        ],
+        [
+          "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+          "ok"
+        ],
+        [
+          "without_a_pause_said_expression_asks_exactly_as_before",
+          "ok"
+        ],
+        [
+          "sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up",
+          "ok"
+        ],
+        [
+          "paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed",
+          "ok"
+        ],
+        [
+          "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+          "ok"
+        ],
+        [
+          "sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus",
+          "ok"
+        ],
+        [
+          "sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had",
+          "ok"
+        ],
+        [
+          "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+          "ok"
+        ],
+        [
+          "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+          "ok"
+        ]
+      ],
+      "complete_case_binding": true,
+      "exit_code": 0,
+      "failed_names": [],
+      "label": "normal27",
+      "mode_environment": null,
+      "setup_failure": false,
+      "summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 27,
+        "raw": "test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.83s",
+        "status": "ok"
+      },
+      "wall_seconds": 3.893977
+    },
+    {
+      "actual_rows": [
+        [
+          "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+          "FAILED"
+        ]
+      ],
+      "complete_case_binding": true,
+      "exit_code": 101,
+      "failed_names": [
+        "enabled_output_uses_a_new_session_and_expires_after_input_loss"
+      ],
+      "label": "expired_fresh",
+      "mode_environment": "expired_fresh",
+      "setup_failure": false,
+      "summary": {
+        "failed": 1,
+        "filtered_out": 26,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 0,
+        "raw": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.57s",
+        "status": "FAILED"
+      },
+      "wall_seconds": 0.637984
+    },
+    {
+      "actual_rows": [
+        [
+          "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+          "FAILED"
+        ]
+      ],
+      "complete_case_binding": true,
+      "exit_code": 101,
+      "failed_names": [
+        "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline"
+      ],
+      "label": "expired_offline_true",
+      "mode_environment": "expired_offline_true",
+      "setup_failure": false,
+      "summary": {
+        "failed": 1,
+        "filtered_out": 26,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 0,
+        "raw": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.60s",
+        "status": "FAILED"
+      },
+      "wall_seconds": 0.630158
+    }
+  ],
+  "phase_summary": [
+    {
+      "body_present": true,
+      "case": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "control": null,
+      "injected_monotonic_us": 10000000,
+      "injected_wall_ms": 1792756886166,
+      "light_present": true,
+      "missing": [
+        "measured body lag",
+        "fresh room state",
+        "fresh person activity"
+      ],
+      "observation": "normal27",
+      "offline_face": null,
+      "service_counts_after": [
+        3,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "service_counts_before": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "transport_expires_ms": 500,
+      "transport_grace_ms": 50,
+      "voice_header_age_ms": {
+        "post_options": 82,
+        "post_populate": 8,
+        "post_service_new": 82,
+        "post_step": 89,
+        "pre_publish": -7,
+        "pre_step": 82
+      }
+    },
+    {
+      "body_present": true,
+      "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "control": null,
+      "injected_monotonic_us": 10000000,
+      "injected_wall_ms": 1792756886175,
+      "light_present": true,
+      "missing": [
+        "measured body lag",
+        "fresh room state",
+        "fresh person activity"
+      ],
+      "observation": "normal27",
+      "offline_face": false,
+      "service_counts_after": [
+        3,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "service_counts_before": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "transport_expires_ms": 500,
+      "transport_grace_ms": 50,
+      "voice_header_age_ms": {
+        "post_options": 88,
+        "post_populate": 9,
+        "post_service_new": 88,
+        "post_step": 93,
+        "pre_publish": -11,
+        "pre_step": 88
+      }
+    },
+    {
+      "body_present": true,
+      "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "control": null,
+      "injected_monotonic_us": 10000000,
+      "injected_wall_ms": 1792756886331,
+      "light_present": true,
+      "missing": [
+        "measured body lag",
+        "fresh room state",
+        "fresh person activity"
+      ],
+      "observation": "normal27",
+      "offline_face": true,
+      "service_counts_after": [
+        3,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "service_counts_before": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "transport_expires_ms": 500,
+      "transport_grace_ms": 50,
+      "voice_header_age_ms": {
+        "post_options": 45,
+        "post_populate": 5,
+        "post_service_new": 45,
+        "post_step": 48,
+        "pre_publish": -6,
+        "pre_step": 45
+      }
+    },
+    {
+      "body_present": false,
+      "case": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "control": {
+        "expired_when_hold_started": false,
+        "expiry_observed_ms": 1792756894753,
+        "header": {
+          "at_unix_ms": 1792756894202,
+          "at_us": 5,
+          "boot": "c0a4d9d19b746cc8",
+          "enc": "json",
+          "expires_ms": 500,
+          "kind": "latest",
+          "seq": 1,
+          "source": "voice",
+          "topic": "voice/timing",
+          "type": "lamp_msgs/VoiceTiming"
+        },
+        "hold_started_ms": 1792756894221,
+        "observer_datagrams": 0,
+        "observer_expired_after": 1,
+        "observer_expired_before": 0,
+        "observer_only": true,
+        "observer_received": 0,
+        "observer_wrong_type": 0
+      },
+      "injected_monotonic_us": 10000000,
+      "injected_wall_ms": 1792756894204,
+      "light_present": false,
+      "missing": [
+        "measured body lag",
+        "fresh voice timing"
+      ],
+      "observation": "expired_fresh",
+      "offline_face": null,
+      "service_counts_after": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "service_counts_before": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "transport_expires_ms": 500,
+      "transport_grace_ms": 50,
+      "voice_header_age_ms": {
+        "post_options": 18,
+        "post_populate": 2,
+        "post_service_new": 18,
+        "post_step": 553,
+        "pre_publish": -2,
+        "pre_step": 552
+      }
+    },
+    {
+      "body_present": true,
+      "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "control": null,
+      "injected_monotonic_us": 10000000,
+      "injected_wall_ms": 1792756897705,
+      "light_present": true,
+      "missing": [
+        "measured body lag",
+        "fresh room state",
+        "fresh person activity"
+      ],
+      "observation": "expired_offline_true",
+      "offline_face": false,
+      "service_counts_after": [
+        3,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "service_counts_before": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "transport_expires_ms": 500,
+      "transport_grace_ms": 50,
+      "voice_header_age_ms": {
+        "post_options": 16,
+        "post_populate": 2,
+        "post_service_new": 16,
+        "post_step": 18,
+        "pre_publish": -2,
+        "pre_step": 16
+      }
+    },
+    {
+      "body_present": false,
+      "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "control": {
+        "expired_when_hold_started": false,
+        "expiry_observed_ms": 1792756898289,
+        "header": {
+          "at_unix_ms": 1792756897738,
+          "at_us": 5,
+          "boot": "8e0113b92ec7e4ff",
+          "enc": "json",
+          "expires_ms": 500,
+          "kind": "latest",
+          "seq": 1,
+          "source": "voice",
+          "topic": "voice/timing",
+          "type": "lamp_msgs/VoiceTiming"
+        },
+        "hold_started_ms": 1792756897756,
+        "observer_datagrams": 0,
+        "observer_expired_after": 1,
+        "observer_expired_before": 0,
+        "observer_only": true,
+        "observer_received": 0,
+        "observer_wrong_type": 0
+      },
+      "injected_monotonic_us": 10000000,
+      "injected_wall_ms": 1792756897740,
+      "light_present": false,
+      "missing": [
+        "measured body lag",
+        "fresh voice timing"
+      ],
+      "observation": "expired_offline_true",
+      "offline_face": true,
+      "service_counts_after": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "service_counts_before": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "transport_expires_ms": 500,
+      "transport_grace_ms": 50,
+      "voice_header_age_ms": {
+        "post_options": 17,
+        "post_populate": 2,
+        "post_service_new": 17,
+        "post_step": 553,
+        "pre_publish": -2,
+        "pre_step": 552
+      }
+    }
+  ]
+}

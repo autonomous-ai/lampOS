@@ -1,0 +1,58 @@
+{
+  "branch": "tests/1806-expression-admission-diagnostic",
+  "changed_paths": [
+    "lampOS/crates/expression/tests/runtime.rs"
+  ],
+  "final_git_status": "",
+  "freshness": {
+    "after": "a54dc32b46ff0b682aa439b4de0b5a0774f317de99fd37ca6eff5c1e4df21fbf",
+    "before": "a54dc32b46ff0b682aa439b4de0b5a0774f317de99fd37ca6eff5c1e4df21fbf",
+    "bytes_modes_equal": true,
+    "mtime_ns": 1792756860911321000,
+    "paths": 10026
+  },
+  "head": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+  "map_construction": "Paths sorted lexically; each row binds Git mode, content bytes and SHA256. Aggregate hashes path UTF-8 + NUL + Git mode ASCII + NUL + 8-byte big-endian byte length + contents. Symlink content is its link target.",
+  "maps_external": [
+    {
+      "availability": "Retained on the original execution host; not independently portable from this folder.",
+      "bytes": 2139488,
+      "path": "/private/tmp/tests-expression-admission-diagnostic-20261023/base-source-map.json",
+      "sha256": "9fe9ef5df3cc3e6c2572a914550534ad01c611121df37613d9e0ded69536d5a0"
+    },
+    {
+      "availability": "Retained on the original execution host; not independently portable from this folder.",
+      "bytes": 2139488,
+      "path": "/private/tmp/tests-expression-admission-diagnostic-20261023/source-map.json",
+      "sha256": "c0d23b073f6b7017faf2ed0680c901315792df4b0b2bdab4b7255d279c44f40e"
+    }
+  ],
+  "no_product_change": true,
+  "original_assertion_proof": {
+    "Cargo_or_formatter_executed": false,
+    "branch": "tests/1806-expression-admission-diagnostic",
+    "git_diff_check_exit_code": 0,
+    "head": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+    "instrumented_sha256": "b86fbdaaf1b9170a305e1f1719f057e64582e040f4b468fe3e1aa02d6f263909",
+    "original_assertion_macros_absent_from_replaced_spans_and_thus_unchanged": true,
+    "original_expectation_texts_preserved": true,
+    "original_fixed_step_clock_and_wall_preserved": true,
+    "original_sha256": "ed1ed5d64f6338357b25bdcbda739985b1c68c501695d20d9bf2e374ce6318e4",
+    "patch_sha256": "e91ee1842dfe6c4782a5d8061bcaca6b6b39f02ffcaa3a6eec715ed1ad2b2b89",
+    "preparation_only": true,
+    "production_source_changes": false,
+    "reversing_exact_helper_and_two_instrumentation_insertions_recovers_original_source_byte_for_byte": true,
+    "scope": [
+      "lampOS/crates/expression/tests/runtime.rs"
+    ],
+    "tests_run": false
+  },
+  "preparation_flags_in_original_proof_are_historical": true,
+  "restored_exactly": true,
+  "runner_finally_restoration": "The sole temporary fixture file was restored after all3 observations; full original tracked-source guard passed.",
+  "source_aggregate_after_restoration": "84f9f5274db3fde4e47c376493b6e5eb935f5bf35433b2c86e75c0372643cef4",
+  "source_aggregate_instrumented": "a54dc32b46ff0b682aa439b4de0b5a0774f317de99fd37ca6eff5c1e4df21fbf",
+  "source_aggregate_original": "84f9f5274db3fde4e47c376493b6e5eb935f5bf35433b2c86e75c0372643cef4",
+  "tracked_paths": 10026,
+  "tree": "4c5c6894939372cd0979c773898a80b5f3904d09"
+}

@@ -1,0 +1,16 @@
+{
+  "candidate_signature_count": 418,
+  "canonical_signatures_sha256": "a1d0a20d8108b6faf6f6ad75c539f5985fb6b3b2b90f29524f11be38ddd0da26",
+  "canonicalization": "Only compiler-artifact records; replace this worktree prefix with <workspace>/ in package_id, keep target name/kind/crate_types, full profile and sorted features, deduplicate/sort by json.dumps(record,sort_keys=True). Excludes src_path, executable, filenames and fresh. This is observed artifact-signature equality, not a complete resolver-graph proof.",
+  "exact_equal_to_previously_published_75_signatures": true,
+  "missing_from_candidate": [],
+  "new_capture": {
+    "availability": "Retained on the original execution host; not independently portable from this folder.",
+    "bytes": 36950,
+    "path": "/private/tmp/tests-expression-admission-diagnostic-20261023/run-2026-10-23T120056.306856+0000/compile/compiler-feature-comparison.json",
+    "sha256": "1cac8943ab7c1189cfd59e5e384bb60fc3557b14b61d8bd6a033e24f9abd7442"
+  },
+  "observed_signature_count": 75,
+  "published_source": "../expression-base-cf462adb0/compiler-feature-comparison.json",
+  "published_source_file_sha256": "3a67f378623a7dc97e02bb8c34609d12edf8a6f4e648b0786b430586c06eee4b"
+}
