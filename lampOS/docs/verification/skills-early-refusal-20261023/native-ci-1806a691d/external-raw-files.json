@@ -1,0 +1,89 @@
+{
+  "files": {
+    "arm64": {
+      "run-final.json": {
+        "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/arm64/run-final.json",
+        "bytes": 12697,
+        "sha256": "cf372a49c1c824279fc4b0f415576b9cd03400c7f4851361d6e846a8c4693aad"
+      },
+      "jobs-final.json": {
+        "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/arm64/jobs-final.json",
+        "bytes": 7027,
+        "sha256": "383b0a4b44f1d717f14a23c7cc5cb642617c15ebd379c9dfdc368ecf55d3cd02"
+      },
+      "full-log.txt": {
+        "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/arm64/full-log.txt",
+        "bytes": 1801407,
+        "sha256": "03de38862953346520d753fc287b6998c03548cc8753e867f626c7a1f8e11d6c"
+      },
+      "full-log.txt.stderr": {
+        "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/arm64/full-log.txt.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "native-watch.txt": {
+        "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/arm64/native-watch.txt",
+        "bytes": 8567,
+        "sha256": "fd65e25501ba4c47d232f6ec74bff1e1b8f43f6d842b40405709a534419383a8"
+      },
+      "native-watch.txt.stderr": {
+        "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/arm64/native-watch.txt.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "result.json": {
+        "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/arm64/result.json",
+        "bytes": 2691,
+        "sha256": "d80206a95e4dcf12d8a9aeb2b4f4fdab4ee69996ce315d3a72441155a4f32f0a"
+      }
+    },
+    "clippy": {
+      "run-final.json": {
+        "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/clippy/run-final.json",
+        "bytes": 12696,
+        "sha256": "e3b8b44a7ea93eb209dda9fa8b02354435a028193909e5e00cec9e09a44de378"
+      },
+      "jobs-final.json": {
+        "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/clippy/jobs-final.json",
+        "bytes": 2637,
+        "sha256": "a3fe7bd6cf8702c44c8daf733e9db8bf12941dd49efa6eea05697d457206a84b"
+      },
+      "full-log.txt": {
+        "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/clippy/full-log.txt",
+        "bytes": 77243,
+        "sha256": "da190e8c3e93d81c918d1da88d1070c6feb057f4fc1354617ae04b08bc25cd9d"
+      },
+      "full-log.txt.stderr": {
+        "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/clippy/full-log.txt.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "native-watch.txt": {
+        "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/clippy/native-watch.txt",
+        "bytes": 2009,
+        "sha256": "5b5010d275b75fc0e2a86fc56aea1650a8cb5907a483ec9110385f5a341f5856"
+      },
+      "native-watch.txt.stderr": {
+        "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/clippy/native-watch.txt.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "result.json": {
+        "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/clippy/result.json",
+        "bytes": 1943,
+        "sha256": "0f151a2b7b246132c5d43587a8dc12a345724090241ff2f8c252e6e007e461a4"
+      }
+    }
+  },
+  "merge_API": {
+    "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/checked-merge-api.json",
+    "bytes": 2603,
+    "sha256": "1d828065f9057529611ee2d00d3d309a9153fd0cffeb394b119eb98426466ae6"
+  },
+  "primary_rows": {
+    "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/primary-rows.json",
+    "bytes": 938042,
+    "sha256": "9ca091c1faef51feeba1606b58ee4b0419d5f2fa7e5210c42f6c14df7b80f5e7"
+  },
+  "availability_limit": "External local paths do not promise remote availability. Complete source commits, primary rows, exact selected raw excerpts and hashes are included; executable bytes are not."
+}

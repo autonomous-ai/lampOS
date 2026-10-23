@@ -1,0 +1,820 @@
+{
+  "arm64": {
+    "original": {
+      "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/arm64/full-log.txt",
+      "bytes": 1801407,
+      "sha256": "03de38862953346520d753fc287b6998c03548cc8753e867f626c7a1f8e11d6c"
+    },
+    "rule": "Exact inclusive UTF-8 line slices, no normalization; full log remains externally retained.",
+    "selections": [
+      {
+        "first_line": 291,
+        "last_line": 292,
+        "bytes": 260,
+        "sha256": "61342faad959c437187c177d184acb6dd7bc19de210df0d8db939fcdb5f04272",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:18.9964160Z [command]/usr/bin/git log -1 --format=%H\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:18.9989703Z 70f428a709da0f0449a8d0ba72195314acbdc3c9\n"
+      },
+      {
+        "first_line": 333,
+        "last_line": 337,
+        "bytes": 694,
+        "sha256": "19bf3bb5bd98b0483ed6e8579bfad1f235e0892218da6ba1f5e73ef46634ff1b",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:19.3179471Z ----------------------------------------------------------------------\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:19.3179921Z Ran 35 tests in 0.250s\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:19.3180056Z \nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:19.3180188Z OK\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:19.3311191Z ##[group]Run curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt\n"
+      },
+      {
+        "first_line": 345,
+        "last_line": 349,
+        "bytes": 702,
+        "sha256": "338937b277b9d79eb4a5d5cebd2939e77af4fb72f6d556981feb54ae5579e350",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:19.6333723Z info: profile set to minimal\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:19.6334056Z info: default host tuple is aarch64-unknown-linux-gnu\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:19.6343661Z info: syncing channel updates for 1.96.0-aarch64-unknown-linux-gnu\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:19.7034699Z info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:19.7035284Z info: downloading 5 components\n"
+      },
+      {
+        "first_line": 351,
+        "last_line": 355,
+        "bytes": 561,
+        "sha256": "3f528b67aa6e4678c3972c194c77a2d461fe588110a278c32d1a9705e26b7a2c",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:24.8511662Z \nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:24.8582930Z   1.96.0-aarch64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:24.8583247Z \nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:24.8583772Z \nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:24.8584248Z Rust is installed now. Great!\n"
+      },
+      {
+        "first_line": 403,
+        "last_line": 407,
+        "bytes": 581,
+        "sha256": "917af75980a513238731e3f36eb2db28e25944083f893c1e346ea951cd9e0d46",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:25.6716977Z ----------------------------------------------------------------------\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:25.6726461Z Ran 12 tests in 0.719s\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:25.6746367Z \nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:25.6746527Z OK\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:25.7828518Z ##[group]Run actions/cache/restore@v4\n"
+      },
+      {
+        "first_line": 496,
+        "last_line": 500,
+        "bytes": 619,
+        "sha256": "40c844a65fc6c5f27e80d00100715c8262627e41951feb48b25ae93cdc739a9e",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:46.7447321Z + cargo-nextest nextest --version\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:46.7472207Z cargo-nextest 0.9.148 (cd1d6d546 2026-10-07)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:46.7472516Z release: 0.9.148\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:46.7472751Z commit-hash: cd1d6d5467322dbc0d39a80cb671d000ac302798\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:46.7473035Z commit-date: 2026-10-07\n"
+      },
+      {
+        "first_line": 510,
+        "last_line": 529,
+        "bytes": 4172,
+        "sha256": "89f1332065244ac6a709d990b31485b5b82f0f27b30dfb1bc8c097bd713d32a7",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6897118Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6897692Z   |\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6898660Z   = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)`\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6900433Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6900993Z   = help: consider changing their names to be unique or compiling them separately\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6901610Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6902096Z   |\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6903036Z   = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)`\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6904244Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6904802Z   = help: consider changing their names to be unique or compiling them separately\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6916920Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6917444Z   |\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6918373Z   = note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/policy)`\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6919573Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6920136Z   = help: consider changing their names to be unique or compiling them separately\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6920761Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6921258Z   |\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6922172Z   = note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/policy)`\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6923355Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:31:49.6923912Z   = help: consider changing their names to be unique or compiling them separately\n"
+      },
+      {
+        "first_line": 632,
+        "last_line": 636,
+        "bytes": 602,
+        "sha256": "4c8e8bd53e6c31b14b3bb93f624077280eac6f93d942d16c90c2dbb2e9bb1811",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.5776093Z ----------------------------------------------------------------------\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.5776405Z Ran 7 tests in 0.423s\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.5776523Z \nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.5776592Z OK\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.5899420Z ##[group]Run python3 -I .github/scripts/lampos-pr-crates.py\n"
+      },
+      {
+        "first_line": 640,
+        "last_line": 675,
+        "bytes": 6725,
+        "sha256": "23f3128d572af891992b26e9f922fae5394a4e8cb0c4b6dde23bc144d6b68de8",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6642236Z Changed: lamp-skills. With the crates that depend on them and the three that read other crates' files (lamp-cloud, lamp-voice-eval, lamp-update): 12 of 46 crates.\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6643415Z -p lamp-body -p lamp-cloud -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-peek -p lamp-setup -p lamp-skills -p lamp-update -p lamp-voice -p lamp-voice-eval\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6725305Z ##[group]Run echo \"cores: $(nproc)\"\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6725628Z \u001b[36;1mecho \"cores: $(nproc)\"\u001b[0m\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6726240Z \u001b[36;1mfilter='not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))'\u001b[0m\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6726736Z \u001b[36;1mif [ -n \"$PICKED\" ]; then filter=\"$filter & ($PICKED)\"; fi\u001b[0m\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6727108Z \u001b[36;1mcargo nextest run --locked --release --workspace \\\u001b[0m\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6727408Z \u001b[36;1m  --profile pr \\\u001b[0m\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6727627Z \u001b[36;1m  --no-tests=pass -j num-cpus \\\u001b[0m\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6727878Z \u001b[36;1m  --partition hash:1/1 \\\u001b[0m\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6728101Z \u001b[36;1m  -E \"$filter\"\u001b[0m\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6744975Z shell: /usr/bin/bash -e {0}\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6745196Z env:\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6746605Z   PICKED: package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6747633Z ##[endgroup]\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:13.6920487Z cores: 4\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1520992Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1521518Z   |\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1522482Z   = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)`\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1523738Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1524327Z   = help: consider changing their names to be unique or compiling them separately\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1524960Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1525449Z   |\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1526552Z   = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)`\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1527780Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1528340Z   = help: consider changing their names to be unique or compiling them separately\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1528980Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1529464Z   |\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1530374Z   = note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/policy)`\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1531552Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1532100Z   = help: consider changing their names to be unique or compiling them separately\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1532719Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1533212Z   |\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1534112Z   = note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/policy)`\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1535285Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:14.1536408Z   = help: consider changing their names to be unique or compiling them separately\n"
+      },
+      {
+        "first_line": 678,
+        "last_line": 680,
+        "bytes": 461,
+        "sha256": "c44117a40664fa4abcd75fd961b5fe5e8afe10a613da22a1f6d15386185bdb4e",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:28.9876493Z ────────────\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:28.9877408Z  Nextest run ID 9e751890-6a38-4fdb-8a52-e421824e8998 with nextest profile: pr\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:33:28.9877911Z     Starting 7266 tests across 62 binaries (33 tests and 106 binaries skipped)\n"
+      },
+      {
+        "first_line": 2711,
+        "last_line": 2711,
+        "bytes": 228,
+        "sha256": "a466ec141bcb4a745250b95a6d0d979c37e64648aa868162fb4262236f74f433",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:34:09.8076100Z         PASS [   0.015s] (2031/7266) lamp-skills::it package::a_peer_refused_before_its_request_is_written_still_leaves_the_skill_in_place\n"
+      },
+      {
+        "first_line": 2713,
+        "last_line": 2713,
+        "bytes": 213,
+        "sha256": "2d3e936c1d2ae8728a28876d8033275c38196979081893001c1a1d958d2340f1",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:34:09.8147283Z         PASS [   0.011s] (2033/7266) lamp-skills::it package::a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed\n"
+      },
+      {
+        "first_line": 2726,
+        "last_line": 2726,
+        "bytes": 224,
+        "sha256": "211851f1447ddf47626d5d1fbd0db9f99e83c7903820cdc1822633d5a1da9a45",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:34:10.6098218Z         PASS [   0.657s] (2046/7266) lamp-skills::it package::the_manage_helper_waits_for_a_held_folder_only_so_long_then_does_nothing\n"
+      },
+      {
+        "first_line": 5801,
+        "last_line": 5801,
+        "bytes": 204,
+        "sha256": "7c29b6d7beaba2bd1430b2b6f9a904643e460c805e596c3f94b0122f7835d7db",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:25.8438129Z         LEAK [   0.227s] (5121/7266) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal\n"
+      },
+      {
+        "first_line": 7948,
+        "last_line": 7948,
+        "bytes": 164,
+        "sha256": "1c3039ed71d250bd53ca7de62ba096c05a25558de3e8883652aab10f097cf5ee",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:55.7203950Z      Summary [ 146.733s] 7266 tests run: 7266 passed (1 leaky), 33 skipped\n"
+      },
+      {
+        "first_line": 8365,
+        "last_line": 8372,
+        "bytes": 1153,
+        "sha256": "181f88308ec26c3a289fc05ad7c8bff1f73a1b1d3297876a9ca9770c9af2a362",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:55.7375034Z ##[group]Run cargo test --locked --release --workspace --doc -- --test-threads=1\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:55.7375646Z \u001b[36;1mcargo test --locked --release --workspace --doc -- --test-threads=1\u001b[0m\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:55.7376385Z \u001b[36;1mcargo test --locked --release -p lamp-ipc --test relay_signals\u001b[0m\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:55.7376849Z \u001b[36;1mcargo test --locked --release -p lamp-turn-end-wire --test process\u001b[0m\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:55.7395103Z shell: /usr/bin/bash -e {0}\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:55.7395337Z ##[endgroup]\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:55.9791896Z     Finished `release` profile [optimized] target(s) in 0.21s\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:55.9916244Z    Doc-tests lamp_actions\n"
+      },
+      {
+        "first_line": 8376,
+        "last_line": 8376,
+        "bytes": 183,
+        "sha256": "ff0f98f8e480d15b6d2492eee9419df7a5b18b463aa8f4305ec5687a0c9aead1",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:56.0846308Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8378,
+        "last_line": 8378,
+        "bytes": 114,
+        "sha256": "5b4c899af2118e4683e9f2f2a11052c22f86e6e2fdeb2f17fa7f4650438d97e9",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:56.0875593Z    Doc-tests lamp_addons\n"
+      },
+      {
+        "first_line": 8382,
+        "last_line": 8382,
+        "bytes": 183,
+        "sha256": "6e9385c8e91b3f1bf063d476e60f966265ee5191fa41863b4d6bac00edeec1e1",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:56.1177495Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8384,
+        "last_line": 8384,
+        "bytes": 111,
+        "sha256": "19ea9c43addb6e14ffe8645167faa0e2e42508604332a6f71c8be84b0aee4c57",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:56.1203664Z    Doc-tests lamp_air\n"
+      },
+      {
+        "first_line": 8388,
+        "last_line": 8388,
+        "bytes": 183,
+        "sha256": "d5e3cc0b83cdb1e97cbeb9520f77fc860d5d3c38d1299a6854418e210a74d55a",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:56.1436188Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8390,
+        "last_line": 8390,
+        "bytes": 113,
+        "sha256": "41e26b28cd073f556bc92f8669fa89d6058bffefdb3d789df1c802ffc492cd55",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:56.1460627Z    Doc-tests lamp_audio\n"
+      },
+      {
+        "first_line": 8394,
+        "last_line": 8394,
+        "bytes": 183,
+        "sha256": "9b0d70de9508d7bcd43a9d1c0b78c6272f56c3a45d356899c3b1edc716a4428a",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:56.3097942Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8396,
+        "last_line": 8396,
+        "bytes": 112,
+        "sha256": "e357ab3645a4017a13eb50e4a16e9e4a6d71f0f27d36d2ca1a0e2d315580e1ec",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:56.3129258Z    Doc-tests lamp_body\n"
+      },
+      {
+        "first_line": 8400,
+        "last_line": 8400,
+        "bytes": 183,
+        "sha256": "54cd3c1384b5a7c397f7dfb7511ee94b95daba7c761276f3dfb6152d5b41d138",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:56.6546923Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8402,
+        "last_line": 8402,
+        "bytes": 111,
+        "sha256": "86b8ba8ee8550ea50dac02ae9b8365c5184b648f1f9fd3ae0a52db36d339ea21",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:56.6578708Z    Doc-tests lamp_bus\n"
+      },
+      {
+        "first_line": 8408,
+        "last_line": 8408,
+        "bytes": 183,
+        "sha256": "246a8f7d70b1b2b0620770e0915a7fb5c08e1c94d4a142c20f75452742ee9949",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.0790928Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8411,
+        "last_line": 8411,
+        "bytes": 114,
+        "sha256": "613dde69d66b22b71b98282084baaed6e65ea459a3bf2f2f5fc1e63f4efd6df6",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.0834612Z    Doc-tests lamp_camera\n"
+      },
+      {
+        "first_line": 8415,
+        "last_line": 8415,
+        "bytes": 183,
+        "sha256": "166b1c068e133f60ecedc097234ca59d7d1f0442a047182137768e0a255b6576",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.1887206Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8417,
+        "last_line": 8417,
+        "bytes": 113,
+        "sha256": "73995708b353d73ffe9ce3cae6b42cfa069a6fc3b76da9411f5dcaffd08235ea",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.1914536Z    Doc-tests lamp_cloud\n"
+      },
+      {
+        "first_line": 8421,
+        "last_line": 8421,
+        "bytes": 183,
+        "sha256": "f3207e9c1c00fa697b0de5c2bdca6cd95bf6a185500c6b20128b425cbc2d1e12",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.3438840Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8423,
+        "last_line": 8423,
+        "bytes": 116,
+        "sha256": "caa712e8e4b9e2d475bd83e5f4fd715883e309a793b5714dc088cd5efefe3a8e",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.3469429Z    Doc-tests lamp_controls\n"
+      },
+      {
+        "first_line": 8427,
+        "last_line": 8427,
+        "bytes": 183,
+        "sha256": "231cfb00e62afa2e47c6894b4771ab886247945a98db014aaf94ff16ef32de45",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.5712214Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8429,
+        "last_line": 8429,
+        "bytes": 112,
+        "sha256": "44a08785cddf71b817d200091c81958a9b9e4e5d285ba57931486fac39c7f87e",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.5740779Z    Doc-tests lamp_ears\n"
+      },
+      {
+        "first_line": 8433,
+        "last_line": 8433,
+        "bytes": 183,
+        "sha256": "f0b7957e8946c78241ba0952ed08c3599c9a326e76d4c763ce27e8582d1aa552",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.6109025Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8435,
+        "last_line": 8435,
+        "bytes": 119,
+        "sha256": "1de8574d76591624a17539dea92b535bad2ec61bdb6e1ffe5fbdb1f06c1910bb",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.6138165Z    Doc-tests lamp_environment\n"
+      },
+      {
+        "first_line": 8439,
+        "last_line": 8439,
+        "bytes": 183,
+        "sha256": "70bfca59302a65a9d1ceb3f0b67883febdbcc4b245c2a25b557b349233682f72",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.6383999Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8441,
+        "last_line": 8441,
+        "bytes": 118,
+        "sha256": "15f747c32522e12eeb65fdb70c068d5d44489559eb12f1f7728e0d733e4ca7b2",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.6408259Z    Doc-tests lamp_expression\n"
+      },
+      {
+        "first_line": 8445,
+        "last_line": 8445,
+        "bytes": 183,
+        "sha256": "c62a009d39f04028cb259e0b8a5edd85f77b90fb02b5f90843d7f61dbb865e82",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.8032042Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8447,
+        "last_line": 8447,
+        "bytes": 112,
+        "sha256": "ff3c30b2f33fbe3e6fb046a15b8ab2f4d37dae67f3669117544ab1ecfa8b7e57",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.8059642Z    Doc-tests lamp_eyes\n"
+      },
+      {
+        "first_line": 8451,
+        "last_line": 8451,
+        "bytes": 183,
+        "sha256": "ec8ab799cccb59ee81ce491a13b3e5f0b6c0d15ede394387bb822c51c82e5a2e",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.9582439Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8453,
+        "last_line": 8453,
+        "bytes": 114,
+        "sha256": "af37b69b92e752f1760284e16fdf5ac0722b608cb686d97f9feb6bdbc6a37459",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:57.9611723Z    Doc-tests lamp_gemini\n"
+      },
+      {
+        "first_line": 8457,
+        "last_line": 8457,
+        "bytes": 183,
+        "sha256": "79c5c42810f192962270383041b7205c32fc63d7b39b66a19ec18e87cc800712",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.0696282Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8459,
+        "last_line": 8459,
+        "bytes": 114,
+        "sha256": "eac1ab2381a056605207d105b911303890df6f630bb8d10d6c51681c97ca3daf",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.0724474Z    Doc-tests lamp_health\n"
+      },
+      {
+        "first_line": 8463,
+        "last_line": 8463,
+        "bytes": 183,
+        "sha256": "9136b659163e73cca8c54230dd43bf6065e924e363eac02332bda42b03820759",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.1157629Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8465,
+        "last_line": 8465,
+        "bytes": 111,
+        "sha256": "337396814d6e85264f2f37df0aed4778bf8544c5b72a95de1475e9dcd90bfd24",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.1184796Z    Doc-tests lamp_ipc\n"
+      },
+      {
+        "first_line": 8470,
+        "last_line": 8470,
+        "bytes": 183,
+        "sha256": "c9e943a4d28552eca6b94c57dd990e5037db892c86eaf67df165493befe73b3e",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.4604006Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8473,
+        "last_line": 8473,
+        "bytes": 114,
+        "sha256": "677860b8ee085220b20cde3a61a0d95a3f96322deff1fdf6e27d0a80d21a319d",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.4648251Z    Doc-tests lamp_keeper\n"
+      },
+      {
+        "first_line": 8477,
+        "last_line": 8477,
+        "bytes": 183,
+        "sha256": "695de5dd887a31d37364723daa00cf24a234dd6ab733c82f3fe997ed79fc5bd4",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.5037721Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8479,
+        "last_line": 8479,
+        "bytes": 112,
+        "sha256": "e94f34b27a9e6607cf37ebc0fa15820202877155506781fbf9586345ecd6f807",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.5063735Z    Doc-tests lamp_lean\n"
+      },
+      {
+        "first_line": 8483,
+        "last_line": 8483,
+        "bytes": 183,
+        "sha256": "8a7ccc970d67eb8a375f2e7aaf3848f77facd3a19b40f599cf43ad8a18f1c8cc",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.5487093Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8485,
+        "last_line": 8485,
+        "bytes": 118,
+        "sha256": "800a7c72a6fdab52961825773640f56ebcb74c96dbbfad7aa9f508d235d5ef09",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.5514222Z    Doc-tests lamp_local_time\n"
+      },
+      {
+        "first_line": 8489,
+        "last_line": 8489,
+        "bytes": 183,
+        "sha256": "747562d23fb3808b3d233efa2a747935cee7a63b045fffad361f61c94e226a72",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.5710055Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8491,
+        "last_line": 8491,
+        "bytes": 114,
+        "sha256": "5cebaffad4d12216794d6558157019e1289a11d21d1e9113764a98ec70725b04",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.5733823Z    Doc-tests lamp_memory\n"
+      },
+      {
+        "first_line": 8495,
+        "last_line": 8495,
+        "bytes": 183,
+        "sha256": "b53a5c8954c1981ed84c55581d5ff21ff6e60a06ef0e0fa17f386678aed82473",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.7175236Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8497,
+        "last_line": 8497,
+        "bytes": 112,
+        "sha256": "18519263ad5c559fa99725be375244ccc3b5771941a8495751d6f4655afd48b5",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.7203088Z    Doc-tests lamp_mood\n"
+      },
+      {
+        "first_line": 8501,
+        "last_line": 8501,
+        "bytes": 183,
+        "sha256": "5526b44982b9c745b3aea29cc8519e2e015ac240f0d8a77d920c2ef2a976c45b",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.7816938Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8503,
+        "last_line": 8503,
+        "bytes": 112,
+        "sha256": "69e1ca758ad8915613e73ba1cbdc8d85fec86b90974c2e29cfec78024207bab9",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:58.7844553Z    Doc-tests lamp_msgs\n"
+      },
+      {
+        "first_line": 8508,
+        "last_line": 8508,
+        "bytes": 183,
+        "sha256": "bff2e15ebc8128d1127a33752eb514f253606ba49c6a5d9d538a27840b0f076c",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:59.7009276Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8511,
+        "last_line": 8511,
+        "bytes": 112,
+        "sha256": "2138f80c821385d55ae466eee4904b24e0cdec4d5bbb0fbb0c70350cebd0a4d7",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:59.7059653Z    Doc-tests lamp_name\n"
+      },
+      {
+        "first_line": 8515,
+        "last_line": 8515,
+        "bytes": 183,
+        "sha256": "fc73d721b0c45438bc2164c3bf6a090a56f51605f35be073bf6b3fba45ebeb81",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:59.7391378Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8517,
+        "last_line": 8517,
+        "bytes": 117,
+        "sha256": "c9d7b7c4d62046a72a80b3a46683eba26a3010bd2ddae4fa3b2ad2cb4853cd21",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:59.7418839Z    Doc-tests lamp_near_call\n"
+      },
+      {
+        "first_line": 8521,
+        "last_line": 8521,
+        "bytes": 183,
+        "sha256": "e7c677c53443d2234b08cf192b95fb4f228b6d8b97984e9a7bdd1db63fe7a220",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:59.7666191Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8523,
+        "last_line": 8523,
+        "bytes": 116,
+        "sha256": "abfd2da289fb83159de977d7d393504756a9304f21b749f044eb31855f6d2626",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:59.7692021Z    Doc-tests lamp_observer\n"
+      },
+      {
+        "first_line": 8527,
+        "last_line": 8527,
+        "bytes": 183,
+        "sha256": "e528aaca7cdd6146f97aa9e15128a9c6d2c25a7413ca603073b4c82b09525f0f",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:59.8068325Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8529,
+        "last_line": 8529,
+        "bytes": 112,
+        "sha256": "6bdd66160d3149e1cb91dbe12dba0ee42e7a31d0ed0fc290f293e4f506f7c163",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:59.8095181Z    Doc-tests lamp_peek\n"
+      },
+      {
+        "first_line": 8533,
+        "last_line": 8533,
+        "bytes": 183,
+        "sha256": "b608ed376325c681896dc0a8c11f0c82a9adb0a025bf565f313049d13d5bd959",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:59.8499900Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8535,
+        "last_line": 8535,
+        "bytes": 114,
+        "sha256": "f71e1ccca83a552445485769282ebadfddd581d981ee8a4416c5fc92771c509f",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:35:59.8529126Z    Doc-tests lamp_policy\n"
+      },
+      {
+        "first_line": 8539,
+        "last_line": 8539,
+        "bytes": 183,
+        "sha256": "20e666c26622413a10a76f973bd2b72fd8901dd84e4eaadfdb99e963b53118bd",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.0571019Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8541,
+        "last_line": 8541,
+        "bytes": 115,
+        "sha256": "7385afa04dc87220fea69643fec9898e1514e7d77b85f590403318d1da347b30",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.0599035Z    Doc-tests lamp_records\n"
+      },
+      {
+        "first_line": 8545,
+        "last_line": 8545,
+        "bytes": 183,
+        "sha256": "74b049ec9156e6de4dcdac39953fe9651d2271360cf0f1c2c5ac061180f55422",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.1522144Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8547,
+        "last_line": 8547,
+        "bytes": 112,
+        "sha256": "ff82d15aa84b89bc3e95a8c149b0bd6ab53f9dcb8b7e9e96fb05dbaddbee0690",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.1550970Z    Doc-tests lamp_ring\n"
+      },
+      {
+        "first_line": 8551,
+        "last_line": 8551,
+        "bytes": 183,
+        "sha256": "76e2c4fbcb9f2a6fe187c42ff296976baa7130715e9e0e0268b01ae09eb89988",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.1841249Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8553,
+        "last_line": 8553,
+        "bytes": 118,
+        "sha256": "f46e5433163fd746fe230e5b6bd67cc67399e84e0363b3b56e74857e37b1e9b4",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.1866643Z    Doc-tests lamp_same_voice\n"
+      },
+      {
+        "first_line": 8557,
+        "last_line": 8557,
+        "bytes": 183,
+        "sha256": "add3c611c6a4ec9531cc26fb62505233a753fd697a79d4a53058b59d2ca0c16d",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.2139360Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8559,
+        "last_line": 8559,
+        "bytes": 116,
+        "sha256": "af1f8941bab7b2fb0b3b7771ed45cb5e6cec681eafb0b3beb0ccb627352e989f",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.2166762Z    Doc-tests lamp_schedule\n"
+      },
+      {
+        "first_line": 8563,
+        "last_line": 8563,
+        "bytes": 183,
+        "sha256": "5d9c44c308041fbf2b15e6a93345596a27875290e0c80a4a7e23b0fa6a8638cb",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.4408663Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8565,
+        "last_line": 8565,
+        "bytes": 116,
+        "sha256": "48c651034dd841fedd63d3ab024483bf74c034a9d9ada672b88aa58f3888bc01",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.4442544Z    Doc-tests lamp_selftest\n"
+      },
+      {
+        "first_line": 8569,
+        "last_line": 8569,
+        "bytes": 183,
+        "sha256": "3b5cb0e4c71f6785c0c239961981cbd2d3fb8309d8fd434d1c222d5536acff61",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.4935220Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8571,
+        "last_line": 8571,
+        "bytes": 116,
+        "sha256": "3916097db993287264fa559481f3152dcdd6264eaa2981e1dac0c40bbf12f269",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.4961536Z    Doc-tests lamp_settings\n"
+      },
+      {
+        "first_line": 8575,
+        "last_line": 8575,
+        "bytes": 183,
+        "sha256": "2b30c09210a372dd97fe3bf6b69f3661e1b3f95e252e9bd480d4dd76f83612df",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.5693778Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8577,
+        "last_line": 8577,
+        "bytes": 113,
+        "sha256": "8bea52932fc94f8bbeabe2f96db309b47cff591318e5dd777c0bac96ae0f5de6",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.5722511Z    Doc-tests lamp_setup\n"
+      },
+      {
+        "first_line": 8581,
+        "last_line": 8581,
+        "bytes": 183,
+        "sha256": "b247b8e72cc81ed20bea6ace40577a5b892ecac63bafc6acca8cd8b3776e17c4",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.6732426Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8583,
+        "last_line": 8583,
+        "bytes": 114,
+        "sha256": "198b749993e2ddabb7cc533e2d84ed44658c51be2e56560cbfd6de04425631b8",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.6760811Z    Doc-tests lamp_skills\n"
+      },
+      {
+        "first_line": 8587,
+        "last_line": 8587,
+        "bytes": 183,
+        "sha256": "dce4c5edbe8fd0301ecb5ea6da044bc44f68ce38cc8bdbefc577b2f03533b53b",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.9611298Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8589,
+        "last_line": 8589,
+        "bytes": 122,
+        "sha256": "2593348fa112676a55b75cc147e8b56c8a6e946db795996c094be939e465e9c9",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:00.9643130Z    Doc-tests lamp_sound_fixtures\n"
+      },
+      {
+        "first_line": 8593,
+        "last_line": 8593,
+        "bytes": 183,
+        "sha256": "c48fc3366739902210d6251592f712b14c7bbaed6c490700bda93842c10575fd",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:01.0158556Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8595,
+        "last_line": 8595,
+        "bytes": 115,
+        "sha256": "51e72e665fb38da52627db25d8b1d8f366a43f03acf29a9dd1336a2b8edeaec4",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:01.0184856Z    Doc-tests lamp_station\n"
+      },
+      {
+        "first_line": 8599,
+        "last_line": 8599,
+        "bytes": 183,
+        "sha256": "649d96753e40f2bafd3c357dab4eb2255d83be2f09aa0ccb3dc7792bca373e2f",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:01.1302271Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8601,
+        "last_line": 8601,
+        "bytes": 116,
+        "sha256": "e4449173c2fd92146301bbc88568b8755aff8b65859a30bf92ac632986580010",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:01.1331294Z    Doc-tests lamp_surround\n"
+      },
+      {
+        "first_line": 8605,
+        "last_line": 8605,
+        "bytes": 183,
+        "sha256": "2136fa0627e91ec4fc1d7f56a6e6980925d96134c989bfe0919cfd15646a8949",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:01.5621538Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8607,
+        "last_line": 8607,
+        "bytes": 113,
+        "sha256": "b8fea4cb4a6e3d995edaecc9f415052d394b36dab46d4f4ae8aca42c849e9018",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:01.5659524Z    Doc-tests lamp_tasks\n"
+      },
+      {
+        "first_line": 8611,
+        "last_line": 8611,
+        "bytes": 183,
+        "sha256": "4165d4060ff72061df3784da6ae63bbf9462327c5e6bfcea452b6ebcee4a6cc8",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:01.7863678Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8613,
+        "last_line": 8613,
+        "bytes": 116,
+        "sha256": "855d029a9997163048336623731b3b81f75402a3582d2add2d1793e42fd759e7",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:01.7891427Z    Doc-tests lamp_turn_end\n"
+      },
+      {
+        "first_line": 8617,
+        "last_line": 8617,
+        "bytes": 183,
+        "sha256": "233b8ab263b775f2dd78564ac8826b948da308e679e6302303c5d820078e5740",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:01.8253248Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8619,
+        "last_line": 8619,
+        "bytes": 121,
+        "sha256": "2a89126ce3e26ba38ec839b890cf67078c562b5f7c3257c273a809275f02f68d",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:01.8280851Z    Doc-tests lamp_turn_end_wire\n"
+      },
+      {
+        "first_line": 8623,
+        "last_line": 8623,
+        "bytes": 183,
+        "sha256": "56ed249b995d32e29abb18e12a8383e92d97633fb1adce7d5d4f92ea78e6e4e2",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:01.8553551Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8625,
+        "last_line": 8625,
+        "bytes": 118,
+        "sha256": "6a6679ca73cb95257b15f7353e29c3246f4cccdda636878cb64f484cf5f7aa6c",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:01.8578773Z    Doc-tests lamp_turn_owner\n"
+      },
+      {
+        "first_line": 8629,
+        "last_line": 8629,
+        "bytes": 183,
+        "sha256": "ce03559f87d33b16a2a8ce71d1980e63a53da5db9a526594b655d5d7e2cd603b",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:01.9148058Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8631,
+        "last_line": 8631,
+        "bytes": 114,
+        "sha256": "86da40e6315a3a407f47c19f2f7ed740749be2ab8e96acf6ed241add91976201",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:01.9175053Z    Doc-tests lamp_update\n"
+      },
+      {
+        "first_line": 8635,
+        "last_line": 8635,
+        "bytes": 183,
+        "sha256": "70b7af427c28e9ec8bc699a93d25ccebfc7105af7a9f92b7091c186b081bf9ac",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:02.1256915Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8637,
+        "last_line": 8637,
+        "bytes": 113,
+        "sha256": "06242c4987dbbab32c2162d1373d57c88ea8161cd9bfc9bfa9a07089cc0c408d",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:02.1286821Z    Doc-tests lamp_voice\n"
+      },
+      {
+        "first_line": 8641,
+        "last_line": 8641,
+        "bytes": 183,
+        "sha256": "87e0c476abe2a50cc8fbe40e6c29f69f45d394fa4b3ccc2ec7027818a9a04fc3",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:04.0393702Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8643,
+        "last_line": 8643,
+        "bytes": 118,
+        "sha256": "4f95bf0863c579c5d52ee1468587d98240a5e46c2e3a123ce725d5d90d8f7d8f",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:04.0440282Z    Doc-tests lamp_voice_eval\n"
+      },
+      {
+        "first_line": 8647,
+        "last_line": 8647,
+        "bytes": 183,
+        "sha256": "f5e0aa7b8bb042e2597c5a00dd2eaeb192ae0f5b6adb507275352609418173a1",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:04.5990684Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+      },
+      {
+        "first_line": 8649,
+        "last_line": 8649,
+        "bytes": 123,
+        "sha256": "6e40d2bc1c6e0a947301ee464270259f56c125cd258ca68a2cee9610df6e9f47",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:04.6025060Z    Doc-tests lamp_voice_processes\n"
+      },
+      {
+        "first_line": 8653,
+        "last_line": 8674,
+        "bytes": 3228,
+        "sha256": "355bd67c901180a88b5fd789cc73b02f617cfdd6a7891b2b27f65273afad5c18",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:04.6195365Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:04.6195883Z \nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:04.7536929Z     Finished `release` profile [optimized] target(s) in 0.10s\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:04.7559099Z      Running tests/relay_signals.rs (target/release/deps/relay_signals-2d7abb229f8ee97a)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:04.7578321Z relay_signals: ok\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:04.8861781Z     Finished `release` profile [optimized] target(s) in 0.10s\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:04.8885314Z      Running tests/process.rs (target/release/deps/process-b3e70ad8a722a93b)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:06.9034439Z     idle 2 s without a restart\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:06.9034838Z test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2013 ms)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:06.9055405Z test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:06.9102353Z test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:06.9665266Z test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:07.1289961Z test missing_model_is_final_and_never_restarted ... ok (162 ms)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:07.1309978Z test missing_executable_fails_at_once ... ok (2 ms)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:07.5424777Z test startup_failures_are_final ... ok (411 ms)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:08.0566477Z test serving_failures_are_replaced_within_budget ... ok (514 ms)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:08.2336702Z test protocol_violations_are_replaced ... ok (177 ms)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:08.3892074Z test cancelled_answers_are_never_delivered ... ok (155 ms)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:08.6228167Z test close_during_inference_never_waits ... ok (233 ms)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:09.3140381Z     full-window submit worst case 301.108µs\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:09.3141151Z test sustained_requests_stay_bounded ... ok (691 ms)\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:09.3141945Z test result: 12 passed; 0 failed\n"
+      },
+      {
+        "first_line": 8678,
+        "last_line": 8682,
+        "bytes": 654,
+        "sha256": "0b850576981ca32774ef78c11a30bbf628fd38fdeb9911199301982a3a7e3ddf",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:09.3257045Z ##[endgroup]\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:09.9269819Z Packaged 47 current workspace binaries and 2 selected examples with complete SHA256SUMS\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:09.9375660Z ##[group]Run actions/upload-artifact@v4\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:09.9376143Z with:\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:09.9376377Z   name: lampos-arm64-1806a691d9dc8f93c61c116793f9c68230448c17\n"
+      },
+      {
+        "first_line": 8711,
+        "last_line": 8718,
+        "bytes": 1325,
+        "sha256": "03148677f282053464e1052650d64afdca49aa3a3adcb0a5e2540682c057936b",
+        "utf8": "lampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:16.7618196Z Finished uploading artifact content to blob storage!\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:16.7620253Z SHA256 digest of uploaded artifact zip is f956322132d608afff96248bad565fdcfee77da9be10e7bd7aed31f519f438bd\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:16.7622169Z Finalizing artifact upload\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:17.2427876Z Artifact lampos-arm64-1806a691d9dc8f93c61c116793f9c68230448c17.zip successfully finalized. Artifact ID 12517060738\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:17.2431112Z Artifact lampos-arm64-1806a691d9dc8f93c61c116793f9c68230448c17 has been successfully uploaded! Final size is 115881908 bytes. Artifact ID is 12517060738\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:17.2436016Z Artifact download URL: https://github.com/autonomous-ai/lampOS/actions/runs/39987367405/artifacts/12517060738\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:17.2663969Z Post job cleanup.\nlampOS — build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T16:36:17.3391389Z [command]/usr/bin/git version\n"
+      }
+    ]
+  },
+  "clippy": {
+    "original": {
+      "external_path": "/private/tmp/tests-skills-early-refusal-ci-20261023/clippy/full-log.txt",
+      "bytes": 77243,
+      "sha256": "da190e8c3e93d81c918d1da88d1070c6feb057f4fc1354617ae04b08bc25cd9d"
+    },
+    "rule": "Exact inclusive UTF-8 line slices, no normalization; full log remains externally retained.",
+    "selections": [
+      {
+        "first_line": 345,
+        "last_line": 346,
+        "bytes": 296,
+        "sha256": "fcb4f0ac90634c9ea98bdd9446cb11d260552a1496d5e840ed3da52f006653f8",
+        "utf8": "lampOS — clippy, every crate and target (x86 Linux)\tRun actions/checkout@v4\t2026-10-23T16:31:15.1137621Z [command]/usr/bin/git log -1 --format=%H\nlampOS — clippy, every crate and target (x86 Linux)\tRun actions/checkout@v4\t2026-10-23T16:31:15.1171305Z 70f428a709da0f0449a8d0ba72195314acbdc3c9\n"
+      },
+      {
+        "first_line": 355,
+        "last_line": 359,
+        "bytes": 730,
+        "sha256": "d93e04e74293df3d1b595f2d78d338392917787bb77312aa86be27846d8ca4e4",
+        "utf8": "lampOS — clippy, every crate and target (x86 Linux)\tRust 1.96.0\t2026-10-23T16:31:16.1392765Z info: profile set to minimal\nlampOS — clippy, every crate and target (x86 Linux)\tRust 1.96.0\t2026-10-23T16:31:16.1393339Z info: default host tuple is x86_64-unknown-linux-gnu\nlampOS — clippy, every crate and target (x86 Linux)\tRust 1.96.0\t2026-10-23T16:31:16.1405666Z info: syncing channel updates for 1.96.0-x86_64-unknown-linux-gnu\nlampOS — clippy, every crate and target (x86 Linux)\tRust 1.96.0\t2026-10-23T16:31:16.2579025Z info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)\nlampOS — clippy, every crate and target (x86 Linux)\tRust 1.96.0\t2026-10-23T16:31:16.2579634Z info: downloading 4 components\n"
+      },
+      {
+        "first_line": 361,
+        "last_line": 365,
+        "bytes": 590,
+        "sha256": "948c7d8936e9b55d5e3371badf79a54a93386b8cffe7c6579d425bc963331750",
+        "utf8": "lampOS — clippy, every crate and target (x86 Linux)\tRust 1.96.0\t2026-10-23T16:31:24.7853418Z \nlampOS — clippy, every crate and target (x86 Linux)\tRust 1.96.0\t2026-10-23T16:31:24.7953796Z   1.96.0-x86_64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)\nlampOS — clippy, every crate and target (x86 Linux)\tRust 1.96.0\t2026-10-23T16:31:24.7954236Z \nlampOS — clippy, every crate and target (x86 Linux)\tRust 1.96.0\t2026-10-23T16:31:24.7955427Z \nlampOS — clippy, every crate and target (x86 Linux)\tRust 1.96.0\t2026-10-23T16:31:24.7955689Z Rust is installed now. Great!\n"
+      },
+      {
+        "first_line": 442,
+        "last_line": 446,
+        "bytes": 1002,
+        "sha256": "4e8d1ea6e94bbd2a7d8fb999cb1a98f9a7a42e71162a7a4046447846b4a9f62f",
+        "utf8": "lampOS — clippy, every crate and target (x86 Linux)\tunchanged source files get the cached build's times back\t2026-10-23T16:32:02.8772137Z 6348 of 6709 source files are as the cached build had them and get its times back; 361 changed or new keep the checkout's time.\nlampOS — clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t﻿2026-10-23T16:32:02.8853510Z ##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings\nlampOS — clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T16:32:02.8854182Z \u001b[36;1mcargo clippy --locked --workspace --all-targets -- -D warnings\u001b[0m\nlampOS — clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T16:32:02.8927216Z shell: /usr/bin/bash -e {0}\nlampOS — clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T16:32:02.8927558Z ##[endgroup]\n"
+      },
+      {
+        "first_line": 481,
+        "last_line": 485,
+        "bytes": 834,
+        "sha256": "18b726855682b5ced9291752ca96ab1929e2f4661d90c73140576e506c18e6aa",
+        "utf8": "lampOS — clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T16:32:56.1438467Z     Checking lamp-cloud v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/cloud)\nlampOS — clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T16:33:49.5204896Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 45s\nlampOS — clippy, every crate and target (x86 Linux)\tPost Run actions/checkout@v4\t﻿2026-10-23T16:33:49.6802132Z Post job cleanup.\nlampOS — clippy, every crate and target (x86 Linux)\tPost Run actions/checkout@v4\t2026-10-23T16:33:49.7894187Z [command]/usr/bin/git version\nlampOS — clippy, every crate and target (x86 Linux)\tPost Run actions/checkout@v4\t2026-10-23T16:33:49.7938000Z git version 2.55.0\n"
+      }
+    ]
+  }
+}

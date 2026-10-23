@@ -1,0 +1,19 @@
+{
+  "columns": [
+    "raw_log_line",
+    "outcome",
+    "seconds",
+    "execution_index",
+    "selected_total",
+    "binary_id",
+    "display_name"
+  ],
+  "row_count": 7266,
+  "count_rule": "Only primary indexed rows before first Summary; later repeated rows are not added again.",
+  "raw_log": {
+    "path": "/private/tmp/tests-skills-early-refusal-ci-20261023/arm64/full-log.txt",
+    "bytes": 1801407,
+    "sha256": "03de38862953346520d753fc287b6998c03548cc8753e867f626c7a1f8e11d6c"
+  },
+  "binary_limit": "Nextest binary identifiers are runner labels, not executable byte hashes. No test ELF downloaded or independently hashed."
+}

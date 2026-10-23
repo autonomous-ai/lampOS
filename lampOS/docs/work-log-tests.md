@@ -1,5 +1,23 @@
 # Tests work log
 
+## 2026-10-23 23:42 +0700 — Skills native CI complete
+
+Ready for lamp-voice: no; awaiting reviewer-two's final evidence disposition.
+
+The [terminal native receipt](verification/skills-early-refusal-20261023/native-ci-1806a691d/)
+binds #3277 at 1806a691d to successful ARM64 run 39987367405 and strict
+Linux Clippy 39987367034. Checked merge 70f428a70 has the authored tree on
+be16c3327. Selected parallel PR execution passed 7,266 total, including one
+Voice journal LEAK, with zero failed, 33 skipped and none selected-unrun.
+Both refusal cases and the authorized held-folder regression passed.
+
+Root verified all ten payloads, all selected exact raw slices, all 7,266
+primary rows and indices, source/case bindings and merge API identity.
+The selected twelve-package run is distinct from local full Skills 513/0/1.
+Fourth posted READ-OK on the exact head; reviewer-two's source read has no
+P1/P2 and its local/native evidence read remains. First owns merge. No retry
+or local ARM build ran, and Common's previous failed gate remains failed.
+
 ## 2026-10-23 23:35 +0700 — standalone Skills early-refusal repair pushed
 
 Ready for lamp-voice: no; #3277 awaits native CI and assigned reads.
