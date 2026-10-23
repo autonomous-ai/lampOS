@@ -1,5 +1,43 @@
 # Tests work log
 
+## 2026-10-23 07:14 +0700 — Eyes and Voice current-head Linux checks pass
+
+Ready for lamp-voice: **source read pending** for
+[#3156](https://github.com/autonomous-ai/lampOS/pull/3156), authored head
+`a2da87221` on `ae4ab0022`. Both native Linux ARM64 and strict Linux Clippy
+workflows and actual jobs completed successfully. The checked synthetic merge
+`7d9908117` has the same tree as the authored head. ARM64's actual command is
+full-workspace release nextest, PR profile, four-core parallel, hash 1/1:
+**10,800 passed / 0 failed / 67 skipped**, including one passing LEAK.
+Eyes contributes **288 passes**; the portable read-only-file and retained Linux
+full-device rows each pass. Separate doctests **4/0**, process **12/0**, relay
+ok. [Terminal CI receipt](verification/eyes-failed-write-20261023/ci/)
+preserves complete raw streams, workflow/job metadata, exact scope and hashes.
+The Mac **286/0/5** package gate, original **0/1** baseline, permission-denied
+attempt and original source receipt remain unchanged. No separate Linux fmt
+command ran and no ARM64 build ran on the Mac. The assigned source read and
+merge owner's eventual current-base train qualification remain.
+
+[#3023](https://github.com/autonomous-ai/lampOS/pull/3023), authored head
+`157b800a1` on `ae4ab0022`, also has terminal successful Linux workflows and
+actual jobs: ARM64 `39875221807` / `120159079217`, Clippy `39875221768` /
+`120159079166`. The checked merge is `ae8167074`. Its full-workspace PR-profile
+parallel ARM run is **10,799/0/67**, including one passing LEAK; all seven
+assigned cases pass, Voice library **3,554 passes**, integration **301**,
+main binary **1**, examples **10**. Separate doctests **4/0**, process **12/0**,
+relay ok. These are current-head Linux observations, not a waiver of the
+historical x86 parallel or Update consumer failures. The proposed exact-base
+parallel before/after and full serial consumer gate remain prepared and
+unstarted pending the merge owner's freeze decision. Source heads stay frozen;
+`lamp-voice` advancing to `9b6960e61` is reserved for later current-base
+qualification.
+
+The next assigned source audit found no complete test-only fix through the
+current Expression/Bus clock interfaces for #1386; no refusal assertion or
+freshness deadline was changed. The two 20 ms nonblocking fixtures on #1339
+are being examined for a separate test-only correction. No extra test, workflow
+rerun, product change or device operation was performed for this record.
+
 ## 2026-10-23 07:07 +0700 — portable Eyes failure fixture pushed; Voice comparison prepared
 
 Ready for lamp-voice: **no, native checks and review pending** for
