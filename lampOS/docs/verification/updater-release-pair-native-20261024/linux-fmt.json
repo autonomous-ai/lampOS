@@ -1,0 +1,32 @@
+{
+  "name": "second-pair-fmt-973382ee9eeb",
+  "image": "sha256:7dc3bb4b3b88bb00e16e37eeb5c98a74f9d926f956584eb8c009c9ca86023cd2",
+  "head": "d5d4d048b0b7fc850abc49d38c9964eaf03ac780",
+  "source_tar_sha256": "f74d938ccaae102c694bc427cc3581eefeeaa1999f37c659d9dc6216ac5b1c9b",
+  "docker_start_exit": 0,
+  "state": {
+    "Status": "exited",
+    "Running": false,
+    "Paused": false,
+    "Restarting": false,
+    "OOMKilled": false,
+    "Dead": false,
+    "Pid": 0,
+    "ExitCode": 0,
+    "Error": "",
+    "StartedAt": "2026-10-23T17:02:30.304328033Z",
+    "FinishedAt": "2026-10-23T17:02:37.836712622Z"
+  },
+  "removed": true,
+  "repository_tree": "7e2bd500b10b3c6dcee1d916ca7817d22adc98a8",
+  "lampOS_tree": "41691f7d7aaeacc818a3d423958836dd269d3446",
+  "command": "cargo fmt --all --check",
+  "environment": {
+    "user": "65534:65534",
+    "network": "none",
+    "root_filesystem": "read-only",
+    "host_mounts": false,
+    "source": "git archive HEAD lampOS streamed to private tmpfs; chmod a-w; all regular-file SHA-256s compared before/after",
+    "build_or_test": false
+  }
+}

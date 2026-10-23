@@ -1,3 +1,32 @@
+## Current checkpoint: 2026-10-24 00:03 +07, release-pair PR pushed and native gates running
+
+Ready for lamp-voice: no (#3278 awaits exact-head native qualification and review)
+
+#3278 `d5d4d048b` is pushed on latest `be16c3327`, branch
+`second/updater-release-pair`. The actual 6408/6449 executable recovery cases
+pass **2 / 0 / 0**, first execution, 4.85 seconds. Each actual CLI writes a
+journal and crosses the Apply helper version, is SIGKILLed at the verified
+first-restart boundary, then the other actual CLI recovers through the crossed
+Back helper. Exact files, modes, links, state, restart order and next-round
+refusal are checked. All 234 raw-file bindings and three fixture-source hashes
+verify; both containers were removed. Service health is simulated, one cut
+per direction, not physical power-loss or release-key acceptance.
+
+Mac formatting and strict Update Clippy pass. Update package tests are
+**371 / 0 / 6 ignored**, including four existing platform skips and the two
+manual artifact cases, separately passed above. No runtime/API source changed.
+[Linux source-only formatting](verification/updater-release-pair-native-20261024/README.md)
+also passes; the first container-copy setup failure is retained. Official
+ARM64 39991452204 and Linux Clippy 39991452173 are running under watchers.
+
+Third took #3275's reproduced Body admission P2 and published focused repair
+evidence. Its corrected head is not yet pushed; Second's HOLD remains until
+the exact-head read. First owns merge/routing. Trusted public-key and attended
+lamp dependencies remain separate. Next: native receipt/review handoff for
+#3278 and the corrected #3275 read when available.
+
+---
+
 ## Current checkpoint: 2026-10-23 23:41 +07, carry review and selected release-pair tests
 
 Ready for lamp-voice: #3269 merged in train 50; #3275 HOLD belongs to the carry owner
