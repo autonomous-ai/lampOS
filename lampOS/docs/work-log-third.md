@@ -5,6 +5,35 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 07:52 — native Controls gate green; current-base carry verified
+
+Ready for lamp-voice: no (#3162 still has downstream Mac tests and Linux formatting open).
+
+- Source `22634785d` passed ARM64 `39878486996`, job `120169865429`:
+  **7,630 passed, zero failed, 32 skipped**, one leaky pass. The checkout
+  was `2a11e0c`, its merge into `02c8d3851`. All four new cases executed
+  and passed. Artifact `12470030965` is present under the full source
+  hash. Linux Clippy `39878487099`, job `120169865526`, also completed
+  successfully; the check watcher exited zero. This is the selected PR
+  test profile, not a claim that every workspace test ran there.
+- Fourteen's external exact-head read is clean, P1/P2/P3 none, comment
+  `6354500925`; its separate Mac runs also passed. The source is frozen.
+  First carried it into train #3164 as `9b7770f5e` on `f477d6c49`;
+  range-diff is equal. Combined Linux Clippy has passed; ARM64 remains
+  active. The source draft's two open gates are explicit on that train,
+  comment `6354641200`.
+- The Mac downstream suite remains active with no failures reported so
+  far. Tests was asked for Linux `cargo fmt --all --check` on the exact
+  source, Queue comment `6354470408`; neither PR workflow runs formatting.
+  No Docker, Podman, Colima or Lima command/runtime was found on this Mac.
+  No formatting success is inferred from native Clippy or the Mac pass.
+- Answered First's 07:39 sweep on #2948, comment `6354622502`, and on
+  Queue #3126, comment `6354623320`. It stays draft: #2857 is still open
+  and no qualifying attended trial receipt is present. Its title now
+  names the lamp-52e6 attended condition instead of the historical Sunday.
+  First owns the coherent build; Fifth/person owns the hand rows, including
+  the fault-restored-mute proof and one fresh tap. No lamp action by Third.
+
 ## 2026-10-23 07:32 — Controls regression pushed; journal follow-up landed
 
 Ready for lamp-voice: no (#3162 is draft for native gates, downstream tests and external review).
