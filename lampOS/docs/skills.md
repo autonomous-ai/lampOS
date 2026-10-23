@@ -1660,6 +1660,13 @@ happens:
    Its text is the brief, then the person's request:
    - The brief is fixed words: the skill format and what a made skill may
      use. So the computer's agent needs no skill creator of its own.
+   - A time of day is asked for as the trigger's own window,
+     `during = { from = "22:00", to = "22:30" }`, not as a `[quiet]` window
+     around it. The brief once said the latter, and #2813's rerun on
+     lamp-0c89 got a 23.5 h `[quiet]` to fire around 22:00.
+   - It says `skill.toml` has no `name` key: the name is SKILL.md's, and
+     `name =` in `skill.toml` fails the check as an unknown field. That was
+     what failed #2813's rerun on lamp-0c89.
    - The request is at most 180 bytes, refused if longer, never cut.
    - Nothing else of the conversation goes with it.
    - The model says back only the request, never the brief, and hands it

@@ -90,11 +90,11 @@ pub fn brief(request: &str) -> Result<String, &'static str> {
     Ok(format!(
         "{BRIEF_HEAD} for the request at the end. Reply with exactly two fenced blocks, \
          ```skill.toml and ```SKILL.md, and nothing else; write no files. skill.toml: \
-         kind = \"installable\", version = \"1.0.0\"; [permissions] with only light = true \
-         and/or body = true, topics only voice/state and room/presence; one [trigger] on \
-         voice/state (field \"state\", equals \"resting\") or room/presence (field \"someone\", \
-         equals true or false), with for, cooldown, rearm = \"ends\"; a time of day as [quiet] \
-         from its end to its start (22:00 to 22:30: from \"22:30\", to \"22:00\"); \
+         kind = \"installable\", version = \"1.0.0\", no name key; [permissions] \
+         with only light = true and/or body = true, topics only voice/state and room/presence; \
+         one [trigger] on voice/state (field \"state\", equals \"resting\") or room/presence (field \"someone\", \
+         equals true or false), with for, cooldown, rearm = \"ends\"; a time of day as the \
+         trigger's during = {{ from = \"22:00\", to = \"22:30\" }}; \
          [ask] policy = \"nudge\"; [[do]] steps: light = {{ colour, level 1-5, for }} or \
          {{ dim = 1 }}, body = {{ gesture = \"nod\" or \"curious\" }}. SKILL.md: front matter \
          name (lowercase, hyphens) and description (one sentence: what it does, when). \
@@ -842,10 +842,7 @@ topic = "voice/state"
 field = "state"
 equals = "resting"
 cooldown = "12h"
-
-[quiet]
-from = "22:30"
-to = "22:00"
+during = { from = "22:00", to = "22:30" }
 
 [ask]
 policy = "nudge"
@@ -872,6 +869,16 @@ light = { dim = 1 }
         assert_eq!(request_of(&longest), request);
         let asked = brief("make me a skill  that dims\nthe light at 10 pm").unwrap();
         assert!(asked.ends_with("Request: make me a skill that dims the light at 10 pm"));
+        // A time of day is the trigger's own window (#2813's rerun on
+        // lamp-0c89: a 23.5 h [quiet] around 22:00, as the brief once said).
+        assert!(
+            asked.contains("during = { from = \"22:00\", to = \"22:30\" }"),
+            "{asked}"
+        );
+        assert!(!asked.contains("from its end to its start"), "{asked}");
+        // The name is SKILL.md's alone: a `name =` in skill.toml fails
+        // lamp-skills' check (Mobile on lamp-0c89, #2813).
+        assert!(asked.contains("no name key"), "{asked}");
         assert!(brief(&"x".repeat(MOST_REQUEST_BYTES + 1)).is_err());
         assert!(brief("  ").is_err());
         assert!(!is_brief("Write a poem about lamps"));
