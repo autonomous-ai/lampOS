@@ -1,0 +1,19 @@
+error[E0425]: cannot find function `read` in this scope
+    --> crates/update/tests/install.rs:4482:16
+     |
+4482 |     assert_eq!(read(&lamp, PINS), pins);
+     |                ^^^^ not found in this scope
+     |
+help: consider importing one of these functions
+     |
+   4 + use crate::fs::read;
+     |
+   4 + use std::fs::read;
+     |
+   4 + use std::ptr::read;
+     |
+   4 + use core::ptr::read;
+     |
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `lamp-update` (test "install") due to 1 previous error

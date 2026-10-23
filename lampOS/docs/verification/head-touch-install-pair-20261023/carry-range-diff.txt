@@ -1,0 +1,22 @@
+1:  2a63ecf92b = 1:  7869486592 lampOS: head touch on in the product units, whole: the voice's LAMP_HEAD_TOUCH, sleep mute and restored mute, Expression's --head-touch, the body's LAMP_HEAD_TOUCH, pins without legacy_head (#711)
+2:  f69bdea646 ! 2:  688bc98180 lampOS: the generic voice's census leaves head touch out of a moved lamp's group on purpose, with the product's own pins and try (#1362)
+    @@ lampOS/crates/update/src/unit.rs
+     @@ lampOS/crates/update/src/unit.rs: mod tests {
+              }
+              // Every switch attention.md names that the product voice sets is in the group above, or
+    -         // here, left out of a moved lamp's voice on purpose: a new attention switch can't be
+    +         // the clock group or here, outside the attention group: a new attention switch can't be
+     -        // forgotten (the Reviewer-lead's P3 on #2883).
+    --        const NOT_THE_GROUP: [&str; 7] = [
+    +-        const NOT_THE_GROUP: [&str; 5] = [
+     +        // forgotten (the Reviewer-lead's P3 on #2883). Head touch goes on with the product's
+     +        // own pins and its try (#1362); a moved lamp's controls carry no head lines yet.
+    -+        const NOT_THE_GROUP: [&str; 8] = [
+    -             "LAMP_CLOCK",
+    ++        const NOT_THE_GROUP: [&str; 6] = [
+                  "LAMP_FIRST_OUTPUT",
+     +            "LAMP_HEAD_TOUCH",
+    -             "LAMP_KERNEL_CLOCK",
+                  "LAMP_PROVIDER_PATIENCE",
+                  "LAMP_SECOND_LOOK",
+    +             "LAMP_THREAD_FILE",

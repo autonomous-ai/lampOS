@@ -5,6 +5,19 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 22:07 — combined carry pushed after host gates
+
+- First assigned the install preflight at 21:21. The complete carry is
+  pushed on `third/head-touch-install-pair` at `413378623`, based on latest
+  `be16c3327`, with #3269 already landed. [Receipt](verification/head-touch-install-pair-20261023/README.md).
+- Host gate: **1,062/0/6 ignored**, including install 87/0 and rounds 151/0;
+  formatting and strict Clippy pass. Both rejection controls and the mute
+  override now pass, with refusal-before-state and calibrated retry coverage.
+  The added-test compile failure is retained separately from the corrected run.
+- Next: open the self-contained PR, obtain Linux formatting and native gates,
+  and take the privacy review. First/Thirteen still route the audible-cue
+  prerequisite. Continue the watch; no lamp acceptance is claimed.
+
 ## 2026-10-23 21:18 — separate install activation gap reproduced
 
 - #2948 `f69bdea64` admits a preserved Voice head-off drop-in beside its

@@ -1,0 +1,45 @@
+{
+  "head": "413378623759a489a5eacd6072640a3e8038da3c",
+  "tree": "67ef50ee24b5067073c6933e45481d7fab6aab23",
+  "base": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+  "full_test_base": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+  "base_delta": [
+    "lampOS/docs/build-rows.md"
+  ],
+  "rebase_preserved_code_and_repair_patch": true,
+  "host_tests": {
+    "exit_code": 0,
+    "targets": 19,
+    "passed": 1062,
+    "failed": 0,
+    "ignored": 6
+  },
+  "clippy_exit_code": 0,
+  "mac_fmt_exit_code": 0,
+  "changed_source_sha256": {
+    "lampOS/crates/controls/tests/it/touch_pins.rs": "2d8702ed6b96da30ede82a5d70d96baf2d78ca751c28874df98c3a8ec0325211",
+    "lampOS/crates/setup/fixtures/reset-plan-example.json": "3a0d41df26c6d050bdbb77321bb6f36a8eaa3fe25f2ad3cb23e86ea1f8f9abfa",
+    "lampOS/crates/setup/fixtures/reset-plan-product.json": "f82d89481380f2a6851ebc09ffa400056494f55c2ff6552d8b58fed2742ebd6b",
+    "lampOS/crates/update/src/apply.rs": "8b6c9d73865dcc61a211486b1bf566bbc61ff626751f1dc24a6e360f80d8a3b7",
+    "lampOS/crates/update/src/head_touch.rs": "7458a9a81fb15d117c407b839c9d505391c757bbe1a936643f0511f39ca1a59b",
+    "lampOS/crates/update/src/install.rs": "af713c6d89eaf59cb272ac7d82cdef529da553a1724efd8da675609ca3e3b47e",
+    "lampOS/crates/update/src/unit.rs": "b77d25b64e966243f69e6f54b34a72fd9f8f812d800d7e6dad2634f0c4426f14",
+    "lampOS/crates/update/tests/install.rs": "c4033f35d3f06fbfcc69c47eb61488a9b7c2f8b47e9dd1c6874106d9080e6542",
+    "lampOS/deploy/product/lamp-body.service": "ec1ccd4c9f5c63e7dd25880da09100d75d8c37687261d945e98fb08cc0808bfe",
+    "lampOS/deploy/product/lamp-controls.service": "1a01dd19b140621fa29079823eb66241bf9dcfcf528e295afb83d4c30455ecc9",
+    "lampOS/deploy/product/lamp-expression.service": "e7b74d8b2754a3fcdffceb6358849c73d12f3fe48e0d4fb0ede0f9cdc911de85",
+    "lampOS/deploy/product/lamp-voice.service": "47bf48cda169d69c97536a3a569f1de44fdd7d7040b1543ca4e82480fb16983f",
+    "lampOS/deploy/product/lampos.conf": "3d5ae5d6c2351dbebc0f5e142441f1637f405c8258b3a6beb30f6f848571bf24",
+    "lampOS/deploy/product/settings/controls-pins.json": "6e9bf8fc1b6d192df8b832d8202a7fc152befeab5c6f83e1ba5eef0cff64987a",
+    "lampOS/docs/controls.md": "061d0a5aae057523a6642924b86c6c1df2bd1289c8b10cc5f369a7a521c94f6b",
+    "lampOS/docs/install.md": "9e260579c2964884eecfc711f0d9d4c63abc65a688dd8f1d34bbe4641e4ad566",
+    "lampOS/docs/setup.md": "b172ad03cff3d4591646e4151d731dcb626028256ddaf3b37a165a2b266aea39",
+    "lampOS/docs/switches.md": "02205ba06ce80f4185e41b5664f2c300cc606a57eefa96c8e041b3d9140ee5bf"
+  },
+  "raw_sha256": {
+    "host-tests.txt": "b8cb6b445b5fb0a8e8b4ba0986ff0c379098ab84df86d38edabe65e61458f11c",
+    "focused-controls.txt": "2889d708dd36f754bb03d6fda3c44c141718a780b9336f07bee1bfd007dd21f6",
+    "host-clippy.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-compile-failure.txt": "ab5eaa98d74abc7415119d8ec32596c3ce8d19d166dc42d9d123d7636bb1120e"
+  }
+}
