@@ -5925,6 +5925,7 @@ fn conversation_with_gate_inner(
                             .with_gain(crate::stop_words::gain_from_environment())
                             .with_language(language.as_deref())
                             .with_backchannel_holds(crate::stop_words::holds_backchannels())
+                            .with_backchannel_debug(crate::stop_words::debugs_backchannels())
                     } else {
                         // Heard in a yield the source stays the default
                         // (`Processed`), so the gain is passed only when the
@@ -5935,6 +5936,7 @@ fn conversation_with_gate_inner(
                                 crate::stop_words::source(),
                             ))
                             .with_language(language.as_deref())
+                            .with_backchannel_debug(crate::stop_words::debugs_backchannels())
                     }
                 })
                 .map_err(|error| eprintln!("lamp-voice: stop words are not heard: {error}"))
