@@ -75,5 +75,14 @@ source fingerprints match. The archive audit records 6,680 verified Git
 blob/mode identities. An earlier archive preparation timeout is retained;
 only the export budget changed, and the formatter ran once.
 
-The integration base is still `b5a199368`. First owns merge. No CI rerun
-or test weakening was used.
+## Landed verification
+
+First's train [#3261](https://github.com/autonomous-ai/lampOS/pull/3261)
+merged this change at `8e3eaa6c26cbe1a5a0c924f5b3a7e972d9083850`.
+All five authored file blobs match `7c3693e66` exactly, checked with
+`git rev-parse <commit>:<path>` for both commits. The train's
+[ARM64 run 39941472913](https://github.com/autonomous-ai/lampOS/actions/runs/39941472913)
+and [Linux Clippy run 39941472888](https://github.com/autonomous-ai/lampOS/actions/runs/39941472888)
+both completed successfully. Signing/publishing and failure-report jobs
+were skipped. This verifies the merged source and CI gates; it does not
+claim installation or spoken-time acceptance on a lamp.

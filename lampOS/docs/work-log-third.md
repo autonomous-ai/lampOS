@@ -5,6 +5,19 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 18:58 — clock landed; update transition review continues
+
+- #3260 landed through train #3261 at `8e3eaa6c2`. All five authored
+  blobs match the reviewed head. Train ARM64 and Linux Clippy passed;
+  the [receipt](verification/generic-voice-clock-20261023/README.md)
+  now records the merge. No device acceptance is claimed.
+- Re-read the current integration protocol and Queue. Second claimed
+  `second/update-head-touch-pins` for the #2948 transition fix at 18:52.
+  Third is preparing the independent partial-reader and rollback read;
+  there is no competing implementation. The prior conditional HOLD stays.
+- El still owns the #3248 retained-hand correction. Neither pending
+  review head changed. The clean main checkout now includes `0f6f728b2`.
+
 ## 2026-10-23 17:46 — clock formatting verified; merge belongs to First
 
 Ready for lamp-voice: yes (#3260); no device acceptance is claimed.
