@@ -1,6 +1,6 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-23 21:47 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-24 00:35 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
 **Build 92.4% over 70 rows. Quality 63.4% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
@@ -79,7 +79,7 @@ Written by the first builder from the team's review page at 2026-10-23 21:47 (+0
 | Guard mode, an installable skill | 0.85 | #2562 #2827 #2828 | jarvis | 22 Oct 15:1x, up from 0.75: merged, each off unless set: it names only a known person who said yes to being named (LAMP_GUARD_NAMES, #2562, 645d2f554), and it reads a return or a thank-you as off (LAMP_GUARD_WORDS_V2, #2… |
 | “Was anyone here while I was out?”, an installable skill | 1.00 | #1989 #2019 | nine, tests | 20 Oct 10:1x, built by the lead’s rule (merged and tried on lamp-4ace at 03:3x); |
 | Music to relax, an installable skill | 0.45 | #1685 #2792 #2793 | second, sixth, first | 22 Oct 11:35, up from 0.4: while requested music plays, the lamp shows it is busy, never resting (Second, #2879). |
-| Faces from a photo and “who is this?”, an installable skill | 0.88 | #2854 #2855 #2856 | mobile, ten | 23 Oct 18:5x, up from 0.85: the eyes’ half of a photo subject’s own yes is merged, off by default (LAMP_PHOTO_SPEAKER, Sixth, train 46). |
+| Faces from a photo and “who is this?”, an installable skill | 0.90 | #2854 #2855 #2856 | mobile, ten | 24 Oct 00:3x, up from 0.88: the eyes’ photo yes counts only a frame dated strictly after it, by one tested conversion, and ends when the voice closes its connection (#3279, train 51). |
 | Light shows and effects, a core skill | 1.00 | #1730 #2028 | twelve, nine | Built and merged (#1730): party, music and calm, under a minute, no flashing, stopping within 0.2 s when someone speaks. |
 | “I’m unplugging you”: it folds safely first, a core skill | 1.00 | #1699 #2478 | fifth | 21 Oct 11:30, built: #1699 merged as #2478 after its rebase, and Prepare to unplug is in every lamp’s default skills. |
 | Smoke and bad-air alerts, a core skill | 1.00 | — | — | 20 Oct 11:42, built: tried on lamp-52e6 with the lead (row 18): a smoke reading said once, the head lifted a little, an amber breath. |
