@@ -1,0 +1,48 @@
+{
+  "status": "passed",
+  "unique_executed_cases": 5896,
+  "selected_unrun": 1341,
+  "all_raw_slices_exact": true,
+  "both_checked_merges_bound_to_authored_trees": true,
+  "four_failed_path_sources_equal_base_peer_Expression": true,
+  "failed_function_exact_bytes_checked": true,
+  "no_rerun_or_new_execution": true,
+  "checks": [
+    {
+      "file": "source-binding.json",
+      "no_index_exit": 1,
+      "whitespace_diagnostics": 0
+    },
+    {
+      "file": "outcomes.json",
+      "no_index_exit": 1,
+      "whitespace_diagnostics": 0
+    },
+    {
+      "file": "external-raw-files.json",
+      "no_index_exit": 1,
+      "whitespace_diagnostics": 0
+    },
+    {
+      "file": "terminal-metadata.json",
+      "no_index_exit": 1,
+      "whitespace_diagnostics": 0
+    },
+    {
+      "file": "selected-raw-logs.json",
+      "no_index_exit": 1,
+      "whitespace_diagnostics": 0
+    },
+    {
+      "file": "README.md",
+      "no_index_exit": 1,
+      "whitespace_diagnostics": 0
+    },
+    {
+      "file": "case-outcomes.json",
+      "no_index_exit": 1,
+      "whitespace_diagnostics": 0
+    }
+  ],
+  "no_index_note": "Exit 1 with no diagnostics denotes the ordinary new-file difference, not a whitespace failure."
+}

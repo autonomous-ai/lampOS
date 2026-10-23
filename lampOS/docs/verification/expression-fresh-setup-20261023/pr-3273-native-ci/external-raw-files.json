@@ -1,0 +1,45 @@
+{
+  "files": [
+    {
+      "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+      "bytes": 1439914,
+      "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+    },
+    {
+      "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/terminal-workflow.json",
+      "bytes": 7803,
+      "sha256": "f7bae72e7a1aba10d141a12dfe453cf9eca9a77a2034f66008598097e581c982"
+    },
+    {
+      "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/terminal-required-jobs.json",
+      "bytes": 7038,
+      "sha256": "237ddad41397d2140340055f01483447c36800a439720cd8e76a4b84a75e464c"
+    },
+    {
+      "external_path": "/private/tmp/tests-expression-ci-20261023/clippy-39969098189/full-terminal-log.stdout.txt",
+      "bytes": 72643,
+      "sha256": "a5d17cd1d20c039fac0721e178182a6df5e3b2e770c4b99bccbe48c1c7c80396"
+    },
+    {
+      "external_path": "/private/tmp/tests-expression-ci-20261023/clippy-39969098189/full-terminal-log.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "external_path": "/private/tmp/tests-expression-ci-20261023/clippy-39969098189/terminal-workflow.json",
+      "bytes": 3365,
+      "sha256": "3014316d6a9b4eb68cc6ce6445cdbfd10993590705f0c677afae5a0640d90d2f"
+    },
+    {
+      "external_path": "/private/tmp/tests-expression-ci-20261023/clippy-39969098189/terminal-required-jobs.json",
+      "bytes": 3520,
+      "sha256": "0b39e69a6d26078348586ee9d183a844ff9de078dc9cd68bbd3cfb059e866bfd"
+    }
+  ],
+  "limits": "Local paths are not a promise of remote availability. Full original logs remain external and at the immutable Actions run URLs; selected failure/command/summary bytes are included here. No binaries, source exports, Python, whole Cargo streams or raw attribution-bearing API responses are published."
+}

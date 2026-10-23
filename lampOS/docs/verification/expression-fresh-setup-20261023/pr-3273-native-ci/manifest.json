@@ -1,0 +1,46 @@
+{
+  "scope": "All payloads except this manifest",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 3744,
+      "sha256": "ad80fb6e52740a0bdbcff57e193060d3f56b3043ec664a036f51b00733473c3c"
+    },
+    {
+      "path": "case-outcomes.json",
+      "bytes": 1044344,
+      "sha256": "9e6495f578af63255dc273f13a483c89998f711d114303c95b97e95007207991"
+    },
+    {
+      "path": "external-raw-files.json",
+      "bytes": 2178,
+      "sha256": "8c0ce84b256447e0c7607ba717960ae3c32a122df67cdbe5ccd35de2e5c21e7c"
+    },
+    {
+      "path": "outcomes.json",
+      "bytes": 5413,
+      "sha256": "e1e5c9689b72883051513e4e36e299ae1694e31522ffb3daf5ac0a042237223b"
+    },
+    {
+      "path": "selected-raw-logs.json",
+      "bytes": 35849,
+      "sha256": "62722eac3c164952fdba31ea15b66bfe8468261fde24204a3519bfbb620de22b"
+    },
+    {
+      "path": "source-binding.json",
+      "bytes": 5500,
+      "sha256": "e7dfc5422b904eeac38a98b70a2d7b90c39a81a3e06bf0d8bd735b664b2bb3c0"
+    },
+    {
+      "path": "terminal-metadata.json",
+      "bytes": 16785,
+      "sha256": "1c81fb558adef2f3929170e37b8f365dffb95dd378954092dd64e2c19b5a1bb0"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 1216,
+      "sha256": "b7e96cad0f2a7a8e48a9e3a3826d85d97761559b3d0cc2d1f696474fbdf2a609"
+    }
+  ],
+  "payload_bytes": 1115029
+}

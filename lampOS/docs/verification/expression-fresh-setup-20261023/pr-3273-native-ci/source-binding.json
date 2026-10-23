@@ -1,0 +1,127 @@
+{
+  "authored": {
+    "head": "809d8493f6ed5a6c2763fead1e66ce0c12b9313e",
+    "parent": "810e05109bced3beca88a5b602930cfed5fba4e5",
+    "tree": "7e3fa889d9dd7bc09275deb1c493be12d7bf43ee",
+    "branch": "tests/1806-expression-fresh-setup",
+    "commit_message": "lampOS: publish fresh Expression inputs after fixture setup",
+    "owned_paths": [
+      "lampOS/crates/expression/tests/runtime.rs",
+      "lampOS/docs/expression.md"
+    ],
+    "clean": true,
+    "all_tracked_committed_blobs_and_modes_match_tested_overlay": true,
+    "tracked_paths": 10033,
+    "tested_source_aggregate_sha256": "ae368921e44f27c88dbe750ac1f1926abd74c944727c359f8cfb270d7e53a05e",
+    "qualification": "The native gate compiled the base plus exact uncommitted overlays. This later commit has exactly the same tracked source tree; native executable identity is not relabeled as a build of this commit.",
+    "native_gate_exit": 1,
+    "failure_unwaived": true
+  },
+  "checked_merge": {
+    "sha": "f6f4d09615dac3d818a0d75f84aad0072ef44711",
+    "tree": "7e3fa889d9dd7bc09275deb1c493be12d7bf43ee",
+    "parents": [
+      "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "809d8493f6ed5a6c2763fead1e66ce0c12b9313e"
+    ],
+    "both_logs_checkout": {
+      "arm64": "f6f4d09615dac3d818a0d75f84aad0072ef44711",
+      "clippy": "f6f4d09615dac3d818a0d75f84aad0072ef44711"
+    },
+    "tree_equals_authored_head": true,
+    "raw_API": {
+      "external_path": "/private/tmp/tests-expression-ci-20261023/checked-merge-api.json",
+      "bytes": 2603,
+      "sha256": "f3f96f6f092fe36e9769779ca89f27afe4c39e9eada90e9adb46c39be762953e"
+    },
+    "attribution_fields_omitted": true
+  },
+  "peer": {
+    "pr": 3271,
+    "head": "55f671b12ef08c93f11ae235980f69cf7059b7a8",
+    "checked_merge": "a6a267bf26c1187170876292bd49c36a870ba0a3",
+    "tree": "c4f5ef905e6b1059badd4450c243a19b7d0165b4",
+    "parents": [
+      "810e05109bced3beca88a5b602930cfed5fba4e5",
+      "55f671b12ef08c93f11ae235980f69cf7059b7a8"
+    ],
+    "tree_equals_authored_head": true,
+    "receipt": {
+      "external_path": "/private/tmp/tests-peer-pr3271-ci-publication-20261023/prepared-public/checked-source.json",
+      "bytes": 3319,
+      "sha256": "695dcdcceccd2d4d1352dbf268926b70fe345420e008d1a369bbacf38b9c1481"
+    }
+  },
+  "failed_fixture_source_equalities": [
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "git_blob": "b4a80268976424bb08aa85065b61be164abe6c44",
+      "bytes": 770784,
+      "sha256": "4e3b891fd552bd5af867f32bed015fc2a89f0b352cf69e14d76ca80da1a4f89b",
+      "base_Expression_peer_byte_equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/room_told.rs",
+      "git_blob": "06d7707ebeffa20d03b8838c76ed3d6ca5081cfa",
+      "bytes": 95641,
+      "sha256": "6a3e4b07fc69e8ed9f5da3ab56e778221f97f018b4d996b2eeb9784b409e6cfb",
+      "base_Expression_peer_byte_equal": true
+    },
+    {
+      "path": "lampOS/crates/ipc/src/lib.rs",
+      "git_blob": "7b8f04f5ab480c998c4f932fd3d2a7571a2e26ab",
+      "bytes": 11409,
+      "sha256": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+      "base_Expression_peer_byte_equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/scenario_clock.rs",
+      "git_blob": "46def4e92fa76d4abcccca90d87a8ab427e22e97",
+      "bytes": 19292,
+      "sha256": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80",
+      "base_Expression_peer_byte_equal": true
+    }
+  ],
+  "exact_failed_function": {
+    "name": "with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+    "first_line": 8588,
+    "last_line": 8677,
+    "bytes": 3916,
+    "sha256": "3a88449d12e0ed750750632890c4ebea6f04f678c64323606150c7e460b1dc35"
+  },
+  "function_binding_method": "Recorded source-line span ending at the closing brace, excluding its final LF exactly as the peer extractor did; byte length and SHA256 checked independently. Entire containing file also equals the base and peer.",
+  "peer_comparison_receipt": {
+    "external_path": "/private/tmp/tests-peer-pr3271-comparison-20261023/prepared-public/source-identities.json",
+    "bytes": 9562,
+    "sha256": "f7802951b7fec63bdcb20f6ffe9d84fe978cb86ee3c1c7cf26eaccb005bce6be"
+  },
+  "CI_configuration": [
+    {
+      "path": ".github/workflows/lampos-arm64.yml",
+      "git_blob": "1c0ac73ea8f7c0970ebaec380bb057a0d17e3dd9",
+      "bytes": 18332,
+      "sha256": "ad1a4cd650db5f2a721b510263ff5c1697b09f872646395fb4cab6173f8757f9"
+    },
+    {
+      "path": ".github/workflows/lampos-clippy.yml",
+      "git_blob": "8e6dc386c08ece68de2c9a42446d2c9de080eb95",
+      "bytes": 4189,
+      "sha256": "2b41648cade7109e94995fd076f638166345867600e38e5e9aa9438a9b18c9ac"
+    },
+    {
+      "path": ".github/scripts/lampos-pr-crates.py",
+      "git_blob": "2213782569c8e9130dc40d6d632ffc04a78e0081",
+      "bytes": 5493,
+      "sha256": "c89f3cc802c1f385793f7a800142ae235ef7b09c00e38f1661427eecffcf2671"
+    },
+    {
+      "path": "lampOS/.config/nextest.toml",
+      "git_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+      "bytes": 5157,
+      "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+    }
+  ],
+  "later_integration_head": "09f8e7412",
+  "later_base_qualification": false,
+  "cause_limit": "Neither failed run records the fixture clock sample or an ELF hash. Byte equality and repeated failure do not prove cause. Recommend the same #3190 prerequisite disposition for First/Reviewer; no duplicate fix, stacking, rebase or retry here."
+}

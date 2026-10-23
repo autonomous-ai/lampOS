@@ -1,5 +1,44 @@
 # Tests work log
 
+## 2026-10-23 21:46 +0700 — Expression PR and terminal CI bound
+
+Ready for lamp-voice: no; #3273 remains draft/HOLD.
+
+The [terminal native receipt](verification/expression-fresh-setup-20261023/pr-3273-native-ci/)
+binds authored 809d8493f to its tested overlay across all 10,033 paths and to
+checked merge f6f4d0961. ARM64 39969098194 failed; Linux Clippy 39969098189 passed.
+ARM: 5,895 passes including one LEAK, one failure, 33 separate skips and
+1,341 selected cases unrun. Both changed Expression cases have literal PASS
+rows. The room-clock setup fails Unknown versus Quiet before that scenario.
+The entire failed fixture is byte-identical to base and peer #3271; this
+establishes source equality, not the failed clock sample or historical cause.
+
+Root verified all eight payloads, twenty exact raw slices, 5,896 unique
+result rows across 52 observed binaries, sixteen Git source bindings and
+the checked merge parents/tree. The 62 selected binaries reported by nextest
+are distinct from those 52 with observed rows. The earlier local light-call
+failure and all original qualification holds remain. No test was repeated
+while collecting this receipt. The later integration 09f8e7412 is not
+qualified by this old-base result. The first builder's subsequent fold of
+#3271 into #3190 is being prepared separately, as recorded above.
+
+## 2026-10-23 21:39 +0700 — fold peer closure into the clock PR on the latest base
+
+Ready for lamp-voice: no; all recorded failures remain unwaived.
+
+The first builder directed that #3271's two reviewed files join #3190,
+instead of waiting as a separate dependent PR. The claimed carry will use
+current integration 09f8e7412, preserve the prior heads and their failed
+receipts, and qualify the combined source separately. #3271 closes only
+after that combined branch is pushed. The shared target first completes
+the bounded Update diagnostic; no simultaneous Cargo work is planned.
+
+Expression #3273 is published at 809d8493f. Its source/control/local-receipt
+read found no P1/P2, but local light-call and native room-clock failures
+remain held. Both changed Expression cases passed on ARM64 before fail-fast;
+1,341 selected tests remain unrun. Train 50 changes Update, a reader in the
+qualified closure, so the old-base observations do not qualify the new base.
+
 ## 2026-10-23 21:20 +0700 — Expression full local gate complete
 
 Ready for lamp-voice: no; native PR checks and review remain required.

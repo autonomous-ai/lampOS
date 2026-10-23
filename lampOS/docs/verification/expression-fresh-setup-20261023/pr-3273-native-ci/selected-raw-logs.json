@@ -1,0 +1,266 @@
+{
+  "encoding": "Exact UTF-8 byte slices, no normalization",
+  "segments": [
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 18790,
+      "source_end": 19218,
+      "bytes": 428,
+      "sha256": "24d6ea7ad901c487f8df2d5e13f5ca00d270544ee5603f98d119b378458d6f90",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:06.6804341Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:06.6955320Z 4 added, 5 removed; done.\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:06.7248517Z Setting up clang (1:14.0-55~exp2) ...\n"
+    },
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 39634,
+      "source_end": 39894,
+      "bytes": 260,
+      "sha256": "3a82bf4a6eb9b7026dd9b6a463bc8d741a81e66584354f5ecea3ccbc57ffc908",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:18.3197298Z [command]/usr/bin/git log -1 --format=%H\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:18.3220301Z f6f4d09615dac3d818a0d75f84aad0072ef44711\n"
+    },
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 49292,
+      "source_end": 49644,
+      "bytes": 352,
+      "sha256": "a5b3193a8222f13925efd3817a224c1055c69c5670b5dfe4e9e537fafed2e571",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:24.4547001Z   1.96.0-aarch64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:24.4547397Z \nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:24.4547551Z \n"
+    },
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 69252,
+      "source_end": 69652,
+      "bytes": 400,
+      "sha256": "3846e6c7439878a47df08318159e2a94ec699226f65f2f54c7b4285503aa7d84",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:46.7681687Z host: aarch64-unknown-linux-gnu\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:46.7685694Z \nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:46.7704782Z ##[end-action id=__taiki-e_install-action.__run;outcome=success;conclusion=success;duration_ms=832]\n"
+    },
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 70691,
+      "source_end": 71369,
+      "bytes": 678,
+      "sha256": "8bcdac5975c84f2ca853415cd66ea3d65ae3b98694a120e47338aecc45ad06df",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:47.1980983Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:47.1981544Z   |\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:47.1982537Z   = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)`\n"
+    },
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 71736,
+      "source_end": 72418,
+      "bytes": 682,
+      "sha256": "1dc5757cbca086a55d3c164b00d5af2a988a93a59c3620b8cd8b4e588e23ea5d",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:47.1985506Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:47.1986005Z   |\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:47.1986967Z   = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)`\n"
+    },
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 72785,
+      "source_end": 73455,
+      "bytes": 670,
+      "sha256": "00069ba1bc8fdb1cd853de102bb934811692fdcfd1f6be7dfb517dbc4ffc7e3f",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:47.1989762Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:47.1990248Z   |\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:47.1991177Z   = note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/policy)`\n"
+    },
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 73822,
+      "source_end": 74496,
+      "bytes": 674,
+      "sha256": "85b0d436fce268e9a57aad5ad572511b1feaee74336ebdcdd1b70c5e67d383b6",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:47.1993576Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:47.1994078Z   |\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:23:47.1995002Z   = note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/policy)`\n"
+    },
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 90520,
+      "source_end": 95513,
+      "bytes": 4993,
+      "sha256": "46e5e3bc78cb3bb75d23b351f04c72917cc45c3ab7db0f08ebaa862ccd965063",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.2953653Z ##[group]Run echo \"cores: $(nproc)\"\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.2954001Z \u001b[36;1mecho \"cores: $(nproc)\"\u001b[0m\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.2954415Z \u001b[36;1mfilter='not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))'\u001b[0m\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.2954917Z \u001b[36;1mif [ -n \"$PICKED\" ]; then filter=\"$filter & ($PICKED)\"; fi\u001b[0m\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.2955300Z \u001b[36;1mcargo nextest run --locked --release --workspace \\\u001b[0m\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.2955607Z \u001b[36;1m  --profile pr \\\u001b[0m\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.2955834Z \u001b[36;1m  --no-tests=pass -j num-cpus \\\u001b[0m\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.2956094Z \u001b[36;1m  --partition hash:1/1 \\\u001b[0m\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.2956330Z \u001b[36;1m  -E \"$filter\"\u001b[0m\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.2974224Z shell: /usr/bin/bash -e {0}\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.2974458Z env:\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.2975475Z   PICKED: package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.2976753Z ##[endgroup]\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.3201657Z cores: 4\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7832780Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7833346Z   |\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7834337Z   = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)`\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7835729Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7836300Z   = help: consider changing their names to be unique or compiling them separately\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7836966Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7837469Z   |\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7838437Z   = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)`\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7839900Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7840468Z   = help: consider changing their names to be unique or compiling them separately\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7841110Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7841593Z   |\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7842524Z   = note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/policy)`\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7843724Z   = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>\n"
+    },
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 95684,
+      "source_end": 96358,
+      "bytes": 674,
+      "sha256": "70eb75fb71d09a08be02e5d1b3159ed5c676b64cb4855351e0b0bb8f08000b22",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7844917Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7845415Z   |\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:15.7846336Z   = note: the example target `progress_cost` in package `lamp-tasks v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/tasks)` has the same output filename as the example target `progress_cost` in package `lamp-policy v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/policy)`\n"
+    },
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 97353,
+      "source_end": 97521,
+      "bytes": 168,
+      "sha256": "e515ae574bdc6b708f7dc9099c8dc0f9ca9c218888c3717fec712a0b49c3892e",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:18.2452126Z     Starting 7237 tests across 62 binaries (33 tests and 106 binaries skipped)\n"
+    },
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 336711,
+      "source_end": 336925,
+      "bytes": 214,
+      "sha256": "8b1828eb8ee3bd43c7b64888fc1fc8fbeb9262537b8580d197a5fe3b7ed818ed",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:34.9962873Z         PASS [   0.009s] (1117/7237) lamp-expression::runtime enabled_output_uses_a_new_session_and_expires_after_input_loss\n"
+    },
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 337546,
+      "source_end": 337775,
+      "bytes": 229,
+      "sha256": "26137abea173daff0d3082efd9ef22be61d460e046e0dd08f178d5fe80f6ce99",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:25:35.0202011Z         PASS [   0.010s] (1121/7237) lamp-expression::runtime only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline\n"
+    },
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 1209499,
+      "source_end": 1209703,
+      "bytes": 204,
+      "sha256": "3085fec9a0761f4afdab9418fd1b22edfad78e0a69618a126e066ea9ddcafaa9",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:14.0655372Z         LEAK [   0.217s] (5092/7237) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal\n"
+    },
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 1389561,
+      "source_end": 1393922,
+      "bytes": 4361,
+      "sha256": "5e601e8d2951f162eff9072cb7d4be33dd23fbe2a85e0f378a129ea337a33d5e",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3853869Z         FAIL [   0.006s] (5893/7237) lamp-voice second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3854730Z   stdout \u2500\u2500\u2500\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3854844Z \nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3854919Z     running 1 test\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3855363Z     test second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy ... FAILED\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3855778Z \nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3855850Z     failures:\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3855955Z \nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3856021Z     failures:\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3856400Z         second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3856779Z \nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3857044Z     test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3699 filtered out; finished in 0.00s\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3857421Z \nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3857521Z   stderr \u2500\u2500\u2500\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3857665Z \nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3858195Z     thread 'second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy' (35174) panicked at crates/voice/src/second_provider/worker.rs:8632:17:\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3859051Z     assertion `left == right` failed\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3859286Z       left: Unknown\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3859466Z      right: Quiet\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3859775Z     note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3860066Z \nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.3860196Z   Cancelling due to test failure: 3 tests still running\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.6808486Z         PASS [   5.539s] (5894/7237) lamp-voice second_provider::worker::tests::a_close_face_turned_over_the_line_counts_for_a_first_word_through_the_eyes\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:27.9238537Z         PASS [   4.017s] (5895/7237) lamp-voice second_provider::worker::tests::the_lamps_name_carries_only_on_a_sign_of_one_speaker\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:28.2887935Z         PASS [   3.848s] (5896/7237) lamp-voice second_provider::worker::tests::with_addressed_a_line_said_close_and_facing_is_let_out_in_a_busy_room\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:28.2909159Z \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:28.2909623Z      Summary [ 130.046s] 5896/7237 tests run: 5895 passed (1 leaky), 1 failed, 33 skipped\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:28.2910286Z         PASS [   3.625s] ( 640/7237) lamp-skills::it skills::a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:28.2910855Z   stdout \u2500\u2500\u2500\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:28.2910961Z \n"
+    },
+    {
+      "kind": "arm64",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/arm64-39969098194/full-terminal-log.stdout.txt",
+        "bytes": 1439914,
+        "sha256": "742b88ed80dc72f93b46f2f99b819c1ab959070c5ba13d5b73af30d1f21be28d"
+      },
+      "source_start": 1436282,
+      "source_end": 1436744,
+      "bytes": 462,
+      "sha256": "a4af2baa0cb7a7e7a57645c3f7674982e36cdbed8e851397fc3b3616cb08b329",
+      "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:28.3015383Z warning: 1341/7237 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:28.3015912Z error: test run failed\nlampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-23T14:27:28.3030727Z ##[error]Process completed with exit code 100.\n"
+    },
+    {
+      "kind": "clippy",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/clippy-39969098189/full-terminal-log.stdout.txt",
+        "bytes": 72643,
+        "sha256": "a5d17cd1d20c039fac0721e178182a6df5e3b2e770c4b99bccbe48c1c7c80396"
+      },
+      "source_start": 26399,
+      "source_end": 26857,
+      "bytes": 458,
+      "sha256": "e1a67452335bb9e14807348f99ea9ca0bce96b3cbac3060d2e8f389e6ced7f76",
+      "utf8": "lampOS \u2014 clippy, every crate and target (x86 Linux)\tsystem packages\t2026-10-23T14:23:16.8867867Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tsystem packages\t2026-10-23T14:23:16.8986208Z 4 added, 5 removed; done.\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tsystem packages\t2026-10-23T14:23:16.9334788Z Setting up clang (1:14.0-55~exp2) ...\n"
+    },
+    {
+      "kind": "clippy",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/clippy-39969098189/full-terminal-log.stdout.txt",
+        "bytes": 72643,
+        "sha256": "a5d17cd1d20c039fac0721e178182a6df5e3b2e770c4b99bccbe48c1c7c80396"
+      },
+      "source_start": 46965,
+      "source_end": 47261,
+      "bytes": 296,
+      "sha256": "fe91f55d7831ab50c335b75df43d01238f8cd621a52e0eed1df2eb67f27d0aa6",
+      "utf8": "lampOS \u2014 clippy, every crate and target (x86 Linux)\tRun actions/checkout@v4\t2026-10-23T14:23:30.3821105Z [command]/usr/bin/git log -1 --format=%H\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tRun actions/checkout@v4\t2026-10-23T14:23:30.3846847Z f6f4d09615dac3d818a0d75f84aad0072ef44711\n"
+    },
+    {
+      "kind": "clippy",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/clippy-39969098189/full-terminal-log.stdout.txt",
+        "bytes": 72643,
+        "sha256": "a5d17cd1d20c039fac0721e178182a6df5e3b2e770c4b99bccbe48c1c7c80396"
+      },
+      "source_start": 49515,
+      "source_end": 49884,
+      "bytes": 369,
+      "sha256": "e527efb8f5cd29d44fb0f9527eb44ff021de8655239073739aacc06c50c01237",
+      "utf8": "lampOS \u2014 clippy, every crate and target (x86 Linux)\tRust 1.96.0\t2026-10-23T14:23:37.7792381Z   1.96.0-x86_64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tRust 1.96.0\t2026-10-23T14:23:37.7792676Z \nlampOS \u2014 clippy, every crate and target (x86 Linux)\tRust 1.96.0\t2026-10-23T14:23:37.7793971Z \n"
+    },
+    {
+      "kind": "clippy",
+      "source": {
+        "external_path": "/private/tmp/tests-expression-ci-20261023/clippy-39969098189/full-terminal-log.stdout.txt",
+        "bytes": 72643,
+        "sha256": "a5d17cd1d20c039fac0721e178182a6df5e3b2e770c4b99bccbe48c1c7c80396"
+      },
+      "source_start": 60693,
+      "source_end": 69266,
+      "bytes": 8573,
+      "sha256": "bbba70bbe0dd22ceacfe05c417f96083e942373ce96ff2ea1835a262c2bb6dd8",
+      "utf8": "lampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t\ufeff2026-10-23T14:24:25.8535887Z ##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:25.8536322Z \u001b[36;1mcargo clippy --locked --workspace --all-targets -- -D warnings\u001b[0m\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:25.8597450Z shell: /usr/bin/bash -e {0}\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:25.8597667Z ##[endgroup]\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:25.9180630Z info: syncing channel updates for 1.96.0-x86_64-unknown-linux-gnu\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:26.1317137Z info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:26.1419047Z info: component clippy is up to date\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:26.1422700Z info: downloading component rustfmt\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:28.0181558Z     Checking lamp-msgs v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/msgs)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:28.0245767Z     Checking lamp-audio v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/audio)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:31.0637211Z     Checking lamp-update v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/update)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:31.0665386Z     Checking lamp-lean v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/lean)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:31.0672634Z     Checking lamp-schedule v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/schedule)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:31.2153765Z     Checking lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:31.3449206Z     Checking lamp-health v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/health)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:31.9270500Z     Checking lamp-policy v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/policy)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:32.5899563Z     Checking lamp-actions v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/actions)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:32.7375412Z     Checking lamp-memory v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/memory)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:33.3326069Z     Checking lamp-tasks v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/tasks)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:33.4782701Z     Checking lamp-ears v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/ears)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:33.7529690Z     Checking lamp-keeper v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/keeper)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:33.7999922Z     Checking lamp-records v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/records)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:34.0571984Z     Checking lamp-eyes v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/eyes)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:34.1355462Z     Checking lamp-body v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/body)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:34.6805453Z     Checking lamp-setup v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/setup)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:35.7125308Z     Checking lamp-air v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/air)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:35.8275194Z     Checking lamp-name v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/name)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:35.9635400Z     Checking lamp-surround v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/surround)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:36.0547387Z     Checking lamp-mood v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/mood)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:36.1494515Z     Checking lamp-settings v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/settings)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:36.4895342Z     Checking lamp-peek v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/peek)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:36.6505328Z     Checking lamp-addons v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/addons)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:36.8424878Z     Checking lamp-selftest v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/selftest)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:36.9765315Z     Checking lamp-station v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/station)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:38.7870448Z     Checking lamp-voice v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/voice)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:24:38.8134472Z     Checking lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:25:03.6575433Z     Checking lamp-skills v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/skills)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:25:04.9329260Z     Checking lamp-voice-eval v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/voice-eval)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:25:07.7165490Z     Checking lamp-cloud v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/cloud)\nlampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t2026-10-23T14:25:49.3695226Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 22s\n"
+    }
+  ],
+  "scope": "Checkout/toolchain/config command lines, warnings, complete Clippy command output, nextest starting/summary, both authored case rows, leaky row and complete first failure block. This is explicitly not a full-log publication."
+}
