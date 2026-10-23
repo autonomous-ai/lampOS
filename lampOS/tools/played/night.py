@@ -240,14 +240,8 @@ def wer(said, heard):
 
 
 def score(played, ev, J, L, heard_by):
-    # Offsets: the journal and the Mac read the same wall clock to within the ssh time; the events' own times are the
-    # lamp's monotonic clock, so they are placed by when they reached the Mac.
+    # The journal and this computer read the same wall clock to within the ssh time.
     out = []
-    # The lamp's own clock places an event; the Mac only reads it when it next looks (not while a clip plays), so the
-    # smallest read delay seen gives the offset to the Mac's clock.
-    offs = [r['_mac'] - r['at_us'] / 1e6 for r in ev.rows if isinstance(r.get('at_us'), int)]
-    off = min(offs) if offs else None
-    def when(r): return r['at_us'] / 1e6 + off if off is not None and isinstance(r.get('at_us'), int) else r['_mac']
     for i, p in enumerate(played):
         voice, kind, text = L[p['id']]
         until = played[i + 1]['start'] if i + 1 < len(played) else p['end'] + 45
@@ -265,9 +259,6 @@ def score(played, ev, J, L, heard_by):
                 if m: firsts.append(int(m.group(1)))
                 if re.search(rf"request {q}'s words, cut short, are let go", l): let_go += 1
                 if re.search(rf'request {q}.*joined', l): joined += 1
-        answered = any(r.get('kind') == 'speaker_first_write' and p['start'] <= when(r) < until for r in ev.rows)
-        # Every verdict held back and nothing said: a sound in the window was not this line's answer.
-        if answered and verdicts and all(v.startswith('held back') for v in verdicts) and not answer: answered = False
         # What was spoken is the journal's own line for the request ("first answer audio"): a transcript can hold words
         # the voice cancelled (a not_for_me after its text), and a sound's time is only when the Mac read it.
         answered = bool(firsts)
