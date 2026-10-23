@@ -5413,10 +5413,12 @@ impl Heeding {
         }
     }
 
-    /// The call let out `by` longer ago, as time passes in a test.
+    /// The call let out `by` longer ago, as time passes in a test. On a
+    /// clock booted under `by` ago the call stays where it is, never a
+    /// panic (#1569).
     #[cfg(test)]
     pub(crate) fn call_older(&mut self, by: Duration) {
-        self.called_at = self.called_at.map(|at| at - by);
+        self.called_at = self.called_at.map(|at| at.checked_sub(by).unwrap_or(at));
     }
 
     /// How long ago the lamp's words sent were played to their end
