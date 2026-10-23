@@ -73,6 +73,35 @@ baseline and fails **0 / 1** with the proposed production diff. It checks
 the limp guard's smaller movement threshold before the slump. No review
 clearance is given while these three current-head failures remain.
 
+## Exact PR-head confirmation
+
+To separate these findings from the newer integration baseline, all three
+remaining cases were rerun in a detached checkout of exact PR head
+`8c76a3dab56b389bc898ee0d7573908fed3dc89b`. Only three tests and diagnostic
+output were appended to `body/tests.rs` (200 added lines); every existing
+test and production file remained unchanged. The checkout stayed at the
+same head throughout, and `git diff --check` passed.
+
+Each case failed **0 / 1**, exit 101, with 421 tests filtered out. Release
+still reports true at steps 227 and 228 after the first quiet step 226.
+The gentle-hold window has 95 observations, from step 250 through 344;
+all 95 report false at pitch load 130, with position equal to goal 2,000.
+The 13-count case has 15 false rows while the verified physical hold
+continues; its exact times are in the [movement receipt](limp-movement-reporting.md).
+
+Commands and environment are the same filters listed above, plus the
+movement case's command. Wall times were 103.943 seconds for release
+including compilation, 0.372 seconds for retention and 0.348 seconds for
+the movement case. These remain Mac deterministic test results, not
+Linux, ARM64 or on-device evidence.
+
+The command-line defaults also matter when judging applicability. Both
+`8c76a3dab` and deployed source `f012c4725` set absent `--give-way` to
+`Some(GiveWay::Return)` and absent `--limp` to on
+(`bin/lamp-body.rs:568-569`; the same code is at 580-581 in `51186d5ea`).
+An argv without either flag therefore does not establish that they are
+off. This is a source check; no fresh lamp inspection was performed.
+
 ## Complete acceptance cases
 
 ```rust

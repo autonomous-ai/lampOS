@@ -23,6 +23,25 @@ The physical guards still execute; the failure is the reported hand.
 The helper's simulated clock has a different origin from `Glimpse.step`.
 These are fixture observations, not measurements from a lamp.
 
+## Exact-head timing confirmation
+
+A separate exact checkout of `8c76a3dab` reproduced this failure with
+only the three review tests appended. The original test file prefix and
+all production files were unchanged. The assertion is unchanged; a compact
+pre-assert diagnostic was added to count the whole observation window.
+All **15 of 15** observations between 12.306400 and 12.586400 simulated
+seconds report no hand, while every row verifies goal 1,900, position
+1,913, load zero, no release and no limp. The slump occurs at 12.706400
+seconds. Thus the first checked false report is about 400 ms before the
+slump, with 280 ms between the first and last checked false samples.
+
+The windows need not start together: this fixture's initial contact load
+ends after 200 ms, then a quiet gap precedes the 13-count move at 600 ms.
+The quiet gap resets `in_hand`, while `felt` continues aging. Also,
+`8c76a3dab` assigns `felt` only in the predicate at `body.rs:5711-5722`;
+the give-way step sets `gave_first`, not an unconditional new reporting
+timer. The retained exact-head fixture below includes the diagnostic.
+
 Command, from `lampOS/`, with `CARGO_BUILD_JOBS=2` and the isolated
 `CARGO_TARGET_DIR=/private/tmp/third-body-gates-target`:
 
@@ -94,6 +113,39 @@ fn a_pinned_pitch_held_thirteen_counts_away_still_says_a_hand_before_slump() {
     assert!(Duration::from_secs_f32(report.released[0].seconds) > window.end);
     let held: Vec<_> = seen.iter().filter(|(at, _)| window.contains(at)).collect();
     assert!(!held.is_empty(), "no held steps before the slump");
+    let false_rows: Vec<_> = held
+        .iter()
+        .filter(|(_, g)| !g.hand)
+        .map(|(at, g)| {
+            serde_json::json!({
+                "at_us": at.as_micros(),
+                "step": g.step,
+                "goal": g.goals[0],
+                "position": g.positions[0],
+                "load": g.loads[0],
+                "hand": g.hand,
+                "limp": g.limp,
+                "released": g.released,
+            })
+        })
+        .collect();
+    eprintln!(
+        "third_13_count_control {}",
+        serde_json::json!({
+            "window_from_us": window.start.as_micros(),
+            "window_until_us": window.end.as_micros(),
+            "rows": held.len(),
+            "false_rows": false_rows.len(),
+            "first_false": false_rows.first(),
+            "last_false": false_rows.last(),
+            "slump_s": report.released[0].seconds,
+            "all_rows_match_physical_hold": held.iter().all(|(_, g)| {
+                !g.limp && g.released == 0 && g.eased == [1, 0, 0]
+                    && g.goals[0] == pinned_at
+                    && g.positions[0] == pinned_at + moved && g.loads[0] == 0
+            }),
+        })
+    );
     for (_, g) in held {
         assert!(!g.limp && g.released == 0 && g.eased == [1, 0, 0], "{g:?}");
         assert_eq!(g.goals[0], pinned_at, "{g:?}");

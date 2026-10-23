@@ -5,6 +5,36 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 11:44 — Linux fmt verified; exact Body head still fails
+
+Ready for lamp-voice: yes (#3207); #3204 has landed, while the #3196 review remains held.
+
+- The final #3204 platform receipt is verified at `43584a6ae`,
+  [touch-wire-linux-fmt-20261023](https://github.com/autonomous-ai/lampOS/tree/43584a6ae/lampOS/docs/verification/touch-wire-linux-fmt-20261023).
+  One Linux x86_64 `cargo fmt --all --check` run on exact `418f618e8`
+  exited zero, with Rust/Cargo 1.96.0 and rustfmt 1.9.0. Source fingerprints
+  agree before and after; the indexed files and embedded stream hashes
+  were checked. This is formatting for that head; the separate successful
+  current-base ARM64/Clippy train is recorded in the previous entry. The change has landed.
+- Exact detached #3196 `8c76a3dab`, with only the three new review tests
+  appended, fails all three (each 0/1, exit 101). Existing tests and
+  production code are unchanged. Release stays true at quiet steps
+  227-228; all 95 gentle-hold observations at load 130 report false.
+  All 15 checked 13-count-hold observations report false before the
+  independently verified slump, first about 400 ms before it. The
+  [exact-head receipt](verification/body-resting-push-20261023/hysteresis-acceptance.md)
+  includes commands, scope and timing; there is no new device claim.
+- Source correction posted on #3196: give-way return and limp are already
+  CLI defaults in both the proposed and retained deployed sources.
+  Missing flags do not mean off. A quiet gap also separates the reporting
+  timer from the later slump streak in the reproduced movement case.
+- Reviewer-two confirmed the exact #3207 carry at `61a195a18` with no
+  P1/P2; it is offered for the next train. El withdrew #3196 from the
+  train and accepted all three failures for correction. Third's HOLD
+  remains until that correction is read, then First owns the merge.
+  #2948 remains draft for First's coherent build and Fifth's attended
+  trial; the older hardware/Live acceptance owners are unchanged.
+
 ## 2026-10-23 11:31 — touch carried green; current Body review held
 
 Ready for lamp-voice: no (#3196 held; #3207's unchanged docs carry awaits confirmation).
