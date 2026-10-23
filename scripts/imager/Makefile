@@ -91,7 +91,7 @@ IMG_FILE := $(IMG_FILE_$(TARGET))
 # straight from the raw .img — skips waiting for xz compression, and writes via rdiskN.
 RAW_IMG_rpi := golden.img
 RAW_IMG_opi := $(DEVICE_TYPE)/golden-opi.img
-RAW_IMG := $(RAW_IMG_$(TARGET))
+RAW_IMG := $(if $(filter lamp-v2,$(DEVICE_TYPE)),lamp-v2/lamp-os-v2.img,$(RAW_IMG_$(TARGET)))
 
 # Preflight — check Docker resources + clean dangling layers before a long
 # build run. Avoids the most common failure modes: OOM (Docker memory < 4GB)
@@ -163,13 +163,13 @@ build: build-preflight
 # is required. LAMPOS_CHANNEL_DIR, a signed channel folder, replaces the product channel at build.
 # LAMPOS_MODELS_DIR holds the models release's files, for those install cannot fetch (a draft release).
 #   make build-v2 LAMPOS_UPDATE_KEY=~/key.pub [LAMPOS_CHANNEL_DIR=~/lampos-channel] [VARIANT=pro] [COMPRESS=0]
-#   → output/lamp-v2/golden-opi-lamp-v2[-<variant>].img.xz
+#   → output/lamp-v2/lamp-os-v2[-<variant>].img.xz (COMPRESS=0: output/lamp-v2/lamp-os-v2.img)
 LAMPOS_UPDATE_KEY ?=
 LAMPOS_CHANNEL_DIR ?=
 LAMPOS_CHANNEL_URL ?=
 LAMPOS_MODELS_DIR ?=
 V2_INPUT := input/lamp-v2
-V2_IMG_FILE := lamp-v2/golden-opi-lamp-v2$(VARIANT_SUFFIX).img.xz
+V2_IMG_FILE := lamp-v2/lamp-os-v2$(VARIANT_SUFFIX).img.xz
 
 build-v2:
 	@[ -n "$(LAMPOS_UPDATE_KEY)" ] && [ -s "$(LAMPOS_UPDATE_KEY)" ] || { echo "ERROR: LAMPOS_UPDATE_KEY=<the update key's public half> is required"; exit 1; }
@@ -195,7 +195,7 @@ build-v2:
 	-e AP_BAND=$(AP_BAND) \
 	-e COUNTRY_CODE=$(COUNTRY_CODE) \
 	pi-builder /work/build-orangepi-v2.sh
-	@if [ -f output/lamp-v2/golden-opi.img.xz ]; then mv -f output/lamp-v2/golden-opi.img.xz output/$(V2_IMG_FILE); echo "==> Built image: output/$(V2_IMG_FILE)"; else echo "==> Built raw image: output/lamp-v2/golden-opi.img"; fi
+	@if [ -f output/lamp-v2/lamp-os-v2.img.xz ]; then mv -f output/lamp-v2/lamp-os-v2.img.xz output/$(V2_IMG_FILE); echo "==> Built image: output/$(V2_IMG_FILE)"; else echo "==> Built raw image: output/lamp-v2/lamp-os-v2.img"; fi
 
 sd-card-list:
 	diskutil list
