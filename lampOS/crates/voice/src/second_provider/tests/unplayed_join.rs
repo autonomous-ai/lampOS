@@ -80,6 +80,8 @@ async fn chats_after_a_cut_of(
             text: "SYSTEM".to_owned(),
             after: None,
             history,
+            requires_speaker: false,
+            pending_private_context: false,
         }
     });
     let now = Arc::new(Mutex::new(Instant::now()));
@@ -273,6 +275,8 @@ fn kept_thread() -> (Arc<Mutex<Thread>>, System) {
             text: "SYSTEM".to_owned(),
             after: None,
             history,
+            requires_speaker: false,
+            pending_private_context: false,
         }
     });
     (thread, system)

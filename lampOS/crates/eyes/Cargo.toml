@@ -53,6 +53,8 @@ jpeg-encoder = "=0.7.1"
 base64 = "0.22"
 
 [target.'cfg(target_os = "linux")'.dependencies]
+# Safe filesystem/UID checks for the private tmpfs speaker source.
+rustix = { version = "=1.1.5", features = ["fs", "process"] }
 lamp-camera = { path = "../camera" }
 lamp-turn-owner = { path = "../turn-owner" }
 

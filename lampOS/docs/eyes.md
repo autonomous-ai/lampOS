@@ -922,6 +922,57 @@ this room" until someone asks to be recognised.
   The voice reads it as it reads `known`, so whatever access a deploy gives
   the voice to `known` it needs to `known-face` too (the voice runs as root
   on lamp-4ace and in the product unit).
+- **Explicit speaker observation** (#3014): with the same tracking switches,
+  `known-speaker` beside `known` publishes one atomic JSON record. A positive
+  record has `state: "seen"`, `name`, optional `id`, the actual faces-publisher
+  `boot`, passing `face`, a random 32-hex `publisher` lifecycle and a nonzero
+  `generation`. A successful empty detection may publish `state: "absent"`
+  with only boot, publisher and generation. It carries no new identity and
+  can only continue a request that Voice already pinned from a positive record.
+  A detected return after absence, even with the same passing face ID, or a
+  changed visible track first publishes identity-free `state: "checking"`.
+  Recognition runs immediately for that candidate, before the ordinary 2 s
+  refresh is due; an unchanged unmatched candidate then keeps that ordinary
+  cadence. Checking grants no personal output and is not ordinary absence.
+  Voice may pause only an already pinned v2 request for that exact epoch and
+  person. A completed positive match for the same name, optional stable ID,
+  boot, publisher and generation returns that request to Ready, even with a
+  new passing face ID, resuming held work without duplicate delivery. Its
+  original grant and audio-end-plus-30-second maximum deadline do not change;
+  the source still expires after 3 s. Initial/legacy Checking never grants or
+  pauses authority. Missing/stale source, another epoch/person, hard revocation,
+  forget, privacy or an error is terminal, not a resumable wait. A fresh proved
+  ask may use a later positive observation.
+  Disappearance before recognition completes advances the generation before
+  another absence is published, so a reader cannot miss the unresolved return.
+  Visible unaligned/unmatched faces and model/decode/camera errors hard-revoke,
+  not ordinary absence. A `revoked` record advances the generation before
+  forgetting, privacy loss, store mutation or teardown; a later `seen` keeps
+  that generation. A new publisher lifecycle cannot continue an old request.
+  Generation exhaustion or publication failure disables the source.
+  The file stays in the existing volatile `/run` folder, mode 0600 and owned
+  by the Eyes writer. Linux checks the canonical parent is on tmpfs, owned by
+  that writer and not group/other writable. An existing legacy `known` must
+  also be a regular 0600 file owned by the writer; its ordinary removal does
+  not prevent an explicit absence record. Persistent custom locations cannot
+  enable this source. Publication uses an exclusive temporary file and atomic
+  rename. Startup and orderly exit invalidate it; abrupt death leaves no fresh
+  look and the source expires. No heartbeat invents a successful camera look.
+  A skipped empty-room inference cannot refresh the record. The active source
+  must ask for a real detection at its recognition refresh cadence instead of
+  turning the empty-room optimization into either fabricated absence or a
+  routine revocation; this work stays in the independent Eyes process.
+  Readers require the opened record's own freshness (3 s), with metadata and
+  content from the same bounded FD. Wall time is sampled after open metadata;
+  monotonic expiry remains anchored before I/O. Future/stale/missing/invalid
+  records refuse, never imply absence. Legacy `known` and `known-face` stay
+  compatible. Legacy positive-only source records grant no absence continuation.
+  Voice requires request-owned positive speaking evidence and an exact initial
+  face/person match. Neither the file nor a geometric passing ID proves
+  physical identity, acoustic authentication or liveness. No frame, print,
+  audio, durable history, extra model tool or RPC is added. This source change
+  does not activate the product's second-route name switch; #3014 and its
+  physical owner checks remain separate. The Live route is unchanged.
 - **Named in Who was here, only with their yes** (#1997, the lead's yes on
   20 Oct; nothing asks it until the voice's question is built):
   - `{"visits_yes":NAME}` keeps a remembered person's yes to being named to
@@ -2075,6 +2126,15 @@ with the known face's id the eyes keep beside the known file
   350 ms on the 10 fps camera (`main.rs`), so 2 s holds 5 to 8 looks. With
   `--steady-rate` a still face is looked at 500 to 600 ms apart, 4 looks a
   window, under the 5 the score needs, so in practice `unknown` (below).
+- **Lamp-4ace source preparation (#3064):** the repository units enable
+  `LAMP_EYES_SPEAKING=on` in Eyes and Voice, with `--steady-rate off` for
+  the regular speaking window. The exact retained Eyes pin accepts all
+  16 unit flags, including this argument's on/off syntax
+  ([receipt](verification/common-checking-20261023/README.md)). Its extra
+  detector work, CPU, temperature and voice-latency cost are unmeasured here. Compatible qualified Voice/Eyes
+  artifact pins, installation and a new known-person lamp run remain owed.
+  The source choice changes neither the classifier's thresholds nor the
+  historical measurements below, and is not a physical qualification.
 - **How fast it answers** (looks every 250 to 350 ms): `yes` on the first
   look after talking starts (0.06 to 0.18 s), and held 1.3 to 1.8 s after
   it stops, the 2 s window emptying.
