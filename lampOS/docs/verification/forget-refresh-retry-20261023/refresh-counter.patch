@@ -1,0 +1,152 @@
+--- a/lampOS/crates/memory/tests/it/voice.rs
++++ b/lampOS/crates/memory/tests/it/voice.rs
+@@ -36,6 +36,7 @@
+     store: Days,
+     trace: Sender<(Value, Value)>,
+     hold: Option<Receiver<()>>,
++    refuse_forget: bool,
+ }
+ 
+ impl Memory for Traced {
+@@ -43,7 +44,13 @@
+         if let Some(hold) = self.hold.take() {
+             hold.recv_timeout(Duration::from_secs(5)).unwrap();
+         }
+-        let answer = days_protocol::answer(&mut self.store, line, now);
++        let request: Value = serde_json::from_slice(line).unwrap();
++        let answer = if self.refuse_forget && request["op"] == "forget" {
++            self.refuse_forget = false;
++            Answer { line: json!({"ok":false,"error":"io"}).to_string(), log: "synthetic refused forget".into(), storage_fault: true, wrote: false, forgot: None }
++        } else {
++            days_protocol::answer(&mut self.store, line, now)
++        };
+         let _ = self.trace.send((
+             serde_json::from_slice(line).unwrap(),
+             serde_json::from_str(&answer.line).unwrap(),
+@@ -63,6 +70,10 @@
+ 
+ impl Fixture {
+     fn new(seed: impl FnOnce(&mut Days, u64), hold: Option<Receiver<()>>) -> Self {
++        Self::with_forget_refusal(seed, hold, false)
++    }
++
++    fn with_forget_refusal(seed: impl FnOnce(&mut Days, u64), hold: Option<Receiver<()>>, refuse_forget: bool) -> Self {
+         let root = std::env::temp_dir().join(format!(
+             "lamp-mv-{}-{}",
+             std::process::id(),
+@@ -94,6 +105,7 @@
+                 store,
+                 trace: tx,
+                 hold,
++                refuse_forget,
+             };
+             server.run(&mut memory, &mut || now, &mut |_| {}).unwrap();
+         });
+@@ -812,3 +824,107 @@
+         assert_eq!(left, 0, "events {events}: search");
+     }
+ }
++
++#[test]
++fn a_refused_follow_up_forget_survives_the_next_turn_note_refresh() {
++    const ABOUT: &str = "Synthetic exam on the hill";
++    const ASK: &str = "How did the exam on the hill go?";
++    const KEEP: &str = "The synthetic lantern inventory is complete.";
++    let id = person_id("Synthetic shared-evidence caller");
++    let person = Person::new(&id).unwrap();
++    let mut seeded = None;
++    let fixture = Fixture::with_forget_refusal(
++        |store, now| {
++            let said = store
++                .append(
++                    &person,
++                    now - DAY,
++                    "Synthetic exam on the hill. The synthetic lantern inventory is complete.",
++                    "Good luck with the exam.",
++                    &[],
++                )
++                .unwrap();
++            let kept = store
++                .remember_from(&person, now - DAY + 1, KEEP, &[said])
++                .unwrap();
++            let job = store
++                .conversation_end(&person, &format!("shared{now}"), &[said])
++                .unwrap();
++            let noticed = store
++                .tidy_apply(
++                    &person,
++                    &job.job,
++                    &Output {
++                        observations: vec![Proposal {
++                            text: ABOUT.into(),
++                            category: Category::Thread,
++                            source_ids: vec![said],
++                            supersedes: None,
++                            on: None,
++                        }],
++                    },
++                )
++                .unwrap();
++            assert_eq!(noticed.len(), 1);
++            let noticed = noticed[0];
++            for entry in [kept, noticed] {
++                assert_eq!(
++                    store.record(&person, entry).unwrap().unwrap().source_ids,
++                    [said],
++                    "both entries must really share the same evidence"
++                );
++            }
++            seeded = Some((said, kept, noticed));
++        },
++        None,
++        true,
++    );
++    let (said, kept, noticed) = seeded.unwrap();
++    let client = fixture.client();
++    client.following_up();
++    let note = client.told_for_session_within(1, Some(&id), false, SESSION);
++    assert!(note.contains(ABOUT), "offered: {note}");
++    assert_eq!(fixture.next("follow_up").1["follow_up"]["id"], noticed);
++    client.mark_if_asked(ASK, Some(&id));
++    assert_eq!(fixture.next("follow_up_asked").1["ok"], true);
++    let (told, ok) = client.run_for(
++        &call(FORGET, json!({})),
++        Duration::from_millis(1500),
++        Some(&id),
++    );
++    assert!(!ok && told["forgotten"] != true, "the first write must be refused: {told}");
++    assert_eq!(fixture.next("kept").0["observations"], true);
++    let first = fixture.next("forget");
++    assert_eq!(first.0, json!({"op":"forget","person":id.as_str(),"id":noticed}));
++    assert_eq!(first.1, json!({"ok":false,"error":"io"}));
++    client.mark_if_asked("Sorry, I could not forget that.", Some(&id));
++    // Second-route Sessions::tidy invalidates the note after changing();
++    // ask_if_due opens the next numbered session before the next turn.
++    let refreshed = client.told_for_session_within(2, Some(&id), false, SESSION);
++    assert!(refreshed.contains(KEEP), "real next-session snapshot must be adopted: {refreshed}");
++    let retry = client.run_for(&call(FORGET, json!({})), Duration::from_millis(1500), Some(&id));
++    let trace: Vec<_> = fixture.trace.try_iter().collect();
++    eprintln!("first={told}; retry={retry:?}; trace={trace:?}");
++    let db = Connection::open_with_flags(
++        fixture.root.join("store").join(DATABASE),
++        OpenFlags::SQLITE_OPEN_READ_ONLY,
++    )
++    .unwrap();
++    let left = db
++        .prepare("SELECT id,kind,text FROM entries WHERE person=?1 ORDER BY id")
++        .unwrap()
++        .query_map([id.as_str()], |row| {
++            Ok((
++                row.get::<_, u64>(0)?,
++                row.get::<_, String>(1)?,
++                row.get::<_, String>(2)?,
++            ))
++        })
++        .unwrap()
++        .collect::<Result<Vec<_>, _>>()
++        .unwrap();
++    assert!(
++        left.iter().any(|row| row.0 == kept && row.2 == KEEP),
++        "a refused follow-up {noticed} retry after its automatic note refresh deleted unrelated keep {kept}: left={left:?}; evidence={said}; retry={retry:?}; trace={trace:?}"
++    );
++}
