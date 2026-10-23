@@ -1,3 +1,33 @@
+## Current checkpoint: 2026-10-23 10:15 +07, saved rollback order green and read
+
+Ready for lamp-voice: yes (#3186), for First's next gated train
+
+#3186 `c02328dd7` passes official ARM64 **7,129 / 0 / 31 skipped**, one
+passing leaky case, and Linux Clippy; both first attempts on base `70cbefcee`.
+Mac Update is **332 / 0 / 4 ignored**, fmt/strict Clippy clean, and exact-head
+Linux formatting passes. Nine and Reviewer-lead both posted READ-OK on this
+head with no blocking finding. [Complete final receipts](verification/updater-saved-order-20261023/README.md#final-official-pr-gates)
+include raw native logs, the two self-switch harness results and the available
+artifact identity. First owns the merge; no direct merge was performed.
+
+Train 29 landed during CI. A clean computed merge onto `e5cd73aca` preserves
+all eight authored files exactly; the reviewed branch is unchanged and no
+old result is relabelled. The next train must gate its current composition.
+
+#3130's independent Second review is complete, **12 / 0**, with our HOLD
+cleared; Seventh and First own its carry/merge. #3173 and #3160 are merged,
+and their train/source receipts are published.
+
+All executable work on the current list is finished. The remaining handoffs
+are First's #3186 merge; First, Fifth and the lead selecting the actual
+artifact/fallback, observer and attended 52e6 window for #2810; and First's
+protected publisher/real-key run for #1812 after attended acceptance. The
+[current worksheet](verification/updater-attended-exec-cut-20261022.md)
+keeps source evidence separate from the unexecuted physical trial. No lamp
+access, installation, physical cut or real release was performed.
+
+---
+
 ## Current checkpoint: 2026-10-23 09:36 +07, saved rollback order published
 
 Ready for lamp-voice: no; #3186 needs native gates and external reads
