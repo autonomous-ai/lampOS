@@ -1,0 +1,9 @@
+
+running 14 tests
+.
+thread 'restart_order::a_cut_at_reload_saves_the_full_old_projection_before_recovery' (68107568) panicked at crates/update/tests/round.rs:282:13:
+the lamp lost power
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+.............
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 109 filtered out; finished in 1.59s
+

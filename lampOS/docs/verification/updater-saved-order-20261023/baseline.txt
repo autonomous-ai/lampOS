@@ -1,0 +1,60 @@
+
+running 14 tests
+..
+thread 'restart_order::a_cut_at_reload_saves_the_full_old_projection_before_recovery' (68073706) panicked at crates/update/tests/round.rs:282:13:
+the lamp lost power
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'restart_order::a_cut_at_reload_saves_the_full_old_projection_before_recovery' (68073706) panicked at crates/update/tests/round/restart_order.rs:587:5:
+assertion `left == right` failed
+  left: Null
+ right: Array [String("lamp-sleeping.service"), String("lamp-zulu.service"), String("lamp-alpha.service")]
+ 2/14
+restart_order::a_cut_at_reload_saves_the_full_old_projection_before_recovery --- FAILED
+.
+thread 'restart_order::empty_saved_order_recovers_files_and_keeps_live_builds_when_inventory_is_unreadable' (68073729) panicked at crates/update/tests/round/restart_order.rs:860:5:
+RolledBack { sequence: 2, why: "the switch was cut short (lamp-update stopped, or the lamp lost power)", after: Err("the restoration's unit order cannot be read: stream did not contain valid UTF-8"), told: Told { new: "", old: "" } }
+ 4/14
+restart_order::empty_saved_order_recovers_files_and_keeps_live_builds_when_inventory_is_unreadable --- FAILED
+....
+thread 'restart_order::saved_rollback_order_keeps_transitive_edges_after_an_unchanged_unit_drifts' (68073871) panicked at crates/update/tests/round/restart_order.rs:521:5:
+RolledBack { sequence: 2, why: "zulu says it is in error: it says it is unwell", after: Err("the restoration's unit order is refused: unit startup ordering has a cycle: lamp-alpha.service, lamp-middle.service"), told: Told { new: "", old: "" } }
+ 9/14
+restart_order::saved_rollback_order_keeps_transitive_edges_after_an_unchanged_unit_drifts --- FAILED
+
+thread 'restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit' (68073875) panicked at crates/update/tests/round/restart_order.rs:467:5:
+RolledBack { sequence: 2, why: "zulu says it is in error: it says it is unwell", after: Err("the restoration's unit order cannot be read: stream did not contain valid UTF-8"), told: Told { new: "", old: "" } }
+restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit --- FAILED
+
+thread 'restart_order::saved_rollback_order_survives_an_interrupted_put_back_and_keeps_inactive_units_off' (68073880) panicked at crates/update/tests/round/restart_order.rs:689:5:
+RolledBack { sequence: 2, why: "the switch was cut short (lamp-update stopped, or the lamp lost power)", after: Err("the restoration's unit order is refused: unit startup ordering has a cycle: lamp-middle.service"), told: Told { new: "", old: "" } }
+restart_order::saved_rollback_order_survives_an_interrupted_put_back_and_keeps_inactive_units_off --- FAILED
+.
+thread 'restart_order::malformed_present_rollback_orders_retain_the_prefix_and_do_not_fetch' (68073736) panicked at crates/update/tests/round/restart_order.rs:785:5:
+null: RolledBack { sequence: 2, why: "the switch was cut short (lamp-update stopped, or the lamp lost power)", after: Ok(()), told: Told { new: "", old: "" } }; prefix unchanged=false; calls=["reload", "restart lamp-zulu.service", "restart lamp-alpha.service"]; fetched=[]
+boolean: RolledBack { sequence: 2, why: "the switch was cut short (lamp-update stopped, or the lamp lost power)", after: Ok(()), told: Told { new: "", old: "" } }; prefix unchanged=false; calls=["reload", "restart lamp-zulu.service", "restart lamp-alpha.service"]; fetched=[]
+string: RolledBack { sequence: 2, why: "the switch was cut short (lamp-update stopped, or the lamp lost power)", after: Ok(()), told: Told { new: "", old: "" } }; prefix unchanged=false; calls=["reload", "restart lamp-zulu.service", "restart lamp-alpha.service"]; fetched=[]
+object: RolledBack { sequence: 2, why: "the switch was cut short (lamp-update stopped, or the lamp lost power)", after: Ok(()), told: Told { new: "", old: "" } }; prefix unchanged=false; calls=["reload", "restart lamp-zulu.service", "restart lamp-alpha.service"]; fetched=[]
+non-string entry: RolledBack { sequence: 2, why: "the switch was cut short (lamp-update stopped, or the lamp lost power)", after: Ok(()), told: Told { new: "", old: "" } }; prefix unchanged=false; calls=["reload", "restart lamp-zulu.service", "restart lamp-alpha.service"]; fetched=[]
+duplicate entry: RolledBack { sequence: 2, why: "the switch was cut short (lamp-update stopped, or the lamp lost power)", after: Ok(()), told: Told { new: "", old: "" } }; prefix unchanged=false; calls=["reload", "restart lamp-zulu.service", "restart lamp-alpha.service"]; fetched=[]
+omission: RolledBack { sequence: 2, why: "the switch was cut short (lamp-update stopped, or the lamp lost power)", after: Ok(()), told: Told { new: "", old: "" } }; prefix unchanged=false; calls=["reload", "restart lamp-zulu.service", "restart lamp-alpha.service"]; fetched=[]
+extra unit: RolledBack { sequence: 2, why: "the switch was cut short (lamp-update stopped, or the lamp lost power)", after: Ok(()), told: Told { new: "", old: "" } }; prefix unchanged=false; calls=["reload", "restart lamp-zulu.service", "restart lamp-alpha.service"]; fetched=[]
+unsafe name: RolledBack { sequence: 2, why: "the switch was cut short (lamp-update stopped, or the lamp lost power)", after: Ok(()), told: Told { new: "", old: "" } }; prefix unchanged=false; calls=["reload", "restart lamp-zulu.service", "restart lamp-alpha.service"]; fetched=[]
+empty: RolledBack { sequence: 2, why: "the switch was cut short (lamp-update stopped, or the lamp lost power)", after: Ok(()), told: Told { new: "", old: "" } }; prefix unchanged=false; calls=["reload", "restart lamp-zulu.service", "restart lamp-alpha.service"]; fetched=[]
+duplicate property: RolledBack { sequence: 2, why: "the switch was cut short (lamp-update stopped, or the lamp lost power)", after: Ok(()), told: Told { new: "", old: "" } }; prefix unchanged=false; calls=["reload", "restart lamp-zulu.service", "restart lamp-alpha.service"]; fetched=[]
+ 13/14
+restart_order::malformed_present_rollback_orders_retain_the_prefix_and_do_not_fetch --- FAILED
+
+failures:
+
+failures:
+    restart_order::a_cut_at_reload_saves_the_full_old_projection_before_recovery
+    restart_order::empty_saved_order_recovers_files_and_keeps_live_builds_when_inventory_is_unreadable
+    restart_order::malformed_present_rollback_orders_retain_the_prefix_and_do_not_fetch
+    restart_order::saved_rollback_order_keeps_transitive_edges_after_an_unchanged_unit_drifts
+    restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit
+    restart_order::saved_rollback_order_survives_an_interrupted_put_back_and_keeps_inactive_units_off
+
+test result: FAILED. 8 passed; 6 failed; 0 ignored; 0 measured; 109 filtered out; finished in 1.69s
+
+error: test failed, to rerun pass `-p lamp-update --test round`
