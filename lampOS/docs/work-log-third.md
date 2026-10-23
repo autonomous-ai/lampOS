@@ -5,6 +5,34 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 10:00 — Body false-push handoff claimed
+
+Ready for lamp-voice: no (reproduction first; no Body product change yet).
+
+- First's 09:34 instruction transfers the Body fix at 10:00 unless Fifth
+  has pushed it. At 10:00 the complete Fifth branch list and Queue were
+  checked: the only recent push was unrelated #3188. The claim is Queue
+  `6356335264`, session `third-body-hand-20261023`, no lamp. The isolated
+  worktree `/private/tmp/third-body-hand-deadband` is on own task branch
+  `third/body-hand-deadband`, from latest `e5cd73aca`.
+- Jarvis's corrected source trace supersedes the fixed-goal explanation.
+  The measured pitch position stays 1,765 while its goal wanders between
+  1,740 and 1,769; load follows that gap and drops after the goal is pinned.
+  The resistance event follows a change to Listening, with a reported load
+  of 192. Its entering goal and the initial startup interval were not kept.
+- Verified the deployed `f012c4725` source: the three-element logged arrays
+  are wrist pitch, wrist roll and base yaw. They are not the first three
+  entries of the five-element bad-read array. The correction and request
+  for complete retained lines are Queue `6356292480`; the raw reply is
+  `6356306956`. No device access was used by Third.
+- Tests will distinguish a motor's non-following goal, whose load falls
+  when the goal is adopted, from a continuing external push. No blanket
+  high-load exemption near a goal is justified: a hand can hold there too.
+  Physical protection and genuine push reporting remain requirements.
+- Third-P4's source is unchanged while its complete Mac workspace gate
+  runs. Controls completed 508 passed, zero failed, one ignored. Its
+  native gates and explicit Linux formatting still follow the code push.
+
 ## 2026-10-23 09:41 — touch compatibility focused gates pass
 
 Ready for lamp-voice: no (full host gate, native gates and external read remain).
