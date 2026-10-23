@@ -308,8 +308,26 @@ mod tests {
     /// A write that fails is said once, not at every read.
     #[test]
     fn a_failed_write_is_said_once() {
+        let dir = dir("failed-write");
+        let path = dir.join("seems.log");
+        std::fs::write(&path, b"").unwrap();
+        // A read-only descriptor rejects writes on every supported host,
+        // including those without Linux's /dev/full device.
+        assert_failed_write_is_said_once(File::open(&path).unwrap());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_full_device_write_failure_is_said_once() {
+        assert_failed_write_is_said_once(
+            OpenOptions::new().append(true).open("/dev/full").unwrap(),
+        );
+    }
+
+    fn assert_failed_write_is_said_once(file: File) {
         let mut log = Log {
-            file: OpenOptions::new().append(true).open("/dev/full").unwrap(),
+            file,
             lines: 0,
             full_said: false,
             failed_said: false,
