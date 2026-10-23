@@ -30,8 +30,9 @@ case "$*" in
   *"tr \"\\0\""*) running ;;
   "date +%s") echo 1000 ;;
   *"journalctl -u lamp-eyes"*)
-    # The Mac goes to sleep mid-arm: the script dies with no trap run.
-    [[ -n ${FAKE_DIE:-} ]] && pkill -KILL -f "[f]ull-look-row.sh t-die"
+    # The Mac goes to sleep mid-arm: the script dies with no trap run. By its PID, which run() keeps: BSD pkill
+    # leaves out its own ancestors, and this stand-in is the script's child (the reviewer-lead's P2 on #3195).
+    [[ -n ${FAKE_DIE:-} ]] && kill -KILL "$(cat "$FAKE_DIR/pid")"
     for n in 1 2 3; do echo "lamp-eyes: 69 frames, looked at 16, a face in 0, 0 unreadable, 13$n ms a look, 2 of them unchanged and not detected, 140 ms a detected look; ms a look: sight file 8.$n, decode 22.$n, grid 1.0"; done ;;
   *"rm -f /run/systemd/system/lamp-eyes.service.d/zz-look-row.conf"*)
     echo restore >>"$FAKE_DIR/restores"
@@ -75,7 +76,10 @@ run() { # run NAME ENV...: a fresh stand-in lamp; the script's output in $T/NAME
   local name=$1; shift
   rm -rf "$T/fake" "$T/out"; mkdir -p "$T/fake" "$T/out/scenarios" "$T/out/prompts/generated"
   env PATH="$T/bin:$PATH" FAKE_DIR="$T/fake" PLAYED_OUT="$T/out" LAMP_HOST=stand-in "$@" \
-    "$ZSH" "$T/full-look-row.sh" "t-$name" >"$T/$name.out" 2>&1
+    "$ZSH" "$T/full-look-row.sh" "t-$name" >"$T/$name.out" 2>&1 &
+  local pid=$!
+  echo "$pid" >"$T/fake/pid"
+  wait "$pid" 2>/dev/null
   echo $? >"$T/$name.exit"
 }
 check() { # check NAME WHAT CONDITION...
@@ -121,7 +125,7 @@ check restore-never "nothing played" test "$(asks)" = 0
 check restore-never "says what to do by hand" grep -q "take it off and restart lamp-eyes by hand" "$T/restore-never.out"
 
 run die FAKE_DIE=1
-check die "the script died mid-arm (no exit 0)" bash -c "! grep -qx 0 '$T/die.exit'"
+check die "the script was killed mid-arm (exit 137)" exit_is die 137
 check die "no put-back ran" test ! -e "$T/fake/restores"
 check die "the drop-in is still on" test -s "$T/fake/dropin"
 check die "but the lamp's guard is armed to take it off" guard_is armed
