@@ -8310,3 +8310,31 @@ running. Current native verification includes 80 Common and 41 Update
 controls, with one overlap, so 120 distinct identities must pass. Photo and
 Name publication remains held for Common landing/routing and their stated
 contract, timing and physical acceptance limits. No score or device claim.
+
+## 2026-10-23 22:56 +07: Common native failure retained; Name checkpoint saved
+
+Ready for lamp-voice: no (#3064 returned to draft after its failed native gate)
+
+Common 4d634474e ARM64 39978630852 failed: 5213/1/69, with 5991 selected
+tests unrun. Skills' non-asker refusal test failed at package.rs:1004 when
+the helper unwrapped a request write returning BrokenPipe, before its
+refusal/status/file-preserved assertions. The file and production refusal
+branch are unchanged from base and prior Common. Early refusal before a
+request read is possible in source; the failed child's status/journal were
+not captured, so cause is not proved. No retry or fixture edit was made.
+All 120 required Common/Update identities were unrun; docs/process/relay and
+artifact export were skipped. Clippy 39978630861 passes; both executed the
+exact published tree. All handles are terminal. Public receipt:
+verification/common-native-failure-4d634474e-20261023/receipt.json.
+First owns the helper under #1685; fixture repair routing is requested,
+with current source/settings/compatible pins and physical acceptance held.
+
+Name's checked five-path preparation is committed and pushed as c1c56ca7b
+on its own checkpoint branch, without a new stacked PR or an update to
+#3014's old head. Only its evidence README changed after both-host 112/0/0
+and fmt/strict Clippy/build passes; the checkpoint parity receipt records
+that boundary. Linux's legacy-helper first 5547 microseconds still misses
+the under-5-ms target; cause is unproved. Independent PR carry waits for
+Common landing/routing, fresh native CI and physical/privacy acceptance.
+Photo and Peek's remaining original-capture/producer-contract and lamp
+acceptance steps likewise remain with First. The memory row stays 0.45.

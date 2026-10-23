@@ -1,0 +1,1080 @@
+{
+  "scope": "Exact-head failed native CI receipt; no readiness claim",
+  "repository": "autonomous-ai/lampOS",
+  "pull_request": 3064,
+  "head": "4d634474e740bd093430ac5ab62801fa9629f014",
+  "author_tree": "137baf4f76e4caf0af5bb436c4e102943b4b0721",
+  "author_parent": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+  "completed_receipt_utc": "2026-10-23T15:54:27.941334+00:00",
+  "runs": {
+    "arm": {
+      "id": 39978630852,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39978630852",
+      "attempt": 1,
+      "conclusion": "failure",
+      "log_sha256": "9de3b92992c20ffe9a8e4c70c74e0318017bb7c0a0a100de2afec8e73c2a614e"
+    },
+    "clippy": {
+      "id": 39978630861,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39978630861",
+      "attempt": 1,
+      "conclusion": "success",
+      "log_sha256": "cc09928b36891c037e277003d9b0d0447e612028dfc127b2e327d65b68c1fff4"
+    }
+  },
+  "executed_checkout": {
+    "sha": "efd5080bab8fd656e690d4af65d06ca9fc805c2b",
+    "tree": "137baf4f76e4caf0af5bb436c4e102943b4b0721",
+    "parents": [
+      "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+      "4d634474e740bd093430ac5ab62801fa9629f014"
+    ],
+    "exact_author_tree": true,
+    "author_to_executed_entry_changes": []
+  },
+  "nextest": {
+    "run": 5214,
+    "selected": 11205,
+    "passed": 5213,
+    "leaky": 0,
+    "failed": 1,
+    "timed_out": 0,
+    "skipped": 69,
+    "selected_not_run": 5991,
+    "explicit_PASS": 5213,
+    "explicit_FAIL": 1,
+    "explicit_LEAK": 0,
+    "duplicate_terminal_lines_deduplicated": 24,
+    "conflicting_terminal_statuses": {},
+    "profile": "pr",
+    "profile_default_filter": "all()",
+    "binaries": 166,
+    "skipped_binaries": 2
+  },
+  "failure": {
+    "native_name": "lamp-skills::it package::a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed",
+    "test_source": "lampOS/crates/skills/tests/it/package.rs",
+    "test_line": 1030,
+    "helper": "ask_helper_as",
+    "panic_line": 1004,
+    "operation": "ours.write_all(line).unwrap()",
+    "error": {
+      "code": 32,
+      "kind": "BrokenPipe",
+      "message": "Broken pipe"
+    },
+    "assertions_not_reached": [
+      "child exits unsuccessfully",
+      "refused response equals package::NOT_AN_ASKER",
+      "skill.toml remains present"
+    ],
+    "source_identity": {
+      "head": "4d634474e740bd093430ac5ab62801fa9629f014",
+      "base": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+      "historical_head": "00c79072298c583c88ac92a0cad42d2f9155520c",
+      "path": "lampOS/crates/skills/tests/it/package.rs",
+      "sha256": "6d7befb391d0f175a3ebfd9a961d97b86dbcae3109bff323debbd4c3731ed19e",
+      "blob_identities": {
+        "4d634474e740bd093430ac5ab62801fa9629f014": "7f8c383e042a320b9b582c167aaa4a9dc897c682",
+        "be16c3327524ccef8a1908a3b8ebf40c16efba8a": "7f8c383e042a320b9b582c167aaa4a9dc897c682",
+        "00c79072298c583c88ac92a0cad42d2f9155520c": "7f8c383e042a320b9b582c167aaa4a9dc897c682"
+      },
+      "head_equals_base": true,
+      "head_equals_historical": true,
+      "failure_line": 1004,
+      "scope_limit": "Changed-versus-base/source identity only; no runtime cause or flaky classification is established."
+    },
+    "production_source": {
+      "path": "lampOS/crates/skills/src/main.rs",
+      "sha256": "a4bb122ca5326280e1626f5e1f9c94dde4a26bf9f5a93910ae364e2339b63777",
+      "blob_identities": {
+        "4d634474e740bd093430ac5ab62801fa9629f014": "d6d28a5c8d92df01c77e1a1fadb4227eae54cf1a",
+        "be16c3327524ccef8a1908a3b8ebf40c16efba8a": "d6d28a5c8d92df01c77e1a1fadb4227eae54cf1a"
+      },
+      "head_equals_base": true,
+      "lines": [
+        378,
+        398
+      ],
+      "source_observation": "The asked branch rejects a non-authorized peer before calling package::asked/read of the request, emits a refusal and returns failure. This permits an early-close versus client write interleaving; the failed run did not retain child status/journal and its actual closure cause remains unproved."
+    },
+    "bounded_follow_up": "An assigned fixture-only correction may handle an early refusal before request write completes, while retaining the exact refusal JSON, unsuccessful child status and unchanged-file assertions plus reliable child cleanup. Do not weaken authorization or classify the existing failure as flaky.",
+    "related_owner_issue_reported_by_Root": 1685,
+    "original_test_commit": "ae3db5339a32595059d0c58392ec0b705d7daf59",
+    "ownership_limit": "No Skills path is changed by the Common commit; the failing source bytes equal both its base and prior Common00c. This does not establish the runtime cause or classify the failure as flaky."
+  },
+  "required_controls": {
+    "Common_expected": 80,
+    "Common_passed": 0,
+    "Common_not_run": 80,
+    "current_base_Update_expected": 41,
+    "current_base_Update_passed": 0,
+    "current_base_Update_not_run": 41,
+    "overlap": [
+      "lamp-update::it scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder"
+    ],
+    "distinct_expected": 120,
+    "distinct_passed": 0,
+    "distinct_not_run": 120,
+    "groups": {
+      "Common_core": [
+        {
+          "name": "expired_private_system_never_calls_chat_or_speech",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 112,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "private_hits_are_guarded_even_with_neutral_system",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 123,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "private_held_forget_policy_expiry_sends_no_chat_or_tool",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 133,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "private_tool_completion_expiry_cannot_start_another_round",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 167,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "expired_prepared_private_events_never_reach_speech",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 202,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "positive_private_and_public_room_contexts_still_dispatch",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 230,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "empty_packets_preserve_legacy_current_and_carried_read_bounds",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 261,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "authority_lost_while_chat_waits_sends_no_private_speech",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 341,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "private_authority_loss_completes_the_live_engine_turn_once",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 364,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "lost_private_authority_cannot_complete_a_revoked_or_different_request",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 432,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "cached_private_hit_cannot_be_downgraded_by_neutral_final_system",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 454,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "private_output_rechecks_authority_after_queue_backpressure",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 481,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "private_held_forget_tool_completion_expiry_sends_no_first_chat",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 508,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "lost_private_authority_cannot_resume_on_a_later_positive_read",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 540,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "buffered_private_output_expires_at_both_receiver_boundaries_without_blocking_public_output",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 553,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "private_words_waiting_for_announcement_capacity_are_never_retained_or_sent_to_tts",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 655,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "private_speech_rechecks_before_first_poll_with_positive_room_and_public_controls",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 700,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "private_speech_packet_returning_after_expiry_is_not_enqueued",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 751,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "private_speech_piece_initialisation_preserves_queue_call_order",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 796,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "private_words_expiring_between_announcement_check_and_retained_words_lock_are_not_kept",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 832,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "event_note_private_provenance_survives_neutral_told_and_async_expiry",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 908,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "queued_private_event_callback_rechecks_proof_before_read",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 968,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "lost_request_before_told_keeps_public_completion_without_private_services",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 1051,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "short_done_after_a_private_tool_keeps_fresh_speaker_permission",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 1192,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "returned_private_event_waits_without_rereading_then_resumes_or_ends",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 1429,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "days_event_lock_pending_is_retried_without_replaying_its_decision",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 1569,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "returned_private_event_pending_obeys_the_original_response_ceiling",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 1935,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "private_pending_before_and_after_note_ready_keeps_the_original_response_ceiling",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "line": 1942,
+          "source_sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "a_short_current_piece_requires_two_unambiguous_positive_frames",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context/short_line.rs",
+          "line": 40,
+          "source_sha256": "32814a0a1961741a06dc1c6109bc9a6ab7cdfaa10a2c5120f9a34af473081f90",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "carried_old_speech_requires_positive_evidence_on_the_actual_current_piece",
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context/carried_speaker.rs",
+          "line": 93,
+          "source_sha256": "a705591e8b0aca48cc33df143288d803e50abb79a859e84b138e8770d6fdbeac",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "explicit_absence_is_request_owned_and_never_grants_an_inherited_private_scope",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 75,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "explicit_absence_never_heals_loss_or_downgrades_errors_and_legacy_sources",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 113,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "repeated_explicit_absence_does_not_extend_the_original_audio_deadline",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 220,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "actual_engine_sealed_microphone_request_finishes_through_explicit_lookaway",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 285,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "actual_http_fallback_retains_only_explicit_same_epoch_lookaway",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 464,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "explicit_lookaway_retains_credited_output_only_for_same_request_epoch",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 571,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "explicit_source_envelopes_reject_malformed_or_mixed_continuation_tokens",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 769,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "returning_track_changed_epoch_checking_and_unmatched_cancel_only_the_old_proved_request",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 873,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "returning_track_same_name_never_erases_changed_stable_identity",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 921,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "returning_track_completed_recognition_keeps_original_grant_at_actual_http_fallback",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 950,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "returning_track_completed_recognition_keeps_original_grant_at_credited_ipc",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 1112,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "returning_track_unbound_and_legacy_requests_still_need_the_original_audio_face",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 1320,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "returning_track_checking_envelope_has_no_identity_and_cannot_arm_continuation",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 1359,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "returning_track_completed_recognition_never_extends_original_audio_deadline",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 1392,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "checking_return_never_arms_and_only_same_subject_can_finish_the_wait",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 1436,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "checking_wait_never_hides_terminal_source_or_identity_loss",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 1478,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "checking_wait_ends_at_the_original_audio_deadline",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 1558,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "checking_return_holds_real_credited_ipc_until_completed_recognition",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 1594,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "event_selection_keeps_checking_distinct_from_room_and_lost",
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "line": 1825,
+          "source_sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "pending_composition_rebuilds_cached_note_history_and_name_before_one_final_chat",
+          "path": "lampOS/crates/voice/src/second_provider/worker/pending_context.rs",
+          "line": 242,
+          "source_sha256": "1c40451c38c03974a1ac5bf1d8f23b8f92f7c042ac49c53062e98b4a33776333",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "pending_prepared_composition_never_freezes_reduced_messages",
+          "path": "lampOS/crates/voice/src/second_provider/worker/pending_context.rs",
+          "line": 252,
+          "source_sha256": "1c40451c38c03974a1ac5bf1d8f23b8f92f7c042ac49c53062e98b4a33776333",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "pending_note_adoption_before_lock_retains_the_completed_read_until_ready",
+          "path": "lampOS/crates/voice/src/remember.rs",
+          "line": 8524,
+          "source_sha256": "6e8009e318344e0d5c9ceca9e8e9ad13ce9d2d04f64b17eedc2b4b4a7c528893",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "pending_note_adoption_after_context_lock_retains_data_and_resumes_without_reading_again",
+          "path": "lampOS/crates/voice/src/remember.rs",
+          "line": 8571,
+          "source_sha256": "6e8009e318344e0d5c9ceca9e8e9ad13ce9d2d04f64b17eedc2b4b4a7c528893",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "pending_note_adoption_terminal_loss_and_forget_fence_still_drop_untold_data",
+          "path": "lampOS/crates/voice/src/remember.rs",
+          "line": 8639,
+          "source_sha256": "6e8009e318344e0d5c9ceca9e8e9ad13ce9d2d04f64b17eedc2b4b4a7c528893",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "pending_note_transport_waits_before_connect_without_sending_and_resumes_once",
+          "path": "lampOS/crates/voice/src/remember.rs",
+          "line": 8731,
+          "source_sha256": "6e8009e318344e0d5c9ceca9e8e9ad13ce9d2d04f64b17eedc2b4b4a7c528893",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "pending_note_transport_after_connect_writes_nothing_until_ready",
+          "path": "lampOS/crates/voice/src/remember.rs",
+          "line": 8782,
+          "source_sha256": "6e8009e318344e0d5c9ceca9e8e9ad13ce9d2d04f64b17eedc2b4b4a7c528893",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "pending_note_legacy_transport_never_waits_while_the_session_is_held",
+          "path": "lampOS/crates/voice/src/remember.rs",
+          "line": 8864,
+          "source_sha256": "6e8009e318344e0d5c9ceca9e8e9ad13ce9d2d04f64b17eedc2b4b4a7c528893",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "pending_note_transport_retains_the_reply_until_ready_without_reissuing",
+          "path": "lampOS/crates/voice/src/remember.rs",
+          "line": 8942,
+          "source_sha256": "6e8009e318344e0d5c9ceca9e8e9ad13ce9d2d04f64b17eedc2b4b4a7c528893",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "pending_note_transport_lost_or_original_deadline_never_sends_or_returns_a_reply",
+          "path": "lampOS/crates/voice/src/remember.rs",
+          "line": 8994,
+          "source_sha256": "6e8009e318344e0d5c9ceca9e8e9ad13ce9d2d04f64b17eedc2b4b4a7c528893",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "an_event_pending_at_the_first_fence_stays_undecided_and_public_options_stay_compatible",
+          "path": "lampOS/crates/voice/src/remember.rs",
+          "line": 18642,
+          "source_sha256": "6e8009e318344e0d5c9ceca9e8e9ad13ce9d2d04f64b17eedc2b4b4a7c528893",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "private_read_loss_is_shared_by_clones_and_cannot_be_reproved",
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "line": 1777,
+          "source_sha256": "24574bcc7e0103a1d053eda7fd21ae1a814bd61803be27f01edd2487b1fac70a",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "private_read_loss_does_not_revoke_narrow_or_destroy_the_original_speaker",
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "line": 1802,
+          "source_sha256": "24574bcc7e0103a1d053eda7fd21ae1a814bd61803be27f01edd2487b1fac70a",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "checking_can_only_pause_a_pinned_grant_and_never_wins_over_loss",
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "line": 1852,
+          "source_sha256": "24574bcc7e0103a1d053eda7fd21ae1a814bd61803be27f01edd2487b1fac70a",
+          "result": "not run before fail-fast"
+        }
+      ],
+      "Common_integration": [
+        {
+          "name": "no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+          "path": "lampOS/crates/update/tests/it/scratch_paths.rs",
+          "line": 136,
+          "source_sha256": "40749f7cf74a1f5bcb11ebce3ba36866710fdf2d3ad13eb85fa1d75169b62554",
+          "native_name": "lamp-update::it scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "prepared_private_context_is_neutral_and_final_proof_discloses_both_layouts",
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "line": 65,
+          "source_sha256": "508c278d3b00aea82ecc2a3b0eac4671314bfb7a9d41afb00616e8f683bcc516",
+          "native_name": "lamp-voice second_provider::worker::kept_name_callback::privacy::prepared_private_context_is_neutral_and_final_proof_discloses_both_layouts",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "unproved_mismatched_expired_and_legacy_private_requests_never_read_memory_or_history",
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "line": 121,
+          "source_sha256": "508c278d3b00aea82ecc2a3b0eac4671314bfb7a9d41afb00616e8f683bcc516",
+          "native_name": "lamp-voice second_provider::worker::kept_name_callback::privacy::unproved_mismatched_expired_and_legacy_private_requests_never_read_memory_or_history",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "genuine_room_context_keeps_room_notes_and_history_without_speaker_proof",
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "line": 181,
+          "source_sha256": "508c278d3b00aea82ecc2a3b0eac4671314bfb7a9d41afb00616e8f683bcc516",
+          "native_name": "lamp-voice second_provider::worker::kept_name_callback::privacy::genuine_room_context_keeps_room_notes_and_history_without_speaker_proof",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "slow_note_read_rechecks_revocation_expiry_and_fresh_known_identity",
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "line": 223,
+          "source_sha256": "508c278d3b00aea82ecc2a3b0eac4671314bfb7a9d41afb00616e8f683bcc516",
+          "native_name": "lamp-voice second_provider::worker::kept_name_callback::privacy::slow_note_read_rechecks_revocation_expiry_and_fresh_known_identity",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "actual_hits_rpc_requires_positive_current_matching_proof_and_rechecks_its_reply",
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "line": 294,
+          "source_sha256": "508c278d3b00aea82ecc2a3b0eac4671314bfb7a9d41afb00616e8f683bcc516",
+          "native_name": "lamp-voice second_provider::worker::kept_name_callback::privacy::actual_hits_rpc_requires_positive_current_matching_proof_and_rechecks_its_reply",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "identity_changed_during_history_composition_discards_the_private_told",
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "line": 376,
+          "source_sha256": "508c278d3b00aea82ecc2a3b0eac4671314bfb7a9d41afb00616e8f683bcc516",
+          "native_name": "lamp-voice second_provider::worker::kept_name_callback::privacy::identity_changed_during_history_composition_discards_the_private_told",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "by_presence_context_never_adopts_a_different_sticky_person",
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "line": 415,
+          "source_sha256": "508c278d3b00aea82ecc2a3b0eac4671314bfb7a9d41afb00616e8f683bcc516",
+          "native_name": "lamp-voice second_provider::worker::kept_name_callback::privacy::by_presence_context_never_adopts_a_different_sticky_person",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "typed_setup_name_uses_final_speaker_proof_and_marks_disclosure",
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "line": 507,
+          "source_sha256": "508c278d3b00aea82ecc2a3b0eac4671314bfb7a9d41afb00616e8f683bcc516",
+          "native_name": "lamp-voice second_provider::worker::kept_name_callback::privacy::typed_setup_name_uses_final_speaker_proof_and_marks_disclosure",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "missing_private_source_is_reported_once_without_granting_context",
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "line": 647,
+          "source_sha256": "508c278d3b00aea82ecc2a3b0eac4671314bfb7a9d41afb00616e8f683bcc516",
+          "native_name": "lamp-voice second_provider::worker::kept_name_callback::privacy::missing_private_source_is_reported_once_without_granting_context",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "closure_flushes_final_accepted_event_without_inventing_complete_evidence",
+          "path": "lampOS/crates/voice/src/service_trace.rs",
+          "line": 607,
+          "source_sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+          "native_name": "lamp-voice service_trace::tests::closure_flushes_final_accepted_event_without_inventing_complete_evidence",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "disk_failure_latches_health_without_an_audio_result_error",
+          "path": "lampOS/crates/voice/src/service_trace.rs",
+          "line": 621,
+          "source_sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+          "native_name": "lamp-voice service_trace::tests::disk_failure_latches_health_without_an_audio_result_error",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining",
+          "path": "lampOS/crates/voice/src/service_trace.rs",
+          "line": 634,
+          "source_sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+          "native_name": "lamp-voice service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "oversized_event_is_dropped_not_truncated_into_a_misleading_record",
+          "path": "lampOS/crates/voice/src/service_trace.rs",
+          "line": 652,
+          "source_sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+          "native_name": "lamp-voice service_trace::tests::oversized_event_is_dropped_not_truncated_into_a_misleading_record",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "shared_session_rotation_keeps_granted_descriptors_and_private_health",
+          "path": "lampOS/crates/voice/src/service_trace.rs",
+          "line": 666,
+          "source_sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+          "native_name": "lamp-voice service_trace::tests::shared_session_rotation_keeps_granted_descriptors_and_private_health",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "rotation_uses_only_pinned_files_and_bounded_disk_space",
+          "path": "lampOS/crates/voice/src/service_trace.rs",
+          "line": 714,
+          "source_sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+          "native_name": "lamp-voice service_trace::tests::rotation_uses_only_pinned_files_and_bounded_disk_space",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+          "path": "lampOS/crates/voice/src/service_trace.rs",
+          "line": 743,
+          "source_sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+          "native_name": "lamp-voice service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+          "result": "not run before fail-fast"
+        }
+      ],
+      "current_base_Update": [
+        {
+          "name": "pr2948_settings_off_preserves_the_old_head_reader",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 112,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::pr2948_settings_off_preserves_the_old_head_reader",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "pr2948_settings_on_keeps_a_head_reader_available",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 134,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::pr2948_settings_on_keeps_a_head_reader_available",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "paired_head_readers_disable_legacy_even_when_signed_pins_enable_it",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 241,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::paired_head_readers_disable_legacy_even_when_signed_pins_enable_it",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "mixed_head_readers_are_refused_before_settings_or_units_are_written",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 257,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::mixed_head_readers_are_refused_before_settings_or_units_are_written",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "paired_head_readers_without_controls_mute_are_refused_before_writes",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 266,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::paired_head_readers_without_controls_mute_are_refused_before_writes",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "settings_off_refuses_paired_head_readers_with_legacy_pins",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 273,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::settings_off_refuses_paired_head_readers_with_legacy_pins",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "custom_head_wiring_is_kept_or_the_reader_transition_is_refused",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 280,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::custom_head_wiring_is_kept_or_the_reader_transition_is_refused",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "failed_head_reader_candidate_restores_exact_old_pins_and_units",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 312,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::failed_head_reader_candidate_restores_exact_old_pins_and_units",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "old_apply_helper_pins_mismatch_is_put_back_before_readers_restart",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 346,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::old_apply_helper_pins_mismatch_is_put_back_before_readers_restart",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "cut_after_pins_apply_restarts_unchanged_controls_after_restoring_old_pins",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 421,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::cut_after_pins_apply_restarts_unchanged_controls_after_restoring_old_pins",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "head_reader_mode_overrides_are_not_guessed_from_base_units",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 504,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::head_reader_mode_overrides_are_not_guessed_from_base_units",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "repeated_projected_pins_keep_their_actual_hash_without_restarting_controls",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 523,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::repeated_projected_pins_keep_their_actual_hash_without_restarting_controls",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "invalid_mute_path_and_unknown_reader_are_refused",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 550,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::invalid_mute_path_and_unknown_reader_are_refused",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "head_pins_cannot_change_without_restarting_their_controls_reader",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 583,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::head_pins_cannot_change_without_restarting_their_controls_reader",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "isolated_voice_controls_bus_is_refused_before_any_write",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 624,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::isolated_voice_controls_bus_is_refused_before_any_write",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "expression_or_controls_bus_mismatch_is_refused_before_any_write",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 637,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::expression_or_controls_bus_mismatch_is_refused_before_any_write",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "matching_explicit_or_default_head_bus_roots_allow_the_paired_transition",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 665,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::matching_explicit_or_default_head_bus_roots_allow_the_paired_transition",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "absent_unused_product_pins_do_not_block_active_build_pins_updates",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 750,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::absent_unused_product_pins_do_not_block_active_build_pins_updates",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "stale_unused_product_pins_do_not_block_active_build_pins_updates",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 777,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::stale_unused_product_pins_do_not_block_active_build_pins_updates",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "custom_active_pins_are_kept_and_checked_against_the_reader_pair",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 813,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::custom_active_pins_are_kept_and_checked_against_the_reader_pair",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "environment_only_head_bus_mismatch_is_refused_before_any_write",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 849,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::environment_only_head_bus_mismatch_is_refused_before_any_write",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "head_bus_root_dropins_are_not_guessed_from_base_units",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 881,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::head_bus_root_dropins_are_not_guessed_from_base_units",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 901,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "third_review_paired_head_readers_on_different_buses_are_refused",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 942,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::third_review_paired_head_readers_on_different_buses_are_refused",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "third_review_binary_update_checks_active_build_local_head_pins",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 980,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::third_review_binary_update_checks_active_build_local_head_pins",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "semantic_head_reader_paths_cannot_expand_invocation_variables",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 1062,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::semantic_head_reader_paths_cannot_expand_invocation_variables",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "textually_equal_expanded_head_bus_roots_are_not_a_verified_pair",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 1126,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::textually_equal_expanded_head_bus_roots_are_not_a_verified_pair",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "malformed_environment_quotes_are_not_reader_evidence",
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "line": 1171,
+          "source_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+          "native_name": "lamp-update::round head_touch::malformed_environment_quotes_are_not_reader_evidence",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "the_generic_voice_runs_the_ring_as_the_product_does",
+          "path": "lampOS/crates/update/src/unit.rs",
+          "line": 211,
+          "source_sha256": "301fd7c31178d4158bd57d477fcebb1545c3fdd709fb5b2051ac0f8f945bbe47",
+          "native_name": "lamp-update unit::tests::the_generic_voice_runs_the_ring_as_the_product_does",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "the_generic_voice_says_its_failures_as_the_product_does",
+          "path": "lampOS/crates/update/src/unit.rs",
+          "line": 237,
+          "source_sha256": "301fd7c31178d4158bd57d477fcebb1545c3fdd709fb5b2051ac0f8f945bbe47",
+          "native_name": "lamp-update unit::tests::the_generic_voice_says_its_failures_as_the_product_does",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "the_generic_voice_has_the_product_clock_and_session_context",
+          "path": "lampOS/crates/update/src/unit.rs",
+          "line": 297,
+          "source_sha256": "301fd7c31178d4158bd57d477fcebb1545c3fdd709fb5b2051ac0f8f945bbe47",
+          "native_name": "lamp-update unit::tests::the_generic_voice_has_the_product_clock_and_session_context",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "the_generic_voice_answers_whom_the_product_does",
+          "path": "lampOS/crates/update/src/unit.rs",
+          "line": 308,
+          "source_sha256": "301fd7c31178d4158bd57d477fcebb1545c3fdd709fb5b2051ac0f8f945bbe47",
+          "native_name": "lamp-update unit::tests::the_generic_voice_answers_whom_the_product_does",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "the_generic_package_sets_up_and_resets_as_the_product_does",
+          "path": "lampOS/crates/update/src/unit.rs",
+          "line": 396,
+          "source_sha256": "301fd7c31178d4158bd57d477fcebb1545c3fdd709fb5b2051ac0f8f945bbe47",
+          "native_name": "lamp-update unit::tests::the_generic_package_sets_up_and_resets_as_the_product_does",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "lamp_4aces_own_units_are_read",
+          "path": "lampOS/crates/update/src/unit.rs",
+          "line": 482,
+          "source_sha256": "301fd7c31178d4158bd57d477fcebb1545c3fdd709fb5b2051ac0f8f945bbe47",
+          "native_name": "lamp-update unit::tests::lamp_4aces_own_units_are_read",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "lamp_4aces_private_memory_has_matching_authority_and_speaking_sources",
+          "path": "lampOS/crates/update/src/unit.rs",
+          "line": 504,
+          "source_sha256": "301fd7c31178d4158bd57d477fcebb1545c3fdd709fb5b2051ac0f8f945bbe47",
+          "native_name": "lamp-update unit::tests::lamp_4aces_private_memory_has_matching_authority_and_speaking_sources",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "a_new_build_is_written_everywhere_the_folder_is_named",
+          "path": "lampOS/crates/update/src/unit.rs",
+          "line": 565,
+          "source_sha256": "301fd7c31178d4158bd57d477fcebb1545c3fdd709fb5b2051ac0f8f945bbe47",
+          "native_name": "lamp-update unit::tests::a_new_build_is_written_everywhere_the_folder_is_named",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "only_a_part_installed_by_build_is_a_program",
+          "path": "lampOS/crates/update/src/unit.rs",
+          "line": 581,
+          "source_sha256": "301fd7c31178d4158bd57d477fcebb1545c3fdd709fb5b2051ac0f8f945bbe47",
+          "native_name": "lamp-update unit::tests::only_a_part_installed_by_build_is_a_program",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "comments_do_not_make_a_unit_another",
+          "path": "lampOS/crates/update/src/unit.rs",
+          "line": 596,
+          "source_sha256": "301fd7c31178d4158bd57d477fcebb1545c3fdd709fb5b2051ac0f8f945bbe47",
+          "native_name": "lamp-update unit::tests::comments_do_not_make_a_unit_another",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "the_product_sees_who_speaks",
+          "path": "lampOS/crates/update/tests/install.rs",
+          "line": 867,
+          "source_sha256": "6a022e3541e3b45bb694fe4384d1b6cd56a094a242d9c38fce2be96e0b438232",
+          "native_name": "lamp-update::install the_product_sees_who_speaks",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+          "path": "lampOS/crates/update/tests/it/scratch_paths.rs",
+          "line": 136,
+          "source_sha256": "40749f7cf74a1f5bcb11ebce3ba36866710fdf2d3ad13eb85fa1d75169b62554",
+          "native_name": "lamp-update::it scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+          "result": "not run before fail-fast"
+        },
+        {
+          "name": "the_names_read_are_the_scratch_folders_only",
+          "path": "lampOS/crates/update/tests/it/scratch_paths.rs",
+          "line": 183,
+          "source_sha256": "40749f7cf74a1f5bcb11ebce3ba36866710fdf2d3ad13eb85fa1d75169b62554",
+          "native_name": "lamp-update::it scratch_paths::the_names_read_are_the_scratch_folders_only",
+          "result": "not run before fail-fast"
+        }
+      ]
+    }
+  },
+  "separate_checks": {
+    "doctests": "not executed: CI step skipped after nextest failure",
+    "turn_end_wire_process": "not executed: CI step skipped after nextest failure",
+    "relay_signals": "not executed: CI step skipped after nextest failure"
+  },
+  "artifact": {
+    "count": 0,
+    "export_step": "skipped",
+    "upload_step": "skipped",
+    "downloaded": false,
+    "checksum_ELF_verification": "not available; no artifact was published"
+  },
+  "observed_CI_commands": {
+    "arm": [
+      "cargo build --locked --release --workspace --bins --examples --message-format=json-render-diagnostics > arm64-build.jsonl",
+      "cargo build --locked --release -p lamp-schedule --example schedule_check --target-dir target/lampos-artifact-examples --message-format=json-render-diagnostics > arm64-schedule-example.jsonl",
+      "cargo build --locked --release -p lamp-expression --example replay_cost --target-dir target/lampos-artifact-examples --message-format=json-render-diagnostics > arm64-expression-example.jsonl",
+      "filter='not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))'",
+      "cargo nextest run --locked --release --workspace --profile pr --no-tests=pass -j num-cpus --partition hash:1/1 -E \"$filter\""
+    ],
+    "clippy": [
+      "cargo clippy --locked --workspace --all-targets -- -D warnings"
+    ]
+  },
+  "separate_host_evidence": {
+    "publication_commit": "0a47224dd2",
+    "reported_by": "Root",
+    "Mac_Update": {
+      "passed": 372,
+      "failed": 0,
+      "skipped": 4
+    },
+    "Linux_Update": {
+      "passed": 374,
+      "failed": 0,
+      "skipped": 2
+    },
+    "privacy_passed_each_platform": 9,
+    "limit": "Separate local gates do not turn the failed native run into a pass."
+  },
+  "limitations": [
+    "The actual cause of the peer closure is not proved by this source/log audit.",
+    "The 5991 selected-but-unrun tests and 69 skipped tests are not passes.",
+    "All 120 distinct requested current-head control identities remained unrun; no old-head result is inherited.",
+    "No CI rerun/dispatch, source/index/ref mutation, build-target work, readiness update or remote publication was performed by this collection.",
+    "Source review, physical acceptance, activation and device behavior remain separate."
+  ]
+}

@@ -26,3 +26,14 @@ review, compatible Voice/Eyes pins, actual published-head native CI and
 First's known-person/other-person/room/off-camera/privacy lamp checks remain
 required. The old 38/40 model result remains historical. The memory row stays
 0.45. No lamp action or score increase was made.
+
+## Durable own-branch checkpoint
+
+The checked preparation is now committed and pushed as `c1c56ca7b` on
+`fourth/name-common-final-20261023`. Only the evidence README changed after
+the host gate; runtime, tests and product configuration remain exact, as the
+[checkpoint parity receipt](checkpoint.json) records. No new stacked PR was
+opened or existing PR head updated. #3014 remains held at its historical head;
+an independent PR carry requires accepted Common on the current base and
+fresh native qualification. This saves the work without bypassing First's
+no-stacked-PR direction or the timing/physical/review holds.

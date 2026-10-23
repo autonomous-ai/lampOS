@@ -1,0 +1,14 @@
+{
+  "after_gate_changes": [
+    "lampOS/docs/verification/known-name-product-prep-20261022/README.md"
+  ],
+  "branch": "fourth/name-common-final-20261023",
+  "checked_tree": "49a8abb5835432fb18eaa4f5e921d7defc891d3e",
+  "checkpoint_head": "c1c56ca7b9cc26a54f943fe35c912fbc31d0ed4f",
+  "checkpoint_tree": "d8a92af2d331e21d654319184c12d77e75fd8348",
+  "latency": "Linux legacy-source first sample 5547 microseconds misses under-5-ms target; cause unproved, no rerun.",
+  "native": "not qualified; future independent PR requires fresh gates",
+  "pull_request_mutation": "No new stacked PR or existing PR head update; #3014 stays held at historical head.",
+  "runtime_tests_product_config_exact": true,
+  "scope": "own branch checkpoint only; no new or updated stacked PR; original base00c retained"
+}
