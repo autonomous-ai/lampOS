@@ -4429,6 +4429,10 @@ fn install_review_head_pair_refusal_precedes_state_and_host_mutation() {
             "/run/systemd/system/lamp-expression.service.d/30-local.conf",
             "[Service]\nEnvironment=LAMP_BUS_ROOT=/run/isolated\n",
         ),
+        (
+            "/usr/local/lib/systemd/system/lamp-voice.service.d/30-local.conf",
+            "[Service]\nEnvironment=LAMP_HEAD_TOUCH=off\n",
+        ),
     ] {
         let mut lamp = Lamp::new(188, &[]);
         fs::create_dir_all(lamp.on(path).parent().unwrap()).unwrap();
