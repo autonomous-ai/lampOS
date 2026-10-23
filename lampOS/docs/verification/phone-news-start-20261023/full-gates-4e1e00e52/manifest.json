@@ -1,0 +1,77 @@
+{
+  "format": 1,
+  "scope": "Every payload except manifest itself.",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 6932,
+      "sha256": "de1273430bc4e49a37f3f006aa7d603ad0b57fd4cc0fd1abf57688c7ce82e496"
+    },
+    {
+      "path": "artifact-bindings.json",
+      "bytes": 64309,
+      "sha256": "fd157f51e32873768669f8ee37f5aa3169739aa398aa3631667f69bf6fd64255"
+    },
+    {
+      "path": "authored.patch.json",
+      "bytes": 3511,
+      "sha256": "8cdf186b2fff6ad14f991450b8c6e0fee6af23251d25d99b43849e65d96c495b"
+    },
+    {
+      "path": "census-and-outcomes.json",
+      "bytes": 1242506,
+      "sha256": "e3536e14f362a7a18d18437fadc691fde347c7e688c9f7b8ca934e376890eb7c"
+    },
+    {
+      "path": "command-results.json",
+      "bytes": 7768,
+      "sha256": "55b439fda045f3ba24deebe502fccd3d3fca1faae06fa49eb35a9c3f8c2ee7d8"
+    },
+    {
+      "path": "dependency-closure.json",
+      "bytes": 30903,
+      "sha256": "cf9e91fa740bb4f78a25b7bbf678074975177fa4a95bf1b51c1899d01d2864f9"
+    },
+    {
+      "path": "external-raw-index.json",
+      "bytes": 90186,
+      "sha256": "a1a84acd02f027ac6990b62b5269d56d7f8256e1258d9e131f5fff8871282493"
+    },
+    {
+      "path": "failures.json",
+      "bytes": 9998,
+      "sha256": "7624ce02624a22bd2236a7b56326c81f78e401071cc0a7f65290425e73b70498"
+    },
+    {
+      "path": "gate-plan.json",
+      "bytes": 7259,
+      "sha256": "d901dbb771dfcab55070e55aa916c8cba54d6fea7d3e8df0c7f03b4c1d25bb1a"
+    },
+    {
+      "path": "native-streams.json",
+      "bytes": 780595,
+      "sha256": "3c5423e1a10aaf18ac9dfeb88dea003d2ab186eafaf0002bb25ef02661b96c11"
+    },
+    {
+      "path": "owned-phone-case.json",
+      "bytes": 416,
+      "sha256": "af18e561048a1be749397d51ccde32067637d2b728aa485bf773da60d91ba039"
+    },
+    {
+      "path": "preflight-revision.json",
+      "bytes": 1169,
+      "sha256": "ece35b5b498c9963f751d5b921ac978aaab3dbd55c2d5cd512cbbd81e56edf86"
+    },
+    {
+      "path": "source-and-environment.json",
+      "bytes": 5371,
+      "sha256": "a9041ceaafd8f8ae77abdf131727724975a48e54e54e4dec79680f58294da4f6"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 9890,
+      "sha256": "1b8b5e3aa765792aedd0163e32e907d0fe1bd2c7d2b3f537788c95f170f9e18e"
+    }
+  ],
+  "total_payload_bytes": 2260813
+}

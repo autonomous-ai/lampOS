@@ -1,5 +1,26 @@
 # Tests work log
 
+## 2026-10-23 17:51 +0700 — current phone full gate retained
+
+Ready for lamp-voice: no (#3218 remains draft).
+
+[Full current phone receipt](verification/phone-news-start-20261023/full-gates-4e1e00e52/)
+binds head `4e1e00e52` on `cf462adb0` to Voice **3,923 / 1 / 15** and
+11 readers **3,227 / 2 / 17**, combined **7,150 / 3 / 32** across all 74
+target summaries and 7,185 identities. Formatting, strict 12-package Clippy,
+workspace build and final source checks pass. The phone case passed.
+
+The failures remain explicit: light-call sorted index 10 was 53.211259 ms
+against 25 ms; Expression did not observe fresh voice/joints in its enabled
+output case or a light request in its offline-face case. All exact diagnostics
+and all retained output are published. No candidate run was repeated.
+
+The matched clean-base full Voice comparison is running on the exclusive
+build directory. Its result is not yet available. The Expression source
+boundaries and a bounded full runtime-target comparison are being prepared;
+no inherited-cause claim or waiver is made. Exact-head ARM64 remains green
+at 7,215 / 0 / 32, including one leaky pass.
+
 ## 2026-10-23 17:42 +0700 — generic voice unit Linux formatting
 
 Ready for lamp-voice: no (support receipt for #3260; its builder owns readiness).

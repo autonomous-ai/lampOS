@@ -1,0 +1,186 @@
+{
+  "head": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e",
+  "count": 3,
+  "failures": [
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:test:it",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "actual_status": "FAILED",
+      "binary_sha256": "7077c08c29c8be105faa07ce98ebd8d92bc6374d6b4d16939951d31de066b8db",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 648976,
+        "original_stream_sha256": "e4bc16109680db0fe83385881d927fc32fd8146fa5becce99a3c143f26e94c35",
+        "byte_offset": 646914,
+        "bytes": 876,
+        "sha256": "0c9fec4994be756b68d0539aac95d5e585b6e5e35245302b0eea3e4f41254471",
+        "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [2.661714ms, 2.759106ms, 2.81309ms, 3.146748ms, 3.587819ms, 21.975044ms, 34.744692ms, 38.098166ms, 41.126564ms, 45.150838ms, 53.211259ms, 55.66614ms, 57.124649ms, 60.080792ms, 72.885702ms, 77.124708ms, 77.369665ms, 77.68858ms, 92.12409ms, 119.695347ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (709152295) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[2.661714ms, 2.759106ms, 2.81309ms, 3.146748ms, 3.587819ms, 21.975044ms, 34.744692ms, 38.098166ms, 41.126564ms, 45.150838ms, 53.211259ms, 55.66614ms, 57.124649ms, 60.080792ms, 72.885702ms, 77.124708ms, 77.369665ms, 77.68858ms, 92.12409ms, 119.695347ms]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-expression:test:runtime",
+      "name": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "actual_status": "FAILED",
+      "binary_sha256": "3a7c9e37eef9dff82b667a4641229e9428c4dbc702efad308caecab1c3205286",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 653859,
+        "original_stream_sha256": "86a4e0643644051a1dc9b6786d1d5a43ced7bfb133fefba16e147cf021cee213",
+        "byte_offset": 453999,
+        "bytes": 244,
+        "sha256": "4d7cfd2513be246464e3501f672133fe3688b8814d47dd8187f3e9d16a56d712",
+        "utf8": "---- enabled_output_uses_a_new_session_and_expires_after_input_loss stdout ----\n\nthread 'enabled_output_uses_a_new_session_and_expires_after_input_loss' (709222552) panicked at crates/expression/tests/runtime.rs:127:28:\nfresh voice and joints\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-expression:test:runtime",
+      "name": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "actual_status": "FAILED",
+      "binary_sha256": "3a7c9e37eef9dff82b667a4641229e9428c4dbc702efad308caecab1c3205286",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 653859,
+        "original_stream_sha256": "86a4e0643644051a1dc9b6786d1d5a43ced7bfb133fefba16e147cf021cee213",
+        "byte_offset": 454243,
+        "bytes": 347,
+        "sha256": "b312287c462ea36089212b146c554e2a068eac45da46f0190957b6a0f4ab5b53",
+        "utf8": "---- only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline stdout ----\n\nthread 'only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline' (709222556) panicked at crates/expression/tests/runtime.rs:1048:14:\na light request\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    }
+  ],
+  "light_call_checked_statistic": {
+    "scope": "One completed full Voice observation; no causal waiver and no retry. Reader gate still independent and running.",
+    "head": "4e1e00e5298b31f797fd90f58d2b439ff2b4e32e",
+    "base": "cf462adb04f64d699c226dd3b1781c0ad927068f",
+    "test": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+    "actual_result": "FAILED",
+    "command_exit": 101,
+    "checked_statistic": "Sorted took[took.len()/2], index 10 of 20; not the maximum",
+    "checked_value": "53.211259ms",
+    "bound": "strictly below 25 ms",
+    "all_reported_times": [
+      "2.661714ms",
+      "2.759106ms",
+      "2.81309ms",
+      "3.146748ms",
+      "3.587819ms",
+      "21.975044ms",
+      "34.744692ms",
+      "38.098166ms",
+      "41.126564ms",
+      "45.150838ms",
+      "53.211259ms",
+      "55.66614ms",
+      "57.124649ms",
+      "60.080792ms",
+      "72.885702ms",
+      "77.124708ms",
+      "77.369665ms",
+      "77.68858ms",
+      "92.12409ms",
+      "119.695347ms"
+    ],
+    "max_context_only": "119.695347ms",
+    "diagnostic": {
+      "source": "/private/tmp/tests-phone-news-start-4e1e00e52-gates-20261023/gates-20261023T100827.070042Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+      "source_bytes": 648976,
+      "source_sha256": "e4bc16109680db0fe83385881d927fc32fd8146fa5becce99a3c143f26e94c35",
+      "original_byte_offset": 646914,
+      "bytes": 876,
+      "sha256": "0c9fec4994be756b68d0539aac95d5e585b6e5e35245302b0eea3e4f41254471",
+      "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [2.661714ms, 2.759106ms, 2.81309ms, 3.146748ms, 3.587819ms, 21.975044ms, 34.744692ms, 38.098166ms, 41.126564ms, 45.150838ms, 53.211259ms, 55.66614ms, 57.124649ms, 60.080792ms, 72.885702ms, 77.124708ms, 77.369665ms, 77.68858ms, 92.12409ms, 119.695347ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (709152295) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[2.661714ms, 2.759106ms, 2.81309ms, 3.146748ms, 3.587819ms, 21.975044ms, 34.744692ms, 38.098166ms, 41.126564ms, 45.150838ms, 53.211259ms, 55.66614ms, 57.124649ms, 60.080792ms, 72.885702ms, 77.124708ms, 77.369665ms, 77.68858ms, 92.12409ms, 119.695347ms]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\n"
+    },
+    "failing_source": {
+      "path": "lampOS/crates/voice/tests/it/light_call.rs",
+      "head_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+      "base_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+      "byte_equal_to_parent": true,
+      "qualification": "Unchanged source alone does not prove failure causality or clear the failed gate."
+    },
+    "owned_phone_case": {
+      "name": "messages::tests::a_text_never_waits_on_the_news_for_the_phone",
+      "actual_result": "ok",
+      "compiled_ignored": false,
+      "library_sha256": "72c30bec58d345f9b690b1f070a659741aac6a7da638b39cda15bb537615e704",
+      "source_aggregate_sha256": "8f8bd4d3e9d9b5c3aba92f3df242444c6f43acb79007a0b6926db57285df1efd",
+      "qualification": "Actual full-Voice row. Any failure remains failed; listing is not execution."
+    },
+    "full_summary": {
+      "source": "actual test result lines only, including any harness-compatible summaries",
+      "command_exit_code": 101,
+      "command_timed_out": false,
+      "rows": [
+        {
+          "raw": "test result: ok. 3643 passed; 0 failed; 15 ignored; 0 measured; 0 filtered out; finished in 316.15s",
+          "status": "ok",
+          "passed": 3643,
+          "failed": 0,
+          "ignored": 15,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "status": "ok",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "raw": "test result: FAILED. 269 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.88s",
+          "status": "FAILED",
+          "passed": 269,
+          "failed": 1,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "raw": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "status": "ok",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "raw": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s",
+          "status": "ok",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "status": "ok",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        }
+      ],
+      "totals": {
+        "passed": 3923,
+        "failed": 1,
+        "ignored": 15,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "qualification": "Nonzero or timeout is still a failed/incomplete gate regardless of parsed counts; compiled inventory is not execution."
+    }
+  },
+  "paired_baseline_run_in_this_plan": false,
+  "failed_candidate_runs_repeated": false
+}

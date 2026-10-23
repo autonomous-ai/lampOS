@@ -1,0 +1,19 @@
+{
+  "reason": "Explicit parent instruction: require socket-enabled tool launch and preflight both Unix datagram and loopback TCP before Cargo.",
+  "original_preparation_untouched_copies": "preflight-revision-original/",
+  "original_sha256": {
+    "run-gates.py": "37e400e1dfce764934e011cc75972a3bd69a6473442841a8a38ff4368da05867",
+    "gate-plan.json": "f639730092c6068bdfefeb53e20289d01a2f94723b9b2d4c23798b374e25befd",
+    "README.md": "734b23f4c3c0caf401809760d803481f89591139d725034ca6d81b8f92064cb7",
+    "SHA256SUMS": "cb4c397d048ffae9f917cf880c8b463a033a325f144e1055f7d366d752c828bb"
+  },
+  "new_sha256": {
+    "run-gates.py": "dd2bf48b896d4f4f6ed06cb3b48fb7c9b22dd85fbdadd97912ba8338ac4ddad3",
+    "gate-plan.json": "d901dbb771dfcab55070e55aa916c8cba54d6fea7d3e8df0c7f03b4c1d25bb1a",
+    "README.md": "cd36d0f4f03b953811c6113c401e7e4eeb7dfe37a3e74ff8d5c987d844c9edfa"
+  },
+  "scope": "Added one loopback bind/listen after the existing Unix datagram bind; recorded both probes; documented require_escalated. No source, Cargo command, parser, census or gate-count changes.",
+  "Cargo_executed": false,
+  "target_access": false,
+  "prior_execution_latch": false
+}
