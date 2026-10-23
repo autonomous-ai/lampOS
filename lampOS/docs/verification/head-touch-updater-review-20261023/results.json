@@ -1,0 +1,46 @@
+{
+  "head": "c062243b6da9b5dad14551d176ef79d81483758e",
+  "file": "lampOS/crates/update/tests/round/head_touch.rs",
+  "draft": "/private/tmp/third-3269-extra-tests.rs",
+  "original_prefix_bytes": 21583,
+  "original_prefix_sha256": "61056ae2ee10e0b15878bb9a52ac528a0b784ca8043ca4ea6b40d602ae4534a6",
+  "appended_prefix_sha256": "61056ae2ee10e0b15878bb9a52ac528a0b784ca8043ca4ea6b40d602ae4534a6",
+  "draft_sha256": "85fffbab07c0733d9414e4d86322f2371a980822c11d1d98d674996cc341579b",
+  "appended_sha256": "315af7257ac912c9f7c26ea6e8c04b7959bc27f191bbbb2da4ba2c2128f66042",
+  "changed_files": [
+    "lampOS/crates/update/tests/round/head_touch.rs"
+  ],
+  "command": [
+    "cargo",
+    "test",
+    "-q",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-update",
+    "--test",
+    "round",
+    "third_review_",
+    "--",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "exit_code": 101,
+  "seconds": 21.023,
+  "log": "/private/tmp/third-3269-p2-tests.log",
+  "summary": [
+    "thread 'head_touch::third_review_binary_update_checks_active_build_local_head_pins' (228673163) panicked at crates/update/tests/round/head_touch.rs:695:5:",
+    "head_touch::third_review_binary_update_checks_active_build_local_head_pins --- FAILED",
+    "thread 'head_touch::third_review_paired_head_readers_on_different_buses_are_refused' (228674316) panicked at crates/update/tests/round/head_touch.rs:232:5:",
+    "head_touch::third_review_paired_head_readers_on_different_buses_are_refused --- FAILED",
+    "test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 137 filtered out; finished in 17.93s",
+    "error: test failed, to rerun pass `-p lamp-update --test round`"
+  ],
+  "final_prefix_sha256": "61056ae2ee10e0b15878bb9a52ac528a0b784ca8043ca4ea6b40d602ae4534a6",
+  "final_file_sha256": "315af7257ac912c9f7c26ea6e8c04b7959bc27f191bbbb2da4ba2c2128f66042",
+  "prefix_unchanged": true,
+  "whole_test_file_unchanged_during_run": true,
+  "final_changed_files": [
+    "lampOS/crates/update/tests/round/head_touch.rs"
+  ]
+}

@@ -1,0 +1,6 @@
+
+running 14 tests
+.....test head_touch::head_reader_mode_overrides_are_not_guessed_from_base_units has been running for over 60 seconds
+.........
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 123 filtered out; finished in 170.60s
+

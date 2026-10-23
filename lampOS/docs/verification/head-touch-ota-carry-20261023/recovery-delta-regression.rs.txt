@@ -1,0 +1,240 @@
+//! Isolated #2948 review regression: a settings update of an existing
+//! product lamp must retain a reader for its head pads.
+use super::*;
+use lamp_controls::touch_pins::TouchPinsConfig;
+use lamp_update::install;
+
+const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
+const OLD_PINS: &str = include_str!("../fixtures/pr2948-before/controls-pins.json");
+const OLD_UNITS: [(&str, &str); 4] = [
+    (
+        "lamp-voice.service",
+        include_str!("../fixtures/pr2948-before/lamp-voice.service"),
+    ),
+    (
+        "lamp-expression.service",
+        include_str!("../fixtures/pr2948-before/lamp-expression.service"),
+    ),
+    (
+        "lamp-controls.service",
+        include_str!("../fixtures/pr2948-before/lamp-controls.service"),
+    ),
+    (
+        "lamp-body.service",
+        include_str!("../fixtures/pr2948-before/lamp-body.service"),
+    ),
+];
+
+fn old_product(settings: bool) -> Lamp {
+    let mut lamp = Lamp::installed();
+    assert!(!lamp.config.settings);
+    assert!(!apply::on(None));
+    assert_eq!(
+        unit::environment(
+            &lamp.read("/etc/systemd/system/lamp-update.service"),
+            apply::SWITCH
+        ),
+        None,
+        "the product has not enabled settings updates by default"
+    );
+    // Keep install's real current links, binaries, settings and records;
+    // restore the exact pre-#2948 head units and their recorded pins.
+    for (name, old) in OLD_UNITS {
+        assert!(unit::linked_program(old, &lamp.root).is_some(), "{name}");
+        fs::write(lamp.root.join("etc/systemd/system").join(name), old).unwrap();
+        lamp.systemd.start(name);
+    }
+    fs::write(lamp.root.join(PINS.trim_start_matches('/')), OLD_PINS).unwrap();
+    let mut state = lamp.state();
+    state["settings"][PINS] = sha(OLD_PINS).into();
+    fs::write(lamp.records().join("state.json"), state.to_string()).unwrap();
+    let pins = TouchPinsConfig::load(&lamp.root.join(PINS.trim_start_matches('/'))).unwrap();
+    assert!(pins.legacy_head);
+    assert_eq!(pins.head_pads.len(), 4);
+    assert!(!head_voice(&lamp));
+    assert!(!head_expression(&lamp));
+    lamp.config.settings = settings;
+    let (root, key) = (lamp.root.clone(), lamp.config.key);
+    lamp.systemd.applier = Some(Box::new(move || {
+        apply::run(
+            &root,
+            &root.join("var/lib/lampos-update"),
+            &key,
+            &mut |_| Ok(()),
+            &mut |_| {},
+        )
+    }));
+    lamp.calls.borrow_mut().clear();
+    lamp
+}
+
+fn head_voice(lamp: &Lamp) -> bool {
+    let voice = lamp.read("/etc/systemd/system/lamp-voice.service");
+    unit::environment(&voice, "LAMP_HEAD_TOUCH").as_deref() == Some("on")
+        && voice.lines().any(|line| {
+            line.starts_with("ExecStart=")
+                && line
+                    .split_whitespace()
+                    .any(|word| word == "--controls-mute")
+        })
+}
+
+fn head_expression(lamp: &Lamp) -> bool {
+    lamp.read("/etc/systemd/system/lamp-expression.service")
+        .lines()
+        .any(|line| {
+            line.starts_with("ExecStart=")
+                && line.split_whitespace().any(|word| word == "--head-touch")
+        })
+}
+
+fn publish_carry(lamp: &mut Lamp) {
+    let mut build = product_build(lamp, 2);
+    // publish::make carries per-lamp, hash-addressed units, not product
+    // current-link units. The round therefore gets no replacement units.
+    assert!(build.units.is_empty());
+    build.settings = install::product_settings();
+    let new_pins = build
+        .settings
+        .iter()
+        .find(|setting| setting.path == PINS)
+        .unwrap();
+    assert_ne!(new_pins.sha256.as_deref(), Some(sha(OLD_PINS).as_str()));
+    needing(lamp, build, manifest::SETTINGS_UPDATER);
+}
+
+#[test]
+fn pr2948_settings_off_preserves_the_old_head_reader() {
+    let mut lamp = old_product(false);
+    publish_carry(&mut lamp);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(PINS), OLD_PINS);
+    for (name, old) in OLD_UNITS {
+        assert_eq!(lamp.read(&format!("/etc/systemd/system/{name}")), old);
+    }
+    assert!(
+        !lamp
+            .calls()
+            .iter()
+            .any(|call| call == &format!("restart {}", apply::UNIT))
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("settings are not written") && line.contains(apply::SWITCH))
+    );
+}
+
+#[test]
+fn pr2948_settings_on_keeps_a_head_reader_available() {
+    let mut lamp = old_product(true);
+    publish_carry(&mut lamp);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    let pins = TouchPinsConfig::load(&lamp.root.join(PINS.trim_start_matches('/'))).unwrap();
+    assert_eq!(
+        pins.head_pads.len(),
+        4,
+        "the physical head inputs still exist"
+    );
+    assert!(
+        lamp.calls()
+            .iter()
+            .any(|call| call == &format!("restart {}", apply::UNIT))
+    );
+    assert!(
+        lamp.calls()
+            .iter()
+            .any(|call| call == "restart lamp-controls.service")
+    );
+    assert_eq!(lamp.state()["settings"][PINS], sha(&lamp.read(PINS)));
+    for (name, old) in OLD_UNITS {
+        assert_eq!(lamp.read(&format!("/etc/systemd/system/{name}")), old);
+    }
+    let voice = head_voice(&lamp);
+    let expression = head_expression(&lamp);
+    assert!(
+        pins.legacy_head || (voice && expression),
+        "settings apply left no head reader: legacy_head={}, Voice head+mute={voice}, Expression head={expression}; pins={} and product units stayed at efc8db9cb",
+        pins.legacy_head,
+        sha(&lamp.read(PINS)),
+    );
+}
+
+#[test]
+fn pr2948_recovery_controls_restart_failure_restores_old_pins_and_state() {
+    let mut lamp = old_product(true);
+    let before = lamp.state()["settings"].clone();
+    assert_eq!(before[PINS], sha(OLD_PINS));
+    lamp.systemd.crashing.push("lamp-controls.service".into());
+    publish_recovery_carry(&mut lamp);
+
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, why, .. } if why.contains("lamp-controls.service")),
+        "{outcome:?}"
+    );
+    assert!(
+        lamp.calls()
+            .iter()
+            .any(|call| call == &format!("restart {}", apply::UNIT))
+    );
+    assert!(
+        lamp.calls()
+            .iter()
+            .any(|call| call == "restart lamp-controls.service")
+    );
+    assert_eq!(lamp.read(PINS).as_bytes(), OLD_PINS.as_bytes());
+    assert_eq!(lamp.state()["settings"][PINS], sha(OLD_PINS));
+    assert_eq!(lamp.state()["settings"], before);
+    assert_eq!(lamp.state()["refused"][0]["sequence"], 2);
+}
+
+#[test]
+fn pr2948_recovery_cut_at_reload_restores_old_pins_and_state() {
+    let mut lamp = old_product(true);
+    let before = lamp.state()["settings"].clone();
+    assert_eq!(before[PINS], sha(OLD_PINS));
+    publish_recovery_carry(&mut lamp);
+    lamp.systemd.cut_at_reload = true;
+
+    let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| lamp.round()));
+    assert!(cut.is_err(), "the settings/reload boundary must be reached");
+    assert_ne!(lamp.read(PINS), OLD_PINS, "pins were written before the cut");
+    let written: serde_json::Value = serde_json::from_str(&lamp.read(PINS)).unwrap();
+    assert_eq!(written["every_ms"], 6);
+    assert!(lamp.exists("/var/lib/lampos-update/journal.json"));
+
+    // Recovery must use the saved files even when the channel is gone.
+    lamp.channel.fetched.clear();
+    lamp.channel.offline = true;
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, why, after: Ok(()), .. } if why.contains("cut short")),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.read(PINS).as_bytes(), OLD_PINS.as_bytes());
+    assert_eq!(lamp.state()["settings"][PINS], sha(OLD_PINS));
+    assert_eq!(lamp.state()["settings"], before);
+    assert_eq!(lamp.state()["refused"][0]["sequence"], 2);
+    assert!(lamp.channel.fetched.is_empty());
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+}
+
+fn publish_recovery_carry(lamp: &mut Lamp) {
+    let mut build = product_build(lamp, 2);
+    assert!(build.units.is_empty());
+    build.settings = install::product_settings();
+    let setting = build
+        .settings
+        .iter_mut()
+        .find(|setting| setting.path == PINS)
+        .unwrap();
+    let mut pins: serde_json::Value =
+        serde_json::from_str(setting.text.as_deref().unwrap()).unwrap();
+    assert_eq!(pins["every_ms"], 5);
+    // Exercise a real settings write even if the head reader is preserved.
+    pins["every_ms"] = 6.into();
+    *setting = Setting::new(PINS, &serde_json::to_string_pretty(&pins).unwrap());
+    assert_ne!(setting.sha256.as_deref(), Some(sha(OLD_PINS).as_str()));
+    needing(lamp, build, manifest::SETTINGS_UPDATER);
+}

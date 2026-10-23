@@ -71,3 +71,16 @@ for the incoming fix's gate to prevent another cross-checkout cache mix.
 
 This remains a focused host review fixture with mocked systemd/binaries,
 not an ARM64 or lamp gate.
+
+
+## Recovery fixture with an explicit pins delta
+
+The [portable extended fixture](recovery-delta-regression.rs.txt) adds a
+separate signed candidate with `every_ms` changed from 5 to 6 for the two
+recovery controls. The original helpers and two settings controls remain
+byte-identical. The cut control confirms the intermediate value is 6,
+then both controls require exact old pins and settings records after recovery.
+[Result](recovery-delta.txt): **2 passed, 0 failed**, exit zero, same
+`f69bdea64` source. This addresses the portability limitation above without
+weakening the write-before-cut assertion. It is fixture input only, not a
+proposed product polling change.

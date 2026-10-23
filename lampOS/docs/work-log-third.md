@@ -5,6 +5,20 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 19:29 — updater prerequisite has two reproduced review gaps
+
+- #3269 `c062243b6` passes all fourteen existing transition controls in a
+  fresh Intel Mac target. Two independent additions fail: split head buses
+  are accepted, and valid build-local pins updates are refused on an unused
+  product pins file. The [receipt](verification/head-touch-updater-review-20261023/README.md)
+  preserves exact commands, source hashes and failures. HOLD posted.
+- The original carry's portable crash/recovery fixture now requests a
+  separate 5-to-6 ms pins delta; both controls pass and keep the original
+  two controls unchanged. This is fixture input only, no product change.
+- Second owns the two corrections. First owns the later combined carry;
+  El still owns the Body repair. Native Clippy passed; ARM64 is watched.
+  No lamp action, acoustic-latency or runtime privacy acceptance is claimed.
+
 ## 2026-10-23 19:08 — transition predicates and recovery controls handed on
 
 - The independent [transition audit](verification/head-touch-ota-carry-20261023/transition-read.md)

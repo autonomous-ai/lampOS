@@ -1,0 +1,122 @@
+// Independent review controls for c062243b6da9b5dad14551d176ef79d81483758e.
+// Append inside tests/round/head_touch.rs, using that head's private helpers.
+
+#[test]
+fn third_review_paired_head_readers_on_different_buses_are_refused() {
+    let mut lamp = old_product(true);
+    let mut build = publish_readers(&mut lamp, true, true, true);
+    let voice = build
+        .units
+        .iter_mut()
+        .find(|unit| unit.unit == "lamp-voice.service")
+        .unwrap();
+    let url = format!("{}{}", build.files_url, voice.file_name());
+    let before = String::from_utf8(lamp.channel.files[&url].clone()).unwrap();
+    assert!(!before.contains("--controls-bus-root"));
+    assert_eq!(
+        unit::environment(&before, "LAMP_BUS_ROOT").as_deref(),
+        Some("/run/lampos-bus")
+    );
+    // Physical privacy still reads the normal bus. Only Voice's optional
+    // hand pump and its voice/mute publisher move away from Controls and
+    // Expression; the three enabling flags therefore do not prove a pair.
+    let text = before
+        .lines()
+        .map(|line| {
+            if line.starts_with("ExecStart=") {
+                format!("{line} --controls-bus-root /run/lampos-voice/isolated-controls")
+            } else {
+                line.to_owned()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n";
+    voice.sha256 = sha(&text);
+    voice.size = text.len() as u64;
+    lamp.channel.files.insert(url, text.into_bytes());
+    needing(&mut lamp, build, manifest::SETTINGS_UPDATER);
+    refused_without_writes(&mut lamp);
+}
+
+#[test]
+fn third_review_binary_update_checks_active_build_local_head_pins() {
+    let mut lamp = old_product(false);
+    for (name, text) in [
+        (
+            "lamp-voice.service",
+            reader_unit("lamp-voice.service", true, true),
+        ),
+        (
+            "lamp-expression.service",
+            reader_unit("lamp-expression.service", true, false),
+        ),
+    ] {
+        fs::write(lamp.root.join("etc/systemd/system").join(name), text).unwrap();
+        lamp.systemd.start(name);
+    }
+
+    let controls_path = "/etc/systemd/system/lamp-controls.service";
+    let controls = lamp.read(controls_path);
+    let old = unit::linked_program(&controls, &lamp.root).unwrap();
+    let folder = old.folder();
+    let active_pins_path = format!("{folder}controls-pins.json");
+    let active_config_path = format!("{folder}controls.json");
+    let active_pins = OLD_PINS.replace("\"legacy_head\": true", "\"legacy_head\": false");
+    let active_config = lamp.read("/etc/lampOS/controls/controls.json");
+    assert!(lamp.exists(&format!("{folder}lamp-controls")));
+    fs::write(
+        lamp.root.join(active_pins_path.trim_start_matches('/')),
+        &active_pins,
+    )
+    .unwrap();
+    fs::write(
+        lamp.root.join(active_config_path.trim_start_matches('/')),
+        &active_config,
+    )
+    .unwrap();
+    // Match the tracked lamp-4ace layout: the executable and both settings
+    // live in an actual installed hash folder. The product pins left under
+    // /etc are unused and must not veto an unrelated binary update.
+    let controls = controls
+        .replace(&format!("{}current/", old.builds), &folder)
+        .replace(PINS, &active_pins_path)
+        .replace("/etc/lampOS/controls/controls.json", &active_config_path);
+    assert!(unit::program(&controls).is_some());
+    fs::write(
+        lamp.root.join(controls_path.trim_start_matches('/')),
+        &controls,
+    )
+    .unwrap();
+    lamp.systemd.start("lamp-controls.service");
+    assert!(head_voice(&lamp) && head_expression(&lamp));
+    assert!(
+        !TouchPinsConfig::load(&lamp.root.join(active_pins_path.trim_start_matches('/')))
+            .unwrap()
+            .legacy_head
+    );
+    assert_eq!(lamp.read(PINS), OLD_PINS);
+
+    let build = product_build(&mut lamp, 2);
+    assert!(build.settings.is_empty() && build.units.is_empty());
+    needing(&mut lamp, build, manifest::SETTINGS_UPDATER);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+
+    let after = lamp.read(controls_path);
+    let new = unit::program(&after).unwrap();
+    assert_ne!(new.folder(), folder, "Controls must actually take build 2");
+    let new_pins_path = format!("{}controls-pins.json", new.folder());
+    let new_config_path = format!("{}controls.json", new.folder());
+    assert!(after.contains(&format!("--pins {new_pins_path}")));
+    assert!(after.contains(&format!("--config {new_config_path}")));
+    assert_eq!(lamp.read(&new_pins_path), active_pins);
+    assert_eq!(lamp.read(&new_config_path), active_config);
+    assert_eq!(lamp.read(PINS), OLD_PINS);
+    assert!(head_voice(&lamp) && head_expression(&lamp));
+    assert!(
+        !lamp
+            .calls()
+            .iter()
+            .any(|call| call == &format!("restart {}", apply::UNIT))
+    );
+}
