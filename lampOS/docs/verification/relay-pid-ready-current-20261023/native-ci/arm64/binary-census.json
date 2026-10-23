@@ -1,0 +1,92 @@
+{
+  "binaries": [
+    {
+      "binary": "lamp-cloud",
+      "outcomes": {
+        "PASS": 166
+      },
+      "cases": 166
+    },
+    {
+      "binary": "lamp-cloud::it",
+      "outcomes": {
+        "PASS": 30
+      },
+      "cases": 30
+    },
+    {
+      "binary": "lamp-update",
+      "outcomes": {
+        "PASS": 119
+      },
+      "cases": 119
+    },
+    {
+      "binary": "lamp-update::functions",
+      "outcomes": {
+        "PASS": 4
+      },
+      "cases": 4
+    },
+    {
+      "binary": "lamp-update::install",
+      "outcomes": {
+        "PASS": 82
+      },
+      "cases": 82
+    },
+    {
+      "binary": "lamp-update::it",
+      "outcomes": {
+        "PASS": 13
+      },
+      "cases": 13
+    },
+    {
+      "binary": "lamp-update::round",
+      "outcomes": {
+        "PASS": 123
+      },
+      "cases": 123
+    },
+    {
+      "binary": "lamp-update::self-cli-exec",
+      "outcomes": {
+        "PASS": 1
+      },
+      "cases": 1
+    },
+    {
+      "binary": "lamp-update::self-process-cuts",
+      "outcomes": {
+        "PASS": 1
+      },
+      "cases": 1
+    },
+    {
+      "binary": "lamp-voice-eval",
+      "outcomes": {
+        "PASS": 378
+      },
+      "cases": 378
+    },
+    {
+      "binary": "lamp-voice-eval::bin/lamp-voice-eval",
+      "outcomes": {
+        "PASS": 7
+      },
+      "cases": 7
+    },
+    {
+      "binary": "lamp-voice-eval::it",
+      "outcomes": {
+        "PASS": 238
+      },
+      "cases": 238
+    }
+  ],
+  "startup_binaries": 14,
+  "terminal_binaries": 12,
+  "skipped_binaries": 154,
+  "limit": "No skipped identities/reasons or zero-row starting binary identities are guessed."
+}

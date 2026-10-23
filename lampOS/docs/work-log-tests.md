@@ -5,7 +5,8 @@
 Ready for lamp-voice: yes (#3255; reviewer read and train remain).
 
 #3255 at `e228f6452` passed native ARM64 run 39934214655 and Linux Clippy
-39934214581. ARM reports **1,162 / 0 / 4**, no leaky pass, selecting Cloud,
+39934214581. The [pinned native receipt](verification/relay-pid-ready-current-20261023/native-ci/)
+binds the exact checked merge tree to the authored head. ARM reports **1,162 / 0 / 4**, no leaky pass, selecting Cloud,
 Update and VoiceEval (3/46 packages); its changed relay test passed. Full
 Mac VoiceEval is **623 / 0 / 0**, with formatting, strict Clippy and build
 green. The invalid restricted-sandbox run remains disclosed. Reviewer-two

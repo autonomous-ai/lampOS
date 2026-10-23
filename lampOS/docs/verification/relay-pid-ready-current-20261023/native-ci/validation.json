@@ -1,0 +1,19 @@
+{
+  "passed": true,
+  "head": "e228f645212fa32d6e9c1446f6d01621fe2c563d",
+  "both_actual_required_jobs_and_workflows_terminal": true,
+  "checkouts_equal": "42fabceba55b7bf579d3e13ed286d28b469f8707",
+  "whole_merge_tree_equals_authored_head": true,
+  "authored_files_verified": 2,
+  "CI_configuration_files_verified": 4,
+  "raw_logs_lossless": 2,
+  "nextest_ordinals_complete": 1162,
+  "selected_cases": 1,
+  "doctest_headers_and_results_preserved": true,
+  "separate_harnesses_not_added": true,
+  "review_pagination_complete": true,
+  "JSON_links_hashes_whitespace": "passed",
+  "person_attribution_metadata_omitted": true,
+  "log_redactions": 0,
+  "readiness_not_advanced": true
+}

@@ -1,0 +1,180 @@
+{
+  "sha": "450e6d02f95b422e15f3c1a2173a0c0e34b52d9f",
+  "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees/450e6d02f95b422e15f3c1a2173a0c0e34b52d9f",
+  "tree": [
+    {
+      "path": ".cursor",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "99d9eeb3016f9ecfdd6eb5c93db8557d48a8be62",
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees/99d9eeb3016f9ecfdd6eb5c93db8557d48a8be62"
+    },
+    {
+      "path": ".gitattributes",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "96fe4193ef020016e1fc8beb3c96555a6fc3327c",
+      "size": 720,
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/96fe4193ef020016e1fc8beb3c96555a6fc3327c"
+    },
+    {
+      "path": ".github",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "d6cdf1fbf133c642ef9aeadd0cd40bdae4b03acf",
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees/d6cdf1fbf133c642ef9aeadd0cd40bdae4b03acf"
+    },
+    {
+      "path": ".gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d51114c820d5a27640242e7e03d2669192eba4e2",
+      "size": 1357,
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/d51114c820d5a27640242e7e03d2669192eba4e2"
+    },
+    {
+      "path": "AGENTS.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "956fff5c0326122f1d6096bf5f1ea7b5830677a4",
+      "size": 19218,
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/956fff5c0326122f1d6096bf5f1ea7b5830677a4"
+    },
+    {
+      "path": "CLAUDE.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aeb8f1a5c4a8295db08a364b965ec0feff97ef60",
+      "size": 19218,
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/aeb8f1a5c4a8295db08a364b965ec0feff97ef60"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4ceb7f17d697361595d584afabb7fa8d6baf35ef",
+      "size": 3382,
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/4ceb7f17d697361595d584afabb7fa8d6baf35ef"
+    },
+    {
+      "path": "CREDITS.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e0611efb7de39d716bcd3c8ffcde362634d306c6",
+      "size": 6680,
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e0611efb7de39d716bcd3c8ffcde362634d306c6"
+    },
+    {
+      "path": "LICENSE",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+      "size": 11358,
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/d645695673349e3947e8e5ae42332d0ac3164cd7"
+    },
+    {
+      "path": "Makefile",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4f68e2fdba14b2d6943b315034ef29d2707e91a2",
+      "size": 29815,
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/4f68e2fdba14b2d6943b315034ef29d2707e91a2"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "68fcd2f35e02265ab99e6f197609b85920ea4056",
+      "size": 16963,
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/68fcd2f35e02265ab99e6f197609b85920ea4056"
+    },
+    {
+      "path": "SECURITY.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1d8fdaab06ba0130b21cc3cc4229c1dd9049498e",
+      "size": 544,
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1d8fdaab06ba0130b21cc3cc4229c1dd9049498e"
+    },
+    {
+      "path": "docs",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "895da65e8ceb33c8ce744a2605a707c1a56c7401",
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees/895da65e8ceb33c8ce744a2605a707c1a56c7401"
+    },
+    {
+      "path": "go.mod",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5d0c465ab3e4f5b3eda7eed43058caef52f77882",
+      "size": 1877,
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/5d0c465ab3e4f5b3eda7eed43058caef52f77882"
+    },
+    {
+      "path": "go.sum",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "144b16c03a1b1374df3ed0320b304c3eb52a4ebf",
+      "size": 10105,
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/144b16c03a1b1374df3ed0320b304c3eb52a4ebf"
+    },
+    {
+      "path": "hal",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "1a8eacb9dc3997b760f88dcd26f46de37ab808da",
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees/1a8eacb9dc3997b760f88dcd26f46de37ab808da"
+    },
+    {
+      "path": "integrations",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "82e408e4f0f549688dba0b4804c0ff026eb83087",
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees/82e408e4f0f549688dba0b4804c0ff026eb83087"
+    },
+    {
+      "path": "lampOS",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "9d42fd58d446ccccfebb737cf059530b5aeb967f",
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees/9d42fd58d446ccccfebb737cf059530b5aeb967f"
+    },
+    {
+      "path": "robots",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "bc8662d7ad90162dc1c0c4f21b6d5f632f2cff01",
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees/bc8662d7ad90162dc1c0c4f21b6d5f632f2cff01"
+    },
+    {
+      "path": "runtimes",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "df54701f08924f0927fe1fabf5e9a45552b7bc91",
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees/df54701f08924f0927fe1fabf5e9a45552b7bc91"
+    },
+    {
+      "path": "scripts",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3e5cdad3c3ccd850c67a71deb7662ec200b184c9",
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees/3e5cdad3c3ccd850c67a71deb7662ec200b184c9"
+    },
+    {
+      "path": "skills",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "285a10c36a9f1abcb202c350280a54f60b517dda",
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees/285a10c36a9f1abcb202c350280a54f60b517dda"
+    },
+    {
+      "path": "system",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2226f02b837259073244d9ea93ed3da98b3129ad",
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees/2226f02b837259073244d9ea93ed3da98b3129ad"
+    }
+  ],
+  "truncated": false
+}

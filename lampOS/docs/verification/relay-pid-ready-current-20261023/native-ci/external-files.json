@@ -1,0 +1,422 @@
+[
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/arm64/binary-census.json",
+    "bytes": 1625,
+    "sha256": "0408bf5e834a116c732ffa8a943befe4d301237fbfe73bf9d41bf7ba6fa94d0c",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/arm64/final-jobs.json",
+    "bytes": 7012,
+    "sha256": "8abb13d7d9f03ba52fe9eb022d68b71ad905f31b2ed8fa8177123784944b9e54",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/arm64/final-jobs.json.command.json",
+    "bytes": 490,
+    "sha256": "eb9c03b0ec0f646898a0ab537b9e02c1e8cbeee57e8894aed2e7bdd450d79052",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/arm64/final-jobs.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/arm64/final-run.json",
+    "bytes": 12729,
+    "sha256": "4e4ca227db11b34991c629514fa469ace457b2129ebed3c3453a1ce201b80dd9",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/arm64/final-run.json.command.json",
+    "bytes": 473,
+    "sha256": "8a44e3d5263d64108642318babe49caec1343fcb4cadf890bba4eed98a0a4aa1",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/arm64/final-run.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/arm64/job.log",
+    "bytes": 267913,
+    "sha256": "a921924069f9e6beaf11efcdbdeb8ef6749139d836f51898d5456cbdc4fecbc9",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/arm64/job.log.command.json",
+    "bytes": 480,
+    "sha256": "2fd12e868f368f9a0413443cd08f90791d1f0b6c5a83b24faf8c49c3a3ce4491",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/arm64/job.log.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/arm64/receipt.json",
+    "bytes": 25854,
+    "sha256": "2290fb71d76df4f17fb090cff5a6e1353ec2fe813922a510ee773b26b22b2515",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/arm64/selected-cases.json",
+    "bytes": 872,
+    "sha256": "f04da90dad3528037ef894b903b87b0ffdf96c85a2ae89bebed507e5cf463111",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/arm64/separate-harnesses.json",
+    "bytes": 13205,
+    "sha256": "0735e0aeeadb8e5932820c1f9e2af522de0eef30d57c6b5b83c565723722782d",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/arm64/terminal-cases.json",
+    "bytes": 278662,
+    "sha256": "d258ac6a6f43af1904f23c71f31d3a14b5211abd494e48e4a5972e41098eec03",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/arm64/unique-terminal-cases.json",
+    "bytes": 278662,
+    "sha256": "d258ac6a6f43af1904f23c71f31d3a14b5211abd494e48e4a5972e41098eec03",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/clippy/final-jobs.json",
+    "bytes": 2632,
+    "sha256": "f480115c4eaf7b9d77a79ad78efc60dd4bed459c9e762ed5312556520dea0256",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/clippy/final-jobs.json.command.json",
+    "bytes": 490,
+    "sha256": "653622959cc05dcb7975978df21a902c10f6c8b72f218573c27f78f7e356baf9",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/clippy/final-jobs.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/clippy/final-run.json",
+    "bytes": 12728,
+    "sha256": "f9aeae6192d3a1718329ea5e3496bc5bd4a61a992abff62e70b5ebe2b847b421",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/clippy/final-run.json.command.json",
+    "bytes": 473,
+    "sha256": "a3bb2fa67c628e46d391f58ebad4543f8638bb006b4b7908f91c3b6f9ee283bc",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/clippy/final-run.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/clippy/job.log",
+    "bytes": 39054,
+    "sha256": "ac7c39396ea0d5312f583096efc653de6f6fcd7ca31c64b924d747d73a113212",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/clippy/job.log.command.json",
+    "bytes": 479,
+    "sha256": "6e03dbc1b0233dfed7ed58075a4d06dd6db2a329b5b4b5343a9ca915771e3f7c",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/clippy/job.log.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/clippy/receipt.json",
+    "bytes": 4034,
+    "sha256": "dcd5c40751e3f7de9af9eea262b216be75d643f2020d75b2c14ef70ee562c3c3",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/collection-config.json",
+    "bytes": 615,
+    "sha256": "5edc6fbb8442db7aae78200dfa145722bdd6536cd72a3bfc5e7a878598487a9f",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/comments/issue-comments-final.json",
+    "bytes": 6200,
+    "sha256": "d8603a8f68eeded670491548c6a0ba25de2d0a106b69b7b70bedf3b1c2805a20",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/comments/issue-comments-final.json.command.json",
+    "bytes": 514,
+    "sha256": "91dffb45495f0b936f6de6021f7aa95510fb57bdb6d087575a6ec2af2744d718",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/comments/issue-comments-final.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/comments/pr-final.json",
+    "bytes": 19596,
+    "sha256": "a094946e309eb769e9775eb260debc70133ae766e4687a1ff6a1e952c6d4ce2f",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/comments/pr-final.json.command.json",
+    "bytes": 459,
+    "sha256": "36030d940498f1801cce306aad9516e948aec86176a21e20a7f830af4e3dafe4",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/comments/pr-final.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/comments/review-comments-final.json",
+    "bytes": 4,
+    "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/comments/review-comments-final.json.command.json",
+    "bytes": 510,
+    "sha256": "c54bc59307624cb79cb8b2131eddaaa0a528b8769e44e42f5d46230777460d2b",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/comments/review-comments-final.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/comments/reviews-final.json",
+    "bytes": 4,
+    "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/comments/reviews-final.json.command.json",
+    "bytes": 509,
+    "sha256": "a7bf0904fcc0a959405ba1b5e4dd2a7e26983328c259e16f8df740582df0869f",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/comments/reviews-final.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/comments/threads-final.json",
+    "bytes": 135,
+    "sha256": "b7d2accee34d7a7fd9354c630e40ba3b856015467aaf9791631673527fac0e4c",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/comments/threads-final.json.command.json",
+    "bytes": 751,
+    "sha256": "3001703f3728c54112886ff6ae78c518043dedf851990ebf98a03cf402c250a9",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/comments/threads-final.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/extraction.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/extraction.stdout.txt",
+    "bytes": 1385,
+    "sha256": "786adb4d5333cd33c9469ab08c866963f8fa1281473b09c37a177fda35da0409",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-0.json",
+    "bytes": 26380,
+    "sha256": "4083e4889d0644eca4b877a7f7b45e84b1698dc31d428887c46c93329551e3f1",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-0.json.command.json",
+    "bytes": 536,
+    "sha256": "168c4e500bf4f8b33d9d190b526f62a41b554fc0bbc920aa85c2aa8456cf5654",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-0.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-1.json",
+    "bytes": 6902,
+    "sha256": "7b600b80540f7f753dbd0bcf6df6e2e584dee3cf2b7c8ca64b9274a233c08806",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-1.json.command.json",
+    "bytes": 535,
+    "sha256": "1eeffdb48cd0e08b80ea2d908d793175ee9689600849bf9e24ad37d5b930bfb1",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-1.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-2.json",
+    "bytes": 8698,
+    "sha256": "83c8f437927949ac13e7d7a768fe9aa567f6520fe74739ed3908d00c8ec29763",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-2.json.command.json",
+    "bytes": 537,
+    "sha256": "237b6d46c31ff601a4e31635b0af14ad0416ae2c8b8adb65986b447827771480",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-2.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-3.json",
+    "bytes": 8179,
+    "sha256": "03922e65150107e2321a7d28bf7d7d70021898d48a23fc65b553ee01ee960f8d",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-3.json.command.json",
+    "bytes": 529,
+    "sha256": "c3f9dc8b8b8d305bd0943b39d812fbe9ad45d1921878004def07379989a7c7c1",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-3.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-4.json",
+    "bytes": 16310,
+    "sha256": "1e3c64e8b0702ecb790dfa38e6446b9fea58fc83570e6eca0b7530dd7af07b18",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-4.json.command.json",
+    "bytes": 555,
+    "sha256": "30e37737024e66a5434da306813d641a7b35d48d4dcdcdf0de6a42da336fcb70",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-4.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-5.json",
+    "bytes": 88417,
+    "sha256": "2fdef26c16db453ff2a33c4a9180c50d9a97551036c9cb759a873a42d8fd1d19",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-5.json.command.json",
+    "bytes": 528,
+    "sha256": "4999bd06bd9127e467da14be9e5cb7a2bb3b87bc92fc93b2ee2cfb938d9fb00c",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/content-5.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/merge-commit.json",
+    "bytes": 2603,
+    "sha256": "95f0be35cabeb1f5a9970c70854fa1e95bdf8ffb7a89c3b831556f1e0367cfbc",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/merge-commit.json.command.json",
+    "bytes": 500,
+    "sha256": "c999cbf09d63064041e27b0b1ffe3b1e32cbe84e6d0059fd12d73841d6cdbee4",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/merge-commit.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/merge-root-tree.json",
+    "bytes": 5120,
+    "sha256": "18f91c2312e36b37a6f5d312cc68868efdb8dcd61be0ff379669c44c15eec3bd",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/merge-root-tree.json.command.json",
+    "bytes": 498,
+    "sha256": "75f1b3960a69516217408c659f0fb99cb47fceef7c9fb358a938882607ee9cf5",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/merge-root-tree.json.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/source-binding.initial.json",
+    "bytes": 420,
+    "sha256": "12906224b933a208cb4c338c71575c86378ad17e7b2199bac6c5c4f7eb99f251",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/identity/source-snapshots.json",
+    "bytes": 112325,
+    "sha256": "757eabb414a2d539929413806f92c86dbe86643c99eccb75db654d32dc4824f0",
+    "reason": "Original external read-only response/log/parse record retained."
+  },
+  {
+    "path": "/private/tmp/tests-3255-e228-ci-20261023/summary.json",
+    "bytes": 3184,
+    "sha256": "a02234e52c21340cc4a8c150d640812d2da5be542aae38d10d630cfb455dc1bb",
+    "reason": "Original external read-only response/log/parse record retained."
+  }
+]

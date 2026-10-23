@@ -1,0 +1,25 @@
+{
+  "pr": 3255,
+  "head": "e228f645212fa32d6e9c1446f6d01621fe2c563d",
+  "cases": [
+    {
+      "name": "relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers",
+      "source": "lampOS/crates/voice-eval/tests/it/relay_hardening.rs",
+      "mapping": "literal",
+      "row": {
+        "status": "PASS",
+        "seconds": 0.032,
+        "ordinal": 1093,
+        "total": 1162,
+        "binary": "lamp-voice-eval::it",
+        "name": "relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers",
+        "raw_line": 1777
+      }
+    }
+  ],
+  "outcomes": {
+    "PASS": 1
+  },
+  "scope": "Authored subset of current CI executed cases, not a full compiled census. The 86 clock fixtures and additional loading-child case are separate when present. Case duration is not product response latency.",
+  "historical_inventory_sha256": null
+}
