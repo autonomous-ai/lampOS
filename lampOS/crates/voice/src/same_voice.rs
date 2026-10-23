@@ -88,6 +88,10 @@ pub const MOST_SAMPLES: usize = RATE * 3;
 pub const ASKED_AT: usize =
     LEAST_SAMPLES + crate::activity::PRE_ROLL_BLOCKS * lamp_audio::CAPTURE_SAMPLES;
 const _: () = assert!(ASKED_AT <= MOST_SAMPLES);
+/// The pre-roll each line's clip begins with, sound from before its speech
+/// began ([`ASKED_AT`]): not speech of the line, so not counted in how much
+/// speech a print was made from ([`Voices::usable_speech`]).
+pub const PRE_ROLL_SAMPLES: usize = crate::activity::PRE_ROLL_BLOCKS * lamp_audio::CAPTURE_SAMPLES;
 /// Two prints with a cosine under this are taken for two voices, the one
 /// bar for every rule that reads a voice: the conversation's own check
 /// (#829) and the rules that hold or chain a line as another person's
@@ -526,6 +530,13 @@ pub struct Voices<P: Printer> {
     caller_seen: Option<u64>,
     /// Where its lines are said ([`to_stderr`] on a lamp).
     journal: Journal,
+    /// How many samples each line's print was asked from, pre-roll and
+    /// all, the newest [`KEPT`] ([`Self::usable_speech`]).
+    lengths: VecDeque<(u64, usize)>,
+    /// A print come after its line's verdict is another voice's only when it
+    /// is sure ([`Self::sure_of_another_only`]): from this many samples of
+    /// speech or more, and under this cosine. `None`: as [`DIFFERENT_BELOW`].
+    sure_of_another: Option<(usize, f32)>,
 }
 
 impl<P: Printer> Voices<P> {
@@ -542,7 +553,30 @@ impl<P: Printer> Voices<P> {
             caller_only: false,
             caller_seen: None,
             journal: to_stderr(),
+            lengths: VecDeque::new(),
+            sure_of_another: None,
         }
+    }
+
+    /// From now on, a print come after its line's verdict ends the
+    /// conversation as another voice's only from `least_samples` samples
+    /// of speech or more and under `below`; an unsure one says nothing
+    /// either way, and is not kept as the conversation's voice
+    /// (`LAMP_SAME_SPEAKER_CARRIES`: on lamp-4ace on 23 Oct short prints of
+    /// what may have been the owner's own lines read 0.25 and 0.27).
+    pub fn sure_of_another_only(&mut self, least_samples: usize, below: f32) {
+        self.sure_of_another = Some((least_samples, below));
+    }
+
+    /// How much speech the print of the line `request` was made from: the
+    /// samples it was asked from less the pre-roll ([`PRE_ROLL_SAMPLES`]),
+    /// not the clip's whole length. Nothing for a line not asked of late.
+    pub fn usable_speech(&self, request: u64) -> Option<usize> {
+        self.lengths
+            .iter()
+            .rev()
+            .find(|(of, _)| *of == request)
+            .map(|(_, samples)| samples.saturating_sub(PRE_ROLL_SAMPLES))
     }
 
     /// The conversation's voice is its caller's only, with `on`
@@ -623,6 +657,10 @@ impl<P: Printer> Voices<P> {
                 self.asked.pop_front();
             }
             self.asked.push_back(clip.request);
+            if self.lengths.len() == KEPT {
+                self.lengths.pop_front();
+            }
+            self.lengths.push_back((clip.request, clip.samples.len()));
         } else {
             // The line is then judged without the check: said, not
             // silently (the reviewer on #1435).
@@ -773,7 +811,23 @@ impl<P: Printer> Voices<P> {
         let likeness = (going_on && self.judged != Some(request))
             .then(|| self.likest(&print))
             .flatten();
+        // With `sure_of_another`, an unsure print is neither another voice
+        // nor the conversation's.
+        let unsure = |likeness: f32| {
+            self.sure_of_another.is_some_and(|(least, below)| {
+                likeness >= below
+                    || self
+                        .usable_speech(request)
+                        .is_none_or(|speech| speech < least)
+            })
+        };
         match likeness {
+            Some(likeness) if likeness < DIFFERENT_BELOW && unsure(likeness) => {
+                (self.journal)(&format!(
+                    "lamp-voice provider: request {request}: a print known after its answer at cosine {likeness:.2}, from {} ms of speech: unsure, neither another voice nor the conversation's",
+                    self.usable_speech(request).unwrap_or(0) * 1_000 / RATE
+                ));
+            }
             Some(likeness) if likeness < DIFFERENT_BELOW => {
                 eprintln!(
                     "lamp-voice provider: request {request}: another voice than the conversation's, known after its answer (cosine {likeness:.2}): the conversation is over"
@@ -1429,6 +1483,34 @@ exec sleep 30"#,
         assert_eq!(voices.take_late_other(), None);
         said(&mut voices, 6, -1, 48_000);
         assert_eq!(voices.likeness(6), Some(1.0));
+    }
+
+    /// `LAMP_SAME_SPEAKER_CARRIES` (reviewer-two at 03:07 on Queue #3126): a
+    /// print's speech is counted without the 0.3 s pre-roll, 1.5 s for a
+    /// full print of 1.8 s; and with [`Voices::sure_of_another_only`] a late
+    /// print of another voice from less speech than asked is unsure: no
+    /// late other, and not the conversation's voice. From enough speech it
+    /// is another voice, as without it.
+    #[test]
+    fn a_late_print_from_too_little_speech_is_unsure() {
+        let mut voices = Voices::new(StandIn::default());
+        said(&mut voices, 1, 1, 48_000);
+        assert_eq!(voices.usable_speech(1), Some(RATE * 3 / 2));
+        voices.decided(1, true, false);
+        voices.sure_of_another_only(RATE * 5 / 2, DIFFERENT_BELOW);
+        voices.printer.slow = true;
+        said(&mut voices, 2, -1, 48_000);
+        voices.decided(2, true, true);
+        voices.printer.slow = false;
+        assert_eq!(voices.take_late_other(), None, "unsure");
+        said(&mut voices, 3, -1, 48_000);
+        assert_eq!(voices.likeness(3), Some(0.0), "not the conversation's");
+        voices.sure_of_another_only(RATE, DIFFERENT_BELOW);
+        voices.printer.slow = true;
+        said(&mut voices, 4, -1, 48_000);
+        voices.decided(4, true, true);
+        voices.printer.slow = false;
+        assert_eq!(voices.take_late_other(), Some(4), "sure");
     }
 
     /// sv-ab on lamp-4ace (21 Oct 20:06, the first builder on #2602): with
