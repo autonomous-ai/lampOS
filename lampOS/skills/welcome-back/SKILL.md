@@ -11,7 +11,9 @@ comes back: look up, a word or two, and nothing more. It does not greet
 people walking past or speak into a conversation.
 
 - **Trigger:** a face on `humans/faces/tracked` where there was none, after
-  at least five minutes with nobody; at most once every twenty minutes.
+  at least five minutes with nobody (counted from when they left: a face
+  glimpsed for a moment as they sit down does not restart it, #2825); at
+  most once every twenty minutes.
 - **After a rested night:** with Bedtime and Morning on, the first face of
   the morning waits for its morning greeting, which is the welcome back;
   if that chance is dropped, the hello comes as usual (`yields_to`, #1672).

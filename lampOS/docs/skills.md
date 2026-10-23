@@ -167,7 +167,7 @@ must not leave a step silently undone)*.
 | `trigger.near` | no | On `humans/faces/tracked` alone: only a face at least this share of the picture's height counts (Welcome back: 0.14, the voice's Presence line for someone at the desk) |
 | `trigger.for` | no | It has held this long |
 | `trigger.gap` | no | A dropout shorter than this does not break `for` |
-| `trigger.absent_for` | no | `appears` only: at least this long before, it did not hold. At the program's start nothing has been away: someone there at the first message is not greeted |
+| `trigger.absent_for` | no | `appears` only: at least this long before, it did not hold, counted from the last time it held in a hold that lasted its `for`: a glimpse shorter than `for` lost past its `gap` (a face caught for 2 s as someone sits down) is no visit and does not start the clock again (#2825). At the program's start nothing has been away: someone there at the first message is not greeted |
 | `trigger.rearm` | no | `leaves` or `ends`, which mean the same: once each time it holds, and again only after it stopped. Without it, `present` runs at every message once `for` has passed, as often as `cooldown` lets it. Or a line, on a trigger with a `field` (#1021): `{ below = N, for = D }` (or `above`): once each time it holds, and again only after the trigger's field has been below N, by the messages of its topic, for D since the last chance; a dip that does not stay past the line does not count, however often the trigger stops and holds again (Stuffy air: `{ below = 1000, for = "10m" }` on a trigger above 1,200). A chance held back by a condition, the cooldown or the Policy is spent as one that ran, unless `wait` keeps one held back by a condition; one that comes in the quiet hours is kept (`[quiet]`): the line waits for the chance taken |
 | `trigger.cooldown` | no | Not again within this long of the last run. A run the Policy refused does not count |
 | `trigger.wait` | no | With `rearm` or `when = "appears"`, at most `1h`: a chance held back by a `[[while]]` condition (someone talking) is kept while the trigger still holds, for at most this long, and taken at the trigger's first message after every condition holds again: the lamp acts once the talk ends, within the same sitting, instead of giving up its turn (#1021). It began waiting when the chance came, or for a chance kept through the `[quiet]` hours, when they end; the trigger stopping (past its `gap`) ends it. A chance let go past its `wait` says so once in the journal (below). Without it, a chance held back by a condition is spent, and says only a `not run: its while did not hold` line in the journal (below). A chance held back by `absent_for` or the cooldown is spent either way |
@@ -1978,7 +1978,7 @@ A due chance any other gate drops or holds back, for every trigger kind,
 says one journal line naming the gate (#2602; on lamp-52e6 two Welcome
 back runs were lost with nothing said): `lamp-skills: <skill> not run:
 <why>`, where why is `away N s, under its N s` (`absent_for`, from the last
-face the trigger held for), `in its cooldown, N min left`, `quiet hours`,
+face the trigger held for its `for`), `in its cooldown, N min left`, `quiet hours`,
 `outside its active hours`, `off`, `snoozed, N min left`, `its N a day
 already run`, `resting after runs nobody noticed, N min left`, `its <group>
 group's hour is spent` or `another <group> skill waits first` (`[budget]`),
