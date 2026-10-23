@@ -1525,7 +1525,19 @@ kept **unconfirmed**, until its person says yes at the lamp:
     carry it, `{"photo_yes":NAME,"face":"<boot>/f<id>"}`, and is kept only
     if it is that same id under that same boot (`photo::is_that_face`):
     another, an older boot's, `null`, or a bare yes is `not_that_face`, and
-    the face stays unconfirmed. The id is held in memory only, beside the
+    the face stays unconfirmed. A passing id can't tell two people apart:
+    another face in the same place within 1.5 s takes it
+    (`bus_out::Ids::of`; reviewer-three's P2). So a yes that passes is not
+    kept at once: the eyes force one look, from a frame read after the yes
+    reached them, and keep it only if that look's near face has the yes's
+    id and prints as the photo's face (`photo::yes_after_look`). No face,
+    no print, another print or another id is `not_that_face`, nothing
+    kept; no such look within `photo::YES_LOOK_WITHIN` (1 s) is
+    `not_that_face` too, so the yes is answered within about a second, inside
+    the voice's 6 s. One yes waits at a time: another meanwhile is `busy`.
+    And a look whose near print isn't the photo's drops the face from
+    `photo_here` at once (`photo::print_is_photos`), rather than leaving it
+    there for `KNOWN_FOR`. The id is held in memory only, beside the
     name, and means nothing after a restart. The voice judges who spoke the
     yes; the eyes only name the face and check it again. Off, both answer
     as before, without `face`, and a yes with `face` is `not_understood`.
