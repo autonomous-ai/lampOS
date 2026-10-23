@@ -4246,9 +4246,6 @@ mod tests {
         assert_eq!(engine.summary()["no_harness"], true);
     }
 
-    /// A stored state with a field twice is refused, as before #1512, and
-    /// not read with the last of the two: it is decoded from its bytes, never
-    /// through a JSON value (found reading Second's #1562).
     /// A task stored by a build that held it to the raw bound only still
     /// opens, though a new one like it is refused (the reviewer-lead on #3259).
     #[test]
@@ -4269,6 +4266,9 @@ mod tests {
         assert_eq!(engine.state.tasks[0].launch.prompt, "\u{1}".repeat(1_000));
     }
 
+    /// A stored state with a field twice is refused, as before #1512, and
+    /// not read with the last of the two: it is decoded from its bytes, never
+    /// through a JSON value (found reading Second's #1562).
     #[test]
     fn a_stored_state_with_a_field_twice_is_refused() {
         let (mut engine, memory) = opened();
