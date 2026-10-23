@@ -5,6 +5,25 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 09:16 — third-P4 approved and claimed; tests first
+
+Ready for lamp-voice: no (implementation and gates in progress).
+
+- First approved third-P4 at 09:12, Queue comment `6355737001`, explicitly
+  asking for an older-reader/newer-message test. Claimed at 09:16 in
+  `6355784291`, session `third-touch-compat-20261023`, no lamp. The task
+  branch is `third/touch-additive-fields` from current `b3a1ece0b`.
+- The unchanged Mac Msgs baseline is **171 passed, zero failed**, using
+  `CARGO_BUILD_JOBS=2 cargo test -q --offline --locked -p lamp-msgs` with
+  local socket access. The earlier sandbox attempt is retained separately:
+  169 passed, one failed Unix-socket bind (`PermissionDenied`), with the doc
+  test not run after that failure. No source changed between attempts.
+- Msgs wire regressions and Controls receiver regressions are being written
+  separately before the three production annotations are removed. Required
+  fields/types, unknown action values, invalid known intent combinations,
+  freshness and identity fences, and deduplication remain in scope; physical
+  privacy evidence remains strict. No new field is published by this piece.
+
 ## 2026-10-23 09:12 — touch wire compatibility audit and next proposal
 
 Ready for lamp-voice: no (third-P4 is proposed; no product change yet).
@@ -3972,7 +3991,7 @@ router, hotspot or lamp; step 4 of #806 needs a builder with a lamp.
 | third-P1 | Expression reads the system's time zone (`--zone system`), so a lamp outside Vietnam keeps its days across daylight saving; Memory's owner the same | #820 | Yes (First, 18:20; Second for the policy, 18:34); #844 |
 | third-P2 | Use diagnostic long-gap counter deltas for Controls totals; rate-limited journal warnings can omit the final suppressed gaps | #2602, 22 Oct 23:36 | Claimed after the self-pick window; delivered as #3083 for documentation review |
 | third-P3 | Test the real bus-to-Controls path for a push, its release or expiry, and recovery only after a fresh head contact | #1798; #3126, 23 Oct 07:02 | Delivered as #3162 through train #3164 at `b7700b7c2`; every initiated gate complete at 08:14; Body implementation and hand qualification remain with their owners |
-| third-P4 | Let touch message readers ignore additive fields while preserving known action, identity, freshness and privacy checks | #3126, 23 Oct 09:09, comment `6355696995` | Proposed; current refusal demonstrated on `e6b88eac2`; self-pick window ends 09:24:40 +07 |
+| third-P4 | Let touch message readers ignore additive fields while preserving known action, identity, freshness and privacy checks | #3126, 23 Oct 09:09, comment `6355696995` | Yes, First 09:12 (`6355737001`); claimed `6355784291`, tests first on `third/touch-additive-fields` from `b3a1ece0b` |
 
 ## 2026-10-15 — Setup for a home (#806) ready as #817; #795 and #808 rebased
 
