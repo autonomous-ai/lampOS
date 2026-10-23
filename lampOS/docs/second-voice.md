@@ -3104,8 +3104,20 @@ after a take-over, but now for every turn:
   than the newest one carried by a sure sign ends nothing. A carried line
   the model leaves unanswered is no talk (`RoomTold::carried`): it neither
   ends the conversation nor keeps the room busy. The 2.5 s and the 0.30
-  under it are to be set from a CAM++ measurement of longer prints. Tests
-  only (`worker.rs`, `CarryDesk`); off until a played five-turn
+  under it are to be set from a CAM++ measurement of longer prints. In
+  short, the contract (the first builder at 04:33 on #3296): the first 8 s
+  are not identity-gated, an uncertain, short or missing print there being
+  no evidence either way; from 8 to 20 s only a sure same-speaker sign
+  carries; and three cases are always held, inside the 8 s too: another
+  face seen speaking, the caller turned away, and a sure other voice, the
+  last not reachable today (prints carry at most 1.5 s of speech, under
+  the provisional 2.5 s; its test is a synthetic classification control).
+  A print that was no evidence never becomes evidence (reviewer-two's P2 at
+  04:31): with the switch, a going-on line's print joins the conversation's
+  voice (`Voices::adopt`) only at `SAME_FROM` or over or when the line was
+  seen spoken by the caller's face, at its verdict or late, caller-only on
+  or off, so an unknown voice let out at 3 s does not match itself at 12 s.
+  Tests only (`worker.rs`, `CarryDesk`); off until a played five-turn
   back-and-forth on lamp-52e6 or lamp-75c9, quiet and with desk talk.
 - **A busy room's call by the text, narrowed** (`LAMP_BUSY_CALLED_STRICT=on`;
   with `--attention`). On #1712's branch the busy room let out "Man, that
