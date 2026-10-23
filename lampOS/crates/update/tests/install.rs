@@ -2136,7 +2136,8 @@ fn prepare_places_the_recorded_lines_a_moved_lamps_voice_reads() {
     assert_eq!(mode & 0o777, 0o644);
     assert_eq!(said.len(), 2, "{said:?}");
     assert!(
-        said[0].starts_with(&format!("kept {}", moved("wifi-lost.en-US.wav"))),
+        said[0].starts_with(&format!("kept {}", moved("wifi-lost.en-US.wav")))
+            && said[0].ends_with("remove it and run prepare again to take the pin"),
         "{said:?}"
     );
     assert!(

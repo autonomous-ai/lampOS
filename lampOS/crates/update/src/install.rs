@@ -2303,7 +2303,9 @@ pub fn place_moved_notices(
 /// Each of `models` under [`NOTICES_PRODUCT`] placed under the same name in
 /// [`NOTICES_MOVED`], only where it is missing, by install's own fetch and
 /// size and SHA-256 check ([`fetch_model`]). One there at its pin is left;
-/// one that isn't is the lamp's own, kept and said. One that cannot be had
+/// one that isn't is kept and said, with how to take the pin: nothing records
+/// what prepare wrote, so a line [`MODELS`] has since re-pinned is not told from
+/// the lamp's own (the Reviewer-lead's and Fourteen's P3 on #3189). One that cannot be had
 /// is said and the rest go on: never a refusal, since the voice plays its
 /// sigh for a line it cannot load. Returns the paths written.
 pub fn place_moved_notices_of(
@@ -2323,7 +2325,9 @@ pub fn place_moved_notices_of(
         match file_sha256(&at) {
             Ok(sha) if sha == model.sha256 => continue,
             Ok(_) => {
-                say(&format!("kept {path}: it is not the pinned line"));
+                say(&format!(
+                    "kept {path}: it is not the pinned line (an older pin or the lamp's own); remove it and run prepare again to take the pin"
+                ));
                 continue;
             }
             Err(_) => {}
