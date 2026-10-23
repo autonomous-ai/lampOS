@@ -2375,28 +2375,24 @@ pub fn serve(
                     .map_or(0, |since| since.as_millis() as u64);
                 // The lamp's own zone, as memory's other notes read the day
                 // (#820): each moment at its own offset.
-                let note = crate::remember::hits_note(
+                let note = crate::remember::hits_note_counted(
                     &socket,
                     person.as_deref(),
                     heard,
                     now_unix_ms,
                     crate::local_time::system(),
                 );
+                // What was told, counted, never said (#2510 take 1 c).
                 eprintln!(
-                    "lamp-voice second: request {request}: memory {} in {} ms ({})",
-                    if note.is_some() {
-                        "told"
-                    } else {
-                        "had nothing told"
-                    },
-                    started.elapsed().as_millis(),
-                    if person.is_some() {
-                        "theirs"
-                    } else {
-                        "the room's"
-                    }
+                    "lamp-voice second: {}",
+                    crate::remember::hits_journal_line(
+                        request,
+                        note.as_ref().map(|(_, count)| *count),
+                        started.elapsed().as_millis(),
+                        person.is_some(),
+                    )
                 );
-                note
+                note.map(|(note, _)| note)
             }));
         }
         (true, _) => eprintln!(
@@ -5417,10 +5413,18 @@ impl Heeding {
         }
     }
 
+    /// The call let out `by` longer ago, as time passes in a test. On a
+    /// clock booted under `by` ago the call stays where it is, never a
+    /// panic (#1569).
+    #[cfg(test)]
+    pub(crate) fn call_older(&mut self, by: Duration) {
+        self.called_at = self.called_at.map(|at| at.checked_sub(by).unwrap_or(at));
+    }
+
     /// How long ago the lamp's words sent were played to their end
     /// ([`crate::second_provider::Did::Said`]), zero while they still play.
     #[cfg(test)]
-    fn said_ended_ago(&self, now_us: u64) -> Option<Duration> {
+    pub(crate) fn said_ended_ago(&self, now_us: u64) -> Option<Duration> {
         ended_ago(self.said_until_us, now_us)
     }
 

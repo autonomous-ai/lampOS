@@ -36,18 +36,9 @@ pub fn on() -> bool {
 }
 
 /// Words nearly every sentence has, in [`fold`]'s form with accents kept:
-/// `lamp_memory::search::COMMON` (#2282), with the words a model uses for
-/// whoever spoke.
-const COMMON: &[&str] = &[
-    "the", "an", "and", "or", "but", "of", "to", "in", "on", "at", "for", "with", "from", "by",
-    "about", "as", "is", "are", "was", "were", "be", "been", "am", "it", "its", "my", "me", "mine",
-    "you", "your", "yours", "we", "our", "us", "he", "him", "his", "she", "her", "they", "them",
-    "their", "what", "which", "who", "when", "where", "why", "how", "that", "this", "these",
-    "those", "do", "does", "did", "have", "has", "had", "can", "could", "would", "should", "will",
-    "any", "some", "not", "no", "so", "if", "there", "tell", "told", "remember", "please", "của",
-    "là", "tôi", "và", "có", "không", "này", "đó", "thì", "mà", "những", "các", "một", "cho",
-    "với", "được", "gì", "nào", "user", "person",
-];
+/// `lamp_memory::search::COMMON` (#2282, [`super::SEARCH_COMMON`]), with
+/// these: "an", and the words a model uses for whoever spoke.
+const COMMON: &[&str] = &["an", "user", "person"];
 
 /// The ways a line asks to be remembered, longest first where one begins
 /// another: what is cut from the front of a kept heard line.
@@ -100,7 +91,12 @@ fn words(value: &str) -> impl Iterator<Item = String> {
 /// The model's words that must have been heard.
 fn key_words(model: &str) -> Vec<String> {
     words(model)
-        .filter(|word| !COMMON.iter().any(|common| fold(common) == *word))
+        .filter(|word| {
+            !super::SEARCH_COMMON
+                .iter()
+                .chain(COMMON)
+                .any(|common| fold(common) == *word)
+        })
         .filter(|word| word.chars().count() >= 3 || word.chars().any(|c| c.is_ascii_digit()))
         .map(|word| bare(&word))
         .collect()

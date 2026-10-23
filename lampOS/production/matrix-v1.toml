@@ -1,0 +1,383 @@
+# The production test suite's coverage matrix, version 1.
+#
+# Version 0's checks, limits, durations, fixtures and "mandatory" unchanged,
+# approved for the pilot (#1700 deliverable 7, batch `pilot-1`): the lead
+# gave the three hardware-test decisions to the hardware team on 21 Oct
+# (#1764), with the limits as version 0 proposed them unless the hardware
+# team objects. A limit the pilot shows wrong is a new version of this file
+# (matrix-v2.toml, ...), the hardware lead's versioned decision, never an edit
+# made to pass a unit. The revision names are still version 0's placeholders,
+# for the hardware lead to name.
+#
+# The fields of each check are as version 0 describes them (matrix-v0.toml).
+
+[suite]
+version = "1"
+approved = true
+
+# A self-test report names the lamp that ran it (`lamp`, its host name); one
+# from a build before reports did cannot be matched to the station's --device.
+# Such a run is "incomplete" (the default) or "refused" (no record made): the
+# hardware lead's choice. A report naming another lamp is always refused.
+[rules]
+selftest_without_lamp = "incomplete"
+
+# Placeholder names: the hardware lead names the revisions.
+[[revision]]
+id = "draft-a"
+what = "every part fitted, the SEN63C air sensor among them, as lamp-4ace is built"
+
+[[revision]]
+id = "draft-a-no-air"
+what = "as draft-a without the air sensor, as lamp-06c1 and lamp-cb94 are"
+
+# Assembly inspection (deliverable 1 lists it; not in the 08:4x draft).
+
+[[check]]
+id = "assembly_inspection"
+part = "assembly"
+kind = "routine"
+method = "manual"
+mandatory = true
+what = "the operator looks the lamp over: shell closed, cables seated, nothing loose (the list is the hardware lead's)"
+
+# Voice microphone (Jieli, mic2).
+
+[[check]]
+id = "voice_mic"
+part = "voice microphone (Jieli, mic2)"
+kind = "routine"
+method = "selftest"
+mandatory = true
+what = "1 s of mic2/audio above -90 dBFS, blocks lost counted"
+
+[[check]]
+id = "voice_mic_tone"
+part = "voice microphone (Jieli, mic2)"
+kind = "routine"
+method = "station"
+mandatory = false
+what = "a tone played at a fixed level is read back within a dB window, and the noise floor (tone, fixture and window not set yet)"
+
+# Room microphone (C-Media, mic1).
+
+[[check]]
+id = "room_mic"
+part = "room microphone (C-Media, mic1)"
+kind = "routine"
+method = "selftest"
+mandatory = true
+what = "ears/level above -90 dBFS"
+
+[[check]]
+id = "room_mic_tone"
+part = "room microphone (C-Media, mic1)"
+kind = "routine"
+method = "station"
+mandatory = false
+what = "the same tone, read back within a dB window (not set yet)"
+
+# Speaker.
+
+[[check]]
+id = "speaker"
+part = "speaker"
+kind = "routine"
+method = "selftest"
+mandatory = true
+what = "from the lamp's own last speaking turn of 4 s or more: make the lamp speak first"
+
+[[check]]
+id = "speaker_level"
+part = "speaker"
+kind = "routine"
+method = "station"
+mandatory = false
+what = "the level at a reference microphone at a fixed distance (fixture and window not set yet)"
+
+[[check]]
+id = "speaker_buzz"
+part = "speaker"
+kind = "routine"
+method = "manual"
+mandatory = true
+what = "a person listens for buzz and rattle while the lamp speaks"
+
+# Servos 1 to 5: each joint is its own self-test part.
+
+[[check]]
+id = "base_yaw"
+part = "servo 1 (base yaw)"
+kind = "routine"
+method = "selftest"
+mandatory = true
+what = "body/joint_states fresh; no warm joint and no resistance warning"
+
+[[check]]
+id = "shoulder"
+part = "servo 2 (shoulder)"
+kind = "routine"
+method = "selftest"
+mandatory = true
+what = "body/joint_states fresh; no warm joint and no resistance warning"
+
+[[check]]
+id = "elbow"
+part = "servo 3 (elbow)"
+kind = "routine"
+method = "selftest"
+mandatory = true
+what = "body/joint_states fresh; no warm joint and no resistance warning"
+
+[[check]]
+id = "head_roll"
+part = "servo 4 (head roll)"
+kind = "routine"
+method = "selftest"
+mandatory = true
+what = "body/joint_states fresh; no warm joint and no resistance warning"
+
+[[check]]
+id = "head_pitch"
+part = "servo 5 (head pitch)"
+kind = "routine"
+method = "selftest"
+mandatory = true
+what = "body/joint_states fresh; no warm joint and no resistance warning"
+
+[[check]]
+id = "head_move"
+part = "servos 4 and 5 (head)"
+kind = "routine"
+method = "selftest"
+mandatory = true
+what = "the head's pitch and roll moved a few counts from rest and back (a factory self-test only)"
+
+[[check]]
+id = "servo_range"
+part = "servos 1 to 5"
+kind = "routine"
+method = "station"
+mandatory = false
+what = "each joint's full range within its limits, and load at rest under a limit (not set yet); the operator's stop first"
+
+[[check]]
+id = "servo_give_way"
+part = "servos 1 to 5"
+kind = "routine"
+method = "manual"
+mandatory = false
+what = "the arm gives way to a hand (#780)"
+
+[[check]]
+id = "servo_endurance"
+part = "servos 1 to 5"
+kind = "qualification"
+method = "station"
+mandatory = true
+what = "temperature after a set time of moves (time and limit not set yet); the operator's stop first"
+
+# Ring (32 pixels).
+
+[[check]]
+id = "ring"
+part = "ring"
+kind = "routine"
+method = "selftest"
+mandatory = true
+what = "each of 10 colours at level 3, seen on light/drawn"
+
+[[check]]
+id = "ring_pixels"
+part = "ring"
+kind = "routine"
+method = "manual"
+mandatory = true
+what = "no dead or stuck pixel: a person looks (or, later, a camera)"
+
+# Camera.
+
+[[check]]
+id = "camera"
+part = "camera"
+kind = "routine"
+method = "selftest"
+mandatory = true
+what = "humans/faces/tracked within 2 s; health has no warning"
+
+[[check]]
+id = "camera_test_card"
+part = "camera"
+kind = "routine"
+method = "station"
+mandatory = false
+what = "focus and exposure on a test card at desk distance (card and fixture not set yet)"
+
+[[check]]
+id = "camera_face_distance"
+part = "camera"
+kind = "routine"
+method = "manual"
+mandatory = false
+what = "a face found at 40 to 80 cm (no picture is kept)"
+
+# The head's two pads and the button. The base's touch strip (the MPR121)
+# is off in V2, not used at the project lead's decision (19 Oct;
+# docs/controls.md, "The base strip is off"), so no check here is the
+# strip's: neither its calibration nor its electrodes.
+
+[[check]]
+id = "touch"
+part = "head pads and button"
+kind = "routine"
+method = "selftest"
+mandatory = true
+what = "controls/touch_state ready, no fault, nothing held 10 s or more"
+
+[[check]]
+id = "touch_by_hand"
+part = "head pads and button"
+kind = "routine"
+method = "selftest"
+mandatory = true
+what = "the operator touches each head pad and presses the button; each pad felt is listed (a factory self-test only)"
+
+# Privacy switch.
+
+[[check]]
+id = "privacy_switch"
+part = "privacy switch"
+kind = "routine"
+method = "manual"
+mandatory = true
+what = "the switch closes both microphones and the camera"
+
+# Air (SEN63C): optional on some revisions.
+
+[[check]]
+id = "air"
+part = "air sensor (SEN63C)"
+kind = "routine"
+method = "selftest"
+mandatory = true
+not_fitted_allowed = ["draft-a-no-air"]
+what = "air/state fresh (15 s) and in range"
+
+[[check]]
+id = "air_reference"
+part = "air sensor (SEN63C)"
+kind = "routine"
+method = "station"
+mandatory = false
+not_fitted_allowed = ["draft-a-no-air"]
+what = "CO2 and PM2.5 against a reference, or a sealed-box test (not set yet)"
+
+[[check]]
+id = "air_read_failures"
+part = "air sensor (SEN63C)"
+kind = "qualification"
+method = "station"
+mandatory = true
+not_fitted_allowed = ["draft-a-no-air"]
+what = "the failed-read rate over 10 minutes (limit not set yet)"
+
+# Board.
+
+[[check]]
+id = "board"
+part = "board"
+kind = "routine"
+method = "selftest"
+mandatory = true
+what = "hottest under 85 °C, 3% of the disk free or more"
+
+[[check]]
+id = "board_load_temperature"
+part = "board"
+kind = "routine"
+method = "station"
+mandatory = false
+what = "the hottest temperature under a fixed 10-minute load with both fans (17 Oct: 87 °C before the second fan)"
+limit = { max = 85.0, unit = "°C" }
+
+# Storage (SD).
+
+[[check]]
+id = "storage"
+part = "storage (SD card)"
+kind = "routine"
+method = "selftest"
+mandatory = true
+what = "no SD I/O or ext4 error in the kernel log since boot"
+
+[[check]]
+id = "storage_write_read"
+part = "storage (SD card)"
+kind = "routine"
+method = "station"
+mandatory = false
+what = "a write and read check (where the card's make and size are kept is open)"
+
+# Power (not in the self-test).
+
+[[check]]
+id = "power_servo_peak"
+part = "power supply"
+kind = "qualification"
+method = "station"
+mandatory = true
+what = "the supply's voltage under the servos' peak (limit not set yet)"
+
+# Interference: all parts at once.
+
+[[check]]
+id = "interference_servos_mic"
+part = "servos and voice microphone"
+kind = "integrated"
+method = "station"
+mandatory = false
+what = "servos moving while the microphones listen: the noise in mic2 (limit not set yet)"
+
+[[check]]
+id = "interference_speaker_room_mic"
+part = "speaker and room microphone"
+kind = "integrated"
+method = "station"
+mandatory = false
+what = "the speaker playing while the room microphone listens (limit not set yet)"
+
+# Recovery: approved scenarios only.
+
+[[check]]
+id = "recovery_power_cut"
+part = "whole lamp"
+kind = "qualification"
+method = "manual"
+mandatory = true
+what = "a power cut: the lamp comes back by itself and the voice comes back unmuted (#784)"
+
+[[check]]
+id = "recovery_wifi_lost"
+part = "whole lamp"
+kind = "qualification"
+method = "manual"
+mandatory = true
+what = "Wi-Fi lost and back: the lamp recovers by itself"
+
+[[check]]
+id = "recovery_part_restart"
+part = "whole lamp"
+kind = "qualification"
+method = "manual"
+mandatory = true
+what = "one part restarted alone: the others keep working"
+
+# Final acceptance.
+
+[[check]]
+id = "spoken_exchange"
+part = "whole lamp"
+kind = "routine"
+method = "manual"
+mandatory = true
+what = "\"Hey Lamp, what time is it?\", answered (nothing of it is recorded)"

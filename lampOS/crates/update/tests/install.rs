@@ -2055,6 +2055,124 @@ fn install_places_the_voices_recorded_lines_where_the_product_voice_reads_them()
     );
 }
 
+/// #2943: a lamp moved from V1 gets no `lamp-update install` and its
+/// package carries no notices, so `lamp-keeper prepare` places the same
+/// pinned lines, by install's own fetch and check, in the folder the
+/// generic voice unit names. Only a missing line is fetched: one at its pin
+/// is left, one that isn't is kept and said, and one that can't be had is
+/// said while the rest are still placed. Nothing is refused, and nothing
+/// goes under `/opt/lampOS`.
+#[test]
+fn prepare_places_the_recorded_lines_a_moved_lamps_voice_reads() {
+    let root = tempfile::tempdir().unwrap();
+    let at = |name: &str| {
+        root.path()
+            .join(install::NOTICES_MOVED.trim_start_matches('/'))
+            .join(name)
+    };
+    let line = |name: &str, bytes: &[u8]| manifest::Model {
+        path: format!("{NOTICES}{name}"),
+        url: format!("https://release.test/{name}"),
+        bytes: bytes.len() as u64,
+        sha256: sha256_hex(bytes),
+        archive: None,
+    };
+    let models = [
+        line("manifest.json", b"{\"lines\":1}"),
+        line("provider-unavailable.en-US.wav", b"the service's line"),
+        line("back-online.en-US.wav", b"back online"),
+        line("wifi-lost.en-US.wav", b"no wifi"),
+        line("voice-service-unreachable.en-US.wav", b"unreachable"),
+        // Not a notice: never placed by prepare.
+        manifest::Model {
+            path: "/opt/lampOS/eyes/models/eyes.onnx".into(),
+            ..line("eyes.onnx", b"eyes")
+        },
+    ];
+    let mut channel = FakeChannel::default();
+    for (name, bytes) in [
+        ("manifest.json", &b"{\"lines\":1}"[..]),
+        ("provider-unavailable.en-US.wav", b"the service's line"),
+        ("back-online.en-US.wav", b"back online"),
+        ("wifi-lost.en-US.wav", b"no wifi"),
+        ("eyes.onnx", b"eyes"),
+    ] {
+        channel
+            .files
+            .insert(format!("https://release.test/{name}"), bytes.to_vec());
+    }
+    // One already at its pin, one the lamp's own.
+    fs::create_dir_all(at("")).unwrap();
+    fs::write(at("back-online.en-US.wav"), b"back online").unwrap();
+    fs::write(at("wifi-lost.en-US.wav"), b"a line of its own").unwrap();
+    let mut said = Vec::new();
+    let wrote = install::place_moved_notices_of(&models, root.path(), &mut channel, &mut |line| {
+        said.push(line.to_owned())
+    });
+    let moved = |name: &str| format!("{}/{name}", install::NOTICES_MOVED);
+    assert_eq!(
+        wrote,
+        [
+            moved("manifest.json"),
+            moved("provider-unavailable.en-US.wav")
+        ]
+    );
+    assert_eq!(fs::read(at("manifest.json")).unwrap(), b"{\"lines\":1}");
+    assert_eq!(
+        fs::read(at("provider-unavailable.en-US.wav")).unwrap(),
+        b"the service's line"
+    );
+    assert_eq!(
+        fs::read(at("wifi-lost.en-US.wav")).unwrap(),
+        b"a line of its own"
+    );
+    assert!(!at("voice-service-unreachable.en-US.wav").exists());
+    assert!(!root.path().join("opt").exists());
+    use std::os::unix::fs::PermissionsExt;
+    let mode = fs::metadata(at("manifest.json"))
+        .unwrap()
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o777, 0o644);
+    assert_eq!(said.len(), 2, "{said:?}");
+    assert!(
+        said[0].starts_with(&format!("kept {}", moved("wifi-lost.en-US.wav")))
+            && said[0].ends_with("remove it and run prepare again to take the pin"),
+        "{said:?}"
+    );
+    assert!(
+        said[1].starts_with(&format!(
+            "{} could not be had",
+            moved("voice-service-unreachable.en-US.wav")
+        )) && said[1].contains("sigh"),
+        "{said:?}"
+    );
+    // Again: everything there is left, and only the missing one is tried.
+    said.clear();
+    let wrote = install::place_moved_notices_of(&models, root.path(), &mut channel, &mut |line| {
+        said.push(line.to_owned())
+    });
+    assert!(wrote.is_empty(), "{wrote:?}");
+    assert_eq!(said.len(), 2, "{said:?}");
+}
+
+/// The pinned lines `lamp-keeper prepare` places are install's own: the
+/// five under the product's folder, nothing else.
+#[test]
+fn a_moved_lamp_is_given_the_product_voices_five_lines() {
+    let root = tempfile::tempdir().unwrap();
+    let mut channel = FakeChannel::default();
+    let mut said = Vec::new();
+    let wrote = install::place_moved_notices(root.path(), &mut channel, &mut |line| {
+        said.push(line.to_owned())
+    });
+    assert!(wrote.is_empty());
+    assert_eq!(said.len(), 5, "{said:?}");
+    for line in &said {
+        assert!(line.starts_with(install::NOTICES_MOVED), "{line}");
+    }
+}
+
 const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
 
 /// The reviewer's P1 on #2143: a lamp whose pins are its own (the

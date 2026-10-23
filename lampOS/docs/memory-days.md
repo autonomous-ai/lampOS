@@ -317,6 +317,14 @@ and `conversation_end` and `session_close` in their scope. The source union
 keeps each ID with its person. With nobody known no request carries a
 `person` and nothing above changes.
 
+With `LAMP_MEMORY_ROOM_AFTER_FORGET=on`, for the rest of the local day after
+someone known said "forget everything", the room's snapshot and the room's
+`search` or `recall` entries given beside theirs leave out every line about a
+person (first, second-person possessive (your...) or third person words, a
+possessive `'s`, or the person's own name as the eyes knew it); the room's other
+lines still reach them. Remembered in the voice's process only
+([memory.md](memory.md), #2849).
+
 Completed conversation exchanges use the person already stored on each thread
 exchange when they are handed to `finished_exchange_for`. A later face change
 or a mixed batch cannot reassign them to one current person. Room exchanges

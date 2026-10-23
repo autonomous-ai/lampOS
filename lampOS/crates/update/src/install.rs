@@ -2274,6 +2274,78 @@ fn place_models(
     Ok(())
 }
 
+/// Where [`MODELS`] places the voice's recorded failure lines on a product
+/// lamp: the folder the product voice unit's `--failure-notice-dir` names
+/// (docs/failure-notices.md, #1844).
+pub const NOTICES_PRODUCT: &str = "/opt/lampOS/voice/notices";
+/// Where `lamp-keeper prepare` places the same lines on a lamp moved from V1,
+/// the folder the generic voice unit names (#2943): a moved lamp gets no
+/// install, its package carries no notices, and the package's packager
+/// takes every path under `/opt/lampOS` for one it carries.
+pub const NOTICES_MOVED: &str = "/var/lib/lampOS/voice/notices";
+
+/// [`MODELS`]' recorded failure lines placed in [`NOTICES_MOVED`] under
+/// `root` (`/` on a lamp), by [`place_moved_notices_of`].
+pub fn place_moved_notices(
+    root: &Path,
+    channel: &mut dyn Channel,
+    say: &mut dyn FnMut(&str),
+) -> Vec<String> {
+    match models() {
+        Ok(models) => place_moved_notices_of(&models, root, channel, say),
+        Err(why) => {
+            say(&why);
+            Vec::new()
+        }
+    }
+}
+
+/// Each of `models` under [`NOTICES_PRODUCT`] placed under the same name in
+/// [`NOTICES_MOVED`], only where it is missing, by install's own fetch and
+/// size and SHA-256 check ([`fetch_model`]). One there at its pin is left;
+/// one that isn't is kept and said, with how to take the pin: nothing records
+/// what prepare wrote, so a line [`MODELS`] has since re-pinned is not told from
+/// the lamp's own (the Reviewer-lead's and Fourteen's P3 on #3189). One that cannot be had
+/// is said and the rest go on: never a refusal, since the voice plays its
+/// sigh for a line it cannot load. Returns the paths written.
+pub fn place_moved_notices_of(
+    models: &[Model],
+    root: &Path,
+    channel: &mut dyn Channel,
+    say: &mut dyn FnMut(&str),
+) -> Vec<String> {
+    let product = format!("{NOTICES_PRODUCT}/");
+    let mut wrote = Vec::new();
+    for model in models {
+        let Some(name) = model.path.strip_prefix(&product) else {
+            continue;
+        };
+        let path = format!("{NOTICES_MOVED}/{name}");
+        let at = root.join(path.trim_start_matches('/'));
+        match file_sha256(&at) {
+            Ok(sha) if sha == model.sha256 => continue,
+            Ok(_) => {
+                say(&format!(
+                    "kept {path}: it is not the pinned line (an older pin or the lamp's own); remove it and run prepare again to take the pin"
+                ));
+                continue;
+            }
+            Err(_) => {}
+        }
+        let placed = Model {
+            path: path.clone(),
+            ..model.clone()
+        };
+        match fetch_model(channel, &placed, &at) {
+            Ok(()) => wrote.push(path),
+            Err(why) => say(&format!(
+                "{path} could not be had ({why}); the voice sighs in its place until it is there"
+            )),
+        }
+    }
+    wrote
+}
+
 /// A model fetched and checked to `at`, whole or not at all. A channel out
 /// of reach is said as [`Fetch::Unreachable`], so a round tries again; any
 /// other failure is [`Fetch::Failed`].

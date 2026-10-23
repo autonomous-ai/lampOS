@@ -87,6 +87,11 @@ impl Scene {
                 ..Default::default()
             }),
         );
+        // Leases a second long, as the burst test's (#1569): a line's waits for Started,
+        // the drained messages and activityEnd send no heartbeat, and a stall
+        // past the rig's 100 ms on a loaded serial run revoked the line's owner
+        // (None at `end_line`, #3180's gate). These tests are about the name.
+        rig.lease_us = 1_000_000;
         rig.owner
             .set_camera_permission(real_time(), Permission::Allowed)
             .unwrap();

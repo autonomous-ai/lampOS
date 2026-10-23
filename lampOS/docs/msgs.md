@@ -283,7 +283,19 @@ transport lifespan) and `controls/touch_state` (`TouchState`, latest,
 `first_topics()` and the existing `controls_topics()` inventories are unchanged.
 Only the explicit `lamp-controls --touch` path publishes them: a change at
 once, what only grows while a hand stays at most every 20 ms, events, and
-every 100 ms otherwise ([controls.md](controls.md)). All fields are strict; old controls shapes are unchanged.
+every 100 ms otherwise ([controls.md](controls.md)). `TouchEvent`,
+`TouchSourceState` and `TouchState` ignore additional JSON fields, including
+fields in nested sources and retained events. The known fields keep their
+required types and semantic checks; unknown source, gesture and intent values
+are refused. An extra field such as `permit` supplies no authority and is not
+written back. Physical privacy evidence keeps its separate strict contract.
+
+This reader tolerance must ship before a later publisher adds fields, as the
+[one-build-apart rule](updates.md#what-parts-say-to-each-other-one-build-apart)
+requires. It cannot make older deployed readers accept an extended message.
+The existing touch JSON output, topic declarations and old controls shapes
+are unchanged; an added field must not change the meaning of an existing
+action or replace a required check.
 
 Source/session/contact identity, original acquisition and contact times,
 raw working-source masks, filtered event geometry, normalized strip position/travel/

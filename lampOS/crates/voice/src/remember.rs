@@ -41,7 +41,7 @@ use lamp_gemini::{Tool, ToolCall};
 use lamp_local_time::LocalTime;
 use serde_json::{Value, json};
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     io::{self, Read, Write},
     os::unix::net::UnixStream,
     path::{Path, PathBuf},
@@ -55,6 +55,7 @@ use std::{
 use unicode_normalization::UnicodeNormalization;
 
 pub mod heard;
+pub mod needs_face;
 pub mod noted;
 pub mod on;
 
@@ -787,6 +788,164 @@ fn facts_in(snapshot: &Value) -> usize {
         .unwrap_or(0)
 }
 
+/// Only the exact value `on`, with the Days client and
+/// [`FORGET_ALL_ENVIRONMENT`] (#2849's find, seen again in #1693's c0a4
+/// run; the first builder's yes on #2602, 23 Oct 03:31): for the rest of
+/// the local day after someone known said "forget everything about me",
+/// their turns are given none of the room's kept things or exchanges that
+/// are about a person ([`about_someone`]): not in a session's note, nor in
+/// what recall or search gives from the room's. The room's other things
+/// still reach them. Remembered in this process only: a restart forgets
+/// who forgot. Off, the room's reach them as before.
+pub const ROOM_AFTER_FORGET_ENVIRONMENT: &str = "LAMP_MEMORY_ROOM_AFTER_FORGET";
+
+/// How many people [`ROOM_AFTER_FORGET_ENVIRONMENT`] remembers at once.
+const FORGOT_MOST: usize = 64;
+
+/// The words that make a line about a person for
+/// [`ROOM_AFTER_FORGET_ENVIRONMENT`]: the first person, the second's own
+/// ("your favourite colour is green", Fourteen's P3 on #3142) and the
+/// third. "we" and "our" are left out: they are the household's; so is a
+/// bare "you", which most of the lamp's own lines hold.
+const PERSON_WORDS: [&str; 25] = [
+    "i",
+    "i'm",
+    "i've",
+    "i'd",
+    "i'll",
+    "me",
+    "my",
+    "mine",
+    "myself",
+    "your",
+    "yours",
+    "yourself",
+    "he",
+    "she",
+    "him",
+    "his",
+    "her",
+    "hers",
+    "herself",
+    "himself",
+    "their",
+    "theirs",
+    "them",
+    "themselves",
+    "user",
+];
+
+/// Words ending in `'s` that are not a person's: a contraction, or "it's".
+const NOT_POSSESSIVE: [&str; 11] = [
+    "it", "that", "what", "there", "here", "let", "where", "when", "how", "who", "today",
+];
+
+/// Whether a line's words are about a person, for
+/// [`ROOM_AFTER_FORGET_ENVIRONMENT`]: a word of [`PERSON_WORDS`] ("I",
+/// "my", "their", "the user", ...), or one ending in `'s` that is not of
+/// [`NOT_POSSESSIVE`] ("Mai's favourite colour"). Lowercased, `’` read as
+/// `'`, whole words only ("mine" in "determined" is not one). Careful on
+/// purpose: a fact about nobody, such as "the meeting is at four", passes.
+fn about_someone(text: &str) -> bool {
+    let lower = text.to_lowercase().replace('\u{2019}', "'");
+    lower
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .map(|word| word.trim_matches('\''))
+        .filter(|word| !word.is_empty())
+        .any(|word| {
+            PERSON_WORDS.contains(&word)
+                || word
+                    .strip_suffix("'s")
+                    .is_some_and(|owner| !owner.is_empty() && !NOT_POSSESSIVE.contains(&owner))
+        })
+}
+
+/// The words of a text for [`names_them`]: NFC, lowercased, split at
+/// anything that is not a letter or a digit.
+fn name_words(text: &str) -> Vec<String> {
+    text.nfc()
+        .collect::<String>()
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Whether a line names `name` (Reviewer-lead's P2 on #3142): its words,
+/// all of them in order, as whole words ([`name_words`]), so "Mai" is in
+/// "Mai likes green tea" and "Mai's bike", never in "Maine". No common
+/// word is passed over: a household line that has the name in it is held
+/// back too, for the day.
+fn names_them(text: &str, name: &str) -> bool {
+    let name = name_words(name);
+    !name.is_empty()
+        && name_words(text)
+            .windows(name.len())
+            .any(|words| words == name.as_slice())
+}
+
+/// Whether a line is about a person for [`ROOM_AFTER_FORGET_ENVIRONMENT`]:
+/// [`about_someone`], or it names the one who forgot ([`names_them`]),
+/// when the eyes gave their name.
+fn about_them(text: &str, name: Option<&str>) -> bool {
+    about_someone(text) || name.is_some_and(|name| names_them(text, name))
+}
+
+/// Whether a recall's entry is about a person ([`about_them`]) in any of
+/// its words: what was heard, said, or kept.
+fn entry_about_them(entry: &Value, name: Option<&str>) -> bool {
+    ["heard", "said", "text"]
+        .iter()
+        .filter_map(|field| entry[*field].as_str())
+        .any(|text| about_them(text, name))
+}
+
+/// The room's validated snapshot without its facts about a person
+/// ([`about_them`]), its ids with them; with how many went. A snapshot
+/// whose note is not as validated is left as it is.
+fn room_without_someone(
+    snapshot: Value,
+    ids: Vec<u64>,
+    name: Option<&str>,
+) -> ((Value, Vec<u64>), usize) {
+    let mut snapshot = snapshot;
+    let Some(mut quoted) = snapshot["note"]
+        .as_str()
+        .and_then(|note| serde_json::from_str::<Value>(note).ok())
+    else {
+        return ((snapshot, ids), 0);
+    };
+    let Some(facts) = quoted.get_mut("facts").and_then(Value::as_array_mut) else {
+        return ((snapshot, ids), 0);
+    };
+    let mut gone = vec![];
+    facts.retain(|fact| {
+        let about = fact["text"]
+            .as_str()
+            .is_some_and(|text| about_them(text, name));
+        if about && let Some(id) = fact["id"].as_u64() {
+            gone.push(id);
+        }
+        !about
+    });
+    if gone.is_empty() {
+        return ((snapshot, ids), 0);
+    }
+    let ids: Vec<u64> = ids.into_iter().filter(|id| !gone.contains(id)).collect();
+    snapshot["note"] = json!(quoted.to_string());
+    snapshot["source_ids"] = json!(ids);
+    ((snapshot, ids), gone.len())
+}
+
+/// The journal's line for [`ROOM_AFTER_FORGET_ENVIRONMENT`]: a count only,
+/// never a word kept.
+fn room_after_forget_line(left_out: usize) -> String {
+    format!(
+        "lamp-voice provider: room after forget: {left_out} room lines about a person left out for them (#2849)"
+    )
+}
+
 /// Only the exact value `on`, with the Days client and a route that gives
 /// it a model ([`observe_with`]): at each conversation's end the memory's
 /// frozen job is sent to the text model, and what it proposes to keep goes
@@ -1506,8 +1665,9 @@ pub enum ForgetPick {
     /// The last thing they asked to keep (`forget_last`): only for a bare
     /// "forget that" or "what I just said".
     Last,
-    // #2808 adds its case here: a bare forget just after a follow-up was
-    // asked picks that follow-up's entry by id ([`Recent`]).
+    /// The follow-up the lamp just asked the same person about, by its id
+    /// ([`Recent::asked`]): a bare "forget that" right after the ask (#2808).
+    Asked(u64),
 }
 
 /// What the session did just before a bare forget, for [`pick_forget`].
@@ -1516,8 +1676,9 @@ pub struct Recent {
     /// What a named forget in the same scope named, within
     /// [`HELD_FORGET_FOR`] and with nothing kept since ([`Carry`]).
     pub named: Option<String>,
-    // #2808: the follow-up just asked of the same person, if any, as the
-    // voice's `mark_if_asked` knows it.
+    /// The follow-up just asked of the same person, within
+    /// [`FORGET_ASKED_LINES`] of their lines ([`bare_forget_target`]).
+    pub asked: Option<u64>,
 }
 
 /// What `call` removes, from the heard line `said` (or, with nothing heard,
@@ -1527,7 +1688,8 @@ pub struct Recent {
 /// no `about` of the model's with [`FORGET_ABOUT_ENVIRONMENT`]) that names
 /// a subject ([`named_subject`]) is [`ForgetPick::Named`]; a bare one just
 /// after a named forget is that subject again (Twelve's "Yes, please forget
-/// it."); any other bare one is [`ForgetPick::Last`].
+/// it."); a bare one just after a follow-up was asked is that follow-up
+/// ([`ForgetPick::Asked`], #2808); any other bare one is [`ForgetPick::Last`].
 pub fn pick_forget(call: &ToolCall, said: Option<&str>, recent: &Recent) -> ForgetPick {
     if call.name != FORGET
         || (forget_all_on() && call.args.get("source_id").is_some_and(|id| !id.is_null()))
@@ -1546,7 +1708,9 @@ pub fn pick_forget(call: &ToolCall, said: Option<&str>, recent: &Recent) -> Forg
         None => model(),
     }
     .or_else(|| recent.named.clone())
-    .map_or(ForgetPick::Last, ForgetPick::Named)
+    .map(ForgetPick::Named)
+    .or_else(|| recent.asked.map(ForgetPick::Asked))
+    .unwrap_or(ForgetPick::Last)
 }
 
 /// The lamp's guard on a `forget` ([`pick_forget`]) in `person`'s scope,
@@ -1571,6 +1735,7 @@ pub fn named_forget_with(
             .as_ref()
             .filter(|(whose, _, at)| whose.as_deref() == person && at.elapsed() <= HELD_FORGET_FOR)
             .map(|(_, about, _)| about.clone()),
+        asked: None,
     };
     let ForgetPick::Named(subject) = pick_forget(call, said, &recent) else {
         return None;
@@ -1743,6 +1908,11 @@ fn run_for_guarded(
 ) -> (Value, bool) {
     if !scope_current(lease) {
         return (gone(), false);
+    }
+    // With `LAMP_MEMORY_PERSONAL_NEEDS_FACE`, nothing about a person is kept
+    // while nobody is known, on either memory client.
+    if let Some(told) = needs_face::withheld(call, person, needs_face::on()) {
+        return (told, true);
     }
     if DAYS_MODE.get() == Some(&true) {
         if crate::rules::on() && crate::rules::is_tool(&call.name) {
@@ -2888,6 +3058,13 @@ fn replace_session(
     fresh: bool,
 ) -> (Option<String>, Option<String>) {
     let previous_person = std::mem::replace(&mut context.session_person, person.map(str::to_owned));
+    // The follow-up just asked about outlives an open for the same person
+    // within its bound: the note's refresh after a refused forget opens the
+    // next session, and their retry must still forget that entry, not their
+    // newest (Second on #3130). Anyone else, or nobody known, lets it go.
+    if bare_forget_target(context, person).is_none() {
+        context.just_asked = None;
+    }
     if context.session.as_deref() == Some(name) {
         (
             None,
@@ -3336,6 +3513,15 @@ pub struct DaysClient {
     replaces: AtomicBool,
     /// [`ROOM_NOT_ASKER_ENVIRONMENT`], read when the client is made (#2176).
     room_not_asker: AtomicBool,
+    /// [`ROOM_AFTER_FORGET_ENVIRONMENT`], read when the client is made.
+    room_after_forget: AtomicBool,
+    /// Who said "forget everything", on which local day and by what name
+    /// the eyes knew them then, with [`ROOM_AFTER_FORGET_ENVIRONMENT`]: at
+    /// most [`FORGOT_MOST`] people, in this process only.
+    forgot_everything: Mutex<HashMap<String, (i64, Option<String>)>>,
+    /// The eyes' known file for [`Self::known_name_of`], in place of the
+    /// voice's ([`KNOWN_FILE`]): for tests.
+    known: Mutex<Option<PathBuf>>,
     /// The household's room sounds yes ([`crate::onboarding::ROOM_SOUNDS_PATH`]),
     /// removed by any forget of everything (#2110), and the face expressions
     /// yes beside it.
@@ -3515,6 +3701,36 @@ struct DaysContext {
     /// and decided it: an offer made again in the same session (a note
     /// asked again) never decides twice.
     event_turn: Option<EventTurn>,
+    /// The follow-up the lamp last asked about (from [`Self::asking`], in
+    /// [`DaysClient::mark_if_asked`]): whose, its id, how many of their
+    /// lines finished since, and when it was asked. A bare "forget that" of
+    /// theirs soon after forgets it ([`bare_forget_target`]). Emptied as a
+    /// session closes, as one opens for anyone else, nobody known or past
+    /// its bound (one for the same person within it keeps it), by a
+    /// remember of theirs, and by a confirmed forget of theirs; a refused
+    /// or lost one leaves it for their retry.
+    just_asked: Option<(String, u64, u32, Instant)>,
+}
+
+/// How many of their lines after the lamp asked about a follow-up a bare
+/// "forget that" may be to forget it: the first or the second.
+const FORGET_ASKED_LINES: u32 = 2;
+
+/// The entry a bare "forget that" (no subject named) from `speaker`
+/// forgets by id: the follow-up the lamp just asked them about, kept by
+/// `remember` or by the end-of-talk pass as an observation, when it is
+/// theirs and their line is within [`FORGET_ASKED_LINES`] of the ask.
+/// `None` is their newest kept thing (`forget_last`), as before. Within [`HELD_FORGET_FOR`]
+/// of the ask too, like a named forget's carry: minutes of talk to someone
+/// else are not "that" (reviewer-two's P2 on #3130). Only with
+/// `LAMP_MEMORY_THREADS`: off, nothing is offered, so nothing is asked.
+/// #3113 owns the one picker; this is its after-a-follow-up case.
+fn bare_forget_target(context: &DaysContext, speaker: Option<&str>) -> Option<u64> {
+    let (whose, id, lines, at) = context.just_asked.as_ref()?;
+    (Some(whose.as_str()) == speaker
+        && *lines < FORGET_ASKED_LINES
+        && at.elapsed() <= HELD_FORGET_FOR)
+        .then_some(*id)
 }
 
 /// A dated follow-up offered this session ([`DaysContext::event_turn`]).
@@ -4062,7 +4278,12 @@ const NOISE: &[&str] = &[
 
 /// Whether the switch is on in this process's environment.
 pub fn hits_on() -> bool {
-    std::env::var(HITS_ENVIRONMENT).ok().as_deref() == Some("on")
+    hits_switch(std::env::var(HITS_ENVIRONMENT).ok().as_deref())
+}
+
+/// Whether a value of [`HITS_ENVIRONMENT`] turns the hits on: `on` only.
+fn hits_switch(value: Option<&str>) -> bool {
+    value == Some("on")
 }
 
 /// What memory holds that may fit `heard`, for one spoken turn: the kept
@@ -4081,7 +4302,27 @@ pub fn hits_note(
     now_unix_ms: u64,
     zone: Option<&LocalTime>,
 ) -> Option<String> {
-    if content_words(heard).is_empty() {
+    hits_note_counted(socket, person, heard, now_unix_ms, zone).map(|(note, _)| note)
+}
+
+/// What a turn's hits told, for its journal line ([`hits_journal_line`],
+/// #2510 take 1 c): how many kept things, and the bytes of their text as
+/// told (each cut to [`HIT_CHARS`]). Counts only, never the text.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct HitsCount {
+    pub told: usize,
+    pub bytes: usize,
+}
+
+/// [`hits_note`], with what it told counted ([`HitsCount`]).
+pub fn hits_note_counted(
+    socket: &Path,
+    person: Option<&str>,
+    heard: &str,
+    now_unix_ms: u64,
+    zone: Option<&LocalTime>,
+) -> Option<(String, HitsCount)> {
+    if hit_words(heard).is_empty() {
         return None;
     }
     let request = for_person(json!({"op":"kept","max_bytes":HITS_KEPT_BYTES}), person);
@@ -4090,7 +4331,7 @@ pub fn hits_note(
         .get()
         .and_then(Option::as_ref)
         .filter(|client| client.socket == socket && client.replaces.load(Ordering::Acquire));
-    let (told, shown) = hits_told(&answer, heard, now_unix_ms, zone, ids.is_some())?;
+    let (told, shown, count) = hits_told(&answer, heard, now_unix_ms, zone, ids.is_some())?;
     // Told by id, so shown: one of them may be corrected (#2510).
     if let Some(client) = ids
         && let Ok(mut context) = client.context.lock()
@@ -4100,10 +4341,34 @@ pub fn hits_note(
             context.shown_as(person, id, &text);
         }
     }
-    Some(match person {
+    let note = match person {
         Some(_) => told,
         None => format!("{told}\n{HITS_ROOM_NOTE}"),
-    })
+    };
+    Some((note, count))
+}
+
+/// A turn's hits journal line: whether memory told anything, how long it
+/// took, whose, and what it told as counts ([`HitsCount`], #2510 take 1 c),
+/// so a day's disclosure can be added up from the journal. No words.
+pub fn hits_journal_line(
+    request: u64,
+    told: Option<HitsCount>,
+    millis: u128,
+    theirs: bool,
+) -> String {
+    let count = told.unwrap_or_default();
+    format!(
+        "request {request}: memory {} in {millis} ms ({}) hits_told={} bytes_told={}",
+        if told.is_some() {
+            "told"
+        } else {
+            "had nothing told"
+        },
+        if theirs { "theirs" } else { "the room's" },
+        count.told,
+        count.bytes
+    )
 }
 
 /// Small words a line about anything has, which match nothing.
@@ -4145,6 +4410,88 @@ fn plural_off(word: &str) -> &str {
     word.strip_suffix('s')
         .filter(|stem| stem.chars().count() >= 3)
         .unwrap_or(word)
+}
+
+/// The memory's common words (`lamp_memory::search::COMMON`, #2282),
+/// mirrored, as the voice does not link the memory crate (the memory's
+/// tests link the voice): a test reads the memory's source and holds the
+/// two lists equal (`search_common_is_the_memorys_own_list`). Kept in the
+/// memory's form, accents kept; [`hit_words`] leaves them out with or
+/// without their accents ([`hit_stop_words`]), and `remember::heard` with
+/// its own few more, accents kept.
+pub(crate) const SEARCH_COMMON: &[&str] = &[
+    "the", "and", "or", "but", "of", "to", "in", "on", "at", "for", "with", "from", "by", "about",
+    "as", "is", "are", "was", "were", "be", "been", "am", "it", "its", "my", "me", "mine", "you",
+    "your", "yours", "we", "our", "us", "he", "him", "his", "she", "her", "they", "them", "their",
+    "what", "which", "who", "when", "where", "why", "how", "that", "this", "these", "those", "do",
+    "does", "did", "have", "has", "had", "can", "could", "would", "should", "will", "any", "some",
+    "not", "no", "so", "if", "there", "tell", "told", "remember", "please", "của", "là", "tôi",
+    "và", "có", "không", "này", "đó", "thì", "mà", "những", "các", "một", "cho", "với", "được",
+    "gì", "nào",
+];
+
+/// [`SMALL_WORDS`] and [`SEARCH_COMMON`] folded once, twice over: in
+/// [`search_text`]'s form with their accents kept ("của"), and without
+/// them ([`about_fold`]: "cua"), as [`hit_words`] compares a word heard
+/// with or without its accents.
+fn hit_stop_words() -> &'static (
+    std::collections::HashSet<String>,
+    std::collections::HashSet<String>,
+) {
+    static FOLDED: OnceLock<(
+        std::collections::HashSet<String>,
+        std::collections::HashSet<String>,
+    )> = OnceLock::new();
+    FOLDED.get_or_init(|| {
+        let words = || SMALL_WORDS.iter().chain(SEARCH_COMMON);
+        (
+            words().map(|word| search_text(word)).collect(),
+            words().map(|word| about_fold(word)).collect(),
+        )
+    })
+}
+
+/// The words a turn's hits match by, on both sides (#2510 take 1 b):
+/// [`content_words`]' rules on the text folded as the memory's search folds
+/// it ([`search_text`]: NFC, lower case, `đ` as `d`), then without accents
+/// ([`about_fold`], as `forget {about}` matches), so "màu" heard as "mau"
+/// is the same word. [`SMALL_WORDS`] and the memory's [`SEARCH_COMMON`] are
+/// left out by one rule (Fourteen's P2 on #3177): a word heard with accents
+/// is left out when it is one of them with those accents ("của"), a word
+/// heard without any when it is one of them without theirs ("cua", "la",
+/// "va"). So Vietnamese function words ("là", "của", "và") match nothing
+/// however they are heard, while an accented word that only folds to one
+/// stays: "cửa" (a door) is a hit word, as "chó" (a dog) is, though
+/// "của" (of) and "cho" (for) are not. Its limit: "cua" heard for "cửa"
+/// without its accents is taken as "của" and matches nothing. A word of
+/// two letters ("đỏ") is still too short, as in English.
+fn hit_words(text: &str) -> Vec<String> {
+    let (accented, bare) = hit_stop_words();
+    let mut words: Vec<String> = search_text(text)
+        .replace('\u{2019}', "'")
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .map(|word| word.trim_matches('\''))
+        .map(|word| word.strip_suffix("'s").unwrap_or(word))
+        .filter(|word| !accented.contains(*word))
+        // Already in search_text's form: only its accents to take off.
+        .map(|word| {
+            (
+                word.nfd()
+                    .filter(|c| !unicode_normalization::char::is_combining_mark(*c))
+                    .nfc()
+                    .collect::<String>(),
+                word,
+            )
+        })
+        // Heard without accents: a stop word's bare form is that stop word.
+        .filter(|(folded, heard)| folded != heard || !bare.contains(folded))
+        .map(|(folded, _)| folded)
+        .filter(|word| word.chars().count() >= 3)
+        .map(|word| plural_off(&word).to_owned())
+        .collect();
+    words.sort();
+    words.dedup();
+    words
 }
 
 /// Whether the lamp's own reply `said` asks about a follow-up whose key
@@ -4327,11 +4674,11 @@ fn hits_told(
     now_unix_ms: u64,
     zone: Option<&LocalTime>,
     ids: bool,
-) -> Option<(String, Vec<u64>)> {
+) -> Option<(String, Vec<u64>, HitsCount)> {
     if answer.get("ok") != Some(&json!(true)) {
         return None;
     }
-    let wanted = content_words(heard);
+    let wanted = hit_words(heard);
     let today = local_day(now_unix_ms, zone);
     let mut found: Vec<(usize, u64, String, Option<u64>)> = answer
         .get("entries")?
@@ -4341,7 +4688,7 @@ fn hits_told(
             let text = entry.get("text")?.as_str()?.trim();
             let at = entry.get("at_unix_ms")?.as_u64()?;
             let id = entry.get("id").and_then(Value::as_u64);
-            let shared = content_words(text)
+            let shared = hit_words(text)
                 .iter()
                 .filter(|word| wanted.contains(word))
                 .count();
@@ -4350,10 +4697,13 @@ fn hits_told(
         .collect();
     found.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
     let mut shown = vec![];
+    let mut count = HitsCount::default();
     let lines: Vec<String> = found
         .into_iter()
         .take(HITS)
         .map(|(_, at, text, id)| {
+            count.told += 1;
+            count.bytes += text.len();
             let when = when(today - local_day(at, zone));
             match id.filter(|_| ids) {
                 Some(id) => {
@@ -4364,7 +4714,7 @@ fn hits_told(
             }
         })
         .collect();
-    (!lines.is_empty()).then(|| (format!("{HITS_NOTE}\n{}", lines.join("\n")), shown))
+    (!lines.is_empty()).then(|| (format!("{HITS_NOTE}\n{}", lines.join("\n")), shown, count))
 }
 
 /// The texts of a kept list's entries with these ids, as a hit line tells
@@ -4402,6 +4752,16 @@ enum Listed {
     /// The ids that match, of a whole listing, and the subjects none
     /// matched, by their index.
     Whole(Vec<u64>, Vec<usize>),
+}
+
+/// An older lamp-memory, updated after the voice, refuses the listing's
+/// `observations` ([`Listed::Refused`], #3113): nothing is removed, never
+/// the last kept thing instead, and the person is told plainly.
+fn older_memory_refused() -> (Value, bool) {
+    (
+        json!({"forgotten": false, "note": "My memory couldn't look that up just now, so I forgot nothing, and nothing else instead. Tell them plainly: \"I couldn't forget that just now.\""}),
+        true,
+    )
 }
 
 enum DaysJob {
@@ -4531,6 +4891,11 @@ impl DaysClient {
             room_not_asker: AtomicBool::new(
                 std::env::var(ROOM_NOT_ASKER_ENVIRONMENT).ok().as_deref() == Some("on"),
             ),
+            room_after_forget: AtomicBool::new(
+                std::env::var(ROOM_AFTER_FORGET_ENVIRONMENT).ok().as_deref() == Some("on"),
+            ),
+            forgot_everything: Mutex::new(HashMap::new()),
+            known: Mutex::new(None),
             room_sounds: crate::onboarding::ROOM_SOUNDS_PATH.into(),
             resumes: AtomicBool::new(
                 std::env::var(JOURNAL_RESUMES_ENVIRONMENT).ok().as_deref() == Some("on"),
@@ -4583,6 +4948,7 @@ impl DaysClient {
             context.carried.clear();
         }
         let unoffered = context.let_event_go();
+        context.just_asked = None;
         drop(context);
         self.take_back(unoffered);
         for (name, person) in open {
@@ -4667,7 +5033,7 @@ impl DaysClient {
         }
         close_replaced(&self.jobs, &name, previous, previous_person);
         let until = started + deadline;
-        let room = self.open_one(&name, None, until)?;
+        let room = self.open_room_for(&name, person, until)?;
         let theirs = person.and_then(|person| self.open_one(&name, Some(person), until).ok());
         // What each note line says is worked out before the context is held.
         let mut opened = self.opened(room, theirs);
@@ -4801,7 +5167,7 @@ impl DaysClient {
         }
         let until = started + deadline;
         let opened = self
-            .open_one(&name, None, until)
+            .open_room_for(&name, person, until)
             .map(|room| {
                 let theirs =
                     person.and_then(|person| self.open_one(&name, Some(person), until).ok());
@@ -4867,6 +5233,86 @@ impl DaysClient {
             complete,
             cause,
         }
+    }
+
+    /// The name the eyes know the face at the lamp by, only when that face
+    /// is `person`'s ([`crate::known_faces::FaceObservation::person`]).
+    fn known_name_of(&self, person: &str) -> Option<String> {
+        let path = self
+            .known
+            .lock()
+            .ok()
+            .and_then(|known| known.clone())
+            .or_else(|| KNOWN_FILE.get().cloned())?;
+        crate::known_faces::FaceObservation::read(&path)
+            .filter(|observation| observation.person() == person)
+            .map(|observation| observation.name().to_owned())
+    }
+
+    /// That `person` said "forget everything" on the local day of `now`
+    /// ([`ROOM_AFTER_FORGET_ENVIRONMENT`]), with the name the eyes know
+    /// them by when they do ([`Self::known_name_of`]), and whether it is now
+    /// held. With [`FORGOT_MOST`] people held, those of an earlier day go
+    /// first, then the earliest.
+    fn forgot_everything_on(&self, person: &str, now: u64, zone: Option<&LocalTime>) -> bool {
+        if !self.room_after_forget.load(Ordering::Acquire) {
+            return false;
+        }
+        let today = local_day(now, zone);
+        // Read before the map is held: a small file, never under the lock.
+        let name = self.known_name_of(person);
+        let Ok(mut forgot) = self.forgot_everything.lock() else {
+            return false;
+        };
+        if !forgot.contains_key(person) && forgot.len() >= FORGOT_MOST {
+            forgot.retain(|_, (day, _)| *day >= today);
+            if forgot.len() >= FORGOT_MOST
+                && let Some(earliest) = forgot
+                    .iter()
+                    .min_by_key(|(_, (day, _))| *day)
+                    .map(|(person, _)| person.clone())
+            {
+                forgot.remove(&earliest);
+            }
+        }
+        forgot.insert(person.to_owned(), (today, name));
+        true
+    }
+
+    /// Whether `person` said "forget everything" on the local day of `now`,
+    /// with [`ROOM_AFTER_FORGET_ENVIRONMENT`]: `Some` with the name the eyes
+    /// knew them by then, if they did. Nobody known never did.
+    #[allow(clippy::option_option)]
+    fn forgot_today(
+        &self,
+        person: Option<&str>,
+        now: u64,
+        zone: Option<&LocalTime>,
+    ) -> Option<Option<String>> {
+        let person = person.filter(|_| self.room_after_forget.load(Ordering::Acquire))?;
+        let forgot = self.forgot_everything.lock().ok()?;
+        let (day, name) = forgot.get(person)?;
+        (*day == local_day(now, zone)).then(|| name.clone())
+    }
+
+    /// The room's snapshot for this session ([`Self::open_one`]), for
+    /// `person` at the lamp: without its facts about a person when they
+    /// forgot everything today ([`ROOM_AFTER_FORGET_ENVIRONMENT`]).
+    fn open_room_for(
+        &self,
+        name: &str,
+        person: Option<&str>,
+        until: Instant,
+    ) -> Result<(Value, Vec<u64>), NoteCause> {
+        let (snapshot, ids) = self.open_one(name, None, until)?;
+        let Some(them) = self.forgot_today(person, unix_ms(), crate::local_time::system()) else {
+            return Ok((snapshot, ids));
+        };
+        let (room, left_out) = room_without_someone(snapshot, ids, them.as_deref());
+        if left_out > 0 {
+            eprintln!("{}", room_after_forget_line(left_out));
+        }
+        Ok(room)
     }
 
     /// One person's snapshot for this session, validated, before `until`,
@@ -5057,6 +5503,60 @@ impl DaysClient {
                     heard_named(call),
                 );
             }
+            // "Forget that" right after a follow-up: the entry it was about
+            // (the first builder, 03:29), as [`pick_forget`] picks it, and
+            // the slot let go. Off, nothing is asked, and the context is not
+            // even looked at. Waited for, as after the store's answer below:
+            // it is never held across I/O, and a busy one must not fail a
+            // forget (reviewer-two's P3 on #3130). Its exchanges since the
+            // ask cite the follow-up, so the store's forget takes them too.
+            FORGET if self.threads.load(Ordering::Acquire) => {
+                let mut context = self.context.lock().ok();
+                let recent = Recent {
+                    named: None,
+                    asked: context
+                        .as_deref()
+                        .and_then(|context| bare_forget_target(context, person)),
+                };
+                match pick_forget(call, None, &recent) {
+                    // The slot stays until the store confirms: a confirmed
+                    // forget of theirs lets it go (after the answer). A refused,
+                    // failed or lost one leaves it, and gives back this
+                    // line, so their retry forgets the same id again and
+                    // never falls to `forget_last` of another kept thing
+                    // (Second's P2 on #3130).
+                    ForgetPick::Asked(id) => {
+                        if let Some((_, _, lines, _)) = context
+                            .as_mut()
+                            .and_then(|context| context.just_asked.as_mut())
+                        {
+                            *lines = lines.saturating_sub(1);
+                        }
+                        drop(context);
+                        // An older lamp-memory, updated after the voice, may
+                        // take another kept thing citing the same exchange
+                        // with it (Second's second P2 on #3130): #3113's
+                        // probe first, its listing that an older one
+                        // refuses, and a refusal forgets nothing.
+                        let until = started + deadline;
+                        let left = || {
+                            until
+                                .checked_duration_since(Instant::now())
+                                .filter(|left| !left.is_zero())
+                        };
+                        match self.about_matching(person, &[], left, lease) {
+                            Listed::Gone => return (gone(), false),
+                            Listed::Refused => return older_memory_refused(),
+                            Listed::Cut | Listed::Whole(..) => {}
+                        }
+                        eprintln!(
+                            "lamp-voice provider: a bare forget after a follow-up forgets entry {id}"
+                        );
+                        Some(json!({"op":"forget","id":id}))
+                    }
+                    _ => None,
+                }
+            }
             _ => None,
         };
         let Some(mut request) = days_request.or_else(|| request(call, now, zone)) else {
@@ -5207,6 +5707,21 @@ impl DaysClient {
                     settled((gone(), false))
                 };
             };
+            // Their memory is emptied, or held nothing: the room's lines
+            // about a person are theirs no more today (#2849), even if what
+            // follows is lost.
+            if call.name == FORGET_EVERYTHING
+                && answer["ok"] == true
+                && let Some(person) = person
+                && self.forgot_everything_on(person, now, zone)
+                && let Ok(mut context) = self.context.lock()
+            {
+                // A note read begun before this, even after the change
+                // marked as the forget was sent, may hold the room's lines
+                // about them: it is no longer current, removed nothing
+                // included (reviewer-two's P2 on #3142).
+                context.changing();
+            }
             // Everything includes the rules they gave, kept beside their
             // memory in a scope of their own (#813).
             if call.name == FORGET_EVERYTHING && crate::rules::on() {
@@ -5280,6 +5795,19 @@ impl DaysClient {
             }
             (told, ids)
         };
+        // A forget of theirs the store confirmed, told or not, lets the
+        // follow-up they were asked about go. Only theirs: another's
+        // forget leaves it for their retry (Second's P2 on #3130).
+        if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING)
+            && told["forgotten"] == true
+            && let Ok(mut context) = self.context.lock()
+            && context
+                .just_asked
+                .as_ref()
+                .is_some_and(|(whose, ..)| Some(whose.as_str()) == person)
+        {
+            context.just_asked = None;
+        }
         if !scope_current(lease) || !crate::tools::sendable(&told) || started.elapsed() >= deadline
         {
             // Answered: its outcome is known, though it isn't told. A forget
@@ -5308,6 +5836,16 @@ impl DaysClient {
                     .map(|(_, id)| *id)
             })
             .flatten();
+        // A newer kept thing of theirs is "that" now, not the follow-up.
+        if call.name == REMEMBER
+            && !ids.is_empty()
+            && context
+                .just_asked
+                .as_ref()
+                .is_some_and(|(whose, ..)| Some(whose.as_str()) == person)
+        {
+            context.just_asked = None;
+        }
         // What this turn's call gave, with what each says, for the link to
         // its exchange (#2176 finding 14). Only with the switch.
         let linking = self.link_used.load(Ordering::Acquire);
@@ -5429,15 +5967,7 @@ impl DaysClient {
                 true,
             )
         };
-        // An older lamp-memory, updated after the voice, refuses the
-        // listing's `observations` (#3113): nothing is removed, never the
-        // last kept thing instead, and the person is told plainly.
-        let refused = || {
-            (
-                json!({"forgotten": false, "note": "My memory couldn't look that up just now, so I forgot nothing, and nothing else instead. Tell them plainly: \"I couldn't forget that just now.\""}),
-                true,
-            )
-        };
+        let refused = older_memory_refused;
         let mut scope = person;
         let (mut matching, mut missed) = match self.about_matching(scope, &words, left, lease) {
             Listed::Gone => return (gone(), false),
@@ -5706,7 +6236,19 @@ impl DaysClient {
             .into_iter()
             .map(|id| (Some(person.to_owned()), id))
             .collect();
-        if let Some(room) = room {
+        if let Some(mut room) = room {
+            // Nothing of the room's about a person for the rest of the day
+            // they forgot everything (#2849, `LAMP_MEMORY_ROOM_AFTER_FORGET`).
+            if let Some(them) = self.forgot_today(Some(person), now, zone)
+                && let Some(entries) = room["entries"].as_array_mut()
+            {
+                let before = entries.len();
+                entries.retain(|entry| !entry_about_them(entry, them.as_deref()));
+                let left_out = before - entries.len();
+                if left_out > 0 {
+                    eprintln!("{}", room_after_forget_line(left_out));
+                }
+            }
             let (room, room_ids) = days_answer(&room, now, zone, dated.then_some(false))?;
             found.extend(room["found"].as_array()?.iter().cloned());
             ids.extend(room_ids.into_iter().map(|id| (None, id)));
@@ -5766,9 +6308,9 @@ impl DaysClient {
     }
 
     /// [`EVENTS_ENVIRONMENT`] on for this client, as the environment sets
-    /// it when the client is made: for other parts' tests.
-    #[cfg(test)]
-    pub(crate) fn telling_events(&self) {
+    /// it when the client is made: for the real store's contract tests and
+    /// other parts' tests.
+    pub fn telling_events(&self) {
         self.events.store(true, Ordering::Release);
     }
 
@@ -6020,15 +6562,25 @@ impl DaysClient {
     /// once (`follow_up_asked`), so it is never offered again. Apart from
     /// the journal ([`hand_on_days`]): a remember or forget turn's reply is
     /// kept out of the journal but still marks it (reviewer-two's P2 on
-    /// #2894).
-    fn mark_if_asked(&self, said: &str, person: Option<&str>) {
+    /// #2894). Each of the person's finished exchanges counts as one of
+    /// their lines since the last ask ([`DaysContext::just_asked`]). Public
+    /// for the real store's contract tests.
+    pub fn mark_if_asked(&self, said: &str, person: Option<&str>) {
         let Ok(mut context) = self.context.lock() else {
             return;
         };
+        if let Some((whose, _, lines, _)) = context.just_asked.as_mut()
+            && Some(whose.as_str()) == person
+        {
+            *lines = lines.saturating_add(1);
+        }
         let at = context.asking.iter().position(|(whose, _, words, dated)| {
             Some(whose.as_str()) == person && asks_about(said, words, *dated)
         });
         let asked = at.map(|at| context.asking.remove(at));
+        if let Some((whose, id, _, _)) = &asked {
+            context.just_asked = Some((whose.clone(), *id, 0, Instant::now()));
+        }
         drop(context);
         if let Some((whose, id, _, _)) = asked {
             let _ = self.jobs.try_send(DaysJob::Asked { person: whose, id });
@@ -6698,6 +7250,7 @@ fn close_job(socket: &Path, person: Option<&str>, job: &str) -> bool {
 /// closes the job with nothing kept. The journal has counts only.
 fn observe_jobs(socket: &Path, jobs: &Receiver<(Option<String>, Value)>) {
     let events = events_on();
+    let needs_face = needs_face::on();
     for (person, input) in jobs {
         let Some(job) = input["job"].as_str().map(str::to_owned) else {
             continue;
@@ -6722,6 +7275,13 @@ fn observe_jobs(socket: &Path, jobs: &Receiver<(Option<String>, Value)>) {
             );
             continue;
         };
+        // With `LAMP_MEMORY_PERSONAL_NEEDS_FACE`, nothing about a person is
+        // kept while nobody is known.
+        let (observations, dropped) =
+            needs_face::kept_proposals(observations, person.as_deref(), needs_face);
+        if dropped > 0 {
+            eprintln!("{}", needs_face::dropped_line(dropped));
+        }
         let answer = bounded_exchange(
             socket,
             &for_person(
@@ -8019,6 +8579,456 @@ mod tests {
         assert!(!is_tool(FORGET_EVERYTHING));
         drop(client);
         std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// Lan, a second known person beside [`MAI`], for
+    /// `LAMP_MEMORY_ROOM_AFTER_FORGET`.
+    const LAN: &str = "p-8192a3b4c5d6e7f8";
+
+    /// The memory of the c0a4 case (#2849, #1693): a known person's own
+    /// is empty; the room's keeps a third-person and a first-person line
+    /// about a favourite colour, and one about nobody.
+    fn room_about_colour(request: &Value) -> Value {
+        match (request["op"].as_str(), request["person"].is_string()) {
+            (Some("forget_all"), _) => json!({"ok":true,"removed":2}),
+            (Some("recall" | "search"), true) => json!({"ok":true,"entries":[]}),
+            (Some("recall" | "search"), false) => json!({"ok":true,"entries":[
+                {"kind":"kept","id":7,"at_unix_ms":NOW,"text":"Their favourite colour is green"},
+                {"kind":"kept","id":8,"at_unix_ms":NOW,"text":"My favourite colour is green"},
+                {"kind":"kept","id":9,"at_unix_ms":NOW,"text":"The meeting is at four"}
+            ]}),
+            (Some("session_open"), true) => {
+                let session = request["session"].as_str().unwrap();
+                json!({"ok":true,"snapshot":{"session":session,"opened_unix_ms":NOW,
+                    "generation":2,"invalidated":false,"source_ids":[],
+                    "note":json!({"scope":PERSON_SCOPE,"untrusted":true,"facts":[]}).to_string()}})
+            }
+            (Some("session_open"), false) => {
+                let session = request["session"].as_str().unwrap();
+                json!({"ok":true,"snapshot":{"session":session,"opened_unix_ms":NOW,
+                    "generation":2,"invalidated":false,"source_ids":[7,8,9],
+                    "note":json!({"scope":ROOM_SCOPE,"untrusted":true,"facts":[
+                        {"id":7,"kind":"preference","text":"Their favourite colour is green"},
+                        {"id":8,"kind":"preference","text":"Mai\u{2019}s favourite colour is green"},
+                        {"id":9,"kind":"preference","text":"The meeting is at four"}
+                    ]}).to_string()}})
+            }
+            _ => json!({"ok":false}),
+        }
+    }
+
+    /// The room's lines for Reviewer-lead's P2 on #3142: two that name Mai
+    /// with no pronoun, one about nobody, and one with "Maine" in it.
+    fn room_naming(request: &Value) -> Value {
+        let facts = [
+            (7, "Mai likes green tea"),
+            (8, "Mai is in Hanoi"),
+            (9, "The meeting is at four"),
+            (10, "Maine is far"),
+        ];
+        match (request["op"].as_str(), request["person"].is_string()) {
+            (Some("forget_all"), _) => json!({"ok":true,"removed":0}),
+            (Some("recall" | "search"), true) => json!({"ok":true,"entries":[]}),
+            (Some("recall" | "search"), false) => json!({"ok":true,"entries":facts
+                .map(|(id, text)| json!({"kind":"kept","id":id,"at_unix_ms":NOW,"text":text}))}),
+            (Some("session_open"), person) => {
+                let session = request["session"].as_str().unwrap();
+                let (scope, facts, ids) = if person {
+                    (PERSON_SCOPE, vec![], vec![])
+                } else {
+                    (
+                        ROOM_SCOPE,
+                        facts
+                            .map(|(id, text)| json!({"id":id,"kind":"preference","text":text}))
+                            .to_vec(),
+                        facts.map(|(id, _)| id).to_vec(),
+                    )
+                };
+                json!({"ok":true,"snapshot":{"session":session,"opened_unix_ms":NOW,
+                    "generation":2,"invalidated":false,"source_ids":ids,
+                    "note":json!({"scope":scope,"untrusted":true,"facts":facts}).to_string()}})
+            }
+            _ => json!({"ok":false}),
+        }
+    }
+
+    /// Reviewer-lead's P2 on #3142: after Mai's "forget everything", with
+    /// the eyes knowing the face at the lamp as Mai, the room's lines that
+    /// name her ("Mai likes green tea", "Mai is in Hanoi") reach neither
+    /// her recall nor her note that day; "The meeting is at four" and
+    /// "Maine is far" do, and Lan gets all four. Off, or with the face at
+    /// the lamp another's when she forgot, the lines naming her reach her
+    /// as before.
+    #[test]
+    fn after_forget_everything_the_room_s_lines_naming_them_are_left_out_that_day() {
+        let mai = person_id("Mai");
+        let (now, zone) = (unix_ms(), crate::local_time::system());
+        let deadline = Duration::from_secs(2);
+        // As the eyes write it: the name of the face at the lamp now.
+        let known_as = |label: &str, name: &str| {
+            let known = std::env::temp_dir().join(format!(
+                "lamp-remember-known-{label}-{}",
+                std::process::id()
+            ));
+            std::fs::write(&known, format!("{name}\n")).unwrap();
+            known
+        };
+        let client_for = |label: &str, requests, on: bool, name: &str| {
+            let (socket, served) = memory(label, requests, room_naming);
+            let client = DaysClient::new(socket.clone()).unwrap();
+            client.forget_all.store(true, Ordering::Release);
+            client.room_after_forget.store(on, Ordering::Release);
+            let known = known_as(label, name);
+            *client.known.lock().unwrap() = Some(known.clone());
+            (client, socket, served, known)
+        };
+        let recall = |client: &DaysClient, person: &str| {
+            client
+                .run_at(
+                    &call(RECALL, json!({"about":"tea"})),
+                    FIRST_READ,
+                    now,
+                    zone,
+                    Some(person),
+                )
+                .0
+                .to_string()
+        };
+        let forget = |client: &DaysClient| {
+            let (told, _) = client.run_at(
+                &call(FORGET_EVERYTHING, json!({})),
+                FIRST_READ,
+                now,
+                zone,
+                Some(&mai),
+            );
+            assert_eq!(told["forgotten"], false, "nothing of hers: {told}");
+        };
+        let all_four = |told: &str| {
+            [
+                "Mai likes green tea",
+                "Mai is in Hanoi",
+                "The meeting is at four",
+                "Maine is far",
+            ]
+            .iter()
+            .all(|line| told.contains(line))
+        };
+
+        let (client, socket, served, known) = client_for("raf-name", 7, true, "Mai");
+        forget(&client);
+        for told in [
+            recall(&client, &mai),
+            client.told_for_session_within(1, Some(&mai), false, deadline),
+        ] {
+            assert!(!told.contains("Mai likes"), "{told}");
+            assert!(!told.contains("Hanoi"), "{told}");
+            assert!(told.contains("The meeting is at four"), "{told}");
+            assert!(told.contains("Maine is far"), "{told}");
+        }
+        let told = recall(&client, LAN);
+        assert!(all_four(&told), "Lan: {told}");
+        assert_eq!(served.join().unwrap().len(), 7);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+        std::fs::remove_file(&known).unwrap();
+
+        for (label, on, name) in [
+            ("raf-name-off", false, "Mai"),
+            ("raf-name-lan", true, "Lan"),
+        ] {
+            let (client, socket, served, known) = client_for(label, 3, on, name);
+            forget(&client);
+            let told = recall(&client, &mai);
+            assert!(all_four(&told), "{label}: {told}");
+            assert_eq!(served.join().unwrap().len(), 3, "{label}");
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+            std::fs::remove_file(&known).unwrap();
+        }
+    }
+
+    /// A name is named only whole: every word of it, in order, as whole
+    /// words, NFC and case aside.
+    #[test]
+    fn names_them_is_the_whole_name_as_whole_words() {
+        for (text, name) in [
+            ("Mai likes green tea", "Mai"),
+            ("Mai is in Hanoi", "Mai"),
+            ("ask MAI about it", "Mai"),
+            ("Mai\u{2019}s bike is blue", "Mai"),
+            ("Mai Lan is here", "Mai Lan"),
+            ("Th\u{00f9}y likes tea", "Thu\u{0300}y"),
+        ] {
+            assert!(names_them(text, name), "{text} / {name}");
+        }
+        for (text, name) in [
+            ("Maine is far", "Mai"),
+            ("Mai2 is a robot", "Mai"),
+            ("Mai is here, Lan too", "Mai Lan"),
+            ("The meeting is at four", "Mai"),
+            ("anything", ""),
+        ] {
+            assert!(!names_them(text, name), "{text} / {name}");
+        }
+        assert!(about_them("Mai is in Hanoi", Some("Mai")));
+        assert!(about_them("their bike", None));
+        assert!(!about_them("Mai is in Hanoi", None));
+    }
+
+    /// #2849's find, seen again in #1693's c0a4 run: after Mai's "forget
+    /// everything", the room's kept lines about a person never reach Mai's
+    /// recall that day, the room's fact about nobody does, Lan still gets
+    /// them all, and so does Mai the next local day. Off, as before.
+    #[test]
+    fn after_forget_everything_the_room_s_lines_about_a_person_are_not_recalled_that_day() {
+        let (socket, served) = memory("room-after-forget", 7, room_about_colour);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        client.room_after_forget.store(true, Ordering::Release);
+        let run = |name, args, now, person| {
+            client
+                .run_at(
+                    &call(name, args),
+                    FIRST_READ,
+                    now,
+                    Some(&EAST),
+                    Some(person),
+                )
+                .0
+        };
+        let told = run(FORGET_EVERYTHING, json!({}), NOW, MAI);
+        assert_eq!(told["forgotten"], true, "{told}");
+        let colour = || json!({"about":"favourite colour"});
+        // Mai, the same day: only the meeting.
+        let told = run(RECALL, colour(), NOW + 3_600_000, MAI).to_string();
+        assert!(told.contains("The meeting is at four"), "{told}");
+        assert!(!told.contains("green"), "{told}");
+        // Lan, who forgot nothing: all three.
+        let told = run(RECALL, colour(), NOW, LAN).to_string();
+        assert_eq!(told.matches("green").count(), 2, "{told}");
+        assert!(told.contains("The meeting is at four"), "{told}");
+        // Mai, the next local day: all three again.
+        let told = run(RECALL, colour(), NOW + DAY, MAI).to_string();
+        assert_eq!(told.matches("green").count(), 2, "{told}");
+        assert_eq!(served.join().unwrap().len(), 7);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+
+        // Off: Mai's forget everything leaves the room's as they were.
+        let (socket, served) = memory("room-after-forget-off", 3, room_about_colour);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        assert!(!client.room_after_forget.load(Ordering::Acquire));
+        let run = |name, args| {
+            client
+                .run_at(&call(name, args), FIRST_READ, NOW, Some(&EAST), Some(MAI))
+                .0
+        };
+        assert_eq!(run(FORGET_EVERYTHING, json!({}))["forgotten"], true);
+        let told = run(RECALL, json!({"about":"favourite colour"})).to_string();
+        assert_eq!(told.matches("green").count(), 2, "{told}");
+        assert_eq!(served.join().unwrap().len(), 3);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// The same for a session's note: after Mai's "forget everything" the
+    /// room's snapshot told to Mai has only its fact about nobody, its
+    /// sources with it; Lan's has all three; and Mai's again the next
+    /// local day.
+    #[test]
+    fn after_forget_everything_the_room_s_lines_about_a_person_are_not_in_their_note_that_day() {
+        let (now, zone) = (unix_ms(), crate::local_time::system());
+        let deadline = Duration::from_secs(2);
+        // One client a session, so no replaced session's close is served:
+        // the forget and both opens for Mai.
+        let (socket, served) = memory("room-after-forget-note", 3, room_about_colour);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        client.room_after_forget.store(true, Ordering::Release);
+        let (told, _) = client.run_at(
+            &call(FORGET_EVERYTHING, json!({})),
+            FIRST_READ,
+            now,
+            zone,
+            Some(MAI),
+        );
+        assert_eq!(told["forgotten"], true, "{told}");
+        let note = client.told_for_session_within(1, Some(MAI), false, deadline);
+        assert!(note.contains("The meeting is at four"), "{note}");
+        assert!(!note.contains("green"), "{note}");
+        // Only what was told is the session's.
+        assert_eq!(client.context.lock().unwrap().of(None), [9]);
+        assert_eq!(served.join().unwrap().len(), 3);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+
+        // Mai forgot today: Lan, who forgot nothing, gets all three; and
+        // Mai does too when it was the day before.
+        for (person, days_ago, name) in [
+            (LAN, 0, "room-after-forget-lan"),
+            (MAI, 1, "room-after-forget-next"),
+        ] {
+            let (socket, served) = memory(name, 2, room_about_colour);
+            let client = DaysClient::new(socket.clone()).unwrap();
+            client.room_after_forget.store(true, Ordering::Release);
+            client.forgot_everything_on(MAI, now - days_ago * DAY, zone);
+            let note = client.told_for_session_within(1, Some(person), false, deadline);
+            assert_eq!(note.matches("green").count(), 2, "{person}: {note}");
+            assert!(note.contains("The meeting is at four"), "{note}");
+            assert_eq!(served.join().unwrap().len(), 2);
+            drop(client);
+            std::fs::remove_file(&socket).unwrap();
+        }
+    }
+
+    /// Reviewer-two's P2 on #3142: a note read for Mai begun while her
+    /// forget everything is with the store, after the change marked as it
+    /// was sent, holds the room's lines about a person unfiltered; once the
+    /// forget is answered it is not current and is never taken, whatever
+    /// the store removed. With no read overlapping, the read after is
+    /// filtered and taken. Off, the overlapping read is taken as before.
+    /// The forget's answer is held until the read is done: no timing is
+    /// assumed.
+    #[test]
+    fn a_note_read_during_a_forget_everything_is_fenced_by_the_room_filter() {
+        for (label, on, removed, overlapping) in [
+            ("none-removed", true, 0, true),
+            ("removed", true, 2, true),
+            ("after", true, 0, false),
+            ("off", false, 0, true),
+        ] {
+            let socket = std::env::temp_dir().join(format!(
+                "lamp-remember-raf-fence-{label}-{}.sock",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_file(&socket);
+            let listener = UnixListener::bind(&socket).unwrap();
+            let (forgetting, sent) = std::sync::mpsc::channel();
+            let (release, released) = std::sync::mpsc::channel::<()>();
+            let released = Arc::new(Mutex::new(released));
+            // The forget and the read's two opens.
+            let served = std::thread::spawn(move || {
+                let answering: Vec<_> = (0..3)
+                    .map(|_| {
+                        let (mut stream, _) = listener.accept().unwrap();
+                        let (forgetting, released) = (forgetting.clone(), Arc::clone(&released));
+                        std::thread::spawn(move || {
+                            let mut line = String::new();
+                            BufReader::new(stream.try_clone().unwrap())
+                                .read_line(&mut line)
+                                .unwrap();
+                            let request: Value = serde_json::from_str(&line).unwrap();
+                            let answer = if request["op"] == "forget_all" {
+                                forgetting.send(()).unwrap();
+                                released
+                                    .lock()
+                                    .unwrap()
+                                    .recv_timeout(Duration::from_secs(2))
+                                    .expect("released");
+                                json!({"ok":true,"removed":removed})
+                            } else {
+                                room_about_colour(&request)
+                            };
+                            let _ = writeln!(stream, "{answer}");
+                            request["op"].as_str().unwrap().to_owned()
+                        })
+                    })
+                    .collect();
+                answering
+                    .into_iter()
+                    .map(|answering| answering.join().unwrap())
+                    .collect::<Vec<_>>()
+            });
+            let client = Arc::new(resumes_test_client(socket.clone(), false));
+            client.forget_all.store(true, Ordering::Release);
+            client.room_after_forget.store(on, Ordering::Release);
+            let read = || {
+                client.read_note_within(1, Some(MAI), false, Duration::from_secs(2), (true, false))
+            };
+            let forget = {
+                let client = Arc::clone(&client);
+                std::thread::spawn(move || {
+                    client
+                        .run_at(
+                            &call(FORGET_EVERYTHING, json!({})),
+                            Duration::from_secs(1),
+                            unix_ms(),
+                            crate::local_time::system(),
+                            Some(MAI),
+                        )
+                        .0
+                })
+            };
+            sent.recv_timeout(Duration::from_secs(2))
+                .expect("the forget reached the store");
+            let during = overlapping.then(read);
+            if let Some(during) = &during {
+                assert!(during.complete(), "{label}");
+                assert_eq!(during.text.matches("green").count(), 2, "{label}");
+                assert!(during.current(), "{label}: current until answered");
+            }
+            release.send(()).unwrap();
+            let told = forget.join().unwrap();
+            assert_eq!(told["forgotten"], removed > 0, "{label}: {told}");
+            let read = during.unwrap_or_else(read);
+            let fenced = on && overlapping;
+            assert_eq!(read.current(), !fenced, "{label}");
+            if !overlapping {
+                assert!(!read.text.contains("green"), "{label}: {}", read.text);
+                assert!(read.text.contains("The meeting is at four"), "{label}");
+            }
+            assert_eq!(read.adopt().is_some(), !fenced, "{label}");
+            assert_eq!(
+                served.join().unwrap().len(),
+                3,
+                "{label}: the forget and two opens"
+            );
+            let _ = std::fs::remove_file(&socket);
+        }
+    }
+
+    /// What is about a person for `LAMP_MEMORY_ROOM_AFTER_FORGET`, and what
+    /// is not; and the most it remembers.
+    #[test]
+    fn about_someone_is_first_and_third_person_words_and_possessives() {
+        for about in [
+            "Their favourite colour is green",
+            "My favourite colour is green",
+            "Mai's favourite colour is green",
+            "Mai\u{2019}s bike is blue",
+            "I'm allergic to nuts",
+            "she likes tea",
+            "the user likes jazz",
+            "Call him at noon",
+            "Your favourite colour is green",
+            "That jacket is yours",
+        ] {
+            assert!(about_someone(about), "{about}");
+        }
+        for not in [
+            "The meeting is at four",
+            "It's raining",
+            "today's bin day is Thursday",
+            "the determined dog",
+            "Bins go out on Thursday",
+        ] {
+            assert!(!about_someone(not), "{not}");
+        }
+        let (socket, _) = memory("room-after-forget-most", 0, room_about_colour);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.room_after_forget.store(true, Ordering::Release);
+        client.forgot_everything_on("yesterday", NOW - DAY, Some(&EAST));
+        for n in 0..FORGOT_MOST {
+            client.forgot_everything_on(&format!("p-{n}"), NOW, Some(&EAST));
+        }
+        let forgot = client.forgot_everything.lock().unwrap();
+        assert_eq!(forgot.len(), FORGOT_MOST);
+        assert!(!forgot.contains_key("yesterday"));
+        drop(forgot);
+        drop(client);
+        let _ = std::fs::remove_file(&socket);
     }
 
     /// #2176, `LAMP_MEMORY_FORGET_ABOUT`: "forget what I said about my
@@ -9528,6 +10538,374 @@ mod tests {
         assert!(taken_back(&work).is_empty(), "flipped");
     }
 
+    /// The person [`offered_an_event`] offers follow-up 12 to.
+    const ASKED_OF: &str = "p-be9688998f085098";
+    const THE_ASK: &str = "Hey! How was your sister's wedding?";
+
+    /// The first builder, 03:29: a bare "forget that" in either of the
+    /// person's next two lines after the lamp asked about a follow-up is
+    /// sent as `forget` of its id, once; their third line is `forget_last`.
+    #[test]
+    fn a_bare_forget_in_their_next_two_lines_forgets_the_follow_up_asked() {
+        let (client, _work) = offered_an_event("forget-asked-window", true, true);
+        let target =
+            |client: &DaysClient, who| bare_forget_target(&client.context.lock().unwrap(), who);
+        assert_eq!(target(&client, Some(ASKED_OF)), None, "not asked yet");
+        client.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        assert_eq!(
+            target(&client, Some(ASKED_OF)),
+            Some(12),
+            "their first line"
+        );
+        client.mark_if_asked("Glad to hear it.", Some(ASKED_OF));
+        assert_eq!(
+            target(&client, Some(ASKED_OF)),
+            Some(12),
+            "their second line"
+        );
+        client.mark_if_asked("Sounds fun.", Some(ASKED_OF));
+        assert_eq!(target(&client, Some(ASKED_OF)), None, "their third line");
+        // What is sent: the follow-up's id, in their scope, then, the slot
+        // taken, `forget_last` for the next bare forget.
+        let (socket, served) = memory("fa-sent", 3, |request| match request["op"].as_str() {
+            Some("kept") => json!({"ok":true,"entries":[]}),
+            Some("forget") => json!({"ok":true,"removed":3}),
+            _ => json!({"ok":true,"removed":null}),
+        });
+        let client = asked_with_memory("forget-asked-sent", &socket);
+        let forget = call(FORGET, json!({}));
+        let deadline = Duration::from_secs(2);
+        assert_eq!(
+            client.run_for(&forget, deadline, Some(ASKED_OF)).0,
+            json!({"forgotten":true})
+        );
+        let _ = client.run_for(&forget, deadline, Some(ASKED_OF));
+        let read = served.join().unwrap();
+        // #3113's probe first: an older memory refuses its listing.
+        assert_eq!(read[0], probe());
+        assert_eq!(read[1], json!({"op":"forget","id":12,"person":ASKED_OF}));
+        assert_eq!(
+            read[2],
+            json!({"op":"forget_last","kind":"kept","person":ASKED_OF})
+        );
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #3113's older-memory probe, as [`ASKED_OF`]'s, that a forget of the
+    /// follow-up asked is sent after.
+    fn probe() -> Value {
+        json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true,"person":ASKED_OF})
+    }
+
+    /// Reviewer-two's P2 on #3130: past [`HELD_FORGET_FOR`] of the ask, a
+    /// bare forget in their next line is `forget_last` again.
+    #[test]
+    fn a_bare_forget_past_a_minute_of_the_ask_is_forget_last() {
+        let (socket, served) = memory("fa-late", 1, |_| json!({"ok":true,"removed":null}));
+        let client = asked_with_memory("forget-asked-late", &socket);
+        let late = Instant::now()
+            .checked_sub(HELD_FORGET_FOR + Duration::from_secs(1))
+            .unwrap();
+        client
+            .context
+            .lock()
+            .unwrap()
+            .just_asked
+            .as_mut()
+            .unwrap()
+            .3 = late;
+        let _ = client.run_for(
+            &call(FORGET, json!({})),
+            Duration::from_secs(2),
+            Some(ASKED_OF),
+        );
+        assert_eq!(
+            served.join().unwrap()[0],
+            json!({"op":"forget_last","kind":"kept","person":ASKED_OF})
+        );
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// Second's P2 on #3130: a forget of the follow-up the store refuses,
+    /// or whose answer is lost, leaves the slot, so the same person's bare
+    /// retry, even in their second line, forgets the same id again and
+    /// never `forget_last`'s another kept thing (30 here). The retry's
+    /// success removes it. An older memory, refusing #3113's probe, is
+    /// sent no forget at all (Second's second P2 on #3130), and the slot
+    /// stays for the retry too.
+    #[test]
+    fn a_refused_forget_of_the_follow_up_is_retried_by_id_never_forget_last() {
+        static KEPT: Mutex<Vec<u64>> = Mutex::new(Vec::new());
+        static FIRST: Mutex<Option<(&str, Value)>> = Mutex::new(None);
+        let forget_once = json!({"op":"forget","id":12,"person":ASKED_OF});
+        // Refused by the store, answered but not understood (lost: it may
+        // have committed), or the probe refused by an older memory.
+        for (name, op, first, sent) in [
+            (
+                "refused",
+                "forget",
+                json!({"ok":false,"error":"io"}),
+                vec![probe(), forget_once.clone()],
+            ),
+            (
+                "lost",
+                "forget",
+                json!({"ok":true}),
+                vec![probe(), forget_once.clone()],
+            ),
+            (
+                "older",
+                "kept",
+                json!({"ok":false,"error":"bad_request"}),
+                vec![probe()],
+            ),
+        ] {
+            *KEPT.lock().unwrap() = vec![12, 30];
+            *FIRST.lock().unwrap() = Some((op, first));
+            let (socket, served) = memory(&format!("fa-{name}"), sent.len() + 2, |request| {
+                let mut first = FIRST.lock().unwrap();
+                if first.as_ref().is_some_and(|(op, _)| request["op"] == *op) {
+                    return first.take().unwrap().1;
+                }
+                drop(first);
+                let mut kept = KEPT.lock().unwrap();
+                match request["op"].as_str() {
+                    Some("kept") => json!({"ok":true,"entries":[]}),
+                    Some("forget") => {
+                        let id = request["id"].as_u64().unwrap();
+                        let before = kept.len();
+                        kept.retain(|kept| *kept != id);
+                        json!({"ok":true,"removed":before - kept.len()})
+                    }
+                    Some("forget_last") => json!({"ok":true,"removed":kept.pop().map(|_| 1)}),
+                    _ => json!({"ok":false}),
+                }
+            });
+            let client = asked_with_memory(&format!("forget-asked-{name}"), &socket);
+            // Their first line after the ask, then the forget in their second.
+            client.mark_if_asked("Glad to hear it.", Some(ASKED_OF));
+            let forget = call(FORGET, json!({}));
+            let deadline = Duration::from_secs(2);
+            assert_ne!(
+                client.run_for(&forget, deadline, Some(ASKED_OF)).0["forgotten"],
+                true,
+                "{name}"
+            );
+            // The failed turn's exchange finishes; they say it again.
+            client.mark_if_asked("Sorry, I couldn't forget that.", Some(ASKED_OF));
+            assert_eq!(
+                client.run_for(&forget, deadline, Some(ASKED_OF)).0,
+                json!({"forgotten":true}),
+                "{name}"
+            );
+            let read = served.join().unwrap();
+            let mut sent = sent;
+            sent.extend([probe(), forget_once.clone()]);
+            assert_eq!(read, sent, "{name}");
+            assert_eq!(*KEPT.lock().unwrap(), vec![30], "{name}");
+            // Confirmed: the slot is gone.
+            assert_eq!(
+                bare_forget_target(&client.context.lock().unwrap(), Some(ASKED_OF)),
+                None,
+                "{name}"
+            );
+            std::fs::remove_file(&socket).unwrap();
+        }
+    }
+
+    /// After a refused forget of the follow-up, another person's bare
+    /// forget is `forget_last` of their own, and the asked person's slot
+    /// is left as it was.
+    #[test]
+    fn a_refused_forget_leaves_the_slot_and_another_s_forget_is_forget_last() {
+        let (socket, served) = memory("fa-refused-other", 3, |request| {
+            match request["op"].as_str() {
+                Some("kept") => json!({"ok":true,"entries":[]}),
+                Some("forget") => json!({"ok":false,"error":"io"}),
+                _ => json!({"ok":true,"removed":1}),
+            }
+        });
+        let client = asked_with_memory("forget-asked-refused-other", &socket);
+        let forget = call(FORGET, json!({}));
+        let deadline = Duration::from_secs(2);
+        let _ = client.run_for(&forget, deadline, Some(ASKED_OF));
+        const OTHER: &str = "p-0123456789abcdef";
+        assert_eq!(
+            client.run_for(&forget, deadline, Some(OTHER)).0,
+            json!({"forgotten":true})
+        );
+        let read = served.join().unwrap();
+        assert_eq!(read[0], probe());
+        assert_eq!(read[1], json!({"op":"forget","id":12,"person":ASKED_OF}));
+        assert_eq!(
+            read[2],
+            json!({"op":"forget_last","kind":"kept","person":OTHER})
+        );
+        let context = client.context.lock().unwrap();
+        assert_eq!(
+            context.just_asked.as_ref().map(|slot| (slot.1, slot.2)),
+            Some((12, 0))
+        );
+        assert_eq!(bare_forget_target(&context, Some(ASKED_OF)), Some(12));
+        drop(context);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// The one picker (#2808 in #3113's): right after a follow-up was asked,
+    /// a bare forget picks its id; a named one still picks what it names.
+    #[test]
+    fn pick_forget_takes_the_follow_up_asked_only_for_a_bare_forget() {
+        let forget = call(FORGET, json!({}));
+        let asked = Recent {
+            named: None,
+            asked: Some(12),
+        };
+        for said in [Some("Forget that."), Some("quên cái đó đi"), None] {
+            assert_eq!(
+                pick_forget(&forget, said, &asked),
+                ForgetPick::Asked(12),
+                "{said:?}"
+            );
+        }
+        assert_eq!(
+            pick_forget(
+                &forget,
+                Some("Lamp, please forget my favourite colour."),
+                &asked
+            ),
+            ForgetPick::Named("favourite colour".into())
+        );
+        assert_eq!(
+            pick_forget(&forget, Some("Forget that."), &Recent::default()),
+            ForgetPick::Last
+        );
+    }
+
+    /// A Days client on `socket`, its session offered follow-up 12 of
+    /// [`ASKED_OF`]'s and the lamp having just asked about it.
+    fn asked_with_memory(name: &str, socket: &Path) -> DaysClient {
+        let (probe, _work) = offered_an_event(name, true, true);
+        // Asked on the probe, whose writer's jobs go nowhere.
+        probe.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        let client = DaysClient::new(socket.to_path_buf()).unwrap();
+        client.threads.store(true, Ordering::Release);
+        *client.context.lock().unwrap() = std::mem::take(&mut *probe.context.lock().unwrap());
+        client
+    }
+
+    /// Fault #1: another person's bare forget, or the room's, is
+    /// `forget_last` of their own, and leaves the asked person's slot.
+    #[test]
+    fn another_speaker_s_bare_forget_never_takes_the_follow_up_asked() {
+        let (client, _work) = offered_an_event("forget-asked-other", true, true);
+        client.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        // Another person's finished line counts none of theirs.
+        client.mark_if_asked("Sure.", Some("p-0123456789abcdef"));
+        let context = client.context.lock().unwrap();
+        assert_eq!(
+            bare_forget_target(&context, Some("p-0123456789abcdef")),
+            None
+        );
+        assert_eq!(bare_forget_target(&context, None), None);
+        assert_eq!(bare_forget_target(&context, Some(ASKED_OF)), Some(12));
+    }
+
+    /// A thing they asked to keep after the ask is the newer "that": the
+    /// slot goes, so `forget_last` forgets it. Another's keeps it.
+    #[test]
+    fn a_remember_after_the_ask_makes_the_bare_forget_forget_last() {
+        let (socket, served) = memory("fa-keep", 2, |_| json!({"ok":true,"id":30}));
+        let client = asked_with_memory("forget-asked-remember", &socket);
+        let keep = call(REMEMBER, json!({"text":"likes tea"}));
+        let deadline = Duration::from_secs(2);
+        assert!(
+            client
+                .run_for(&keep, deadline, Some("p-0123456789abcdef"))
+                .1
+        );
+        let target = |client: &DaysClient| {
+            bare_forget_target(&client.context.lock().unwrap(), Some(ASKED_OF))
+        };
+        assert_eq!(target(&client), Some(12), "another's remember");
+        assert!(client.run_for(&keep, deadline, Some(ASKED_OF)).1);
+        assert_eq!(target(&client), None, "theirs");
+        served.join().unwrap();
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// A session closing lets the slot go, and so does one opening for
+    /// another person, nobody known, or past the bound. One opening for the
+    /// same person within it, the note's refresh after a refused forget,
+    /// keeps it (Second on #3130).
+    #[test]
+    fn a_session_change_lets_the_follow_up_asked_go() {
+        let (client, _work) = offered_an_event("forget-asked-closed", true, true);
+        client.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        client.close_open_session(Duration::from_millis(20));
+        let context = client.context.lock().unwrap();
+        assert_eq!(bare_forget_target(&context, Some(ASKED_OF)), None, "closed");
+        drop(context);
+        let (jobs, _) = sync_channel(16);
+        let open = |context: &mut DaysContext, name: &str, person: Option<&str>| {
+            let _ = replace_session(context, &jobs, (name, person), true);
+            bare_forget_target(context, Some(ASKED_OF))
+        };
+        let (client, work) = offered_an_event("forget-asked-opened", true, true);
+        client.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        let mut context = client.context.lock().unwrap();
+        assert_eq!(
+            open(&mut context, "same", Some(ASKED_OF)),
+            Some(12),
+            "same person"
+        );
+        assert_eq!(open(&mut context, "nobody", None), None, "nobody known");
+        drop(context);
+        drop(work);
+        let (client, work) = offered_an_event("forget-asked-another", true, true);
+        client.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        let mut context = client.context.lock().unwrap();
+        let other = Some("p-0123456789abcdef");
+        assert_eq!(open(&mut context, "another", other), None, "another person");
+        // Back to them: what another's open let go stays gone.
+        assert_eq!(
+            open(&mut context, "them-again", Some(ASKED_OF)),
+            None,
+            "gone"
+        );
+        drop(context);
+        drop(work);
+        let (client, work) = offered_an_event("forget-asked-late", true, true);
+        client.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        let mut context = client.context.lock().unwrap();
+        if let Some(slot) = context.just_asked.as_mut() {
+            slot.3 -= HELD_FORGET_FOR + Duration::from_secs(1);
+        }
+        assert_eq!(open(&mut context, "late", Some(ASKED_OF)), None, "expired");
+        assert!(context.just_asked.is_none(), "expired slot let go");
+        drop(work);
+    }
+
+    /// With `LAMP_MEMORY_THREADS` off nothing is offered, so nothing is
+    /// asked and a bare forget is `forget_last` as before.
+    #[test]
+    fn with_threads_off_a_bare_forget_is_forget_last() {
+        let (socket, served) = memory("fa-off", 2, |request| match request["op"].as_str() {
+            Some("session_open") => {
+                json!({"ok":true,"snapshot":snapshot(request["session"].as_str().unwrap())})
+            }
+            _ => json!({"ok":false}),
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.threads.store(false, Ordering::Release);
+        let _ = client.told_for_session_within(1, Some(ASKED_OF), false, Duration::from_secs(2));
+        served.join().unwrap();
+        std::fs::remove_file(&socket).unwrap();
+        client.mark_if_asked(THE_ASK, Some(ASKED_OF));
+        let context = client.context.lock().unwrap();
+        assert!(context.asking.is_empty());
+        assert_eq!(bare_forget_target(&context, Some(ASKED_OF)), None);
+    }
+
     /// The first builder on #2805, 22 Oct 20:28, and the c0a4 set on #3059
     /// (22 Oct): what a greeting is, and a line that opens nothing.
     #[test]
@@ -9632,6 +11010,9 @@ mod tests {
             threads: AtomicBool::new(true),
             events: AtomicBool::new(true),
             room_not_asker: AtomicBool::new(false),
+            room_after_forget: AtomicBool::new(false),
+            forgot_everything: Mutex::new(HashMap::new()),
+            known: Mutex::new(None),
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
             remember_once: AtomicBool::new(false),
@@ -12231,7 +13612,239 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
-    fn memory(
+    /// #2510 take 1 (b): a kept thing in Vietnamese is found by what was
+    /// heard as speech to text writes it, with or without its accents,
+    /// both sides folded as the memory's search folds them. Made-up texts.
+    #[test]
+    fn a_vietnamese_kept_thing_is_found_with_or_without_its_accents() {
+        const NOW: u64 = 1_792_000_000_000;
+        let (socket, served) = memory("hits-vi", 3, |_| {
+            json!({"ok":true,"entries":[
+                {"id":1,"at_unix_ms":NOW,"text":"Màu yêu thích là xanh."},
+                {"id":2,"at_unix_ms":NOW,"text":"Their sister lives in Hue."}
+            ]})
+        });
+        for heard in ["mau yeu thich", "Màu yêu thích của tôi là gì?"] {
+            let told = hits_note(&socket, Some("p-1"), heard, NOW, None).unwrap();
+            assert!(told.contains("- Màu yêu thích là xanh. (today)"), "{told}");
+            assert!(!told.contains("sister"), "{told}");
+        }
+        let đ = hits_note(&socket, Some("p-1"), "ĐƯỢC YÊU", NOW, None).unwrap();
+        assert!(đ.contains("xanh"), "upper case and đ fold: {đ}");
+        served.join().unwrap();
+        let _ = std::fs::remove_file(&socket);
+        assert_eq!(hit_words("Màu YÊU thích"), ["mau", "thich", "yeu"]);
+        assert_eq!(hit_words("Đen"), ["den"]);
+    }
+
+    /// #2510 take 1 (b): English words match as they did, with the memory's
+    /// common words ("been", "should", "told") now left out too.
+    #[test]
+    fn english_hit_words_are_as_before_but_the_memorys_common_words() {
+        for line in [
+            "What's my name?",
+            "how is my sister's job?",
+            "They take their coffee black, no sugar.",
+            "Names of the cats: Pim and Pom.",
+            "the wedding",
+        ] {
+            assert_eq!(hit_words(line), content_words(line), "{line}");
+        }
+        assert_eq!(
+            content_words("I told you, it's been raining"),
+            ["been", "raining", "told"]
+        );
+        assert_eq!(hit_words("I told you, it's been raining"), ["raining"]);
+    }
+
+    /// The reviewer-lead's P3 on #3177: [`SEARCH_COMMON`] is
+    /// `lamp_memory::search::COMMON`, word for word and in its order, read
+    /// from the memory's own source, so a word added there and not here
+    /// fails here.
+    #[test]
+    fn search_common_is_the_memorys_own_list() {
+        let source = include_str!("../../memory/src/search.rs");
+        let start = source
+            .find("const COMMON: &[&str] = &[")
+            .expect("the memory's COMMON");
+        let list = &source[start..];
+        let list = &list[..list.find("];").expect("COMMON's end")];
+        let theirs: Vec<&str> = list.split('"').skip(1).step_by(2).collect();
+        assert_eq!(theirs, SEARCH_COMMON);
+    }
+
+    /// reviewer-two's three cases on #3177, heard without accents against a
+    /// kept thing with them: a function word ("cua", "toi") is now never a
+    /// hit word, so "la cua va" no longer finds "Cửa nhà màu đỏ" nor "toi"
+    /// "Tối nay đi xem phim". "ban co khoe khong" still finds "Bạn thân tên
+    /// Lan" by "ban": "bạn" is not one of the memory's common words, and a
+    /// content word heard without its accents matching is (b)'s point, as
+    /// "mau yeu thich" finds "Màu yêu thích".
+    #[test]
+    fn unaccented_function_words_find_no_accented_kept_thing() {
+        let shared = |heard: &str, kept: &str| -> Vec<String> {
+            let kept = hit_words(kept);
+            hit_words(heard)
+                .into_iter()
+                .filter(|word| kept.contains(word))
+                .collect()
+        };
+        assert!(shared("la cua va", "Cửa nhà màu đỏ").is_empty());
+        assert!(shared("toi", "Tối nay đi xem phim").is_empty());
+        assert_eq!(shared("ban co khoe khong", "Bạn thân tên Lan"), ["ban"]);
+        assert_eq!(
+            shared("mau yeu thich", "Màu yêu thích là xanh."),
+            ["mau", "thich", "yeu"]
+        );
+        assert_eq!(shared("cái cửa", "Cửa nhà màu đỏ"), ["cua"]);
+        assert!(shared("của tôi", "Cửa nhà của tôi").is_empty());
+    }
+
+    /// #2510 take 1 (b): Vietnamese function words alone ("là", "của",
+    /// "và", with their accents or as heard without: "la cua va") match
+    /// nothing and ask nothing (Fourteen's P2 on #3177); an accented word
+    /// that only folds to one stays: "chó" (a dog) is not "cho" (for), and
+    /// "cửa" (a door) not "của" (of).
+    #[test]
+    fn vietnamese_function_words_alone_are_never_a_hit() {
+        const NOW: u64 = 1_792_000_000_000;
+        assert!(hit_words("là của và").is_empty());
+        assert!(hit_words("la cua va").is_empty());
+        assert!(hit_words("LA CUA VA khong co gi").is_empty());
+        assert!(hit_words("Đó là của tôi, và không có gì").is_empty());
+        assert!(hit_words("của tôi").is_empty());
+        assert!(hit_words("cua toi").is_empty());
+        assert_eq!(hit_words("cái cửa"), ["cai", "cua"]);
+        assert_eq!(hit_words("con chó cho tôi"), ["cho", "con"]);
+        let (socket, served) = memory("hits-vi-small", 1, |_| {
+            json!({"ok":true,"entries":[
+                {"id":1,"at_unix_ms":NOW,"text":"Cái này là của tôi và của anh."}
+            ]})
+        });
+        assert_eq!(
+            hits_note(&socket, None, "là của và", NOW, None),
+            None,
+            "not asked"
+        );
+        assert_eq!(
+            hits_note(&socket, None, "la cua va", NOW, None),
+            None,
+            "heard without accents, not asked"
+        );
+        assert_eq!(
+            hits_note(&socket, None, "của nhà", NOW, None),
+            None,
+            "asked, nothing shared"
+        );
+        served.join().unwrap();
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// #2510 take 1 (c): a turn's journal line counts what its hits told,
+    /// how many and how many bytes of kept text, and never says the text.
+    #[test]
+    fn the_journal_line_counts_what_was_told_and_never_says_it() {
+        const NOW: u64 = 1_792_000_000_000;
+        let (socket, served) = memory("hits-counts", 2, |_| {
+            json!({"ok":true,"entries":[
+                {"id":1,"at_unix_ms":NOW,"text":"Màu yêu thích là xanh."},
+                {"id":2,"at_unix_ms":NOW,"text":"Their name is Ossa."}
+            ]})
+        });
+        let (note, count) =
+            hits_note_counted(&socket, Some("p-1"), "màu yêu thích", NOW, None).unwrap();
+        assert!(note.contains("xanh"));
+        assert_eq!(
+            count,
+            HitsCount {
+                told: 1,
+                bytes: "Màu yêu thích là xanh.".len()
+            }
+        );
+        let line = hits_journal_line(7, Some(count), 3, true);
+        assert_eq!(
+            line,
+            "request 7: memory told in 3 ms (theirs) hits_told=1 bytes_told=26"
+        );
+        for word in ["xanh", "Màu", "mau", "Ossa"] {
+            assert!(!line.contains(word), "{line}");
+        }
+        assert_eq!(
+            hits_journal_line(8, None, 1, false),
+            "request 8: memory had nothing told in 1 ms (the room's) hits_told=0 bytes_told=0"
+        );
+        assert_eq!(
+            hits_note_counted(&socket, None, "what is the weather", NOW, None),
+            None
+        );
+        served.join().unwrap();
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    /// Off unless exactly `on`: with the switch off the worker asks no hits
+    /// and writes no hits line, as before.
+    #[test]
+    fn the_hits_switch_is_off_unless_exactly_on() {
+        for value in [
+            None,
+            Some(""),
+            Some("off"),
+            Some("1"),
+            Some("ON"),
+            Some("true"),
+        ] {
+            assert!(!hits_switch(value), "{value:?}");
+        }
+        assert!(hits_switch(Some("on")));
+        assert!(!hits_on(), "unset in the tests");
+    }
+
+    /// #2510 take 1: `hits_note`'s time on this machine, 200 calls on a
+    /// 200-entry kept list, half Vietnamese. Run by hand with `--ignored
+    /// --nocapture`; its p95 must stay inside `HITS_WITHIN`.
+    #[test]
+    #[ignore = "a measurement, run by hand"]
+    fn hits_note_latency_on_a_200_entry_kept_list() {
+        const NOW: u64 = 1_792_000_000_000;
+        const CALLS: usize = 200;
+        let (socket, served) = memory("hits-bench", CALLS, |_| {
+            let entries: Vec<Value> = (0..200u64)
+                .map(|id| {
+                    let text = if id % 2 == 0 {
+                        format!("Kept thing {id}: their favourite garden tool is the small rake number {id}, bought last spring.")
+                    } else {
+                        format!("Điều {id}: món ăn yêu thích của họ là phở bò tái, ăn ở quán gần nhà số {id}.")
+                    };
+                    json!({"id":id,"at_unix_ms":NOW - id,"text":text})
+                })
+                .collect();
+            json!({"ok":true,"entries":entries})
+        });
+        let mut took = Vec::with_capacity(CALLS);
+        for call in 0..CALLS {
+            let heard = if call % 2 == 0 {
+                "what's my favourite garden tool?"
+            } else {
+                "món ăn yêu thích của tôi là gì?"
+            };
+            let started = Instant::now();
+            assert!(hits_note(&socket, Some("p-1"), heard, NOW, None).is_some());
+            took.push(started.elapsed());
+        }
+        served.join().unwrap();
+        let _ = std::fs::remove_file(&socket);
+        took.sort();
+        let at = |q: usize| took[(CALLS * q / 100).min(CALLS - 1)];
+        eprintln!(
+            "hits_note over {CALLS} calls, 200 kept: p50 {:?} p95 {:?} max {:?}",
+            at(50),
+            at(95),
+            took[CALLS - 1]
+        );
+        assert!(at(95) < HITS_WITHIN, "{:?}", at(95));
+    }
+
+    pub(super) fn memory(
         name: &str,
         requests: usize,
         answer: fn(&Value) -> Value,
@@ -13314,6 +14927,9 @@ mod tests {
             threads: AtomicBool::new(false),
             events: AtomicBool::new(false),
             room_not_asker: AtomicBool::new(false),
+            room_after_forget: AtomicBool::new(false),
+            forgot_everything: Mutex::new(HashMap::new()),
+            known: Mutex::new(None),
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
             remember_once: AtomicBool::new(false),
@@ -13478,6 +15094,9 @@ mod tests {
             threads: AtomicBool::new(false),
             events: AtomicBool::new(false),
             room_not_asker: AtomicBool::new(false),
+            room_after_forget: AtomicBool::new(false),
+            forgot_everything: Mutex::new(HashMap::new()),
+            known: Mutex::new(None),
             room_sounds: PathBuf::from("/unused-no-io"),
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
@@ -13951,6 +15570,9 @@ mod tests {
             threads: AtomicBool::new(false),
             events: AtomicBool::new(false),
             room_not_asker: AtomicBool::new(false),
+            room_after_forget: AtomicBool::new(false),
+            forgot_everything: Mutex::new(HashMap::new()),
+            known: Mutex::new(None),
             room_sounds: PathBuf::from("/unused-no-io"),
             forget_all: AtomicBool::new(false),
             recall_v2: AtomicBool::new(false),
@@ -15077,13 +16699,13 @@ mod tests {
         let answer = json!({"ok":true,"entries":[
             {"id":4,"at_unix_ms":NOW,"text":"Her favourite colour is violet."}
         ]});
-        let (off, none) = hits_told(&answer, "my favourite colour", NOW, None, false).unwrap();
+        let (off, none, _) = hits_told(&answer, "my favourite colour", NOW, None, false).unwrap();
         assert_eq!(
             off,
             format!("{HITS_NOTE}\n- Her favourite colour is violet. (today)")
         );
         assert!(none.is_empty());
-        let (on, shown) = hits_told(&answer, "my favourite colour", NOW, None, true).unwrap();
+        let (on, shown, _) = hits_told(&answer, "my favourite colour", NOW, None, true).unwrap();
         assert_eq!(
             on,
             format!("{HITS_NOTE}\n- Her favourite colour is violet. (today, source_id 4)")
@@ -15654,6 +17276,7 @@ mod tests {
         assert_eq!(pick_forget(&forget, None, &none), ForgetPick::Last);
         let named = Recent {
             named: Some("favourite colour".into()),
+            asked: None,
         };
         assert_eq!(
             pick_forget(&forget, Some("Yes, please forget it."), &named),

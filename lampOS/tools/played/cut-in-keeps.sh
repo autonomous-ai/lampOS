@@ -42,7 +42,7 @@ if [[ -z $LABEL || ! $ROUNDS =~ ^[1-9][0-9]?$ ]]; then
   echo "usage: cut-in-keeps.sh LABEL [ROUNDS, 1 to 99]" >&2
   exit 2
 fi
-if [[ $(date +%u) -le 5 && $(date +%H) -ge 12 && $(date +%H) -lt 14 && ${LAMP_PLAY_AT_LUNCH:-} != yes ]]; then
+if [[ $(date +%u) -le 5 && $((10#$(date +%H))) -ge 12 && $((10#$(date +%H))) -lt 14 && ${LAMP_PLAY_AT_LUNCH:-} != yes ]]; then
   echo "cut-in-keeps.sh: not between 12:00 and 14:00 local, when the office rests" >&2
   exit 2
 fi

@@ -189,12 +189,15 @@ check "--from 2 --to 3 runs only steps 2 and 3" '[[ $status == 0 ]] && grep -q "
 # lamp-controls is, and started again only once Controls is back (after its
 # restart on the new pins) and before the self-test; none running, none.
 line() { grep -n "$1" "$T/log" | "${2:-head}" -1 | cut -d: -f1; }
+# An empty line number would compare as 0, so a missing match fails here
+# instead of passing an ordering check.
+before() { [[ -n $1 && -n $2 ]] && (( $1 < $2 )); }
 lamp; FAKE_VOICE_STATE=active ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
-check "the voice and ears are stopped before Controls is, started after Controls is back, before the self-test" '[[ $status == 0 ]] && [[ $(line "^systemctl stop lamp-voice lamp-ears$") -lt $(line "^systemctl stop lamp-controls$") ]] && [[ $(line "lamp-controls$" tail) -lt $(line "^systemctl start lamp-voice lamp-ears$") ]] && [[ $(line "^systemctl start lamp-voice") -lt $(line "^selftest") ]] && [[ $(grep -c "^systemctl \(start\|stop\) lamp-voice" "$T/log") == 2 ]] && ! grep -q "^systemctl restart lamp-voice" "$T/log"'
+check "the voice and ears are stopped before Controls is, started after Controls is back, before the self-test" '[[ $status == 0 ]] && before "$(line "^systemctl stop lamp-voice lamp-ears$")" "$(line "^systemctl stop lamp-controls$")" && before "$(line "lamp-controls$" tail)" "$(line "^systemctl start lamp-voice lamp-ears$")" && before "$(line "^systemctl start lamp-voice")" "$(line "^selftest")" && [[ $(grep -c "^systemctl \(start\|stop\) lamp-voice" "$T/log") == 2 ]] && ! grep -q "^systemctl restart lamp-voice" "$T/log"'
 lamp; ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
 check "a voice and ears not running are neither stopped nor started" '[[ $status == 0 ]] && ! grep -q "^systemctl \(stop\|start\|restart\).*lamp-\(voice\|ears\)" "$T/log"'
 lamp; FAKE_VOICE_STATE=active FAKE_DISCOVERY_EXIT=1 ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
-check "a failed touch step still starts the voice and ears again, after Controls" '[[ $status == 1 ]] && [[ $(line "^systemctl start lamp-controls$" tail) -lt $(line "^systemctl start lamp-voice lamp-ears$") ]]'
+check "a failed touch step still starts the voice and ears again, after Controls" '[[ $status == 1 ]] && before "$(line "^systemctl start lamp-controls$" tail)" "$(line "^systemctl start lamp-voice lamp-ears$")"'
 lamp; run --from 3 --to 2; status=$?
 check "--to before --from is refused" '[[ $status == 2 ]]'
 

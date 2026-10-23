@@ -27,11 +27,11 @@ UMask=0077
 # --ring-channel-ceiling: the light ring's worker, as the product unit starts it. Without it no
 # ring worker runs and a lamp moved from V1 stays dark (#2396). The ring's own values (spidev3.0,
 # 32 pixels) are the board's and in crates/ring; only the ceiling is the unit's.
-# --failure-notice-dir/-language: the lines recorded in the lamp's own voice, as the product unit names them
+# --failure-notice-dir/-language: the lines recorded in the lamp's own voice, in the product unit's language
 # (lampOS/docs/failure-notices.md), so a lamp moved from V1 says why it can't answer: a refused key, a spent
-# allowance, no network (#2943). With no directory or no manifest each notice stays silent, and
-# failure_notice_capability says why.
-ExecStart=/opt/lampOS/releases/@VOICE_SHA256@/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --ring-channel-ceiling 24 --failure-notice-dir /opt/lampOS/voice/notices --failure-notice-language en-US @VOICE_OPTIONS@
+# allowance, no network (#2943). The folder is the one lamp-keeper prepare fills from the product's pins, not
+# the product's under /opt/lampOS, which the package does not carry. A line it cannot load is a sigh.
+ExecStart=/opt/lampOS/releases/@VOICE_SHA256@/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --ring-channel-ceiling 24 --failure-notice-dir /var/lib/lampOS/voice/notices --failure-notice-language en-US @VOICE_OPTIONS@
 # Microphone and speaker threads may not wait behind other work (lamp-4ace, 2026-10-13).
 CPUSchedulingPolicy=rr
 CPUSchedulingPriority=20

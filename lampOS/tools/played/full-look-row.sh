@@ -9,7 +9,11 @@
 #  1. The pair, as lamp-75c9's (22 Oct 06:30, Ten on #2602): a /run drop-in runs the unit's own ExecStart with
 #     `--sight-from-look off`, then `on`, both with `--look-on-change on` (the 10 s line's stage times need it); 30 s to
 #     settle, then 4 minutes each. Prints the medians of the 10 s line's "sight file" and "decode" ms a look and of its
-#     "ms a look". The drop-in is removed on exit and the eyes restarted, as installed.
+#     "ms a look". The drop-in is removed on exit and the eyes restarted, as installed. With each drop-in the lamp arms
+#     its own guard, a systemd-run timer (zz-look-row-guard) that takes the drop-in off and restarts the eyes unaided
+#     10 min after the arm and the quiet wait after it are due to end; the put-back stops it. So a Mac that sleeps or
+#     drops off mid-arm, and never runs its exit trap, leaves the lamp changed for at most that long (lamp-0c89, 22 Oct:
+#     its Mac slept in the first arm and the drop-in stayed on overnight, Mobile on #3126).
 #  2. The asks: "Hey Lamp, what do you see?", each in a scene of its own. Per ask, from the voice's session: the first
 #     and second times the lamp starts speaking after the end of speech was decided (for a look, normally its "Let me
 #     look." and the look's answer), and what the lamp said.
@@ -22,8 +26,11 @@ lamp() { ./lamp_ssh "$@" </dev/null }
 lamp "ls $D 2>/dev/null" | grep -q . && { echo "full-look-row: a /run drop-in is on lamp-eyes already; not starting" >&2; exit 3 }
 cmd=$(lamp 'tr "\0" " " < /proc/$(systemctl show -p MainPID --value lamp-eyes)/cmdline')
 [[ $cmd == *"--full-look "* && $cmd == *"--sight-from-look on"* ]] || { echo "full-look-row: lamp-eyes runs without --full-look and --sight-from-look on (a build before #2998?): $cmd" >&2; exit 3 }
+# The lamp's guard (above), stopped first: it is no longer needed once the put-back runs.
+GUARD=zz-look-row-guard
+unguard="sudo -n systemctl stop $GUARD.timer 2>/dev/null; sudo -n systemctl reset-failed $GUARD.timer $GUARD.service 2>/dev/null"
 # Each step checked, and the drop-in's absence after: a failed step fails the whole put-back.
-restore() { lamp "sudo -n rm -f $D/zz-look-row.conf && sudo -n systemctl daemon-reload && sudo -n systemctl restart lamp-eyes && ! test -e $D/zz-look-row.conf" }
+restore() { lamp "$unguard; sudo -n rm -f $D/zz-look-row.conf && sudo -n systemctl daemon-reload && sudo -n systemctl restart lamp-eyes && ! test -e $D/zz-look-row.conf" }
 # Tried up to three times; says so when the lamp is still left changed.
 put_back() {
   local i
@@ -35,6 +42,8 @@ put_back() {
 armed=no
 trap 'exit 130' INT TERM
 QUIET_MAX=${QUIET_MAX:-900}
+# How long the guard waits: the arm's 30 s and 4 minutes, the quiet wait after it, and 10 minutes more.
+guard_after=$((30 + 240 + QUIET_MAX + 600))
 quiet() { # until the lamp has heard and said nothing for 45 s
   local waited=0
   until ./quiet_gate.sh 45 >/dev/null 2>&1; do
@@ -52,7 +61,7 @@ for mode in off on; do
   [[ $armed == yes ]] || { trap 'put_back' EXIT; armed=yes }
   print -r -- "[Service]
 ExecStart=
-ExecStart=${line/--sight-from-look on/--sight-from-look $mode} --look-on-change on" | ./lamp_ssh "cat > /tmp/zz-look-row.conf && sudo -n mkdir -p $D && sudo -n install -m 0644 /tmp/zz-look-row.conf $D/zz-look-row.conf && rm /tmp/zz-look-row.conf && sudo -n systemctl daemon-reload && sudo -n systemctl restart lamp-eyes" || { echo "full-look-row: the drop-in could not be put on (sudo -n)" >&2; exit 4 }
+ExecStart=${line/--sight-from-look on/--sight-from-look $mode} --look-on-change on" | ./lamp_ssh "cat > /tmp/zz-look-row.conf && { $unguard; true; } && sudo -n systemd-run --unit=$GUARD --on-active=${guard_after}s /bin/sh -c 'rm -f $D/zz-look-row.conf && systemctl daemon-reload && systemctl restart lamp-eyes' && sudo -n mkdir -p $D && sudo -n install -m 0644 /tmp/zz-look-row.conf $D/zz-look-row.conf && rm /tmp/zz-look-row.conf && sudo -n systemctl daemon-reload && sudo -n systemctl restart lamp-eyes" || { echo "full-look-row: the drop-in could not be put on (sudo -n)" >&2; exit 4 }
   sleep 30
   got=$(lamp 'tr "\0" " " < /proc/$(systemctl show -p MainPID --value lamp-eyes)/cmdline')
   [[ $got == *"--sight-from-look $mode"*"--look-on-change on"* ]] || { echo "full-look-row: lamp-eyes isn't running the $mode arm: $got" >&2; exit 6 }

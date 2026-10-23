@@ -71,6 +71,8 @@ kept its version shows.
 - `[rules]`: `selftest_without_lamp`, what a run is whose self-test report
   does not name its lamp (below, "Whose report it is"): `incomplete` (the
   default, and version 0's) or `refused`. The hardware lead's to set.
+
+**Version 1** (`production/matrix-v1.toml`, 21 Oct) is version 0 with `approved = true`, every check, limit and rule unchanged, for the pilot (batch `pilot-1`). The lead gave the three decisions to the hardware team on 21 Oct (#1764): the limits as version 0 proposed them unless the hardware team objects; the pilot lamps theirs to pick, not the office lamps, which have been taken apart and run hard; and the records kept in their own private place. A limit the pilot shows wrong is version 2.
 - `[[revision]]`: the hardware revisions the matrix knows, each with an
   `id` and a line saying `what` it has. Version 0's two are placeholders the
   hardware lead names: `draft-a` (every part fitted, the air sensor among
@@ -176,9 +178,9 @@ is that name.
 ### The command
 
 ```sh
-lamp-station --matrix production/matrix-v0.toml --answers answers.json \
+lamp-station --matrix production/matrix-v1.toml --answers answers.json \
   --selftest latest.json --device lamp-4ace --revision draft-a --batch pilot-1 \
-  --lampos-build dab3f1242486 --suite 0+dab3f1242486 --station station-01 \
+  --lampos-build dab3f1242486 --suite 1+dab3f1242486 --station station-01 \
   --operator op-7 --occasion routine --out records/
 ```
 
@@ -225,7 +227,7 @@ right to the place removes them.
 ### One lamp's records
 
 ```sh
-lamp-station records --records PLACE --device lamp-4ace [--matrix production/matrix-v0.toml]
+lamp-station records --records PLACE --device lamp-4ace [--matrix production/matrix-v1.toml]
 ```
 
 lists the lamp's records in the place, oldest first (a run id begins with

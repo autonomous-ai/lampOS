@@ -34,7 +34,7 @@ if [[ -z $LABEL ]]; then
   echo "usage: addon-say.sh LABEL [\"the kept text\"]" >&2
   exit 2
 fi
-if [[ $(date +%u) -le 5 && $(date +%H) -ge 12 && $(date +%H) -lt 14 && ${LAMP_PLAY_AT_LUNCH:-} != yes ]]; then
+if [[ $(date +%u) -le 5 && $((10#$(date +%H))) -ge 12 && $((10#$(date +%H))) -lt 14 && ${LAMP_PLAY_AT_LUNCH:-} != yes ]]; then
   echo "addon-say.sh: not between 12:00 and 14:00 local, when the office rests" >&2
   exit 2
 fi

@@ -260,7 +260,11 @@ fn samples_of(payload: &[u8]) -> Result<(u64, Vec<i16>), Error> {
 /// after its end, but never past the play before's end or the play after's
 /// start, so a clip never holds another play's line (Fourteen's P2 on
 /// #3125).
-fn clips_from_bus(recording: &Path, plays: &Path, offset_ms: i64) -> Result<(Clips, u64), Error> {
+fn clips_from_bus(
+    recording: &Path,
+    plays: &Path,
+    offset_ms: i64,
+) -> Result<(Clips, u64, usize), Error> {
     // Each block: when it was sent, its count, its samples.
     let mut blocks: Vec<(i64, u64, Vec<i16>)> = Vec::new();
     for line in std::fs::read_to_string(recording)?.lines() {
@@ -288,6 +292,7 @@ fn clips_from_bus(recording: &Path, plays: &Path, offset_ms: i64) -> Result<(Cli
     plays.sort_by_key(|(start, _, _)| *start);
     let mut clips = Vec::new();
     let mut lost = 0u64;
+    let mut unrecorded = 0usize;
     for (index, (start, end, label)) in plays.iter().enumerate() {
         let before = index.checked_sub(1).map(|before| plays[before].1);
         let after = plays.get(index + 1).map(|(next, _, _)| *next);
@@ -304,12 +309,24 @@ fn clips_from_bus(recording: &Path, plays: &Path, offset_ms: i64) -> Result<(Cli
             last = Some(*sequence);
             samples.extend_from_slice(block);
         }
+        // A play with no block in its window is counted and left out, so one
+        // silent window doesn't cost the round's table (4ace's mic2 round,
+        // 23 Oct 10:36); with none recorded at all, the times or the
+        // recording are wrong, and that is an error.
         if samples.is_empty() {
-            return Err(format!("no sound recorded for the play {start}-{end} {label}").into());
+            unrecorded += 1;
+            continue;
         }
         clips.push((label.clone(), samples));
     }
-    Ok((clips, lost))
+    if clips.is_empty() {
+        return Err(format!(
+            "no sound recorded for any of the {} plays: check --offset-ms and the recording",
+            plays.len()
+        )
+        .into());
+    }
+    Ok((clips, lost, unrecorded))
 }
 
 /// Each play's start and end in Unix ms and its voice: from a TSV of
@@ -400,8 +417,8 @@ fn main() -> Result<(), Error> {
             _ => return Err(format!("unknown option {flag}").into()),
         }
     }
-    let (clips, lost) = match (index_path, bus, plays) {
-        (Some(index), None, None) => (clips_from_index(index)?, 0),
+    let (clips, lost, unrecorded) = match (index_path, bus, plays) {
+        (Some(index), None, None) => (clips_from_index(index)?, 0, 0),
         (None, Some(bus), Some(plays)) => clips_from_bus(bus, plays, offset_ms)?,
         _ => return Err(format!("an index, or --bus with --plays: {USAGE}").into()),
     };
@@ -457,7 +474,7 @@ fn main() -> Result<(), Error> {
     let voices: std::collections::BTreeSet<&str> =
         lines.iter().map(|line| line.voice.as_str()).collect();
     println!(
-        "clips {}, with no line heard {silent}, lines printed {} ({} voices), too short to print {unprinted}; end silence {end_silence_ms} ms; blocks lost inside the clips {lost}",
+        "clips {}, with no line heard {silent}, lines printed {} ({} voices), too short to print {unprinted}; end silence {end_silence_ms} ms; blocks lost inside the clips {lost}; plays with no sound recorded {unrecorded}",
         clips.len(),
         lines.len(),
         voices.len()
@@ -537,5 +554,65 @@ mod tests {
         .block(&[0, 0, 0, 0])
         .unwrap();
         assert!(samples_of(&stereo).is_err());
+    }
+
+    /// Standard base64 with padding, the inverse of `unbase64`, for the
+    /// recordings these tests write.
+    fn base64(bytes: &[u8]) -> String {
+        const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut out = String::new();
+        for chunk in bytes.chunks(3) {
+            let word = chunk.iter().enumerate().fold(0u32, |word, (i, byte)| {
+                word | u32::from(*byte) << (16 - 8 * i)
+            });
+            for i in 0..4 {
+                out.push(if i <= chunk.len() {
+                    ALPHABET[(word >> (18 - 6 * i) & 63) as usize] as char
+                } else {
+                    '='
+                });
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn a_play_with_no_sound_recorded_is_counted_and_left_out_unless_all_are() {
+        let folder = std::env::temp_dir().join(format!("svp-empty-{}", std::process::id()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let block = lamp_msgs::Audio {
+            sample_rate: 16_000,
+            channels: 1,
+            sample_format: lamp_msgs::Audio::S16LE.into(),
+            sequence: 0,
+        };
+        // Blocks from 10.0 s to 10.5 s only: the first play has sound, the
+        // second (20 s on) none.
+        let mut recording = String::new();
+        for n in 0..50u64 {
+            let audio = lamp_msgs::Audio {
+                sequence: n,
+                ..block.clone()
+            };
+            let payload = audio.block(&[1, 0, 2, 0]).unwrap();
+            recording.push_str(&format!(
+                "{{\"header\":{{\"at_unix_ms\":{}}},\"payload_b64\":\"{}\"}}\n",
+                10_000 + n * 10,
+                base64(&payload)
+            ));
+        }
+        let bus = folder.join("mic2_audio.jsonl");
+        std::fs::write(&bus, recording).unwrap();
+        let plays = folder.join("plays.tsv");
+        std::fs::write(&plays, "10000\t10400\ta\n20000\t20400\tb\n").unwrap();
+        let (clips, lost, unrecorded) = clips_from_bus(&bus, &plays, 0).unwrap();
+        assert_eq!(clips.len(), 1);
+        assert_eq!(clips[0].0, "a");
+        assert_eq!((lost, unrecorded), (0, 1));
+        // No play near the recording at all: an error, not an empty table.
+        std::fs::write(&plays, "30000\t30400\ta\n40000\t40400\tb\n").unwrap();
+        let error = clips_from_bus(&bus, &plays, 0).unwrap_err().to_string();
+        assert!(error.contains("any of the 2 plays"), "{error}");
+        let _ = std::fs::remove_dir_all(&folder);
     }
 }

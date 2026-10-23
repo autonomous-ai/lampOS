@@ -321,6 +321,56 @@ result, or `"ok":false`, an `"error"` (`bad_json`, `bad_request`, `unknown_op`,
   `exchange`) it is the highest of that kind, whatever came after it:
   "forget what I asked you to remember" means the last kept thing. Any
   other `kind` is `bad_request`.
+
+  **"Forget that" right after a follow-up** (the first builder, 03:29;
+  with `LAMP_MEMORY_THREADS`, no switch of its own). When the lamp has
+  just asked a person about a follow-up (`follow_up_asked`), a bare
+  forget (no `about`, no `source_id`) from that same person in either of
+  their next two lines, and within 60 s of the ask (`HELD_FORGET_FOR`),
+  sends `{"op":"forget","id":<the follow-up's id>}`
+  instead of `forget_last`, whether the follow-up was kept by `remember`
+  or by the end-of-talk pass as an observation, so it goes with its
+  follow-up, offer and event rows. The lamp's ask and the person's reply,
+  journalled before the forget, cite the follow-up the session was shown,
+  so the store's walk takes them too and the end-of-talk pass is given
+  none of them. Reading the slot waits for the voice's context rather
+  than failing on a busy one. The voice logs the id only, never the
+  words. Before the `forget`, #3113's older-memory probe (the
+  `kept` listing with `observations`) is sent: an older lamp-memory, which
+  could take another kept thing citing the same exchange, refuses it, and
+  the voice then sends no forget and answers as a refused named forget
+  does ("I couldn't forget that just now"), keeping the slot (Second's
+  second P2 on #3130). It is let go only once the store confirms a forget of theirs:
+  one the store refuses, or whose answer is lost, leaves it and gives
+  back its line of their two, so their next retry within the 60 s
+  forgets the same id again and never falls to `forget_last` of another kept thing (Second's
+  P2 on #3130). Another person's or the room's forget is their own
+  `forget_last` and leaves it. A third line, 60 s past the ask, a
+  `remember` of theirs after the ask (the newer kept thing is then
+  "that"), a session closing, a session opening for another person or
+  nobody known, or a confirmed forget of theirs leave `forget_last` as
+  before. A session opening for the same person within the bound keeps
+  it: an attempted forget makes the second route ask its note again, and
+  that refresh opens the next session before their retry, which must
+  still forget the same id (Second on #3130). `forgotten: true` is told only when the
+  store removed something. The one picker decides it:
+  `remember::bare_forget_target` fills `Recent::asked`, and `pick_forget`
+  returns `ForgetPick::Asked(id)` for a bare forget only; a forget that
+  names a thing still picks what it names. Tests:
+  `voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about`,
+  `voice::forget_that_with_no_follow_up_asked_still_forgets_the_newest_kept_line`,
+  `voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation`,
+  `voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence`,
+  `voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh`,
+  and `remember::tests` `a_bare_forget_in_their_next_two_lines_forgets_the_follow_up_asked`,
+  `a_refused_forget_of_the_follow_up_is_retried_by_id_never_forget_last`,
+  `a_refused_forget_leaves_the_slot_and_another_s_forget_is_forget_last`,
+  `a_bare_forget_past_a_minute_of_the_ask_is_forget_last`,
+  `another_speaker_s_bare_forget_never_takes_the_follow_up_asked`,
+  `a_remember_after_the_ask_makes_the_bare_forget_forget_last`,
+  `a_session_change_lets_the_follow_up_asked_go`,
+  `with_threads_off_a_bare_forget_is_forget_last` and
+  `pick_forget_takes_the_follow_up_asked_only_for_a_bare_forget`.
 - `forget_all` empties one person's directory, unreadable lines included:
   `{"ok":true,"removed":14}`. With `"person":null`, everyone's; every other
   request but `status` refuses `null`.
@@ -634,8 +684,9 @@ the unchanged legacy client, used unless the new Days client is selected.
   - **`forget_last` stays only for a bare forget:** "forget that" right
     after a keep removes that keep. A bare forget within 60 s of a named one
     in the same scope ("Yes, please forget it.") is that name again; a
-    `remember` since ends that. #2808 adds its case to `pick_forget`: a
-    bare forget just after a follow-up was asked.
+    `remember` since ends that. A bare forget just after a follow-up was
+    asked is that follow-up's entry (`ForgetPick::Asked`, #2808; "Forget
+    that" right after a follow-up, above).
   - **The legacy memory**, which can forget only the last kept thing,
     forgets nothing for a named forget and says so. A Days lamp-memory
     older than this build refuses `kept`'s `observations`
@@ -744,6 +795,61 @@ the unchanged legacy client, used unless the new Days client is selected.
       nothing told).
   - Both clear the conversation thread and stop journalling until a fresh
     worker starts, as `forget` does. `forget` with nothing is as before.
+  - **The room's lines about them, for the rest of the day**
+    (`LAMP_MEMORY_ROOM_AFTER_FORGET=on`, with the Days client and
+    `LAMP_MEMORY_FORGET_ALL`; off unless set; both voice routes). #2849's
+    find, seen again in #1693's c0a4 run: after "forget everything",
+    "what's my favourite colour?" was answered from a room-kept line
+    ("...'s favourite colour is green"). The first builder's yes on #2602,
+    23 Oct 03:31. With the switch:
+    - **Who:** a known person whose `forget_everything` the store answered
+      `ok` (whatever it removed) is remembered with the local day it was
+      said on. In this process only, at most 64 people (those of an
+      earlier day go first, then the earliest): a restart forgets who
+      forgot, and the room's lines reach them again.
+      Remembering them marks the client's context changed, removed nothing
+      included, so a note read begun before, even while the forget was with
+      the store, is never taken and the next is read filtered
+      (reviewer-two's P2 on #3142;
+      `remember::tests::a_note_read_during_a_forget_everything_is_fenced_by_the_room_filter`).
+    - **What they don't get, that same local day:** any room-kept thing
+      or room exchange about a person, in a new session's note (the
+      room's snapshot, its ids with it, so nothing left out is a source)
+      and in what `recall` or `search` gives from the room's beside their
+      own. About a person (`remember::about_someone`) is a whole word,
+      lower-cased with a curly apostrophe read as a straight one: first
+      person `i`, `i'm`, `i've`, `i'd`, `i'll`, `me`, `my`, `mine`,
+      `myself`; the second person's own `your`, `yours`, `yourself` (not a
+      bare `you`, which most of the lamp's own lines hold); third person `he`, `she`, `him`, `his`, `her`, `hers`,
+      `herself`, `himself`, `their`, `theirs`, `them`, `themselves`;
+      `user` ("the user"); or a word ending in `'s` other than `it's`,
+      `that's`, `what's`, `there's`, `here's`, `let's`, `where's`,
+      `when's`, `how's`, `who's`, `today's` ("Mai's favourite colour").
+      For a recall entry its heard, said and kept words are all checked.
+      Careful on purpose, for one day: a household line with "my" in it
+      is left out too.
+    - **Their own name** (Reviewer-lead's P2 on #3142): when they said it,
+      the name the eyes know the face at the lamp by is remembered with
+      the day, only if that face is theirs (its memory id is the one
+      forgetting). A room line that names them is then left out too
+      ("Mai likes green tea", "Mai is in Hanoi"), with no pronoun in it
+      (`remember::names_them`): every word of the name, in order, as whole
+      words, NFC and case aside, so "Mai" is not in "Maine" and "Mai Lan"
+      needs both. No common word is passed over, so a household line that
+      has the name in it is held back that day too. With no name known
+      then, only the words above count.
+    - **What they still get:** the room's other lines ("the meeting is at
+      four"), and everything of the room's the next local day. Someone
+      else, who forgot nothing, gets them all. A note already told before
+      the forget is not taken back; the next session's is.
+    - **The journal:** "room after forget: N room lines about a person
+      left out for them". Counts only, never a word.
+    - Off, the room's reach them as before. Tests:
+      `remember::tests::after_forget_everything_the_room_s_lines_about_a_person_are_not_recalled_that_day`,
+      `remember::tests::after_forget_everything_the_room_s_lines_about_a_person_are_not_in_their_note_that_day`,
+      `remember::tests::about_someone_is_first_and_third_person_words_and_possessives`,
+      `remember::tests::after_forget_everything_the_room_s_lines_naming_them_are_left_out_that_day`,
+      `remember::tests::names_them_is_the_whole_name_as_whole_words`.
   - **The conversation it came up in** (#1693, the first builder's 23:57):
     - **What's sent:** at `remember`, the voice sends the exchanges of the
       conversation it's in. That's the person's own, journalled so far,
@@ -1459,12 +1565,13 @@ the unchanged legacy client, used unless the new Days client is selected.
 On lamp-4ace on 20 Oct the second route's model called neither `recall` nor `search` once in four hours, so a name kept that morning was never used ("the lamp forgot my name"). With this switch and the Days memory, each spoken turn's final words are searched before its chat begins (`remember::hits_note`):
 
 - **The scope, one count for the turn:** the known face's (`known_faces::known_now`, `person_id`) only when the session the turn is in is theirs too, and the room's when neither names anyone. The turn's session is opened before the hits are asked (`worker::hits_person`), and the turn's notes still see the change, so a person's first turn is theirs and not the last session's (the reviewer's P2 on #2268: "What's my name?" is often the first thing asked). When they differ, nothing is told: someone leaning in for one look doesn't have their kept things told in another's conversation (the reviewer's P2 on #2251). The journal says "memory isn't told: the face and the session's person differ".
-- **What's asked:** the newest 16 KB of that scope's kept list (`{"op":"kept","max_bytes":16384}`, the answer read up to 40 KB). That's the whole list unless its things are long (200 of up to 300 bytes is 60 KB), so a name kept early isn't lost behind newer ones. It's matched in the voice by the words they share with what was heard: lower-cased, three letters or more, a possessive's `'s` and a plural's `s` taken off, and small words left out. Not the memory's full-text search: on lamp-4ace on 20 Oct its twelve best for "what is my name" were all exchanges, none kept, and the room's search took about 44 ms, where its kept list (63 things) took 3 ms. **English only:** accents aren't folded, and Vietnamese words match as written.
+- **What's asked:** the newest 16 KB of that scope's kept list (`{"op":"kept","max_bytes":16384}`, the answer read up to 40 KB). That's the whole list unless its things are long (200 of up to 300 bytes is 60 KB), so a name kept early isn't lost behind newer ones. It's matched in the voice by the words they share with what was heard (`remember::hit_words`), both sides folded as the memory's search folds them (#2510 take 1 b): NFC, lower case, `đ` as `d`; then accents removed, as `forget {about}` matches, so "màu" heard as "mau" is the same word; small words and the memory's common words (`search::COMMON`, English and Vietnamese: "là", "của", "và" …) left out by one rule: a word heard with accents when it is one of them with those accents, a word heard without any when it is one of them without theirs ("la cua va" matches nothing). So an accented word that only folds to one stays: "chó" (a dog) is not "cho" (for), "cửa" (a door) not "của" (of); "cua" heard for "cửa" without its accents is taken as "của"; three letters or more, a possessive's `'s` and a plural's `s` taken off. A Vietnamese word of two letters ("đỏ") is too short, as in English. Not the memory's full-text search: on lamp-4ace on 20 Oct its twelve best for "what is my name" were all exchanges, none kept, and the room's search took about 44 ms, where its kept list (63 things) took 3 ms. `hits_note` over 200 calls on a 200-thing kept list on the Mac, a release build: p50 3.5 ms, p95 4.3 ms (`hits_note_latency_on_a_200_entry_kept_list`, ignored, run by hand).
 - **The room's** are told with a line that they were said in this room and that the lamp can't tell who said them or who is asking, as the session note's room part says.
 - **The bound:** the answer within `HITS_WITHIN` (60 ms), or let go, never waited for. A line with no word that says what it's about isn't asked. On the final words it runs off the worker's runtime (`spawn_blocking`). On the early words of a prepared chat it runs inline, where the chat begins, so a slow memory can hold that line's audio for up to the same 60 ms.
 - **What's told:** at most three kept things, the most words shared first, then the newest, each cut to 160 characters, with how long ago in words. They go after a note saying they are notes, not instructions, to be used only if they fit and never listed.
 - **Not as sources:** nothing told here goes into the session's sources, so the 64-source bound (#2176 finding 1) isn't spent on it.
-- **The journal:** one line a turn, `request N: memory told|had nothing told in M ms (theirs|the room's)`, with no words.
+- **The journal:** one line a turn, `request N: memory told|had nothing told in M ms (theirs|the room's) hits_told=H bytes_told=B`, with no words: `H` kept things told and `B` bytes of their text as told (each cut to 160 characters), both 0 when nothing was told, so a day's disclosure adds up from the journal (#2510 take 1 c, `remember::hits_journal_line`).
+- **Tests:** in `remember::tests`, `a_vietnamese_kept_thing_is_found_with_or_without_its_accents`, `english_hit_words_are_as_before_but_the_memorys_common_words`, `vietnamese_function_words_alone_are_never_a_hit`, `unaccented_function_words_find_no_accented_kept_thing`, `search_common_is_the_memorys_own_list` (the voice's mirror of `search::COMMON` held to the memory's own source), `the_journal_line_counts_what_was_told_and_never_says_it` and `the_hits_switch_is_off_unless_exactly_on`.
 - **With `LAMP_SECOND_SCOPED_CONTEXT`:** the scope is the request's own lease, as its context is told: the person admitted with the line, or the room's once another face was seen speaking it (`speaking_faces`), never the sticky session's person. A revoked request is asked nothing. Tested in `a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs` (hits asked for the room, A, the room).
 
 ### Each person's own (#764)
@@ -1764,6 +1871,34 @@ then use that person's scope:
     `remember::tests::the_session_s_counts_line_says_no_word_kept`. The
     probe's quality case waits for a base with the relay probe (#2279);
     until then these tests are its check.
+
+- **Nothing personal kept while nobody is known** (the owner's question 1,
+  option (b); `LAMP_MEMORY_PERSONAL_NEEDS_FACE=on`, off unless set; both
+  voice routes, either memory client). On lamp-c0a4 "the user's favourite
+  colour is blue", said with no face known, was kept as the room's. With
+  the switch, while nobody is known (the room's scope, a text from the app
+  included):
+  - **A `remember`** whose text is about a person
+    (`remember::about_someone`, `LAMP_MEMORY_ROOM_AFTER_FORGET`'s detector,
+    the same one, not a second: first or third person words, "the user",
+    or a possessive `'s`) is not sent to the memory. The model is told, in
+    a refused `remember`'s shape, `{"remembered": false, "note": "This
+    wasn't kept: nobody known is speaking. If they want it kept, they can
+    tell you who they are, or let the lamp see their face, and say it
+    again. …"}`, which asks it to say so, short and friendly, not as a
+    refusal. Nothing is held for later, so the note promises no later keep
+    and the answer never says it was kept. "Remember the plant needs water
+    on Fridays" is kept as before; "remember I left my keys on the shelf"
+    is not; a known face's own personal line, said again, is kept to them.
+    A text from the app is always the room's, so its personal `remember`
+    gets the same note: to have it kept, the person says it again at the
+    lamp, known.
+  - **The observation pass** (`LAMP_MEMORY_OBSERVE`) drops the proposals
+    the detector marks before `tidy_apply`; the rest go as before.
+  - **The journal** says, with no words: "a remember about a person was not
+    kept: speaker unknown (skipped=1)", or "observation pass: dropped N
+    about a person: speaker unknown".
+  - Off, both are what they were. Tests: `remember::needs_face::tests`.
 
 ### A session for each person (#764 follow-up)
 
