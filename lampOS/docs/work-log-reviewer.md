@@ -1,5 +1,13 @@
 # Reviewer work log
 
+## 2026-10-24 (reviewer-two conversation P1 preparation at 02:56 +07)
+
+First's Queue6373496532 reassigns the two owner P1s: face memory now Third with reviewer-three/reviewer-lead; five-turn conversation now Sixth with reviewer-lead/reviewer-two. This supersedes the prior Fourteen priority. Posted review scope and baseline findings at6373519333; no PR exists yet. Will read promptly on opening, alongside assigned qualification receipts.
+
+Baseline93cb3f3de source inspected: name_or_follow_up.rs default8s, valid configured1–15s; second_provider/worker.rs follows_up uses onset-relative age, and busy ended signs require followed_up && !talked_past. room_told.rs judged counts busy-policy holds as talk with ends_sooner; two talk lines since last answer end conversation, one other-voice hold counts as two; called resets the count. Busy expiry is60s with sooner and180s otherwise, with separate answered/unknown rules. These are candidate feedback paths, not a cause claimed for the owner's lamp. Read must preserve same-speaker continuation across five turns and interleaved-colleague rejection, off-state parity, bounded expiry, stale/missing evidence and stop/privacy/forget resets. Quiet and desk-talk played evidence must identify build/settings and exact latency boundaries.
+
+V1 baseline inspected at cached origin/main 1b5f7a78b86a0aac64a87950100e09d1bda6e42b: config.py speaker-cache defaults90s/300s follow-up, device_voice_pipeline.py starts at most one FIFO speculative recognition worker and permits persistence only after transcript admission and valid capture; reviewed v1-voice-parity.md as context. No claim that V1 cache duration is suitable for the new multi-person path or that parity is established. No code, test, provider, model or device execution. Next Sixth's PR when opened and the three qualification tables; operator-status answer still absent. Own merge count ten, inherited pr.json untouched.
+
 ## 2026-10-24 (reviewer-two train 56 landing verified at 02:39 +07)
 
 #3289 landed through train 56/#3290 at 02:35 as 93cb3f3defdd279633c5192fa291eb43cad6fa7b, parent 9e995b1ee959a22d81f633c7bd65e055c2f877f8. Fresh fetch and git diff confirm the landed document matches READ-OK 074e2343d exactly. Read6373144775, Queue6373145385; train landing6373163522/Queue6373164379. The all-by-barge-in clarification remains nonblocking P3, not incorporated into the landed row. Own log338d20da1d pushed; own merge count remains ten.
