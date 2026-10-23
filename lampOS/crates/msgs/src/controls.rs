@@ -405,7 +405,6 @@ pub enum TouchIntent {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct TouchEvent {
     pub stamp: ClockStamp,
     pub session_id: String,
@@ -591,7 +590,6 @@ impl TouchEvent {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct TouchSourceState {
     pub source: TouchSource,
     pub name: String,
@@ -687,7 +685,6 @@ impl TouchSourceState {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct TouchState {
     pub stamp: ClockStamp,
     pub session_id: String,
