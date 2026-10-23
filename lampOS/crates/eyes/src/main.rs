@@ -821,13 +821,16 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     /// One crop the seems worker read: the mouth's openness, how long its
     /// mesh took, when its face was seen, and the seems read if one was due.
     type CropRead = (Option<f32>, Duration, u64, Option<SeemsRead>);
+    /// One crop offered to the seems worker: its pixels, the eye line, when
+    /// its face was seen, and whether a seems read is due on it.
+    type CropOffer = (Vec<f32>, (f32, f32), u64, bool);
     enum Reader {
         FerPlus(lamp_eyes::seems::Reader),
         /// On its own thread with its own mesh: the look only cuts the
         /// face's crop and offers it, newest only, and takes the reads
         /// that are done.
         Blendshapes {
-            latest: lamp_eyes::latest::Latest<(Vec<f32>, (f32, f32), u64, bool)>,
+            latest: lamp_eyes::latest::Latest<CropOffer>,
             done: std::sync::mpsc::Receiver<CropRead>,
         },
     }
@@ -854,7 +857,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         let mut mesh = load_mesh()?.ok_or("--seems-blendshapes needs --mouth-model")?;
         let (latest, done) = lamp_eyes::latest::worker(
             "eyes-seems",
-            move |(input, eye_line, at_us, due): (Vec<f32>, (f32, f32), u64, bool)| -> CropRead {
+            move |(input, eye_line, at_us, due): CropOffer| -> CropRead {
                 let began = Instant::now();
                 let (open, read) = match mesh.landmarks_of(input) {
                     Ok(landmarks) => lamp_eyes::blendshapes::read_crop(
