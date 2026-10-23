@@ -1,0 +1,78 @@
+{
+  "classification": "provisional current Mac writer/coordinator with exact integration-base ARM64 helper",
+  "current_head": "46f5f384ad94f9c2dcc5f7050991ef4325621384",
+  "old_source": "810e05109bced3beca88a5b602930cfed5fba4e5",
+  "old_source_is_direct_parent": true,
+  "old_helper": {
+    "tag": "lampos-lamp-voice-6439",
+    "asset_id": 669155906,
+    "sha256": "46cc53ce09ef4e93272daf4849f4aab41034efad61cb5bc10f7aefde55067d17",
+    "size": 4690480,
+    "release_signature_verified": false,
+    "key_fingerprint": "54213f8d3aa2f241"
+  },
+  "manifest_sha256": "8cbc94f6839747cafff66a7077b30f79e7916914f7f3ae759925065062f8fb02",
+  "publisher_run": {
+    "databaseId": 39954691687,
+    "headSha": "810e05109bced3beca88a5b602930cfed5fba4e5",
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39954691687"
+  },
+  "publisher_jobs": [
+    {
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "conclusion": "success"
+    },
+    {
+      "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+      "conclusion": "success"
+    },
+    {
+      "name": "report-full-run-failure",
+      "conclusion": "skipped"
+    }
+  ],
+  "result": {
+    "standalone": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "seconds": 2.2
+    },
+    "round": {
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "filtered_out": 155,
+      "seconds": 7.56
+    },
+    "fmt_exit": 0,
+    "clippy_exit": 0
+  },
+  "fixture_sha256": {
+    "helper_release_pair.rs": "63558eff3b2627af73484e98dc8ce1b7cad582e580d497cc41b2087b57994ed5",
+    "round/head_touch.rs": "ad3e474d01452807f0b52ae756aa9a1e25cbdda9357b3db431093a53c45e64d6"
+  },
+  "reproduction": "Use previous-helper-6408-20261023 fixture and round patch, then git apply --unidiff-zero artifact-pin.patch; commands/environment unchanged except old helper artifact path.",
+  "cleanup_command": "docker --context colima-lampos container ls -a --filter label=lamp.compat.owner --format '{{.Names}}'",
+  "cleanup_exit": 0,
+  "raw_output_sha256": {
+    "standalone": "6008fefd74a3ee4509f8134f11273e4d6a4c714d348b2106b4eebcd654439a2a",
+    "round": "d35902a96b4954bd8d122cd23dcc5618b8369660ec93640f888dd7cba8780eb4",
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cleanup": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "output_normalization": "Terminal blank lines removed; retain one final newline for nonempty output.",
+  "evidence_sha256": {
+    "round.txt": "1fc74fd987d3e9bd20553e2dafac0d7b7f85e6d64d053eec2ab0bc21f0b02da0",
+    "cleanup.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "release.json": "ac83759b2e9a3494cd3f74928a46730e77a8a1ac0bea0eab21fac34dcb5d482f",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "standalone.txt": "8cd0dd146bbbfa5d0a6d71a6358cd83bb36e306f8966fb424969a22c80534aeb",
+    "clippy.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifact-pin.patch": "9e7b38c8f81512b98332c30768ae9f3698335b61cc4230268ea6ddccb722050b"
+  }
+}

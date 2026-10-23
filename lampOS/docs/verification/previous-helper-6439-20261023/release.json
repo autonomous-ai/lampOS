@@ -1,0 +1,21 @@
+{
+  "assets": [
+    {
+      "browser_download_url": "https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-6439/lamp-update",
+      "digest": "sha256:46cc53ce09ef4e93272daf4849f4aab41034efad61cb5bc10f7aefde55067d17",
+      "id": 669155906,
+      "name": "lamp-update",
+      "size": 4690480
+    },
+    {
+      "browser_download_url": "https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-6439/lampos-manifest.json",
+      "digest": "sha256:8cbc94f6839747cafff66a7077b30f79e7916914f7f3ae759925065062f8fb02",
+      "id": 669155937,
+      "name": "lampos-manifest.json",
+      "size": 13563
+    }
+  ],
+  "body": "Built and tested from 810e05109bced3beca88a5b602930cfed5fba4e5; ARM64 workflow run 39954691687, attempt 1, sequence 6439.\n",
+  "published_at": "2026-10-23T13:05:47Z",
+  "tag_name": "lampos-lamp-voice-6439"
+}
