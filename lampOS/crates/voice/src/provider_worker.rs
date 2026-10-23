@@ -498,6 +498,11 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (said_as_heard, flags) = crate::said_as_heard::take(flags);
     let (scoped_session, flags) = crate::scoped_session::take(flags);
     let (name_or_follow_up, flags) = crate::name_or_follow_up::take(flags);
+    // The follow-up window, when `LAMP_FOLLOW_UP_FOR_MS` gives one.
+    let (follow_up_for, flags) = crate::name_or_follow_up::take_for(flags);
+    if let Some(window) = follow_up_for {
+        crate::name_or_follow_up::set_follow_up_for(window);
+    }
     // `start_agent_task` says what the staff's note asks, when it is sent.
     if let Some(place) = tools.tasks.as_mut() {
         place.staff_note = staff_note;
@@ -1958,7 +1963,7 @@ async fn serve_with_visual<C: Connect>(
     if face_or_window {
         eprintln!(
             "lamp-voice provider: in a busy room, a face turned to the lamp lets no line out alone, and a conversation goes on only {} s after the lamp's own words; held talk and two faces make the room busy (LAMP_NAME_OR_FOLLOW_UP)",
-            crate::name_or_follow_up::FOLLOW_UP_FOR.as_secs()
+            crate::name_or_follow_up::seconds(crate::name_or_follow_up::follow_up_for())
         );
     }
     // With it, only talk between people makes the room busy (#829).

@@ -2320,7 +2320,8 @@ their sign, and each answer's window let the next lines of the talk in. With
 lamp is never a reason on its own and only confirms the name heard in the
 sound, and a line is in the conversation going on when it began while the
 lamp's own words played or within 8 s of their end
-(`name_or_follow_up::FOLLOW_UP_FOR`), however long it then goes on, and
+(`name_or_follow_up::FOLLOW_UP_FOR`; `LAMP_FOLLOW_UP_FOR_MS` sets it, from 1
+to 15 s, the lead's decision 4 on 23 Oct), however long it then goes on, and
 nobody has talked past the lamp since; the thread's 45 s and a busy room's
 15 s, read as the line is judged, don't decide there (on lamp-52e6 the same
 day, follow-ups begun as the answers played were answered 0 of 3). Later, a
