@@ -692,45 +692,50 @@ const ASKS_TO_REMEMBER: &[&[&str]] = &[
     &["keep", "my", "face"],
 ];
 
-/// Words just before an ask that take it back: "don't remember me",
-/// "never remember my face", "you don't remember me".
-const NOT_AN_ASK_AFTER: &[&str] = &["don't", "dont", "not", "never"];
+/// Words anywhere in a line that make it no plain ask to remember them: a
+/// refusal or a wish not to be kept ("I'd rather you didn't remember me",
+/// "Please never remember me"), and any word ending in "n't" ("I don't want
+/// you to remember my face", "You shouldn't remember me"). With one, the
+/// model is asked as before (reviewer-three's P2 on #3298).
+const NOT_A_PLAIN_ASK: &[&str] = &[
+    "no", "not", "never", "nope", "dont", "rather", "stop", "without", "nobody", "neither", "nor",
+];
 
-/// Whether what the person said asks the lamp to remember their own face or
-/// who they are ([`ASKS_TO_REMEMBER`]): "Lamp, remember my face", "Can you
-/// remember me?". Not taken back ([`NOT_AN_ASK_AFTER`]), and not a question
-/// of whether the lamp knows them already: "Do you remember me?", "Did you
-/// remember my face?". English only: [`gives_a_name`], which a forced call
-/// needs beside it, has no Vietnamese forms.
+/// What a sentence asking what the lamp already knows opens with, past a
+/// greeting and the lamp's name ([`BEFORE_A_LINE`]): "Do you still remember
+/// me?", "Did you remember my face?", "Have you remembered me?".
+const ASKS_WHAT_IT_KNOWS: &[&str] = &["do", "did", "does", "have", "has", "had"];
+
+/// Whether what the person said is a plain ask that the lamp remember their
+/// own face or who they are ([`ASKS_TO_REMEMBER`]): "Lamp, remember my
+/// face", "Can you remember me?". Never with a refusal anywhere in the line
+/// ([`NOT_A_PLAIN_ASK`]), nor in a sentence that asks whether the lamp knows
+/// them already ([`ASKS_WHAT_IT_KNOWS`]). English only: [`gives_a_name`],
+/// which a forced call needs beside it, has no Vietnamese forms.
 pub fn asks_to_remember(said: &str) -> bool {
-    let words = lower_words(said);
-    (0..words.len()).any(|at| {
-        let before = |back: usize| at.checked_sub(back).map(|i| words[i].as_str());
-        ASKS_TO_REMEMBER.iter().any(|phrase| {
-            words.len() >= at + phrase.len()
-                && words[at..at + phrase.len()]
-                    .iter()
-                    .zip(phrase.iter())
-                    .all(|(word, asked)| word == asked)
-        }) && !before(1).is_some_and(|word| NOT_AN_ASK_AFTER.contains(&word))
-            && !(before(1) == Some("you") && matches!(before(2), Some("do" | "did")))
-    })
-}
-
-/// Whether what the person said is mostly a name spelled letter by letter:
-/// "K, E, S, S.", "It's K E S S." A run of two or more letters, and more
-/// than two in three of the line's words single letters, so that "I a
-/// little" in passing is not.
-pub fn spells_a_name(said: &str) -> bool {
-    let words = folded_words(said);
-    let letters = words
+    let refused = lower_words(said)
         .iter()
-        .filter(|word| word.chars().count() == 1)
-        .count();
-    3 * letters > 2 * words.len()
-        && spelled_runs(&words)
-            .iter()
-            .any(|run| run.chars().count() >= 2)
+        .any(|word| NOT_A_PLAIN_ASK.contains(&word.as_str()) || word.ends_with("n't"));
+    !refused
+        && said
+            .replace('\u{2019}', "'")
+            .split(['.', '!', '?', ';'])
+            .any(|sentence| {
+                let words = lower_words(sentence);
+                let opens = words
+                    .iter()
+                    .find(|word| !BEFORE_A_LINE.contains(&word.as_str()));
+                !opens.is_some_and(|word| ASKS_WHAT_IT_KNOWS.contains(&word.as_str()))
+                    && (0..words.len()).any(|at| {
+                        ASKS_TO_REMEMBER.iter().any(|phrase| {
+                            words.len() >= at + phrase.len()
+                                && words[at..at + phrase.len()]
+                                    .iter()
+                                    .zip(phrase.iter())
+                                    .all(|(word, asked)| word == asked)
+                        })
+                    })
+            })
 }
 
 /// What the model is told beside a request in which the person gave their
@@ -1914,8 +1919,9 @@ mod tests {
         );
     }
 
-    /// `LAMP_SECOND_REMEMBER_ASKED`'s two halves: an ask to remember the
-    /// speaker's own face or who they are, and a name spelled after one.
+    /// `LAMP_SECOND_REMEMBER_ASKED`: a plain ask to remember the speaker's
+    /// own face or who they are, never a refusal or a question of what the
+    /// lamp knows (reviewer-three's six lines on #3298 among them).
     #[test]
     fn an_ask_to_remember_is_their_own_face_and_never_a_question_or_a_no() {
         for asked in [
@@ -1927,15 +1933,25 @@ mod tests {
             "Learn my face.",
             "Could you save my face?",
             "Please remember my name is Jim.",
+            "I'm Kess. Remember my face.",
         ] {
             assert!(asks_to_remember(asked), "{asked}");
         }
         for not in [
             "Do you remember me?",
             "Did you remember my face?",
+            "Lamp, do you remember me?",
+            "Have you remembered me?",
             "Don't remember my face.",
             "Never remember me.",
             "You don't remember me.",
+            "I don't want you to remember my face, I'm Kess.",
+            "Please don't ever remember me, I'm Kess.",
+            "You shouldn't remember my face, I'm Kess.",
+            "I'd rather you didn't remember me, I'm Kess.",
+            "Do you still remember me? I'm Kess.",
+            "Do you even remember my face? I'm Kess.",
+            "Remember my face? No.",
             "Remember her face.",
             "Remember my friend.",
             "Remember to turn the light off.",
@@ -1944,12 +1960,6 @@ mod tests {
             "Nhớ mặt tôi nhé.",
         ] {
             assert!(!asks_to_remember(not), "{not}");
-        }
-        for spelled in ["K, E, S, S.", "It's K E S S.", "k e s s"] {
-            assert!(spells_a_name(spelled), "{spelled}");
-        }
-        for not in ["Kess.", "I a little", "It's Q. Q. Q.", "Okay.", "I'm Kess."] {
-            assert!(!spells_a_name(not), "{not}");
         }
     }
 

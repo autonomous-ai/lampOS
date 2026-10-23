@@ -1428,20 +1428,29 @@ With the switch:
   given every function and its first round called `take_a_look`. The
   spelled name after it called nothing, and the lamp said it knew the
   face while the eyes held no one. With the switch, names checked and the
-  eyes' who socket, a line whose own words ask the lamp to remember the
-  speaker's face or who they are ("remember my face", "remember me",
-  "remember who I am", "remember what I look like", "learn my face",
-  "save my face", "remember my name"; `known_faces::asks_to_remember`)
-  and give their name (`known_faces::gives_a_name`) has its first round
-  sent with `tool_choice` naming `remember_my_face`. So does a line that
-  gives or spells the name (`known_faces::spells_a_name`, "K, E, S, S.")
-  right after a line of theirs that asked. The name is still checked, so
+  eyes' who socket, a line whose own words plainly ask the lamp to
+  remember the speaker's face or who they are ("remember my face",
+  "remember me", "remember who I am", "remember what I look like", "learn
+  my face", "save my face", "remember my name";
+  `known_faces::asks_to_remember`) and give their name
+  (`known_faces::gives_a_name`) has its first round sent with
+  `tool_choice` naming `remember_my_face`. The name is still checked, so
   one not in their words is refused, and the model asks them to spell it.
-  Not forced: an ask with no name, a question whether the lamp knows them
-  ("Do you remember me?"), a taken-back ask ("Don't remember my face"),
-  someone else's face, a round after a call, and Vietnamese, which
-  `gives_a_name` doesn't read. The line that names one of the staff
-  (`LAMP_TASKS_NAMED_ASK`) is forced first.
+  Not forced, the model's as before:
+  - an ask with no name;
+  - a name in the line after an ask, since the thread doesn't say the two
+    lines were the same person's;
+  - a line with a refusal anywhere in it ("I don't want you to remember my
+    face", "I'd rather you didn't", any word ending in "n't");
+  - a sentence asking whether the lamp knows them ("Do you still remember
+    me?");
+  - someone else's face, and a round after a call;
+  - Vietnamese, which `gives_a_name` doesn't read (reviewer-three's P2s on
+    #3298).
+
+  The line that names one of the staff (`LAMP_TASKS_NAMED_ASK`) is forced
+  first. A forced save, like the model's, checks the name and that one
+  face is in view, but not that the face is the speaker's.
 - The eyes take the plain `{"remember":"A"}` as before, so an older
   voice is unchanged. The other way round, a voice with the switch talking
   to older eyes gets `not_understood` for every remember (they take no

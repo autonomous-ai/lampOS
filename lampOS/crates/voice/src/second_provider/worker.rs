@@ -3491,38 +3491,32 @@ pub(crate) fn named_asks(place: crate::agent_tasks::Place) -> crate::second_prov
 
 /// What makes a spoken turn's first round call `remember_my_face`, with
 /// `LAMP_SECOND_REMEMBER_ASKED=on` and names checked: the last message is
-/// the person's, and its words give their name
-/// ([`crate::known_faces::gives_a_name`]) and ask the lamp to remember their
-/// face or who they are ([`crate::known_faces::asks_to_remember`]); or they
-/// give or spell it ([`crate::known_faces::spells_a_name`]) right after a
-/// line of theirs that asked. A round after a call ends with the call's
-/// result, and is asked as before.
+/// the person's, and its own words give their name
+/// ([`crate::known_faces::gives_a_name`]) and plainly ask the lamp to
+/// remember their face or who they are
+/// ([`crate::known_faces::asks_to_remember`]). A round after a call ends
+/// with the call's result, and is asked as before.
 ///
 /// On lamp-4ace on 23 Oct at 18:30 (the owner's own try), "Lamp, remember my
 /// face, I'm …" was given every function, and its round 1 called
 /// take_a_look; when the name was spelled after it, the lamp said it knew
 /// the face now, and the eyes held no one. The name is still checked
 /// (`LAMP_NAMES=checked`): one not in their words is refused, and the model
-/// is told to ask them to spell it.
+/// is told to ask them to spell it. A name in a later line is the model's,
+/// as before: the thread's messages don't say whether the line before was
+/// the same person's, and in a room another's ask would file this one's
+/// name on the face at the lamp (reviewer-three's P2 on #3298).
 pub(crate) fn remember_asks() -> crate::second_provider::net::Force {
-    use crate::known_faces::{asks_to_remember, gives_a_name, spells_a_name};
+    use crate::known_faces::{asks_to_remember, gives_a_name};
     Arc::new(|messages: &[Message]| {
-        let (last, before) = messages.split_last()?;
-        let words = last.words().filter(|_| last.role == "user")?;
-        let asked_now = || gives_a_name(words) && asks_to_remember(words);
-        let asked_before = || {
-            (gives_a_name(words) || spells_a_name(words))
-                && before
-                    .iter()
-                    .rev()
-                    .find(|message| message.role == "user")
-                    .and_then(Message::words)
-                    .is_some_and(asks_to_remember)
-        };
-        (asked_now() || asked_before()).then_some(crate::second_provider::net::Forced {
-            name: crate::known_faces::REMEMBER,
-            only: None,
-        })
+        let last = messages.last().filter(|message| message.role == "user")?;
+        let words = last.words()?;
+        (gives_a_name(words) && asks_to_remember(words)).then_some(
+            crate::second_provider::net::Forced {
+                name: crate::known_faces::REMEMBER,
+                only: None,
+            },
+        )
     })
 }
 
@@ -17712,11 +17706,11 @@ mod memory_observer {
     }
 
     /// `LAMP_SECOND_REMEMBER_ASKED`: on lamp-4ace on 23 Oct at 18:30, the
-    /// owner's "Lamp, remember my face, I'm …" called take_a_look, and the
-    /// spelled name after it no function, while the lamp said it knew the
-    /// face. Forced, both call remember_my_face in round 1. An ask with no
-    /// name, a name with no ask, a question whether the lamp knows them, a
-    /// taken-back ask, someone else's face, a round after a call and a chat
+    /// owner's "Lamp, remember my face, I'm …" called take_a_look, while the
+    /// lamp said it knew the face. Forced, it calls remember_my_face in its
+    /// first round. An ask with no name, a name with no ask, a name in the
+    /// line after an ask (whoever said it), a question whether the lamp knows
+    /// them, a refusal, someone else's face, a round after a call and a chat
     /// without the face functions are asked as before, with no `tool_choice`.
     #[test]
     fn an_ask_to_remember_a_face_with_a_name_makes_the_first_round_call_remember_my_face() {
@@ -17766,11 +17760,9 @@ mod memory_observer {
             ("assistant", "Could you spell that for me?"),
             ("user", "K, E, S, S."),
         ]);
-        for messages in [&asked, &told_after, &spelled_after] {
-            assert_eq!(choice(&forcing, messages), remember, "{messages:?}");
-            assert_eq!(choice(&plain, messages), None);
-            assert_eq!(choice(&unseeing, messages), None);
-        }
+        assert_eq!(choice(&forcing, &asked), remember);
+        assert_eq!(choice(&plain, &asked), None);
+        assert_eq!(choice(&unseeing, &asked), None);
         let mut after_a_call = asked.clone();
         after_a_call.push(Message::tool("1", "{\"remembered\": true}"));
         for messages in [
@@ -17779,6 +17771,12 @@ mod memory_observer {
             turn(&[("user", "K, E, S, S.")]),
             turn(&[("user", "Do you remember me? I'm Kess.")]),
             turn(&[("user", "Don't remember my face, I'm Kess.")]),
+            turn(&[("user", "I don't want you to remember my face, I'm Kess.")]),
+            turn(&[("user", "I'd rather you didn't remember me, I'm Kess.")]),
+            // A name after an ask may be another person's (reviewer-three's
+            // P2 on #3298): the model's, as before.
+            told_after,
+            spelled_after,
             turn(&[("user", "Remember her face, she's Kess.")]),
             turn(&[
                 ("user", "What's the weather?"),
