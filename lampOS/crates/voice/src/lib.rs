@@ -166,6 +166,7 @@ pub mod coordinator;
 mod receipt_history;
 mod service_trace;
 mod session_lifetime;
+mod session_reader;
 mod session_state;
 
 #[cfg(test)]

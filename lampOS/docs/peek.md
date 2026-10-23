@@ -43,8 +43,9 @@ these kinds are taken, and of each only the fields named:
   `input_let_go_body_moving`, `asker_first_answer_held`,
   `provider_turn_unclear`, `provider_turn_failed`.
 
-A `transcript` record, or any field not named, is never read. A name that
-is not plain (letters, digits, `-_./`) shows as `?`. A newer session starts
+Peek ignores a `transcript` record or any field not named. This reader-side
+filter does not make a file safe for another account to open: shared files
+use the producer projection described below. A name that is not plain (letters, digits, `-_./`) shows as `?`. A newer session starts
 the turns again. A file first read when it is longer than 4 MB is read from
 4 MB before its end: only the newest turns are kept. On this Mac, in
 release, the first read of a 63 MB session took 7.5 ms, a read of one more
@@ -74,9 +75,83 @@ changed Turns and Overview events, with ordinary local file reads and a
 responsive or cached unit-status read. The existing unit-status deadline
 can still delay an entire push by up to 10 s ([below](#what-status-costs));
 this is not a deadline for arbitrary filesystem stalls or a lamp timing
-claim. This piece grants no new filesystem permission. The dedicated
-reader group, deployment unit and authorized lamp check remain separate
-parts of #2789.
+claim. This status reporting grants no new filesystem permission. The dedicated
+reader policy is described below; the deployment unit and authorized lamp
+check remain separate parts of #2789.
+
+### Session-reader access
+
+#2789's service-event permission contract pairs Voice's explicit
+`LAMP_SESSION_READ_GROUP` with the same per-root `session_read_group` in
+Records. Unset remains private. A dedicated local group can read only new
+service-session event files (0640) through their invocation and metadata
+directories (0750); health stays 0600. Records also accepts private historical
+sessions and retains its ownership, filesystem, link, ACL and deletion
+identity checks. [Records](records.md#optional-session-reader-group-2789)
+describes the exact policy and rollout order.
+
+After a successful grant, Voice serializes a separate flat metadata
+projection before an event enters the writer queue (#3211). Every data row
+has `shared_metadata: 1`. Only the twelve Turns kinds listed above retain
+their kind; every other kind, including transcripts and malformed/unknown
+kinds, becomes the fixed `service_event`. `service_sequence`, `turn` and
+`at_us` are kept only as unsigned integers. The stage kinds may also keep
+unsigned `decided_at_us`, `words_ms`, `cue_ms`, `chat_first_ms`,
+`first_answer_audio_ms` and `after_decision_ms`; `turn_finished` may keep
+unsigned `playback_gaps`. `admission_basis` and `outcome` come only from
+fixed producer vocabularies. Unknown values and wrong types are omitted.
+No nested data, transcript words, names, person/face/worker identifiers,
+paths, arbitrary status text or unlisted fields are serialized. Segment
+headers contain only the writer's fixed evidence label and counters.
+
+This deliberately is not the full diagnostic trace. Generic rows preserve
+sequence/count observations without revealing their original kind or data;
+tools needing endpoint, yield or other detailed receipts must use a private
+trace. New diagnostic fields need an explicit producer-schema review before
+sharing. Peek's existing numeric Turns reader needs no schema change.
+
+Unset, finite runs, failed group lookup and verified private grant rollback
+keep their existing private trace format. The projection changes no live
+bookkeeping, receipt, cue, admission or output authority. Health remains
+private and uses its existing schema. It applies only to newly created
+shared invocations, and does not redact any historical file already shared
+by an older build.
+
+An authorized office installation must prepare the voice parent for only
+that group's traversal (0710) and the sessions root for its read/traversal
+(0750), with trusted ownership and no ACL. Voice validates this preparation;
+it does not widen ancestors or historical sessions. Group lookup and grants
+happen before service workers, never on each turn or rotation. A failed
+grant reports degraded access and verifies a private rollback before allowing
+metadata writing to continue. If rollback cannot be verified, metadata writing
+stops; healthy voice continues. Finite/diagnostic sessions do not opt in.
+
+Projection uses fixed field lookups and bounded serialization with the existing
+32 KiB packet, 64-packet queue and four 4 MiB segment limits. It performs no
+filesystem work on the control/capture thread. The host target is under 1 ms
+per record for record admission, projection and enqueue, measured separately
+from asynchronous file writing. This is not a filesystem or device latency
+bound. The permission setup still runs only at service startup.
+
+Before granting parent traversal, the installer must verify that every other
+immediate child is an owned private 0700 directory or single-link 0600 file,
+with no ACL. A known filename can be opened through a search-only parent
+without listing it. Voice checks these siblings before preparing and granting
+the new session and refuses extra-readable files, links or special nodes;
+it never repairs their permissions. Its refusal cannot undo exposure from
+an already unsafe external setup.
+
+This does not give the reader membership in `lampos` or authorize a product
+default. The dedicated account still needs a separate bus contract that
+excludes raw speech and private state before delivery. Peek currently filters
+raw `voice/heard` and `voice/said` payloads after receiving them, so a
+subscriber-only grant alone would not protect their contents. Its own socket
+must also prevent write/unlink access to another subscriber. The producer-side
+metadata view and its owner remain a separate decision for #2789. The
+own-account unit and an authorized lamp install/restart showing Turns plus an
+unreadable outside
+file remain separate acceptance steps. No physical acceptance is implied by
+host permissions tests.
 
 ### Two sessions' stages side by side: `tools/day-stages.sh`
 
