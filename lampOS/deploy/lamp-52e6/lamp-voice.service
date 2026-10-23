@@ -72,8 +72,10 @@ Environment=LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json
 Environment=LAMP_SECOND_CHAT=deepseek
 Environment=LAMP_SECOND_SEARCH=deepseek
 Environment=LAMP_SECOND_SPEECH_MODEL=eleven_v4_turbo
-# DeepSeek's chat and search through the relay with second.json's llm_credential_file, so no deepseek.key (#1934, #1939).
-Environment=LAMP_SECOND_DEEPSEEK_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek
+# DeepSeek's chat and search go through the relay, at the address the voice derives from second.json's llm_base_url
+# (second_config::relay_deepseek, #2978) with its llm_credential_file, so no deepseek.key (#1934, #1939). Not
+# LAMP_SECOND_DEEPSEEK_BASE_URL here: an address the unit gives is never routed, so the relay's near route
+# (LAMP_RELAY_ROUTES, #2882) could not take the chat (Queue #3126: lamp-4ace's r11 without it, 0.39 s off the median).
 Environment=LAMP_SECOND_DOWN_LINE=on
 Environment=LAMP_SECOND_WAIT_CUE=on
 Environment=LAMP_SPOKEN_TO=on
