@@ -41,9 +41,11 @@ pub const MAX_PROMPT_BYTES: usize = 2000;
 /// newlines and tabs, at 2 bytes each, still fit.
 pub const MAX_ENCODED_PROMPT_BYTES: usize = 2 * MAX_PROMPT_BYTES;
 
-/// Whether a task can be handed over: at most [`MAX_PROMPT_BYTES`] as
+/// Whether a new task can be taken: at most [`MAX_PROMPT_BYTES`] as
 /// written, and at most [`MAX_ENCODED_PROMPT_BYTES`] as the request line
-/// carries it. The voice asks this before it sends anything.
+/// carries it. The engine asks this where a task is prepared, and the voice
+/// before it sends anything. A stored task is held to the raw bound only, so
+/// a store an earlier build wrote still opens.
 pub fn prompt_fits(prompt: &str) -> bool {
     prompt.len() <= MAX_PROMPT_BYTES
         && serde_json::to_string(prompt)
@@ -323,7 +325,7 @@ impl Launch {
         // The pinned --task parser refuses a value beginning with --. Do not
         // rewrite the task or silently select another CLI permission mode.
         if self.prompt.trim().is_empty()
-            || !prompt_fits(&self.prompt)
+            || self.prompt.len() > MAX_PROMPT_BYTES
             || self.prompt.starts_with("--")
             || self.prompt.contains('\0')
         {
