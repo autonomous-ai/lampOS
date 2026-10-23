@@ -22,8 +22,25 @@ original refusal control independently passing 1/0. Its Linux formatting
 receipt at `c10b653e2` passes; Third reconstructed all 6,709 regular-file
 hashes from the exact Git archive and matched both recorded manifests
 (`381b48f8117f6d67b3ca053bdfd679659813020bde6266ad7a55eba8bde461ed`).
-The source trees, exit zero and cleanup agree. Fresh native gates and First's
-final disposition remain required.
+The source trees, exit zero and cleanup agree. First posted READ-OK on
+`06ae9205f` and explicitly lifted the HOLD at 00:29. Linux Clippy
+39994168593 passes; ARM64 39994168508 remains active. The preceding head's
+ARM64 39993576976 was superseded/cancelled by workflow concurrency after
+the latest-base carry; its Linux Clippy passed. No native failure was retried.
+
+Latest carry, 24 October 00:39: `ff99df2881a7ce3fded9f3da4aaa4747c89cc259`
+on train 52 `061e2ee6b`, repository tree
+`a0362293d824167b5512ac5aea04e603a9181c1c`, lampOS subtree
+`ade0cc783ced13eeea4d495bf1719edb1181dc85`.
+All six commits remain equal in the [third range-diff](train52-range.txt).
+Update runtime, installer/round tests and dependencies are unchanged. The
+base adds the independently reviewed #3278 release-pair target, its docs and
+evidence. That target compiles and its ordinary execution is correctly
+[0 passed / 0 failed / 2 ignored](train52-target.txt); this is not an artifact
+execution. Mac formatting and [strict Update Clippy](train52-clippy.txt) pass
+again. The earlier full 385/0/4 result retains its original binding.
+Fresh native runs are ARM64 39996802080 and Linux Clippy 39996802014;
+current-head Linux formatting and final disposition have been requested.
 
 ## Failure retained
 

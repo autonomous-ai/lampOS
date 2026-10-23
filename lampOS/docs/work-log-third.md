@@ -5,6 +5,18 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 00:39 — carry follows the reviewed release-pair merge
+
+- #3278 merged in train 52 as `061e2ee6b`; Third's assigned review is
+  complete and the nonblocking provenance P3 is resolved.
+- #3275 is now `ff99df288` on that base, with six equal commits and unchanged
+  tested Update runtime/install/round source and dependencies. Mac fmt and
+  strict Update Clippy pass; the added release-pair target compiles and stays
+  correctly ignored without external artifacts (**0/0/2**).
+- First lifted the prior-head HOLD at 00:29; requested carried-head
+  disposition and Linux formatting. Fresh native runs remain watched.
+  [Receipt](verification/head-touch-body-pair-fix-20261023/README.md).
+
 ## 2026-10-24 00:22 — release-pair review and train-51 carry
 
 - #3278 source and local evidence read at `7ebb876be`, carried unchanged

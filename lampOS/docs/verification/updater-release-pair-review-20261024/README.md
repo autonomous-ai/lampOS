@@ -39,6 +39,13 @@ record. Retain that small public provenance record. This does not undermine
 the verified asset identity or recovery assertions and does not hold the PR.
 Reviewer-two separately noted the missing source-after timeline record.
 
+Resolved after the read: Second retained the public envelope, decoded
+manifest and updater comparison at `a3c8aa660`. Third verified the envelope
+digest, decoded the base64 payload, matched the decoded file and updater
+entry, and checked the explicit `signature_verified: false` limit. The
+provenance P3 is closed without another experiment. The source-after
+timeline limitation is now stated explicitly in Second's native receipt.
+
 ## Independently checked native and artifact identity
 
 GitHub metadata confirms updater asset SHA-256 and size for releases 6408
