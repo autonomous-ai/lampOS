@@ -398,3 +398,58 @@ fn the_last_two_boots_are_kept_at_shutdown_only() {
         ]
     );
 }
+
+/// A move that fails at shutdown (the eMMC full or read-only) leaves the
+/// two kept boots as they were, and says so where the journal sees it.
+#[test]
+fn a_failed_move_keeps_the_kept_boots_and_says_so() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let (from, keep, run, bin) = (
+        root.path().join("var/log/journal/0123456789abcdef"),
+        root.path().join("var/lib/lamp-journal"),
+        root.path().join("run/log/journal"),
+        root.path().join("bin"),
+    );
+    a_boot(&from, "a", &[1000]);
+    journal_keep("keep", "stopping", &from, &keep, &run);
+    a_boot(&from, "b", &[1000]);
+    journal_keep("keep", "stopping", &from, &keep, &run);
+    // An `mv` that fails to put this boot in place, and works otherwise.
+    fs::create_dir_all(&bin).unwrap();
+    let mv = bin.join("mv");
+    fs::write(
+        &mv,
+        "#!/bin/sh\ncase \"$1\" in */.new) exit 1;; esac\nPATH=${PATH#*:} exec mv \"$@\"\n",
+    )
+    .unwrap();
+    fs::set_permissions(&mv, fs::Permissions::from_mode(0o755)).unwrap();
+    a_boot(&from, "c", &[1000]);
+    let out = Command::new("bash")
+        .arg(rootfs().join("usr/local/libexec/lamp-journal-keep"))
+        .arg("keep")
+        .env(
+            "PATH",
+            format!("{}:{}", bin.display(), std::env::var("PATH").unwrap()),
+        )
+        .env("LAMP_JOURNAL_STATE", "stopping")
+        .env("LAMP_JOURNAL_FROM", &from)
+        .env("LAMP_JOURNAL_KEEP", &keep)
+        .env("LAMP_JOURNAL_RUN", &run)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("this boot is not kept"),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(kept(&keep, "last")[0].starts_with("system@b-"));
+    assert!(kept(&keep, "previous")[0].starts_with("system@a-"));
+    let mut names: Vec<_> = fs::read_dir(&keep)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(names, ["last", "previous"]);
+}
