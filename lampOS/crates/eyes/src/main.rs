@@ -819,7 +819,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         ended: lamp_eyes::photo::YesEnded<UnixStream>,
         known_file: Option<&std::path::Path>,
     ) {
-        let (mut stream, reply) = match ended {
+        // The commit point (Fourth's 17:01 on #2856): `fenced` checks the
+        // voice's connection right before `confirmed()`. A close observed
+        // there refuses and nothing is kept; a close after it cannot undo
+        // the save. A close is not an atomic revocation across the two
+        // processes: one that lands after this fence is too late.
+        let (mut stream, reply) = match ended.fenced() {
             lamp_eyes::photo::YesEnded::Keep(name, stream) => (stream, keep_photo_yes(who, &name)),
             lamp_eyes::photo::YesEnded::Refuse(stream, why) => {
                 eprintln!("lamp-eyes: a yes to a face from a photo was not kept: {why}");
@@ -1888,11 +1893,14 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         newest = got.bytes_used.min(frame.len());
                         latest = Some(newest);
                         // The driver's time in the shared monotonic clock,
-                        // or, without it, when it was read.
+                        // or, without it, 0: before any photo yes, so such a
+                        // frame never answers one, which then runs out
+                        // (not dated by its read, which a frame buffered
+                        // before the yes would pass, #3257).
                         latest_us = got
                             .timestamp
                             .filter(|at| at.domain == lamp_camera::TimestampDomain::HostMonotonic)
-                            .map_or_else(lamp_ipc::monotonic_us, |at| at.micros);
+                            .map_or(0, |at| at.micros);
                     }
                     Ok(None) => break,
                     Err(error) => {
