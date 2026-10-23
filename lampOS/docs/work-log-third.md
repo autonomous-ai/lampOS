@@ -5,6 +5,20 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 21:01 — corrected updater prerequisite passes independent review
+
+- #3269 `46f5f384a` passes all 28 transition cases on the Intel Mac in a
+  clean checkout and fresh target, exit zero. Both reproduced P2s are
+  resolved; parser and active-pins/recovery reads found no further P1/P2.
+  The [corrected-head receipt](verification/head-touch-updater-review-20261023/corrected-head.md)
+  preserves results separately from the original failures.
+- Official ARM64 and Linux Clippy pass on the matching authored tree.
+  Third's two prerequisite HOLDs are lifted; First owns its merge.
+- Continue watching for First's combined #2948 carry. Its audible tap
+  prerequisite still defaults to −35 dBFS on current integration; the
+  measured −20 carry needs identification or assignment from First.
+  El owns the separate #3248 Body correction. No lamp action occurred.
+
 ## 2026-10-23 19:41 — review control and native gate complete
 
 - The unchanged build-local-pins control passes 1/0 on parent runtime

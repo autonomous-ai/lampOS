@@ -1,0 +1,13 @@
+{
+  "head": "46f5f384ad94f9c2dcc5f7050991ef4325621384",
+  "tree": "c069dbad50071717a8cab4827d39ebc08bcac08b",
+  "clean": true,
+  "original_test_prefix_bytes": 21583,
+  "original_test_prefix_sha256": "61056ae2ee10e0b15878bb9a52ac528a0b784ca8043ca4ea6b40d602ae4534a6",
+  "test_file_sha256": "dcf0c8dc3e709ab340dfc489b82f600f6d147ae9c97f2651cafbe460c0e72f85",
+  "output_sha256": "52b5acb0fbcd4e1cdd43e2f1d72c0b4a988e859983f76725d2acdce8e02bfd31",
+  "exit_code": 0,
+  "passed": 28,
+  "failed": 0,
+  "test_seconds": 504.1
+}

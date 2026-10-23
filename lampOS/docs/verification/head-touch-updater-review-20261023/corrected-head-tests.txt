@@ -1,0 +1,10 @@
+
+running 28 tests
+test head_touch::absent_unused_product_pins_do_not_block_active_build_pins_updates has been running for over 60 seconds
+test head_touch::custom_active_pins_are_kept_and_checked_against_the_reader_pair has been running for over 60 seconds
+.........test head_touch::head_reader_mode_overrides_are_not_guessed_from_base_units has been running for over 60 seconds
+..............test head_touch::semantic_head_reader_paths_cannot_expand_invocation_variables has been running for over 60 seconds
+..test head_touch::stale_unused_product_pins_do_not_block_active_build_pins_updates has been running for over 60 seconds
+...
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 123 filtered out; finished in 504.10s
+
