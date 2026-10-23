@@ -1,0 +1,25 @@
+
+running 2 tests
+
+thread 'head_touch_carry_review::pr2948_recovery_controls_restart_failure_restores_old_pins_and_state' (228393347) panicked at crates/update/tests/round/head_touch_carry_review.rs:102:5:
+assertion `left != right` failed
+  left: Some("27644201b67d66bc12e0cddb22b87955ee3de2da36d3c6fe49d883f3beb5961d")
+ right: Some("27644201b67d66bc12e0cddb22b87955ee3de2da36d3c6fe49d883f3beb5961d")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+head_touch_carry_review::pr2948_recovery_controls_restart_failure_restores_old_pins_and_state --- FAILED
+
+thread 'head_touch_carry_review::pr2948_recovery_cut_at_reload_restores_old_pins_and_state' (228394593) panicked at crates/update/tests/round/head_touch_carry_review.rs:102:5:
+assertion `left != right` failed
+  left: Some("27644201b67d66bc12e0cddb22b87955ee3de2da36d3c6fe49d883f3beb5961d")
+ right: Some("27644201b67d66bc12e0cddb22b87955ee3de2da36d3c6fe49d883f3beb5961d")
+head_touch_carry_review::pr2948_recovery_cut_at_reload_restores_old_pins_and_state --- FAILED
+
+failures:
+
+failures:
+    head_touch_carry_review::pr2948_recovery_controls_restart_failure_restores_old_pins_and_state
+    head_touch_carry_review::pr2948_recovery_cut_at_reload_restores_old_pins_and_state
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 125 filtered out; finished in 13.81s
+
+error: test failed, to rerun pass `-p lamp-update --test round`

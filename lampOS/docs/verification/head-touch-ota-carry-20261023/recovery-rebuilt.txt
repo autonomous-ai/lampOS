@@ -1,0 +1,30 @@
+cwd /private/tmp/third-2948-ota-review/lampOS
+source_head f69bdea6466191f44ad5ec0aeecf50abe38c4a69
+workspace /private/tmp/third-2948-ota-review/lampOS/Cargo.toml
+install_source_hash_before edd6c39a2fcb23b6db5f337828f35b724f4025378ff6b1ca0e05c743dc9e2508
+install_source_hash_after edd6c39a2fcb23b6db5f337828f35b724f4025378ff6b1ca0e05c743dc9e2508
+install_mtime_before 1792749402814526299 after 1792757181834267000
+input_sha256 6e9bf8fc1b6d192df8b832d8202a7fc152befeab5c6f83e1ba5eef0cff64987a deploy/product/settings/controls-pins.json
+input_sha256 27644201b67d66bc12e0cddb22b87955ee3de2da36d3c6fe49d883f3beb5961d crates/update/tests/fixtures/pr2948-before/controls-pins.json
+original_two_tests_unchanged
+command: CARGO_BUILD_JOBS=2 CARGO_TARGET_DIR=/private/tmp/third-body-gates-target cargo test -q --locked --offline -p lamp-update --test round head_touch_carry_review:: -- --test-threads=1 --nocapture
+
+running 4 tests
+.
+thread 'head_touch_carry_review::pr2948_recovery_cut_at_reload_restores_old_pins_and_state' (228427389) panicked at crates/update/tests/round.rs:284:13:
+the lamp lost power
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+..
+thread 'head_touch_carry_review::pr2948_settings_on_keeps_a_head_reader_available' (228432427) panicked at crates/update/tests/round/head_touch_carry_review.rs:155:5:
+settings apply left no head reader: legacy_head=false, Voice head+mute=false, Expression head=false; pins=6e9bf8fc1b6d192df8b832d8202a7fc152befeab5c6f83e1ba5eef0cff64987a and product units stayed at efc8db9cb
+ 3/4
+head_touch_carry_review::pr2948_settings_on_keeps_a_head_reader_available --- FAILED
+
+failures:
+
+failures:
+    head_touch_carry_review::pr2948_settings_on_keeps_a_head_reader_available
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 123 filtered out; finished in 46.80s
+
+error: test failed, to rerun pass `-p lamp-update --test round`

@@ -34,5 +34,40 @@ CARGO_BUILD_JOBS=2 cargo test -q --offline -p lamp-update --test round pr2948_se
 
 [Result](result.txt): 1 passed, 1 failed, exit 101. The availability
 assertion is the only failure. No ARM64 linking or hardware test was run.
-Retain legacy delivery until the paired readers are enabled, or migrate
-settings and reader units together; retain both transition controls.
+Migrate settings and reader units coherently; retain both transition
+controls. The [transition audit](transition-read.md) refines the predicates:
+either new reader excludes legacy, and Expression head sleep requires
+Voice head plus durable mute. Partial readers are not an old-reader state.
+
+
+## Recovery controls added at the same head
+
+[Extended fixture](recovery-regression.rs.txt) preserves the original two
+tests and adds Controls-crash rollback and interrupted-reload recovery.
+Both require byte-exact old pins and their recorded settings hashes; the
+interrupted round recovers without the channel.
+
+The [first run](recovery-stale-build.txt) failed both cases before recovery:
+the shared build target's compiled product pins equaled the old fixture,
+despite the checked-out product template differing. This is an invalid
+source/build match, not a recovery failure. Cwd and workspace were the
+correct detached checkout; dependency fingerprints named relative source
+and include paths, with timestamps newer than those checkout inputs.
+
+Invalidating only the Update library source timestamp forced recompilation;
+the source bytes and fixtures were unchanged. The [corrected run](recovery-rebuilt.txt)
+records source/input hashes and its exact command. It reports **3 passed,
+1 failed**: both new recovery cases and settings-off passed; the unchanged
+settings-on case still failed at the missing-reader assertion. The expected
+interrupted-reload panic is caught. Both invocations exited 101 and are
+retained; this is not a green gate or a claim against Second's upcoming fix.
+
+A corrected implementation may keep the pins bytes unchanged for the old
+readers. To exercise its transformed-byte rollback path, a future fixture
+must explicitly request a valid unrelated pins change as well; the current
+cut control deliberately requires a write before the cut and must not be
+weakened into a no-op recovery test. Use a checkout-specific target directory
+for the incoming fix's gate to prevent another cross-checkout cache mix.
+
+This remains a focused host review fixture with mocked systemd/binaries,
+not an ARM64 or lamp gate.

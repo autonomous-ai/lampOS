@@ -5,6 +5,21 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 19:08 — transition predicates and recovery controls handed on
+
+- The independent [transition audit](verification/head-touch-ota-carry-20261023/transition-read.md)
+  separates legacy exclusion from sleep coherence, covers resulting units
+  rather than installed text alone, and preserves unknown reader states.
+  Requirements are posted on #2948 for Second's active fix.
+- Two added crash/interruption controls pass on `f69bdea64`; settings-off
+  still passes and the original settings-on missing-reader failure remains.
+  The first run did not reach recovery because a shared target supplied
+  stale compiled pins. Both runs and the unchanged-source rebuild evidence
+  are preserved in the [receipt](verification/head-touch-ota-carry-20261023/README.md).
+- #1798 now reflects Fifth's completed attended #2857 trial and the remaining
+  unmerged product activation, with its camera and latency limits intact.
+  No product patch or lamp operation was performed for this review.
+
 ## 2026-10-23 18:58 — clock landed; update transition review continues
 
 - #3260 landed through train #3261 at `8e3eaa6c2`. All five authored
