@@ -49,5 +49,26 @@ The source read found no further issue in projected-byte hashes, repeat
 updates, rollback ordering or old-helper mismatch handling. Older-helper
 coverage simulates its output/receipts, not an actual historical executable.
 The exact-head HOLD is on #3269; #2948 retains its separate combined-carry
-HOLD. Native Linux Clippy passed; ARM64 was still running when this receipt
-was prepared and is reported separately after completion.
+HOLD. Native [Linux Clippy 39952200929](https://github.com/autonomous-ai/lampOS/actions/runs/39952200929)
+and [ARM64 39952201001](https://github.com/autonomous-ai/lampOS/actions/runs/39952201001)
+both completed successfully on `c062243b6`. The ARM64 workflow's
+sign/publish and failure-report jobs were skipped. Green existing CI does
+not resolve the two added failing controls.
+
+
+## Parent implementation control
+
+The unchanged build-local-pins regression passes **1/0**, exit zero, with
+the parent `2615c87b6` runtime. Only `apply.rs`, `round.rs` and `lib.rs` were
+temporarily restored from that parent in the detached review lab; the new
+head-touch module was then unused. The [log](parent-control.txt) gives the
+exact single-test command. The [hash receipt](parent-control-hashes.json)
+confirms all three production files were restored exactly to `c062243b6`
+and the test file was unchanged. This proves the fixed-path refusal is
+introduced by the prerequisite. It is not a full parent gate and makes
+no claim that split buses were safe before this change.
+
+Raw output files retain their original trailing blank lines. Markdown,
+fixture text and JSON passed the focused whitespace check; two raw streams
+in the preceding evidence commit report blank EOF lines under Git's generic
+whitespace check and were deliberately kept byte-for-byte.

@@ -1,0 +1,9 @@
+Parent runtime control: 2615c87b636d8e39d8df9548b00af7ed4e164f70
+Review fixture checkout: c062243b6da9b5dad14551d176ef79d81483758e
+CARGO_BUILD_JOBS=2 CARGO_TARGET_DIR=/private/tmp/third-3269-target cargo test -q --locked --offline -p lamp-update --test round third_review_binary_update_checks_active_build_local_head_pins -- --nocapture
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 138 filtered out; finished in 11.24s
+

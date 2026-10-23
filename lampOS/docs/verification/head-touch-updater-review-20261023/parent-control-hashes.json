@@ -1,0 +1,26 @@
+{
+  "head": "c062243b6da9b5dad14551d176ef79d81483758e",
+  "parent": "2615c87b636d8e39d8df9548b00af7ed4e164f70",
+  "files": {
+    "lampOS/crates/update/src/apply.rs": {
+      "pre": "1b7c596de2bc700f65be18f0e2e49c21a2d877e1414ec996bec6c6e47e69703c",
+      "parent": "89db5a74e01e2ce5419ef4de9c6c0c87001941a4de36ea39c7805573de497274",
+      "restored": "1b7c596de2bc700f65be18f0e2e49c21a2d877e1414ec996bec6c6e47e69703c"
+    },
+    "lampOS/crates/update/src/round.rs": {
+      "pre": "25d68afc11a493c87b9d2d5b114943d2507d71bd670b861f7c45e193b204839a",
+      "parent": "8c30f94ec870a3b2b4d2901623364e7d14cb71b32b1d66fcc3d0d96be12af299",
+      "restored": "25d68afc11a493c87b9d2d5b114943d2507d71bd670b861f7c45e193b204839a"
+    },
+    "lampOS/crates/update/src/lib.rs": {
+      "pre": "d2abedede0921948295a1a00b673dd6c47669d87a275e0430c812eec3251c99a",
+      "parent": "0dee46c6481bdd66b01b692bf3b37b01d9501a1d2b051e8d739491062fac63a0",
+      "restored": "d2abedede0921948295a1a00b673dd6c47669d87a275e0430c812eec3251c99a"
+    }
+  },
+  "test_before": "315af7257ac912c9f7c26ea6e8c04b7959bc27f191bbbb2da4ba2c2128f66042",
+  "cargo_exit_code": 0,
+  "test_after": "315af7257ac912c9f7c26ea6e8c04b7959bc27f191bbbb2da4ba2c2128f66042",
+  "restored_exactly": true,
+  "test_unchanged": true
+}

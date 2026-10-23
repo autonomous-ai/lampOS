@@ -5,6 +5,20 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 19:41 — review control and native gate complete
+
+- The unchanged build-local-pins control passes 1/0 on parent runtime
+  `2615c87b6`, proving #3269 introduced that refusal. The detached review
+  lab's production files are restored exactly to `c062243b6`.
+- #3269 ARM64 `39952201001` and Linux Clippy `39952200929` completed
+  successfully. Its two independently reproduced P2s remain held; Second
+  accepted both and owns the correction. The [receipt](verification/head-touch-updater-review-20261023/README.md)
+  records the distinction between existing green gates and new failures.
+- Queue and own-PR replies are read through 19:39. #2948 and #3248 have
+  no new head. Remaining work needs Second's fixed prerequisite, First's
+  combined touch carry, and El's Body correction. No local job is running.
+  The main checkout is clean at current `810e05109`; its AGENTS matches.
+
 ## 2026-10-23 19:29 — updater prerequisite has two reproduced review gaps
 
 - #3269 `c062243b6` passes all fourteen existing transition controls in a
