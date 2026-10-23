@@ -20,10 +20,10 @@
 //!    the build's lamp-skills must still load every skill that loads now.
 //! 7. At a quiet moment (nobody heard or answered for 45 s, the voice
 //!    resting) the units are written, the product skills' files placed,
-//!    and the parts restarted, the voice first.
+//!    and the parts restarted in the candidate units' startup order.
 //! 8. For a minute each restarted part must stay up with one process and
-//!    not say it is worse; otherwise every part is put back, in the reverse
-//!    order, and the build is refused from then on.
+//!    not say it is worse; otherwise every part is put back in the saved
+//!    old startup order, and the build is refused from then on.
 //!
 //! Without `apply` it stops after step 5 and says what it would do, having
 //! written nothing.
@@ -390,6 +390,7 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         setting_writes: Vec::new(),
         image_writes: Vec::new(),
         applying: None,
+        rollback_order: None,
     };
     if !config.apply {
         let state = run.records.peek_state();
@@ -500,6 +501,9 @@ struct Run<'r, 'w> {
     /// Those of them that are the image's own files (crate::image).
     image_writes: Vec<String>,
     applying: Option<u64>,
+    /// Old startup order fixed before switching, including inactive changed
+    /// units. None means an older journal must reconstruct its old graph.
+    rollback_order: Option<Vec<String>>,
 }
 
 /// A unit as it is to be put back.
@@ -756,7 +760,7 @@ impl Run<'_, '_> {
             .filter_map(|path| image::restarts(path))
             .map(str::to_owned)
             .collect();
-        let changes = plan(
+        let (changes, rollback_order) = plan(
             self.config,
             &manifest,
             &installed,
@@ -766,6 +770,7 @@ impl Run<'_, '_> {
             &forced,
         )
         .map_err(Outcome::Refused)?;
+        self.rollback_order = Some(rollback_order);
         self.fetching = to_fetch(self.config, &changes, &self.placings);
         self.room(&changes)?;
         let placing = self.product_skills(state, &manifest, &installed, &carried)?;
@@ -1765,6 +1770,7 @@ impl Run<'_, '_> {
             .collect();
         let journal = Journal {
             build: build.clone(),
+            rollback_order: self.rollback_order.clone(),
             units: backs
                 .iter()
                 .map(|back| Switching {
@@ -2097,11 +2103,24 @@ impl Run<'_, '_> {
         }
     }
 
-    /// Reconstruct the old startup graph without depending on journal order
-    /// or the channel. Unchanged installed units retain transitive edges;
-    /// exact saved text replaces every changed unit. Already-restored and
-    /// inactive members do not gain a restart merely by being in the graph.
+    /// Use the order validated and saved before switching. Only older
+    /// journals reconstruct the old graph from saved and installed units.
+    /// Already-restored and inactive members do not gain a restart merely
+    /// by being named in the full saved order.
     fn restore_order<'a>(&self, backs: &'a [Back]) -> Result<Vec<&'a Back>, String> {
+        if let Some(order) = &self.rollback_order {
+            if backs.iter().any(|back| !order.contains(&back.unit)) {
+                return Err("the saved rollback order omits a unit to restore".into());
+            }
+            return Ok(order
+                .iter()
+                .filter_map(|name| {
+                    backs
+                        .iter()
+                        .find(|back| back.restarted && back.unit == *name)
+                })
+                .collect());
+        }
         let mut texts: BTreeMap<String, String> = installed_units(self.config)
             .map_err(|error| format!("the restoration's unit order cannot be read: {error}"))?
             .into_iter()
@@ -2128,6 +2147,10 @@ impl Run<'_, '_> {
 
     /// Step 1: a switch the last run did not finish is put back.
     fn recover(&mut self, journal: Journal) -> Outcome {
+        // Records validates this against all journal members before any
+        // already-restored prefix is excluded below. Legacy journals stay
+        // byte-for-byte intact while their graph is reconstructed.
+        self.rollback_order = journal.rollback_order.clone();
         let why =
             "the switch was cut short (lamp-update stopped, or the lamp lost power)".to_owned();
         self.say(&format!(
@@ -2367,8 +2390,16 @@ impl Run<'_, '_> {
     /// stays too. A folder it did not make is never removed.
     fn prune(&mut self, state: &mut State) {
         // Named now: by a unit, or by a part's current link.
-        let mut named: BTreeSet<String> = installed_units(self.config)
-            .unwrap_or_default()
+        let installed = match installed_units(self.config) {
+            Ok(installed) => installed,
+            Err(error) => {
+                self.say(&format!(
+                    "build folders are kept because the installed units cannot be read: {error}"
+                ));
+                return;
+            }
+        };
+        let mut named: BTreeSet<String> = installed
             .into_iter()
             .map(|part| part.program.folder())
             .collect();
@@ -2682,7 +2713,7 @@ fn plan(
     models: &[Model],
     touched: &[String],
     forced: &[String],
-) -> Result<Vec<Change>, String> {
+) -> Result<(Vec<Change>, Vec<String>), String> {
     let files: BTreeMap<&str, &manifest::File> = manifest
         .files
         .iter()
@@ -2788,8 +2819,14 @@ fn plan(
         .iter()
         .map(|part| (part.unit.as_str(), part.text.as_str()))
         .collect();
-    unit::start_order(texts.iter().map(|(name, text)| (*name, *text)))
+    let rollback_order = unit::start_order(texts.iter().map(|(name, text)| (*name, *text)))
         .map_err(|why| format!("the rollback unit order is refused: {why}"))?;
+    // Project only after ordering the full old graph: unchanged nodes can
+    // connect two changed units. Inactive members stay for crash recovery.
+    let rollback_order = rollback_order
+        .into_iter()
+        .filter(|name| changes.iter().any(|change| change.unit == *name))
+        .collect();
     for change in &changes {
         texts.insert(&change.unit, &change.after);
     }
@@ -2800,7 +2837,7 @@ fn plan(
         .map(|(position, name)| (name.as_str(), position))
         .collect();
     changes.sort_by_key(|change| positions[change.unit.as_str()]);
-    Ok(changes)
+    Ok((changes, rollback_order))
 }
 
 /// The skills part, and its binary.
