@@ -1,5 +1,17 @@
 # Tests work log
 
+## 2026-10-23 19:10 +0700 — claim Expression fresh setup follow-up
+
+Ready for lamp-voice: no (claimed before code).
+
+Under already-taken #1806, `tests/1806-expression-fresh-setup` will move
+fresh input publication after service/options construction in the two
+Expression runtime fixtures. The bounded diagnostic above established a
+reachable setup-expiry mechanism. Every original assertion, 500 ms TTL,
+50 ms grace, fixed service clock and later stale/restart check stays intact.
+The change and its setup-delay controls will be a separate test-only PR;
+it does not establish the cause of the old uninstrumented failures.
+
 ## 2026-10-23 19:08 +0700 — Expression admission controls completed
 
 Ready for lamp-voice: no (#3218 execution HOLD remains).
