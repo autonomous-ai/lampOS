@@ -1,10 +1,12 @@
 # One attended updater exec cut — preparation only
 
-Second, 22 October 2026. **Not executed; no lamp result.** This worksheet
+Second, 22 October 2026; routing updated 23 October. **Not executed; no lamp result.** This worksheet
 refines [#2810](https://github.com/autonomous-ai/lampOS/issues/2810)'s earlier
 pending-before-link plan. It selects a successful exec of the candidate,
-before its new main runs. First owns the lamp, the attending person and the
-approved access. Second has performed no SSH, installation or physical cut.
+before its new main runs. The lead chooses the person-test window on lamp-52e6;
+Fifth is that lamp's recorded holder and coordinates the actual device work
+and access/install approval. First supplies the qualified build and reviewed
+trial configuration. Second has performed no SSH, installation or physical cut.
 
 The [ARM64 CLI rehearsal](updater-cli-exec-20261022/README.md) establishes the
 boundary on synthetic binaries in Podman. It does not qualify a device
@@ -12,12 +14,30 @@ observer, distinct release versions, systemd, flash or a cold boot. This is
 not a command sheet: First must supply and review the actual persistent
 configuration, observer and restoration procedure before use.
 
+## Person-test routing, 23 October
+
+The lead's [08:21 routing](https://github.com/autonomous-ai/lampOS/issues/1711#issuecomment-6355091313)
+places person tests on lamp-52e6. It supersedes the earlier table's 0c89
+entry for #2810. This is a scheduling/ownership handoff, not permission for
+Second to access a lamp; Second's role still names none. Fifth's recorded
+ownership is confirmed by `deploy/lamp-52e6/LAMP.md` on `7bfcb31b8`.
+No window is booked by this document, and the ongoing voice trial must not
+be interrupted for an unplug. The holder needs the completed inputs below
+and a qualified actual-device observer before the person is asked to act.
+
+The same-sequence, self-only scope below leaves ordinary part updates out of
+this trial. The separate dependency-order change in #3173 is simulated
+restart evidence; it does not qualify this physical boundary. A power cut
+still removes torque, so arm support remains necessary even when Body is
+not being updated. The real signed internet/Body trial remains #1812 and
+follows acceptance of this one.
+
 ## Inputs to complete before a window is booked
 
 | Input | Actual value / evidence |
 | --- | --- |
-| Assigned lamp, attending role, explicit access/install approval | Pending First |
-| Reserved window; no conflicting played round on Queue | Pending First |
+| Assigned lamp, attending role, explicit access/install approval | Lead's route: lamp-52e6; holder Fifth. Window, attending person and access/install approval pending |
+| Reserved window; no conflicting played round on Queue | Pending lead and Fifth |
 | Arm support, clearance, power/boot precautions and recovery access | Pending First |
 | Installed old and candidate release, exact ARM64 hashes and green source heads | Pending First |
 | Fixed fallback hash; actual unit/drop-in identities and recovery timer state | Pending First |
@@ -35,7 +55,11 @@ quiet/safety controls. Any played round needs its own Queue `PLAYING` slot.
 
 ## Source contract being tested
 
-This reading is bound to PR head `97ca7b322`, not an unspecified future build.
+The original reading was bound to PR head `97ca7b322`. A [23 October source
+comparison](updater-attended-source-20261023.json) finds all seven relevant
+updater runtime and service/timer files byte-identical at integration head
+`7bfcb31b8`. This updates the source binding only; it does not qualify a new
+binary, an observer or a device. The actual trial artifact remains to select.
 In `crates/update/src/round.rs`, `own_switch` stages and syncs the candidate,
 saves `made`, writes pending, then replaces and syncs `current`.
 `records::write_whole` syncs its temporary file and containing directory;
@@ -131,6 +155,6 @@ method. Complete any signed same-N binary restoration before returning to
 the ordinary production channel. Restoration is an uncut step, not another
 power-loss trial.
 
-Result and restoration fields remain **unexecuted**. First must post the
-actual steps/outcome on #2810; [#1812](https://github.com/autonomous-ai/lampOS/issues/1812)'s
+Result and restoration fields remain **unexecuted**. The assigned device
+operator must post the actual steps/outcome with First on #2810; [#1812](https://github.com/autonomous-ai/lampOS/issues/1812)'s
 real signed internet release follows acceptance of that work.
