@@ -97,6 +97,17 @@ serve. `busy-near` judges a busy room as `busy` does until the package runs
 `lamp-ears`. The second route (`LAMP_VOICE_ROUTE=second`) is left out too,
 since nothing in this package writes `/etc/lampOS/voice/second.json`.
 
+The generic voice also carries the product's `LAMP_TOOLS`, `LAMP_CLOCK`,
+`LAMP_TIME_PLACES`, `LAMP_KERNEL_CLOCK` and `LAMP_SESSION_FACT`, all `on`.
+Its Live session receives the `the_time` function and opening time and
+session context. The clock uses the kernel clock, `/etc/localtime` and
+`/usr/share/zoneinfo`; it needs no product-only file, socket or service.
+An unsynchronised clock is reported as unset, and an unknown place is
+reported as unknown. The lamp's system zone must still be set correctly;
+these switches do not choose it. The unit census and `update`'s function
+tests cover the actual generic unit's flags and declarations. No moved-lamp
+spoken-time or acoustic-latency trial is claimed by those host tests.
+
 `lamp-body.service` is `Type=notify` with `WatchdogSec=5`: the body says
 when it is ready and that its loop is alive. The others are `Type=simple`
 until each calls the keeper's helper; then each becomes `Type=notify` with

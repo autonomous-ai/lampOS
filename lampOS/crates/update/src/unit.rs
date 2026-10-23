@@ -285,6 +285,27 @@ mod tests {
         "LAMP_WAIT_KEEPS_ANSWER",
     ];
 
+    /// The clock and opening context need no per-lamp provider file: use
+    /// the same local clock, zone database and session fact as the product.
+    const CLOCK_AND_SESSION: [&str; 5] = [
+        "LAMP_TOOLS",
+        "LAMP_CLOCK",
+        "LAMP_TIME_PLACES",
+        "LAMP_KERNEL_CLOCK",
+        "LAMP_SESSION_FACT",
+    ];
+
+    #[test]
+    fn the_generic_voice_has_the_product_clock_and_session_context() {
+        let product = include_str!("../../../deploy/product/lamp-voice.service");
+        let generic = include_str!("../../../deploy/units/lamp-voice.service");
+        for name in CLOCK_AND_SESSION {
+            let value = environment(product, name);
+            assert_eq!(value.as_deref(), Some("on"), "{name}");
+            assert_eq!(environment(generic, name), value, "{name}");
+        }
+    }
+
     #[test]
     fn the_generic_voice_answers_whom_the_product_does() {
         let product = include_str!("../../../deploy/product/lamp-voice.service");
@@ -295,12 +316,10 @@ mod tests {
             assert_eq!(environment(generic, name), value, "{name}");
         }
         // Every switch attention.md names that the product voice sets is in the group above, or
-        // here, left out of a moved lamp's voice on purpose: a new attention switch can't be
+        // the clock group or here, outside the attention group: a new attention switch can't be
         // forgotten (the Reviewer-lead's P3 on #2883).
-        const NOT_THE_GROUP: [&str; 7] = [
-            "LAMP_CLOCK",
+        const NOT_THE_GROUP: [&str; 5] = [
             "LAMP_FIRST_OUTPUT",
-            "LAMP_KERNEL_CLOCK",
             "LAMP_PROVIDER_PATIENCE",
             "LAMP_SECOND_LOOK",
             "LAMP_THREAD_FILE",
@@ -321,7 +340,9 @@ mod tests {
             });
             if named {
                 assert!(
-                    WHO_IT_ANSWERS.contains(&name) || NOT_THE_GROUP.contains(&name),
+                    WHO_IT_ANSWERS.contains(&name)
+                        || CLOCK_AND_SESSION.contains(&name)
+                        || NOT_THE_GROUP.contains(&name),
                     "{name} is named in attention.md and set in the product voice: add it to the group or leave it out on purpose"
                 );
             }
