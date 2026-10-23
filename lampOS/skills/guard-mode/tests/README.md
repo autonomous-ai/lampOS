@@ -10,7 +10,12 @@ ask on `voice/heard` at 2 s; the ring's word that the mark shows,
 `light/reached`, at 4.35 s, in every case where the mark is asked for but
 one; in one case a sample of `voice/privacy`, the
 voice's lease, once a second; and in the two #2562 cases `ears/classes`
-around 660 s, a door scored 0.91 at 660 s with the lamp's own voice clear. What the eyes know of the face at the lamp is
+around 660 s, a door scored 0.91 at 660 s with the lamp's own voice clear.
+The three cases named "real" hold real recordings' scores on `ears/classes`
+instead: ESC-50 clips (CC BY-NC), scored on a Mac by the pinned YAMNet
+through lamp-ears' own frontend and model, one patch each 0.5 s, numbers
+only and no audio kept; a file scores higher than a room would through a
+speaker and a microphone. What the eyes know of the face at the lamp is
 not on the bus (it is the eyes' known file, which the program reads), so a
 case says it as `[[known]]`: from `at`, that name, or with none, nobody
 known. Each `expect.toml` sets the local time of the first message
@@ -28,6 +33,9 @@ lamp-skills`, which runs every skill's cases).
 | `a-visit-gives-one-text-with-its-time-and-length` | Asked at 14:20; the desk empty from 49 s; someone at 14:31 (660 s) for two minutes, a face it doesn't know | Pass: the mark at 4 s; the head turns to the face once at 661.5 s (#2562); one text at 799 s, when they've gone: "Someone I don't know was at your desk at 14:31, for about 2 minutes." |
 | `a-door-with-no-face-texts-nothing` | #2562: asked at 14:20; the desk empty from 49 s; a door at 14:31 (660 s), and no face, voice or anyone after | Pass: the mark at 4 s, and nothing else: a sound alone is nobody coming in |
 | `a-door-then-a-face-is-one-arrival` | #2562: as above, then a face it doesn't know at 668.5 s that stays at the desk to 739 s | Pass: the mark at 4 s; the head turns to the face once at 668.5 s; one text at 760 s: "Someone I don't know came in at 14:31 and was here for about 2 minutes." |
+| `a-real-knock-with-no-face-texts-nothing` | #2562: as `a-door-with-no-face-texts-nothing`, with a real knock (ESC-50 `1-103999-A-30`): door 0.162 at 659.5 s, 0.648 at 660 s, then 0 to 663.5 s | Pass: the mark at 4 s, and nothing else |
+| `a-real-knock-then-a-face-is-one-arrival` | #2562: as `a-door-then-a-face-is-one-arrival`, with the same real knock | Pass: the mark at 4 s; the head turns to the face once at 668.5 s; one text at 760 s: "Someone I don't know came in at 14:31 and was here for about 2 minutes." |
+| `real-footsteps-then-a-face-is-one-arrival` | #2562: as above, with real footsteps (ESC-50 `1-155858-A-25`): footsteps 0.364 at 659 s rising to 0.603 at 660 s and 0.622 at 660.5 s, then under 0.3 to 663 s | Pass: the same as the real knock's: one head turn at 668.5 s and one text at 760 s, "came in at 14:31" |
 | `a-second-visit-within-ten-minutes-is-not-texted` | Visits at 14:31, 14:36 and 14:45, a minute each, heard but no face | Pass: texts at 739 s and 1579 s; none for the second, 300 s after the first text |
 | `your-face-back-ends-it` | A, whose face the eyes know, asks and leaves; back at 14:40 and known at 1202 s | Pass: the mark at 4 s; the head turns to them at 1200.5 s, before they are known; the mark given back at 1202 s and "I'm off guard." said aloud (#2562); no text |
 | `someone-known-is-said-as-known-never-by-name` | A asks and leaves; B, also known, at the desk for three minutes | Pass: the head turns to B once at 661.5 s; one text at 859 s, "Someone you've introduced me to was at your desk at 14:31, for about 3 minutes."; no name |

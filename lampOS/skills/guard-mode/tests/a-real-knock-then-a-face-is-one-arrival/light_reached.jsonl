@@ -1,0 +1,2 @@
+{"topic":"light/reached","declaration":{"type":"lamp_msgs/LightReached","version":1,"kind":"event"}}
+{"header":{"topic":"light/reached","kind":"event","enc":"json","type":"lamp_msgs/LightReached","source":"ring","boot":"6c1a7e0f3b5d2e91","seq":1,"at_us":4350000,"at_unix_ms":1792400004350},"payload_b64":"eyJzb3VyY2UiOiJza2lsbDpndWFyZC1tb2RlIiwibGlnaHQiOnsib24iOnRydWUsImNvbG91ciI6ImJsdWUiLCJsZXZlbCI6MX19"}
