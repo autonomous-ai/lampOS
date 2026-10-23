@@ -1,0 +1,25 @@
+{
+  "tested_head": "7a9fc09ba2d096d6f60b33de54b30617e6302e9a",
+  "carried_head": "96fa27cdf551cc142ed23f455cdb5331b6dba401",
+  "base": "b7700b7c268c0c22e26c1c88c9e9ee359cddf550",
+  "changed_bound_files": [
+    "lampOS/builders/thirteen.md",
+    "lampOS/crates/controls/tests/it/touch_runtime.rs",
+    "lampOS/docs/install.md"
+  ],
+  "new_files": [
+    "lampOS/docs/verification/controls-body-hand-20261023/README.md"
+  ],
+  "voice_and_workspace_production_rust_and_cargo_inputs_unchanged": true,
+  "range_diff": "1:  28cc2539a = 1:  96fa27cdf lampOS: guard the additional shared conversation fixtures\n",
+  "mac_format_on_carried_head": {
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0
+  }
+}

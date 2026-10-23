@@ -106,3 +106,29 @@ lacked rustfmt and tried an unavailable offline download; the development
 image already had `/src`. Neither reached formatting. The successful
 command selects the cached toolchain and extracts into a new empty directory.
 No source was changed between these setup attempts.
+
+## Reviewed carry on train 23's integration head
+
+Head `28cc2539a` also completed both official jobs on their first attempts:
+ARM64 **39879235794 / 120172316078**, **7,042 / 0 / 31 skipped**, one passing
+LEAK; Linux Clippy **39879235765 / 120172315743**. Both checked merge
+`78bee58f5` against `02c8d3851`; `native-28cc2539a.json` retains identities,
+summary lines and raw-log hashes. Tests posted READ-OK for that source at
+08:00 +07, with no P1/P2/P3; explicit Linux formatting above also passed.
+
+Because train 22 changed runtime inputs, the full Mac Voice gate was
+refreshed on the equal carry `7a9fc09ba`, based on `f477d6c49`: **3,829 passed
+/ 0 failed / 14 ignored** (3,548 + 1 + 270 + 4 + 6), formatting and strict
+all-target Clippy passed. All **6,528** bound inputs stayed unchanged.
+`mac-train22/` keeps complete output, commands, manifest, and candidate patch
+against that public base, so this local tested commit is reconstructible.
+
+The reviewed patch then carried equally to published **`96fa27cdf`** on
+**`b7700b7c2`**. The intervening changes are an unrelated Controls fixture,
+installer shell helpers and Markdown; all workspace production Rust, Voice
+tests and Cargo inputs are unchanged. `mac-train22/carry.json` records the
+equal range-diff and changed bound paths. Fresh Mac formatting and exact-head
+Linux formatting passed; `linux-format-train23/` binds the latter's immutable
+image, source tree and output. The PR is ready under the 07:49 no-drafts rule;
+new-head official ARM64 and Clippy checks are in progress. No completed
+earlier-head check is represented as a result of this new head.
