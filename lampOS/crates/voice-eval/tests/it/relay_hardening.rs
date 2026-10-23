@@ -199,15 +199,17 @@ fn oversized_or_non_utf8_trace_records_stop_the_trace_explicitly() {
 fn a_closed_runner_transport_stops_the_runtime_and_its_workers() {
     let dir = common::Private::new("rsc");
     let pid_file = dir.join("worker.pid");
+    let ready_file = dir.join("worker.ready");
     let script = format!(
         r#"{TRACE}
 sleep 30 &
-echo $! > {}
+echo $! > {} && : > {}
 exec sleep 30"#,
-        pid_file.display()
+        pid_file.display(),
+        ready_file.display()
     );
     let started = Instant::now();
-    let (code, lines) = relay(&dir, &script, Some(&pid_file));
+    let (code, lines) = relay(&dir, &script, Some(&ready_file));
     // The runtime would otherwise run for its full 5 s session.
     assert!(
         started.elapsed() < Duration::from_secs(4),
