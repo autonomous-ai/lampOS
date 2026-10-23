@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-23 08:14 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-23 10:18 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 90.4% over 72 rows. Quality 63.1% over 16 rows.**
+**Build 91.0% over 72 rows. Quality 64.4% over 16 rows.**
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -36,7 +36,7 @@ Written by the first builder from the team's review page at 2026-10-23 08:14 (+0
 | Two-minute self-test | 1.00 | #812 #983 #1243 #1245 | ten | All merged: every part checked, reported in health (#1243), run at first boot and every 6 hours (#1245), and the head’s small move (#983, 12:23) |
 | One install for a new lamp | 1.00 | #811 | nine | Shown 19 Oct 15:1x on a second lamp, lamp-c0a4: build 3162 installed over V1 from a test-signed local channel, all 45 files equal to the build’s checksums, V1 stopped and kept, no reboot; |
 | No internet at home | 1.00 | #830 #1242 #1256 #1247 | nine | 21 Oct 14:1x: its lamp runs passed on lamp-75c9 (Nine): the outage found with nobody speaking, the offline line once, “back online” after, and the unavailable face. |
-| Everything is a skill, core and installable, no one-off code | 0.70 | #940 #938 #1667 #1696 #1698 #2643 #2654 #2674 #2822 #2823 #2824 #2825 #2826 | seventh | 22 Oct 15:1x, up from 0.65: look for things’ walk, its note, places, order and words now live in its skill’s file, read by the voice from lamp-skills’ tools file (Thirteen, #2916, a16545d92; |
+| Everything is a skill, core and installable, no one-off code | 0.72 | #940 #938 #1667 #1696 #1698 #2643 #2654 #2674 #2822 #2823 #2824 #2825 #2826 | seventh | 23 Oct 09:2x, up from 0.7: night sleep runs through its skill, with the built-in one only as a fallback for one release (#2744). |
 | An owner makes their own skill | 0.78 | #941 #1698 #2424 #2811 #2813 #2814 #2815 #2816 | sixth, ten | 22 Oct 22:0x, up from 0.75: a developer’s path to make a skill by hand, in skill-creator’s README (#3055 merged, Blue). |
 | A Skills Store to publish skills | 0.60 | #1698 #2801 #2802 | fourteen | 22 Oct 22:0x, up from 0.55: an installed package keeps its sha256 and skills.list gives it beside the catalogue’s (Backend3, #3042 merged; |
 | Updates over the internet, by themselves | 0.65 | #737 #1812 | migrate, second | 20 Oct 06:11: shown again on lamp-4ace on the merged code (El’s test, three cases: a good build kept, one that fails to start put back in under 2 min, one that never confirms put back after its 10 min), the lamp left exa… |
@@ -52,9 +52,9 @@ Written by the first builder from the team's review page at 2026-10-23 08:14 (+0
 | One inner state (mood) every behaviour reads, and familiarity *(not a ship gate)* | 0.72 | #713 #1670 #1728 #1749 #1772 #2829 #2830 #2831 | fourth, ten | 22 Oct 22:0x, up from 0.7: a say’s record keeps who it told and the familiar level (#3056 merged, Seventh), so #2831’s last bar can be read on 52e6. |
 | Joys: sways to music, watches you leave, core skills | 0.70 | #1669 #1707 #1748 #2832 #2833 #2834 | sixth | 21 Oct 14:3x: the glance at a laugh is taken out of the row (the lead on #1711: you never asked for it; |
 | Dance when asked | 1.00 | #999 | jarvis | Built (the Dance skill, V1’s dance clips) |
-| Bedtime and Morning as a skill, with night caps on light and volume | 0.65 | #1672 #1732 #2803 #2804 | jarvis, second | 22 Oct, up from 0.5: evening, the glow, bedtime twice and a night sound’s end passed on lamp-06c1 (Jarvis, 21–22 Oct). |
+| Bedtime and Morning as a skill, with night caps on light and volume | 0.85 | #1672 #1732 #2803 #2804 | jarvis, second | 23 Oct 09:2x, up from 0.65: a full real night through the skills on lamp-06c1 met its done-when (#2803), the night caps on light and volume held across restarts and silence (#2804), and night sleep now runs through the s… |
 | “What do you see?” and showing it a page | 1.00 | #836 #842 | seventh | Built |
-| Seeing someone speak (is the face it looks at talking?) | 0.90 | #720 #1470 #2008 #2026 #2859 #2860 | fifth, ten | 23 Oct 06:5x, up from 0.85: the mouth reads a talking face at desk distance (Fifth, lamp-52e6, 06:21: a muted talking video at 1 m’s size, speaking read yes in 228 of 234 looks, a still mouth no in 101 of 105; |
+| Seeing someone speak (is the face it looks at talking?) | 0.92 | #720 #1470 #2008 #2026 #2859 #2860 | fifth, ten | 23 Oct 09:2x, up from 0.9: with the eyes as they ship (blendshapes on), the speaking read now reads the lips each look (#3158, train 26); |
 | The eye: looks toward you, blinks, a face for each state | 1.00 | #712 | first | Built (ring eye, asleep face) |
 | Its light by voice and in the app, kept across a restart | 1.00 | #1472 #1484 #1464 #1468 | — | Built |
 | Volume by voice and in the app | 1.00 | #1458 #1465 | — | Built |
@@ -63,12 +63,12 @@ Written by the first builder from the team's review page at 2026-10-23 08:14 (+0
 | “Look for my keys”, an installable skill | 0.85 | #1685 #1738 #2444 #2466 #2835 #2904 | first | 22 Oct 17:5x, up from 0.8: a push on the lamp ends its search at once, a real push and a test input each ending it on lamp-c0a4 (Thirteen, #2983 carried as #2990, fe49ed3c4). |
 | The light dims and goes out when nobody is there, a core skill | 1.00 | #1677 #1721 #1747 | nine | Built and tried on lamp-4ace 20 Oct 01:23 (trials.sh with Tests’ #1999 stages, lamp-skills at 782e6ef34): with nobody there the light-out skill asked the ring to fade the light over 30 s, held it while nobody was there, … |
 | What you teach it (“don’t say hello in the morning”) is kept and honoured | 1.00 | #813 | seventh | Built |
-| Forgets on request: that, everything, my face, and everything it came from | 0.95 | #1586 #1693 #2849 #2850 | fourth, twelve | 23 Oct 08:1x, up from 0.88: a named forget removes only what matches, observations included, and never another kept thing (#3127, train 22), checked on lamp-c0a4 by Twelve at 08:0x; |
-| Remembers what matters without being asked (“how was the wedding?”) | 0.75 | #1693 #2648 #2680 #2805 #2806 #2807 #2808 | friday, twelve | 23 Oct 02:1x, up from 0.7: a dated follow-up is asked of the person who told it on their greeting line, never of another face (#3059 merged in train 3; |
+| Forgets on request: that, everything, my face, and everything it came from | 0.97 | #1586 #1693 #2849 #2850 | fourth, twelve | 23 Oct 10:1x, up from 0.95: after “forget everything”, the room’s lines about that person are left out for their day (#3142, train 29). |
+| Remembers what matters without being asked (“how was the wedding?”) | 0.80 | #1693 #2648 #2680 #2805 #2806 #2807 #2808 | friday, twelve | 23 Oct 09:2x, up from 0.75: a session’s first line after a restart is kept for the speaker the eyes name, never for the wrong person (#3108, train 26; |
 | Keeps going when one part fails | 1.00 | — | — | Built: each part its own unit, restarted alone, health says how the lamp is |
 | Change the Wi-Fi, name or time zone after setup, without a reset | 0.95 | #1982 #1995 #2038 #2851 #2852 #2853 | fourteen, nine | 22 Oct 16:1x, up from 0.9: the settings and Wi-Fi helpers take a request only from lamp-cloud’s unit (#2696), and install puts their units on every product lamp (Sixth’s #2926, carried as #2955). |
 | Hand-overs from a home lamp: Harness installed, the person signed in | 0.80 | #751 #765 #798 #1854 #2702 #2838 #2839 #2840 #2841 #2842 | seventh, eighth | 22 Oct 09:10, up from 0.75: a task’s finish is told after the agent’s question, on lamp-75c9 (Eighth, #2543). |
-| Updates cover the whole lamp, so V3, V4 and V5 update a shipped lamp in place: units, models, the updater itself, rollback, every part’s saved data read across versions | 0.55 | #1369 #1505 #2700 #2809 #2810 | migrate, tests | 22 Oct 12:4x, up from 0.5: three more parts’ kept files are read by every later build’s tests: controls (#2784), lamp-cloud’s rotated login (#2786) and records (#2787) (Migrate). |
+| Updates cover the whole lamp, so V3, V4 and V5 update a shipped lamp in place: units, models, the updater itself, rollback, every part’s saved data read across versions | 0.60 | #1369 #1505 #2700 #2809 #2810 | migrate, tests | 23 Oct 09:2x, up from 0.55: an update restarts the parts the voice calls before the voice, and rolls back the same way (#3173, train 27), and the rule that every part works with the previous build of the other side is wr… |
 | The company sees its lamps in homes: health, crash and support logs, opt-in | 0.95 | #1683 #1755 #2862 | jarvis, mobile, backend | 22 Oct 12:46, up from 0.9: the health report lists the product parts that have failed, under the same consent (Second, #2764). |
 | The factory’s per-lamp steps: body poses, touch pads, the update key | 0.70 | #1682 #1717 #1744 #2817 #2818 | third, thirteen | 22 Oct 16:3x, up from 0.65: the factory steps start the body before the stand, so a whole run needs no person between steps (Fifth, #2869, ef1eb0cf2). |
 | Reads your mood from your face or voice *(not a ship gate)* | 0.45 | #2796 #2797 #2798 #2799 #2800 | ten, fourth | 23 Oct 02:1x, up from 0.35: the product units carry the face reader, Blendshape alone (#2953, #2799 closed), and onboarding’s one ask whether the lamp may notice how a face seems, keeping only a yes, is merged (#3082, tr… |
@@ -83,22 +83,22 @@ Written by the first builder from the team's review page at 2026-10-23 08:14 (+0
 | Light shows and effects, a core skill | 1.00 | #1730 #2028 | twelve, nine | Built and merged (#1730): party, music and calm, under a minute, no flashing, stopping within 0.2 s when someone speaks. |
 | “I’m unplugging you”: it folds safely first, a core skill | 1.00 | #1699 #2478 | fifth | 21 Oct 11:30, built: #1699 merged as #2478 after its rebase, and Prepare to unplug is in every lamp’s default skills. |
 | Smoke and bad-air alerts, a core skill | 1.00 | — | — | 20 Oct 11:42, built: tried on lamp-52e6 with the lead (row 18): a smoke reading said once, the head lifted a little, an amber breath. |
-| Every lamp passes an approved hardware test before it ships: stations, records, a 3–5 lamp pilot | 0.40 | #1700 #812 #1682 #1741 #2794 #2795 | first, ten, thirteen | 22 Oct 23:1x, up from 0.35: lamp-station keeps each run’s record and a lamp’s standing (#3054 merged, Ten; |
+| Every lamp passes an approved hardware test before it ships: stations, records, a 3–5 lamp pilot | 0.45 | #1700 #812 #1682 #1741 #2794 #2795 | first, ten, thirteen | 23 Oct 10:1x, up from 0.4: the matrix’s version 1, version 0’s checks and limits approved for the pilot, is merged (#2461, train 29). |
 
 ## Quality rows
 
 | Row | Now | Target | Where it is |
 |---|---|---|---|
-| Fast answers | 0.70 | 0.85 | 23 Oct 08:1x, up from 0.6: on the near relay the answer’s own first sound (not the wait sound) came at a median 1.46 s in r11 and 1.50 s in r12, played kit, and a wait sound before the chat began fell from 13 of 72 reque… |
+| Fast answers | 0.75 | 0.85 | 23 Oct 10:1x, up from 0.7: a real person (the lead, lamp-52e6, build G, 09:16–09:31): the first sound at 1.18–1.71 s on five of six lines, one tool follow-up at 7.8 s. |
 | Knows when you have finished | 0.50 | 0.85 | 22 Oct 23:1x, up from 0.45 on played rounds only (made people’s voices, 50 lines): lines split at a pause 24 → 11 and a first half let go 11 → 1 from 19:32 to 22:37 (the end-of-line dials, #3045’s unfinished-words wait, … |
 | Cutting in | 0.50 | 0.75 | 20 Oct 03:45 on the cheaper voice, lamp-4ace: two lines played over a long story each made the lamp pause and then go on, and after two such pauses it no longer lets anyone cut in on that story, so a third line 30 s late… |
 | Stop words | 0.50 | 0.75 | 21 Oct 22:5x, the speech-to-text path scored on the same two recordings, on lamp-4ace through the product’s own relay: it caught none of the ten “stop” lines. |
 | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |
-| Not spoken to | 0.50 | 0.90 | 23 Oct 08:1x, down from 0.55: r08’s 12 of 12 held only because London’s ask was held; |
+| Not spoken to | 0.60 | 0.90 | 23 Oct 10:1x, up from 0.5: with the voice check on (CAM++, the lead’s yes for the owner’s test), r13 on lamp-4ace left 11 of 12 desk lines alone and all 4 colleague lines said 4 s after an answer (8 and 2 without it); |
 | Several people | 0.65 | 0.85 | 22 Oct 07:38, up from 0.6: both halves of the going-on rows on lamp-52e6 with Mac voices and screen faces (Seventh). |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.80 | 0.85 | 18 Oct 15:39, everything the lamp said unasked since midnight (Jarvis’s readout, 14 sessions): 17 reminders and timers, a median 0.98 s after they were due (16 within 5 s, one held back by the link), and 17 pieces of tas… |
-| Remembers you: your name and what you told it | 0.55 | 0.90 | 22 Oct 19:3x, down from 0.65: “what’s my name?” failed for the owner at 19:04 (their face record refused “remember my face” twice at 15:33; |
+| Remembers you: your name and what you told it | 0.60 | 0.90 | 23 Oct 10:1x, up from 0.55: a real person’s name came back from their face (“What is my name?”, “Leo.”) nine minutes after “remember my face”, with LAMP_SECOND_FACE_NAME on; |
 | A good companion | 0.65 | 0.90 | 22 Oct 17:4x, up from 0.6: in the owner’s try the weather was looked up for Hanoi and then the lamp’s place, tomorrow, and the time called for London: the functions the bound had left out are back (#2961, merged a0705aee… |
 | Both microphones | 0.65 | 0.80 | 22 Oct 06:41, up from 0.6: step 4 passed on lamp-75c9 from the privacy test input (Nine, #694, the lead’s 05:5x ruling): after the switch closes, the room microphone stops within one 100 ms level period and gives nothing… |
 | Body | 0.70 | 0.80 | 17 Oct: the guarded body (#1192) on lamp-4ace since 07:34: stands for a question, turns to the voice, gestures and folds, with no refused or bad-read stop; |
