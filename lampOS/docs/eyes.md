@@ -1044,6 +1044,11 @@ analysis on #3126). With the switch on:
   line) and, while speaking is judged, has the passing id their face had
   at the match (`Held::keeps_print`). Anything else lets them go at once,
   the known file with them, so a stranger sitting down is never named.
+  A near face seen but not printed (turned, too small) keeps the held name
+  only with the passing id their face had at the match
+  (`Held::keeps_unprinted`); with no near face the hold runs to its 4 s.
+  With `LAMP_EYES_SPEAKING` off there is no passing id: a printed face
+  relies on the 0.30 bar alone, and an unprinted near face lets go at once.
 - **The camera closed lets them go at once**: the name and the known file
   go as it closes, held or not.
 
