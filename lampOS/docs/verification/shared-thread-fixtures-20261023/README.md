@@ -56,6 +56,20 @@ This is not a claim that every indirect conversation writer is serialized.
 The separate Music-stop helper guard and its previously published overlap
 control belong to Tests' #3023; this patch leaves that helper unchanged.
 
-The Mac gate and official PR ARM64/Linux checks will be appended with their
-exact source identity and result counts. No lamp operation, acoustic result
-or signed release is established here.
+## Mac gate and current-base carry
+
+The full changed-crate command on the uninstrumented five-line candidate
+passed **3,815 / 0 / 14 ignored**, six terminal results with no filtering:
+3,534 + 1 + 270 + 4 + 6 + 0 passed. Formatting and strict all-target Voice
+Clippy passed. `mac/` retains the full outputs and their hashes; all 6,519
+bound files stayed unchanged during the commands.
+
+The committed candidate `8beb6bd53` carried equally to `5ce68c9a3` on
+`9b6960e61`. Only two unrelated Cloud test files changed in the base;
+Voice, its dependencies, Cargo manifests/lock and workflows stayed identical.
+`rebase.json` binds that carry and the three exact tested source hashes.
+Current-base formatting and strict Voice Clippy passed (`mac-current/`).
+The completed identical-input full test run was retained, not repeated.
+
+Official PR ARM64 and Linux Clippy results remain pending. No lamp operation,
+acoustic result or signed release is established here.

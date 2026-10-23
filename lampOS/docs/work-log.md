@@ -1,3 +1,27 @@
+## Current checkpoint: 2026-10-23 07:17 +07, five writer guards pushed as #3160
+
+Ready for lamp-voice: no (#3160 native checks and external read pending)
+
+#3160 is one commit `5ce68c9a3` on current `9b6960e61`. Mac Voice passes
+**3,815 / 0 / 14 ignored** without filtering; formatting and strict
+all-target Clippy pass. The equal carry changes only unrelated Cloud tests
+in its base; the exact tested Voice files and dependencies stay unchanged.
+Current-base fmt and strict Clippy also pass. [Full Mac gate and controls](verification/shared-thread-fixtures-20261023/README.md).
+Tests confirmed these five additional writers belong to Second; #3023's
+Music helper is untouched. The draft starts the official native checks.
+
+#3150's identical docs patch passed ARM64 **10,799 / 0 / 67 skipped**, one
+passing LEAK, and Linux Clippy on `7600fdb1b`. It is now carried equally to
+`b30c0f501` on `9b6960e61`, with new-head checks running; the previous gate
+is recorded separately in [the Queue routing receipt](verification/queue-routing-20261023/README.md).
+
+Second is preparing the requested #3130 composition read at stacked
+`8dd86272e` while #3127 remains open. A possible refusal/retry fallthrough
+needs a focused real-client counter before a finding; no final qualification
+is claimed before the dependency and rebase condition.
+
+---
+
 ## Current checkpoint: 2026-10-23 07:09 +07, another conversation writer overlap reproduced
 
 Ready for lamp-voice: no (changed Voice crate gate and native checks remain)

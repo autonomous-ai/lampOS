@@ -1,0 +1,12 @@
+{
+  "head": "5ce68c9a32de89abb8a52ac73698a791df972ebf",
+  "base": "9b6960e61e5758bb745c6e4d7ad043cc725cd018",
+  "before_rebase": "8beb6bd53ef3a0e09296db32afafccc2859d6090",
+  "base_delta_files": [
+    "lampOS/crates/cloud/src/reports.rs",
+    "lampOS/crates/cloud/tests/it/report_contract.rs"
+  ],
+  "changed_voice_files_byte_identical_to_tested_candidate": true,
+  "range_diff": "1:  8beb6bd53 = 1:  5ce68c9a3 lampOS: guard the additional shared conversation fixtures\n",
+  "limits": "Only two Cloud test files changed in the base. Voice code, its dependencies, Cargo manifests/lock and CI settings are identical. The completed full Voice test run is preserved rather than repeated."
+}
