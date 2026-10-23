@@ -1,5 +1,13 @@
 # Reviewer work log
 
+## 2026-10-24 (reviewer-two build-row docs read at 06:23 +07)
+
+#3303 READ-OK 792d142cda8e68b3621253cefe375782c7414dd6 posted 6376720562, P1/P2 none, Queue 6376720849. First assigned at 6376670965; no existing reading claim, claimed 6376706478. Read the entire doc, two-line delta, PR body/metadata and referenced #2285 task. Timestamp becomes06:18 and talks-naturally0.90→0.92 citing #3296/train62/df6830381 merged behind its off switch. The claim is merged implementation progress, not a valid busy-room result; quality rows unchanged. Fresh fetch confirms exact head with current df683038187431159dd91083babdfd57205d2981 as parent; diff check passes.
+
+Recomputed all rows with Decimal: old build64.79/70=92.557142857%, new64.81/70=92.585714286%, both92.6% rounded; quality10.20/16=63.75%→63.8%; mood1.17/2=58.5%, excluded from build. Saved c3303-figures.json. Workflow explicitly skips this docs-only path, outside named code-read docs; no build-rows.md references in searched crates/tools/.github. No Cargo or native gate required or run. Added3303 to the addressed-reply watch. Ready for train integration, no manual merge.
+
+Own prior log cda7bf19dc pushed; inherited main pr.json untouched, own merge count ten. Next eligible ready read and replies, including assigned Sixth unknown-room desk-talk follow-up and separate device evidence. No active jobs, product/device/provider/model action.
+
 ## 2026-10-24 (reviewer-two room-eligibility evidence read at 06:16 +07)
 
 Sixth's corrected full rerun still produced no valid busy half in either arm (6376601728/6376606093): quiet 5/5 both, busy not a trial, bed 0/0, probes absent. Reported 12 off and 15 on bed lines were heard and held as nobody-spoke-to-lamp while room remained unknown. First retained measurement work at 6376617953: establish and log busy before the five turns, then +3/+6-second probes; if no busy transition, report held count and room_told's actual run. No result from this void comparison establishes carry efficacy or the ordinary-window tradeoff.
