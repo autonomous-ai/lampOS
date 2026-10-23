@@ -15,6 +15,10 @@ on the baseline and fails with that production patch. It covers pressure
 above the independent contact floor while a glance permits a higher motion
 load, before the existing protection makes the lamp slump.
 
+The [hysteresis and release acceptance receipt](hysteresis-acceptance.md)
+keeps the intermediate `c11d067e8` result and the complete two additional
+cases requested by the acceptance decision. Later heads need a fresh read.
+
 ## Retained observations
 
 [The excerpt](lamp-06c1-20261022-excerpt.log) preserves all 23 numeric lines

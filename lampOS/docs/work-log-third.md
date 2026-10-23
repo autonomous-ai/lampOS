@@ -5,6 +5,32 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-23 11:24 — ARM64 failure retained; Body acceptance review
+
+Ready for lamp-voice: no (#3204 native gate failed; #3196 review continues).
+
+- #3204's native ARM64 run `39897297680` failed at the person-name fixture
+  `a_name_offered_to_a_line_given_up_before_its_end_is_told_to_the_next`:
+  `person_name.rs:342`, missing owner at `unwrap()`. The log reports a
+  105 ms provider hold and one lapsed snapshot. Nextest stopped after
+  8,146 passed, one failed and 68 skipped; 8,147 of 10,933 ran. The
+  separately green Linux Clippy run is `39897297556`. No waiver or clean
+  rerun is claimed. The already reviewed #3198 fixes this fixture's
+  100 ms lease; its integration carry is pending.
+- Fourteen read #3204's `418f618e8` with no P1/P2. The optional field-name
+  compatibility note is now docs-only #3207, `0a1ba6d55`, based on
+  `03eb18168`; `git diff --check` passed. Tests is preparing explicit
+  Linux fmt evidence; it has not yet been received.
+- The [acceptance receipt](verification/body-resting-push-20261023/hysteresis-acceptance.md)
+  preserves the intermediate #3196 `c11d067e8` result: the sustained
+  displaced hold passes, while contact-floor reporting, prompt release
+  and lower-load retention fail. The latter two express First's new
+  acceptance requirements. The newer `8c76a3dab` is being checked
+  separately, including the reported 12–15-count limp movement gap.
+- Fetched origin again. Local AGENTS.md matches the current integration
+  copy at `03eb18168`; Queue #3126 and PR comments remain the route.
+  #2948 stays draft and no lamp has been accessed.
+
 ## 2026-10-23 10:58 — compatibility PR pushed; second Body review failure
 
 Ready for lamp-voice: no (#3204 Linux gates/read remain; #3196 needs correction).
