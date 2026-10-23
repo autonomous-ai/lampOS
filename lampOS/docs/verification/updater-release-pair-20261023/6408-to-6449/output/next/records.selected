@@ -1,0 +1,2 @@
+#!/bin/sh
+printf 'synthetic records 1\n'

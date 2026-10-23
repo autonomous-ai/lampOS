@@ -1,0 +1,6 @@
+[Unit]
+Description=release-pair candidate air
+After=lamp-records.service
+[Service]
+ExecStart=/opt/lampOS/air/current/lamp-air
+Restart=on-failure

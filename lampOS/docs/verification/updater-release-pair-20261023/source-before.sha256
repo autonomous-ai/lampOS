@@ -1,0 +1,3 @@
+6ff8c240b6064654ab3640e6bee009ae0f9c5c13a8ef2d3569e17d79df7a1812  lampOS/crates/update/tests/release_pair.rs
+9ec752bf75d942ed16ee35372513db659a6bf20026ff4a70f7ece3ba737c582d  lampOS/crates/update/tests/release_pair/run.sh
+8b2a06b747aa406caed9beb6ca475bf2e75a3c895a8298ce6dc1f81bc2d13e77  lampOS/crates/update/tests/release_pair/systemctl.sh

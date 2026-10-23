@@ -902,6 +902,37 @@ seconds. Systemctl is an exact fixture, not a real service. This does not
 test distinct release versions, fixed-path fallback, timer expiry, production
 quiet/health timing, cold boot or physical power loss.
 
+**Two published updater versions recovering each other's work** (#2809).
+The manual `release_pair` integration target uses the actual ARM64
+`lamp-update` executables from releases 6408 and 6449, with pinned SHA-256
+digests. It runs both directions: `release_6408_recovers_a_cut_written_by_release_6449`
+and `release_6449_recovers_a_cut_written_by_release_6408`. The writing CLI
+creates the journal and helper request itself. A controlled command boundary
+stops it after settings and candidate units have changed; the fixture kills
+that writer, then asks the opposite-version CLI to recover. Apply and Back
+also cross the helper-version boundary. The fixture checks exact restored
+files, modes, links and recorded hashes; it does not author the recovery
+journal or call the current recovery library in place of the old executable.
+
+These two cases are explicitly manual/ignored in an ordinary crate run:
+their immutable external release artifacts and cached ARM64 container image
+must already be present. They do not download a binary or pull an image.
+Run them explicitly with the release files:
+
+```sh
+LAMP_COMPAT_6408=/path/to/release-6408/lamp-update \
+LAMP_COMPAT_6449=/path/to/release-6449/lamp-update \
+cargo +1.96.0 test -p lamp-update --test release_pair -- --ignored --nocapture --test-threads=1
+```
+
+Execution uses a disposable network-disabled container, without host mounts,
+and a strict fake systemctl boundary. Fixture/result directories are retained
+for inspection. This is distinct-version executable/process recovery evidence,
+not a production systemd sandbox, release-signature acceptance, attended motion,
+cold boot, lost kernel caches or flash durability. A named case only counts
+as passed when its explicit run and cleanup succeed; the ordinary CI skip is
+not release-pair qualification.
+
 **A good build cut off from the channel is put back.** The confirmation
 needs the channel: a new lamp-update that cannot reach it for the 10 min of
 the deadline, a network down or a router restarting, is put back and its
@@ -1786,11 +1817,15 @@ test does (#1512):
   signing key, switched quietly and put back on failure, including an
   attended run with the body. These remain
   [#1812](https://github.com/autonomous-ai/lampOS/issues/1812)'s acceptance
-  checks. That issue records the owner's deferral of publishing and the
-  real key until about 20 November; the local trials do not complete them.
-- Real CI publication: the job above is implemented but disabled until
-  the owner activates it. Offline rehearsal and the lamp trials use test
-  keys; neither is evidence of a release signed with the real key.
+  checks. Publication is now active, but independent verification with the
+  trusted public key and the attended acceptance run remain outstanding;
+  the local trials do not complete them.
+- Independent trust and device acceptance of the published release. Real
+  CI publication itself has run: release `lampos-lamp-voice-6449`, source
+  `be16c3327`, came from successful ARM64 build and publisher run
+  [39973722029](https://github.com/autonomous-ai/lampOS/actions/runs/39973722029).
+  Matching downloaded bytes to its asset digest and manifest entry does not
+  substitute for independent signature verification or an attended install.
 - A power cut during a switch, on the lamp's storage: the journal is
   tested with the files a cut would leave, on the Mac.
 - Models in the manifest (`LAMP_UPDATE_MODELS`): tested on the Mac only

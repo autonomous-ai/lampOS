@@ -1,0 +1,1 @@
+lamp-update: once channel=lamp-voice url=file:///case/channel/ lamp=fixture apply=on self=off key=b5efbc41ae3c3438

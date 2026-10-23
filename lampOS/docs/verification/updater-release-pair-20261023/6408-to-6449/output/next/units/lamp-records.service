@@ -1,0 +1,6 @@
+[Unit]
+Description=release-pair before records
+After=lamp-air.service
+[Service]
+ExecStart=/opt/lampOS/records/current/lamp-records
+Restart=on-failure
