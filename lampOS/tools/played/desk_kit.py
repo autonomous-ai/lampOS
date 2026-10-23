@@ -120,13 +120,15 @@ LINE = re.compile(r'^\s*(-?\d+\.\d+)s (.{5}) ?(.*)$')
 
 
 def parse(text):
-    """-> [(t, kind, text)] for PLAY, HEARD and LAMP lines with words."""
+    """-> [(t, kind, text)] for PLAY, HEARD and LAMP lines with words, and SOUND: scenario.py's speaker_first_write
+    line ("[lamp starts speaking ...]"), when the lamp's answer first reached its speaker."""
     events = []
     for line in text.splitlines():
         m = LINE.match(line)
         if not m: continue
         kind, said = m.group(2).strip(), m.group(3).strip()
-        if kind == 'PLAY' or (kind in ('HEARD', 'LAMP') and said):
+        if not kind and said.startswith('[lamp starts speaking'): kind = 'SOUND'
+        if kind in ('PLAY', 'SOUND') or (kind in ('HEARD', 'LAMP') and said):
             events.append((float(m.group(1)), kind, said))
     return events
 
@@ -183,7 +185,9 @@ def score_file(text, plan):
         for e in seg:
             if e[1] == 'HEARD': last_heard = e[2]
             elif e[1] == 'LAMP' and last_heard is not None and has_keys(last_heard, a['keys']): a['whole'] = True
-        after = [e[0] for e in events[a['last'] + 1:stop] if e[1] == 'LAMP']
+        # The answer time ends at the answer's first sound on the lamp's speaker, not at its transcript, which comes
+        # later and by a varying amount; no recorded first sound, no answer time.
+        after = [e[0] for e in events[a['last'] + 1:stop] if e[1] == 'SOUND']
         a['answer_ms'] = round((after[0] - a['end_t']) * 1000) if after else None
     return asks
 
@@ -241,15 +245,19 @@ def score(argv):
 FIXTURE = '''scenario fixture  2026-10-22T09:00:00Z  say rate 185
    5.00s PLAY  wav: Lamp, what's the capital of Australia?
    8.10s HEARD Lamp, what's the capital of Australia?
-   9.50s LAMP  Canberra.
+   8.20s       [end of speech decided after 200 ms of quiet (silence)]
+   9.50s       [lamp starts speaking 1.30 s after that decision]
+  12.00s LAMP  Canberra.
    9.60s LAMP
   20.00s PLAY  wav: Hey Lamp, um what's a good name for a small grey cat?
   21.00s HEARD Hey, Lamp.
   21.40s HEARD
   24.00s HEARD for a small grey cat?
-  26.00s LAMP  Maybe Smoky.
+  26.00s       [lamp starts speaking]
+  27.50s LAMP  Maybe Smoky.
   35.00s PLAY  Samantha: Do you want a coffee?
   37.00s HEARD Do you want a coffee?
+  38.40s       [lamp starts speaking 1.40 s after that decision]
   38.50s LAMP  I can't drink it.
   45.00s PLAY  Daniel: Yes please, with milk.
   47.00s HEARD Yes, please, with milk.
@@ -265,6 +273,8 @@ def selftest():
     assert cap['whole'] and not cap['split'] and not cap['lost'] and cap['answer_ms'] == 1500, cap
     assert cat['split'] and cat['lost'] and not cat['whole'] and cat['heard'] == ['Hey, Lamp.', 'for a small grey cat?'], cat
     assert cat['answer_ms'] == 2500 and side['spoke'] and side['mark'] == 'C', side
+    # The transcript alone (no recorded first sound) gives no answer time.
+    assert score_file('  1.00s PLAY  wav: Lamp, hi.\n  3.00s LAMP  Hello.\n', [('L', 'hi', 'hi', '', '1.00', 'x')])[0]['answer_ms'] is None
     s = summary(asks, 'fixture', 1)
     assert (s['whole'], s['split'], s['first_lost'], s['side_let_out'], s['median_ms'], s['max_ms']) == (1, 1, 1, 1, 2000, 2500), s
     inferred = infer_plan(['Daniel: Hey Lamp, tell me a short', 'Daniel: fact about elephants.', 'Samantha: Do you want a coffee?'])

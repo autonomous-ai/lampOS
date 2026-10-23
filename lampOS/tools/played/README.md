@@ -183,10 +183,14 @@ ARMS="off:LAMP_X=off" lampOS/tools/played/desk-kit.sh --dry [SCENARIO ...]
 - **Each arm** is `NAME:ENV=v,ENV=v`, put on lamp-voice with `BASE` through
   a `/run` drop-in (`zz-desk-kit.conf`), the voice restarted and its
   environment checked before anything is played; `VOICE_BIN` runs another
-  lamp-voice for the run. It refuses to start when another `/run` drop-in
-  is on lamp-voice or its face is already shown, stops on an HTTP 429 from
-  the relay, and on any exit removes the drop-in, restarts the voice and
-  closes the face.
+  lamp-voice for the run. It refuses to start when any `/run` drop-in is
+  on lamp-voice (`zz-desk-kit.conf` included: another run's, or one left
+  behind, to be removed by hand) or its face is already shown, and stops
+  on an HTTP 429 from the relay. On any exit it closes the face, and
+  removes the drop-in and restarts the voice only when this run wrote it:
+  the first arm creates the file only if none is there, its first line
+  names this run, and the file is removed only while that line is still
+  in it. An interrupt before the first arm leaves the lamp as it was.
 - **The face**: `FACE`, an image or page on your Mac (never in the repo),
   shown full screen on the built-in display for the whole run (`FACE_SIZE`,
   default `1728,1117`), as a person facing the lamp. Without it no face is
@@ -205,7 +209,7 @@ which line was which). From an ask's PLAY line to the next line's:
 | split | the ask came out as 2 or more heard requests |
 | first words lost | the last request heard lacks the ask's first part (its longest word before the first pause, or "lamp"); of the asks with a pause that were heard |
 | side talk let out | the lamp said something after a colleague's line, before the next line |
-| answer time | from the end of the ask's wav to the lamp's first words, ms, median and max; the start is read just before the clip begins, so 0.1 to 0.3 s long. Below zero: the lamp answered before the ask ended |
+| answer time | from the end of the ask's wav to the first sound of the lamp's answer on its speaker (the scenario's `[lamp starts speaking]` line, its `speaker_first_write`; not the later transcript), ms, median and max; the start is read just before the clip begins, so 0.1 to 0.3 s long. Below zero: the lamp answered before the ask ended |
 
 Empty heard and said lines are not counted. `desk_kit.py score SCENARIO`
 also scores any scenario file without a plan: a line not ending in . ? !

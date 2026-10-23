@@ -98,21 +98,28 @@ loan() { [[ -n $LOANS ]] && echo "$(date +%H:%M) $LOAN_NAME: $1" | "$LAMP_SSH" "
 
 FACE_PID=
 hide_face() { [[ -n $FACE_PID ]] && kill "$FACE_PID" 2>/dev/null; FACE_PID=; pkill -f "user-data-dir=$PROFILE" 2>/dev/null; true; }
+# The put-back touches only what this run made: the lamp's drop-in once OWNED (set just before this run's first write
+# of it), and then only while the file still holds this run's TOKEN, so a drop-in another run or person put there is
+# never removed and the voice never restarted for it (reviewer-two, #2964). Before that an interrupt leaves the lamp.
+TOKEN="# desk kit run $(hostname -s | tr -cd "A-Za-z0-9.-") pid $$ $(date +%s)"
+OWNED= LOANED=
 put_back() {
   trap '' INT TERM; trap - EXIT
   hide_face
   osascript -e "set volume output volume 50"
-  lamp "sudo -n rm -f $DROPIN; sudo -n systemctl daemon-reload; sudo -n systemctl restart lamp-voice; systemctl is-active lamp-voice"
-  loan "desk kit $LABEL done, lamp-voice back without $DROPIN, face closed; loan ended"
+  [[ -n $OWNED ]] && lamp "if sudo -n grep -qsxF '$TOKEN' $DROPIN; then sudo -n rm -f $DROPIN; sudo -n systemctl daemon-reload; sudo -n systemctl restart lamp-voice; fi; systemctl is-active lamp-voice"
+  [[ -n $LOANED ]] && loan "desk kit $LABEL done${OWNED:+, lamp-voice back without its $DROPIN}, face closed; loan ended"
+  true
 }
-# On any exit, interrupts included, the drop-in comes off (on 75c9 an interrupt left it, Ten 17:3x).
+# On any exit, interrupts included, this run's drop-in comes off (on 75c9 an interrupt left it, Ten 17:3x).
 trap put_back EXIT
 trap 'put_back; exit 130' INT TERM HUP
 
-lamp "ls ${DROPIN%/*}/ 2>/dev/null" | grep -v "^${DROPIN##*/}\$" && { echo "desk-kit.sh: another /run drop-in on lamp-voice; not starting" >&2; trap - EXIT; exit 3; }
+# Any drop-in there, the kit's own name included (another run's, or one left behind), and it does not start.
+lamp "ls ${DROPIN%/*}/ 2>/dev/null" | grep . && { echo "desk-kit.sh: a /run drop-in is on lamp-voice already (another run's or one left behind); not starting" >&2; trap - EXIT; exit 3; }
 pgrep -f "user-data-dir=$PROFILE" >/dev/null && { echo "desk-kit.sh: a face is already shown; not starting" >&2; trap - EXIT; exit 3; }
 n=0; for a in $ARMS; do n=$((n + 1)); done
-loan "desk kit $LABEL, lamp-voice + /run ${DROPIN##*/}, Mac voices${FACE:+ + a face on the Mac screen}, no person, ~$((n * (TRIALS * 8 + 3))) min"
+LOANED=yes; loan "desk kit $LABEL, lamp-voice + /run ${DROPIN##*/}, Mac voices${FACE:+ + a face on the Mac screen}, no person, ~$((n * (TRIALS * 8 + 3))) min"
 exec_line=
 if [[ -n $VOICE_BIN ]]; then
   exec_line=$(lamp "systemctl cat lamp-voice | grep '^ExecStart=.' | tail -1 | cut -d= -f2-")
@@ -151,8 +158,11 @@ arm() { # arm NAME:ENV=v,...
   envs=${envs//,/ }
   # An arm's value overrides BASE's for the same switch (systemd keeps the last), so only the last is checked.
   envs=$(printf '%s\n' $envs | awk -F= '{v[$1]=$0; if (!($1 in o)) {o[$1]=++n; k[n]=$1}} END{for (i=1;i<=n;i++) print v[k[i]]}' | tr '\n' ' ')
-  dropin "$1" "$exec_line" | "$LAMP_SSH" "sudo -n mkdir -p ${DROPIN%/*} && sudo -n tee $DROPIN >/dev/null && sudo -n systemctl daemon-reload && sudo -n systemctl restart lamp-voice" \
-    || { echo "desk-kit.sh: the drop-in could not be put on (sudo -n)" | tee -a "$LOG"; exit 4; }
+  # The first arm creates the file only if none is there (set -C): one written meanwhile is not taken over.
+  local make="sudo -n sh -c 'set -C; cat > $DROPIN'"; [[ -n $OWNED ]] && make="sudo -n tee $DROPIN >/dev/null"
+  OWNED=yes
+  { echo "$TOKEN"; dropin "$1" "$exec_line"; } | "$LAMP_SSH" "sudo -n mkdir -p ${DROPIN%/*} && $make && sudo -n systemctl daemon-reload && sudo -n systemctl restart lamp-voice" \
+    || { echo "desk-kit.sh: the drop-in could not be put on (sudo -n, or one is there already)" | tee -a "$LOG"; exit 4; }
   sleep 20
   local names; names=$(for e in $envs; do printf '%s|' "${e%%=*}"; done)
   local got; got=$(lamp "p=\$(systemctl show -p MainPID --value lamp-voice); sudo -n readlink /proc/\$p/exe; sudo -n cat /proc/\$p/environ | tr '\\0' '\\n' | grep -E '^(${names%|})=' | sort | tr '\\n' ' '")
