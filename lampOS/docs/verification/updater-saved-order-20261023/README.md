@@ -105,3 +105,8 @@ execution as a current-base run.
 formatting check from exact committed source `c02328dd7`, networking off.
 The latest integration ancestry was checked immediately before the own-branch
 push. Official PR ARM64 and Linux Clippy run separately on the new head.
+
+The original `3a332edd3` ARM64 run 39890406276 and Clippy run 39890406136
+both ended **cancelled** when the current-base carry was pushed. Their
+terminal states are retained in `superseded-native-state.json`; neither is
+counted as a successful native gate or substituted for the current-head run.
