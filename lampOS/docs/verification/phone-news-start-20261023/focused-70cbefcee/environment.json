@@ -1,0 +1,35 @@
+{
+  "base": "70cbefceee62c0bc4cad4ec0b7054335dd8f0a5d",
+  "run_path": "/private/tmp/tests-phone-news-start-70cbefcee-evidence-20261023/run-20261023T031009.481569Z",
+  "run_started_at": "2026-10-23T03:10:09.482177+00:00",
+  "run_finished_at": "2026-10-23T03:24:35.845214+00:00",
+  "test": "messages::tests::a_text_never_waits_on_the_news_for_the_phone",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_BUILD_TARGET": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTFLAGS": null,
+    "RUST_BACKTRACE": "0",
+    "RUST_TEST_THREADS": null
+  },
+  "path_value_omitted": {
+    "sha256": "2db016c7667ac4d5a4a753bf030da00184e7a76845c12f56803253e8ceca34a9",
+    "reason": "Local installation/user directory metadata; full original value is in external results.json"
+  },
+  "socket_bind": "passed",
+  "toolchain_command_id": "rustc",
+  "compiler_host": "x86_64-apple-darwin",
+  "binary_architecture": "Mach-O 64-bit executable x86_64",
+  "physical_hardware_and_translation": "Not established by this capture",
+  "concurrency": "One exact case per process, --test-threads=1. No matched or isolated host-load claim.",
+  "sample_timing_boundary": "External process launch through exit; compile excluded; full 2-second absence observation included. libtest elapsed retained separately.",
+  "gates_executed": false,
+  "run_terminal": "Parent reports session93171 terminal0; structured results report all prescribed observations matched. No terminal stdout stream supplied, so no invented stream or hash.",
+  "current_base_carry": "Parent carrying source to e5cd73aca for separate qualification; not covered by this receipt"
+}

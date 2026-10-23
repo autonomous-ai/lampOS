@@ -1,0 +1,10 @@
+{
+  "before_base": "70cbefceee62c0bc4cad4ec0b7054335dd8f0a5d",
+  "after_base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "patch_sha256": "6a85e3205664487c98f2aced6fb303315cc6af39079f17f91bcdc5ee7d7c0e65",
+  "files": {
+    "lampOS/crates/voice/src/messages.rs": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+    "lampOS/docs/messages.md": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3"
+  },
+  "complete_candidate_bytes_unchanged": true
+}

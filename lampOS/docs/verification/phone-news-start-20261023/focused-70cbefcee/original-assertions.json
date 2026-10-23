@@ -1,0 +1,22 @@
+[
+  {
+    "macro": "assert",
+    "text": "assert!(Instant::now() < until, \"the worker never listened\")"
+  },
+  {
+    "macro": "assert",
+    "text": "assert!(Instant::now() < until, \"the text waited: {got:?}\")"
+  },
+  {
+    "macro": "assert",
+    "text": "assert!(\n            sent_at.elapsed() < Duration::from_secs(2),\n            \"{:?}\",\n            sent_at.elapsed()\n        )"
+  },
+  {
+    "macro": "assert",
+    "text": "assert!(\n            got.iter().all(|out| out.part != ChatPart::TaskNews),\n            \"{got:?}\"\n        )"
+  },
+  {
+    "macro": "assert_eq",
+    "text": "assert_eq!(\n            got.last().map(|out| out.text.as_str()),\n            Some(\"Hi. Codex finished.\")\n        )"
+  }
+]

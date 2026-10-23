@@ -1,0 +1,90 @@
+Raw stream: normal-before/compile.stderr
+Payload bytes: 2746
+Payload SHA256: 22708ec6b4ae9f34c637faaa55f33234e41fe5d42778d2a8c140ce48327bd763
+BEGIN RAW PAYLOAD
+   Compiling lamp-ipc v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/ipc)
+   Compiling lamp-bus v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/turn-owner)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/msgs)
+   Compiling lamp-local-time v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/local-time)
+   Compiling lamp-camera v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/camera)
+   Compiling sonora v0.2.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/third_party/sonora)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/gemini)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/keeper)
+   Compiling lamp-lean v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/lean)
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/body)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/schedule)
+   Compiling lamp-actions v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/actions)
+   Compiling lamp-expression v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/expression)
+   Compiling lamp-ears v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/ears)
+   Compiling lamp-policy v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/policy)
+   Compiling lamp-health v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/health)
+   Compiling lamp-controls v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/controls)
+   Compiling lamp-tasks v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/tasks)
+   Compiling lamp-audio v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/audio)
+   Compiling lamp-ring v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/ring)
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/turn-end-wire)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/near-call)
+   Compiling lamp-voice-processes v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice-processes)
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 1m 58s
+END RAW PAYLOAD
+
+Raw stream: normal-after/compile.stderr
+Payload bytes: 166
+Payload SHA256: 7c4a8b50b3d032ae0d1812d9f5c33a102f0ea61b2720cee022ed265247097bcd
+BEGIN RAW PAYLOAD
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 1m 36s
+END RAW PAYLOAD
+
+Raw stream: healthy-delayed-start-before/compile.stderr
+Payload bytes: 166
+Payload SHA256: c893bf4f760c5be47a1c1334160358acc4090e6e8f47cd7f0768130d7f83c65a
+BEGIN RAW PAYLOAD
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 1m 48s
+END RAW PAYLOAD
+
+Raw stream: healthy-delayed-start-after/compile.stderr
+Payload bytes: 166
+Payload SHA256: 3bd9b6ad2f03448b9c5403514d26f86e5650d5cdcbe796413ed5cc7f507e063e
+BEGIN RAW PAYLOAD
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 1m 55s
+END RAW PAYLOAD
+
+Raw stream: delayed-start-no-preemption-before/compile.stderr
+Payload bytes: 166
+Payload SHA256: 8a98d48fb73174f80ca3c82a3b0f5c32dfa9aed5319544949fdd78351f391b78
+BEGIN RAW PAYLOAD
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 2m 01s
+END RAW PAYLOAD
+
+Raw stream: delayed-start-no-preemption-after/compile.stderr
+Payload bytes: 166
+Payload SHA256: 17f6c7cabf606ddb9f1a62fa6f0770be73283aca81f94894a7b91c1f86b2f73e
+BEGIN RAW PAYLOAD
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice)
+    Finished `test` profile [unoptimized] target(s) in 1m 39s
+END RAW PAYLOAD
+
+Raw stream: missing-ready-event-after/compile.stderr
+Payload bytes: 570
+Payload SHA256: 3e31f91d37426d263d3582b3dd2f869d1ebfcb5cf12a51f5acc4226c7af56dcc
+BEGIN RAW PAYLOAD
+   Compiling lamp-voice v0.1.0 (/private/tmp/tests-codex-phone-news-start-20261023/lampOS/crates/voice)
+warning: field `began` is never read
+   --> crates/voice/src/messages.rs:905:13
+    |
+904 |         struct SlowForThePhone {
+    |                --------------- field in this struct
+905 |             began: std::sync::Arc<tokio::sync::Notify>,
+    |             ^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `lamp-voice` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized] target(s) in 1m 37s
+END RAW PAYLOAD

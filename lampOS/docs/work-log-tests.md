@@ -1,5 +1,22 @@
 # Tests work log
 
+## 2026-10-23 10:40 +0700 — phone-news event control catches a false pass
+
+Ready for lamp-voice: no (full gates pending for the two-file #1806 slice).
+
+The [focused receipt](verification/phone-news-start-20261023/focused-70cbefcee/)
+retains all eleven prescribed observations on `70cbefcee`: three normal
+passes before and after, two healthy delayed-start passes, a false pass
+before and original-assertion failure after with broken preemption, and
+one missing-event readiness failure before response timing. The normal
+process-wall median changes from 3.394540 s to 3.128815 s. The complete
+two-second negative observation and all five original assertions remain.
+
+The [carry](verification/phone-news-start-20261023/carry-e5.json) preserves
+both authored files byte-for-byte on `e5cd73aca`; the focused evidence does
+not qualify that later base. Full checks are queued behind the boot-clock
+comparison. No product change, local ARM build or device access occurred.
+
 ## 2026-10-23 10:38 +0700 — prior-head ARM64 and Clippy census preserved
 
 Ready for lamp-voice: no (#3190, current gate and review hold remain).

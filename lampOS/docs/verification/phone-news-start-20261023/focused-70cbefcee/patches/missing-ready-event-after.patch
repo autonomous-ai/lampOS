@@ -1,0 +1,18 @@
+--- a/lampOS/crates/voice/src/messages.rs
++++ b/lampOS/crates/voice/src/messages.rs
+@@ -912,7 +912,6 @@
+             ) -> BoxFuture<'a, Result<Vec<ToolCall>, String>> {
+                 Box::pin(async move {
+                     if format!("{:?}", messages.last()).contains("Nobody wrote just now") {
+-                        self.began.notify_one();
+                         tokio::time::sleep(Duration::from_secs(30)).await;
+                         text("Codex finished, says the phone.");
+                     } else {
+@@ -953,6 +952,7 @@
+         tokio::time::timeout(Duration::from_secs(5), began.notified())
+             .await
+             .expect("phone-news round did not begin");
++        eprintln!("PHONE_NEWS_CONTROL_TEXT_TIMER_STARTED");
+         let sent_at = Instant::now();
+         let until = sent_at + Duration::from_secs(5);
+         while sends

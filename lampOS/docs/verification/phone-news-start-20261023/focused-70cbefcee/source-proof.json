@@ -1,0 +1,176 @@
+{
+  "base": "70cbefceee62c0bc4cad4ec0b7054335dd8f0a5d",
+  "base_tree": "dd8f7dc8f42c7db522c876ba989647087864add0",
+  "source_paths": 9991,
+  "source_bytes": 265276230,
+  "source_map_sha256": "d711b9900fd572d642dcbc6a060eda36d0733aae3357be8ee1612db8eee16110",
+  "aggregates": {
+    "normal-before": "ca283e6b1b00d09c5f5fa6eedc5f1a615f9953365728c449b0b6bdcdc637f42a",
+    "normal-after": "5260918e4ad5dff6c93a34913ecc7bd519bac6d622bece6ba70172ef78bac5d7",
+    "healthy-delayed-start-before": "734476a4982ebd30a474969912f0d1933837806309604f1009fe8d4a04760f8d",
+    "healthy-delayed-start-after": "caae26a6fb5861c6159771899c61d3d31a406cf412754342ecc4147771b40b4e",
+    "delayed-start-no-preemption-before": "e68061d884b22c64b10a34751422cec20009aca430bacb410eb29a2df8c9f330",
+    "delayed-start-no-preemption-after": "c95d0f397c1e746176adf1b0bfa707883975297a88ba6f37548bfd845a260fec",
+    "missing-ready-event-after": "4d51db418cebf2ae62f7df17bc044c89c8738aaaa9334b756b64e92859c6650d"
+  },
+  "variants": 7,
+  "observations": 11,
+  "commands": 40,
+  "verified_raw_streams": 80,
+  "inventory_tests": 3589,
+  "ignored": 14,
+  "assertions_per_variant": 5,
+  "response_and_quiet_tail_sha256": "43e1949d74da7bccec20a0ccd3360b3f888ba3b4999b1bf553634c55cb73cf8a",
+  "production_prefix_sha256": "fc9f0adee7b7f37ed160c11e26e67bcd98616ef2ac69484e8574e8731e3860c0",
+  "all_checks_passed": true,
+  "source": "lampOS/crates/voice/src/messages.rs",
+  "doc": "lampOS/docs/messages.md",
+  "before_source_sha256": "1bc28d917159472dcd6de1e2436c07b85f1215f9f67d8b39563e0bd339a62fb5",
+  "after_source_sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+  "before_doc_sha256": "60ac65a303056dbf6829e3b3eda24a0d1163ab359cfa18ad92e97c930b632ec9",
+  "after_doc_sha256": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3",
+  "base_source_git_blob": "3bbae6c36cdef540bbf26a523a5525bd6b69d7b4",
+  "base_doc_git_blob": "69162487753820b1affe7e8f6746b9441bc06799",
+  "changed_paths": [
+    "lampOS/crates/voice/src/messages.rs",
+    "lampOS/docs/messages.md"
+  ],
+  "source_reconstruction": "All 9,991 Git-tree paths/modes/blob bytes match the recorded source map after substituting the candidate messages.rs and messages.md. Every seven-variant aggregate independently recomputed from those bytes matches the run. Before arm differs from base only by the same candidate documentation used for both arms. No live working-tree or target artifact was modified or requalified.",
+  "aggregate_algorithm": "sorted path + NUL + Git mode + NUL + u64 big-endian length + bytes; symlinks use literal target bytes",
+  "source_freshness": {
+    "count": 9991,
+    "mtime_ns": 1792725011100911000,
+    "before_sha256": "5260918e4ad5dff6c93a34913ecc7bd519bac6d622bece6ba70172ef78bac5d7",
+    "after_sha256": "5260918e4ad5dff6c93a34913ecc7bd519bac6d622bece6ba70172ef78bac5d7",
+    "bytes_identical": true,
+    "algorithm": "sorted path + NUL + Git mode + NUL + u64 big-endian length + bytes; symlinks use literal target bytes"
+  },
+  "restorations": [
+    {
+      "label": "normal-before",
+      "at": "2026-10-23T03:12:31.291899+00:00",
+      "sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "exact_saved_bytes": true
+    },
+    {
+      "label": "normal-after",
+      "at": "2026-10-23T03:14:29.138688+00:00",
+      "sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "exact_saved_bytes": true
+    },
+    {
+      "label": "healthy-delayed-start-before",
+      "at": "2026-10-23T03:16:29.158539+00:00",
+      "sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "exact_saved_bytes": true
+    },
+    {
+      "label": "healthy-delayed-start-after",
+      "at": "2026-10-23T03:18:38.159828+00:00",
+      "sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "exact_saved_bytes": true
+    },
+    {
+      "label": "delayed-start-no-preemption-before",
+      "at": "2026-10-23T03:20:52.365250+00:00",
+      "sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "exact_saved_bytes": true
+    },
+    {
+      "label": "delayed-start-no-preemption-after",
+      "at": "2026-10-23T03:22:45.136700+00:00",
+      "sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "exact_saved_bytes": true
+    },
+    {
+      "label": "missing-ready-event-after",
+      "at": "2026-10-23T03:24:34.303261+00:00",
+      "sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "exact_saved_bytes": true
+    },
+    {
+      "label": "final",
+      "at": "2026-10-23T03:24:34.304314+00:00",
+      "sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "exact_saved_bytes": true
+    }
+  ],
+  "final_source_aggregate_sha256": "5260918e4ad5dff6c93a34913ecc7bd519bac6d622bece6ba70172ef78bac5d7",
+  "full_tail_preserved_all_seven_variants": true,
+  "authored_source_outside_exact_test_equal": true,
+  "authored_production_prefix_equal": true,
+  "patch_apply_checks": [
+    {
+      "patch": "patches/authored.patch",
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "/private/tmp/tests-phone-news-start-70cbefcee-evidence-20261023/prepared-public/patches/authored.patch"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0
+    },
+    {
+      "patch": "patches/healthy-delayed-start-before.patch",
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "/private/tmp/tests-phone-news-start-70cbefcee-evidence-20261023/prepared-public/patches/healthy-delayed-start-before.patch"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0
+    },
+    {
+      "patch": "patches/healthy-delayed-start-after.patch",
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "/private/tmp/tests-phone-news-start-70cbefcee-evidence-20261023/prepared-public/patches/healthy-delayed-start-after.patch"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0
+    },
+    {
+      "patch": "patches/delayed-start-no-preemption-before.patch",
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "/private/tmp/tests-phone-news-start-70cbefcee-evidence-20261023/prepared-public/patches/delayed-start-no-preemption-before.patch"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0
+    },
+    {
+      "patch": "patches/delayed-start-no-preemption-after.patch",
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "/private/tmp/tests-phone-news-start-70cbefcee-evidence-20261023/prepared-public/patches/delayed-start-no-preemption-after.patch"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0
+    },
+    {
+      "patch": "patches/missing-ready-event-after.patch",
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "/private/tmp/tests-phone-news-start-70cbefcee-evidence-20261023/prepared-public/patches/missing-ready-event-after.patch"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0
+    }
+  ]
+}

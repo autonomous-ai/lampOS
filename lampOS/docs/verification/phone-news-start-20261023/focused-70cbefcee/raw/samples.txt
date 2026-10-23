@@ -1,0 +1,232 @@
+Raw stream: normal-before/sample-1.stdout
+Payload bytes: 189
+Payload SHA256: dbe910c8b5e17233c7e110325d3862aaf471cfe6733463676de6c5d0d86715a5
+BEGIN RAW PAYLOAD
+
+running 1 test
+test messages::tests::a_text_never_waits_on_the_news_for_the_phone ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3588 filtered out; finished in 3.33s
+
+END RAW PAYLOAD
+
+Raw stream: normal-before/sample-1.stderr
+Payload bytes: 86
+Payload SHA256: 0aa9023a3d818dcf9d906f8bc87d48bb41c4c5a553b68e4e5b25abaca132ebbf
+BEGIN RAW PAYLOAD
+lamp-voice second: texts from the Autonomous app are answered here (LAMP_MESSAGES=on)
+END RAW PAYLOAD
+
+Raw stream: normal-before/sample-2.stdout
+Payload bytes: 189
+Payload SHA256: dbe910c8b5e17233c7e110325d3862aaf471cfe6733463676de6c5d0d86715a5
+BEGIN RAW PAYLOAD
+
+running 1 test
+test messages::tests::a_text_never_waits_on_the_news_for_the_phone ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3588 filtered out; finished in 3.33s
+
+END RAW PAYLOAD
+
+Raw stream: normal-before/sample-2.stderr
+Payload bytes: 86
+Payload SHA256: 0aa9023a3d818dcf9d906f8bc87d48bb41c4c5a553b68e4e5b25abaca132ebbf
+BEGIN RAW PAYLOAD
+lamp-voice second: texts from the Autonomous app are answered here (LAMP_MESSAGES=on)
+END RAW PAYLOAD
+
+Raw stream: normal-before/sample-3.stdout
+Payload bytes: 189
+Payload SHA256: 2d4d3bda79bd7eeb4123ba80a0146d6d9645794bad2ba4145fc1381697ab15a9
+BEGIN RAW PAYLOAD
+
+running 1 test
+test messages::tests::a_text_never_waits_on_the_news_for_the_phone ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3588 filtered out; finished in 3.32s
+
+END RAW PAYLOAD
+
+Raw stream: normal-before/sample-3.stderr
+Payload bytes: 86
+Payload SHA256: 0aa9023a3d818dcf9d906f8bc87d48bb41c4c5a553b68e4e5b25abaca132ebbf
+BEGIN RAW PAYLOAD
+lamp-voice second: texts from the Autonomous app are answered here (LAMP_MESSAGES=on)
+END RAW PAYLOAD
+
+Raw stream: normal-after/sample-1.stdout
+Payload bytes: 189
+Payload SHA256: e14072b4fa4ca5ec8c38bc329f931cdfca3fe0a9059991ed6bdda2e994786071
+BEGIN RAW PAYLOAD
+
+running 1 test
+test messages::tests::a_text_never_waits_on_the_news_for_the_phone ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3588 filtered out; finished in 3.07s
+
+END RAW PAYLOAD
+
+Raw stream: normal-after/sample-1.stderr
+Payload bytes: 86
+Payload SHA256: 0aa9023a3d818dcf9d906f8bc87d48bb41c4c5a553b68e4e5b25abaca132ebbf
+BEGIN RAW PAYLOAD
+lamp-voice second: texts from the Autonomous app are answered here (LAMP_MESSAGES=on)
+END RAW PAYLOAD
+
+Raw stream: normal-after/sample-2.stdout
+Payload bytes: 189
+Payload SHA256: e14072b4fa4ca5ec8c38bc329f931cdfca3fe0a9059991ed6bdda2e994786071
+BEGIN RAW PAYLOAD
+
+running 1 test
+test messages::tests::a_text_never_waits_on_the_news_for_the_phone ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3588 filtered out; finished in 3.07s
+
+END RAW PAYLOAD
+
+Raw stream: normal-after/sample-2.stderr
+Payload bytes: 86
+Payload SHA256: 0aa9023a3d818dcf9d906f8bc87d48bb41c4c5a553b68e4e5b25abaca132ebbf
+BEGIN RAW PAYLOAD
+lamp-voice second: texts from the Autonomous app are answered here (LAMP_MESSAGES=on)
+END RAW PAYLOAD
+
+Raw stream: normal-after/sample-3.stdout
+Payload bytes: 189
+Payload SHA256: e14072b4fa4ca5ec8c38bc329f931cdfca3fe0a9059991ed6bdda2e994786071
+BEGIN RAW PAYLOAD
+
+running 1 test
+test messages::tests::a_text_never_waits_on_the_news_for_the_phone ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3588 filtered out; finished in 3.07s
+
+END RAW PAYLOAD
+
+Raw stream: normal-after/sample-3.stderr
+Payload bytes: 86
+Payload SHA256: 0aa9023a3d818dcf9d906f8bc87d48bb41c4c5a553b68e4e5b25abaca132ebbf
+BEGIN RAW PAYLOAD
+lamp-voice second: texts from the Autonomous app are answered here (LAMP_MESSAGES=on)
+END RAW PAYLOAD
+
+Raw stream: healthy-delayed-start-before/sample-1.stdout
+Payload bytes: 189
+Payload SHA256: 7feff9bece2cecabddf96ac0dad13c668fc4b44cbd71524993329a83959f59b4
+BEGIN RAW PAYLOAD
+
+running 1 test
+test messages::tests::a_text_never_waits_on_the_news_for_the_phone ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3588 filtered out; finished in 3.76s
+
+END RAW PAYLOAD
+
+Raw stream: healthy-delayed-start-before/sample-1.stderr
+Payload bytes: 124
+Payload SHA256: 977bbf7a6f59f8f3a8abfb1aeb162b7079d653e71fe0a8d16401257a3386af34
+BEGIN RAW PAYLOAD
+PHONE_NEWS_CONTROL_TEXT_TIMER_STARTED
+lamp-voice second: texts from the Autonomous app are answered here (LAMP_MESSAGES=on)
+END RAW PAYLOAD
+
+Raw stream: healthy-delayed-start-after/sample-1.stdout
+Payload bytes: 189
+Payload SHA256: 9fc7a20fd2e25248fb02222d292f0a27e75b1b02e7315957376fe50eb9f8020c
+BEGIN RAW PAYLOAD
+
+running 1 test
+test messages::tests::a_text_never_waits_on_the_news_for_the_phone ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3588 filtered out; finished in 4.68s
+
+END RAW PAYLOAD
+
+Raw stream: healthy-delayed-start-after/sample-1.stderr
+Payload bytes: 163
+Payload SHA256: 5e5da119a3fa50b9fe32da0552dc629898c7bc576ccb6eac3cff2be8892678a4
+BEGIN RAW PAYLOAD
+lamp-voice second: texts from the Autonomous app are answered here (LAMP_MESSAGES=on)
+PHONE_NEWS_CONTROL_PHONE_ROUND_ENTERED
+PHONE_NEWS_CONTROL_TEXT_TIMER_STARTED
+END RAW PAYLOAD
+
+Raw stream: delayed-start-no-preemption-before/sample-1.stdout
+Payload bytes: 189
+Payload SHA256: 8fb7b526ae5ed5105c91ba12c97fd5cf6ccd8a38997976a5bb8daf9e0e89ab86
+BEGIN RAW PAYLOAD
+
+running 1 test
+test messages::tests::a_text_never_waits_on_the_news_for_the_phone ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3588 filtered out; finished in 3.77s
+
+END RAW PAYLOAD
+
+Raw stream: delayed-start-no-preemption-before/sample-1.stderr
+Payload bytes: 124
+Payload SHA256: 977bbf7a6f59f8f3a8abfb1aeb162b7079d653e71fe0a8d16401257a3386af34
+BEGIN RAW PAYLOAD
+PHONE_NEWS_CONTROL_TEXT_TIMER_STARTED
+lamp-voice second: texts from the Autonomous app are answered here (LAMP_MESSAGES=on)
+END RAW PAYLOAD
+
+Raw stream: delayed-start-no-preemption-after/sample-1.stdout
+Payload bytes: 285
+Payload SHA256: a54e7bcacf8a8bdaa063a7b4a82318cd47fe5c08ee16b3c85243b49370dd7f33
+BEGIN RAW PAYLOAD
+
+running 1 test
+test messages::tests::a_text_never_waits_on_the_news_for_the_phone ... FAILED
+
+failures:
+
+failures:
+    messages::tests::a_text_never_waits_on_the_news_for_the_phone
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3588 filtered out; finished in 7.62s
+
+END RAW PAYLOAD
+
+Raw stream: delayed-start-no-preemption-after/sample-1.stderr
+Payload bytes: 394
+Payload SHA256: d21973c46d1cec87d9dbbe584fee051f741096b112b27d38d9ea4978a4f4ef2e
+BEGIN RAW PAYLOAD
+lamp-voice second: texts from the Autonomous app are answered here (LAMP_MESSAGES=on)
+PHONE_NEWS_CONTROL_PHONE_ROUND_ENTERED
+PHONE_NEWS_CONTROL_TEXT_TIMER_STARTED
+
+thread 'messages::tests::a_text_never_waits_on_the_news_for_the_phone' (705686055) panicked at crates/voice/src/messages.rs:967:13:
+the text waited: []
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+END RAW PAYLOAD
+
+Raw stream: missing-ready-event-after/sample-1.stdout
+Payload bytes: 285
+Payload SHA256: 6f53f33acc44fc8a12bab1c0da12d401ceb6bc2c4d34ef67ec67d2efc402e6eb
+BEGIN RAW PAYLOAD
+
+running 1 test
+test messages::tests::a_text_never_waits_on_the_news_for_the_phone ... FAILED
+
+failures:
+
+failures:
+    messages::tests::a_text_never_waits_on_the_news_for_the_phone
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3588 filtered out; finished in 5.00s
+
+END RAW PAYLOAD
+
+Raw stream: missing-ready-event-after/sample-1.stderr
+Payload bytes: 341
+Payload SHA256: d3f6f8d62cdb1d40469598e5568f5fdbd49433d7b353178fcfe43e29c77dda26
+BEGIN RAW PAYLOAD
+lamp-voice second: texts from the Autonomous app are answered here (LAMP_MESSAGES=on)
+
+thread 'messages::tests::a_text_never_waits_on_the_news_for_the_phone' (705700187) panicked at crates/voice/src/messages.rs:954:14:
+phone-news round did not begin: Elapsed(())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+END RAW PAYLOAD

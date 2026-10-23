@@ -1,0 +1,51 @@
+--- a/lampOS/crates/voice/src/messages.rs
++++ b/lampOS/crates/voice/src/messages.rs
+@@ -913,6 +913,7 @@
+                 Box::pin(async move {
+                     if format!("{:?}", messages.last()).contains("Nobody wrote just now") {
+                         self.began.notify_one();
++                        eprintln!("PHONE_NEWS_CONTROL_PHONE_ROUND_ENTERED");
+                         tokio::time::sleep(Duration::from_secs(30)).await;
+                         text("Codex finished, says the phone.");
+                     } else {
+@@ -936,16 +937,22 @@
+             .unwrap()
+             .push(news("s1:4:1", "(Nobody has spoken. Codex finished.)"));
+         let began = std::sync::Arc::new(tokio::sync::Notify::new());
+-        let worker = tokio::spawn(serve_with(
+-            SlowForThePhone {
+-                began: began.clone(),
+-            },
+-            system(),
+-            no_tools(),
+-            Box::new(waiting),
+-            root.clone(),
+-            Unasked::after(Duration::ZERO),
+-        ));
++        let worker_root = root.clone();
++        let worker_began = began.clone();
++        let worker = tokio::spawn(async move {
++            tokio::time::sleep(Duration::from_millis(1600)).await;
++            serve_with(
++                SlowForThePhone {
++                    began: worker_began,
++                },
++                system(),
++                no_tools(),
++                Box::new(waiting),
++                worker_root,
++                Unasked::after(Duration::ZERO),
++            )
++            .await
++        });
+         let mut sends = bus
+             .publisher_declared(ChatIn::TOPIC, &ChatIn::declaration(), "cloud")
+             .unwrap();
+@@ -953,6 +960,7 @@
+         tokio::time::timeout(Duration::from_secs(5), began.notified())
+             .await
+             .expect("phone-news round did not begin");
++        eprintln!("PHONE_NEWS_CONTROL_TEXT_TIMER_STARTED");
+         let sent_at = Instant::now();
+         let until = sent_at + Duration::from_secs(5);
+         while sends
