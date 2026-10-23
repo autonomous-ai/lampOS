@@ -1,0 +1,84 @@
+{
+  "base": {
+    "head": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "tree": "c069dbad50071717a8cab4827d39ebc08bcac08b",
+    "role": "Exact qualification base, not latest lamp-voice."
+  },
+  "candidate": {
+    "worktree": "/private/tmp/tests-codex-boot-clock-current-20261023",
+    "head": "4e8ea747cd7dc745742283d6d08cb100297a8bfa",
+    "base_tree": "1a2db98b23f06944cbe06dd567f3ff3c11c0cae8",
+    "qualification_base": "09f8e7412f92870e16ccca14e1b9cdc1b14add48",
+    "branch": "tests/1569-boot-clock-current",
+    "tracked_paths": 10055,
+    "lampos_paths": 6709,
+    "source_aggregate_sha256": "f346596d5fa5ad67f19179739baf22ba50eb101a79e95e91f9e679d73501509d",
+    "owned_paths": [
+      "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "combined_authored_paths": [
+      "lampOS/crates/voice/src/coordinator/second.rs",
+      "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "lampOS/crates/voice/src/scenario_clock.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/stop_words.rs",
+      "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "source_map_sha256": "b92be8c24a20160abb688b967ac7b38fe75e013c0f605c38e772648c59f8e290",
+    "only_owned_files_differ_from_HEAD": true,
+    "overlay_limit": "HEAD is the equal-rebased boot commit; only reviewed peer source and combined doc are dirty. Execution does not yet bind a final combined commit.",
+    "record_context": "Historical source snapshot at the original gate; worktree and branch fields describe that capture, not their current contents.",
+    "post_execution_binding": {
+      "commit": "72a62a51c065002eeff4407dba77c56088e3649f",
+      "archive_ref": "refs/heads/tests/archive-3190-executed-combined-72a62a51c-20261023",
+      "receipt": "https://github.com/autonomous-ai/lampOS/tree/789cb57064/lampOS/docs/verification/voice-boot-clock-20261023/combined-09f8e7412/final-carry-be16c3327"
+    }
+  },
+  "source_inputs": [
+    {
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "base_sha256": "0c5187d595c326fda96aed34ca1c8faeb387bc946c34a23900c95480973c0674",
+      "candidate_sha256": "0c5187d595c326fda96aed34ca1c8faeb387bc946c34a23900c95480973c0674",
+      "captured_gate_row": {
+        "path": "lampOS/crates/voice/src/privacy_bus.rs",
+        "git_mode": "100644",
+        "base_blob": "8b608ea882644fb1673c7aebb9c24c7f33ecf481",
+        "bytes": 63219,
+        "sha256": "0c5187d595c326fda96aed34ca1c8faeb387bc946c34a23900c95480973c0674"
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+      "base_sha256": "418607b8c2f0b03895b7f4f083bd0fbe69e17045c07d7de1ff50ad8e0ca2afb4",
+      "candidate_sha256": "418607b8c2f0b03895b7f4f083bd0fbe69e17045c07d7de1ff50ad8e0ca2afb4",
+      "captured_gate_row": {
+        "path": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+        "git_mode": "100644",
+        "base_blob": "837fba9299772d5a49eeb56bfe35e32ad2d2de0c",
+        "bytes": 222082,
+        "sha256": "418607b8c2f0b03895b7f4f083bd0fbe69e17045c07d7de1ff50ad8e0ca2afb4"
+      }
+    }
+  ],
+  "candidate_reconstruction": {
+    "source_map_external": "/private/tmp/tests-3190-peer-fold-gates-20261023/source-map.json",
+    "source_map_sha256": "b92be8c24a20160abb688b967ac7b38fe75e013c0f605c38e772648c59f8e290",
+    "overlays": [
+      {
+        "path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+        "snapshot": "/private/tmp/tests-3190-peer-fold-gates-20261023/candidate-fixture_provider.rs",
+        "sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400"
+      },
+      {
+        "path": "lampOS/docs/voice-test-fixtures.md",
+        "snapshot": "/private/tmp/tests-3190-peer-fold-gates-20261023/candidate-voice-test-fixtures.md",
+        "sha256": "77388c4a7523c56e20e5cbe9406f721e52db4463be34482ff831b6a0dd884615"
+      }
+    ]
+  },
+  "limits": "The matched source arms are frozen historical inputs. These proposed controls do not qualify the carried/current PR head. Future execution must reconstruct and guard the complete source tree and bind actual compiled artifacts; none is captured for these patches yet."
+}

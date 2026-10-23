@@ -1,0 +1,46 @@
+{
+  "status": "PREPARED_UNRUN",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 3766,
+      "sha256": "76f52708b344b1842fd8baf9a7aa99c94f159bcde4e5c37763d5b1ef0230468b"
+    },
+    {
+      "path": "fixed-plan.json",
+      "bytes": 7868,
+      "sha256": "8a057d3f52aeb18b3cd9f3a6ba1ac1b4763611795242185ed1062332df41eebd"
+    },
+    {
+      "path": "patches.json",
+      "bytes": 22566,
+      "sha256": "6b0058c3af100fbf9c5fc5c66a30176c7653cc9f379dd6b9d3ba4f2317ab8ff5"
+    },
+    {
+      "path": "preservation.json",
+      "bytes": 2381,
+      "sha256": "29cc2f922e3003a590c644bc82d25b6dc9f955aacc1a3ccbae992cdd840ede7b"
+    },
+    {
+      "path": "review-inputs.json",
+      "bytes": 4340,
+      "sha256": "d88f01e44b266c6717530019d2b5f1afe24da9bb98196c1dc62e843fc18d8ac8"
+    },
+    {
+      "path": "source-binding.json",
+      "bytes": 4407,
+      "sha256": "2495b682364c265c7b6fc74c63ceb015e1eb5cb44061bf16574f6b69e80fb1ee"
+    }
+  ],
+  "validation": {
+    "json_parse": true,
+    "lossless_patch_envelopes": true,
+    "git_apply_check_and_full_result_bytes": true,
+    "all_original_assertions_byte_identical": true,
+    "no_tests_or_cargo_or_formatter_run": true,
+    "no_trailing_whitespace_or_extra_blank_EOF": true,
+    "readme_links_resolve": true,
+    "isolated_default_staged_git_diff_check_exit": 0
+  },
+  "execution_authorized": false
+}

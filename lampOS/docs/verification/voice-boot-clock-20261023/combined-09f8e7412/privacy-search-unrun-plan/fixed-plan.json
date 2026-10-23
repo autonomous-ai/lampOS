@@ -1,0 +1,106 @@
+{
+  "status": "PREPARED_UNRUN_PENDING_REVIEW; no execution grant",
+  "source_binding": "source-binding.json",
+  "patch_binding": "patches.json",
+  "fixed_invocation_count": 8,
+  "observations": [
+    {
+      "ordinal": 1,
+      "source_arm": "base",
+      "variant": "observation",
+      "case": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 60,
+      "expected": "Any complete original pass/failure is an observation; no retry and no waiver."
+    },
+    {
+      "ordinal": 2,
+      "source_arm": "base",
+      "variant": "observation",
+      "case": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 420,
+      "expected": "Any complete original pass/failure is an observation; no retry and no waiver."
+    },
+    {
+      "ordinal": 3,
+      "source_arm": "base",
+      "variant": "forced_boundaries",
+      "case": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 60,
+      "expected": "Exactly one original retry-exhaustion failure with privacy publisher unavailable, forced prepublication pause records and no malformed setup. Freshness must be assessed from captured stamps; expiry/other errors invalidate the intended boundary attribution."
+    },
+    {
+      "ordinal": 4,
+      "source_arm": "base",
+      "variant": "forced_boundaries",
+      "case": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 420,
+      "expected": "Exactly one original Run::assert_clean failure after forced-host-deadline marker; result must contain scenario host watchdog. Cleanup suffix is recorded as actually observed, not required: the initial waitid probe can already see an exited child. No separate-hang or historical-cause claim."
+    },
+    {
+      "ordinal": 5,
+      "source_arm": "candidate",
+      "variant": "observation",
+      "case": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 60,
+      "expected": "Any complete original pass/failure is an observation; no retry and no waiver."
+    },
+    {
+      "ordinal": 6,
+      "source_arm": "candidate",
+      "variant": "observation",
+      "case": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 420,
+      "expected": "Any complete original pass/failure is an observation; no retry and no waiver."
+    },
+    {
+      "ordinal": 7,
+      "source_arm": "candidate",
+      "variant": "forced_boundaries",
+      "case": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 60,
+      "expected": "Exactly one original retry-exhaustion failure with privacy publisher unavailable, forced prepublication pause records and no malformed setup. Freshness must be assessed from captured stamps; expiry/other errors invalidate the intended boundary attribution."
+    },
+    {
+      "ordinal": 8,
+      "source_arm": "candidate",
+      "variant": "forced_boundaries",
+      "case": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "execution": "Retained compiled library executable --exact CASE --nocapture --test-threads=1",
+      "outer_cap_seconds": 420,
+      "expected": "Exactly one original Run::assert_clean failure after forced-host-deadline marker; result must contain scenario host watchdog. Cleanup suffix is recorded as actually observed, not required: the initial waitid probe can already see an exited child. No separate-hang or historical-cause claim."
+    }
+  ],
+  "compile_plan": "Only after review/grant: for each source arm compile observation variant once, run its two exact cases once, restore; compile forced_boundaries once, run its two exact cases once, restore. Proposed command cargo test --offline --locked -p lamp-voice --lib --no-run --message-format=json-render-diagnostics. No full suite/gate and no automatic retry.",
+  "environment": {
+    "target": "/private/tmp/tests-codex-1569-target only with explicit exclusive CPU/target grant",
+    "permissions": "require_escalated for authorized Unix/loopback fixture sockets",
+    "PATH_prefix": "/Users/autonomous/.cargo/bin",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "RUST_BACKTRACE": "1",
+    "architecture": "Assert actual rustc host x86_64-apple-darwin and retained Mach-O x86_64 executable; physical hardware/translation remains unverified."
+  },
+  "before_each_case": [
+    "Verify exact source arm, complete source map/modes, only owned diagnostic deltas and unchanged original assertions.",
+    "Verify compiler-artifact path/hash and complete --list inventory matches the frozen arm; exactly one matching case; bind rustc/cargo/profile/features.",
+    "Verify executable SHA before and after; use an exclusive execution marker; retain command/cwd/env/start/finish/exit/raw streams and all outputs."
+  ],
+  "stop_conditions": [
+    "Any compile/format preflight error, source/artifact mismatch, invalid inventory, socket permission failure, unexpected setup panic, crash, outer timeout, trace overflow or failed forced-boundary validation stops remaining execution after bounded owned-group cleanup. Retain attempted/invalid/unrun distinctly.",
+    "A complete normal case failure at an original scenario assertion is retained as an observation; it does not authorize a retry or fix.",
+    "SIGINT/SIGTERM/exception must terminate and reap only the owned verified process group within a bounded cleanup, then restore exact source bytes/modes in finally. No orphan or arbitrary PID signalling.",
+    "Never add notice/is_late/source_gone/sources calls; never alter production clock, freshness, assertions or fixture deadlines to obtain the expected outcome."
+  ],
+  "external_cap_basis": "Privacy original read loop bounds plus ten attempts in each of two arms;60 s is external emergency containment. Search has two scenario arms, each with five child readiness waits bounded30 s, scope24 s and original supervisor cleanup;420 s covers that existing worst-case composition plus setup. These external caps do not change any fixture watchdog.",
+  "interpretation": "Normal traces address which boundary an observed execution reaches. Forced arms are attribution/boundary controls only: they force elapsed time after a chosen event and cannot establish why the earlier unscheduled failure occurred. No original failure is overwritten or waived. Search pause proves only the watchdog/cleanup boundary after fixture publication; it does not prove coordinator consumption or recreate the original semantic progress.",
+  "search_boundary_trigger": "After fixture publishes push (without observing coordinator consumption). The hold is inside the peer pump before the coordinator resumes; it is not a reproduction of the earlier trace that already recorded search_pushed."
+}

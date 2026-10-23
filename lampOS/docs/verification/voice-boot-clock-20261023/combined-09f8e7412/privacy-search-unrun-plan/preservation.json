@@ -1,0 +1,43 @@
+{
+  "checks": [
+    {
+      "variant": "observation",
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "original_assertion_count": 46,
+      "all_assertion_invocations_byte_identical": true,
+      "assertion_sequence_sha256": "317e68020b12dc497679d0c0f2ecc5321cd6b94d779ee7404528da0d4dc55ce9",
+      "production_prefix_and_other_tests_unchanged": true
+    },
+    {
+      "variant": "observation",
+      "path": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+      "original_assertion_count": 506,
+      "all_assertion_invocations_byte_identical": true,
+      "assertion_sequence_sha256": "9fc9954c7deda7defb6b1851eda1b667328031bbf1a39e448b06e2aa4c5a89e1",
+      "production_prefix_and_other_tests_unchanged": "Entire file is in the cfg(test) coordinator test module; only test helpers changed; selected test body unchanged."
+    },
+    {
+      "variant": "forced_boundaries",
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "original_assertion_count": 46,
+      "all_assertion_invocations_byte_identical": true,
+      "assertion_sequence_sha256": "317e68020b12dc497679d0c0f2ecc5321cd6b94d779ee7404528da0d4dc55ce9",
+      "production_prefix_and_other_tests_unchanged": true
+    },
+    {
+      "variant": "forced_boundaries",
+      "path": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+      "original_assertion_count": 506,
+      "all_assertion_invocations_byte_identical": true,
+      "assertion_sequence_sha256": "9fc9954c7deda7defb6b1851eda1b667328031bbf1a39e448b06e2aa4c5a89e1",
+      "production_prefix_and_other_tests_unchanged": "Entire file is in the cfg(test) coordinator test module; only test helpers changed; selected test body unchanged."
+    }
+  ],
+  "unchanged_contracts": [
+    "Privacy ten attempts per arm; 500 ms read watchdog; original2 ms polling; 50 ms lease and10 ms topic period; no added notice/is_late/source_gone/sources/recv calls.",
+    "Search LIMIT12 s/logical and scope24 s host; all ready-child barriers; original supervisor300 ms shutdown; same wait_child_exited invocation and original assertion bodies; no added process signalling/probes."
+  ],
+  "patch_apply_and_complete_byte_comparison": true,
+  "compiled_or_formatted": false,
+  "caveat": "Source-only checks do not establish Rust type correctness, runtime behavior or no observation overhead. No Cargo/rustfmt/test command was run."
+}

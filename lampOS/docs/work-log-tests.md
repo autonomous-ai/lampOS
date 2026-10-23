@@ -1,5 +1,24 @@
 # Tests work log
 
+## 2026-10-23 23:16 +0700 — privacy and search controls prepared, unrun
+
+Ready for lamp-voice: no; proposal only, with execution pending review.
+
+The [fixed diagnostic proposal](verification/voice-boot-clock-20261023/combined-09f8e7412/privacy-search-unrun-plan/)
+contains exact fixture-only patches and eight planned exact-case observations
+across the frozen base and original combined execution. Root verified every
+payload and applied all four patches to isolated source copies, checking exact
+result hashes; both input files match the archived combined source. Original
+assertions and timing bounds are preserved. No Cargo, formatter or test ran.
+
+Privacy records passive counters and stored stamps without extra notice reads.
+Search records existing transitions and exit probes. Its proposed forced wait
+begins after the fixture publishes a push, without observing coordinator
+consumption. Neither forced boundary would establish the historical cause.
+The original capture metadata is explicitly historical and linked to the
+preserved combined commit. Additional execution remains with reviewer-two's
+patch/plan read; the independent Skills fixture repair continues meanwhile.
+
 ## 2026-10-23 23:12 +0700 — combined head native checks green
 
 Ready for lamp-voice: no; green native checks do not waive the failed local gate.
