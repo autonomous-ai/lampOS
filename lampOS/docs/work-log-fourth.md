@@ -8139,3 +8139,43 @@ timeouts were preserved. Evidence:
 The wire-contract tests are now staged before the production correction;
 that correction has not run. The original-capture contract remains with
 the first builder. No physical consent, activation or score increase is claimed.
+
+## 2026-10-23 20:02 +07: Common pushed on train 49 and Photo wire reproduced
+
+Ready for lamp-voice: no (#3064 native gate and reviews pending)
+
+Common #3064 is pushed as one commit 00c790722, parent 810e05109,
+tree caa0e61cc. Range-diff from 71275b221 changes one test fixture prefix
+and appended-document context only. The scratch correction first passed
+both host gates on tree 5f5c1056d, then was folded into that one commit.
+Its initial filename-based test filter selected zero tests and was rejected;
+the correctly qualified privacy module passed all nine tests on each host.
+The rebase retained both complete reuse-decision sections and every Peek
+addition; no Common runtime or assertion changed.
+
+The exact final head passes formatting and strict workspace/all-target
+Clippy on Mac and Linux. Scratch census passes 1/0 and privacy 9/0 on each;
+ServiceTrace passes 6/0 on Mac and 7/0 on Linux. Every tracked source byte,
+mode, mtime and semantic index entry remained stable, and all target owners
+confirmed cleanup before release. Receipt:
+/private/tmp/fourth-common-final-base-carry-checks-20261023/final-receipt.json.
+Fresh ARM64 39957390695 and Clippy 39957390652 are running. The earlier
+native census failure and Linux Skills observer failure remain retained.
+Current reviewer dispositions, compatible pins and First's physical checks
+still gate acceptance; no lamp or score claim is made.
+
+Photo's actual scoped-route wire controls reproduced the wrong JSON field:
+12 tests gave 8/4/0, and nine photo-face tests gave 8/1/0. All five failures
+identified emitted photo_speaker where Eyes expects face; the negative
+older-peer case did not demonstrate an extra request or retry. The exact
+one-key production correction and matching docs are now under focused
+GREEN checks on tree 7a9c4ecf9. Its old base is explicit; those results
+cannot qualify the later current-Common carry. The carry drops obsolete
+Eyes code in favor of current forced-look consent and preserves typed
+Pending/Ready/Lost handling; new path-specific controls are being prepared.
+Original microphone provenance still needs First's contract decision.
+
+Name's five-path source preparation preserves current Common runtime.
+Review corrected its product-unit table cell and clarified that only terminal
+Lost cannot revive; a previously proved same-epoch Pending request may resume.
+Its own gate, published carry and physical acceptance remain pending.
