@@ -140,3 +140,23 @@ records a clean computed merge with all eight authored files identical and
 the same builder rules. This comparison did not change the reviewed branch
 and is not a new execution: First must gate the later train composition.
 No lamp, physical unplug, flash durability or real-key release is claimed.
+
+## Train 31 and the landed source
+
+#3186 landed through [train #3192](https://github.com/autonomous-ai/lampOS/pull/3192)
+at `498aca8a2` (10:34 +07). Its updater commit is `e3d9324df`; range-diff
+from reviewed `c02328dd7` is `=`, all eight authored files match, and the
+complete landed tree matches tested train `f42887330`.
+
+The actual train ARM64 gate, run **39893963040**, reports **10,927 passed /
+0 failed / 68 skipped**, one passing leaky case; Linux Clippy run
+**39893962998** passed. [Train receipts](train31/README.md) contain both
+complete raw logs, checkout and landing bindings, 35 specific result lines,
+and the artifact identity. The CLI exec case is **0.135 s** and the SIGKILL
+harness **3.559 s** on this composition. #3130's reviewed carry also landed;
+its source comparison and scoped read are retained beside the native proof.
+
+This completes the software carry and required gates. #2810's actual
+candidate/fallback, observer and attended 52e6 unplug remain with First,
+Fifth and the attending person. #1812's protected publisher/real-key run
+follows attended acceptance. No lamp or real release was performed here.

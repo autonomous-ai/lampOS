@@ -1,0 +1,64 @@
+{
+  "observed_at_utc": "2026-10-23T03:36:26.241555+00:00",
+  "train_pr": 3192,
+  "train_head": "f42887330292883f225b147df64c0846e84588dc",
+  "base": "e5cd73aca116e6bb52fbc41fdd0094b8bf10f5bc",
+  "landed_integration": "498aca8a2c37e02dcdcde9e15d297cedc52040fc",
+  "landed_updater_commit": "e3d9324df784240274e9202398cc3db909ae6ea9",
+  "train_tree": "64df58a42de788c4677d449fbde2f1fa9fd402e6",
+  "landed_tree": "64df58a42de788c4677d449fbde2f1fa9fd402e6",
+  "complete_tree_identical": true,
+  "reviewed_head": "c02328dd77486b3b7c381ede9f0d4b5365cf3d4f",
+  "range_diff": "1:  c02328dd7 = 1:  e3d9324df lampOS: save rollback order before replacing units\n",
+  "files": [
+    {
+      "path": "lampOS/crates/update/src/records.rs",
+      "reviewed_sha256": "8d561cb9619f6bee959ab666409043672cf71766e868c5b1f2f285f9137735f3",
+      "landed_sha256": "8d561cb9619f6bee959ab666409043672cf71766e868c5b1f2f285f9137735f3",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/update/src/round.rs",
+      "reviewed_sha256": "8c30f94ec870a3b2b4d2901623364e7d14cb71b32b1d66fcc3d0d96be12af299",
+      "landed_sha256": "8c30f94ec870a3b2b4d2901623364e7d14cb71b32b1d66fcc3d0d96be12af299",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/update/tests/fixtures/stores/README.md",
+      "reviewed_sha256": "75af3b67ba178a21f66dd8b4a124aa4b434df605d4d06a67e4f48725de86c015",
+      "landed_sha256": "75af3b67ba178a21f66dd8b4a124aa4b434df605d4d06a67e4f48725de86c015",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/update/tests/fixtures/stores/journal-2026-10-23.json",
+      "reviewed_sha256": "957d5640ee1268de2b88718876e972fce64272668ffc7c205ac9364728133a02",
+      "landed_sha256": "957d5640ee1268de2b88718876e972fce64272668ffc7c205ac9364728133a02",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/update/tests/fixtures/stores/state-2026-10-23.json",
+      "reviewed_sha256": "233dde8f72ac8db24b29d53ae2ceb5c2522ac872e8758cc4e531384a7df90838",
+      "landed_sha256": "233dde8f72ac8db24b29d53ae2ceb5c2522ac872e8758cc4e531384a7df90838",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/restart_order.rs",
+      "reviewed_sha256": "a5ccc9f79612fbf2edb547e70910b17adc9dd0d01b3e21150ac7477c8ecf8acc",
+      "landed_sha256": "a5ccc9f79612fbf2edb547e70910b17adc9dd0d01b3e21150ac7477c8ecf8acc",
+      "identical": true
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "reviewed_sha256": "ce655703dfb31a0ab5fae07e0d9669473a746eae6d2902b05065ba7f56f10892",
+      "landed_sha256": "ce655703dfb31a0ab5fae07e0d9669473a746eae6d2902b05065ba7f56f10892",
+      "identical": true
+    },
+    {
+      "path": "lampOS/docs/verification/updater-saved-order-20261023/README.md",
+      "reviewed_sha256": "0799b27edad2f4054d3557e0ff494b48864fface1d9ddc3247128af39ec83e67",
+      "landed_sha256": "0799b27edad2f4054d3557e0ff494b48864fface1d9ddc3247128af39ec83e67",
+      "identical": true
+    }
+  ],
+  "limits": "Source and native-CI evidence only. No lamp, physical unplug, flash-durability or real-key release result."
+}
