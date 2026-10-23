@@ -92,6 +92,162 @@ fn heartbeat(value: &mut TouchReceiver, through: u64, retained: Vec<TouchEvent>)
     sequence
 }
 
+fn with_additive_fields<T: serde::Serialize + serde::de::DeserializeOwned>(original: &T) -> T {
+    fn decorate(wire: &mut serde_json::Value) {
+        wire["metadata"] = serde_json::json!({"writer": "next_build", "notes": ["ignored"]});
+        wire["permit"] = serde_json::json!({
+            "allowed": true, "enabled": true, "ready": true,
+            "clock_id": "boot", "session_id": "controls", "reader_session_id": "reader",
+            "expires_us": u64::MAX
+        });
+        for field in ["sources", "latest"] {
+            if let Some(children) = wire
+                .get_mut(field)
+                .and_then(serde_json::Value::as_array_mut)
+            {
+                children.iter_mut().for_each(decorate);
+            }
+        }
+    }
+    let mut wire = serde_json::to_value(original).unwrap();
+    decorate(&mut wire);
+    serde_json::from_value(wire).expect("unknown touch fields must be ignored")
+}
+
+#[test]
+fn additive_fields_preserve_delivery_and_deduplication() {
+    for retained in [false, true] {
+        let mut r = receiver();
+        let original = event(1, 10_000, 30_000);
+        let e: TouchEvent = with_additive_fields(&original);
+        assert_eq!(e, original);
+        let original = state(
+            30_000,
+            2,
+            1,
+            if retained { vec![e.clone()] } else { vec![] },
+        );
+        let s: TouchState = with_additive_fields(&original);
+        assert_eq!(s, original);
+        let accepted = r.observe(30_000, &s).unwrap();
+        if retained {
+            assert_eq!(accepted, std::slice::from_ref(&e));
+        } else {
+            assert!(accepted.is_empty());
+            assert_eq!(r.event(30_000, &e).unwrap(), Some(e.clone()));
+        }
+        assert!(r.event(30_000, &e).unwrap().is_none());
+        assert!(r.observe(30_000, &s).unwrap().is_empty());
+        let mut next = s;
+        next.stamp.sequence += 1;
+        next.stamp.at_us += 1;
+        next.sources[0].observed_us = Some(30_001);
+        assert!(
+            r.observe(30_001, &with_additive_fields(&next))
+                .unwrap()
+                .is_empty()
+        );
+    }
+}
+
+#[test]
+fn additive_fields_do_not_authorize_invalid_states() {
+    for case in ["disabled", "stale", "future", "foreign_clock"] {
+        let mut r = receiver();
+        let mut s = state(30_000, 2, 1, Vec::new());
+        let now = match case {
+            "disabled" => {
+                s.enabled = false;
+                30_000
+            }
+            "stale" => 30_000 + TOUCH_STATE_TTL_US,
+            "future" => {
+                s.stamp.at_us += 1;
+                30_000
+            }
+            "foreign_clock" => {
+                s.stamp.clock_id = "other".into();
+                30_000
+            }
+            _ => unreachable!(),
+        };
+        s.check().unwrap();
+        let decoded = with_additive_fields(&s);
+        assert_eq!(decoded, s);
+        assert!(r.observe(now, &decoded).is_err(), "{case}");
+    }
+}
+
+#[test]
+fn additive_fields_do_not_authorize_invalid_events() {
+    for case in [
+        "disabled",
+        "stale",
+        "future",
+        "foreign_clock",
+        "owner",
+        "reader",
+    ] {
+        let mut r = receiver();
+        let mut e = event(1, 10_000, 30_000);
+        let now = match case {
+            "disabled" => {
+                e.enabled = false;
+                30_000
+            }
+            "stale" => 30_000 + TOUCH_INPUT_TTL_US,
+            "future" => {
+                e.stamp.at_us += 1;
+                30_000
+            }
+            "foreign_clock" => {
+                e.stamp.clock_id = "other".into();
+                30_000
+            }
+            "owner" => {
+                e.session_id = "other".into();
+                30_000
+            }
+            "reader" => {
+                e.reader_session_id = "other".into();
+                30_000
+            }
+            _ => unreachable!(),
+        };
+        // Keep the current state/source fresh, isolating the event's refusal.
+        let s = with_additive_fields(&state(now, 2, 1, Vec::new()));
+        assert!(r.observe(now, &s).unwrap().is_empty());
+        e.check().unwrap();
+        let decoded = with_additive_fields(&e);
+        assert_eq!(decoded, e);
+        assert!(r.event(now, &decoded).is_err(), "{case}");
+        // Refusing the bad event must not consume its identity.
+        let valid = with_additive_fields(&event(1, now - 20_000, now));
+        assert_eq!(r.event(now, &valid).unwrap(), Some(valid), "{case}");
+    }
+}
+
+#[test]
+fn additive_fields_do_not_restore_retired_owner_or_reader() {
+    for replace_reader in [false, true] {
+        let mut r = receiver();
+        let mut replacement = state(10, 2, 0, Vec::new());
+        if replace_reader {
+            replacement.sources[0].reader_session_id = Some("reader2".into());
+        } else {
+            replacement.session_id = "controls2".into();
+        }
+        // New sessions are valid transitions; only the retired one is refused.
+        assert!(
+            r.observe(10, &with_additive_fields(&replacement))
+                .unwrap()
+                .is_empty()
+        );
+        let retired = with_additive_fields(&state(20, 3, 0, Vec::new()));
+        assert!(r.observe(20, &retired).is_err());
+    }
+}
+
 #[test]
 fn retained_touch_sleep_and_reset_do_not_replay_on_subscribe() {
     for e in [event(1, 10, 20_010), sleep(1, 10, 2_000_010)] {
