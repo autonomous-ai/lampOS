@@ -5,6 +5,7 @@
 //! ([`Permit::heard`]).
 
 use std::os::unix::net::UnixDatagram;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -90,6 +91,9 @@ pub struct Permit {
     at: Arc<Mutex<Option<Instant>>>,
     /// Datagrams that are not a permission, newest last, at most [`HEARD`].
     others: Arc<Mutex<Vec<Vec<u8>>>>,
+    /// Which hold this is ([`Permit::held`]): one more at each close and at
+    /// each permission after one ran out, changed only under `at`'s lock.
+    hold: Arc<AtomicU64>,
 }
 
 /// Datagrams other than a permission kept for the loop at most: an older
@@ -104,6 +108,7 @@ impl Permit {
         let permit = Permit::default();
         let at = Arc::clone(&permit.at);
         let others = Arc::clone(&permit.others);
+        let hold = Arc::clone(&permit.hold);
         std::thread::Builder::new()
             .name("permit".into())
             .spawn(move || {
@@ -123,7 +128,11 @@ impl Permit {
                             continue;
                         }
                     };
-                    *at.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = heard;
+                    let mut at = at.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                    if heard.is_none() || at.is_none_or(|at| at.elapsed() >= STALE) {
+                        hold.fetch_add(1, Ordering::Relaxed);
+                    }
+                    *at = heard;
                 }
             })?;
         Ok(permit)
@@ -146,6 +155,18 @@ impl Permit {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .is_some_and(|at| at.elapsed() < STALE)
+    }
+
+    /// The hold the camera may be open under now, or `None`: another once
+    /// it was taken back or ran out, though it is given again. A photo yes
+    /// waits only within one (`photo::PendingYes`, #2856).
+    pub fn held(&self) -> Option<u64> {
+        let at = self
+            .at
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        at.is_some_and(|at| at.elapsed() < STALE)
+            .then(|| self.hold.load(Ordering::Relaxed))
     }
 
     /// A camera that has just opened, kept only if the permission still
@@ -178,6 +199,35 @@ mod tests {
             std::thread::sleep(Duration::from_millis(1));
         }
         (permit, voice)
+    }
+
+    /// A photo yes waits within one hold (#2856): a renewal keeps it; a
+    /// close, though the permission comes again, or one run out, is another.
+    #[test]
+    fn each_close_and_each_permission_after_one_ran_out_is_another_hold() {
+        let (permit, voice) = permitted();
+        let first = permit.held().unwrap();
+        let heard = |permit: &Permit, wanted: bool| {
+            let waited = Instant::now();
+            while permit.held().is_some() != wanted {
+                assert!(waited.elapsed() < Duration::from_secs(1), "never heard");
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        };
+        voice.send(br#"{"camera":true}"#).unwrap();
+        std::thread::sleep(OPENING);
+        assert_eq!(permit.held(), Some(first));
+        voice.send(br#"{"camera":false}"#).unwrap();
+        heard(&permit, false);
+        voice.send(br#"{"camera":true}"#).unwrap();
+        heard(&permit, true);
+        let second = permit.held().unwrap();
+        assert_ne!(second, first);
+        *permit.at.lock().unwrap() = Instant::now().checked_sub(Duration::from_millis(1_600));
+        assert_eq!(permit.held(), None);
+        voice.send(br#"{"camera":true}"#).unwrap();
+        heard(&permit, true);
+        assert_ne!(permit.held(), Some(second));
     }
 
     #[test]
