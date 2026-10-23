@@ -1,0 +1,44 @@
+
+#[test]
+fn install_review_head_pair_refuses_a_removed_mute_before_mutation() {
+    const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
+    const DROP_IN: &str = "/etc/systemd/system/lamp-voice.service.d/40-local-command.conf";
+    const VOICE: &str = "/etc/systemd/system/lamp-voice.service";
+    const EXPRESSION: &str = "/etc/systemd/system/lamp-expression.service";
+    let mut lamp = Lamp::new(188, &[]);
+    let product_voice = PRODUCT.iter().find(|(name, _)| *name == "lamp-voice.service").unwrap().1;
+    let exec = product_voice.lines().find(|line| line.starts_with("ExecStart=")).unwrap();
+    let mute = " --controls-mute /var/lib/lampOS/voice/mute/record.json";
+    assert!(exec.contains(mute));
+    let command = exec.replace(mute, "");
+    assert!(!command.contains("--controls-mute"));
+    let drop_in = format!("[Service]\nExecStart=\n{command}\n");
+    let mut pins: serde_json::Value = serde_json::from_str(
+        SETTINGS.iter().find(|(path, _)| *path == PINS).unwrap().1,
+    ).unwrap();
+    pins["legacy_head"] = true.into();
+    pins["review_owned_marker"] = "keep this local value".into();
+    let before_pins = serde_json::to_string_pretty(&pins).unwrap();
+    for path in [PINS, DROP_IN] {
+        fs::create_dir_all(lamp.on(path).parent().unwrap()).unwrap();
+    }
+    fs::write(lamp.on(PINS), &before_pins).unwrap();
+    fs::write(lamp.on(DROP_IN), &drop_in).unwrap();
+    let before_voice = fs::read(lamp.on(VOICE)).ok();
+    let before_expression = fs::read(lamp.on(EXPRESSION)).ok();
+    let result = lamp.install();
+    let after_pins: serde_json::Value = serde_json::from_slice(&fs::read(lamp.on(PINS)).unwrap()).unwrap();
+    let voice = fs::read_to_string(lamp.on(VOICE)).unwrap_or_default();
+    let expression = fs::read_to_string(lamp.on(EXPRESSION)).unwrap_or_default();
+    eprintln!(
+        "removed_mute_override=true, install_ok={}, legacy_head={:?}, base_voice_head={}, base_expression_head={}, drop_in_kept={}, override_has_mute={}",
+        result.is_ok(), after_pins.get("legacy_head"),
+        voice.contains("Environment=LAMP_HEAD_TOUCH=on"), expression.contains(" --head-touch"),
+        fs::read_to_string(lamp.on(DROP_IN)).unwrap() == drop_in, command.contains("--controls-mute"),
+    );
+    assert_eq!(fs::read_to_string(lamp.on(DROP_IN)).unwrap(), drop_in);
+    assert!(result.is_err(), "install admitted head-enabled Expression beside a preserved Voice command without --controls-mute");
+    assert_eq!(fs::read_to_string(lamp.on(PINS)).unwrap(), before_pins);
+    assert_eq!(fs::read(lamp.on(VOICE)).ok(), before_voice);
+    assert_eq!(fs::read(lamp.on(EXPRESSION)).ok(), before_expression);
+}

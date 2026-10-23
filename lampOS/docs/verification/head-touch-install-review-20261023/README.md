@@ -66,3 +66,19 @@ This is a separate P2 on #2948. Third's READ-OK on #3269 `46f5f384a` remains
 for that prerequisite's corrected update-round scope. First owns the carry
 and routes its repair; there is no competing product patch. No lamp access,
 ARM64 linking, acoustic measurement or observed privacy failure occurred.
+
+## Requested command-override control
+
+The privacy reader requested the same boundary with a preserved `ExecStart`
+override removing `--controls-mute`. The [added fixture](mute-regression.rs.txt)
+keeps the previous two controls byte-for-byte. On the same exact head and
+pinned host setup, `cargo test -q --locked --offline -p lamp-update --test
+install install_review_head_pair_refuses_a_removed_mute_before_mutation --
+--test-threads=1 --nocapture` gives **0 passed, 1 failed**, exit 101, 6.92 s.
+The [raw result](mute-result.txt) confirms install succeeds, removes legacy
+delivery, retains the command override without mute, and enables both base
+head readers. This is also an admission/file result, not runtime observation.
+
+First assigned the install repair to Third's combined carry at 21:21 on the
+Queue. It will be developed on Third's own branch; no other builder's branch
+will be pushed. The audible-cue prerequisite retains its separate owner.

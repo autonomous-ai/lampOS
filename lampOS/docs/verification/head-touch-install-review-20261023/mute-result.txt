@@ -1,0 +1,17 @@
+
+running 1 test
+removed_mute_override=true, install_ok=true, legacy_head=None, base_voice_head=true, base_expression_head=true, drop_in_kept=true, override_has_mute=false
+
+thread 'install_review_head_pair_refuses_a_removed_mute_before_mutation' (229962692) panicked at crates/update/tests/install.rs:4354:5:
+install admitted head-enabled Expression beside a preserved Voice command without --controls-mute
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+install_review_head_pair_refuses_a_removed_mute_before_mutation --- FAILED
+
+failures:
+
+failures:
+    install_review_head_pair_refuses_a_removed_mute_before_mutation
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 83 filtered out; finished in 6.92s
+
+error: test failed, to rerun pass `-p lamp-update --test install`
