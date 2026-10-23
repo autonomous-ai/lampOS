@@ -1,0 +1,49 @@
+--- a/lampOS/crates/memory/tests/it/voice.rs
++++ b/lampOS/crates/memory/tests/it/voice.rs
+@@ -684,17 +684,16 @@
+         Some(&id),
+     );
+     assert!(ok, "{told}");
+-    assert_eq!(told, json!({"forgotten":true}));
++    assert_eq!(told["forgotten"], false, "older Memory must refuse: {told}");
+     // #3113's older-memory probe first (Second's second P2 on #3130): this
+     // memory lists, so the forget is sent. An older one refuses the probe
+     // and is sent no forget (the voice's unit test).
+     let (probe, listed) = fixture.next("kept");
+     assert_eq!(probe["observations"], true);
+-    assert_eq!(listed["ok"], true, "{listed}");
+-    assert_eq!(
+-        fixture.next("forget").0,
+-        json!({"op":"forget","person":id.as_str(),"id":noticed})
+-    );
++    assert_eq!(listed["ok"], false, "{listed}");
++    assert_eq!(listed["error"], "bad_request");
++    let trace: Vec<_> = fixture.trace.try_iter().collect();
++    assert!(trace.iter().all(|(request,_)| !matches!(request["op"].as_str(),Some("forget" | "forget_last"))), "no deletion may be sent: {trace:?}");
+     let db = Connection::open_with_flags(
+         fixture.root.join("store").join(DATABASE),
+         OpenFlags::SQLITE_OPEN_READ_ONLY,
+@@ -713,17 +712,16 @@
+         .unwrap()
+         .collect::<Result<Vec<_>, _>>()
+         .unwrap();
+-    assert_eq!(
+-        left,
+-        [(kept, "kept".to_owned(), KEEP.to_owned())],
+-        "forgetting follow-up {noticed} and its evidence {said} must preserve unrelated keep {kept}"
+-    );
++    assert_eq!(left.len(), 3, "nothing may be deleted: {left:?}");
++    assert!(left.iter().any(|row|row.0==kept && row.1=="kept" && row.2==KEEP), "unrelated keep survives: {left:?}");
++    assert!(left.iter().any(|row|row.0==noticed && row.2==ABOUT), "observation survives: {left:?}");
++    assert!(left.iter().any(|row|row.0==said), "shared evidence survives: {left:?}");
+     let links: u64 = db
+         .query_row("SELECT count(*) FROM sources", [], |row| row.get(0))
+         .unwrap();
+     assert_eq!(
+-        links, 0,
+-        "the kept row must not retain a dangling evidence link"
++        links, 2,
++        "both original evidence links must be unchanged"
+     );
+ }
+ 

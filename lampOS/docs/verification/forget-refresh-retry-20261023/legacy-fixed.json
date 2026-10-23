@@ -1,0 +1,31 @@
+{
+  "head": "a1b8034bfed33e723b22e3779f98f81ea59c3511",
+  "legacy_runtime_head": "ae4ab0022a5716b8b393956d5e26fd1480aac350",
+  "host": "Darwin arm64; Rust 1.96.0",
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-memory",
+    "--test",
+    "it",
+    "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+    "--",
+    "--exact",
+    "--nocapture"
+  ],
+  "started_at_utc": "2026-10-23T01:57:52.830970+00:00",
+  "elapsed_seconds": 5.112,
+  "exit_code": 0,
+  "bound_files": 6520,
+  "inputs_unchanged": true,
+  "test_patch_sha256": "f77b8df7f2a42c9a2bbbb5c1a413e4d9b852506d48b29c1ab8130ce70f9c229c",
+  "log_sha256": "4af21ff14955c820687db9f4932edb724f6ac62cad36bc4836aadf57dcf5d89e",
+  "result_lines": [
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 157 filtered out; finished in 0.41s"
+  ]
+}
