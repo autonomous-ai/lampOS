@@ -1,0 +1,12 @@
+{
+  "command": [
+    "gh",
+    "api",
+    "repos/autonomous-ai/lampOS/actions/jobs/120188999822/logs"
+  ],
+  "collected_utc": "2026-10-23T01:58:02.942955+00:00",
+  "exit": 0,
+  "bytes": 1602418,
+  "sha256": "d141ab71e6b6b4b8a1d8d6b67509961e55881a1be515435092321fcea1edca11",
+  "stderr_bytes": 0
+}

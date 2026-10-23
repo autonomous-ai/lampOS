@@ -1,0 +1,79 @@
+{
+  "source_directory": "/private/tmp/tests-2964-boot-classification-20261023/read-authorized-20261023T015651556078Z",
+  "unchanged_exports": [
+    {
+      "path": "attempt-1-arm64-job.log.txt",
+      "source_sha256": "d141ab71e6b6b4b8a1d8d6b67509961e55881a1be515435092321fcea1edca11",
+      "bytes": 1602418,
+      "unchanged": true,
+      "source_path": "attempt-1-arm64-job.log"
+    },
+    {
+      "path": "attempt-1-arm64-job.stderr",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "unchanged": true
+    },
+    {
+      "path": "attempt-1-log-download.json",
+      "source_sha256": "90871391c6f49da1a2843f4f27ab0e10a3dd9105a60f24497bb5138b0e03b802",
+      "bytes": 297,
+      "unchanged": true
+    },
+    {
+      "path": "source-identity.json",
+      "source_sha256": "aecbb4f3358a1ae3e0d97c1669307787e06af9da1a78c2c19a27dacd7711e8f5",
+      "bytes": 7618,
+      "unchanged": true
+    },
+    {
+      "path": "corrected-fixture-relevant.patch",
+      "source_sha256": "56c885c1a54afec79658cb9191433fe15e85be8c0fe9ce12a135f5e6e14443f0",
+      "bytes": 6934,
+      "unchanged": true
+    },
+    {
+      "path": "corrected-voice-paths.txt",
+      "source_sha256": "ec36317fc0b69572b8b7c9eb730d5b48fd7123ac1af1a02e4a247aa57f6a5951",
+      "bytes": 365,
+      "unchanged": true
+    },
+    {
+      "path": "existing-local-control-references.json",
+      "source_sha256": "b32ef163a7538404d87f9316ab2d140eb4d7749f158af17309713b1c31b16c9d",
+      "bytes": 6833,
+      "unchanged": true
+    },
+    {
+      "path": "selected-attempt-1-log.txt",
+      "source_sha256": "9599c29c300456f8bd68bc3d8f2510bc5bd3a2a95bbd6152418b7ca248e46466",
+      "bytes": 6159,
+      "unchanged": true
+    },
+    {
+      "path": "classification.json",
+      "source_sha256": "555ded9e22519419481300710d429f47585c2121b184114e81ce822092430027",
+      "bytes": 2730,
+      "unchanged": true
+    },
+    {
+      "path": "checked-merge-tree-crates.json",
+      "source_sha256": "071bf2c72b5900d629328ad497118f5b2e0e9260924ebd9bc985e1ff09ca563c",
+      "bytes": 9699,
+      "unchanged": true
+    },
+    {
+      "path": "checked-merge-tree-lampOS.json",
+      "source_sha256": "624964e45329ab4473a13d272b4f299c1005e3474592c1ac6ed159a7ab64de8c",
+      "bytes": 5497,
+      "unchanged": true
+    },
+    {
+      "path": "checked-merge-tree-root.json",
+      "source_sha256": "510433f0e44b89ec7d3b8136aba14ec1fd8071ed35e8eac2e4bb0a141184e1a7",
+      "bytes": 5120,
+      "unchanged": true
+    }
+  ],
+  "derived_metadata": "checked-merge-identity.json retains only commit/tree/parent identities; account metadata and unrelated PR conversations are omitted. Original API receipts stay external. The full ARM job log is unchanged."
+}

@@ -1,0 +1,201 @@
+[
+  {
+    "role": "baseline",
+    "source_ref": "f477d6c49732dbd5cba84cbe18ea568692c056e6",
+    "profile": "Cargo default test (not --release)",
+    "architecture": "x86_64-unknown-linux-gnu",
+    "case": {
+      "case": {
+        "name": "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+        "clock_seconds": 60,
+        "expected_exit": 101,
+        "watchdog_seconds": 120,
+        "required_patterns": [
+          "attempt to subtract with overflow",
+          "src/second_provider/worker\\.rs"
+        ]
+      },
+      "command_label": "case-001",
+      "clocks": [
+        {
+          "boottime": 1032490.07156255,
+          "realtime": 1792717646.52301,
+          "time_namespace": "time:[4026531834]",
+          "offsets": "monotonic           0         0\nboottime            0         0\n",
+          "uid": 1000,
+          "phase": "outer_before",
+          "monotonic": 1032490.07155459,
+          "pid": 1
+        },
+        {
+          "offsets": "monotonic    -1032430         0\nboottime     -1032430         0\n",
+          "uid": 1000,
+          "pid": 3,
+          "monotonic": 60.08975986,
+          "boottime": 60.089767613,
+          "phase": "namespace_before",
+          "realtime": 1792717646.54121,
+          "time_namespace": "time:[4026532607]"
+        },
+        {
+          "time_namespace": "time:[4026532607]",
+          "realtime": 1792717646.54196,
+          "phase": "test_child_before_exec",
+          "boottime": 60.090514735,
+          "monotonic": 60.090506284,
+          "offsets": "monotonic    -1032430         0\nboottime     -1032430         0\n",
+          "uid": 1000,
+          "pid": 4
+        },
+        {
+          "time_namespace": "time:[4026532607]",
+          "realtime": 1792717646.5474,
+          "phase": "namespace_after",
+          "boottime": 60.095954049,
+          "monotonic": 60.095947484,
+          "test_wait_status": 25856,
+          "offsets": "monotonic    -1032430         0\nboottime     -1032430         0\n",
+          "uid": 1000,
+          "pid": 3
+        },
+        {
+          "boottime": 1032490.09703118,
+          "namespace_wait_status": 25856,
+          "offsets": "monotonic           0         0\nboottime            0         0\n",
+          "time_namespace": "time:[4026531834]",
+          "realtime": 1792717646.54848,
+          "uid": 1000,
+          "pid": 1,
+          "monotonic": 1032490.09702455,
+          "phase": "outer_after"
+        }
+      ],
+      "test_summaries": [
+        [
+          "FAILED",
+          "0",
+          "1",
+          "0",
+          "0",
+          "3582"
+        ]
+      ],
+      "expected_outcome_matched": true
+    },
+    "external_files": [
+      {
+        "path": "/private/tmp/tests-boot-clock-linux-20261023/runs/baseline-20261023t010211777596z/results.json",
+        "sha256": "0487cdc3c30988f768979a7edeb72be763cd2d85271351ec427399af5530dd36",
+        "bytes": 54514
+      },
+      {
+        "path": "/private/tmp/tests-boot-clock-linux-20261023/runs/baseline-20261023t010211777596z/case-001.stdout",
+        "sha256": "d2d33d7b9455bcaee84bc535d92d1757945c1f6da37b64a36b03a64a22f493e1",
+        "bytes": 1728
+      },
+      {
+        "path": "/private/tmp/tests-boot-clock-linux-20261023/runs/baseline-20261023t010211777596z/case-001.stderr",
+        "sha256": "f7373ade834d516d462a65d9507dab0d5dc4291783094aabd60083fc3ad3d557",
+        "bytes": 291
+      }
+    ]
+  },
+  {
+    "role": "corrected",
+    "source_ref": "da595851f239cd6456cc1fb4565d3fc272675702",
+    "profile": "Cargo default test (not --release)",
+    "architecture": "x86_64-unknown-linux-gnu",
+    "case": {
+      "case": {
+        "name": "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+        "clock_seconds": 60,
+        "expected_exit": 0,
+        "watchdog_seconds": 120,
+        "required_patterns": []
+      },
+      "command_label": "case-001",
+      "clocks": [
+        {
+          "pid": 1,
+          "boottime": 1033756.80676445,
+          "uid": 1000,
+          "time_namespace": "time:[4026531834]",
+          "phase": "outer_before",
+          "realtime": 1792718913.25821,
+          "monotonic": 1033756.80675613,
+          "offsets": "monotonic           0         0\nboottime            0         0\n"
+        },
+        {
+          "uid": 1000,
+          "monotonic": 60.824790633,
+          "offsets": "monotonic    -1033696         0\nboottime     -1033696         0\n",
+          "realtime": 1792718913.27624,
+          "phase": "namespace_before",
+          "boottime": 60.824798316,
+          "pid": 3,
+          "time_namespace": "time:[4026532607]"
+        },
+        {
+          "uid": 1000,
+          "offsets": "monotonic    -1033696         0\nboottime     -1033696         0\n",
+          "monotonic": 60.82556646,
+          "boottime": 60.825573235,
+          "phase": "test_child_before_exec",
+          "realtime": 1792718913.27702,
+          "pid": 4,
+          "time_namespace": "time:[4026532607]"
+        },
+        {
+          "time_namespace": "time:[4026532607]",
+          "test_wait_status": 0,
+          "pid": 3,
+          "boottime": 60.835164008,
+          "phase": "namespace_after",
+          "realtime": 1792718913.28661,
+          "offsets": "monotonic    -1033696         0\nboottime     -1033696         0\n",
+          "monotonic": 60.835157234,
+          "uid": 1000
+        },
+        {
+          "pid": 1,
+          "namespace_wait_status": 0,
+          "uid": 1000,
+          "boottime": 1033756.83627537,
+          "phase": "outer_after",
+          "realtime": 1792718913.28772,
+          "time_namespace": "time:[4026531834]",
+          "offsets": "monotonic           0         0\nboottime            0         0\n",
+          "monotonic": 1033756.8362688
+        }
+      ],
+      "test_summaries": [
+        [
+          "ok",
+          "1",
+          "0",
+          "0",
+          "0",
+          "3582"
+        ]
+      ],
+      "expected_outcome_matched": true
+    },
+    "external_files": [
+      {
+        "path": "/private/tmp/tests-boot-clock-linux-corrected-20261023/runs/candidate-20261023t012553024008z/results.json",
+        "sha256": "0acd729b63845df462a218f6b482152fc9263caf23bf53ab5820a68674bedb0d",
+        "bytes": 704378
+      },
+      {
+        "path": "/private/tmp/tests-boot-clock-linux-corrected-20261023/runs/candidate-20261023t012553024008z/case-001.stdout",
+        "sha256": "c1a0e9bb72ef8718a4af013c4fbdb4a770169771d6bc44b9e6b0942f8130c7cc",
+        "bytes": 1585
+      },
+      {
+        "path": "/private/tmp/tests-boot-clock-linux-corrected-20261023/runs/candidate-20261023t012553024008z/case-001.stderr",
+        "sha256": "662b672cc1acf072ba1d5bf5d84f4397ff3e869d75290373b19f8dd90eec478f",
+        "bytes": 1514
+      }
+    ]
+  }
+]

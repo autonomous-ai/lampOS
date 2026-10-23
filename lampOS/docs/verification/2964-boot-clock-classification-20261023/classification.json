@@ -1,0 +1,56 @@
+{
+  "collected_utc": "2026-10-23T02:02:51.533424+00:00",
+  "scope": "Read-only GitHub GET and local source/receipt inspection; no Cargo, tests, rerun, source/branch changes or posts",
+  "attempt_1": {
+    "run": 39884377570,
+    "run_number": 6285,
+    "job": 120188999822,
+    "head": "2f259bf69864d369333f80618b9d4e833c6e8b96",
+    "checked_merge": "3b3fa4910d63ba83d2079adccae1922beb7da6ed",
+    "checked_base": "7bfcb31b8a4761f141e9efb6712e502a1e60752b",
+    "workflow": "completed/failure",
+    "job_state": "completed/failure",
+    "exit": 100,
+    "planned_tests": 10827,
+    "executed": 9509,
+    "passed": 9508,
+    "leaky_in_passed": 1,
+    "failed": 1,
+    "skipped": 67,
+    "selected_unrun": 1318,
+    "wall_seconds": 173.722,
+    "failure": "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+    "panic": "crates/voice/src/second_provider/worker.rs:8342:17, left Unknown, right Quiet",
+    "actual_uptime_recorded": false
+  },
+  "attempt_2_observed_metadata": {
+    "run_attempt": 2,
+    "workflow": "completed/success",
+    "job": 120192468683,
+    "job_state": "completed/success",
+    "head": "2f259bf69864d369333f80618b9d4e833c6e8b96",
+    "updated_at": "2026-10-23T01:48:43Z",
+    "log_not_downloaded": "No checked-merge, test-count or causal claim made from attempt2 metadata alone"
+  },
+  "classification": "Existing boot-history-sensitive fixture; source mechanism matches the reported release assertion conditionally. Failed runner uptime is unrecorded. Original failure is retained and unwaived.",
+  "release_arithmetic_condition": "If now_us is in [90000000,400000000) and unsigned subtraction wraps, now_us-400000000 wraps but now_us-90000000 does not. RoomTold::at records the wrapped first timestamp; both later saturating elapsed calculations are zero, so the freshly reset room remains Unknown. This is source reasoning, not a release reproduction or measured uptime.",
+  "local_control_limit": "Existing Linux x86 default-test60.0905s baseline failed earlier at subtraction overflow; corrected60.8256s exact case passed. They demonstrate the history defect and correction, not this exact ARM release Unknown assertion.",
+  "new_pr_updates": [
+    {
+      "pr": 3165,
+      "state": "closed",
+      "api_merged": false,
+      "comment": 6355448326,
+      "time": "2026-10-23T01:49:54Z",
+      "report": "Train bot says carried in3172 at e6b88eac2; train payload/gates not audited here"
+    },
+    {
+      "pr": 3023,
+      "state": "closed",
+      "api_merged": false,
+      "comment": 6355453690,
+      "time": "2026-10-23T01:50:19Z",
+      "report": "Train bot says carried in3172 at e6b88eac2; train payload/gates not audited here"
+    }
+  ]
+}

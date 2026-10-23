@@ -1,0 +1,7 @@
+M	lampOS/crates/voice/src/coordinator/second.rs
+M	lampOS/crates/voice/src/coordinator/tests/hand_controls.rs
+M	lampOS/crates/voice/src/coordinator/tests/turn_taking.rs
+M	lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs
+M	lampOS/crates/voice/src/scenario_clock.rs
+M	lampOS/crates/voice/src/second_provider/worker.rs
+M	lampOS/crates/voice/src/stop_words.rs

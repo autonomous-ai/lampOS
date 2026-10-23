@@ -1,0 +1,84 @@
+BEGIN checkout original lines285-292
+285: 2026-10-23T01:31:09.1424846Z   git switch -
+286: 2026-10-23T01:31:09.1424976Z 
+287: 2026-10-23T01:31:09.1425222Z Turn off this advice by setting config variable advice.detachedHead to false
+288: 2026-10-23T01:31:09.1425552Z 
+289: 2026-10-23T01:31:09.1425901Z HEAD is now at 3b3fa49 Merge 2f259bf69864d369333f80618b9d4e833c6e8b96 into 7bfcb31b8a4761f141e9efb6712e502a1e60752b
+290: 2026-10-23T01:31:09.1955411Z ##[endgroup]
+291: 2026-10-23T01:31:09.1995120Z [command]/usr/bin/git log -1 --format=%H
+292: 2026-10-23T01:31:09.2017932Z 3b3fa4910d63ba83d2079adccae1922beb7da6ed
+END checkout
+
+BEGIN scope original lines633-654
+633: 2026-10-23T01:33:16.2010694Z 
+634: 2026-10-23T01:33:16.2010958Z OK
+635: 2026-10-23T01:33:16.2140078Z ##[group]Run python3 -I .github/scripts/lampos-pr-crates.py
+636: 2026-10-23T01:33:16.2140559Z [36;1mpython3 -I .github/scripts/lampos-pr-crates.py[0m
+637: 2026-10-23T01:33:16.2158834Z shell: /usr/bin/bash -e {0}
+638: 2026-10-23T01:33:16.2159062Z ##[endgroup]
+639: 2026-10-23T01:33:16.2398067Z The whole workspace: `lampOS/tools/played/README.md` (lampOS/tools, read by tests this can't see).
+640: 2026-10-23T01:33:16.2398766Z --workspace
+641: 2026-10-23T01:33:16.2476933Z ##[group]Run echo "cores: $(nproc)"
+642: 2026-10-23T01:33:16.2477288Z [36;1mecho "cores: $(nproc)"[0m
+643: 2026-10-23T01:33:16.2477705Z [36;1mfilter='not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))'[0m
+644: 2026-10-23T01:33:16.2478213Z [36;1mif [ -n "$PICKED" ]; then filter="$filter & ($PICKED)"; fi[0m
+645: 2026-10-23T01:33:16.2478598Z [36;1mcargo nextest run --locked --release --workspace \[0m
+646: 2026-10-23T01:33:16.2478908Z [36;1m  --profile pr \[0m
+647: 2026-10-23T01:33:16.2479137Z [36;1m  --no-tests=pass -j num-cpus \[0m
+648: 2026-10-23T01:33:16.2479399Z [36;1m  --partition hash:1/1 \[0m
+649: 2026-10-23T01:33:16.2479627Z [36;1m  -E "$filter"[0m
+650: 2026-10-23T01:33:16.2496247Z shell: /usr/bin/bash -e {0}
+651: 2026-10-23T01:33:16.2496469Z env:
+652: 2026-10-23T01:33:16.2496635Z   PICKED: 
+653: 2026-10-23T01:33:16.2496804Z ##[endgroup]
+654: 2026-10-23T01:33:16.2690092Z cores: 4
+END scope
+
+BEGIN inventory original lines675-678
+675: 2026-10-23T01:33:16.8163864Z     Finished `release` profile [optimized] target(s) in 0.26s
+676: 2026-10-23T01:33:17.2477931Z ────────────
+677: 2026-10-23T01:33:17.2479251Z  Nextest run ID a397e54a-1d4a-4897-a4fc-010bb81f4cb0 with nextest profile: pr
+678: 2026-10-23T01:33:17.2479807Z     Starting 10827 tests across 166 binaries (67 tests and 2 binaries skipped)
+END inventory
+
+BEGIN failure original lines10184-10210
+10184: 2026-10-23T01:36:09.9748207Z         FAIL [   0.005s] ( 9506/10827) lamp-voice second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy
+10185: 2026-10-23T01:36:09.9749413Z   stdout ───
+10186: 2026-10-23T01:36:09.9749595Z 
+10187: 2026-10-23T01:36:09.9749674Z     running 1 test
+10188: 2026-10-23T01:36:09.9750545Z     test second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy ... FAILED
+10189: 2026-10-23T01:36:09.9751143Z 
+10190: 2026-10-23T01:36:09.9751218Z     failures:
+10191: 2026-10-23T01:36:09.9751323Z 
+10192: 2026-10-23T01:36:09.9751390Z     failures:
+10193: 2026-10-23T01:36:09.9751777Z         second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy
+10194: 2026-10-23T01:36:09.9752146Z 
+10195: 2026-10-23T01:36:09.9752410Z     test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3582 filtered out; finished in 0.00s
+10196: 2026-10-23T01:36:09.9752769Z 
+10197: 2026-10-23T01:36:09.9752920Z   stderr ───
+10198: 2026-10-23T01:36:09.9753023Z 
+10199: 2026-10-23T01:36:09.9753552Z     thread 'second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy' (45700) panicked at crates/voice/src/second_provider/worker.rs:8342:17:
+10200: 2026-10-23T01:36:09.9754259Z     assertion `left == right` failed
+10201: 2026-10-23T01:36:09.9754493Z       left: Unknown
+10202: 2026-10-23T01:36:09.9754680Z      right: Quiet
+10203: 2026-10-23T01:36:09.9754985Z     note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+10204: 2026-10-23T01:36:09.9755274Z 
+10205: 2026-10-23T01:36:09.9755404Z   Cancelling due to test failure: 3 tests still running
+10206: 2026-10-23T01:36:10.2999091Z         PASS [   5.457s] ( 9507/10827) lamp-voice second_provider::worker::tests::a_close_face_turned_over_the_line_counts_for_a_first_word_through_the_eyes
+10207: 2026-10-23T01:36:10.6074101Z         PASS [   4.014s] ( 9508/10827) lamp-voice second_provider::worker::tests::the_lamps_name_carries_only_on_a_sign_of_one_speaker
+10208: 2026-10-23T01:36:10.9673158Z         PASS [   3.842s] ( 9509/10827) lamp-voice second_provider::worker::tests::with_addressed_a_line_said_close_and_facing_is_let_out_in_a_busy_room
+10209: 2026-10-23T01:36:10.9700654Z ────────────
+10210: 2026-10-23T01:36:10.9701367Z      Summary [ 173.722s] 9509/10827 tests run: 9508 passed (1 leaky), 1 failed, 67 skipped
+END failure
+
+BEGIN terminal original lines10522-10529
+10522: 2026-10-23T01:36:10.9805852Z     warm-up: session 1 ran through
+10523: 2026-10-23T01:36:10.9806265Z     lamp-voice: capture: waits on the microphone and its sockets between blocks (LAMP_CAPTURE_WAIT=on)
+10524: 2026-10-23T01:36:10.9806899Z     render 5ms after each block: 200 blocks read 25 us (median), 40 us (p90), 98 us (most) after they were there
+10525: 2026-10-23T01:36:10.9807268Z 
+10526: 2026-10-23T01:36:10.9807660Z         FAIL [   0.005s] ( 9506/10827) lamp-voice second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy
+10527: 2026-10-23T01:36:10.9808474Z warning: 1318/10827 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
+10528: 2026-10-23T01:36:10.9808992Z error: test run failed
+10529: 2026-10-23T01:36:10.9822330Z ##[error]Process completed with exit code 100.
+END terminal
+

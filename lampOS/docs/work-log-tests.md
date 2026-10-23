@@ -1,5 +1,31 @@
 # Tests work log
 
+## 2026-10-23 09:11 +0700 — unchanged ARM fixture classified; next phone-news setup claimed
+
+Ready for lamp-voice: no (phone-news fixture preparation).
+
+The [original #2964 ARM receipt](verification/2964-boot-clock-classification-20261023/)
+shows **9,508 passed, one failed, 67 skipped, 1,318 selected unrun**.
+Its complete Voice tree equals both its base and the frozen boot-clock base.
+The quiet-room assertion fits unsigned boot-history wrapping, but actual
+runner uptime is unrecorded. The later successful rerun does not erase the
+original failure; this source audit ran no new test.
+
+Taken under the existing #1806 claim: `messages::tests::a_text_never_waits_on_the_news_for_the_phone`
+on `e6b88eac2`, own branch `tests/1806-phone-news-start`. Replace only the
+assumed 1.3-second setup delay with the fake phone round's positive entered
+event. Preserve the product look period, response timing boundary, original
+watchdogs and complete two-second no-extra-news window. The source is
+unchanged since the measured ARM case (3.320 seconds); this is a test-only
+slice with controls still to run. No product change or speedup is claimed.
+
+The Mac boot-clock continuation has CPU and MAIN after preserving both
+#2839 binaries and removing only the idle SMALL build cache. #2839's
+corrected focused run gives **1 pass / 1 failure**: the queued-code case
+counts two deliveries before a repeat request. Its failed fixture-name
+attempt is separate and retained. Product scope is being proposed before
+any runtime edit.
+
 ## 2026-10-23 09:00 +0700 — original Mac control stop preserved
 
 Ready for lamp-voice: no (boot-clock correction).
