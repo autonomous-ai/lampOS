@@ -46,7 +46,18 @@ pub fn main() -> io::Result<()> {
     }
     let plan: Value = serde_json::from_slice(&fs::read(home.join("plan.json"))?)?;
     let operation = args.first().map_or("", String::as_str);
-    let step = &plan[operation];
+    // `{"each": [step, …]}`: the operation's first call takes the first
+    // step, its next the next, and the last step stands after them.
+    let before = fs::read_to_string(home.join("calls.jsonl"))
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .filter(|call| call["args"][0] == operation)
+        .count();
+    let step = match plan[operation]["each"].as_array() {
+        Some(steps) if !steps.is_empty() => &steps[before.min(steps.len() - 1)],
+        _ => &plan[operation],
+    };
     let environment = env::vars().collect::<std::collections::BTreeMap<_, _>>();
     let mut calls = fs::OpenOptions::new()
         .create(true)

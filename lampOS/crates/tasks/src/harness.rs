@@ -512,9 +512,10 @@ impl Cli {
             launch.target.machine_id.clone().into(),
         ];
         // A cloud agent is given no folder (openharness#1444).
-        if !launch.target.engine.cloud() {
+        let project_at = (!launch.target.engine.cloud()).then(|| {
             args.push(launch.target.project.clone().into());
-        }
+            args.len() - 1
+        });
         args.extend(["--name".into(), launch.name.clone().into()]);
         // Harness's default, approved by the owner on 2026-10-15: Claude
         // Code works in its own project folder without asking, and still
@@ -531,7 +532,24 @@ impl Cli {
             "--task".into(),
             launch.prompt.clone().into(),
         ]);
-        match self.run(&args, self.config.launch_timeout) {
+        let mut reply = self.run(&args, self.config.launch_timeout);
+        // A bare name gets its folder, `~/harnesses/<name>`, from Harness on
+        // the first `new`, and every later `new` on that name is refused
+        // for it, before anything starts (Harness 0.4.55; Mobile on
+        // lamp-0c89, 23 Oct). On that refusal alone, asked once more in
+        // the folder it names; nothing else is ever asked twice.
+        if let (Some(at), Ok(refused)) = (project_at, &reply)
+            && !refused.success
+            && let Some(folder) = name_taken(&refused.stdout, &launch.target.project)
+        {
+            eprintln!(
+                "tasks: {}: Harness made the folder {folder} for the name '{}' before, so it starts there",
+                launch.name, launch.target.project
+            );
+            args[at] = folder.into();
+            reply = self.run(&args, self.config.launch_timeout);
+        }
+        match reply {
             Ok(reply) if reply.success => parse_launch(&reply.stdout, launch),
             Ok(reply) if self.config.folder_missing && folder_missing(&reply.stdout) => {
                 not_sent("folder_missing")
@@ -1293,6 +1311,41 @@ fn folder_missing(bytes: &[u8]) -> bool {
                 || reply.error.starts_with("CWD_NOT_FOUND (")
                 || reply.error == "That folder does not exist on the machine.")
     })
+}
+
+/// The folder Harness made for the bare project name `project`, when the
+/// reply is its refusal of a `new` for it: "“NAME” already exists on
+/// COMPUTER: FOLDER. Choose another name …", FOLDER as that computer
+/// reports it. A folder target is never one, and FOLDER must end in this
+/// name.
+fn name_taken(bytes: &[u8], project: &str) -> Option<String> {
+    #[derive(Deserialize)]
+    struct Failed {
+        ok: bool,
+        error: String,
+    }
+    if project.starts_with('/') || project.starts_with("~/") {
+        return None;
+    }
+    let reply = serde_json::from_slice::<Failed>(bytes).ok()?;
+    if reply.ok {
+        return None;
+    }
+    // "… exists on COMPUTER: FOLDER. Choose …": the computer's label comes
+    // first, so the folder is what follows the last ": " before the end.
+    let (said, _) = reply
+        .error
+        .strip_prefix(&format!("“{project}” already exists on "))?
+        .split_once(". Choose another name")?;
+    let (_, folder) = said.rsplit_once(": ")?;
+    // The folder as the computer reports it: `~/…` from Harness 0.4.55, or
+    // its absolute path (openharness `newCommand.ts`, for another
+    // machine). Only one that ends in this name, with nothing odd in it.
+    let well_formed = (folder.starts_with("~/") || folder.starts_with('/'))
+        && folder.len() <= 512
+        && !folder.chars().any(char::is_control)
+        && folder.rsplit('/').next() == Some(project);
+    well_formed.then(|| folder.to_owned())
 }
 
 fn parse_launch(bytes: &[u8], launch: &Launch) -> LaunchOutcome {
