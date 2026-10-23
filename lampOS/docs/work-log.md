@@ -1,3 +1,30 @@
+## Current checkpoint: 2026-10-23 23:41 +07, carry review and selected release-pair tests
+
+Ready for lamp-voice: #3269 merged in train 50; #3275 HOLD belongs to the carry owner
+
+Read the full Queue since the last post and current integration rules.
+#3269 merged as `09f8e7412`; integration is now `be16c3327`. First assigned
+the #3275 units/update read and the #2809 updater row using release 6408's
+actual binary, both directions. Fourth completed the Linux formatting request.
+
+The [#3275 review](verification/head-touch-body-pair-review-20261023/README.md)
+reproduces a P2: install admits a preserved Body head-off override alongside
+enabled Voice/Expression. Original installer controls **6 / 0**, original
+round controls **28 / 0**, additive required-refusal control **0 / 1**.
+Third took the repair, including calibrated Body configuration, on its carry.
+No physical motion or privacy violation is claimed by this filesystem test.
+
+The next test branch is `second/updater-release-pair`, based on `be16c3327`.
+Old artifact 6408 and current artifact 6449 are actual ARM64 ELF executables
+with verified asset hashes; 6449 also matches its manifest entry and exact
+current source. Tests will use each CLI as the writer and the other as the
+recovery reader after SIGKILL at a verified journal boundary, crossing the
+real Apply/Back helper requests as well. This is isolated-container process
+evidence with fake systemd, not a physical unplug or signed-release acceptance.
+The trusted public-key and attended-lamp dependencies remain separately open.
+
+---
+
 ## Current checkpoint: 2026-10-23 21:17 +07, executable work complete and remaining owners named
 
 Ready for lamp-voice: #3269 is ready for review; Reviewer-lead and First retain their decisions
