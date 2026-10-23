@@ -1,4 +1,4 @@
-## Current checkpoint: 2026-10-23 20:18 +07, corrected updater green and old helper exercised
+## Current checkpoint: 2026-10-23 20:40 +07, corrected updater green and old helper exercised
 
 Ready for lamp-voice: #3269 is ready for review; current reviewer dispositions remain required
 
@@ -17,6 +17,11 @@ mismatch-before-restart and logical-cut recovery in the current round harness.
 The old consumer is release 6408's pinned ARM64 executable; the coordinator
 runs on the Mac with fake systemd. This is provisional, not First's selected
 supported pair, a real process cut or physical durability acceptance.
+
+[Exact-base release 6439 helper](verification/previous-helper-6439-20261023/README.md)
+also passes the same **6 / 0** cases; only the pinned executable digest changed.
+Its source is the PR head's direct parent, so it is the closer provisional
+old-side recommendation. The prior 6408 results remain separate and intact.
 
 The whole-lamp state inventory is published for #2809. #1812 still requires
 Migrate's trusted public key for fingerprint `54213f8d3aa2f241`. #2810 still

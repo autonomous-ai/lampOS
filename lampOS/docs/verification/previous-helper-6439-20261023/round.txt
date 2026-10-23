@@ -1,0 +1,16 @@
+
+running 2 tests
+{"docker_start_exit_code":0,"phase":"old_helper_streams","stderr":"lamp-update-apply: wrote /etc/lampOS/controls/controls-pins.json\n","stdout":""}
+{"context":"colima-lampos","docker_start_exit_code":0,"evidence":"provisional current-host-writer/old-arm64-helper format only","helper_arguments":["apply"],"helper_exit_code":0,"image":"sha256:7dc3bb4b3b88bb00e16e37eeb5c98a74f9d926f956584eb8c009c9ca86023cd2","network":"none","old_helper_sha256":"46cc53ce09ef4e93272daf4849f4aab41034efad61cb5bc10f7aefde55067d17","platform":"linux/arm64","stderr":"lamp-update-apply: wrote /etc/lampOS/controls/controls-pins.json\n","stdout":""}
+{"docker_start_exit_code":0,"phase":"old_helper_streams","stderr":"lamp-update-apply: put /etc/lampOS/controls/controls-pins.json back as it was\n","stdout":""}
+{"context":"colima-lampos","docker_start_exit_code":0,"evidence":"provisional current-host-writer/old-arm64-helper format only","helper_arguments":["apply"],"helper_exit_code":0,"image":"sha256:7dc3bb4b3b88bb00e16e37eeb5c98a74f9d926f956584eb8c009c9ca86023cd2","network":"none","old_helper_sha256":"46cc53ce09ef4e93272daf4849f4aab41034efad61cb5bc10f7aefde55067d17","platform":"linux/arm64","stderr":"lamp-update-apply: put /etc/lampOS/controls/controls-pins.json back as it was\n","stdout":""}
+.{"docker_start_exit_code":0,"phase":"old_helper_streams","stderr":"lamp-update-apply: wrote /etc/lampOS/controls/controls-pins.json\n","stdout":""}
+{"context":"colima-lampos","docker_start_exit_code":0,"evidence":"provisional current-host-writer/old-arm64-helper format only","helper_arguments":["apply"],"helper_exit_code":0,"image":"sha256:7dc3bb4b3b88bb00e16e37eeb5c98a74f9d926f956584eb8c009c9ca86023cd2","network":"none","old_helper_sha256":"46cc53ce09ef4e93272daf4849f4aab41034efad61cb5bc10f7aefde55067d17","platform":"linux/arm64","stderr":"lamp-update-apply: wrote /etc/lampOS/controls/controls-pins.json\n","stdout":""}
+
+thread 'head_touch::cut_after_actual_old_apply_recovers_pins_and_restarts_unchanged_controls' (72191725) panicked at crates/update/tests/round/head_touch.rs:1319:13:
+Box<dyn Any>
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+{"docker_start_exit_code":0,"phase":"old_helper_streams","stderr":"lamp-update-apply: put /etc/lampOS/controls/controls-pins.json back as it was\n","stdout":""}
+{"context":"colima-lampos","docker_start_exit_code":0,"evidence":"provisional current-host-writer/old-arm64-helper format only","helper_arguments":["apply"],"helper_exit_code":0,"image":"sha256:7dc3bb4b3b88bb00e16e37eeb5c98a74f9d926f956584eb8c009c9ca86023cd2","network":"none","old_helper_sha256":"46cc53ce09ef4e93272daf4849f4aab41034efad61cb5bc10f7aefde55067d17","platform":"linux/arm64","stderr":"lamp-update-apply: put /etc/lampOS/controls/controls-pins.json back as it was\n","stdout":""}
+.
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 155 filtered out; finished in 7.56s

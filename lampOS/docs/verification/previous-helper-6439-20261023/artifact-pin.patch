@@ -1,0 +1,5 @@
+--- a/lampOS/crates/update/tests/helper_release_pair.rs
++++ b/lampOS/crates/update/tests/helper_release_pair.rs
+@@ -29 +29 @@
+-const OLD_SHA: &str = "f731555d6b783a69eb00bc2ff774e8ad922988284c9f3a9114010fa75fa51778";
++const OLD_SHA: &str = "46cc53ce09ef4e93272daf4849f4aab41034efad61cb5bc10f7aefde55067d17";
