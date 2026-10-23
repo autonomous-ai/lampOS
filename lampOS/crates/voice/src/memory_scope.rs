@@ -7,10 +7,11 @@
 //! a voice start, a privacy change, a face remembered or a change in the
 //! eyes' known file, with no face named since), keeps for the known face
 //! the eyes name by the line's end plus [`KEEPER_WAIT`], unless another face
-//! was seen speaking it (#2807); its reads stay the room's. Armed only by
-//! going cold during the line, it keeps for that face only if the eyes saw
-//! it in view as the line began ([`ScopeLease::face_at_end_seen`]): the
-//! known file also changes when a known person walks in.
+//! was seen speaking it (#2807); its reads stay the room's. With the eyes'
+//! view it keeps for that face only if the eyes saw it in view as the line
+//! began ([`ScopeLease::face_at_end_seen`]): the known file also changes
+//! when a known person walks in. Without it, only a line begun cold keeps,
+//! and only for a face first named within [`REFRESH_EVERY`] of its start.
 use crate::known_faces::{FaceObservation, KnownMark};
 use lamp_turn_owner::BootId;
 use std::{
@@ -92,6 +93,11 @@ struct CachedFace {
     /// The end of its last fresh sighting: a held gap is measured from it,
     /// never from a hold, so it can't be renewed by holding.
     seen_until: Instant,
+    /// When a refresh first named this face, of its unbroken run in this
+    /// generation: a line begun cold with no eyes' view keeps for it only if
+    /// this is within [`REFRESH_EVERY`] of the line's start
+    /// ([`ScopeLease::face_at_end_seen`]).
+    named_at: Instant,
 }
 
 /// Acquired before reading the source. An invalidation retires all earlier
@@ -114,6 +120,10 @@ pub struct RefreshToken {
 /// 3 s after the eyes write it ([`crate::known_faces::FRESH`]): 5 s covers
 /// both with room to spare. Past it, a cache that names nobody means nobody
 /// known is in view, so a room's line has no late look (El's P2 on #3108).
+/// The whole window serves only with the eyes' view, where the keeper must
+/// also have been in view at the line's start; without it a line begun cold
+/// keeps only for a face named within [`REFRESH_EVERY`] of its start
+/// ([`ScopeLease::face_at_end_seen`]).
 pub const COLD_FOR: Duration = Duration::from_secs(5);
 
 /// The caller refreshes this slot off the audio path and owns that refresh's
@@ -287,21 +297,36 @@ impl FaceCache {
         if !current() {
             return false;
         }
-        let next = observation.map(|observation| CachedFace {
-            generation: token.generation,
-            scope: ScopeSnapshot {
-                person: Some(Arc::from(observation.person())),
-                held: false,
-            },
-            valid_until: observation.valid_until(),
-            seen_until: observation.valid_until(),
-        });
         let Ok(mut face) = self.face.lock() else {
             return false;
         };
         if !current() {
             return false;
         }
+        let named_at = Instant::now();
+        let next = observation.map(|observation| {
+            let person: Arc<str> = Arc::from(observation.person());
+            // The same face named on, unbroken in this generation, keeps
+            // when it was first named.
+            let named_at = face
+                .as_ref()
+                .filter(|was| {
+                    was.generation == token.generation
+                        && !was.scope.held
+                        && was.scope.person.as_deref() == Some(&*person)
+                })
+                .map_or(named_at, |was| was.named_at);
+            CachedFace {
+                generation: token.generation,
+                scope: ScopeSnapshot {
+                    person: Some(person),
+                    held: false,
+                },
+                valid_until: observation.valid_until(),
+                seen_until: observation.valid_until(),
+                named_at,
+            }
+        });
         // Up to the gap past the face's last sighting and past the lamp's
         // last answer to them, whichever ends first: never someone the lamp
         // isn't talking with.
@@ -321,6 +346,7 @@ impl FaceCache {
                 scope: ScopeSnapshot { held: true, ..whom },
                 valid_until: (was.seen_until + gap).min(at + gap),
                 seen_until: was.seen_until,
+                named_at: was.named_at,
             })
         };
         let named = next.is_some();
@@ -388,27 +414,29 @@ impl FaceCache {
     /// [`Self::snapshot`], waiting for the cache's lock when `wait` (a late
     /// look's last read, so a refresh holding it then is not the room's).
     fn snapshot_locking(&self, now: Instant, wait: bool) -> ScopeSnapshot {
+        self.named_locking(now, wait)
+            .map(|(scope, _)| scope)
+            .unwrap_or_default()
+    }
+
+    /// [`Self::snapshot_locking`] with when the cached face was first named
+    /// ([`CachedFace::named_at`]); `None` for the room's.
+    fn named_locking(&self, now: Instant, wait: bool) -> Option<(ScopeSnapshot, Instant)> {
         let generation = self.generation.load(Ordering::Acquire);
         if generation == u64::MAX {
-            return ScopeSnapshot::room();
+            return None;
         }
         let face = if wait {
             self.face.lock().ok()
         } else {
             self.face.try_lock().ok()
         };
-        let snapshot = face
-            .and_then(|face| {
-                face.as_ref()
-                    .filter(|face| face.generation == generation && now < face.valid_until)
-                    .map(|face| face.scope.clone())
-            })
-            .unwrap_or_default();
-        if generation == self.generation.load(Ordering::Acquire) {
-            snapshot
-        } else {
-            ScopeSnapshot::room()
-        }
+        let named = face.and_then(|face| {
+            face.as_ref()
+                .filter(|face| face.generation == generation && now < face.valid_until)
+                .map(|face| (face.scope.clone(), face.named_at))
+        });
+        named.filter(|_| generation == self.generation.load(Ordering::Acquire))
     }
 }
 
@@ -460,11 +488,21 @@ impl LateLook {
     }
 }
 
+/// Whether the eyes had a person's face in view at a time
+/// (`speaking_faces::known_in_view_since`), when their view is there.
+pub type InView<'a> = &'a dyn Fn(&str, Instant) -> bool;
+
 /// How long past a line's end, at most, a line admitted as the room's waits
 /// for the eyes to name a known face as its keeper (#2807): one refresh of
 /// the face cache (200 ms) and a little. A face first named later is never
 /// the keeper. A keep also waits at most this long for that decision.
 pub const KEEPER_WAIT: Duration = Duration::from_millis(300);
+/// How often the second voice refreshes the face cache from the eyes' known
+/// file. Without the eyes' view, a line begun while the cache is cold keeps
+/// for a known face only if it was named within this of the line's start
+/// ([`ScopeLease::face_at_end_seen`]): a keep going to the wrong person's
+/// memory is the worse failure (the first builder on #3108, 06:50).
+pub const REFRESH_EVERY: Duration = Duration::from_millis(200);
 /// How often that wait looks at the cache.
 const KEEPER_POLL: Duration = Duration::from_millis(50);
 
@@ -618,7 +656,8 @@ impl ScopeLease {
     /// the lamp answers never takes the keep. The caller still checks who
     /// was seen speaking the line before recording it. Without the eyes'
     /// view ([`Self::face_at_end_seen`]), a line armed only by going cold
-    /// during it names nobody.
+    /// during it names nobody, and one begun cold names only a face first
+    /// named within [`REFRESH_EVERY`] of its start.
     pub fn face_at_end(&self, ended: Instant) -> Option<String> {
         self.face_at_end_seen(ended, None)
     }
@@ -627,19 +666,18 @@ impl ScopeLease {
     /// `person`'s face was in view as the line was admitted (`started`):
     /// the eyes' passing id beside their known file, tracked then
     /// (`LAMP_EYES_SPEAKING=on`, [`crate::speaking_faces::SpeakingFaces::known_in_view_since`]).
-    /// A line whose cache was cold at its start keeps for whoever is named,
-    /// as before. One armed only by a cold event during it (the eyes' known
-    /// file also changes when a known person walks in) keeps only for a
-    /// face in view since its start: on lamp-c0a4 A's face was in view,
-    /// unknown, before the line and named ~2 s into it; a known person
-    /// walking in while someone off camera speaks never takes the keep
-    /// (El's P2 on #3108). `None` for `in_view` (the eyes' speaking off)
-    /// arms no such line.
-    pub fn face_at_end_seen(
-        &self,
-        ended: Instant,
-        in_view: Option<&dyn Fn(&str, Instant) -> bool>,
-    ) -> Option<String> {
+    /// With the eyes' view, an armed line, whether begun cold or gone cold
+    /// during it (the eyes' known file also changes when a known person
+    /// walks in), keeps only for a face in view at its start: on lamp-c0a4
+    /// A's face was in view, unknown, before the line and named ~2 s into
+    /// it, and after a restart A's face is tracked before their first line;
+    /// a known person walking in while someone off camera speaks never
+    /// takes the keep (El's and reviewer-three's P2s on #3108). `None` for
+    /// `in_view` (the eyes' speaking off): a line begun cold keeps only for
+    /// a face first named within [`REFRESH_EVERY`] of its start, and one
+    /// armed only during it keeps for nobody (the first builder's 06:50 on
+    /// #3108: the wrong person's keep is the worse failure).
+    pub fn face_at_end_seen(&self, ended: Instant, in_view: Option<InView<'_>>) -> Option<String> {
         let until = ended + KEEPER_WAIT;
         loop {
             let late = self.late_open()?;
@@ -647,12 +685,20 @@ impl ScopeLease {
             let last = now >= until;
             // The last read waits for the cache's lock: a refresh holding
             // it then does not make the line the room's (Eighth's P3).
-            let seen = late.cache.snapshot_locking(now, last);
+            let named = late.cache.named_locking(now, last);
             if late.armed()
+                && let Some((seen, named_at)) = &named
                 && !seen.held
                 && let Some(person) = seen.person()
                 && now <= until
-                && (late.cold_at_start || in_view.is_some_and(|seen| seen(person, late.started)))
+                && match in_view {
+                    // With the eyes' view: in view at the line's start,
+                    // whether it began cold or went cold during it.
+                    Some(in_view) => in_view(person, late.started),
+                    // Without it: begun cold, and named within one refresh
+                    // of its start.
+                    None => late.cold_at_start && *named_at <= late.started + REFRESH_EVERY,
+                }
             {
                 return Some(person.to_owned());
             }
@@ -680,9 +726,10 @@ impl ScopeLease {
     /// restart, or a face just remembered, the first line was admitted
     /// before the eyes named them and its keep went to the room. `None`,
     /// and the keep is the lease's own (the room's), for a person's line, a
-    /// line never armed (a warm cache, no cold event through it), one armed
-    /// only during it whose named face the eyes did not see in view as it
-    /// began ([`Self::face_at_end_seen`]), a revoked one, a privacy change since admission, a face held only by
+    /// line never armed (a warm cache, no cold event through it), one whose
+    /// named face the eyes did not see in view as it began, or, without the
+    /// eyes' view, one armed only during it or whose face was first named
+    /// past [`REFRESH_EVERY`] from its start ([`Self::face_at_end_seen`]), a revoked one, a privacy change since admission, a face held only by
     /// its gap, another face seen speaking the line, nobody known by its end
     /// plus [`KEEPER_WAIT`], or no record by then. Only a keep reads this;
     /// every read stays the room's.
@@ -723,6 +770,7 @@ mod tests {
             },
             valid_until: until,
             seen_until: until,
+            named_at: Instant::now(),
         });
     }
     #[test]
@@ -1206,6 +1254,7 @@ mod tests {
             },
             valid_until: Instant::now() + Duration::from_secs(3),
             seen_until: Instant::now(),
+            named_at: Instant::now(),
         });
         ended(&line.lease());
         assert_eq!(line.lease().keeper_within(Duration::ZERO), None);
@@ -1298,8 +1347,9 @@ mod tests {
     /// plus [`KEEPER_WAIT`]: A is the keeper, decided at the end. A cold
     /// event within the wait past the end counts too. Armed only mid-line,
     /// A's face first in view during the line (El's walk-in) or no eyes'
-    /// view at all keeps for nobody; cold at the start keeps for A either
-    /// way. A warm line with no cold event through it arms nothing, A cached
+    /// view at all keeps for nobody. Cold at the start, it keeps for A with
+    /// the eyes' view only if A was in view at the start, and without it
+    /// only if A was named within one refresh of the start. A warm line with no cold event through it arms nothing, A cached
     /// mid-line or not (El's P2 on #3108).
     #[test]
     fn a_cache_gone_cold_during_the_line_arms_its_late_look_at_the_end() {
@@ -1326,7 +1376,7 @@ mod tests {
                 in_view && person == ann
             }
         };
-        let seen_end = |lease: &ScopeLease, eyes: Option<&dyn Fn(&str, Instant) -> bool>| {
+        let seen_end = |lease: &ScopeLease, eyes: Option<InView<'_>>| {
             lease.record_keeper(lease.face_at_end_seen(Instant::now(), eyes));
         };
 
@@ -1385,16 +1435,19 @@ mod tests {
         seen_end(&line.lease(), None);
         assert_eq!(line.lease().keeper_within(Duration::ZERO), None);
 
-        // Cold at its start, as before: A, with the eyes' view or without,
-        // in view at the start or not.
-        for (index, eyes) in [None, Some(false)].into_iter().enumerate() {
+        // Cold at its start: A with the eyes' view and A in view at the
+        // start, or without the view and A named within one refresh of the
+        // start; with the view and A first in view mid-line, nobody
+        // (reviewer-three's P2 on #3108).
+        for (index, eyes, keeper) in [
+            (0, None, Some(ann.clone())),
+            (1, Some(true), Some(ann.clone())),
+            (2, Some(false), None),
+        ] {
             let cache = warm();
             cache.went_cold(Instant::now());
-            let line = RequestScope::looking_later(
-                key(8 + index as u8),
-                ScopeSnapshot::room(),
-                cache.clone(),
-            );
+            let line =
+                RequestScope::looking_later(key(8 + index), ScopeSnapshot::room(), cache.clone());
             let begun = Instant::now();
             assert!(cache.replace(cache.begin_refresh(), Some(observation("Ann"))));
             let view = eyes.map(|in_view| view(in_view, begun));
@@ -1405,7 +1458,8 @@ mod tests {
             );
             assert_eq!(
                 line.lease().keeper_within(Duration::ZERO),
-                Some(ann.clone())
+                keeper,
+                "{eyes:?}"
             );
         }
 
@@ -1424,6 +1478,64 @@ mod tests {
         cache.went_cold(Instant::now());
         assert!(cache.replace(cache.begin_refresh(), Some(observation("Ann"))));
         assert_eq!(line.lease().keeper_within(Duration::ZERO), None);
+    }
+
+    /// Reviewer-three's P2 on #3108 and the first builder's 06:50 ruling: a
+    /// line begun while the cache is cold (here a privacy change, an unmute)
+    /// by someone off camera, while known A walks in and is named mid-line,
+    /// never keeps for A. With the eyes' view, A must have been in view at
+    /// the line's start; without it, A must have been named within one
+    /// refresh ([`REFRESH_EVERY`]) of the start, not anywhere in
+    /// [`COLD_FOR`].
+    #[test]
+    fn a_line_begun_cold_keeps_only_for_a_face_seen_or_named_at_its_start() {
+        let ann = crate::remember::person_id("Ann");
+        let in_view_at_start = |at_start: bool| move |_: &str, _: Instant| -> bool { at_start };
+        let past_one_refresh = || std::thread::sleep(REFRESH_EVERY + Duration::from_millis(50));
+
+        // The probe: invalidate, a line begun cold, A cached mid-line, no
+        // eyes' view: nobody. With the view and A not in view at the start:
+        // nobody either.
+        let cache = Arc::new(FaceCache::default());
+        cache.invalidate();
+        let line = RequestScope::looking_later(key(1), ScopeSnapshot::room(), cache.clone());
+        assert!(line.lease().looks_later(), "begun cold");
+        past_one_refresh();
+        cached(&cache, "Ann", Instant::now() + Duration::from_secs(3));
+        assert_eq!(line.lease().face_at_end_seen(Instant::now(), None), None);
+        let not_seen = in_view_at_start(false);
+        assert_eq!(
+            line.lease()
+                .face_at_end_seen(Instant::now(), Some(&not_seen)),
+            None
+        );
+        // With the view and A in view at the start: A, however late named.
+        let seen = in_view_at_start(true);
+        assert_eq!(
+            line.lease().face_at_end_seen(Instant::now(), Some(&seen)),
+            Some(ann.clone())
+        );
+
+        // No view, A named within one refresh of the start: A.
+        let cache = Arc::new(FaceCache::default());
+        cache.invalidate();
+        let line = RequestScope::looking_later(key(2), ScopeSnapshot::room(), cache.clone());
+        assert!(cache.replace(cache.begin_refresh(), Some(observation("Ann"))));
+        past_one_refresh();
+        // Named on by later refreshes: still first named at the start.
+        assert!(cache.replace(cache.begin_refresh(), Some(observation("Ann"))));
+        assert_eq!(
+            line.lease().face_at_end_seen(Instant::now(), None),
+            Some(ann.clone())
+        );
+
+        // No view, A first named past one refresh of the start: nobody.
+        let cache = Arc::new(FaceCache::default());
+        cache.invalidate();
+        let line = RequestScope::looking_later(key(3), ScopeSnapshot::room(), cache.clone());
+        past_one_refresh();
+        assert!(cache.replace(cache.begin_refresh(), Some(observation("Ann"))));
+        assert_eq!(line.lease().face_at_end_seen(Instant::now(), None), None);
     }
 
     /// The #2807 run on lamp-c0a4 at `39a68c91b`: a face remembered through
