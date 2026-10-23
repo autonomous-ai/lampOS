@@ -238,7 +238,16 @@ the task was started on. The `@<id>` form before it is refused ("Name the
 machine with --machine <id>."), so a `lamp-tasks` build from before that
 change fails every launch with `new_failed`.
 
-A target's folder must already be on the computer: Harness never makes it.
+A target's `project` is a folder or a name, and Harness treats the two
+oppositely (openharness `cli/src/lib/newCommand.ts`, `projectExists`). A
+**name** (`lamp-tasks`) asks Harness to make a new project folder
+(`~/harnesses/lamp-tasks`) and is refused with `PROJECT_EXISTS` ("“lamp-tasks”
+already exists on …") once that folder is there. So a named target takes its
+first hand-over, and every later one fails `new_failed`: lamp-4ace's first
+night (below), and again on lamp-0c89 on 23 October (#2813), whose folder had
+been made by hand. A target used again and again names its **folder**
+(`~/harnesses/lamp-tasks` or an absolute path), and that folder must already
+be on the computer: Harness never makes one it is given.
 `new` into a folder that isn't there is refused before anything is made
 (`{"ok":false,"error":"CWD_NOT_FOUND"}`, openharness `core/agents/create.ts`;
 `INVALID_CWD`'s "That folder does not exist on the machine." alike). Found
@@ -707,8 +716,10 @@ are off:
     bytes (`MacBook Air` is `macbook-air`), `computer` with nothing left,
     and `-2`, `-3` … where two would be the same;
   - **each target:** the machine's id, the folder `~/harnesses/lamp-tasks`
-    (lamp-4ace's today; Harness never makes it, so a computer without it
-    refuses each hand-over: see `--folder-missing`) and `ENGINE`
+    (lamp-4ace's today; a folder, not the name `lamp-tasks`, which Harness
+    would refuse from the second hand-over on. Harness never makes it, so a
+    computer without it refuses each hand-over: see `--folder-missing`) and
+    `ENGINE`
     (`claude`, `codex` or `opencode`), until Harness says which engines a
     machine has (openharness#1410's question 2).
 
