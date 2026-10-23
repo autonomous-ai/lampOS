@@ -682,8 +682,9 @@ fn going_on_same_one_is_read_after_others_answer() {
     assert!(parse_flags(dir, &wrong).is_err());
 }
 
-/// `--name-or-follow-up` comes right after `--live-scoped-session`, as the
-/// coordinator writes them, on both routes' parsers.
+/// `--name-or-follow-up` comes right after `--live-scoped-session`, and
+/// `--follow-up-for-ms` with its value right after it, as the coordinator
+/// writes them, on both routes' parsers.
 #[test]
 fn name_or_follow_up_is_read_after_the_scoped_session() {
     let dir = std::path::Path::new("/run/test");
@@ -701,5 +702,28 @@ fn name_or_follow_up_is_read_after_the_scoped_session() {
     let wrong: Vec<String> = [crate::name_or_follow_up::FLAG, crate::scoped_session::FLAG]
         .map(String::from)
         .into();
+    assert!(parse_flags(dir, &wrong).is_err());
+    // `LAMP_FOLLOW_UP_FOR_MS`'s flag and value right after it, on both
+    // routes; 8000, the window as unset, since the window is the process's.
+    let window = format!("{}", crate::name_or_follow_up::FOLLOW_UP_FOR.as_millis());
+    let flags: Vec<String> = [
+        crate::scoped_session::FLAG,
+        crate::name_or_follow_up::FLAG,
+        crate::name_or_follow_up::FOR_FLAG,
+        &window,
+    ]
+    .map(String::from)
+    .into();
+    let (_, _, files, _) = parse_flags(dir, &flags).unwrap();
+    assert!(files.scoped_session && files.name_or_follow_up);
+    let (_, _, files, _) = crate::second_provider::worker::parse_flags(dir, &flags).unwrap();
+    assert!(files.name_or_follow_up);
+    let wrong: Vec<String> = [
+        crate::name_or_follow_up::FOR_FLAG,
+        &window,
+        crate::name_or_follow_up::FLAG,
+    ]
+    .map(String::from)
+    .into();
     assert!(parse_flags(dir, &wrong).is_err());
 }

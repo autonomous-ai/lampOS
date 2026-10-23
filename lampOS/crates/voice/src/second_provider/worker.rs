@@ -2834,7 +2834,7 @@ pub fn serve(
         {
             eprintln!(
                 "lamp-voice second: in a busy room, a face turned to the lamp lets no line out alone, and a conversation goes on only {} s after the lamp's own words; held talk and two faces make the room busy (LAMP_NAME_OR_FOLLOW_UP)",
-                crate::name_or_follow_up::FOLLOW_UP_FOR.as_secs()
+                crate::name_or_follow_up::seconds(crate::name_or_follow_up::follow_up_for())
             );
             heeding.needing_name_or_follow_up();
             if let Ok(mut room) = crate::room_told::room().lock() {
@@ -5750,7 +5750,7 @@ impl Heeding {
                         "lamp-voice second: request {request}: no conversation going on: in a busy room, the line began {} after the lamp's words ended and {} after its call, past the {} s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)",
                         after(said_ago),
                         after(called_ago),
-                        crate::name_or_follow_up::FOLLOW_UP_FOR.as_secs()
+                        crate::name_or_follow_up::seconds(crate::name_or_follow_up::follow_up_for())
                     );
                 } else if talked_past {
                     eprintln!(
