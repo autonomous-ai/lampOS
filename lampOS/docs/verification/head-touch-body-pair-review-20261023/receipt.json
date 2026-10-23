@@ -1,0 +1,23 @@
+{
+  "head": "92088b7eaf1127cba12037399e7a8f7aef451846",
+  "base": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+  "platform": "macOS, Rust 1.96.0",
+  "existing_install_controls": {
+    "passed": 6,
+    "failed": 0,
+    "ignored": 0,
+    "exit": 0
+  },
+  "additive_body_override_control": {
+    "passed": 0,
+    "failed": 1,
+    "ignored": 0,
+    "exit": 101
+  },
+  "scope": "Original product/runtime source unchanged; only additive installer test overlay. Fake host and temporary filesystem; no systemd, device, or physical behavior executed.",
+  "sha256": {
+    "body-override.patch": "ed39ce675dc345140e3c87ef8d4454752be9d494fb1bea27dd7973adb5d27d4f",
+    "body-override.txt": "1ca9401107139fc811728de14975808c46fa0ac938a2674e0b8b881a5cd531b0",
+    "install.txt": "5eecab1a3dcf2b72689d9cd3a5ec49e4c1d9feac43ba28bb1e8658468c557941"
+  }
+}

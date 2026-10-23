@@ -1,0 +1,17 @@
+
+running 1 test
+install_ok=true, kept_body_off=true, voice_head_on=true, expression_head_on=true, pins_written=true
+
+thread 'second_review_body_head_off_refuses_before_bundle_mutation' (73397102) panicked at crates/update/tests/install.rs:4514:5:
+install admitted the new head bundle beside a preserved Body head-off override
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+second_review_body_head_off_refuses_before_bundle_mutation --- FAILED
+
+failures:
+
+failures:
+    second_review_body_head_off_refuses_before_bundle_mutation
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 3.29s
+
+error: test failed, to rerun pass `-p lamp-update --test install`

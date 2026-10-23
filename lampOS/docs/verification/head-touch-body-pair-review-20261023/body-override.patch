@@ -1,0 +1,29 @@
+diff --git a/lampOS/crates/update/tests/install.rs b/lampOS/crates/update/tests/install.rs
+index bdfe69793..3c139e6f3 100644
+--- a/lampOS/crates/update/tests/install.rs
++++ b/lampOS/crates/update/tests/install.rs
+@@ -4493,3 +4493,24 @@ fn install_review_head_pair_retry_keeps_calibration_and_is_idempotent() {
+     assert_eq!(tree(&lamp.root), installed);
+     assert_eq!(lamp.host.calls.len(), calls);
+ }
++
++#[test]
++fn second_review_body_head_off_refuses_before_bundle_mutation() {
++    const DROP_IN: &str = "/etc/systemd/system/lamp-body.service.d/30-local.conf";
++    const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
++    let mut lamp = Lamp::new(188, &[]);
++    fs::create_dir_all(lamp.on(DROP_IN).parent().unwrap()).unwrap();
++    let drop_in = "[Service]\nEnvironment=LAMP_HEAD_TOUCH=off\n";
++    fs::write(lamp.on(DROP_IN), drop_in).unwrap();
++    let result = lamp.install();
++    let pins = fs::read_to_string(lamp.on(PINS)).ok();
++    let voice = fs::read_to_string(lamp.on("/etc/systemd/system/lamp-voice.service")).unwrap_or_default();
++    let expression = fs::read_to_string(lamp.on("/etc/systemd/system/lamp-expression.service")).unwrap_or_default();
++    eprintln!("install_ok={}, kept_body_off={}, voice_head_on={}, expression_head_on={}, pins_written={}",
++        result.is_ok(), fs::read_to_string(lamp.on(DROP_IN)).unwrap() == drop_in,
++        voice.lines().any(|line| line == "Environment=LAMP_HEAD_TOUCH=on"),
++        expression.lines().any(|line| line.starts_with("ExecStart=") && line.split_whitespace().any(|word| word == "--head-touch")),
++        pins.is_some());
++    assert!(result.is_err(), "install admitted the new head bundle beside a preserved Body head-off override");
++    assert!(pins.is_none(), "refusal must precede product pins creation");
++}
