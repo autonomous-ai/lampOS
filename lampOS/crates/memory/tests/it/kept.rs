@@ -169,10 +169,17 @@ fn write_a_days_fixture() {
 /// by the full-text search.
 #[test]
 fn each_kept_database_opens_with_what_it_held() {
-    let kept: [(&str, &str); 1] = [(
-        "2026-10-21",
-        include_str!("../fixtures/stores/days-2026-10-21.sql"),
-    )];
+    let kept: [(&str, &str); 2] = [
+        (
+            "2026-10-21",
+            include_str!("../fixtures/stores/days-2026-10-21.sql"),
+        ),
+        // With #2849's `speakers` table (and #1693's side tables).
+        (
+            "2026-10-23",
+            include_str!("../fixtures/stores/days-2026-10-23.sql"),
+        ),
+    ];
     for (day, sql) in kept {
         let scratch = Scratch::new(day);
         let file = scratch.0.join(DATABASE);
@@ -215,5 +222,11 @@ fn each_kept_database_opens_with_what_it_held() {
         // A store from before #1693's event days: the table is made on
         // open, and a follow-up with `events` answers.
         assert_eq!(days.follow_up_with(&an, true).unwrap(), None, "{day}");
+        // #2849's speakers: made on open in a store from before it, empty
+        // (no line kept before had a speaker); the version still 1.
+        let db = Connection::open(&file).unwrap();
+        let one = |sql: &str| -> u64 { db.query_row(sql, [], |row| row.get(0)).unwrap() };
+        assert_eq!(one("SELECT count(*) FROM speakers"), 0, "{day}");
+        assert_eq!(one("PRAGMA user_version"), 1, "{day}");
     }
 }

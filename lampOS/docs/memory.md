@@ -348,6 +348,7 @@ order; it does not return observations. New operations are:
 {"op":"conversation_end","conversation":"turn_1","source_ids":[1],"previous_ids":[]}
 {"op":"conversation_end","conversation":"voice_1","source_ids":[1],"submit":true}
 {"op":"tidy_apply","job":"j1","observations":[{"text":"Prefers black coffee","category":"preference","source_ids":[1],"supersedes":null}]}
+{"op":"forget_said","speaker":"p-be9688998f085098"}
 ```
 
 These are shapes, not an ordered script: IDs must come from successful
@@ -710,6 +711,37 @@ the unchanged legacy client, used unless the new Days client is selected.
     everything only for someone it knows by face, and one thing at a time
     instead: the room's memory is the household's, and a guest, a child or
     the TV must never empty it (the reviewer on #1723).
+  - **And what they said in the room** (#2849, the first builder's yes,
+    23 Oct 09:37; `LAMP_MEMORY_ROOM_SPEAKER=on`, the second route only, off
+    unless set). A known person's line can still be kept as the room's: a
+    late look on a cold cache, a line narrowed to the room because another
+    face spoke, two known people taking turns.
+    - **Who said it:** only the one known person whose face, and no other,
+      the eyes saw saying that line (`speaking_faces::seen_saying` on the
+      line's `LineSeen`, read at its end, beside the turn and never waited
+      for). Not a face only in view, not two faces, never the voice alone.
+      It needs `LAMP_EYES_SPEAKING=on`; without it the start says so and no
+      line has a speaker. That person's id goes as `speaker` on the room's
+      `append_linked`, and on a room `remember` asked for in their line
+      (their words). Lines kept before the switch have none.
+    - **Never told:** the id is not in any note, recall, search or answer,
+      and never picks what is said; only `forget_said` reads it.
+    - **Forget everything:** once their `forget_all` answers `ok`, the
+      voice sends `forget_said {speaker}`. It removes the room's lines with
+      their id and their versions, and what was made only from those; a
+      thing also made from someone else's words stays, and so do those
+      words. The journal gives the count, never a line. What they are told
+      is as before.
+    - **An older memory:** it refuses a line with `speaker`
+      (`bad_request`): the voice sends it again once without it, the line
+      is kept as before, the journal says `room line kept without its
+      speaker (older memory)`, and no speaker is sent again that run. It
+      answers `forget_said` with `unknown_op`: nothing more is removed, the
+      journal says so, and the person is told as today.
+    - **Tests:** `remember::tests::room_speaker` (the speaker's source,
+      the switch off, both skews) and `crates/memory/tests/it/days_speakers.rs`
+      (the table, `forget_said`, the mixed-source rule, schema both ways,
+      nothing told).
   - Both clear the conversation thread and stop journalling until a fresh
     worker starts, as `forget` does. `forget` with nothing is as before.
   - **The conversation it came up in** (#1693, the first builder's 23:57):
