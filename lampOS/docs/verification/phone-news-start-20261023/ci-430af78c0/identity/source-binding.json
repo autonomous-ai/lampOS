@@ -1,0 +1,66 @@
+{
+  "pr": 3218,
+  "head": "430af78c0a1a785c2f422fc62d7bbdcc80103d4d",
+  "checked_merge": "4b724f7447003e84b2648c403b392552e6c38d64",
+  "base_parent": "6b52c916a3cfcc26a2c97670b1a9ebab4c84d174",
+  "parents": [
+    "6b52c916a3cfcc26a2c97670b1a9ebab4c84d174",
+    "430af78c0a1a785c2f422fc62d7bbdcc80103d4d"
+  ],
+  "merge_tree": "f6d053a93e642389a1a5d5bcca21180c4bd6e5e0",
+  "all_captured_blobs_match_authored_head": true,
+  "authored_head_parent": "6b52c916a3cfcc26a2c97670b1a9ebab4c84d174",
+  "authored_head_tree": "f6d053a93e642389a1a5d5bcca21180c4bd6e5e0",
+  "files": [
+    {
+      "path": ".github/workflows/lampos-arm64.yml",
+      "git_blob": "1c0ac73ea8f7c0970ebaec380bb057a0d17e3dd9",
+      "sha256": "ad1a4cd650db5f2a721b510263ff5c1697b09f872646395fb4cab6173f8757f9",
+      "bytes": 18332,
+      "matches_authored_head": true,
+      "authored_head_sha256": "ad1a4cd650db5f2a721b510263ff5c1697b09f872646395fb4cab6173f8757f9"
+    },
+    {
+      "path": ".github/workflows/lampos-clippy.yml",
+      "git_blob": "8e6dc386c08ece68de2c9a42446d2c9de080eb95",
+      "sha256": "2b41648cade7109e94995fd076f638166345867600e38e5e9aa9438a9b18c9ac",
+      "bytes": 4189,
+      "matches_authored_head": true,
+      "authored_head_sha256": "2b41648cade7109e94995fd076f638166345867600e38e5e9aa9438a9b18c9ac"
+    },
+    {
+      "path": ".github/scripts/lampos-pr-crates.py",
+      "git_blob": "2213782569c8e9130dc40d6d632ffc04a78e0081",
+      "sha256": "c89f3cc802c1f385793f7a800142ae235ef7b09c00e38f1661427eecffcf2671",
+      "bytes": 5493,
+      "matches_authored_head": true,
+      "authored_head_sha256": "c89f3cc802c1f385793f7a800142ae235ef7b09c00e38f1661427eecffcf2671"
+    },
+    {
+      "path": "lampOS/.config/nextest.toml",
+      "git_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+      "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+      "bytes": 5157,
+      "matches_authored_head": true,
+      "authored_head_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+    },
+    {
+      "path": "lampOS/crates/voice/src/messages.rs",
+      "git_blob": "7ede2e9b0b14c32c36aa1bca279dbcf65f6a7608",
+      "sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de",
+      "bytes": 51731,
+      "matches_authored_head": true,
+      "authored_head_sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de"
+    },
+    {
+      "path": "lampOS/docs/messages.md",
+      "git_blob": "3c8f3b35827cd753501db2fb07eff88a763c6f18",
+      "sha256": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3",
+      "bytes": 23556,
+      "matches_authored_head": true,
+      "authored_head_sha256": "c45dd64a5c938962ce270619022ddca72af7dc86f520318a51737b668349a0d3"
+    }
+  ],
+  "scope": "Synthetic merge and authored head trees are compared explicitly; current latest-parent qualification remains separate.",
+  "whole_merge_tree_equals_authored_head": true
+}

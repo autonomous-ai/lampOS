@@ -1,0 +1,25 @@
+{
+  "pr": 3218,
+  "head": "430af78c0a1a785c2f422fc62d7bbdcc80103d4d",
+  "cases": [
+    {
+      "name": "messages::tests::a_text_never_waits_on_the_news_for_the_phone",
+      "source": "lampOS/crates/voice/src/messages.rs",
+      "mapping": "literal",
+      "row": {
+        "status": "PASS",
+        "seconds": 3.067,
+        "ordinal": 4034,
+        "total": 7173,
+        "binary": "lamp-voice",
+        "name": "messages::tests::a_text_never_waits_on_the_news_for_the_phone",
+        "raw_line": 4728
+      }
+    }
+  ],
+  "outcomes": {
+    "PASS": 1
+  },
+  "scope": "Authored subset of current CI executed cases, not a full compiled census. The 86 clock fixtures and additional loading-child case are separate when present. Case duration is not product response latency.",
+  "historical_inventory_sha256": null
+}

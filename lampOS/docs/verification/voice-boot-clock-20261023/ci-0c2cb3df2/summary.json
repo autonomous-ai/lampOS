@@ -1,0 +1,130 @@
+{
+  "pr": 3190,
+  "head": "0c2cb3df2672d08f580f0c6ccad9781f054bdbf9",
+  "checked_merge": "d800e03641b5df1239a75ff789e1a51b9365676c",
+  "base_parent": "6b52c916a3cfcc26a2c97670b1a9ebab4c84d174",
+  "parents": [
+    "6b52c916a3cfcc26a2c97670b1a9ebab4c84d174",
+    "0c2cb3df2672d08f580f0c6ccad9781f054bdbf9"
+  ],
+  "merge_tree": "fbf70a0a34e617bd71aae6a6f7e8775929dd29af",
+  "all_captured_blobs_match_authored_head": true,
+  "required_results": {
+    "arm64": {
+      "run_id": 39908570990,
+      "run_number": 6383,
+      "job_id": 120266045049,
+      "workflow_status": "completed",
+      "workflow_conclusion": "success",
+      "job_status": "completed",
+      "job_conclusion": "success",
+      "started_at": "2026-10-23T05:56:47Z",
+      "completed_at": "2026-10-23T06:09:00Z"
+    },
+    "clippy": {
+      "run_id": 39908570985,
+      "run_number": 2385,
+      "job_id": 120266045368,
+      "workflow_status": "completed",
+      "workflow_conclusion": "success",
+      "job_status": "completed",
+      "job_conclusion": "success",
+      "started_at": "2026-10-23T05:56:45Z",
+      "completed_at": "2026-10-23T06:05:15Z"
+    }
+  },
+  "nextest": {
+    "total": 7173,
+    "passed": 7173,
+    "failed": 0,
+    "leaky_included": 1,
+    "skipped_tests": 32,
+    "skipped_binaries": 106,
+    "startup_binaries": 62,
+    "terminal_binaries": 58,
+    "duration_seconds": 141.89,
+    "packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "selected_packages": 12,
+    "workspace_packages": 46,
+    "profile": "pr",
+    "default_filter": "all()",
+    "partition": "hash:1/1",
+    "ordinal_coverage": "1..7173 complete",
+    "raw_rows": 7207,
+    "identical_repetitions": 34
+  },
+  "selected_case_results": {
+    "PASS": 87
+  },
+  "selected_count": 87,
+  "leaky_passes": [
+    {
+      "status": "LEAK",
+      "seconds": 0.217,
+      "ordinal": 5054,
+      "total": 7173,
+      "binary": "lamp-voice",
+      "name": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+      "raw_line": 5743
+    }
+  ],
+  "failures": [],
+  "separate_harnesses": {
+    "doctests": {
+      "targets": 46,
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "process": {
+      "ok": 12
+    },
+    "relay": "ok",
+    "offline_publication_checks": [
+      {
+        "script": "lampos-publish-test.py",
+        "count": 35,
+        "result": "OK",
+        "raw_first": 294,
+        "raw_last": 337,
+        "summary": "2026-10-23T05:57:16.3063667Z Ran 35 tests in 0.232s"
+      },
+      {
+        "script": "lampos-publish-artifact-test.py",
+        "count": 12,
+        "result": "OK",
+        "raw_first": 387,
+        "raw_last": 407,
+        "summary": "2026-10-23T05:57:22.6212243Z Ran 12 tests in 0.698s"
+      },
+      {
+        "script": "lampos-publish-cli-test.py",
+        "count": 7,
+        "result": "OK",
+        "raw_first": 624,
+        "raw_last": 639,
+        "summary": "2026-10-23T06:01:32.9431819Z Ran 7 tests in 0.390s"
+      }
+    ]
+  },
+  "limits": [
+    "Historical carry on6b52c916a; newer cf462 carries are separate.",
+    "Native success does not waive retained Mac failures or reviewer HOLD.",
+    "No Linux formatting was run by these jobs.",
+    "Cached builds/source timestamps: not a cold-build result.",
+    "Artifact upload identity is a log observation only; no artifact ZIP downloaded/independently hashed."
+  ]
+}

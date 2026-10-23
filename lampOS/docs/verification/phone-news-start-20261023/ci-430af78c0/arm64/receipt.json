@@ -1,0 +1,1032 @@
+{
+  "run_id": 39908229542,
+  "run_number": 6381,
+  "run_attempt": 1,
+  "head": "430af78c0a1a785c2f422fc62d7bbdcc80103d4d",
+  "workflow_status": "completed",
+  "workflow_conclusion": "success",
+  "job_id": 120264988637,
+  "job_status": "completed",
+  "job_conclusion": "success",
+  "run_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39908229542",
+  "job_url": "https://github.com/autonomous-ai/lampOS/actions/runs/39908229542/job/120264988637",
+  "checked_merge": "4b724f7447003e84b2648c403b392552e6c38d64",
+  "log_bytes": 1264224,
+  "log_sha256": "df24f2cb45dbc4dd6bf823bd72fdad7ee3a3a3ecee7c5e3e5e4c24b3cae867b8",
+  "started_at": "2026-10-23T05:53:09Z",
+  "completed_at": "2026-10-23T06:06:38Z",
+  "commands": [
+    {
+      "raw_line": 37,
+      "text": "2026-10-23T05:53:11.8227593Z ##[group]Run sudo apt-get update"
+    },
+    {
+      "raw_line": 185,
+      "text": "2026-10-23T05:53:47.2500282Z ##[group]Run actions/checkout@v4"
+    },
+    {
+      "raw_line": 293,
+      "text": "2026-10-23T05:53:53.2374847Z ##[group]Run python3 -I .github/scripts/lampos-publish-test.py"
+    },
+    {
+      "raw_line": 337,
+      "text": "2026-10-23T05:53:53.7078332Z ##[group]Run curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt"
+    },
+    {
+      "raw_line": 386,
+      "text": "2026-10-23T05:53:59.8951748Z ##[group]Run python3 -B -I .github/scripts/lampos-publish-artifact-test.py"
+    },
+    {
+      "raw_line": 407,
+      "text": "2026-10-23T05:54:00.8855226Z ##[group]Run actions/cache/restore@v4"
+    },
+    {
+      "raw_line": 443,
+      "text": "2026-10-23T05:54:34.4406078Z ##[group]Run python3 -I .github/scripts/lampos-source-times.py"
+    },
+    {
+      "raw_line": 448,
+      "text": "2026-10-23T05:54:35.4988482Z ##[group]Run taiki-e/install-action@v2"
+    },
+    {
+      "raw_line": 455,
+      "text": "2026-10-23T05:54:35.6086171Z ##[group]Run bail() {"
+    },
+    {
+      "raw_line": 507,
+      "text": "2026-10-23T05:54:37.0204489Z ##[group]Run cargo build --locked --release --workspace --bins --examples --message-format=json-render-diagnostics > arm64-build.jsonl"
+    },
+    {
+      "raw_line": 538,
+      "text": "2026-10-23T05:56:56.8052937Z ##[group]Run bash tools/package-binaries-test.sh && bash tools/package-binaries.sh deploy/package-binaries.json target/release"
+    },
+    {
+      "raw_line": 544,
+      "text": "2026-10-23T05:56:56.9668241Z ##[group]Run cargo build --locked --release -p lamp-schedule --example schedule_check \\"
+    },
+    {
+      "raw_line": 627,
+      "text": "2026-10-23T05:58:23.1436070Z ##[group]Run python3 -I .github/scripts/lampos-publish-cli-test.py --updater lampOS/target/release/lamp-update"
+    },
+    {
+      "raw_line": 643,
+      "text": "2026-10-23T05:58:23.6135024Z ##[group]Run python3 -I .github/scripts/lampos-pr-crates.py"
+    },
+    {
+      "raw_line": 649,
+      "text": "2026-10-23T05:58:23.6895531Z ##[group]Run echo \"cores: $(nproc)\""
+    },
+    {
+      "raw_line": 8286,
+      "text": "2026-10-23T06:06:09.0533237Z ##[group]Run cargo test --locked --release --workspace --doc -- --test-threads=1"
+    },
+    {
+      "raw_line": 8596,
+      "text": "2026-10-23T06:06:22.8025479Z ##[group]Run python3 -B -I .github/scripts/lampos-publish-artifact.py --workspace lampOS --build-log lampOS/arm64-build.jsonl --build-log lampOS/arm64-schedule-example.jsonl --build-log lampOS/arm64-expression-example.jsonl --out lampOS/arm64-out"
+    },
+    {
+      "raw_line": 8601,
+      "text": "2026-10-23T06:06:23.4459302Z ##[group]Run actions/upload-artifact@v4"
+    }
+  ],
+  "toolchain_lines": [
+    {
+      "raw_line": 352,
+      "text": "2026-10-23T05:53:59.8354416Z   1.96.0-aarch64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)"
+    },
+    {
+      "raw_line": 496,
+      "text": "2026-10-23T05:54:36.9347637Z info: cargo-nextest installed at /home/runner/.cargo/bin/cargo-nextest"
+    },
+    {
+      "raw_line": 497,
+      "text": "2026-10-23T05:54:36.9350780Z + cargo-nextest nextest --version"
+    },
+    {
+      "raw_line": 498,
+      "text": "2026-10-23T05:54:36.9374345Z cargo-nextest 0.9.148 (cd1d6d546 2026-10-07)"
+    },
+    {
+      "raw_line": 502,
+      "text": "2026-10-23T05:54:36.9375350Z host: aarch64-unknown-linux-gnu"
+    }
+  ],
+  "steps": [
+    {
+      "name": "Set up job",
+      "number": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T05:53:10Z",
+      "completed_at": "2026-10-23T05:53:11Z"
+    },
+    {
+      "name": "system packages",
+      "number": 2,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T05:53:11Z",
+      "completed_at": "2026-10-23T05:53:47Z"
+    },
+    {
+      "name": "Run actions/checkout@v4",
+      "number": 3,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T05:53:47Z",
+      "completed_at": "2026-10-23T05:53:53Z"
+    },
+    {
+      "name": "publication failure tests (offline, no signing secret)",
+      "number": 4,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T05:53:53Z",
+      "completed_at": "2026-10-23T05:53:53Z"
+    },
+    {
+      "name": "Rust 1.96.0",
+      "number": 5,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T05:53:53Z",
+      "completed_at": "2026-10-23T05:53:59Z"
+    },
+    {
+      "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+      "number": 6,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T05:53:59Z",
+      "completed_at": "2026-10-23T05:54:00Z"
+    },
+    {
+      "name": "restore the cache",
+      "number": 7,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T05:54:00Z",
+      "completed_at": "2026-10-23T05:54:34Z"
+    },
+    {
+      "name": "unchanged source files get the cached build's times back",
+      "number": 8,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T05:54:34Z",
+      "completed_at": "2026-10-23T05:54:35Z"
+    },
+    {
+      "name": "record fresh source times for a cold publication build",
+      "number": 9,
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-10-23T05:54:35Z",
+      "completed_at": "2026-10-23T05:54:35Z"
+    },
+    {
+      "name": "Run taiki-e/install-action@v2",
+      "number": 10,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T05:54:35Z",
+      "completed_at": "2026-10-23T05:54:36Z"
+    },
+    {
+      "name": "build (release, the lamps' binaries)",
+      "number": 11,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T05:54:36Z",
+      "completed_at": "2026-10-23T05:56:56Z"
+    },
+    {
+      "name": "every built lamp-* binary is classified for the lamp-os package",
+      "number": 12,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T05:56:56Z",
+      "completed_at": "2026-10-23T05:56:56Z"
+    },
+    {
+      "name": "build the two selected artifact examples without filename collisions",
+      "number": 13,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T05:56:56Z",
+      "completed_at": "2026-10-23T05:58:23Z"
+    },
+    {
+      "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+      "number": 14,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T05:58:23Z",
+      "completed_at": "2026-10-23T05:58:23Z"
+    },
+    {
+      "name": "which crates a pull request tests",
+      "number": 15,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T05:58:23Z",
+      "completed_at": "2026-10-23T05:58:23Z"
+    },
+    {
+      "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+      "number": 16,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T05:58:23Z",
+      "completed_at": "2026-10-23T06:06:09Z"
+    },
+    {
+      "name": "doc tests and the own-harness tests (nextest runs neither)",
+      "number": 17,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T06:06:09Z",
+      "completed_at": "2026-10-23T06:06:22Z"
+    },
+    {
+      "name": "export only current Cargo targets and their SHA-256",
+      "number": 18,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T06:06:22Z",
+      "completed_at": "2026-10-23T06:06:23Z"
+    },
+    {
+      "name": "Run actions/upload-artifact@v4",
+      "number": 19,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T06:06:23Z",
+      "completed_at": "2026-10-23T06:06:30Z"
+    },
+    {
+      "name": "discard the isolated example target before saving the cache",
+      "number": 20,
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-10-23T06:06:30Z",
+      "completed_at": "2026-10-23T06:06:30Z"
+    },
+    {
+      "name": "save the cache",
+      "number": 21,
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-10-23T06:06:30Z",
+      "completed_at": "2026-10-23T06:06:30Z"
+    },
+    {
+      "name": "Post Run actions/checkout@v4",
+      "number": 42,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T06:06:31Z",
+      "completed_at": "2026-10-23T06:06:31Z"
+    },
+    {
+      "name": "Complete job",
+      "number": 43,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-23T06:06:31Z",
+      "completed_at": "2026-10-23T06:06:31Z"
+    }
+  ],
+  "terminal_counts": {
+    "PASS": 7172,
+    "LEAK": 1
+  },
+  "test_rows": 7173,
+  "raw_terminal_rows": 7207,
+  "duplicate_identical_rows": 34,
+  "terminal_binary_count": 58,
+  "ordinal_coverage_complete": true,
+  "changed_phone_case": [
+    {
+      "status": "PASS",
+      "seconds": 3.067,
+      "ordinal": 4034,
+      "total": 7173,
+      "binary": "lamp-voice",
+      "name": "messages::tests::a_text_never_waits_on_the_news_for_the_phone",
+      "raw_line": 4728
+    }
+  ],
+  "failed_terminal_rows": [],
+  "leaky_passes": [
+    {
+      "status": "LEAK",
+      "seconds": 0.223,
+      "ordinal": 5054,
+      "total": 7173,
+      "binary": "lamp-voice",
+      "name": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+      "raw_line": 5748
+    }
+  ],
+  "nextest_summaries": [
+    {
+      "raw_line": 694,
+      "text": "2026-10-23T06:03:47.0338780Z     Starting 7173 tests across 62 binaries (32 tests and 106 binaries skipped)"
+    },
+    {
+      "raw_line": 7869,
+      "text": "2026-10-23T06:06:09.0353265Z      Summary [ 142.002s] 7173 tests run: 7173 passed (1 leaky), 32 skipped"
+    }
+  ],
+  "scope_lines": [
+    {
+      "raw_line": 647,
+      "text": "2026-10-23T05:58:23.6809930Z Changed: lamp-voice. With the crates that depend on them and the three that read other crates' files (lamp-cloud, lamp-voice-eval, lamp-update): 12 of 46 crates."
+    },
+    {
+      "raw_line": 660,
+      "text": "2026-10-23T05:58:23.6917000Z   PICKED: package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)"
+    }
+  ],
+  "named_skip_lines": [],
+  "separate_harness_lines": [
+    {
+      "raw_line": 1046,
+      "text": "2026-10-23T06:03:48.8656543Z         PASS [   0.004s] ( 352/7173) lamp-body inspection::tests::clock_regression_and_failed_cancellation_source_cannot_admit_another_operation"
+    },
+    {
+      "raw_line": 1091,
+      "text": "2026-10-23T06:03:49.2015493Z         PASS [   0.007s] ( 397/7173) lamp-body runtime::supervisor::tests::inhibition_measurement_must_be_between_spawn_and_publication"
+    },
+    {
+      "raw_line": 1143,
+      "text": "2026-10-23T06:03:49.6310174Z         PASS [   0.004s] ( 449/7173) lamp-body::it control::clock_regression_latches_fault_and_stale_readback_cannot_start"
+    },
+    {
+      "raw_line": 1510,
+      "text": "2026-10-23T06:04:00.8366870Z         PASS [   0.009s] ( 816/7173) lamp-expression runtime::unplug_tests::closed_privacy_and_failed_light_publication_never_acknowledge"
+    },
+    {
+      "raw_line": 1573,
+      "text": "2026-10-23T06:04:01.5276638Z         PASS [   0.006s] ( 879/7173) lamp-expression::it alive_engine::the_name_onset_not_its_publication_or_receipt_selects_the_speech_window"
+    },
+    {
+      "raw_line": 1629,
+      "text": "2026-10-23T06:04:02.8533627Z         PASS [   0.004s] ( 935/7173) lamp-expression::it engine::wrong_clock_rejects_only_the_input_but_clock_regression_latches_safe_stop"
+    },
+    {
+      "raw_line": 1642,
+      "text": "2026-10-23T06:04:02.9233198Z         PASS [   0.004s] ( 948/7173) lamp-expression::it recent_playout::a_future_interval_admitted_promptly_can_outlive_its_publication_ttl"
+    },
+    {
+      "raw_line": 1676,
+      "text": "2026-10-23T06:04:02.9948548Z         PASS [   0.004s] ( 982/7173) lamp-expression::it recent_playout_replay::publication_receipt_and_next_tick_are_separate_authored_boundaries"
+    },
+    {
+      "raw_line": 1726,
+      "text": "2026-10-23T06:04:03.1754829Z         PASS [   0.004s] (1032/7173) lamp-expression::it rest_engine::rehold_requires_a_new_generation_and_regressions_do_not_mutate_state"
+    },
+    {
+      "raw_line": 1745,
+      "text": "2026-10-23T06:04:03.3141873Z         PASS [   0.004s] (1051/7173) lamp-expression::it rest_replay::no_concentration_publication_means_not_concentrating_and_healthy_with_other_inputs_known"
+    },
+    {
+      "raw_line": 1762,
+      "text": "2026-10-23T06:04:03.5506536Z         PASS [   0.004s] (1068/7173) lamp-expression::it rest_requests::duplicate_order_and_wake_to_rest_regression_cannot_restart_a_clip"
+    },
+    {
+      "raw_line": 1820,
+      "text": "2026-10-23T06:04:05.0911627Z         PASS [   0.004s] (1126/7173) lamp-expression::runtime sleep_name::name_adaptation_keeps_publication_delay_and_ago_ms"
+    },
+    {
+      "raw_line": 1953,
+      "text": "2026-10-23T06:04:06.0217757Z         PASS [   0.004s] (1259/7173) lamp-memory health::schedule_tests::completion_waits_for_actual_publication_and_overrun_has_no_catchup_queue"
+    },
+    {
+      "raw_line": 1955,
+      "text": "2026-10-23T06:04:06.0302821Z         PASS [   0.004s] (1261/7173) lamp-memory health::schedule_tests::publication_outcomes_follow_the_actual_error_and_recovery_results"
+    },
+    {
+      "raw_line": 1959,
+      "text": "2026-10-23T06:04:06.0589903Z         PASS [   0.005s] (1265/7173) lamp-memory health::schedule_tests::successful_publication_is_not_a_receipt_and_the_shared_bus_clock_rescans_real_sockets"
+    },
+    {
+      "raw_line": 1962,
+      "text": "2026-10-23T06:04:06.1425735Z         PASS [   0.104s] (1268/7173) lamp-memory health::schedule_tests::stopping_a_held_publication_keeps_the_host_bound_without_false_completion"
+    },
+    {
+      "raw_line": 1970,
+      "text": "2026-10-23T06:04:07.1740161Z         PASS [   0.106s] (1276/7173) lamp-memory health::tests::held_publication_cannot_block_a_real_socket_or_bounded_shutdown"
+    },
+    {
+      "raw_line": 2047,
+      "text": "2026-10-23T06:04:07.7783524Z         PASS [   0.005s] (1353/7173) lamp-memory::health_control cadence_reads_and_same_time_rounds_do_not_invent_publications"
+    },
+    {
+      "raw_line": 2168,
+      "text": "2026-10-23T06:04:09.8846146Z         PASS [   0.005s] (1474/7173) lamp-memory::it fixture_child::pre_deadline_wait_preserves_the_full_period_and_due_requires_real_publication"
+    },
+    {
+      "raw_line": 2173,
+      "text": "2026-10-23T06:04:09.9277444Z         PASS [   0.022s] (1479/7173) lamp-memory::it health::a_working_bus_that_fails_stays_failed_until_publication_really_recovers"
+    },
+    {
+      "raw_line": 2560,
+      "text": "2026-10-23T06:04:20.4894759Z         PASS [   0.007s] (1866/7173) lamp-skills routine::tests::publication_stops_at_the_episode_cap_but_cancel_remains_deliverable"
+    },
+    {
+      "raw_line": 3342,
+      "text": "2026-10-23T06:04:58.0336176Z         PASS [   0.005s] (2648/7173) lamp-voice admission::outage_drain_tests::discard_clock_regression_and_explicit_reset_do_not_reuse_candidate_identity"
+    },
+    {
+      "raw_line": 3571,
+      "text": "2026-10-23T06:05:00.6641725Z         PASS [   0.006s] (2877/7173) lamp-voice choreography::tests::clock_regression_latches_without_mutating_controller"
+    },
+    {
+      "raw_line": 4956,
+      "text": "2026-10-23T06:05:24.7178725Z         PASS [   0.006s] (4262/7173) lamp-voice provider_worker::tests::audit_shared_clock_regression_cannot_be_hidden_by_a_later_clock_gap"
+    },
+    {
+      "raw_line": 5539,
+      "text": "2026-10-23T06:05:38.4889000Z         PASS [   0.006s] (4845/7173) lamp-voice requested_audio::runtime::tests::equal_sequence_changes_regression_and_restart_break_permission"
+    },
+    {
+      "raw_line": 6838,
+      "text": "2026-10-23T06:05:57.3055467Z         PASS [   0.006s] (6144/7173) lamp-voice transport::probe::tests::causally_held_publication_returns_busy_without_waiting_or_claiming_a_receipt"
+    },
+    {
+      "raw_line": 6839,
+      "text": "2026-10-23T06:05:57.3089300Z         PASS [   0.006s] (6145/7173) lamp-voice transport::probe::tests::counter_and_publication_overflow_latch_without_fabricating_success"
+    },
+    {
+      "raw_line": 6883,
+      "text": "2026-10-23T06:05:57.4140951Z         PASS [   0.007s] (6189/7173) lamp-voice turn_taking::tests::original_read_start_is_preserved_and_clock_regression_is_rejected"
+    },
+    {
+      "raw_line": 6939,
+      "text": "2026-10-23T06:05:57.5212788Z         PASS [   0.006s] (6245/7173) lamp-voice wire::playback_gap_receipt_tests::timestamps_allow_equality_but_not_zero_start_or_regression"
+    },
+    {
+      "raw_line": 6954,
+      "text": "2026-10-23T06:05:57.5437867Z         PASS [   0.005s] (6260/7173) lamp-voice::it admission::detector_failure_or_clock_regression_cannot_leave_acceptable_pending_audio"
+    },
+    {
+      "raw_line": 7105,
+      "text": "2026-10-23T06:05:57.8898499Z         PASS [   0.005s] (6411/7173) lamp-voice::it privacy_controls::repeated_publication_does_not_refresh_or_rename_acquisition"
+    },
+    {
+      "raw_line": 7114,
+      "text": "2026-10-23T06:05:57.9324340Z         PASS [   0.005s] (6420/7173) lamp-voice::it privacy_pipeline::repeated_publication_preserves_original_acquisition_and_cannot_extend_capture"
+    },
+    {
+      "raw_line": 7131,
+      "text": "2026-10-23T06:05:58.6340665Z         PASS [   0.656s] (6437/7173) lamp-voice::it privacy_worker::a_gap_ride_recovers_short_repeated_publication_gaps_in_the_same_worker"
+    },
+    {
+      "raw_line": 7876,
+      "text": "2026-10-23T06:06:09.0355531Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 304 filtered out; finished in 3.61s"
+    },
+    {
+      "raw_line": 7892,
+      "text": "2026-10-23T06:06:09.0363372Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 304 filtered out; finished in 1.15s"
+    },
+    {
+      "raw_line": 7918,
+      "text": "2026-10-23T06:06:09.0373542Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 304 filtered out; finished in 4.51s"
+    },
+    {
+      "raw_line": 7933,
+      "text": "2026-10-23T06:06:09.0378110Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 304 filtered out; finished in 0.92s"
+    },
+    {
+      "raw_line": 7955,
+      "text": "2026-10-23T06:06:09.0386270Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 304 filtered out; finished in 1.74s"
+    },
+    {
+      "raw_line": 7980,
+      "text": "2026-10-23T06:06:09.0396367Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3642 filtered out; finished in 3.01s"
+    },
+    {
+      "raw_line": 7997,
+      "text": "2026-10-23T06:06:09.0402464Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3642 filtered out; finished in 2.73s"
+    },
+    {
+      "raw_line": 8006,
+      "text": "2026-10-23T06:06:09.0404811Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3642 filtered out; finished in 1.30s"
+    },
+    {
+      "raw_line": 8015,
+      "text": "2026-10-23T06:06:09.0407610Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.95s"
+    },
+    {
+      "raw_line": 8028,
+      "text": "2026-10-23T06:06:09.0412018Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 1.55s"
+    },
+    {
+      "raw_line": 8040,
+      "text": "2026-10-23T06:06:09.0415495Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.88s"
+    },
+    {
+      "raw_line": 8052,
+      "text": "2026-10-23T06:06:09.0419117Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 1.01s"
+    },
+    {
+      "raw_line": 8063,
+      "text": "2026-10-23T06:06:09.0422138Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 2.25s"
+    },
+    {
+      "raw_line": 8075,
+      "text": "2026-10-23T06:06:09.0425595Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.80s"
+    },
+    {
+      "raw_line": 8086,
+      "text": "2026-10-23T06:06:09.0428720Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 2.80s"
+    },
+    {
+      "raw_line": 8098,
+      "text": "2026-10-23T06:06:09.0433076Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 2.80s"
+    },
+    {
+      "raw_line": 8110,
+      "text": "2026-10-23T06:06:09.0436968Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 1.31s"
+    },
+    {
+      "raw_line": 8121,
+      "text": "2026-10-23T06:06:09.0440155Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 2.31s"
+    },
+    {
+      "raw_line": 8132,
+      "text": "2026-10-23T06:06:09.0443204Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 3.50s"
+    },
+    {
+      "raw_line": 8143,
+      "text": "2026-10-23T06:06:09.0445869Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 7.91s"
+    },
+    {
+      "raw_line": 8155,
+      "text": "2026-10-23T06:06:09.0449208Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 1.59s"
+    },
+    {
+      "raw_line": 8169,
+      "text": "2026-10-23T06:06:09.0454628Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 2.51s"
+    },
+    {
+      "raw_line": 8182,
+      "text": "2026-10-23T06:06:09.0458899Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8191,
+      "text": "2026-10-23T06:06:09.0461393Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.07s"
+    },
+    {
+      "raw_line": 8200,
+      "text": "2026-10-23T06:06:09.0463794Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.06s"
+    },
+    {
+      "raw_line": 8203,
+      "text": "2026-10-23T06:06:09.0464496Z         PASS [   0.656s] (6437/7173) lamp-voice::it privacy_worker::a_gap_ride_recovers_short_repeated_publication_gaps_in_the_same_worker"
+    },
+    {
+      "raw_line": 8207,
+      "text": "2026-10-23T06:06:09.0465601Z     test privacy_worker::a_gap_ride_recovers_short_repeated_publication_gaps_in_the_same_worker ... ok"
+    },
+    {
+      "raw_line": 8209,
+      "text": "2026-10-23T06:06:09.0466201Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.65s"
+    },
+    {
+      "raw_line": 8218,
+      "text": "2026-10-23T06:06:09.0468567Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.40s"
+    },
+    {
+      "raw_line": 8227,
+      "text": "2026-10-23T06:06:09.0471488Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.21s"
+    },
+    {
+      "raw_line": 8236,
+      "text": "2026-10-23T06:06:09.0474225Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.20s"
+    },
+    {
+      "raw_line": 8245,
+      "text": "2026-10-23T06:06:09.0476645Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.12s"
+    },
+    {
+      "raw_line": 8254,
+      "text": "2026-10-23T06:06:09.0478943Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.24s"
+    },
+    {
+      "raw_line": 8263,
+      "text": "2026-10-23T06:06:09.0481448Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.11s"
+    },
+    {
+      "raw_line": 8272,
+      "text": "2026-10-23T06:06:09.0484068Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.33s"
+    },
+    {
+      "raw_line": 8283,
+      "text": "2026-10-23T06:06:09.0487500Z     test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 301 filtered out; finished in 1.12s"
+    },
+    {
+      "raw_line": 8293,
+      "text": "2026-10-23T06:06:09.3120845Z    Doc-tests lamp_actions"
+    },
+    {
+      "raw_line": 8297,
+      "text": "2026-10-23T06:06:09.4031713Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8299,
+      "text": "2026-10-23T06:06:09.4060080Z    Doc-tests lamp_addons"
+    },
+    {
+      "raw_line": 8303,
+      "text": "2026-10-23T06:06:09.4361767Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8305,
+      "text": "2026-10-23T06:06:09.4388290Z    Doc-tests lamp_air"
+    },
+    {
+      "raw_line": 8309,
+      "text": "2026-10-23T06:06:09.4623268Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8311,
+      "text": "2026-10-23T06:06:09.4647407Z    Doc-tests lamp_audio"
+    },
+    {
+      "raw_line": 8315,
+      "text": "2026-10-23T06:06:09.6291461Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8317,
+      "text": "2026-10-23T06:06:09.6321858Z    Doc-tests lamp_body"
+    },
+    {
+      "raw_line": 8321,
+      "text": "2026-10-23T06:06:09.9715412Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8323,
+      "text": "2026-10-23T06:06:09.9744466Z    Doc-tests lamp_bus"
+    },
+    {
+      "raw_line": 8329,
+      "text": "2026-10-23T06:06:10.3959657Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8332,
+      "text": "2026-10-23T06:06:10.4000718Z    Doc-tests lamp_camera"
+    },
+    {
+      "raw_line": 8336,
+      "text": "2026-10-23T06:06:10.5061547Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8338,
+      "text": "2026-10-23T06:06:10.5090109Z    Doc-tests lamp_cloud"
+    },
+    {
+      "raw_line": 8342,
+      "text": "2026-10-23T06:06:10.6531199Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8344,
+      "text": "2026-10-23T06:06:10.6562781Z    Doc-tests lamp_controls"
+    },
+    {
+      "raw_line": 8348,
+      "text": "2026-10-23T06:06:10.8764854Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8350,
+      "text": "2026-10-23T06:06:10.8794660Z    Doc-tests lamp_ears"
+    },
+    {
+      "raw_line": 8354,
+      "text": "2026-10-23T06:06:10.9163793Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8356,
+      "text": "2026-10-23T06:06:10.9195684Z    Doc-tests lamp_environment"
+    },
+    {
+      "raw_line": 8360,
+      "text": "2026-10-23T06:06:10.9443313Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8362,
+      "text": "2026-10-23T06:06:10.9468207Z    Doc-tests lamp_expression"
+    },
+    {
+      "raw_line": 8366,
+      "text": "2026-10-23T06:06:11.1104236Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8368,
+      "text": "2026-10-23T06:06:11.1136522Z    Doc-tests lamp_eyes"
+    },
+    {
+      "raw_line": 8372,
+      "text": "2026-10-23T06:06:11.2620473Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8374,
+      "text": "2026-10-23T06:06:11.2649622Z    Doc-tests lamp_gemini"
+    },
+    {
+      "raw_line": 8378,
+      "text": "2026-10-23T06:06:11.3750859Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8380,
+      "text": "2026-10-23T06:06:11.3780181Z    Doc-tests lamp_health"
+    },
+    {
+      "raw_line": 8384,
+      "text": "2026-10-23T06:06:11.4214688Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8386,
+      "text": "2026-10-23T06:06:11.4243209Z    Doc-tests lamp_ipc"
+    },
+    {
+      "raw_line": 8391,
+      "text": "2026-10-23T06:06:11.7664197Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8394,
+      "text": "2026-10-23T06:06:11.7704792Z    Doc-tests lamp_keeper"
+    },
+    {
+      "raw_line": 8398,
+      "text": "2026-10-23T06:06:11.8103324Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8400,
+      "text": "2026-10-23T06:06:11.8130587Z    Doc-tests lamp_lean"
+    },
+    {
+      "raw_line": 8404,
+      "text": "2026-10-23T06:06:11.8561040Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8406,
+      "text": "2026-10-23T06:06:11.8587909Z    Doc-tests lamp_local_time"
+    },
+    {
+      "raw_line": 8410,
+      "text": "2026-10-23T06:06:11.8782583Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8412,
+      "text": "2026-10-23T06:06:11.8807405Z    Doc-tests lamp_memory"
+    },
+    {
+      "raw_line": 8416,
+      "text": "2026-10-23T06:06:12.0273712Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8418,
+      "text": "2026-10-23T06:06:12.0306140Z    Doc-tests lamp_mood"
+    },
+    {
+      "raw_line": 8422,
+      "text": "2026-10-23T06:06:12.0920644Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8424,
+      "text": "2026-10-23T06:06:12.0947978Z    Doc-tests lamp_msgs"
+    },
+    {
+      "raw_line": 8429,
+      "text": "2026-10-23T06:06:13.0245980Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8432,
+      "text": "2026-10-23T06:06:13.0298143Z    Doc-tests lamp_name"
+    },
+    {
+      "raw_line": 8436,
+      "text": "2026-10-23T06:06:13.0643610Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8438,
+      "text": "2026-10-23T06:06:13.0670734Z    Doc-tests lamp_near_call"
+    },
+    {
+      "raw_line": 8442,
+      "text": "2026-10-23T06:06:13.0930663Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8444,
+      "text": "2026-10-23T06:06:13.0955994Z    Doc-tests lamp_observer"
+    },
+    {
+      "raw_line": 8448,
+      "text": "2026-10-23T06:06:13.1368817Z    Doc-tests lamp_peek"
+    },
+    {
+      "raw_line": 8449,
+      "text": "2026-10-23T06:06:13.1369192Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8454,
+      "text": "2026-10-23T06:06:13.1784363Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8456,
+      "text": "2026-10-23T06:06:13.1811818Z    Doc-tests lamp_policy"
+    },
+    {
+      "raw_line": 8460,
+      "text": "2026-10-23T06:06:13.3924472Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8462,
+      "text": "2026-10-23T06:06:13.3953334Z    Doc-tests lamp_records"
+    },
+    {
+      "raw_line": 8466,
+      "text": "2026-10-23T06:06:13.4865819Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8468,
+      "text": "2026-10-23T06:06:13.4893377Z    Doc-tests lamp_ring"
+    },
+    {
+      "raw_line": 8472,
+      "text": "2026-10-23T06:06:13.5200789Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8474,
+      "text": "2026-10-23T06:06:13.5227397Z    Doc-tests lamp_same_voice"
+    },
+    {
+      "raw_line": 8478,
+      "text": "2026-10-23T06:06:13.5517922Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8480,
+      "text": "2026-10-23T06:06:13.5545075Z    Doc-tests lamp_schedule"
+    },
+    {
+      "raw_line": 8484,
+      "text": "2026-10-23T06:06:13.7920240Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8486,
+      "text": "2026-10-23T06:06:13.7949094Z    Doc-tests lamp_selftest"
+    },
+    {
+      "raw_line": 8490,
+      "text": "2026-10-23T06:06:13.8448448Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8492,
+      "text": "2026-10-23T06:06:13.8476235Z    Doc-tests lamp_settings"
+    },
+    {
+      "raw_line": 8496,
+      "text": "2026-10-23T06:06:13.9228524Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8498,
+      "text": "2026-10-23T06:06:13.9259041Z    Doc-tests lamp_setup"
+    },
+    {
+      "raw_line": 8502,
+      "text": "2026-10-23T06:06:14.0266425Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8504,
+      "text": "2026-10-23T06:06:14.0296020Z    Doc-tests lamp_skills"
+    },
+    {
+      "raw_line": 8508,
+      "text": "2026-10-23T06:06:14.3311668Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8510,
+      "text": "2026-10-23T06:06:14.3345844Z    Doc-tests lamp_sound_fixtures"
+    },
+    {
+      "raw_line": 8514,
+      "text": "2026-10-23T06:06:14.3860342Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8516,
+      "text": "2026-10-23T06:06:14.3888602Z    Doc-tests lamp_station"
+    },
+    {
+      "raw_line": 8520,
+      "text": "2026-10-23T06:06:14.5030869Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8522,
+      "text": "2026-10-23T06:06:14.5056680Z    Doc-tests lamp_surround"
+    },
+    {
+      "raw_line": 8526,
+      "text": "2026-10-23T06:06:14.9357856Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8528,
+      "text": "2026-10-23T06:06:14.9393118Z    Doc-tests lamp_tasks"
+    },
+    {
+      "raw_line": 8532,
+      "text": "2026-10-23T06:06:15.1663514Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8534,
+      "text": "2026-10-23T06:06:15.1690719Z    Doc-tests lamp_turn_end"
+    },
+    {
+      "raw_line": 8538,
+      "text": "2026-10-23T06:06:15.2056206Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8540,
+      "text": "2026-10-23T06:06:15.2082661Z    Doc-tests lamp_turn_end_wire"
+    },
+    {
+      "raw_line": 8544,
+      "text": "2026-10-23T06:06:15.2364402Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8546,
+      "text": "2026-10-23T06:06:15.2391283Z    Doc-tests lamp_turn_owner"
+    },
+    {
+      "raw_line": 8550,
+      "text": "2026-10-23T06:06:15.2975094Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8552,
+      "text": "2026-10-23T06:06:15.3001380Z    Doc-tests lamp_update"
+    },
+    {
+      "raw_line": 8556,
+      "text": "2026-10-23T06:06:15.5076510Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8558,
+      "text": "2026-10-23T06:06:15.5106529Z    Doc-tests lamp_voice"
+    },
+    {
+      "raw_line": 8562,
+      "text": "2026-10-23T06:06:17.4848822Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8564,
+      "text": "2026-10-23T06:06:17.4894967Z    Doc-tests lamp_voice_eval"
+    },
+    {
+      "raw_line": 8568,
+      "text": "2026-10-23T06:06:18.0618504Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8570,
+      "text": "2026-10-23T06:06:18.0655453Z    Doc-tests lamp_voice_processes"
+    },
+    {
+      "raw_line": 8574,
+      "text": "2026-10-23T06:06:18.0832282Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "raw_line": 8578,
+      "text": "2026-10-23T06:06:18.2199041Z relay_signals: ok"
+    },
+    {
+      "raw_line": 8580,
+      "text": "2026-10-23T06:06:18.3504735Z      Running tests/process.rs (target/release/deps/process-b3e70ad8a722a93b)"
+    },
+    {
+      "raw_line": 8595,
+      "text": "2026-10-23T06:06:22.7929962Z test result: 12 passed; 0 failed"
+    }
+  ],
+  "artifact_lines": [
+    {
+      "raw_line": 8600,
+      "text": "2026-10-23T06:06:23.4349602Z Packaged 47 current workspace binaries and 2 selected examples with complete SHA256SUMS"
+    },
+    {
+      "raw_line": 8633,
+      "text": "2026-10-23T06:06:30.4048818Z SHA256 digest of uploaded artifact zip is a9b06368720250884d9de2cd06c4fefbd75f6f2e65f4fcbed699c99aae2d33aa"
+    },
+    {
+      "raw_line": 8637,
+      "text": "2026-10-23T06:06:30.9793968Z Artifact download URL: https://github.com/autonomous-ai/lampOS/actions/runs/39908229542/artifacts/12481609956"
+    }
+  ],
+  "limits": [
+    "Nextest terminal rows are counted once when repeated identically in final output; raw repetitions remain.",
+    "LEAK is a leaky passing outcome, disclosed separately; failures are not waived.",
+    "Skipped totals and binary totals must come from the actual Starting/Summary lines; omitted individual rows are not assigned guessed skip reasons.",
+    "These runtime counts are selected package coverage if the log records PICKED; cargo --workspace also compiles dependencies.",
+    "Doctest/custom harness commands and outcomes remain separate from nextest totals."
+  ]
+}

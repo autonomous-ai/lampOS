@@ -1,5 +1,23 @@
 # Tests work log
 
+## 2026-10-23 16:55 +0700 — current relay gate passes after environment correction
+
+Ready for lamp-voice: no (native qualification and review pending).
+
+#3255 at `e228f6452` on `cf462adb0` passed formatting, strict all-target
+VoiceEval Clippy and workspace build. The [current full-package receipt](verification/relay-pid-ready-current-20261023/)
+records **623 / 0 / 0** with all seven relay cases passing. The original
+sandbox-denied invocation remains **509 / 114 / 0**, explicitly invalid
+qualification; the corrected invocation changed only execution permissions
+for local fixture sockets. No product/test source or assertion changed.
+
+The preceding carries' native receipts are also published: [#3190 at 0c2](verification/voice-boot-clock-20261023/ci-0c2cb3df2/)
+and [#3218 at 430](verification/phone-news-start-20261023/ci-430af78c0/).
+Each passed **7,173 / 0 / 32**, including one leaky pass, across 12/46 selected
+packages; both strict Linux Clippy checks passed. Their checked merge trees
+equal the authored heads on `6b52c916a`. These are historical to the latest
+`cf462adb0` carries and do not qualify them or waive retained Mac failures.
+
 ## 2026-10-23 16:49 +0700 — relay fix pushed and current qualification resumed
 
 Ready for lamp-voice: no (#3255, #3190 and #3218 remain draft).
