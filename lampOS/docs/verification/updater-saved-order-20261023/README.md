@@ -89,3 +89,19 @@ in the existing Rust 1.96.0 aarch64 container with network disabled;
 `linux-format/` records the source tree, immutable image ID and raw output.
 No local ARM64 compilation or test gate ran. Official PR checks remain
 separate and pending at this checkpoint.
+
+## Carry onto train 28
+
+The integration branch advanced during PR creation. The one-commit carry
+is `c02328dd7` on `70cbefcee`. `git range-diff` reports `=` and all eight
+authored files are byte-identical (`train28-carry.json`). The new base changes
+Voice, a test dependency, and an embedded product-unit comment, so the
+required Mac Update gate was refreshed rather than treating the earlier
+execution as a current-base run.
+
+`mac-train28/`: fmt and strict all-target Clippy pass; tests again report
+**332 passed / 0 failed / 4 ignored** (119 + 4 + 78 + 8 + 123), with all
+6,655 bound files unchanged. `linux-format-train28/` records a successful
+formatting check from exact committed source `c02328dd7`, networking off.
+The latest integration ancestry was checked immediately before the own-branch
+push. Official PR ARM64 and Linux Clippy run separately on the new head.
