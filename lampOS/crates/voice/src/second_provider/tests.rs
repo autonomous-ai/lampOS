@@ -2357,6 +2357,7 @@ async fn lines_the_route_gave_up_are_no_talk_past_the_lamp() {
 /// got a word out. On the lamp, four of the five were held.
 #[tokio::test(start_paused = true)]
 async fn the_owners_ten_lines_are_let_out_though_each_answer_was_cut_by_the_next() {
+    let _one = crate::provider_worker::tests::one_thread();
     let lines = [
         "Lamp, what time is this?",
         "Hey, Lamp. Watch the weather in Hanoi today.",
@@ -6871,6 +6872,7 @@ async fn a_held_lines_yes_runs_for_no_one_though_the_face_is_back_before_the_cal
 /// talk in the room is. On lamp-0c89 (21 Oct, #1968) both yeses were taken.
 #[tokio::test(start_paused = true)]
 async fn a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room() {
+    let _one = crate::provider_worker::tests::one_thread();
     let photo = crate::photo_faces::note("Lan");
     for (lamp_said, heard, called) in [
         (
