@@ -43,8 +43,28 @@ pub const PRESENCE_VOICE_ENVIRONMENT: &str = "LAMP_PRESENCE_VOICE";
 pub const PRESENCE_FAR_ENVIRONMENT: &str = "LAMP_PRESENCE_FAR";
 
 /// Where the eyes read whether to say what the person at the desk is doing
-/// (#1678), with the bus on. `on` only.
+/// (#1678), with the bus on: `on`, or `place` ([`activity_by`]).
 pub const ACTIVITY_ENVIRONMENT: &str = "LAMP_ACTIVITY";
+
+/// How the sitter is told from others while what they do is said.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ActivityBy {
+    /// `on`: by face too, when the eyes have the recogniser (#1678's (d)).
+    Face,
+    /// `place` (#2834, the product's): by place only, no print ever taken,
+    /// until the face path has its privacy read (eyes.md).
+    Place,
+}
+
+/// What [`ACTIVITY_ENVIRONMENT`] asks for: `on` or `place` exactly, else
+/// nothing is said.
+pub fn activity_by(value: Option<&str>) -> Option<ActivityBy> {
+    match value {
+        Some("on") => Some(ActivityBy::Face),
+        Some("place") => Some(ActivityBy::Place),
+        _ => None,
+    }
+}
 /// The name the eyes publish under.
 pub const SOURCE: &str = "eyes";
 /// How long a list of faces means anything.
@@ -313,6 +333,7 @@ struct ActivityOut {
     out: Publisher,
     stood: Publisher,
     judge: Judge,
+    by: ActivityBy,
 }
 
 /// `room/presence`, what it is judged from, and the voice's lines.
@@ -357,8 +378,8 @@ impl BusOut {
         if familiar && let Err(error) = out.say_familiar(&bus) {
             eprintln!("lamp-eyes: how familiar the person at the lamp is is not said: {error}");
         }
-        if std::env::var(ACTIVITY_ENVIRONMENT).ok().as_deref() == Some("on")
-            && let Err(error) = out.say_activity(&bus)
+        if let Some(by) = activity_by(std::env::var(ACTIVITY_ENVIRONMENT).ok().as_deref())
+            && let Err(error) = out.say_activity(&bus, by)
         {
             eprintln!("lamp-eyes: what the person at the desk is doing is not said: {error}");
         }
@@ -425,7 +446,7 @@ impl BusOut {
 
     /// Also say what the person at the desk is doing, on `room/activity`,
     /// and when they stand up and leave, on `room/stood_up` (#1678).
-    pub fn say_activity(&mut self, bus: &Bus) -> io::Result<()> {
+    pub fn say_activity(&mut self, bus: &Bus, by: ActivityBy) -> io::Result<()> {
         let mut out =
             bus.publisher_declared(RoomActivity::TOPIC, &RoomActivity::declaration(), SOURCE)?;
         out.expires_after(Some(RoomActivity::LASTS));
@@ -434,14 +455,18 @@ impl BusOut {
             out,
             stood,
             judge: Judge::default(),
+            by,
         });
         Ok(())
     }
 
     /// With activity on, tell the sitter from others by face: the eyes'
-    /// recogniser gives the prints the judge asks for (#1678's (d)).
+    /// recogniser gives the prints the judge asks for (#1678's (d)). Not
+    /// with `place`, which never takes a print.
     pub fn activity_by_face(&mut self) {
-        if let Some(activity) = self.activity.as_mut() {
+        if let Some(activity) = self.activity.as_mut()
+            && activity.by == ActivityBy::Face
+        {
             activity.judge = Judge::with_prints();
         }
     }
@@ -1222,7 +1247,7 @@ mod tests {
             .subscribe_typed(StoodUp::TOPIC, "test", StoodUp::TYPE)
             .unwrap();
         let mut out = BusOut::on(&bus).unwrap();
-        out.say_activity(&bus).unwrap();
+        out.say_activity(&bus, ActivityBy::Face).unwrap();
         let s = 1_000_000u64;
         let mut said = Vec::new();
         // Seated 30 s, a face 120 of 480 tall, a look every 500 ms.
@@ -1264,6 +1289,47 @@ mod tests {
         std::fs::remove_dir_all(&root).unwrap();
     }
 
+    /// `LAMP_ACTIVITY=place` (#2834, the product's): the person at the desk
+    /// is said as with `on`, but followed by place only, so the judge never
+    /// asks for a face print even when the eyes have the recogniser; `on`
+    /// asks for the sitter's within the sitting's first looks.
+    #[test]
+    fn with_place_the_sitter_is_never_printed() {
+        assert_eq!(activity_by(Some("on")), Some(ActivityBy::Face));
+        assert_eq!(activity_by(Some("place")), Some(ActivityBy::Place));
+        for off in [None, Some(""), Some("off"), Some("ON"), Some("yes")] {
+            assert_eq!(activity_by(off), None, "{off:?}");
+        }
+        let root = std::path::PathBuf::from(format!("/tmp/lepl-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let asked = |by: ActivityBy| {
+            let mut out = BusOut::on(&bus).unwrap();
+            out.say_activity(&bus, by).unwrap();
+            // As main.rs does when the eyes have the recogniser.
+            out.activity_by_face();
+            let s = 1_000_000u64;
+            let mut asked = 0;
+            for look in 0..120u64 {
+                let at = look * s / 2;
+                out.saw(&[face(260.0, 180.0, 96.0, 120.0, 0.0)], &[], PICTURE, at);
+                out.tick(at);
+                if out.activity_wants_print(at).is_some() {
+                    asked += 1;
+                    out.activity_printed(at, Some(&[0.5; 128]));
+                }
+            }
+            asked
+        };
+        assert!(
+            asked(ActivityBy::Face) > 0,
+            "on asks for the sitter's print"
+        );
+        assert_eq!(asked(ActivityBy::Place), 0, "place never does");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
     /// #1722 (20 Oct 01:11): the start line says what is said, and which
     /// switched topics aren't with the switch that would say them.
     #[test]
@@ -1278,7 +1344,7 @@ mod tests {
             "said on the bus: humans/faces/tracked, diagnostics; not said: room/presence \
              (LAMP_PRESENCE), room/activity (LAMP_ACTIVITY)"
         );
-        out.say_activity(&bus).unwrap();
+        out.say_activity(&bus, ActivityBy::Face).unwrap();
         assert_eq!(
             out.said(),
             "said on the bus: humans/faces/tracked, diagnostics, room/activity, \
