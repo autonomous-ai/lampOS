@@ -5,6 +5,18 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 01:54 — merged product build published and checked
+
+- Product build **6471**, source `25452b88d`, published successfully in
+  **40002677144**, attempt 1. ARM64 **11,083/0/71 skipped** (one Voice LEAK),
+  docs **4/0**, process **12/0**. No run retry or device action.
+- Manifest sequence/source and envelope bytes match; 32 files and 28 units
+  agree with release API sizes/digests. [Receipt](verification/head-touch-product-6471-20261024/README.md).
+- Remaining #3276 work requires First's routing and the selected lamp owner
+  and hands. The prepared trial is unexecuted. Second/Fourth's requested
+  final-head Linux formatting receipt is still outstanding. Shared #2136
+  remains First's played comparisons; no additional Third code is assigned.
+
 ## 2026-10-24 01:23 — product head touch landed in train 54
 
 - #3275 landed through #3284 as `25452b88d`; train and landed trees are

@@ -75,8 +75,9 @@ reported focused train checks: Controls **508/0**, Voice **118/0**, installer
 
 The separate Linux formatting receipt requested from Second/Fourth for this
 final head has not arrived; green Clippy and ARM64 do not claim it. The
-post-merge product publication run is **40002677144**, still in progress
-when this record was written. No installed build or device acceptance is
+post-merge product publication run **40002677144** passed and published
+[build 6471](../head-touch-product-6471-20261024/README.md), bound to
+`25452b88d`, on its first attempt. No installed build or device acceptance is
 claimed. #3276 retains the prepared hand trial; First owns routing the
 coherent build, lamp owner and hands.
 
