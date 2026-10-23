@@ -1196,6 +1196,10 @@ pub fn install(
     let _lock = records
         .lock()
         .map_err(|error| format!("another lamp-update is running: {error}"))?;
+    // The base units below replace the installed ones, but local drop-ins
+    // survive. Refuse an unknown or conflicting head reader before any
+    // state migration, user, binary link, unit or pins write.
+    crate::head_touch::preflight_install(&config.root, &config.on(UNITS), PRODUCT, SETTINGS)?;
     // The records as `Records::state` reads them: an unreadable file stops
     // install rather than being written over, and a corrupt one is set
     // aside and said. Set aside, it is not known what install wrote before,

@@ -337,8 +337,18 @@ ignores them and starts as before (#2157). Factory reset empties both durable di
 interrupted writes and state kept aside, while retaining the private
 directories ([setup.md](setup.md)).
 
-**17 October: lamp-4ace's switches of that day became the product's** (joining.md's rule), taken from lamp-4ace's unit as it ran that day; most were switched on there on 16 or 17 October, several only as part of the groups of #1238's census, so their lamp record is that day's running, not a run of their own. They're the switch groups (lead-in to a tool, a waited answer kept, the stop told, the asker first only recorded, names checked, the staff note, task news at a pause, memory rules), the light requests (the voice's ring and the skills' half, `lamp-skills.service`), the quiet pace, starting offline, the asleep ring, a sorry in another language, the lamp's name in passing ignored, first words kept, tasks asked and who asked, a cut keeping the name, the self-test's speaker, the stall recorder, the strong ring eye, and short sounds judged in a quiet room after a check. Head touch came after (#711, merged only after the owner's try with a person at the lamp): the voice's `LAMP_HEAD_TOUCH=on`, `--controls-mute` (its record in `/var/lib/lampOS/voice/mute`, which `lampos.conf` makes and a reset empties) and `LAMP_RESTORED_MUTE=on`, Expression's `--head-touch`, the body's `LAMP_HEAD_TOUCH=on` (it folds when a hand puts the lamp to sleep, #1362), and the pins without `legacy_head`, all together. Not taken: those that need the second voice's configuration (stop words, its down-line and wait cue, the voice link), which a product lamp doesn't have; the office's own (its Harness target, its say group); those that need another part's flag the product doesn't pass (the Policy holding actions needs `lamp-policy --act attention`, its hello and progress news need `--hello` and `--progress`, the full look needs the eyes' `--full-look`); and "that was weird", a builder's review tool whose marks (`/var/lib/lampOS/voice/marked/`) the reset doesn't wipe. Expression's catalogue differs too (`expression-alive-name-speech` on
+**17 October: lamp-4ace's switches of that day became the product's** (joining.md's rule), taken from lamp-4ace's unit as it ran that day; most were switched on there on 16 or 17 October, several only as part of the groups of #1238's census, so their lamp record is that day's running, not a run of their own. They're the switch groups (lead-in to a tool, a waited answer kept, the stop told, the asker first only recorded, names checked, the staff note, task news at a pause, memory rules), the light requests (the voice's ring and the skills' half, `lamp-skills.service`), the quiet pace, starting offline, the asleep ring, a sorry in another language, the lamp's name in passing ignored, first words kept, tasks asked and who asked, a cut keeping the name, the self-test's speaker, the stall recorder, the strong ring eye, and short sounds judged in a quiet room after a check. The head-touch carry (#711, #2948) pairs the voice's `LAMP_HEAD_TOUCH=on`, `--controls-mute` (its record in `/var/lib/lampOS/voice/mute`, which `lampos.conf` makes and a reset empties) and `LAMP_RESTORED_MUTE=on`, Expression's `--head-touch`, the body's `LAMP_HEAD_TOUCH=on` (it folds when a hand puts the lamp to sleep, #1362), and the pins without `legacy_head`, all together. Not taken: those that need the second voice's configuration (stop words, its down-line and wait cue, the voice link), which a product lamp doesn't have; the office's own (its Harness target, its say group); those that need another part's flag the product doesn't pass (the Policy holding actions needs `lamp-policy --act attention`, its hello and progress news need `--hello` and `--progress`, the full look needs the eyes' `--full-look`); and "that was weird", a builder's review tool whose marks (`/var/lib/lampOS/voice/marked/`) the reset doesn't wipe. Expression's catalogue differs too (`expression-alive-name-speech` on
 lamp-4ace, `expression-alive` on lamp-52e6): the product takes lamp-4ace's, plus the `speaking` section (#933): the nods on stressed words, the base's sway between sentences (#1067) and the settle at the end, which no catalogue in `deploy/` had, so a product lamp only leaned while it spoke (the body's lean, #1010, needs no catalogue). `speaking_engine`'s `the_products_catalogue_nods_sways_and_settles_as_the_alive_one_does` holds the product's to the alive catalogue's.
+
+The head-touch evidence is two separate checks. Fifth's attended lamp-52e6
+hand trial (#2857) passed tap, stroke, a 3 s hold to sleep, a wake tap and
+20 s with hands away. Thirteen's lamp-c0a4 check killed Voice with SIGKILL
+while listening, observed the restart guard's mute, then reached readiness
+about 300 ms after an injected tap; a chosen sleep mute stayed closed.
+That injected-input result is recovery/readiness evidence, not a real-hand
+or first-speaker latency measurement. The cue's code default remains
+−35 dBFS. Thirteen's separately owned −20 dBFS carry is pending; neither its
+landing nor audible-cue acceptance is established by these checks.
 
 **Neither: the person's.** The time zone (#820). Setup links `/etc/localtime`
 to the zone the person's phone gives and names it in `/etc/timezone` (#806).
@@ -386,12 +396,12 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   `current`; the product's settings in `/etc/lampOS/<part>/` (decided by the
   first builder on #811, 2026-10-15 17:37): Expression's catalogue as
   `/etc/lampOS/expression/expression.json`, the controls' two files in
-  `/etc/lampOS/controls/` (the pins name the button, the two head pads and
+  `/etc/lampOS/controls/` (the pins name the button, the head pad lines and
   the reset button, line 100; the unit serves `--touch`, the path whose
-  reset event `watch-reset` reads. The product's voice and Expression do
-  not read the head's `controls/touch` yet, so `legacy_head` keeps a pat
-  the old engine's `Pet`, which wakes a lamp asleep at night; a head tap
-  does not stop the voice on a product lamp, #1167). A pins file changed by
+  reset event `watch-reset` reads. The product's Voice and Expression read
+  the head's `controls/touch` together, with Voice's `--controls-mute` and
+  the pins' `legacy_head` absent: a tap stops speech and a 3 s hold asks
+  Voice to sleep, including its software mute, #711). A pins file changed by
   hand is kept, and must pass the touch path's checks, which are stricter
   than the old reader's (chip 0, the button on line 99, head pads on 37,
   96, 97 or 98), or Controls does not start, and the button with it. A
@@ -413,7 +423,10 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   A lamp's own `legacy_head: true` goes too, as the build's pins have none:
   the product's voice and Expression read the head from `controls/touch`
   (#711), and a pat must not also be the old engine's `Pet` beside them
-  (#1176). `/etc/lampOS` is made 0755 and each of these
+  (#1176). Install first verifies the resulting product readers and the
+  relevant local overrides it preserves, before touching the pins or units
+  (the preflight in "The install command", below). `/etc/lampOS` is made
+  0755 and each of these
   folders 0755, files 0644: readable by `lampos`. A default found with install's own bytes but another mode is install's, and is given its mode (lamp-cb94's settings were there before any install at 0600, and Controls and Expression could not read them, #705); a lamp's own setting found closed is kept as it is, and said. lamp-4ace's `/etc/lampOS`
   is root's alone; `install` does not open one made closed (credentials may
   be below it) and says so. The voice's turn-end model and ONNX
@@ -457,6 +470,9 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
 - **Switches** are in the product unit as `Environment=` lines, on; a lamp
   that must have one off says so in a drop-in
   (`/etc/systemd/system/lamp-<part>.service.d/`), which no update touches.
+  A relevant head-reader override makes install refuse if its resulting
+  mode conflicts with the product or cannot be verified; install leaves
+  that drop-in and the head files untouched.
 - **The person's settings** (zone, name, Wi-Fi, credential) are setup's, in
   setup's files.
 - **Nothing starts before setup:** every part in `lampos.target`, and the
@@ -690,6 +706,17 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
 1. Reads the channel's newest build and checks it with the image's key
    (`/etc/lampOS/update/key.pub` unless `--key-file` says otherwise), as a
    round does. No key, no install.
+   After taking the updater lock, it preflights the product Voice,
+   Expression and Controls units it will install against the relevant
+   local overrides it will preserve. This uses the updater's existing
+   literal-mode rules: Voice's head reader, its `--controls-mute`,
+   Expression's head reader and Controls' delivery must agree, with their
+   enabled readers on the same bus, including Voice's enabled privacy
+   reader. Conflicting or unknown modes, including relevant drop-ins or
+   expansions that those rules cannot verify, refuse the install. This
+   happens before reading or repairing state, making users, moving links,
+   or writing units or head files. Local drop-ins and head files remain
+   untouched on that refusal; benign unrelated drop-ins remain supported.
 2. Makes the users `lampos` (in `audio`, `video`, `dialout`, `i2c` and
    `gpio`, each only if the image has that group, and says which it has
    not) and `lampos-memory` (in `lampos`), unless they are there.
