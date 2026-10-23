@@ -316,6 +316,69 @@ pub fn holds_backchannels() -> bool {
     std::env::var(BACKCHANNEL_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// Where the voice reads whether a yield's decision is journaled with its
+/// words (#2939): `on`. Off unless set, for debugging only, and only with
+/// backchannel holds; at most two words of a person's speech are written
+/// ([`StopWords::with_backchannel_debug`]).
+pub const BACKCHANNEL_DEBUG_ENVIRONMENT: &str = "LAMP_BACKCHANNEL_DEBUG";
+
+/// Whether the environment asks for a yield's words to be journaled: only
+/// with backchannel holds on too.
+pub fn debugs_backchannels() -> bool {
+    holds_backchannels()
+        && std::env::var(BACKCHANNEL_DEBUG_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// How many words `heard` has: none when it has no word at all, as a
+/// final of only "..." (#2939), else as many as spaces part.
+fn word_count(heard: &str) -> usize {
+    if words(heard).is_empty() {
+        0
+    } else {
+        heard.split_whitespace().count()
+    }
+}
+
+/// `heard` with every hyphen or dash taken out: "uh\u{2011}huh" is "uhhuh".
+fn dashes_joined(heard: &str) -> String {
+    use unicode_normalization::UnicodeNormalization;
+    heard
+        .nfc()
+        .filter(|c| !matches!(c, '-' | '\u{2010}'..='\u{2015}' | '\u{2212}'))
+        .collect()
+}
+
+/// The journal line for a yield's words with
+/// [`BACKCHANNEL_DEBUG_ENVIRONMENT`]: at most two words, lower case and
+/// without punctuation, and why they were decided so; none for more.
+fn debug_line(heard: &str, lamp_asked: bool, vietnamese: bool) -> Option<String> {
+    let said = words(&dashes_joined(heard));
+    if said.len() > 2 {
+        return None;
+    }
+    let why = if said.is_empty() {
+        "no words"
+    } else if stop_phrase(heard) {
+        "a stop phrase"
+    } else if backchannel(heard, vietnamese) {
+        if lamp_asked {
+            "on the list, but the lamp asked a question"
+        } else {
+            "on the list"
+        }
+    } else if heard.contains('?') {
+        "asked as a question"
+    } else if !vietnamese && said.iter().all(|word| LEADS_ONLY.contains(&word.as_str())) {
+        "leads-only"
+    } else {
+        "not on the list"
+    };
+    Some(format!(
+        "lamp-voice: backchannel debug: a yield's words \"{}\": {why}",
+        said.join(" ")
+    ))
+}
+
 /// Words that only acknowledge, said while the lamp speaks: "Mm-hm.",
 /// "Yeah.", "Oh, okay." Hyphens and other dashes are joined first, so
 /// "uh-huh", with a hyphen or a dash, is "uhhuh"; the speech-to-text's other
@@ -365,12 +428,8 @@ pub fn lamp_asked(said: &str) -> bool {
 /// as one ("Oh, I see.", "Okay, sure."), no question mark and no stop
 /// phrase.
 pub fn backchannel(heard: &str, vietnamese: bool) -> bool {
-    use unicode_normalization::UnicodeNormalization;
     // Any hyphen or dash: "uh\u{2011}huh", "mm\u{2013}hm".
-    let heard: String = heard
-        .nfc()
-        .filter(|c| !matches!(c, '-' | '\u{2010}'..='\u{2015}' | '\u{2212}'))
-        .collect();
+    let heard = dashes_joined(heard);
     let list = if vietnamese {
         BACKCHANNELS_VI
     } else {
@@ -551,6 +610,9 @@ pub struct StopWords {
     /// and whether they were last told as a backchannel.
     yield_words: String,
     yield_backchannel: bool,
+    /// A yield's words are journaled with its decision
+    /// ([`Self::with_backchannel_debug`]).
+    debug: bool,
 }
 
 /// A stop heard over the lamp and held ([`HOLD_US`]): what was heard,
@@ -598,6 +660,7 @@ impl StopWords {
             tells_yields: false,
             yield_words: String::new(),
             yield_backchannel: false,
+            debug: false,
         }
     }
 
@@ -612,6 +675,22 @@ impl StopWords {
     pub fn with_backchannel_holds(mut self, on: bool) -> Self {
         self.tells_yields = on && self.always;
         self
+    }
+
+    /// With `on`, a yield's words, at most two, are journaled with why
+    /// they were decided so: `LAMP_BACKCHANNEL_DEBUG=on`, taken only with
+    /// backchannel holds (#2939). Off, nothing more is journaled.
+    pub fn with_backchannel_debug(mut self, on: bool) -> Self {
+        self.debug = on;
+        self
+    }
+
+    /// The journal line for a yield's words, when debugging asks for one
+    /// ([`Self::with_backchannel_debug`]).
+    fn debug_words(&self, heard: &str) -> Option<String> {
+        self.debug
+            .then(|| debug_line(heard, self.lamp_asked, self.vietnamese))
+            .flatten()
     }
 
     /// With `on`, listening to everything, a stop heard is acted on only
@@ -807,7 +886,7 @@ impl StopWords {
             // and resumes at the bound as with no words (#2939).
             if self.yielded
                 && decides
-                && !heard.trim().is_empty()
+                && !words(&heard).is_empty()
                 && (!self.told || self.yield_backchannel)
             {
                 if !self.yield_words.is_empty() {
@@ -815,10 +894,13 @@ impl StopWords {
                 }
                 self.yield_words.push_str(&heard);
                 let held = !self.lamp_asked && backchannel(&self.yield_words, self.vietnamese);
+                if let Some(line) = self.debug_words(&self.yield_words) {
+                    eprintln!("{line}");
+                }
                 if !(self.told && held) {
                     tell = Tell::Words {
                         stop: false,
-                        count: self.yield_words.split_whitespace().count(),
+                        count: word_count(&self.yield_words),
                         backchannel: held,
                     };
                 }
@@ -1067,9 +1149,12 @@ impl StopWords {
             && let Some(words) = self.ears.words()
         {
             self.told = true;
+            if let Some(line) = self.debug_words(&words) {
+                eprintln!("{line}");
+            }
             tell = Tell::Words {
                 stop: stop_phrase(&words),
-                count: words.split_whitespace().count(),
+                count: word_count(&words),
                 backchannel: !self.lamp_asked && backchannel(&words, self.vietnamese),
             };
         }
@@ -1884,6 +1969,52 @@ async fn serve<C, F>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #2939, `LAMP_BACKCHANNEL_DEBUG`: off by default nothing is
+    /// journaled; on, at most two words, lower case without punctuation,
+    /// with why they were decided so; never more words.
+    #[test]
+    fn backchannel_debug_journals_at_most_two_words_and_only_when_asked() {
+        let quiet = StopWords::new(Box::new(Scripted(Arc::default())));
+        assert_eq!(quiet.debug_words("Right."), None);
+        let mut asked =
+            StopWords::new(Box::new(Scripted(Arc::default()))).with_backchannel_debug(true);
+        let line = |words: &StopWords, heard: &str| words.debug_words(heard);
+        for (heard, expected) in [
+            ("Right.", "\"right\": on the list"),
+            ("Uh\u{2011}huh!", "\"uhhuh\": on the list"),
+            ("Rite.", "\"rite\": not on the list"),
+            ("Oh.", "\"oh\": leads-only"),
+            ("Yeah?", "\"yeah\": asked as a question"),
+            ("Wait, wait.", "\"wait wait\": a stop phrase"),
+            ("...", "\"\": no words"),
+        ] {
+            assert_eq!(
+                line(&asked, heard),
+                Some(format!(
+                    "lamp-voice: backchannel debug: a yield's words {expected}"
+                )),
+                "{heard}"
+            );
+        }
+        assert_eq!(line(&asked, "Tell me a story."), None);
+        asked.lamp_asked = true;
+        assert_eq!(
+            line(&asked, "Yes."),
+            Some(
+                "lamp-voice: backchannel debug: a yield's words \"yes\": on the list, but the lamp asked a question"
+                    .into()
+            )
+        );
+    }
+
+    /// #2939: a final of only punctuation is no words, as an empty one.
+    #[test]
+    fn punctuation_alone_counts_no_words() {
+        assert_eq!(word_count("..."), 0);
+        assert_eq!(word_count(" - "), 0);
+        assert_eq!(word_count("Uh-huh, okay."), 2);
+    }
 
     /// #1047 and #828: `raw` and `linear` as written; anything else, and
     /// unset, hears the canceller's output as before.

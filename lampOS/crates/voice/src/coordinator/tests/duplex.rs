@@ -1604,18 +1604,21 @@ fn with_backchannel_holds_a_half_second_wordless_yield_resumes() {
 
 /// lamp-52e6 on 23 Oct (#2939), `heard`: "a yield's words came: 0 words,
 /// not a stop phrase" committed a turn. Words that come empty are none,
-/// on both modes, with the switch; without it they commit as before.
+/// on both modes, with the switch; without it they commit as before. A
+/// final of only punctuation, "...", is no words as well.
 #[test]
 fn with_backchannel_holds_empty_words_resume_the_reply() {
-    for word in [Word::Plain, Word::Long] {
-        let (_, _, committed, event) = a_short_word(Some(""), word, true, false);
-        assert!(!committed, "{word:?} heard");
-        assert_eq!(event["kind"], "duplex_resume");
-        let (_, committed, event) = a_short_word_heard_always("", word, true);
-        assert!(!committed, "{word:?} heard-always");
-        assert_eq!(event["kind"], "duplex_resume");
-        let (_, _, committed, _) = a_short_word(Some(""), word, false, false);
-        assert!(committed, "{word:?} off");
+    for words in ["", "...", " - "] {
+        for word in [Word::Plain, Word::Long] {
+            let (_, _, committed, event) = a_short_word(Some(words), word, true, false);
+            assert!(!committed, "{words:?} {word:?} heard");
+            assert_eq!(event["kind"], "duplex_resume");
+            let (_, committed, event) = a_short_word_heard_always(words, word, true);
+            assert!(!committed, "{words:?} {word:?} heard-always");
+            assert_eq!(event["kind"], "duplex_resume");
+            let (_, _, committed, _) = a_short_word(Some(words), word, false, false);
+            assert!(committed, "{words:?} {word:?} off");
+        }
     }
 }
 
