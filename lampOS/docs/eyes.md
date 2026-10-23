@@ -1740,6 +1740,11 @@ to others; under 20 reads judged is "too few"; reads are counted right or wrong 
 by reader and confidence, an unsure read and one far from any label not at
 all, and bad lines are refused. The flag needs a reader (`main.rs`).
 
+The failed-write check uses a real file opened read-only, so the write fails
+on macOS as well as Linux. Linux also runs the same checks against `/dev/full`:
+the first failure is reported, the next is silent, and no line is counted.
+Only the fixture differs; the log's file handling is unchanged.
+
 Tests: a face made grey and 64 by 64; the eight scores made shares;
 `positive`, `negative` and `unsure` at the line and just under it; a file
 that isn't the pinned model refused; with the model present
