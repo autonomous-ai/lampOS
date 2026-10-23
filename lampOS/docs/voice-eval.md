@@ -310,6 +310,8 @@ still in the group is killed and reported as `stray_processes_stopped` (evidence
 not an invalid trace). The runner kills its transport, room recorder and players
 if it fails between session start and finish. Tests: `tests/it/relay_hardening.rs`,
 `physical::framing` and `physical::mac::relay_reader_tests`.
+The closed-transport fixture waits for a distinct ready marker published only
+after the worker PID write completes.
 
 ## Evaluation rules
 
