@@ -49,8 +49,9 @@ until its model is put there and the voice is told where.
   and `voice`; `--offset-ms` for the two clocks). Each clip runs from 300 ms before its play to 700 ms
   after, never past the plays on either side. Keep the 300 ms lead:
   `afplay`'s start time is taken before its sound begins. It also counts
-  the plays with no line heard, the blocks lost inside the clips and the
-  lines too short to print. These are diagnostics, not proof the times
+  the plays with no line heard, the blocks lost inside the clips, the
+  lines too short to print, and the plays with no sound recorded at all,
+  which are left out (only none recorded for every play stops the run). These are diagnostics, not proof the times
   line up: the first and last tend to rise when the times miss the sound,
   but a recording with no loss counts 0 lost at any offset. `at_unix_ms`
   is when a block was published, not when it was heard, so one constant
