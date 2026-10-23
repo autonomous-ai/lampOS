@@ -47,8 +47,9 @@ fn voice(at_us: u64) -> VoiceTiming {
 }
 
 /// Publishes the fixture's inputs and returns the wall clock just after:
-/// a test steps with it, so a loaded machine's delay before the step cannot
-/// age them past their freshness (#844 review, #912). Loosest limit first:
+/// a test steps with it for the engine's freshness checks (#844 review, #912).
+/// Transport admission still uses the real wall clock. Finish service setup
+/// before publishing inputs that the first step must accept. Loosest limit first:
 /// the light (a setting, no age), the voice (500 ms), the joints (300 ms in
 /// the engine) last. A stall between the voice and the clock read longer
 /// than 500 ms still fails (docs/realtime-tests.md).
@@ -121,8 +122,8 @@ fn the_heads_topics_are_read_only_with_head_touch() {
 fn enabled_output_uses_a_new_session_and_expires_after_input_loss() {
     let root = Root::new();
     let bus = Bus::new(&root.0).unwrap();
-    let wall = populate(&bus, 10_000_000);
     let mut service = runtime::Service::new(&bus, Catalogue::builtin(), true, "test").unwrap();
+    let wall = populate(&bus, 10_000_000);
     let output = service.step(|| 10_000_000, wall);
     let body = output.body.expect("fresh voice and joints");
     body.check().unwrap();
@@ -1022,6 +1023,10 @@ fn only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline
     let face = |offline_face: bool| {
         let root = Root::new();
         let bus = Bus::new(&root.0).unwrap();
+        let mut service = runtime::Service::new(&bus, Catalogue::builtin(), true, "test").unwrap();
+        if offline_face {
+            service = service.with_offline_face(&bus);
+        }
         bus.publisher_declared(
             lamp_msgs::Online::TOPIC,
             &lamp_msgs::Online::declaration(),
@@ -1038,10 +1043,6 @@ fn only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline
         )
         .unwrap();
         let wall = populate(&bus, 10_000_000);
-        let mut service = runtime::Service::new(&bus, Catalogue::builtin(), true, "test").unwrap();
-        if offline_face {
-            service = service.with_offline_face(&bus);
-        }
         service
             .step(|| 10_000_000, wall)
             .light
