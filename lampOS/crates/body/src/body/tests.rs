@@ -1676,6 +1676,62 @@ fn an_arm_that_strains_goes_back_down_and_stays_down_for_a_while() {
     assert_eq!((lamp.servos[1].goal, lamp.servos[2].goal), (2_050, 2_047));
 }
 
+/// lamp-4ace, 20 to 24 Oct: three strains of the elbow in half an hour sat
+/// the lamp down for the rest of a five-day run, and it never stood again
+/// until restarted. Three inside `Standing::RETREAT_WINDOW` rest it
+/// `Standing::LONG_REST`, and then, still spoken to, it stands again.
+#[test]
+fn three_strains_rest_the_lamp_a_long_while_not_for_the_rest_of_the_run() {
+    let long = Standing::LONG_REST;
+    let ends = long + Duration::from_secs(300);
+    let (mut lamp, mut clock) = folded(ends);
+    lamp.arm_moves = true;
+    lamp.overload_clears = 3;
+    // The shoulder over its bound for a second on each of the first three
+    // rises: at once, then after each minute's rest.
+    lamp.strains = [2_500u64, 64_000, 126_000]
+        .iter()
+        .map(|&at| {
+            (
+                Duration::from_millis(at),
+                Duration::from_millis(at + 1_000),
+                1,
+                990,
+            )
+        })
+        .collect();
+    let time = clock.time.clone();
+    let news = move || Some((Mood::Listening, 100));
+    let (mut resting, mut after) = (Vec::new(), Vec::new());
+    let report = run_standing(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        Some(standing(100, 60)),
+        news,
+        |glimpse| {
+            let now = time.get();
+            if now > Duration::from_secs(200) && now < long {
+                resting.push(glimpse.stand);
+            }
+            if now > ends - Duration::from_secs(60) {
+                after.push(glimpse.stand);
+            }
+        },
+    );
+    assert_eq!(report.retreats.len(), 3, "{:?}", report.retreats);
+    assert!(
+        !resting.is_empty() && resting.iter().all(|stand| *stand == 0.0),
+        "it rests after the third"
+    );
+    assert!(
+        after.iter().any(|stand| *stand > 0.99),
+        "it stands again after the long rest: {:?}",
+        after.last()
+    );
+}
+
 /// #1518, the reviewer's P2: the fold that is itself the sit-down for a
 /// strain, on the way up or while standing, says so, not "nothing retreated".
 #[test]
