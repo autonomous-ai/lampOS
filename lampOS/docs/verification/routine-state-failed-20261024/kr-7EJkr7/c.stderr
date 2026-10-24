@@ -1,0 +1,9 @@
+lamp-skills: the skills a person turned off kept in state: ["toggle-check"]
+lamp-skills: skills from skills, the Policy's ask asked on skills/ask, a skill's light set through the actions part and given back
+lamp-skills: loaded ["control-check", "plain-check"]
+lamp-skills: plain-check Triggered: fixture/pair has held for 0 s
+lamp-skills: plain-check Asked: policy nudge
+lamp-skills: plain-check Answered: not asked: nobody is subscribed to skills/ask (lamp-policy --gate)
+lamp-skills: control-check Triggered: fixture/pair has held for 0 s
+lamp-skills: control-check Asked: policy nudge
+lamp-skills: control-check Answered: not asked: nobody is subscribed to skills/ask (lamp-policy --gate)
