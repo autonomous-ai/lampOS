@@ -1,0 +1,20 @@
+[
+  {
+    "run": 1,
+    "exit": 0,
+    "seconds": 0.769342173,
+    "log": "/private/tmp/third-room-proof-privacy-isolated-1.txt"
+  },
+  {
+    "run": 2,
+    "exit": 0,
+    "seconds": 0.556071459,
+    "log": "/private/tmp/third-room-proof-privacy-isolated-2.txt"
+  },
+  {
+    "run": 3,
+    "exit": 0,
+    "seconds": 0.5616395520000002,
+    "log": "/private/tmp/third-room-proof-privacy-isolated-3.txt"
+  }
+]

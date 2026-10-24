@@ -5,6 +5,17 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 13:49 — room enrollment proof reproduced and corrected
+
+- Claimed #3306’s same-request proof overwrite; focused before **0/1**,
+  corrected enrollment **24/0**, fmt and strict Voice Clippy pass.
+- First full library **3,711/1/15 ignored**: privacy kept-lease timing test.
+  It passes **3/3** alone; full serial rerun is running, no cause inferred.
+- [Raw receipts](verification/room-enrollment-proof-20261024/README.md).
+- #3334 timeout correction `63e2d963d` READ-OK after exact socket controls
+  **2/0**; full original Actions gate/evidence remains separately retained.
+- Enrollment hands sheet routed into the 15:00 batch. No device action.
+
 ## 2026-10-24 13:30 — landed own-name guard and completed release-pair reads
 
 - #3328 carried unchanged in train 70; integration evidence retained.

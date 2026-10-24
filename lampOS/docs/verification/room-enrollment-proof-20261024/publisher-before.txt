@@ -1,0 +1,28 @@
+
+running 1 test
+second_provider::tests::remember_speaker::remember_speaker_room_publish_keeps_only_its_live_request_proof --- FAILED
+
+failures:
+
+---- second_provider::tests::remember_speaker::remember_speaker_room_publish_keeps_only_its_live_request_proof stdout ----
+lamp-voice second: request 3298701: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 3298701 heard 7 words, the last 31 ms after the line ended
+lamp-voice second: request 3298701 chat round 1 first event in 0 ms
+lamp-voice second: request 3298701 chat round 1 called remember_my_face
+lamp-voice second: request 3298701 chat round 2 first event in 0 ms
+lamp-voice second: request 3298701 first piece to the voice 0 ms after the words were heard, 1 words
+lamp-voice second: request 3298701 first answer audio 2 ms after the words were heard
+
+thread 'second_provider::tests::remember_speaker::remember_speaker_room_publish_keeps_only_its_live_request_proof' (241490753) panicked at crates/voice/src/second_provider/tests/remember_speaker.rs:211:5:
+assertion `left == right` failed
+  left: None
+ right: Some(("eyes/f1", "My name is Kesh, remember my face", 2739560559056, 2739561059056))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    second_provider::tests::remember_speaker::remember_speaker_room_publish_keeps_only_its_live_request_proof
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3726 filtered out; finished in 0.06s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`
