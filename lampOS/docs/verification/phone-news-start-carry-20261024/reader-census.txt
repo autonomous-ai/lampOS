@@ -1,0 +1,12 @@
+lampOS/crates/cloud/src/chat.rs:2://! (#1673, `docs/messages.md`): `chat.send` on `fa_channel` is acked with
+lampOS/crates/cloud/src/unasked.rs:2://! (`messages/out`, `docs/messages.md`, "Unasked texts"): guard mode's
+lampOS/crates/msgs/src/chat.rs:2://! sends back (`chat/in`, `chat/out`, #1673, `docs/messages.md`).
+lampOS/crates/msgs/src/chat.rs:35:    /// aloud, whatever the app asks (`docs/messages.md`).
+lampOS/crates/msgs/src/chat.rs:64:/// `chat.event` types (`docs/messages.md`).
+lampOS/crates/msgs/src/chat.rs:132:/// (`lamp_cloud::unasked`, `docs/messages.md`, "Unasked texts").
+lampOS/crates/cloud/tests/it/texts.rs:2://! (#1673, `docs/messages.md`): `chat.send` is acked with a run and put on
+lampOS/crates/voice/src/messages.rs:2://! `docs/messages.md`): each text on `chat/in` is answered in text on
+lampOS/crates/voice/src/messages.rs:902:    async fn a_text_never_waits_on_the_news_for_the_phone() {
+lampOS/crates/voice/src/messages.rs:904:        struct SlowForThePhone {
+lampOS/crates/voice/src/messages.rs:907:        impl Model for SlowForThePhone {
+lampOS/crates/voice/src/messages.rs:940:            SlowForThePhone {

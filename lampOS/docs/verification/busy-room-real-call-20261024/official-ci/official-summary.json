@@ -1,0 +1,34 @@
+{
+  "head": "b33ade24771fb8e72f56df4ca1155eb591534d45",
+  "checked_merge": "1bd5ce7b951ca415e0e386f3b1b830db30cfe481",
+  "base": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+  "arm64_run": 40093839677,
+  "linux_clippy_run": 40093839666,
+  "nextest": {
+    "PASS": 7373,
+    "LEAK": 1,
+    "failed": 0,
+    "unrun": 0,
+    "summary_skipped": 53,
+    "packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ]
+  },
+  "all_required_controls_once": true,
+  "raw_log_sha256": {
+    "arm64": "3d9eb3bf4655461a756eb3d9a0c29e0072a080ca9f8c3b634c60f7ab883f8c88",
+    "linux": "78b2963a44e09811ecc8217179f4b71fd0b1a5614cd59af8335ad3e4ac88b943"
+  },
+  "limits": "Selected parallel PR profile; not full realtime, physical or end-to-end qualification. LEAK retained distinctly."
+}

@@ -1,0 +1,10 @@
+{
+  "artifacts": [],
+  "diagnostics": [
+    {
+      "reason": "build-finished",
+      "success": true
+    }
+  ],
+  "full_private_log_sha256": "7cbcd14c1ded39334ad1558f0e91f792734501d6bb88155497d5bbcec218a415"
+}

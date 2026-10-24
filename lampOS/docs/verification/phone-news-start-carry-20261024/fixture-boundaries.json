@@ -1,0 +1,11 @@
+{
+  "head": "c185843f7495902223fa6abaa0687030696a2f0d",
+  "base": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+  "retained_original": "328f7da0f5c1fd729bd5d22a974f9c0a67cf07dd",
+  "original_authorship_retained": true,
+  "entire_tail_from_response_timer_unchanged": true,
+  "assertion_count_before": 5,
+  "assertion_count_after": 5,
+  "original_test_sha256": "a62631725983d23d4759f238c336e07ca21f39b6b73c7e20f174b7831a5b53d6",
+  "carried_test_sha256": "6cb929ec9683920ef33b1ba66c178525073c03be0537f836654c57f5a9123521"
+}

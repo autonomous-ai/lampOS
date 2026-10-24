@@ -1,0 +1,64 @@
+diff --git a/lampOS/crates/voice/src/messages.rs b/lampOS/crates/voice/src/messages.rs
+index 3bbae6c36..7ede2e9b0 100644
+--- a/lampOS/crates/voice/src/messages.rs
++++ b/lampOS/crates/voice/src/messages.rs
+@@ -901,7 +901,9 @@ mod tests {
+     #[tokio::test]
+     async fn a_text_never_waits_on_the_news_for_the_phone() {
+         /// Slow for the news for the phone, at once for a text.
+-        struct SlowForThePhone;
++        struct SlowForThePhone {
++            began: std::sync::Arc<tokio::sync::Notify>,
++        }
+         impl Model for SlowForThePhone {
+             fn round<'a>(
+                 &'a self,
+@@ -910,6 +912,7 @@ mod tests {
+             ) -> BoxFuture<'a, Result<Vec<ToolCall>, String>> {
+                 Box::pin(async move {
+                     if format!("{:?}", messages.last()).contains("Nobody wrote just now") {
++                        self.began.notify_one();
+                         tokio::time::sleep(Duration::from_secs(30)).await;
+                         text("Codex finished, says the phone.");
+                     } else {
+@@ -932,8 +935,11 @@ mod tests {
+             .lock()
+             .unwrap()
+             .push(news("s1:4:1", "(Nobody has spoken. Codex finished.)"));
++        let began = std::sync::Arc::new(tokio::sync::Notify::new());
+         let worker = tokio::spawn(serve_with(
+-            SlowForThePhone,
++            SlowForThePhone {
++                began: began.clone(),
++            },
+             system(),
+             no_tools(),
+             Box::new(waiting),
+@@ -943,8 +949,10 @@ mod tests {
+         let mut sends = bus
+             .publisher_declared(ChatIn::TOPIC, &ChatIn::declaration(), "cloud")
+             .unwrap();
+-        // The round for the phone has begun by now (it's due at once).
+-        tokio::time::sleep(UNASKED_LOOK_EVERY + Duration::from_millis(300)).await;
++        // The slow phone round must be polled before the text is timed.
++        tokio::time::timeout(Duration::from_secs(5), began.notified())
++            .await
++            .expect("phone-news round did not begin");
+         let sent_at = Instant::now();
+         let until = sent_at + Duration::from_secs(5);
+         while sends
+diff --git a/lampOS/docs/messages.md b/lampOS/docs/messages.md
+index 691624877..3c8f3b358 100644
+--- a/lampOS/docs/messages.md
++++ b/lampOS/docs/messages.md
+@@ -342,7 +342,9 @@ minutes." ([guard-mode.md](guard-mode.md), #1685).
+   piece that reached nothing is not kept, and is sent again a minute on.
+ - `messages::tests::a_text_never_waits_on_the_news_for_the_phone`: through a
+   bus, a text during a 30 s round for the phone is answered within 2 s,
+-  with the news, and nothing more is sent.
++  with the news, and nothing more is sent. The fake model signals when the
++  slow round begins before the test sends and times the text. The full
++  two-second observation for unwanted phone news remains on the host clock.
+ - `messages::tests::news_waiting_is_given_with_the_next_texts_answer_once`:
+   the next text's answer is given the news, typed, and keeps it as given;
+   the text after has none; a model that can't answer gives none.
