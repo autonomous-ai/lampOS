@@ -8444,7 +8444,7 @@ Records #3329 landed in train 71, with dedicated native 3/0, full ARM 11,169 PAS
 
 Common's frozen Linux gate passed all eight stages; Mac completed all stages with Voice failures, which remain unwaived. Both released their targets after unchanged-source and cleanup checks. Latest process decisions remove holds solely for a stale base; genuine conflicts and changed-source checks still require repair. No lamp is assigned.
 
-## 2026-10-24 13:36 +07: Memory P2 actual pair and Common diagnosis
+## 2026-10-24 13:31 +07: Memory P2 actual pair and Common diagnosis
 
 Memory's strengthened survivor comparisons passed both actual published-binary cases, 2/0/0, with 41 successful RPCs and three reaps per direction. Linux full Memory passes314/0/8; Mac strict Clippy and formatting pass. Remaining checks and final source/cleanup receipts still precede the folded push.
 
