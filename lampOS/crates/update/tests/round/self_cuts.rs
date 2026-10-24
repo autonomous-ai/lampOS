@@ -4,12 +4,15 @@
 //! the real library performs the signed install, round, confirmation and back.
 use super::*;
 use std::{
-    io::{Read, Write},
+    io::Write,
     os::unix::fs::PermissionsExt,
     panic::{AssertUnwindSafe, catch_unwind, panic_any, resume_unwind},
-    process::{Child, Command, Stdio},
+    process::{Child, Command, ExitStatus, Stdio},
     time::Instant,
 };
+
+#[path = "runnable_events.rs"]
+mod runnable_events;
 
 const OLD: &str = "#!/bin/sh\nprintf 'old-updater\\n'\n";
 const NEW: &str = "#!/bin/sh\nprintf 'new-updater\\n'\n";
@@ -75,43 +78,18 @@ fn executable(path: &Path, script: &str) {
             }),
     );
     let started = Instant::now();
-    let deadline = started + Duration::from_secs(2);
-    let mut polls = 0;
-    let status = loop {
-        let poll_started = started.elapsed();
-        let observed = child.0.try_wait();
-        let poll_finished = started.elapsed();
-        polls += 1;
-        if let Some(status) = observed.unwrap_or_else(|error| {
-            panic!("cannot read updater fixture status: {context}; {error}")
-        }) {
-            break status;
-        }
-        if Instant::now() >= deadline {
-            let elapsed = started.elapsed();
-            // The child may exit while the parent is descheduled after the
-            // previous poll. Preserve that evidence without clearing failure.
-            let final_status = child.0.try_wait();
-            panic!(
-                "updater fixture did not exit: {context}; pid={} elapsed={elapsed:?} \
-                 polls={polls} last_poll={poll_started:?}..{poll_finished:?} \
-                 final_status={final_status:?} (diagnostic only; timeout still fails)",
-                child.0.id(),
-            );
-        }
-        // Polling bounds the child; it does not choose a cut or order writes.
-        std::thread::sleep(Duration::from_millis(5));
-    };
+    let stdout = child.0.stdout.take().unwrap();
+    let (status, output) = runnable_events::observe(&mut child.0, &stdout, started)
+        .unwrap_or_else(|error| panic!("updater fixture observation failed: {context}; {error}"));
+    assert_runnable_output(status, output, script, &context);
+}
+
+#[track_caller]
+fn assert_runnable_output(status: ExitStatus, output: Vec<u8>, script: &str, context: &str) {
     assert!(status.success(), "{context}; {status}");
-    let mut output = String::new();
-    child
-        .0
-        .stdout
-        .take()
-        .unwrap()
-        .take(128)
-        .read_to_string(&mut output)
-        .unwrap();
+    let output = String::from_utf8(output).unwrap_or_else(|error| {
+        panic!("updater fixture output is not UTF-8: {context}; {error:?}")
+    });
     assert_eq!(
         output,
         if script == OLD {
