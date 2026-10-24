@@ -1,5 +1,11 @@
 # Tests work log
 
+## 2026-10-25 06:02 — exact tested-tree Cloud carry on latest base
+
+Ready for lamp-voice: no
+
+Cloud #3410 is pushed as38b696201 on current42 with equal range-diff. [Original e993 native and carry proof](verification/tests-cloud-e993-native-38-carry-20261025/) retains ARM40139970163=1,216PASS/8skip and Linux40139969877 green, actualpreview42+e993. That preview tree differs from the old authorede993 tree, and exactly equals the new38 authored whole tree6c120da5. The pre-push source gates are exact-tree bound; old run IDs are not renamed, new38native/reads remain pending. Mac196/0/4 stays e993/fc31; no new local Cargo during NoPause147. Its changed runtime case passed3/3 atslots70–72, but other ordinary failures remain unqualified. Fourth confirms the offered LinuxSkills compute shares thisMac; its fixed controls wait for the explicit147quiet-window release, with frozen source/protocol already published.
+
 ## 2026-10-25 05:56 — frozen Skills source handoff
 
 Ready for lamp-voice: no

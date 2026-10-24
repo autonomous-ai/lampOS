@@ -1,0 +1,60 @@
+{
+  "files": [
+    {
+      "path": "40139969877/console.txt",
+      "bytes": 69295,
+      "sha256": "d8af7832b349132dfe28bc279c3a762004142ca786f7ab36bcfe5289498023d1"
+    },
+    {
+      "path": "40139969877/receipt.json",
+      "bytes": 491,
+      "sha256": "0461a4ec69b21c9507b54d4a487a97bcf43e4f8bb992ae2731fe0f924fb00c52"
+    },
+    {
+      "path": "40139969877/run.json",
+      "bytes": 2320,
+      "sha256": "ef7ca3cf738a2bbdce6409d227449895c964e3c81de0f22b950dff113c3aef18"
+    },
+    {
+      "path": "40139970163/case-outcomes.json",
+      "bytes": 262824,
+      "sha256": "fa3fb3b50051aaea71f396cd41b68810fb51cc16a13ee08d22b4a2ee5760427d"
+    },
+    {
+      "path": "40139970163/console.txt",
+      "bytes": 411887,
+      "sha256": "8871a7e1577133a8291c91ffb13e8890e8178462c2231185fa27a9baa817b2aa"
+    },
+    {
+      "path": "40139970163/receipt.json",
+      "bytes": 824,
+      "sha256": "8f701341b27c8c013baa14a974f1132a7fb2ef65cc65dccf5caafabd67096ebf"
+    },
+    {
+      "path": "40139970163/run.json",
+      "bytes": 5255,
+      "sha256": "5133b1ec26fe6e71d883afe09ce8a0357a648329917e86653b0a6d32c9a7f18e"
+    },
+    {
+      "path": "preview-tree.json",
+      "bytes": 199,
+      "sha256": "597750ac0b2e4e0e1cffa999e23cb512b0d94b178e6b2a568ffaa16edb84b7cf"
+    },
+    {
+      "path": "prior-72-comparison.json",
+      "bytes": 59,
+      "sha256": "f9d3168f27564fdb32ee976adadc6fcaa2e495648aa12aa709c3b0e0c11c80a3"
+    },
+    {
+      "path": "range-diff-to-38.txt",
+      "bytes": 91,
+      "sha256": "b8eb9c91e82dc22edd1f1958f7a90e2383ea278b550d8afaa2f855587e0525f3"
+    },
+    {
+      "path": "rebased-38-tree-binding.json",
+      "bytes": 714,
+      "sha256": "6c10d89aa091d1fcd3dbb335130ee252aa180377f3bd6901bbcb0f871ee85c31"
+    }
+  ],
+  "representation": "Complete byte-preserved gh console renderings, original run metadata, and derived case/tree/range projections. Not raw API log archives."
+}

@@ -1,0 +1,16 @@
+{
+  "parents": [
+    "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+    "e993cacefb453830b2979b7662a081c5b1b42bc4"
+  ],
+  "sha": "aaeaeb360101b2696b6ee06d4ed4009ca8b4e5af",
+  "tree": "6c120da5143790193470239112c7f05009810300",
+  "rebased_authored_head": "38b696201d59038a1d4201f596f91e62b9674f81",
+  "rebased_authored_tree": "6c120da5143790193470239112c7f05009810300",
+  "whole_tree_equal_to_actual_original_tested_preview": true,
+  "original_runs": [
+    40139970163,
+    40139969877
+  ],
+  "scope": "Original e993 PR runs tested this exact complete latest-base source tree. They remain original e993 runs, not new 38 head runs. New 38 native gates/readiness still required. No new local Cargo during NoPause147."
+}
