@@ -1,0 +1,30 @@
+{
+  "run": 40089244359,
+  "authored_head": "d57c2779225479b9dd9def546f07db97602a83e2",
+  "executed_preview": "822f8c58492b8528103360c1c65ffa1b9d486654",
+  "preview_tree": "e7971127d50429e8b044ca3e791ff4f9b4de61bc",
+  "bindings": [
+    {
+      "path": ".github/workflows/lampos-clippy.yml",
+      "sha256": "993532ccb76c0941e34a084b8120424ed1b9cdf522a597fbbf5e7bb4860d162a",
+      "authored_preview_equal": true
+    },
+    {
+      "path": "lampOS/README.md",
+      "sha256": "a3f2005eba3b0be8993d8345e36f91c3ab7ce449143e857701eef3d300962633",
+      "authored_preview_equal": true
+    }
+  ],
+  "format_step": {
+    "completedAt": "2026-10-24T11:17:12Z",
+    "conclusion": "success",
+    "name": "formatting (whole workspace, pinned Rust)",
+    "number": 5,
+    "startedAt": "2026-10-24T11:17:06Z",
+    "status": "completed"
+  },
+  "linux_formatting_actually_executed": true,
+  "strict_workspace_clippy": "success",
+  "raw_log_sha256": "112414b365be85d83f06b7ad52cb0f0301c377428c501c85b31c58d2f85d3142",
+  "device_or_ARM_execution_on_Mac": false
+}
