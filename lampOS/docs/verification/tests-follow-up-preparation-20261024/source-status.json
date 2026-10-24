@@ -1,0 +1,75 @@
+{
+  "recorded_utc": "2026-10-24T02:30:53.651985+00:00",
+  "pieces": [
+    {
+      "piece": "sign-in-atomic-claim",
+      "base": "88b1ad796e5045490ad678eb240eea2dab010c81",
+      "branch": "tests/2839-sign-in-atomic-claim",
+      "committed": false,
+      "compiled": false,
+      "tests_run": false,
+      "paths": [
+        {
+          "path": "lampOS/crates/tasks/src/engine.rs",
+          "bytes": 220681,
+          "sha256": "ba237f3b05b1f12314adf72b7d3b13ce8fd031b5717b4a3e4081c3c692fcd73c"
+        },
+        {
+          "path": "lampOS/crates/tasks/src/protocol.rs",
+          "bytes": 10246,
+          "sha256": "576d8eb4592667f254fe2e9500e9cff48f648227276a8bc451fce67c76452d27"
+        },
+        {
+          "path": "lampOS/crates/tasks/src/runtime.rs",
+          "bytes": 124768,
+          "sha256": "9ecc10ae8e17b2671e7f72fe9858a68c59523566c25471712c7c6abd2d792ccd"
+        },
+        {
+          "path": "lampOS/crates/tasks/src/sign_in.rs",
+          "bytes": 35919,
+          "sha256": "b9c496a6d3662644981bd14463c87fbdb1213e604f5c89264d49560bfd3b90a0"
+        },
+        {
+          "path": "lampOS/crates/tasks/tests/runtime.rs",
+          "bytes": 80462,
+          "sha256": "4a4acf662f4818e96ca96900d2af7146ef4ac7118213cca2b94dfcc6e9b21049"
+        },
+        {
+          "path": "lampOS/crates/voice/src/sign_in.rs",
+          "bytes": 113478,
+          "sha256": "1f50a7879b4ca30ea1aa613972cda010517203fef0abec308e9de104b9ca03ad"
+        },
+        {
+          "path": "lampOS/crates/voice/src/task_news.rs",
+          "bytes": 189099,
+          "sha256": "c6e76e7412cd5f11f02b59aa7e8fdfccca5efb346e0b9dbbd9eb88943d15cac2"
+        },
+        {
+          "path": "lampOS/docs/tasks.md",
+          "bytes": 196955,
+          "sha256": "f894f0d0abf4e136492c2d4a7aeec1784750ab0f206ca9bfaea76fe24a7c4ee7"
+        }
+      ]
+    },
+    {
+      "piece": "same-voice-teardown",
+      "base": "88b1ad796e5045490ad678eb240eea2dab010c81",
+      "branch": "tests/1569-same-voice-teardown",
+      "committed": false,
+      "compiled": false,
+      "tests_run": false,
+      "paths": [
+        {
+          "path": "lampOS/crates/voice/src/same_voice.rs",
+          "bytes": 78529,
+          "sha256": "6c2f9d1f01cf02f0cedaa82ec2ff5ad20d16bacbb8bb4d606883932b00bd37d6"
+        },
+        {
+          "path": "lampOS/docs/voice-test-fixtures.md",
+          "bytes": 31719,
+          "sha256": "62b75b108b980691a69e5b6cde89cbf18006a06232ca220872e80524be502da1"
+        }
+      ]
+    }
+  ]
+}

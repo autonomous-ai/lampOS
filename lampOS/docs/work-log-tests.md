@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-24 09:31 +0700 — bounded comparison and prepared failure controls
+
+Ready for lamp-voice: no; full qualification remains active.
+
+The frozen 4a84fa5ab full Voice stage ended with 3,950 passed, 11 failed and 15 ignored across all six targets. Its library alone is 3,672/8/15; integration is 267/3/0. Dependent packages are still running, so this is not a full-gate result. Search/push, privacy lease resync and light-call match their original assertion phases; no historical cause is inferred. The genuinely matched 93c995a6b candidate follows this base. The subsequent latest-base carry and gates remain mandatory; a moving integration head will not relabel these observations.
+
+[Follow-up preparation](verification/tests-follow-up-preparation-20261024/) records the eight-file #2839 source, four new event-controlled order/loss cases, successful source formatting, and a separate unapplied legacy-polling control. No compilation or test result is claimed. The same-voice two-file draft/control likewise remains unexecuted. Light-call's existing event boundary and possible scheduling-only correction were posted on #3315; no assertion was widened and no additional code draft started.
+
+The Queue's launch-only priority is applied: the current conversation/room test qualification and update compatibility read come first. #3312's corrected execution remains Second's lane; its successful historical retry does not clear the original failure or the unpushed correction.
+
 ## 2026-10-24 09:12 +0700 — current carries and retained older-base failures
 
 Ready for lamp-voice: no; fresh matched qualification is active.

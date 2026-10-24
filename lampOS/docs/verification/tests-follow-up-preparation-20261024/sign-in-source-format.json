@@ -1,0 +1,36 @@
+{
+  "command": [
+    "cargo",
+    "fmt",
+    "-p",
+    "lamp-tasks",
+    "-p",
+    "lamp-voice"
+  ],
+  "started_utc": "2026-10-24T02:22:07.499895+00:00",
+  "finished_utc": "2026-10-24T02:22:13.451165+00:00",
+  "elapsed_seconds": 5.951256199739873,
+  "exit_code": 0,
+  "before": {
+    "lampOS/crates/tasks/src/engine.rs": "ba237f3b05b1f12314adf72b7d3b13ce8fd031b5717b4a3e4081c3c692fcd73c",
+    "lampOS/crates/tasks/src/protocol.rs": "3d4c3897b72cdec125662a74075ba2ec1a35a4c8fe4f20bd8648feddd27040d2",
+    "lampOS/crates/tasks/src/runtime.rs": "9ecc10ae8e17b2671e7f72fe9858a68c59523566c25471712c7c6abd2d792ccd",
+    "lampOS/crates/tasks/src/sign_in.rs": "be01cc0409cfb468887f6005670c060286b4bf68a00fa7fd664565fd9073ffe1",
+    "lampOS/crates/tasks/tests/runtime.rs": "4a4acf662f4818e96ca96900d2af7146ef4ac7118213cca2b94dfcc6e9b21049",
+    "lampOS/crates/voice/src/sign_in.rs": "188801fc296437ac9043392aa0829f17c02da33cd0c2480c2e490b645c2d6261",
+    "lampOS/crates/voice/src/task_news.rs": "c6e76e7412cd5f11f02b59aa7e8fdfccca5efb346e0b9dbbd9eb88943d15cac2",
+    "lampOS/docs/tasks.md": "f894f0d0abf4e136492c2d4a7aeec1784750ab0f206ca9bfaea76fe24a7c4ee7"
+  },
+  "after": {
+    "lampOS/crates/tasks/src/engine.rs": "ba237f3b05b1f12314adf72b7d3b13ce8fd031b5717b4a3e4081c3c692fcd73c",
+    "lampOS/crates/tasks/src/protocol.rs": "576d8eb4592667f254fe2e9500e9cff48f648227276a8bc451fce67c76452d27",
+    "lampOS/crates/tasks/src/runtime.rs": "9ecc10ae8e17b2671e7f72fe9858a68c59523566c25471712c7c6abd2d792ccd",
+    "lampOS/crates/tasks/src/sign_in.rs": "b9c496a6d3662644981bd14463c87fbdb1213e604f5c89264d49560bfd3b90a0",
+    "lampOS/crates/tasks/tests/runtime.rs": "4a4acf662f4818e96ca96900d2af7146ef4ac7118213cca2b94dfcc6e9b21049",
+    "lampOS/crates/voice/src/sign_in.rs": "1f50a7879b4ca30ea1aa613972cda010517203fef0abec308e9de104b9ca03ad",
+    "lampOS/crates/voice/src/task_news.rs": "c6e76e7412cd5f11f02b59aa7e8fdfccca5efb346e0b9dbbd9eb88943d15cac2",
+    "lampOS/docs/tasks.md": "f894f0d0abf4e136492c2d4a7aeec1784750ab0f206ca9bfaea76fe24a7c4ee7"
+  },
+  "compilation": false,
+  "tests": false
+}
