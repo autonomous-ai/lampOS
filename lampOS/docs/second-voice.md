@@ -3320,6 +3320,40 @@ after a take-over, but now for every turn:
   goes on as the conversation, before the face is read, and stays carried.
   Risk: the owner turned to the lamp and asking, whose mouth the eyes read
   still through the whole line, needs its name or a follow-up.
+- **Two faces must stay to make the room busy** (`LAMP_TWO_FACES_HELD=on`,
+  with `LAMP_NAME_OR_FOLLOW_UP`; Sixth's plan under the 24 Oct freeze). A
+  thread of the worker's own reads every look the eyes publish
+  (`humans/faces/tracked`) as it comes and keeps the last 2.5 s of them
+  (`worker::FacesHeld`, `FACES_KEPT_MS`, at most 16). Each look is dated
+  by its `header.at_us`, the eyes' `lamp_ipc::monotonic_us`: the
+  system-wide monotonic clock the voice reads too (reviewer-two on #3355).
+  Its age, expiry and span checks use only that clock, so a wall-clock
+  step cannot fabricate a longer held span. The bus still applies its
+  wall-clock expiry before delivering a look; these helper checks do not
+  establish that live delivery is unaffected by a wall-clock step.
+  The eyes look every 250 ms with a face to follow, 500 ms with one face
+  sat still and 600 ms with nobody (`LOOK_EVERY`, `STEADY_EVERY`,
+  `GLANCE_EVERY` in `lamp-eyes`). Spanning at least 1.5 s needs 7, 4 and
+  4 looks at those respective paces; four 600 ms looks span 1.8 s. The
+  rule uses elapsed time rather than a fixed four-look count. At a line's
+  verdict, two faces make the room busy only when the newest look, not
+  over 1 s old nor expired (its `expires_ms` and the bus's grace), sees
+  two or more and at least 3 of the kept looks did, spanning 1.5 s or more
+  (`TWO_FACES_LOOKS`, `TWO_FACES_FOR_MS`). A look already over 1 s old or
+  expired when taken is refused, so a look delivered late gets no time
+  back. A gap over 1 s between looks, a look dated before the last one
+  kept or ahead of now, or a missing or expired newest look drops
+  everything kept (`LOOK_GAP_MS`), and so does a privacy change, closed or
+  reopened: after it, a look dated at or before it, or taken across it, is
+  refused, so looks queued before it never come back (reviewer-two's
+  HOLDs on #3355). Two faces held between lines make the first line's
+  room busy. One look with two faces (a passer-by, a misread, a photo
+  frame), a second face that has left, or two faces for under 1.5 s leave
+  the room as it was. A first version sampled the newest look once per
+  line, which made it 3 lines of 4 (the coordinator's finding on #3355).
+  Held talk, talk past the lamp, another voice and the same speaker's
+  carry are unchanged. Off, one look is enough, as before. If the looks
+  cannot be subscribed to, two faces make no room busy, said once.
 - **A line is a known person's only when their own face was seen speaking
   it** (`LAMP_PERSON_SCOPE_SEEN=on`; with `LAMP_SECOND_SPEAKING_FACE`). Off,
   a line admitted as the known person's is narrowed to the room only when

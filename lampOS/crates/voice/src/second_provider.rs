@@ -492,6 +492,14 @@ pub const TURNED_SPEAKING_ENVIRONMENT: &str = "LAMP_TURNED_SPEAKING";
 /// `worker::Heeding::needing_the_turned_face_to_speak`).
 pub const TURNED_FACE_SPEAKS_ENVIRONMENT: &str = "LAMP_TURNED_FACE_SPEAKS";
 
+/// Where the worker reads whether two faces make the room busy only when
+/// they stay: `on`, and nothing else. With `LAMP_NAME_OR_FOLLOW_UP`, two
+/// faces in view make the room busy only when the eyes' newest look and at
+/// least 3 of their looks in the last 2.5 s saw two, spanning 1.5 s or
+/// more, not on one look (a passer-by, a misread, a photo frame;
+/// `worker::FacesHeld`).
+pub const TWO_FACES_HELD_ENVIRONMENT: &str = "LAMP_TWO_FACES_HELD";
+
 /// Where the worker reads whether a line that cut the one before it short
 /// is asked with that one's words when the same person said both: `on`,
 /// and nothing else ([`Engine::joining_cut_words`]). On lamp-4ace on 21 Oct
