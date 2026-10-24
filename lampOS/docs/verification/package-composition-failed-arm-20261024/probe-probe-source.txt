@@ -1,0 +1,18 @@
+use lamp_voice::room_told::{Room, RoomTold};
+#[test]
+fn unsigned_boot_epoch_wrap_reproduces_unknown_on_the_unchanged_classifier() {
+    let setup = |now_us: u64| {
+        let mut room = RoomTold::new();
+        room.count_only_talk(true);
+        room.count_held_talk(true);
+        // Explicit wrapping models the unchanged test's release arithmetic.
+        let first = now_us.wrapping_sub(400_000_000);
+        let second = now_us.wrapping_sub(90_000_000);
+        room.at(first);
+        let result = room.at(second);
+        println!("clock={now_us} first={first} second={second} room={result:?}");
+        result
+    };
+    assert_eq!(setup(500_000_000), Room::Quiet);
+    assert_eq!(setup(100_000_000), Room::Unknown);
+}

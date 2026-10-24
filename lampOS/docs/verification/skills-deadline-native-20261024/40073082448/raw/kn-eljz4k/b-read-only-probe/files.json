@@ -1,0 +1,34 @@
+[
+  {
+    "bytes": 22118,
+    "file": "daily.json",
+    "mode": 384,
+    "sha256": "db695c636fe0b55d60fc44771f2cc9e5b0082134ccc05610149284f881b3a1aa"
+  },
+  {
+    "bytes": 19,
+    "file": "rested",
+    "mode": 420,
+    "sha256": "ca9a8a44196f47452fad3060f0aaa14c2528d0c7c0262bc963e2c80b36b26aef"
+  },
+  {
+    "absent": true,
+    "file": "on"
+  },
+  {
+    "absent": true,
+    "file": "off"
+  },
+  {
+    "bytes": 75,
+    "file": "SKILL.md",
+    "sha256": "c7fba59a65e44c3ef01e57d637ea0a209c50532553c95c0cc736b4810128b58f",
+    "unchanged": true
+  },
+  {
+    "bytes": 1288,
+    "file": "skill.toml",
+    "sha256": "6aa43551259cb9b5c545bd0a7e174e1fb7eb9a15762c36592870a17881527f27",
+    "unchanged": true
+  }
+]
