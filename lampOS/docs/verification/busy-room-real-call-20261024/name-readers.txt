@@ -1,0 +1,26 @@
+lampOS/crates/voice/src/second_provider/probe/handover.rs:120:        worker::call_note(crate::attention::called_by_name_on(said, true)).to_owned(),
+lampOS/crates/voice/src/second_provider/own_echo.rs:27://! the tail, has the lamp's name ([`crate::attention::called_by_name_on`],
+lampOS/crates/voice/src/second_provider/own_echo.rs:207:    } else if line.called || crate::attention::called_by_name_on(line.heard, true) {
+lampOS/crates/voice/src/attention.rs:605:    called_by_name_on(heard, false)
+lampOS/crates/voice/src/attention.rs:611:pub fn called_by_name_on(heard: &str, stand_alone_ins: bool) -> bool {
+lampOS/crates/voice/src/attention.rs:612:    name_said_to(heard, stand_alone_ins, true)
+lampOS/crates/voice/src/attention.rs:617:pub(crate) fn called_by_real_name(heard: &str) -> bool {
+lampOS/crates/voice/src/attention.rs:618:    name_said_to(heard, false, false)
+lampOS/crates/voice/src/attention.rs:621:fn name_said_to(heard: &str, stand_alone_ins: bool, recognizer_stand_ins: bool) -> bool {
+lampOS/crates/voice/src/attention.rs:685:/// read as that route reads a call: [`called_by_name_on`] with the words
+lampOS/crates/voice/src/attention.rs:700:        && called_by_name_on(heard, true)
+lampOS/crates/voice/src/attention.rs:1415:                || called_by_name_on(&self.heard, self.stand_alone_ins))
+lampOS/crates/voice/src/attention.rs:1816:            || called_by_name_on(&self.heard, self.stand_alone_ins);
+lampOS/crates/voice/src/attention.rs:2026:    /// ([`called_by_name_on`] with `LAMP_NAME_IN_PASSING=ignored`, else
+lampOS/crates/voice/src/attention.rs:2030:            called_by_name_on(&self.heard, self.stand_alone_ins)
+lampOS/crates/voice/src/attention.rs:3855:            assert!(called_by_name_on(heard, true), "{heard}");
+lampOS/crates/voice/src/attention.rs:3861:            assert!(!called_by_name_on(heard, true), "{heard}");
+lampOS/crates/voice/src/attention.rs:4101:    fn the_name_said_to_the_lamp_is_a_call_and_the_lamp_spoken_of_is_not_with_the_switch() {
+lampOS/crates/voice/src/attention.rs:4161:            assert!(called_by_real_name(called), "{called}");
+lampOS/crates/voice/src/attention.rs:4172:            assert!(!called_by_real_name(not_called), "{not_called}");
+lampOS/crates/voice/src/attention.rs:4175:        assert!(called_by_name_on("Plan.", true));
+lampOS/crates/voice/src/attention.rs:4176:        assert!(called_by_name_on("Plan.", false));
+lampOS/crates/voice/src/second_provider/tests.rs:8807:        Some(worker::call_note(crate::attention::called_by_name_on(
+lampOS/crates/voice/src/second_provider/worker.rs:3260:            Some(call_note(crate::attention::called_by_name_on(words, true)))
+lampOS/crates/voice/src/second_provider/worker.rs:4444:    if crate::attention::called_by_real_name(heard) {
+lampOS/crates/voice/src/second_provider.rs:5866:        let named = crate::attention::called_by_name_on(said, true);

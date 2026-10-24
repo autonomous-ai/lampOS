@@ -1,3 +1,20 @@
+## Current checkpoint: 2026-10-24 19:26 +07, busy-room carry gate passed
+
+Literal-name carry `b33ade247` retains the original #3356 commit and fixes
+its stand-in P2. [Exact source and gate proof](verification/busy-room-real-call-20261024/README.md):
+Mac **4,006/0/21 ignored**, fmt/strict Voice Clippy pass, all three required
+regressions pass exactly once, 7,023 tracked input hashes unchanged.
+The 26 selected local workspace packages were rebuilt; artifact freshness
+is recorded. Exact source-only Linux fmt passes, 7,023 regular files
+unchanged and owned container removed. No local ARM build/test or lamp run.
+
+Next: push the replacement PR, ask two current readers and await official
+ARM64 plus Linux fmt/Clippy while continuing own findings/Queue work.
+First retains played acceptance. #2809/#1812 still need the trusted public
+half, lamp holder and isolated restoration route; no new operator inputs.
+
+---
+
 ## Current checkpoint: 2026-10-24 19:14 +07, busy-room carry in scoped gate
 
 Second took stalled #3356 at 18:52, with the original commit and authorship

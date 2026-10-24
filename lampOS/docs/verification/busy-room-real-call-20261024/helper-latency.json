@@ -1,0 +1,187 @@
+{
+  "scope": "Mac helper only; no audio, IPC, ARM64 or physical latency measured",
+  "source_sha256": "2a3eb5c81620635ccc3d0b5ed02db6cd3171b146ecd73d2f4ebae7b984f9b058",
+  "extraction_sha256": "d7aa1a0375f7a37375429633dd910f672ed95d1e380ea103e301f469934219f4",
+  "runs": [
+    {
+      "mode": "before",
+      "first_ns": 583,
+      "n": 20000,
+      "p50_ns": 125,
+      "p95_ns": 208,
+      "p99_ns": 209,
+      "max_ns": 3750
+    },
+    {
+      "mode": "before",
+      "first_ns": 708,
+      "n": 20000,
+      "p50_ns": 125,
+      "p95_ns": 209,
+      "p99_ns": 250,
+      "max_ns": 4000
+    },
+    {
+      "mode": "before",
+      "first_ns": 750,
+      "n": 20000,
+      "p50_ns": 84,
+      "p95_ns": 208,
+      "p99_ns": 209,
+      "max_ns": 3292
+    },
+    {
+      "mode": "before",
+      "first_ns": 625,
+      "n": 20000,
+      "p50_ns": 125,
+      "p95_ns": 208,
+      "p99_ns": 209,
+      "max_ns": 3375
+    },
+    {
+      "mode": "before",
+      "first_ns": 541,
+      "n": 20000,
+      "p50_ns": 84,
+      "p95_ns": 208,
+      "p99_ns": 209,
+      "max_ns": 3500
+    },
+    {
+      "mode": "before",
+      "first_ns": 667,
+      "n": 20000,
+      "p50_ns": 125,
+      "p95_ns": 209,
+      "p99_ns": 209,
+      "max_ns": 6750
+    },
+    {
+      "mode": "before",
+      "first_ns": 542,
+      "n": 20000,
+      "p50_ns": 125,
+      "p95_ns": 208,
+      "p99_ns": 209,
+      "max_ns": 3291
+    },
+    {
+      "mode": "before",
+      "first_ns": 500,
+      "n": 20000,
+      "p50_ns": 125,
+      "p95_ns": 208,
+      "p99_ns": 209,
+      "max_ns": 3417
+    },
+    {
+      "mode": "before",
+      "first_ns": 500,
+      "n": 20000,
+      "p50_ns": 125,
+      "p95_ns": 209,
+      "p99_ns": 250,
+      "max_ns": 3708
+    },
+    {
+      "mode": "before",
+      "first_ns": 417,
+      "n": 20000,
+      "p50_ns": 125,
+      "p95_ns": 208,
+      "p99_ns": 209,
+      "max_ns": 3167
+    },
+    {
+      "mode": "after",
+      "first_ns": 334,
+      "n": 20000,
+      "p50_ns": 84,
+      "p95_ns": 167,
+      "p99_ns": 209,
+      "max_ns": 3375
+    },
+    {
+      "mode": "after",
+      "first_ns": 708,
+      "n": 20000,
+      "p50_ns": 84,
+      "p95_ns": 208,
+      "p99_ns": 209,
+      "max_ns": 6875
+    },
+    {
+      "mode": "after",
+      "first_ns": 833,
+      "n": 20000,
+      "p50_ns": 84,
+      "p95_ns": 208,
+      "p99_ns": 209,
+      "max_ns": 3417
+    },
+    {
+      "mode": "after",
+      "first_ns": 375,
+      "n": 20000,
+      "p50_ns": 84,
+      "p95_ns": 208,
+      "p99_ns": 209,
+      "max_ns": 3084
+    },
+    {
+      "mode": "after",
+      "first_ns": 458,
+      "n": 20000,
+      "p50_ns": 84,
+      "p95_ns": 208,
+      "p99_ns": 209,
+      "max_ns": 3125
+    },
+    {
+      "mode": "after",
+      "first_ns": 333,
+      "n": 20000,
+      "p50_ns": 84,
+      "p95_ns": 208,
+      "p99_ns": 209,
+      "max_ns": 3292
+    },
+    {
+      "mode": "after",
+      "first_ns": 417,
+      "n": 20000,
+      "p50_ns": 84,
+      "p95_ns": 208,
+      "p99_ns": 209,
+      "max_ns": 3334
+    },
+    {
+      "mode": "after",
+      "first_ns": 375,
+      "n": 20000,
+      "p50_ns": 84,
+      "p95_ns": 208,
+      "p99_ns": 209,
+      "max_ns": 3333
+    },
+    {
+      "mode": "after",
+      "first_ns": 583,
+      "n": 20000,
+      "p50_ns": 84,
+      "p95_ns": 167,
+      "p99_ns": 209,
+      "max_ns": 4208
+    },
+    {
+      "mode": "after",
+      "first_ns": 792,
+      "n": 20000,
+      "p50_ns": 84,
+      "p95_ns": 208,
+      "p99_ns": 209,
+      "max_ns": 3375
+    }
+  ]
+}
