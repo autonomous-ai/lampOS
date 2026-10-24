@@ -847,6 +847,25 @@ With the switch:
   thread of its own (`RelayEars`). Connecting took 0.6 to 0.7 s on
   lamp-52e6, so it's done before it's needed. The stream is kept with
   `KeepAlive`, and closed when the reply ends.
+- **A spare beside it, heard in yields** (`MOST_READY_IN_YIELDS`, 2). Two
+  streams are kept connected while a reply plays, the ready one and a
+  spare, and another is asked for whenever a yield takes one, so the next
+  yield finds one connected. On lamp-52e6 on 24 Oct at 13:40 a yield began
+  after the one before had taken the ready stream; the next connected
+  666 ms later, after its words' 610 ms hold had run out, and the person's
+  question was dropped. Connecting measured 620 to 740 ms all day, longer
+  than the hold. With `heard-always` the reply's one stream takes all its
+  audio, so one is kept; a waited sound's words keep one too. None is kept
+  without a reply.
+  **Its cost:** one more idle stream for the length of each answer,
+  carrying only `KeepAlive`: a 30 s answer adds 0.5 stream-minutes, and one
+  more connection.
+- **A ready stream the relay has closed is dropped and replaced**, looked
+  at each time the thread wakes and when a yield takes one, which then
+  takes the spare. One closed within 3 s of connecting (`FAST_CLOSE`)
+  counts as a failed connection: the next waits 5 s (`RETRY`), so a relay
+  that closes each stream as it opens is not asked again and again; the
+  same holds for the `heard-always` stream that ends during the reply.
 - **A yield's audio to it.** The audio held for the yield, then each block
   while it is in force. The rule now waits for the words: stillness doesn't
   resume the reply until they come (`Interruption::await_words`). Its
@@ -1106,6 +1125,9 @@ Tests:
   block until the words are asked for, asked once, taken once, forgotten
   when the yield ends; a yield without words unheard; closing drops the
   yield and the stream once, and the next reply has one ready again;
+  two yields 300 ms apart each find a stream connected, though connecting
+  takes 700 ms; a relay that closes each stream as it opens is asked at
+  most 3 times in a second of yields; no stream opens without a reply;
 - `lamp-audio` `duplex::tests::a_yield_waiting_for_its_words_commits_on_a_stop_word_and_otherwise_resumes`
   (the rule);
 - `coordinator::tests::duplex::a_stop_word_heard_in_a_yield_commits_it_and_other_words_resume_it`,
@@ -1221,6 +1243,8 @@ come sooner.
 - At start, "stop words: heard-always, …" with the speech-to-text's host,
   or why it isn't heard.
 - Each stream: "a stream is ready, connected in N ms", or why not.
+- A ready stream found closed: "a ready stream was closed N ms after it
+  connected; another is asked for", with " in 5 s" when it was within 3 s.
 - Each reply's end, or its close by a stop: "the reply's N blocks went to
   the speech-to-text, its words asked for at P pauses, M results came
   back", with ", a stop phrase among them" when one stopped it. Then, from
