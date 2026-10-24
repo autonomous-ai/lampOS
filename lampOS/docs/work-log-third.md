@@ -5,6 +5,22 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 03:16 — active-thread correction qualified locally
+
+Ready for lamp-voice: no (#3408 remains draft for fresh native gates/reads).
+
+- Corrected current-base head 1d8384591 retains the first consumed current
+  likeness. The expanded 60-row control and four cancellation/off cases pass;
+  positive owner/nearness evidence remains required in every room.
+- Full Mac fmt, strict Voice/Eval all-target Clippy, workspace build and
+  affected serial tests pass: **4,657/0/21 ignored**, 11 summaries.
+  All 7,025 source records match the committed blobs/modes; clean tree.
+- [Final proof](verification/carry-late-verdict-20261025/active-thread/final/README.md)
+  retains argv, output, source guards, range-diff and final binary listings.
+  Earlier original native and red/sandbox-invalid attempts stay separate.
+- New native jobs and two fresh reads are next; meanwhile taking the
+  separately claimed multiple-held-colleague regression. No lamp action.
+
 ## 2026-10-25 03:12 — held-colleague constraints claimed
 
 Ready for lamp-voice: no (design and regression preparation only).
