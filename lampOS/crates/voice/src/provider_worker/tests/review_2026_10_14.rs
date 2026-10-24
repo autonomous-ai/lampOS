@@ -923,7 +923,7 @@ async fn a_music_action_before_decline_keeps_its_single_offer_and_confirmation()
         assert_eq!(response_id(&answered), "music-original");
         assert_eq!(
             answered["toolResponse"]["functionResponses"][0]["response"],
-            json!({"next":"Confirm."})
+            json!({"next":"Confirm. The recording has only been offered for preparation; playback has not started and may still be refused. Confirm only that you will try to play it. Do not say it is playing, has started, or is ready."})
         );
         let first = rig.output().await;
         let ProviderOutput::RequestedAudio {

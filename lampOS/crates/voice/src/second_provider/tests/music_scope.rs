@@ -303,7 +303,7 @@ async fn prepared_music_for(speaker: &str, revoke: bool) {
             follow_up.last(),
             Some(&Message::tool(
                 expected_call,
-                json!({"next":"Confirm."}).to_string()
+                json!({"next":"Confirm. The recording has only been offered for preparation; playback has not started and may still be refused. Confirm only that you will try to play it. Do not say it is playing, has started, or is ready."}).to_string()
             ))
         );
         if narrowed {

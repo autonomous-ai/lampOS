@@ -11749,7 +11749,7 @@ pub(crate) mod tests {
             assert_eq!(
                 rig.service_message(&mut dial).await,
                 json!({"toolResponse":{"functionResponses":[{
-                    "id":"music-original", "name":name, "response":{"next":"Confirm."}
+                    "id":"music-original", "name":name, "response":{"next":"Confirm. The recording has only been offered for preparation; playback has not started and may still be refused. Confirm only that you will try to play it. Do not say it is playing, has started, or is ready."}
                 }]}})
             );
             let offer = skill.join().unwrap();
