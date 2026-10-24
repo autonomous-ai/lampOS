@@ -542,3 +542,19 @@ on every run: hold 4,000 ms, playback finished at 24,004 ms, completion at
 Before, those were 4,000 to 4,001, 24,024 to 24,028, 20,003 to 20,007, 0 to
 1, and 4,326 to 4,350 ms. The ignored sixty-second and three-minute answers
 keep an ordinary runtime, so they still play in real time.
+
+
+## Keep-alive HTTP fixture framing
+
+The two chat keep-alive mocks answer complete header-only GET requests, not
+individual TCP reads. Like the TTS mocks, they accumulate through CRLF-CRLF
+and keep any following bytes for the next request, with a 4,096-byte header
+cap. Idle durations, the 50 ms overlap delay, pool limits and all original
+connection-count assertions are unchanged. Production client code is unchanged.
+
+A split-header control waits until the server has processed an incomplete
+header, sends the final separator, then half-closes the request stream. It
+reads responses through EOF and requires exactly one response. This detects
+premature per-read replies without a short absence window or an assumption
+that two writes are two reads. The retained three-versus-two full-run outcome
+is not assigned a historical cause by this fixture correction.
