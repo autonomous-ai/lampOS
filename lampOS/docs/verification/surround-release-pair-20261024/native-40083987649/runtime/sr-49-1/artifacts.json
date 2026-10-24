@@ -1,0 +1,20 @@
+[
+  {
+    "actual_released_payload": true,
+    "bytes": 13871368,
+    "copy_mode": 365,
+    "original_links": 1,
+    "original_mode": 365,
+    "release": 6498,
+    "sha256": "f75b1a57dd2cfc4edcc521b0d8a254ca72c9ba4402de61a6873b3bcafd0ca765"
+  },
+  {
+    "actual_released_payload": true,
+    "bytes": 13871368,
+    "copy_mode": 365,
+    "original_links": 1,
+    "original_mode": 365,
+    "release": 6408,
+    "sha256": "f75b1a57dd2cfc4edcc521b0d8a254ca72c9ba4402de61a6873b3bcafd0ca765"
+  }
+]

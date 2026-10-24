@@ -1,3 +1,23 @@
+## Current checkpoint: 2026-10-24 17:04 +07, repair gates and real-lamp blockers
+
+#3361 corrected head `e14e3c51b`: Mac **268/0/2 ignored**, strict Clippy,
+Mac/Linux formatting and 7,016 unchanged source files pass. Fresh dedicated
+ARM **2/0/3 filtered**, Linux Clippy green; ordinary ARM and current reader
+remain active. [Current proof](verification/surround-release-pair-20261024/README.md)
+preserves original author failure **5,864 pass / 1 fail / 106 skipped /
+5,348 unrun**, before any child spawn. Fresh pair: 14 reaps/50 exchanges;
+10,379 exact native path hashes, original artifacts and isolation/removal.
+
+First's ship-critical #2809 real-lamp update/put-back assignment is active.
+[Updated attended worksheet and release observation](verification/update-lamp-acceptance-20261024/README.md)
+records release 6592 consistency, real-key/lamp/holder/isolated-bad-route
+inputs and missing models/settings/image coverage. Second has no lamp;
+blocker/recommendation is on Queue 6382802856. No key, release or device
+mutation. Next: finish own ordinary/read gates and post the worksheet on
+#2396/#2809 for the holder's exact window and execution.
+
+---
+
 ## Current checkpoint: 2026-10-24 16:54 +07, Surround pair qualified
 
 Draft #3361 `806e4006c` has Mac **268/0/2 ignored**, formatting and strict

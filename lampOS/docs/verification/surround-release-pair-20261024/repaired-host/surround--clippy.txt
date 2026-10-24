@@ -1,0 +1,2 @@
+    Checking lamp-surround v0.1.0 (/private/tmp/second-surround-release-pair-20261024/lampOS/crates/surround)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.23s

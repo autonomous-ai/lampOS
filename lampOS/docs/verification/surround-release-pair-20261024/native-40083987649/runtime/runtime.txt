@@ -1,0 +1,6 @@
+surround-release-pair: OK
+lamp-surround-6408: OK
+lamp-surround-6498: OK
+surround-release-pair: OK
+lamp-surround-6408: OK
+lamp-surround-6498: OK

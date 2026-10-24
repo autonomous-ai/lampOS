@@ -1,0 +1,9 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T09:50:46.2235080Z         PASS [   0.959s] ( 5348/11213) lamp-skills::it skills::a_searchs_pose_held_past_its_run_still_ends_when_someone_speaks
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T09:50:57.6622468Z         FAIL [   0.007s] ( 5862/11213) lamp-surround::release_pair current_cli_candidate_smoke
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T09:50:57.6632170Z     test current_cli_candidate_smoke ... FAILED
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T09:50:57.6632789Z         current_cli_candidate_smoke
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T09:50:57.6634599Z     thread 'current_cli_candidate_smoke' (27069) panicked at crates/surround/tests/release_pair/fixture.rs:49:5:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T09:50:57.6635069Z     bounded plain input
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T09:50:57.8101597Z      Summary [ 108.547s] 5865/11213 tests run: 5864 passed, 1 failed, 106 skipped
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T09:50:57.8207078Z         FAIL [   0.007s] ( 5862/11213) lamp-surround::release_pair current_cli_candidate_smoke
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T09:50:57.8207872Z warning: 5348/11213 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
