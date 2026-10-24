@@ -4246,3 +4246,9 @@ Current READ-OK and all Linux checks passed. Fresh primary-log verification find
 Ready for lamp-voice: no
 
 Exactly one original-case observation passed, with the unchanged two-second helper and timeout-only probe unused. No cause finding or historical 2/3 waiver; no retry or component control. Original package/profile/features and all 58 case/ignored inventories match; 117 local compiler messages are fresh, 425/419 unit context counts match, source/full modes/mtimes stay fixed and all 178 owned groups close. Supported-clean qualifier limits remain explicit. [Complete diagnostic](verification/tests-update-one-observation-20261024/). The test-only event-helper candidate is now carried onto landed22 and being formatted; it is not yet tested or offered. The separate SleepingService control remains an unapplied proposal.
+
+## 24 October, 22:17 — Update directed controls pass
+
+Ready for lamp-voice: no
+
+All ten planned event-helper controls passed once, with zero unrun observations and owned child cleanup verified. The fixture watchdog change is explicit; exact output, status and recovery checks remain. Current compilation and round inventory bind the tested source and executable. The separate old-loop gate comparison is compiling; the original one-pass diagnostic still proves no cause and leaves the historical 2/3 HOLD intact. The claimed no-pause ordering fix is in source preparation, with only input publication moved after setup. [Directed receipts](verification/tests-update-components-20261024/).

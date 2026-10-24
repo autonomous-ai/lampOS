@@ -1,0 +1,26 @@
+[
+  {
+    "file": "controls-final-proof.json",
+    "sha256": "a049eb2bbc675c167ee896d0f3a0b3ba2871495471771b5e31ec2fdb84817b7a"
+  },
+  {
+    "file": "clean-compile-final-receipt.json",
+    "sha256": "967a0b6934d62492594fb386c42c2f6e605d259716831f94e4d8ae62bf81510e"
+  },
+  {
+    "file": "inventory-final-receipt.json",
+    "sha256": "81c69cf890ec2a05797537d4b0782b44c9efaef5ee4e5d0c694972232e666bc6"
+  },
+  {
+    "file": "execution-plan.json",
+    "sha256": "58cee80a55a63aad4a00ac0ba285066a8b74df8bfc4a881d23627c3d44f00e65"
+  },
+  {
+    "file": "candidate.patch",
+    "sha256": "757473aa8e732fff379364a23f22cd8989ac215d01deafb562559d086a0490da"
+  },
+  {
+    "file": "static-preservation-checks.json",
+    "sha256": "391142c2cd9ae26d1d68f75c40f80fecf75727fec286a2047e5e263e29e817f9"
+  }
+]

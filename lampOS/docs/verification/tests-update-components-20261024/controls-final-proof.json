@@ -1,0 +1,620 @@
+{
+  "native_handle": 4662,
+  "native_exit": 0,
+  "phase": "candidate10directedcontrols",
+  "actual_tests": {
+    "passed": 10,
+    "failed": 0,
+    "ignored": 0
+  },
+  "consumed": 10,
+  "completed": 10,
+  "unrun": 0,
+  "observations_per_name": 1,
+  "no_retry": true,
+  "root_phase_terminal": {
+    "phase": "controls",
+    "lane": "candidate",
+    "started_at": "2026-10-24T15:07:30.250069+00:00",
+    "planned_directed_observations": 10,
+    "final_source_fullmode_mtime_guard": true,
+    "sealed_artifacts_guard": true,
+    "consumed_launch_allocations": 10,
+    "completed_case_command_receipts": 10,
+    "unconsumed_planned_controls": 0,
+    "finished_at": "2026-10-24T15:10:07.544776+00:00"
+  },
+  "cases": [
+    {
+      "slot": 1,
+      "name": "self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog",
+      "actual_outcome": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 166
+      },
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog",
+          "--nocapture"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS",
+        "started_at": "2026-10-24T15:07:36.263198+00:00",
+        "timeout_seconds": 120,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 89615,
+        "owned_process_group": 89615,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 2.268668,
+        "finished_at": "2026-10-24T15:07:38.531931+00:00",
+        "stdout_sha256": "abf946b6b77e18c0e47e27e98dd53246ff4bd044efb4fbc6dbfe580aaeb3758b",
+        "stdout_bytes": 230,
+        "stderr_sha256": "2aa9d263c301f507965b751400ec3b5a0a61ad4edd1981ced0c503f5d4680ec3",
+        "stderr_bytes": 129
+      },
+      "streams": {
+        "exact.stdout.txt": {
+          "bytes": 230,
+          "sha256": "abf946b6b77e18c0e47e27e98dd53246ff4bd044efb4fbc6dbfe580aaeb3758b",
+          "utf8": "\nrunning 1 test\ntest self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 2.22s\n\n"
+        },
+        "exact.stderr.txt": {
+          "bytes": 129,
+          "sha256": "2aa9d263c301f507965b751400ec3b5a0a61ad4edd1981ced0c503f5d4680ec3",
+          "utf8": "control cleanup: pid=89616 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(0))) cached=Ok(Some(ExitStatus(unix_wait_status(0))))\n"
+        }
+      },
+      "cleanup_receipts": [
+        "control cleanup: pid=89616 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(0))) cached=Ok(Some(ExitStatus(unix_wait_status(0))))"
+      ],
+      "evidence_limit": "Passing compiled assertions validate expected output/status/phase; successful detailed gate/output values not printed by this control are not fabricated. Later-byte control has explicit raw gate/timeout values."
+    },
+    {
+      "slot": 2,
+      "name": "self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog",
+      "actual_outcome": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 166
+      },
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog",
+          "--nocapture"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS",
+        "started_at": "2026-10-24T15:07:50.986083+00:00",
+        "timeout_seconds": 120,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 90487,
+        "owned_process_group": 90487,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 2.101823,
+        "finished_at": "2026-10-24T15:07:53.087951+00:00",
+        "stdout_sha256": "6810cf3c71fb76a09cf2b3c6ba417eaf85a6f7fb71e531ab0196cbc5dd7bbec9",
+        "stdout_bytes": 223,
+        "stderr_sha256": "431f94dbc8597fbfa9d87041ce5704ef4741047f64e3882ee55e7f324bb2b2a7",
+        "stderr_bytes": 129
+      },
+      "streams": {
+        "exact.stdout.txt": {
+          "bytes": 223,
+          "sha256": "6810cf3c71fb76a09cf2b3c6ba417eaf85a6f7fb71e531ab0196cbc5dd7bbec9",
+          "utf8": "\nrunning 1 test\ntest self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 2.01s\n\n"
+        },
+        "exact.stderr.txt": {
+          "bytes": 129,
+          "sha256": "431f94dbc8597fbfa9d87041ce5704ef4741047f64e3882ee55e7f324bb2b2a7",
+          "utf8": "control cleanup: pid=90489 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(9))) cached=Ok(Some(ExitStatus(unix_wait_status(9))))\n"
+        }
+      },
+      "cleanup_receipts": [
+        "control cleanup: pid=90489 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(9))) cached=Ok(Some(ExitStatus(unix_wait_status(9))))"
+      ],
+      "evidence_limit": "Passing compiled assertions validate expected output/status/phase; successful detailed gate/output values not printed by this control are not fabricated. Later-byte control has explicit raw gate/timeout values."
+    },
+    {
+      "slot": 3,
+      "name": "self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog",
+      "actual_outcome": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 166
+      },
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog",
+          "--nocapture"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS",
+        "started_at": "2026-10-24T15:08:05.743247+00:00",
+        "timeout_seconds": 120,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 90968,
+        "owned_process_group": 90968,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 2.105767,
+        "finished_at": "2026-10-24T15:08:07.849118+00:00",
+        "stdout_sha256": "3621a245be7874c80b37d0ceb99122bc9f3953cc8805bc4a9787d1cce3e5b04b",
+        "stdout_bytes": 219,
+        "stderr_sha256": "186a967990864c340d2d29019d1b2d6bb36fc2b8e98a52a7ec257809ba1abe79",
+        "stderr_bytes": 129
+      },
+      "streams": {
+        "exact.stdout.txt": {
+          "bytes": 219,
+          "sha256": "3621a245be7874c80b37d0ceb99122bc9f3953cc8805bc4a9787d1cce3e5b04b",
+          "utf8": "\nrunning 1 test\ntest self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 2.01s\n\n"
+        },
+        "exact.stderr.txt": {
+          "bytes": 129,
+          "sha256": "186a967990864c340d2d29019d1b2d6bb36fc2b8e98a52a7ec257809ba1abe79",
+          "utf8": "control cleanup: pid=90975 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(9))) cached=Ok(Some(ExitStatus(unix_wait_status(9))))\n"
+        }
+      },
+      "cleanup_receipts": [
+        "control cleanup: pid=90975 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(9))) cached=Ok(Some(ExitStatus(unix_wait_status(9))))"
+      ],
+      "evidence_limit": "Passing compiled assertions validate expected output/status/phase; successful detailed gate/output values not printed by this control are not fabricated. Later-byte control has explicit raw gate/timeout values."
+    },
+    {
+      "slot": 4,
+      "name": "self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete",
+      "actual_outcome": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 166
+      },
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete",
+          "--nocapture"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS",
+        "started_at": "2026-10-24T15:08:21.414780+00:00",
+        "timeout_seconds": 120,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 91227,
+        "owned_process_group": 91227,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 2.0423,
+        "finished_at": "2026-10-24T15:08:23.457168+00:00",
+        "stdout_sha256": "9180da94f3025e3085274debed7f4ddde8d63f328f2bfbfe1a132eab0b1e4179",
+        "stdout_bytes": 229,
+        "stderr_sha256": "fb75423f7d6c046f929b3510a04fabde582c3eefba04a743919c3e4ea3339b2c",
+        "stderr_bytes": 129
+      },
+      "streams": {
+        "exact.stdout.txt": {
+          "bytes": 229,
+          "sha256": "9180da94f3025e3085274debed7f4ddde8d63f328f2bfbfe1a132eab0b1e4179",
+          "utf8": "\nrunning 1 test\ntest self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 2.01s\n\n"
+        },
+        "exact.stderr.txt": {
+          "bytes": 129,
+          "sha256": "fb75423f7d6c046f929b3510a04fabde582c3eefba04a743919c3e4ea3339b2c",
+          "utf8": "control cleanup: pid=91228 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(0))) cached=Ok(Some(ExitStatus(unix_wait_status(0))))\n"
+        }
+      },
+      "cleanup_receipts": [
+        "control cleanup: pid=91228 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(0))) cached=Ok(Some(ExitStatus(unix_wait_status(0))))"
+      ],
+      "evidence_limit": "Passing compiled assertions validate expected output/status/phase; successful detailed gate/output values not printed by this control are not fabricated. Later-byte control has explicit raw gate/timeout values."
+    },
+    {
+      "slot": 5,
+      "name": "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture",
+      "actual_outcome": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 166
+      },
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture",
+          "--nocapture"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS",
+        "started_at": "2026-10-24T15:08:36.485385+00:00",
+        "timeout_seconds": 120,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 92334,
+        "owned_process_group": 92334,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.105866,
+        "finished_at": "2026-10-24T15:08:36.591362+00:00",
+        "stdout_sha256": "60f6b585bb7a8ef6afb5d3c9cda4137872368195f0dff103dcbd6f6793cc68e8",
+        "stdout_bytes": 233,
+        "stderr_sha256": "87d30f8d8d2026bdb58f717b43aaf864cec93f446d092eaba4445ad010e1b38f",
+        "stderr_bytes": 3977
+      },
+      "streams": {
+        "exact.stdout.txt": {
+          "bytes": 233,
+          "sha256": "60f6b585bb7a8ef6afb5d3c9cda4137872368195f0dff103dcbd6f6793cc68e8",
+          "utf8": "\nrunning 1 test\ntest self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 0.07s\n\n"
+        },
+        "exact.stderr.txt": {
+          "bytes": 3977,
+          "sha256": "87d30f8d8d2026bdb58f717b43aaf864cec93f446d092eaba4445ad010e1b38f",
+          "utf8": "control cleanup: pid=92337 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(0))) cached=Ok(Some(ExitStatus(unix_wait_status(0))))\n\nthread 'self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture' (4034112) panicked at crates/update/tests/round/runnable_event_controls.rs:176:17:\nassertion `left == right` failed: printf 'wrong\\n'\n  left: \"wrong\\n\"\n right: \"old-updater\\n\"\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::assert_failed_inner\n   3: core::panicking::assert_failed\n   4: round::self_cuts::assert_runnable_output\n   5: round::self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture::{{closure}}\n   6: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once\n   7: std::panicking::catch_unwind::do_call\n   8: ___rust_try\n   9: std::panic::catch_unwind\n  10: round::self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture\n  11: round::self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture::{{closure}}\n  12: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\ncontrol cleanup: pid=92341 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(1792))) cached=Ok(Some(ExitStatus(unix_wait_status(1792))))\n\nthread 'self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture' (4034112) panicked at crates/update/tests/round/runnable_event_controls.rs:176:17:\nprintf 'old-updater\\n'; exit 7; exit status: 7\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: round::self_cuts::assert_runnable_output\n   3: round::self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture::{{closure}}\n   4: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once\n   5: std::panicking::catch_unwind::do_call\n   6: ___rust_try\n   7: std::panic::catch_unwind\n   8: round::self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture\n   9: round::self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture::{{closure}}\n  10: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\ncontrol cleanup: pid=92342 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(0))) cached=Ok(Some(ExitStatus(unix_wait_status(0))))\n\nthread 'self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture' (4034112) panicked at crates/update/tests/round/self_cuts.rs:91:9:\nupdater fixture output is not UTF-8: printf '\\377\\n'; FromUtf8Error { bytes: [255, 10], error: Utf8Error { valid_up_to: 0, error_len: Some(1) } }\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: round::self_cuts::assert_runnable_output::{{closure}}\n   3: core::result::Result<T,E>::unwrap_or_else\n   4: round::self_cuts::assert_runnable_output\n   5: round::self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture::{{closure}}\n   6: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once\n   7: std::panicking::catch_unwind::do_call\n   8: ___rust_try\n   9: std::panic::catch_unwind\n  10: round::self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture\n  11: round::self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture::{{closure}}\n  12: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n"
+        }
+      },
+      "cleanup_receipts": [
+        "control cleanup: pid=92337 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(0))) cached=Ok(Some(ExitStatus(unix_wait_status(0))))",
+        "control cleanup: pid=92341 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(1792))) cached=Ok(Some(ExitStatus(unix_wait_status(1792))))",
+        "control cleanup: pid=92342 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(0))) cached=Ok(Some(ExitStatus(unix_wait_status(0))))"
+      ],
+      "evidence_limit": "Passing compiled assertions validate expected output/status/phase; successful detailed gate/output values not printed by this control are not fabricated. Later-byte control has explicit raw gate/timeout values."
+    },
+    {
+      "slot": 6,
+      "name": "self_cuts::runnable_events::controls::no_output_is_not_readiness",
+      "actual_outcome": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 166
+      },
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::runnable_events::controls::no_output_is_not_readiness",
+          "--nocapture"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS",
+        "started_at": "2026-10-24T15:08:49.080059+00:00",
+        "timeout_seconds": 120,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 93135,
+        "owned_process_group": 93135,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.061895,
+        "finished_at": "2026-10-24T15:08:49.142116+00:00",
+        "stdout_sha256": "5096b360fdc8a1d580cc674f5a45ece0d2ef6f78544f9804079e107520ebee74",
+        "stdout_bytes": 191,
+        "stderr_sha256": "5abff2c56efb7c50abad708f295fd427548c015744e632acc7474f9267eba918",
+        "stderr_bytes": 129
+      },
+      "streams": {
+        "exact.stdout.txt": {
+          "bytes": 191,
+          "sha256": "5096b360fdc8a1d580cc674f5a45ece0d2ef6f78544f9804079e107520ebee74",
+          "utf8": "\nrunning 1 test\ntest self_cuts::runnable_events::controls::no_output_is_not_readiness ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 0.01s\n\n"
+        },
+        "exact.stderr.txt": {
+          "bytes": 129,
+          "sha256": "5abff2c56efb7c50abad708f295fd427548c015744e632acc7474f9267eba918",
+          "utf8": "control cleanup: pid=93137 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(0))) cached=Ok(Some(ExitStatus(unix_wait_status(0))))\n"
+        }
+      },
+      "cleanup_receipts": [
+        "control cleanup: pid=93137 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(0))) cached=Ok(Some(ExitStatus(unix_wait_status(0))))"
+      ],
+      "evidence_limit": "Passing compiled assertions validate expected output/status/phase; successful detailed gate/output values not printed by this control are not fabricated. Later-byte control has explicit raw gate/timeout values."
+    },
+    {
+      "slot": 7,
+      "name": "self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly",
+      "actual_outcome": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 166
+      },
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly",
+          "--nocapture"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS",
+        "started_at": "2026-10-24T15:09:01.173915+00:00",
+        "timeout_seconds": 120,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 93297,
+        "owned_process_group": 93297,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.065722,
+        "finished_at": "2026-10-24T15:09:01.239748+00:00",
+        "stdout_sha256": "ce42cab4ecda49680d22acd38f51a76e46fc4505c78b936050366baefaf65ece",
+        "stdout_bytes": 222,
+        "stderr_sha256": "66d563cd6e91b5a8b5644b92dce1d7fd1b65540e9197b0060ac509693f0c751d",
+        "stderr_bytes": 129
+      },
+      "streams": {
+        "exact.stdout.txt": {
+          "bytes": 222,
+          "sha256": "ce42cab4ecda49680d22acd38f51a76e46fc4505c78b936050366baefaf65ece",
+          "utf8": "\nrunning 1 test\ntest self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 0.01s\n\n"
+        },
+        "exact.stderr.txt": {
+          "bytes": 129,
+          "sha256": "66d563cd6e91b5a8b5644b92dce1d7fd1b65540e9197b0060ac509693f0c751d",
+          "utf8": "control cleanup: pid=93298 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(0))) cached=Ok(Some(ExitStatus(unix_wait_status(0))))\n"
+        }
+      },
+      "cleanup_receipts": [
+        "control cleanup: pid=93298 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(0))) cached=Ok(Some(ExitStatus(unix_wait_status(0))))"
+      ],
+      "evidence_limit": "Passing compiled assertions validate expected output/status/phase; successful detailed gate/output values not printed by this control are not fabricated. Later-byte control has explicit raw gate/timeout values."
+    },
+    {
+      "slot": 8,
+      "name": "self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned",
+      "actual_outcome": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 166
+      },
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned",
+          "--nocapture"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS",
+        "started_at": "2026-10-24T15:09:13.530115+00:00",
+        "timeout_seconds": 120,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 93635,
+        "owned_process_group": 93635,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.034734,
+        "finished_at": "2026-10-24T15:09:13.564995+00:00",
+        "stdout_sha256": "b06da9755c162d404b8117ead32555f1511ceb4e83f311ed5bcff765f9ac40d9",
+        "stdout_bytes": 226,
+        "stderr_sha256": "57fe2951e834e8fa27cab17c215322bcbe733ad7cda1d0b302844f80bc1edd2d",
+        "stderr_bytes": 129
+      },
+      "streams": {
+        "exact.stdout.txt": {
+          "bytes": 226,
+          "sha256": "b06da9755c162d404b8117ead32555f1511ceb4e83f311ed5bcff765f9ac40d9",
+          "utf8": "\nrunning 1 test\ntest self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 0.00s\n\n"
+        },
+        "exact.stderr.txt": {
+          "bytes": 129,
+          "sha256": "57fe2951e834e8fa27cab17c215322bcbe733ad7cda1d0b302844f80bc1edd2d",
+          "utf8": "control cleanup: pid=93638 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(9))) cached=Ok(Some(ExitStatus(unix_wait_status(9))))\n"
+        }
+      },
+      "cleanup_receipts": [
+        "control cleanup: pid=93638 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(9))) cached=Ok(Some(ExitStatus(unix_wait_status(9))))"
+      ],
+      "evidence_limit": "Passing compiled assertions validate expected output/status/phase; successful detailed gate/output values not printed by this control are not fabricated. Later-byte control has explicit raw gate/timeout values."
+    },
+    {
+      "slot": 9,
+      "name": "self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog",
+      "actual_outcome": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 166
+      },
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog",
+          "--nocapture"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS",
+        "started_at": "2026-10-24T15:09:25.656469+00:00",
+        "timeout_seconds": 120,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 93822,
+        "owned_process_group": 93822,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 5.054984,
+        "finished_at": "2026-10-24T15:09:30.711481+00:00",
+        "stdout_sha256": "d3ad1be3998a1b03a2c0c92fc30e13a070860813309f6529a5ba3ac9cdae854b",
+        "stdout_bytes": 225,
+        "stderr_sha256": "77407b0e21ba335f4d02e52f5a574e70da1b0257c3ef334cf4d0138b21bd26d0",
+        "stderr_bytes": 129
+      },
+      "streams": {
+        "exact.stdout.txt": {
+          "bytes": 225,
+          "sha256": "d3ad1be3998a1b03a2c0c92fc30e13a070860813309f6529a5ba3ac9cdae854b",
+          "utf8": "\nrunning 1 test\ntest self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 5.00s\n\n"
+        },
+        "exact.stderr.txt": {
+          "bytes": 129,
+          "sha256": "77407b0e21ba335f4d02e52f5a574e70da1b0257c3ef334cf4d0138b21bd26d0",
+          "utf8": "control cleanup: pid=93823 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(9))) cached=Ok(Some(ExitStatus(unix_wait_status(9))))\n"
+        }
+      },
+      "cleanup_receipts": [
+        "control cleanup: pid=93823 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(9))) cached=Ok(Some(ExitStatus(unix_wait_status(9))))"
+      ],
+      "evidence_limit": "Passing compiled assertions validate expected output/status/phase; successful detailed gate/output values not printed by this control are not fabricated. Later-byte control has explicit raw gate/timeout values."
+    },
+    {
+      "slot": 10,
+      "name": "self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline",
+      "actual_outcome": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 166
+      },
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline",
+          "--nocapture"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS",
+        "started_at": "2026-10-24T15:09:45.545084+00:00",
+        "timeout_seconds": 120,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 94687,
+        "owned_process_group": 94687,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 2.095361,
+        "finished_at": "2026-10-24T15:09:47.640532+00:00",
+        "stdout_sha256": "c3c204c3560fc8eb34e1b0afdc9bd03384a8e9f6e52671a7d76b734843f03a50",
+        "stdout_bytes": 220,
+        "stderr_sha256": "8fa8bc133cf3c0c3003798e89f4fc52bc95bda98fb6c9b9ab3572d64b127b2d7",
+        "stderr_bytes": 469
+      },
+      "streams": {
+        "exact.stdout.txt": {
+          "bytes": 220,
+          "sha256": "c3c204c3560fc8eb34e1b0afdc9bd03384a8e9f6e52671a7d76b734843f03a50",
+          "utf8": "\nrunning 1 test\ntest self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 2.01s\n\n"
+        },
+        "exact.stderr.txt": {
+          "bytes": 469,
+          "sha256": "8fa8bc133cf3c0c3003798e89f4fc52bc95bda98fb6c9b9ab3572d64b127b2d7",
+          "utf8": "control cleanup: pid=94689 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(256))) cached=Ok(Some(ExitStatus(unix_wait_status(256))))\nlater-byte control: releases=[(706.854283ms, 3), (1.400338224s, 3)] finished=2.011349191s observation=exit/EOF watchdog: pid=94689 elapsed=2.011264174s first_byte=Some(11.026635ms) eof=false status=None output=[111, 108, 100] polls=330 last_poll=(2.008533915s, 2.008536498s) final_status=Ok(None) (diagnostic only; timeout still fails)\n"
+        }
+      },
+      "cleanup_receipts": [
+        "control cleanup: pid=94689 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(256))) cached=Ok(Some(ExitStatus(unix_wait_status(256))))"
+      ],
+      "evidence_limit": "Passing compiled assertions validate expected output/status/phase; successful detailed gate/output values not printed by this control are not fabricated. Later-byte control has explicit raw gate/timeout values."
+    }
+  ],
+  "intended_negative_outcomes": "Timeout/error/assertion cases are INTERNAL EXPECTED negatives validated by each libtestPASS. Three caught invalid-result panics in control5 are not failed Rust test rows. No historical failure/cause equivalence inferred.",
+  "raw_highlights": {
+    "new2200ms_startup": "Control1 libtest2.22s with preserved successful exact12byte/status/EOF assertions and zeroexit reap; exact successful releaseelapsed/rawpayload not independently printed.",
+    "full_partial_held_EOF": "Controls2-4 libtest~2.01s each; expected exit/EOF phase/payload asserted in frozen source. Raw cleanup is signal9 for blockedchildren or exit0 for exitedleader; failure strings not printed on success.",
+    "invalid_results": "Control5 raw caught panics show wrong\\n vsold-updater\\n, exit7, and invalidUTF8bytes[255,10].",
+    "startup_no_first_byte": "Control9 libtest5.00s and signal9 reap; startup/first_byteNone/empty output predicates asserted, not separately printed.",
+    "later_bytes_exact_raw": "Control10 releases[(706.854283ms,3),(1.400338224s,3)], first_byte11.026635ms, timeoutelapsed2.011264174s, output[111,108,100],EOFfalse,statusNone,finalstatusOkNone; proves laterbytesdidnotrenew within the asserted comparison."
+  },
+  "final_guards": {
+    "whole10444source_fullmode_mtime": true,
+    "sealed_artifacts": true,
+    "readonly_diagnostic3f9_witness": true,
+    "all10command_groups_absent_directchildren_waited0": true
+  },
+  "old_overlay_applied_or_executed": false,
+  "full_gates_executed": false,
+  "commits_push": false,
+  "owned_jobs_remaining": 0,
+  "target_reserved_pending_root_next_grant": true
+}

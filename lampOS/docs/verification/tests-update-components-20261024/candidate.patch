@@ -1,0 +1,523 @@
+--- a/lampOS/crates/update/tests/round/self_cuts.rs
++++ b/lampOS/crates/update/tests/round/self_cuts.rs
+@@ -4,12 +4,15 @@
+ //! the real library performs the signed install, round, confirmation and back.
+ use super::*;
+ use std::{
+-    io::{Read, Write},
++    io::Write,
+     os::unix::fs::PermissionsExt,
+     panic::{AssertUnwindSafe, catch_unwind, panic_any, resume_unwind},
+-    process::{Child, Command, Stdio},
++    process::{Child, Command, ExitStatus, Stdio},
+     time::Instant,
+ };
++
++#[path = "runnable_events.rs"]
++mod runnable_events;
+ 
+ const OLD: &str = "#!/bin/sh\nprintf 'old-updater\\n'\n";
+ const NEW: &str = "#!/bin/sh\nprintf 'new-updater\\n'\n";
+@@ -75,43 +78,18 @@
+             }),
+     );
+     let started = Instant::now();
+-    let deadline = started + Duration::from_secs(2);
+-    let mut polls = 0;
+-    let status = loop {
+-        let poll_started = started.elapsed();
+-        let observed = child.0.try_wait();
+-        let poll_finished = started.elapsed();
+-        polls += 1;
+-        if let Some(status) = observed.unwrap_or_else(|error| {
+-            panic!("cannot read updater fixture status: {context}; {error}")
+-        }) {
+-            break status;
+-        }
+-        if Instant::now() >= deadline {
+-            let elapsed = started.elapsed();
+-            // The child may exit while the parent is descheduled after the
+-            // previous poll. Preserve that evidence without clearing failure.
+-            let final_status = child.0.try_wait();
+-            panic!(
+-                "updater fixture did not exit: {context}; pid={} elapsed={elapsed:?} \
+-                 polls={polls} last_poll={poll_started:?}..{poll_finished:?} \
+-                 final_status={final_status:?} (diagnostic only; timeout still fails)",
+-                child.0.id(),
+-            );
+-        }
+-        // Polling bounds the child; it does not choose a cut or order writes.
+-        std::thread::sleep(Duration::from_millis(5));
+-    };
++    let stdout = child.0.stdout.take().unwrap();
++    let (status, output) = runnable_events::observe(&mut child.0, &stdout, started)
++        .unwrap_or_else(|error| panic!("updater fixture observation failed: {context}; {error}"));
++    assert_runnable_output(status, output, script, &context);
++}
++
++#[track_caller]
++fn assert_runnable_output(status: ExitStatus, output: Vec<u8>, script: &str, context: &str) {
+     assert!(status.success(), "{context}; {status}");
+-    let mut output = String::new();
+-    child
+-        .0
+-        .stdout
+-        .take()
+-        .unwrap()
+-        .take(128)
+-        .read_to_string(&mut output)
+-        .unwrap();
++    let output = String::from_utf8(output).unwrap_or_else(|error| {
++        panic!("updater fixture output is not UTF-8: {context}; {error:?}")
++    });
+     assert_eq!(
+         output,
+         if script == OLD {
+--- /dev/null
++++ b/lampOS/crates/update/tests/round/runnable_events.rs
+@@ -0,0 +1,143 @@
++//! Test-only ownership of a builtin stub's output and exit. The caller retains
++//! the Child guard: this helper never starts a thread or transfers reaping.
++use std::{
++    io,
++    os::fd::AsFd,
++    process::{Child, ExitStatus},
++    time::{Duration, Instant},
++};
++
++const STARTUP: Duration = Duration::from_secs(5);
++const FINISH: Duration = Duration::from_secs(2);
++const POLL: Duration = Duration::from_millis(5);
++const OUTPUT_LIMIT: usize = 128;
++
++/// No blocking read, including after leader exit: EOF is its own event. One
++/// extra byte detects output beyond the old 128-byte limit instead of silently
++/// discarding it. All bytes read, including invalid UTF-8, remain in diagnostics.
++pub(super) fn observe(
++    child: &mut Child,
++    stdout: &impl AsFd,
++    started: Instant,
++) -> Result<(ExitStatus, Vec<u8>), String> {
++    let flags = rustix::fs::fcntl_getfl(stdout).map_err(|error| error.to_string())?;
++    let observed = (|| {
++        rustix::fs::fcntl_setfl(stdout, flags | rustix::fs::OFlags::NONBLOCK)
++            .map_err(|error| error.to_string())?;
++        let actual = rustix::fs::fcntl_getfl(stdout).map_err(|error| error.to_string())?;
++        if !actual.contains(rustix::fs::OFlags::NONBLOCK) {
++            return Err("stdout remained blocking".to_owned());
++        }
++        collect(child, stdout, started)
++    })();
++    // Also restore on a failed read or watchdog. The caller owns this descriptor
++    // throughout; controls can verify that neither path leaves shared flags set.
++    let restored = (|| -> io::Result<()> {
++        rustix::fs::fcntl_setfl(stdout, flags)?;
++        if rustix::fs::fcntl_getfl(stdout)? != flags {
++            return Err(io::Error::other("stdout flags did not restore exactly"));
++        }
++        Ok(())
++    })();
++    match (observed, restored) {
++        (result, Ok(())) => result,
++        (result, Err(error)) => Err(format!(
++            "stdout restoration failed: {error}; observation={result:?}"
++        )),
++    }
++}
++
++fn collect(
++    child: &mut Child,
++    stdout: &impl AsFd,
++    started: Instant,
++) -> Result<(ExitStatus, Vec<u8>), String> {
++    let startup_deadline = started + STARTUP;
++    let mut first_byte: Option<Instant> = None;
++    let mut output = Vec::new();
++    let mut eof = false;
++    let mut status = None;
++    let mut polls = 0;
++    let mut last_poll = (Duration::ZERO, Duration::ZERO);
++    loop {
++        let deadline = first_byte.map_or(startup_deadline, |at| at + FINISH);
++        if Instant::now() >= deadline {
++            // Evidence only. A late exit cannot turn a missed deadline green.
++            let final_status = child.try_wait();
++            return Err(format!(
++                "{} watchdog: pid={} elapsed={:?} first_byte={:?} eof={eof} \
++                 status={status:?} output={output:?} polls={polls} \
++                 last_poll={last_poll:?} final_status={final_status:?} \
++                 (diagnostic only; timeout still fails)",
++                if first_byte.is_some() {
++                    "exit/EOF"
++                } else {
++                    "startup"
++                },
++                child.id(),
++                started.elapsed(),
++                first_byte.map(|at| at.duration_since(started)),
++            ));
++        }
++        if !eof {
++            let mut buffer = [0_u8; OUTPUT_LIMIT + 1];
++            match rustix::io::read(stdout, &mut buffer[..OUTPUT_LIMIT + 1 - output.len()]) {
++                Ok(0) => eof = true,
++                Ok(count) => {
++                    let at = Instant::now();
++                    output.extend_from_slice(&buffer[..count]);
++                    // Do not move startup's boundary retroactively if this read
++                    // was observed late. Subsequent bytes never renew FINISH.
++                    if first_byte.is_none() {
++                        if at >= startup_deadline {
++                            return Err(format!(
++                                "startup watchdog: first byte observed late; elapsed={:?} output={output:?}",
++                                started.elapsed()
++                            ));
++                        }
++                        first_byte = Some(at);
++                    }
++                    if output.len() > OUTPUT_LIMIT {
++                        return Err(format!(
++                            "stdout exceeded {OUTPUT_LIMIT} bytes; output={output:?}"
++                        ));
++                    }
++                }
++                Err(rustix::io::Errno::AGAIN | rustix::io::Errno::INTR) => {}
++                Err(error) => {
++                    return Err(format!("stdout read failed: {error}; output={output:?}"));
++                }
++            }
++        }
++        if status.is_none() {
++            last_poll.0 = started.elapsed();
++            status = child
++                .try_wait()
++                .map_err(|error| format!("status read failed: {error}; output={output:?}"))?;
++            last_poll.1 = started.elapsed();
++            polls += 1;
++        }
++        // Recheck time before accepting completion, even if the process exited
++        // while this test thread was descheduled. The next iteration diagnoses it.
++        let deadline = first_byte.map_or(startup_deadline, |at| at + FINISH);
++        if Instant::now() < deadline && eof {
++            if let Some(status) = status {
++                if first_byte.is_none() {
++                    return Err(format!(
++                        "updater exited without output: {status}; output={output:?}"
++                    ));
++                }
++                return Ok((status, output));
++            }
++        }
++        let remaining = deadline.saturating_duration_since(Instant::now());
++        if !remaining.is_zero() {
++            // Only a pending event chooses this poll wait, never test completion.
++            std::thread::sleep(POLL.min(remaining));
++        }
++    }
++}
++
++#[cfg(test)]
++#[path = "runnable_event_controls.rs"]
++mod controls;
+--- /dev/null
++++ b/lampOS/crates/update/tests/round/runnable_event_controls.rs
+@@ -0,0 +1,257 @@
++//! Real builtin-only children and test-owned descriptors. Timed gate release is
++//! an intervention, never the condition that makes the observed fixture pass.
++use super::super::{OLD, Running, assert_runnable_output, forking};
++use super::*;
++use std::{
++    os::{fd::OwnedFd, unix::net::UnixStream},
++    panic::{AssertUnwindSafe, catch_unwind},
++    process::{ChildStdin, Command, Stdio},
++    sync::mpsc,
++    thread::{self, JoinHandle},
++};
++
++fn spawn(script: &str, stdout: Stdio) -> Running {
++    Running(
++        Command::new("/bin/sh")
++            .args(["-c", script])
++            .env_clear()
++            .stdin(Stdio::piped())
++            .stdout(stdout)
++            .stderr(Stdio::null())
++            .spawn()
++            .unwrap(),
++    )
++}
++
++fn observed(script: &str) -> Result<(ExitStatus, Vec<u8>), String> {
++    let mut child = spawn(script, Stdio::piped());
++    let stdout = child.0.stdout.take().unwrap();
++    let flags = rustix::fs::fcntl_getfl(&stdout).unwrap();
++    let result = observe(&mut child.0, &stdout, Instant::now());
++    reap(&mut child);
++    assert_eq!(rustix::fs::fcntl_getfl(&stdout).unwrap(), flags);
++    result
++}
++
++fn reap(child: &mut Running) {
++    let pid = child.0.id();
++    let killed = child.0.kill();
++    let waited = child.0.wait();
++    let cached = child.0.try_wait();
++    eprintln!("control cleanup: pid={pid} kill={killed:?} wait={waited:?} cached={cached:?}");
++    let status = waited.unwrap();
++    assert_eq!(
++        cached.unwrap(),
++        Some(status),
++        "direct child must be reaped; pid={pid} kill={killed:?}"
++    );
++}
++
++// Cancellation releases the controller promptly on every unwind. The only
++// write is nonblocking and three bytes long; no join waits for the child.
++type Releases = Vec<(Duration, usize)>;
++
++struct Gate {
++    cancel: mpsc::Sender<()>,
++    worker: Option<JoinHandle<io::Result<Releases>>>,
++}
++
++impl Gate {
++    fn release_after(stdin: ChildStdin, delay: Duration, started: Instant) -> Self {
++        Self::release_at(stdin, vec![delay], started)
++    }
++
++    fn release_at(stdin: ChildStdin, times: Vec<Duration>, started: Instant) -> Self {
++        let flags = rustix::fs::fcntl_getfl(&stdin).unwrap();
++        rustix::fs::fcntl_setfl(&stdin, flags | rustix::fs::OFlags::NONBLOCK).unwrap();
++        let (cancel, receive) = mpsc::channel();
++        let worker = thread::spawn(move || {
++            let mut releases = Vec::new();
++            for time in times {
++                let remaining = (started + time).saturating_duration_since(Instant::now());
++                match receive.recv_timeout(remaining) {
++                    Err(mpsc::RecvTimeoutError::Timeout) => {
++                        let count = rustix::io::write(&stdin, b"go\n")?;
++                        releases.push((started.elapsed(), count));
++                    }
++                    _ => return Ok(releases),
++                }
++            }
++            // Keep stdin owned/open for an unfinished final builtin read. Our
++            // owner cancels this channel before joining on success or unwind.
++            let _ = receive.recv();
++            Ok(releases)
++        });
++        Self {
++            cancel,
++            worker: Some(worker),
++        }
++    }
++
++    fn finish(mut self) -> io::Result<Releases> {
++        let _ = self.cancel.send(());
++        self.worker.take().unwrap().join().unwrap()
++    }
++}
++
++impl Drop for Gate {
++    fn drop(&mut self) {
++        let _ = self.cancel.send(());
++        if let Some(worker) = self.worker.take() {
++            // The controller waits on our channel, never on process completion.
++            let _ = worker.join();
++        }
++    }
++}
++
++#[test]
++fn first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog() {
++    let _forking = forking();
++    let mut child = spawn("read gate; printf 'old-updater\\n'", Stdio::piped());
++    let started = Instant::now();
++    let stdout = child.0.stdout.take().unwrap();
++    let gate = Gate::release_after(
++        child.0.stdin.take().unwrap(),
++        Duration::from_millis(2200),
++        started,
++    );
++    let result = observe(&mut child.0, &stdout, started);
++    let releases = gate.finish();
++    reap(&mut child);
++    let (status, output) = result.unwrap();
++    let releases = releases.unwrap();
++    assert_eq!(releases.len(), 1);
++    assert!(releases[0].0 > Duration::from_secs(2));
++    assert_eq!(releases[0].1, 3);
++    assert_runnable_output(status, output, OLD, "pre-output gate control");
++}
++
++#[test]
++fn full_output_without_exit_hits_the_absolute_finish_watchdog() {
++    let _forking = forking();
++    let failed = observed("printf 'old-updater\\n'; read gate").unwrap_err();
++    assert!(failed.contains("exit/EOF watchdog"), "{failed}");
++    assert!(
++        failed.contains("output=[111, 108, 100, 45, 117, 112, 100, 97, 116, 101, 114, 10]"),
++        "{failed}"
++    );
++}
++
++#[test]
++fn a_partial_first_output_also_starts_the_finish_watchdog() {
++    let _forking = forking();
++    let failed = observed("printf 'o'; read gate").unwrap_err();
++    assert!(failed.contains("exit/EOF watchdog"), "{failed}");
++    assert!(failed.contains("output=[111]"), "{failed}");
++}
++
++#[test]
++fn an_exited_leader_does_not_make_a_held_output_descriptor_complete() {
++    let _forking = forking();
++    let (stdout, held_writer) = UnixStream::pair().unwrap();
++    let child_writer: OwnedFd = held_writer.try_clone().unwrap().into();
++    let mut child = spawn("printf 'old-updater\\n'", Stdio::from(child_writer));
++    let result = observe(&mut child.0, &stdout, Instant::now());
++    let status = child.0.try_wait();
++    reap(&mut child);
++    // No child/grandchild owns the extra writer; this test releases it itself.
++    drop(held_writer);
++    let failed = result.unwrap_err();
++    assert!(failed.contains("exit/EOF watchdog"), "{failed}");
++    assert!(failed.contains("eof=false"), "{failed}");
++    assert!(status.unwrap().unwrap().success());
++}
++
++#[test]
++fn wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture() {
++    let _forking = forking();
++    for script in [
++        "printf 'wrong\\n'",
++        "printf 'old-updater\\n'; exit 7",
++        "printf '\\377\\n'",
++    ] {
++        let (status, output) = observed(script).unwrap();
++        assert!(
++            catch_unwind(AssertUnwindSafe(|| {
++                assert_runnable_output(status, output, OLD, script);
++            }))
++            .is_err(),
++            "invalid fixture passed: {script}"
++        );
++    }
++}
++
++#[test]
++fn no_output_is_not_readiness() {
++    let _forking = forking();
++    let failed = observed("exit 0").unwrap_err();
++    assert!(failed.contains("without output"), "{failed}");
++}
++
++#[test]
++fn output_beyond_the_previous_capture_limit_fails_explicitly() {
++    let _forking = forking();
++    let failed = observed("printf '%0130d' 0").unwrap_err();
++    assert!(failed.contains("stdout exceeded 128 bytes"), "{failed}");
++}
++
++#[test]
++fn a_read_error_restores_flags_and_leaves_the_direct_child_owned() {
++    let _forking = forking();
++    let mut child = spawn("read gate", Stdio::piped());
++    let not_readable = std::fs::OpenOptions::new()
++        .write(true)
++        .open("/dev/null")
++        .unwrap();
++    let flags = rustix::fs::fcntl_getfl(&not_readable).unwrap();
++    let result = observe(&mut child.0, &not_readable, Instant::now());
++    let restored = rustix::fs::fcntl_getfl(&not_readable);
++    reap(&mut child);
++    let failed = result.unwrap_err();
++    assert!(failed.contains("stdout read failed"), "{failed}");
++    assert_eq!(restored.unwrap(), flags);
++}
++
++#[test]
++fn a_never_released_first_output_gate_hits_the_startup_watchdog() {
++    let _forking = forking();
++    let failed = observed("read gate").unwrap_err();
++    assert!(failed.contains("startup watchdog"), "{failed}");
++    assert!(failed.contains("first_byte=None"), "{failed}");
++    assert!(failed.contains("output=[]"), "{failed}");
++}
++
++#[test]
++fn later_bytes_do_not_renew_the_first_byte_finish_deadline() {
++    let _forking = forking();
++    let mut child = spawn(
++        "printf 'o'; read one; printf 'l'; read two; printf 'd'; read end",
++        Stdio::piped(),
++    );
++    let started = Instant::now();
++    let stdout = child.0.stdout.take().unwrap();
++    let gate = Gate::release_at(
++        child.0.stdin.take().unwrap(),
++        vec![Duration::from_millis(700), Duration::from_millis(1400)],
++        started,
++    );
++    let result = observe(&mut child.0, &stdout, started);
++    let finished = started.elapsed();
++    let releases = gate.finish();
++    reap(&mut child);
++    let failed = result.unwrap_err();
++    let releases = releases.unwrap();
++    eprintln!(
++        "later-byte control: releases={releases:?} finished={finished:?} observation={failed}"
++    );
++    assert_eq!(releases.len(), 2);
++    assert!(releases.iter().all(|(_, count)| *count == 3));
++    assert!(failed.contains("exit/EOF watchdog"), "{failed}");
++    assert!(failed.contains("output=[111, 108, 100]"), "{failed}");
++    // If FINISH renewed at the last byte, its two seconds could not have elapsed yet.
++    // A delayed controller or parent therefore fails this control as invalid.
++    assert!(
++        finished.saturating_sub(releases[1].0) < FINISH,
++        "{releases:?}; {failed}"
++    );
++}
+--- a/lampOS/docs/updates.md
++++ b/lampOS/docs/updates.md
+@@ -850,15 +850,30 @@
+ or fsync durability proof, and the stubs do not exercise the daemon's `exec`
+ handover.
+ 
+-Each stub still has a two-second exit-observation bound after spawn, with
+-five-millisecond polls. A timeout reports the check number on its test
+-thread, call site, executable path, expected old/new bytes' hash, PID and
+-poll timings; a last nonblocking status read is diagnostic only and cannot
+-turn the timeout into a pass.
+-Failure cleanup records the kill and reap results. These details distinguish
+-the repeated checks when one fails; they do not establish why the original
+-Mac consumer run timed out (#1569/#3012), extend its bound, or qualify that
+-failed run. Runtime updater code and recovery assertions are unchanged.
++The builtin-only stubs have a test-harness startup watchdog of five seconds
++from spawn's return to the first observed stdout byte. That byte starts one
++absolute two-second deadline for both successful exit and stdout EOF; later
++bytes do not renew it. This changes the fixture's old two-second-after-spawn
++boundary, not a product startup or recovery deadline. A single owner polls
++nonblocking stdout and child status at up to five-millisecond intervals; it
++does not wait for a complete line or block reading after the leader exits.
++The exact old/new payload (including its final newline), successful status,
++file bytes/mode, links and recovery records are still checked. Output beyond
++the former 128-byte capture bound fails explicitly; observed bytes, including
++invalid UTF-8, remain in failure diagnostics.
++
++Timeouts report the check number, caller, selected path, expected script hash,
++PID, startup/finish phase, captured bytes, EOF/status and poll timing. A final
++status read is diagnostic only and cannot clear a timeout. The caller retains
++the direct child and its original kill/reap cleanup, whose results are logged
++on failure. These byte-checked scripts create no descendants; they retain the
++outer runner's inherited process group. The collector starts no thread and
++cannot leave a reader join waiting on an open pipe. Separate controls own
++held descriptors explicitly and exercise delayed first output, partial/full
++output followed by a hang, held EOF, wrong or missing output, nonzero status
++and read errors. This harness change does not establish the cause of, or
++qualify, either historical failed Mac run (#1569/#3012). Runtime updater code
++and recovery assertions are unchanged.
+ 
+ **Unclean process death at the write boundaries** (#2810). The separate
+ Linux `self-process-cuts` test uses the same signed install/round fixture in

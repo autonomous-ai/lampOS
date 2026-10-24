@@ -1,0 +1,9 @@
+{
+  "all_state_checks_tests_from_build_onward_byte_identical": true,
+  "Running_kill_wait_guard_byte_identical": true,
+  "byte_mode_spawn_prechecks_byte_identical": true,
+  "exact_script_constants_byte_identical": true,
+  "exact_final_payload_assert_byte_identical": true,
+  "successful_exit_assert_retained": true,
+  "no_product_or_manifest_diff": true
+}
