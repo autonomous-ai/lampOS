@@ -1,0 +1,27 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9900127Z         FAIL [   0.005s] ( 9766/11118) lamp-voice second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9901419Z   stdout ───
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9901568Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9901683Z     running 1 test
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9902142Z     test second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy ... FAILED
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9902560Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9902628Z     failures:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9902731Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9902801Z     failures:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9903171Z         second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9903541Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9903795Z     test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3726 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9904148Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9904278Z   stderr ───
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9904380Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9904896Z     thread 'second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy' (49062) panicked at crates/voice/src/second_provider/worker.rs:8976:17:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9905578Z     assertion `left == right` failed
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9906216Z       left: Unknown
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9906401Z      right: Quiet
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9906707Z     note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9906995Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:12.9907118Z   Cancelling due to test failure: 3 tests still running
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:13.2613786Z         PASS [   5.422s] ( 9767/11118) lamp-voice second_provider::worker::tests::a_close_face_turned_over_the_line_counts_for_a_first_word_through_the_eyes
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:13.6303762Z         PASS [   4.014s] ( 9768/11118) lamp-voice second_provider::worker::tests::the_lamps_name_carries_only_on_a_sign_of_one_speaker
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:14.0009651Z         PASS [   3.838s] ( 9769/11118) lamp-voice second_provider::worker::tests::with_addressed_a_line_said_close_and_facing_is_let_out_in_a_busy_room
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:14.0036849Z ────────────
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T01:52:14.0037286Z      Summary [ 187.000s] 9769/11118 tests run: 9768 passed (1 leaky), 1 failed, 83 skipped

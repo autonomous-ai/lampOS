@@ -1,0 +1,18 @@
+{
+  "head": "ba7031f589611d1834c882d82ea8aed2c243fe34",
+  "run": 40051251652,
+  "artifact": 12543552663,
+  "archive_sha256": "c76c3057488fc7dcb6aaf1be12b6319db82ea20e53b33ba4f74dcccfb7351c44",
+  "schedule": {
+    "passed": 4,
+    "failed": 0
+  },
+  "tasks": {
+    "passed": 0,
+    "failed": 2
+  },
+  "voice": {
+    "passed": 4,
+    "failed": 2
+  }
+}
