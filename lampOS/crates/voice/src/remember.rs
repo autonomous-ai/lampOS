@@ -7869,7 +7869,39 @@ fn exchange_within(
     lease: Option<&crate::memory_scope::ScopeLease>,
     most: usize,
 ) -> Option<Value> {
-    if !scope_current(lease) {
+    exchange_guarded(socket, line, budget, lease, most, None)
+}
+
+/// The same bounded transport with a request-local evidence fence, for
+/// face enrollment. Dropping the socket tells Eyes to cancel its capture.
+pub(crate) fn bounded_exchange_guarded(
+    socket: &Path,
+    line: &Value,
+    budget: Duration,
+    lease: &crate::memory_scope::ScopeLease,
+    current: &dyn Fn() -> bool,
+) -> Option<Value> {
+    exchange_guarded(
+        socket,
+        line,
+        budget,
+        Some(lease),
+        ANSWER_BYTES,
+        Some(current),
+    )
+}
+
+fn exchange_guarded(
+    socket: &Path,
+    line: &Value,
+    budget: Duration,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    most: usize,
+    guard: Option<&dyn Fn() -> bool>,
+) -> Option<Value> {
+    let current = || scope_current(lease) && guard.is_none_or(|guard| guard());
+    let cancellable = lease.is_some() || guard.is_some();
+    if !current() {
         return None;
     }
     use rustix::{
@@ -7879,19 +7911,19 @@ fn exchange_within(
     let until = Instant::now().checked_add(budget)?;
     let address = SocketAddrUnix::new(socket).ok()?;
     let stream = unconnected()?;
-    if !scope_current(lease) {
+    if !current() {
         return None;
     }
     let connected = connect(&stream, &address);
     let wait = |interest| -> Option<()> {
         loop {
-            if !scope_current(lease) {
+            if !current() {
                 return None;
             }
             let left = until
                 .checked_duration_since(Instant::now())
                 .filter(|left| !left.is_zero())?;
-            let left = if lease.is_some() {
+            let left = if cancellable {
                 left.min(Duration::from_millis(20))
             } else {
                 left
@@ -7902,7 +7934,7 @@ fn exchange_within(
             };
             let mut fds = [PollFd::new(&stream, interest)];
             match poll(&mut fds, Some(&timeout)) {
-                Ok(0) if lease.is_some() => continue,
+                Ok(0) if cancellable => continue,
                 Ok(0) => return None,
                 Ok(_)
                     if fds[0]
@@ -7936,7 +7968,7 @@ fn exchange_within(
     bytes.push(b'\n');
     let mut sent = 0;
     while sent < bytes.len() {
-        if !scope_current(lease) {
+        if !current() {
             return None;
         }
         until.checked_duration_since(Instant::now())?;
@@ -7951,7 +7983,7 @@ fn exchange_within(
     let mut answer = Vec::with_capacity(1_024);
     let mut chunk = [0u8; 1_024];
     loop {
-        if !scope_current(lease) {
+        if !current() {
             return None;
         }
         until.checked_duration_since(Instant::now())?;
@@ -7963,11 +7995,11 @@ fn exchange_within(
                 if let Some(end) = chunk[..n].iter().position(|byte| *byte == b'\n') {
                     answer.extend_from_slice(&chunk[..=end]);
                     let value = serde_json::from_slice(&answer).ok()?;
-                    if !scope_current(lease) {
+                    if !current() {
                         return None;
                     }
                     until.checked_duration_since(Instant::now())?;
-                    return scope_current(lease).then_some(value);
+                    return current().then_some(value);
                 }
                 answer.extend_from_slice(&chunk[..n]);
             }

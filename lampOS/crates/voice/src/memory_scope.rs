@@ -574,6 +574,7 @@ impl RequestScope {
     }
     pub fn revoke(&self) {
         self.context.active.store(false, Ordering::Release);
+        crate::speaking_faces::cancel_enrollment(self.context.key.request);
     }
 }
 impl Drop for RequestScope {

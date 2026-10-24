@@ -2253,6 +2253,7 @@ pub fn serve(
     // A held line's `reports_stop` is done, its answer kept held, as on the
     // Live route (`crate::attention::DONE_THOUGH_HELD`), with LAMP_REPORTS=on.
     let though_held = tools.reports_stop;
+    let remember_speaker = tools.remember_speaker;
     // The weather's call is answered before any of these, as the search's
     // is inside them, with LAMP_SECOND_WEATHER=on.
     let audio_runner = tools.requested_audio.then(|| {
@@ -2460,6 +2461,7 @@ pub fn serve(
     // runs; the judging happens only at a held forget's yes. Without the
     // memory's known file and the bus, a held forget runs on a yes as before,
     // and the journal says so once.
+    let mut enrollment_eyes = speaking_eyes.clone();
     let _forget_sight_reader = match (&scope_file, files.bus_root.as_deref()) {
         (Some(known), Some(root)) if crate::speaking_faces::eyes_from_environment() => {
             let (eyes, reader) = match speaking_eyes {
@@ -2472,6 +2474,7 @@ pub fn serve(
             };
             match eyes {
                 Some(eyes) => {
+                    enrollment_eyes = Some(eyes.clone());
                     eprintln!(
                         "lamp-voice second: a held forget's yes counts only from their face seen saying it (LAMP_EYES_SPEAKING)"
                     );
@@ -2497,6 +2500,22 @@ pub fn serve(
             None
         }
     };
+    // Enrollment does not need a previously known face, but does need the
+    // speaking topic. Reuse its reader when one is already running.
+    let _enrollment_reader = if remember_speaker
+        && crate::speaking_faces::eyes_from_environment()
+        && enrollment_eyes.is_none()
+    {
+        files.bus_root.as_deref().and_then(|root| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let reader = crate::speaking_faces::read_from(eyes.clone(), root)?;
+            enrollment_eyes = Some(eyes);
+            Some(reader)
+        })
+    } else {
+        None
+    };
+    engine = engine.remembering_speaker(remember_speaker, enrollment_eyes);
     if let (Some(early), Some(search)) = (early, search) {
         engine = engine.hearing_words(Arc::new(move |request, heard| {
             let Some(query) = early_query(heard, crate::local_time::month_and_year_here()) else {

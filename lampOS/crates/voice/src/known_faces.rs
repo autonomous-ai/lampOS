@@ -41,6 +41,7 @@ pub const VISITS_FLAG: &str = "--who-visits";
 pub struct FaceSwitches {
     pub checked: bool,
     pub visits: bool,
+    pub remember_speaker: bool,
 }
 /// The exchanges before the turn in hand that a name may have been said
 /// in, to be kept once the lamp has said it back and the person agreed
@@ -715,6 +716,7 @@ pub fn tools_checked(checked: bool) -> Vec<Tool> {
     tools_for(FaceSwitches {
         checked,
         visits: false,
+        remember_speaker: false,
     })
 }
 
@@ -824,6 +826,7 @@ pub fn run(socket: &Path, call: &ToolCall, checked: bool) -> (Value, bool) {
         FaceSwitches {
             checked,
             visits: false,
+            remember_speaker: false,
         },
         None,
         None,
@@ -843,6 +846,9 @@ pub fn run_for(
     person: Option<&str>,
     line: Option<&crate::speaking_faces::LineSeen>,
 ) -> (Value, bool) {
+    if switches.remember_speaker && call.name == REMEMBER {
+        return (json!({"error": crate::remember_speaker::NOT_SEEN}), true);
+    }
     if matches!(call.name.as_str(), TELL | DONT_TELL) {
         return if switches.visits {
             run_visits(socket, call, person)
@@ -881,6 +887,77 @@ pub fn run_for(
         Said::default()
     };
     run_switched(socket, call, switches, &said)
+}
+
+/// Enrollment under the caller's revocable authority. The switch-off
+/// request and all other face tools still use their existing path.
+pub fn run_scoped(
+    socket: &Path,
+    call: &ToolCall,
+    switches: FaceSwitches,
+    person: Option<&str>,
+    line: Option<&crate::speaking_faces::LineSeen>,
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> (Value, bool) {
+    if call.name != REMEMBER || !switches.remember_speaker {
+        return run_for(socket, call, switches, person, line);
+    }
+    let proof = line
+        .filter(|line| line.request == request)
+        .and_then(|line| line.enrollment.as_ref());
+    let lease = lease.filter(|lease| lease.key().request == request && lease.is_current());
+    let (Some(proof), Some(lease)) = (proof, lease) else {
+        return (json!({"error": crate::remember_speaker::NOT_SEEN}), true);
+    };
+    if !switches.checked || !proof.is_current(lamp_ipc::monotonic_us()) {
+        return (json!({"error": crate::remember_speaker::NOT_SEEN}), true);
+    }
+    let Some(name) = call
+        .args
+        .get("name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+    else {
+        return (
+            json!({"error": "There was no name in that for me to keep."}),
+            true,
+        );
+    };
+    // Earlier names may belong to someone else. This path uses only the
+    // request's own heard words, including its spelling checks.
+    let said = Said::now(&proof.heard);
+    if !name_heard(name, &said) {
+        return (json!({"error": NOT_HEARD}), true);
+    }
+    let replace = call.args.get("replace").and_then(Value::as_bool) == Some(true);
+    // No earlier speaker confirmation is proven. Keep the existing
+    // replacement check; it conservatively refuses on this scoped path.
+    if replace && !agreed_to(name, &said) {
+        return (
+            json!({"error": "I cannot safely replace a saved name from this request, so I have not changed anyone's saved face."}),
+            true,
+        );
+    }
+    let apart = call.args.get("apart").and_then(Value::as_bool) == Some(true)
+        && spelled_by_them(name, &said.this);
+    let line = json!({"remember_speaker": {
+        "name": name,
+        "face": proof.face,
+        "began_us": proof.began_us,
+        "ended_us": proof.ended_us,
+        "replace": replace,
+        "apart": apart,
+    }});
+    let current = || proof.is_current(lamp_ipc::monotonic_us());
+    match crate::remember::bounded_exchange_guarded(socket, &line, DEADLINE, lease, &current) {
+        Some(answer) => (told_asking(&answer, switches.visits), true),
+        None => (
+            json!({"error": "I could not finish remembering that face. I have not confirmed that it was saved."}),
+            false,
+        ),
+    }
 }
 
 /// What the model is told when "forget my face" names no face of the person
@@ -939,7 +1016,16 @@ pub fn forget_name(
 #[cfg(test)]
 fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Value, bool) {
     let visits = false;
-    run_switched(socket, call, FaceSwitches { checked, visits }, said)
+    run_switched(
+        socket,
+        call,
+        FaceSwitches {
+            checked,
+            visits,
+            remember_speaker: false,
+        },
+        said,
+    )
 }
 
 fn run_switched(
@@ -1163,6 +1249,10 @@ fn told_asking(answer: &Value, visits: bool) -> Value {
             "There was more than one face in front of me. Only they should be in front of me when they ask again."
         }
         Some("eyes_shut") => "My eye is shut just now, so I could not see them.",
+        Some("speaker_not_seen" | "speaker_expired" | "not_that_face") => {
+            crate::remember_speaker::NOT_SEEN
+        }
+        Some("peer_closed") => "That request ended before I could confirm a face was saved.",
         Some("busy") => "I was already remembering someone. They should ask again in a moment.",
         Some("full") => {
             "I already know as many faces as I can keep. Someone has to be forgotten first."
@@ -1618,6 +1708,7 @@ mod tests {
             tools_for(FaceSwitches {
                 checked: true,
                 visits,
+                remember_speaker: false,
             })
             .into_iter()
             .map(|tool| tool.name)
@@ -2446,6 +2537,7 @@ mod tests {
             request: 1,
             speakers: speakers.iter().map(|id| (*id).to_owned()).collect(),
             known: known.map(|(name, face)| (name.to_owned(), face.to_owned())),
+            enrollment: None,
         };
         let theirs_said = seen(&["f1"], Some(("Alex", "f1")));
         for known in [Some(&alex), Some(&bo), None] {
@@ -2523,6 +2615,7 @@ mod tests {
             request: 1,
             speakers: speakers.iter().map(|id| (*id).to_owned()).collect(),
             known: known_with_face(&known),
+            enrollment: None,
         };
         let refused = |line: Option<&LineSeen>| {
             let told = run_for(&socket, &call("Alex"), switches, None, line);
