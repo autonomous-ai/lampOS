@@ -8585,3 +8585,7 @@ Current build-rows.md on22b scores the memory-quality row0.35 after today's owne
 ## 2026-10-24: Name Mac selected qualification summary
 
 [Selected Mac counts/source hashes](verification/name-current-mac-20261024/README.md) confirm five stages0, Voice4125/0/21, Update386/0/6, all five controls and fresh46/source/cleanup. Complete raw Mac packet remains private after automatic approval review rejected whole-packet disclosure to the public repository; this publication contains only the constructed count/hash summary. Finalf7d README-only binding is already published; native/physical/latency holds remain.
+
+## 2026-10-24: Photo origin interface made concrete
+
+[Source-owner proposal](verification/photo-origin-contract-20261024/README.md) maps actual capture identity loss, clone/rebind and fresh-timestamp replay on pinned Main6b/Commone9d. It recommends a bounded producer-owned monotone decision, optional existing private IPC and one-shot accepted-audio seal; no ledger, source freshness inference or new service. Budgets and compatibility cases are proposed, not measured. First retains active producer fixes; Fourth consumes only opaque evidence, with original/interval/physical holds unchanged. No code or test claim.
