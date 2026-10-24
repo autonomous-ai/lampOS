@@ -1,0 +1,15 @@
+{
+  "at_unix": 1792830629.2752671,
+  "sources": {
+    "baseline": {
+      "bytes_modes_mtimes_semantic_index_unchanged": true,
+      "files": 10313,
+      "tree": "4668b6542f7b095229776c9953e848a8f641d569"
+    },
+    "candidate": {
+      "bytes_modes_mtimes_semantic_index_unchanged": true,
+      "files": 10323,
+      "tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2"
+    }
+  }
+}

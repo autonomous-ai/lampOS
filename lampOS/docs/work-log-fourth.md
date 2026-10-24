@@ -8473,3 +8473,7 @@ Both published payloads are identical AArch64 executables running through existi
 ## 2026-10-24: corrected Memory native gates green
 
 #3333 head0882cb904 passes ARM6440077748435 selected1530/0with14skipped, separate process12/0, and strictworkspaceClippy40077748328. [Preview/driver binding](verification/memory-survivor-native-20261024/README.md) proves both jobs used the same newer-base merge and exact tested fixture, without a false whole-tree equality claim. Third and Reviewer-two are rereading the P2 correction. Common matched diagnostic completed27/0onbothsources with all54invocations, stable source/driver hashes and cleanup. That diagnostic does not waive the earlier full-suite failures; complete current carry gates are next.
+
+## 2026-10-24: Common matched diagnosis completed
+
+[Matched diagnostic](verification/common-matched-recovered-20261024/README.md) passes all27 selected controls on both exact baseline and candidate sources,54 complete invocations, stable sources/drivers and proven cleanup. This standalone outcome does not establish the original full-suite failures' cause or waive them. Preparing fresh complete Mac/Linux qualification of current carry5191c66e9; both target handoffs are proven. Memory0882cb904 now waits only on the P2 reread, with current native gates green.

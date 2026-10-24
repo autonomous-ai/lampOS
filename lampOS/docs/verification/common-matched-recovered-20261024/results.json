@@ -1,0 +1,2594 @@
+[
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 0,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "coordinator::tests::reminders::a_mute_past_an_hour_leaves_the_reminder_to_the_one_hour_rule",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "coordinator::tests::reminders::a_mute_past_an_hour_leaves_the_reminder_to_the_one_hour_rule",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 3.0301078139996207,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 12026,
+      "process_group": 12026,
+      "timeout_seconds": 4910
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 0,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "coordinator::tests::reminders::a_mute_past_an_hour_leaves_the_reminder_to_the_one_hour_rule",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "coordinator::tests::reminders::a_mute_past_an_hour_leaves_the_reminder_to_the_one_hour_rule",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 3.4049307399995996,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 12232,
+      "process_group": 12232,
+      "timeout_seconds": 4901
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 1,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "coordinator::tests::reminders::reminder_waits_for_named_request_second_look_before_its_window_can_expire",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "coordinator::tests::reminders::reminder_waits_for_named_request_second_look_before_its_window_can_expire",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.7842947999997705,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 14744,
+      "process_group": 14744,
+      "timeout_seconds": 4892
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 1,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "coordinator::tests::reminders::reminder_waits_for_named_request_second_look_before_its_window_can_expire",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "coordinator::tests::reminders::reminder_waits_for_named_request_second_look_before_its_window_can_expire",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.722653765999894,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 14898,
+      "process_group": 14898,
+      "timeout_seconds": 4886
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 2,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.21520312699976785,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 15294,
+      "process_group": 15294,
+      "timeout_seconds": 4879
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 2,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.21306681200030653,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 15381,
+      "process_group": 15381,
+      "timeout_seconds": 4873
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 3,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 2.804976696000267,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 15471,
+      "process_group": 15471,
+      "timeout_seconds": 4867
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 3,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 2.8431968559998495,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 16177,
+      "process_group": 16177,
+      "timeout_seconds": 4858
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 4,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.04898740299995552,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 16931,
+      "process_group": 16931,
+      "timeout_seconds": 4850
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 4,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.04237407599975995,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 17008,
+      "process_group": 17008,
+      "timeout_seconds": 4844
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 5,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::catalog::no_renewal_while_a_turn_is_open",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::catalog::no_renewal_while_a_turn_is_open",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.30126114899985623,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 17267,
+      "process_group": 17267,
+      "timeout_seconds": 4835
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 5,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::catalog::no_renewal_while_a_turn_is_open",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::catalog::no_renewal_while_a_turn_is_open",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.30991184599997723,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 17514,
+      "process_group": 17514,
+      "timeout_seconds": 4825
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 6,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::catalog::the_light_back_renews_at_the_first_short_gap_between_owned_turns",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::catalog::the_light_back_renews_at_the_first_short_gap_between_owned_turns",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 1.423119628999757,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 17644,
+      "process_group": 17644,
+      "timeout_seconds": 4818
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 6,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::catalog::the_light_back_renews_at_the_first_short_gap_between_owned_turns",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::catalog::the_light_back_renews_at_the_first_short_gap_between_owned_turns",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 1.4286641489998146,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 17712,
+      "process_group": 17712,
+      "timeout_seconds": 4812
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 7,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.1591760000001159,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 17866,
+      "process_group": 17866,
+      "timeout_seconds": 4804
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 7,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.16406087899986233,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 18268,
+      "process_group": 18268,
+      "timeout_seconds": 4797
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 8,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::review_2026_10_14::an_accepted_decline_allows_reports_withdrawal_without_reviving_speech",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::review_2026_10_14::an_accepted_decline_allows_reports_withdrawal_without_reviving_speech",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.2235678199999711,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 18936,
+      "process_group": 18936,
+      "timeout_seconds": 4789
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 8,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::review_2026_10_14::an_accepted_decline_allows_reports_withdrawal_without_reviving_speech",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::review_2026_10_14::an_accepted_decline_allows_reports_withdrawal_without_reviving_speech",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.21943418199998632,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 19006,
+      "process_group": 19006,
+      "timeout_seconds": 4782
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 9,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::review_2026_10_14::an_accepted_decline_blocks_later_and_mixed_music_calls",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::review_2026_10_14::an_accepted_decline_blocks_later_and_mixed_music_calls",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.16186619500012966,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 19095,
+      "process_group": 19095,
+      "timeout_seconds": 4776
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 9,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::review_2026_10_14::an_accepted_decline_blocks_later_and_mixed_music_calls",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::review_2026_10_14::an_accepted_decline_blocks_later_and_mixed_music_calls",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.20976509600041027,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 19171,
+      "process_group": 19171,
+      "timeout_seconds": 4770
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 10,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::review_2026_10_14::an_accepted_decline_does_not_release_a_parked_music_call",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::review_2026_10_14::an_accepted_decline_does_not_release_a_parked_music_call",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.10936212600017825,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 19267,
+      "process_group": 19267,
+      "timeout_seconds": 4762
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 10,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::review_2026_10_14::an_accepted_decline_does_not_release_a_parked_music_call",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::review_2026_10_14::an_accepted_decline_does_not_release_a_parked_music_call",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.10502148400018996,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 20065,
+      "process_group": 20065,
+      "timeout_seconds": 4754
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 11,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::sounds::a_cut_in_heard_as_a_fragment_is_asked_again_and_stop_is_answered",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::sounds::a_cut_in_heard_as_a_fragment_is_asked_again_and_stop_is_answered",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.16922589899968443,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 20264,
+      "process_group": 20264,
+      "timeout_seconds": 4747
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 11,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::sounds::a_cut_in_heard_as_a_fragment_is_asked_again_and_stop_is_answered",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::sounds::a_cut_in_heard_as_a_fragment_is_asked_again_and_stop_is_answered",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.1046001489999071,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 20358,
+      "process_group": 20358,
+      "timeout_seconds": 4741
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 12,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::sounds::a_sound_heard_as_another_language_is_held_and_a_short_word_is_answered",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::sounds::a_sound_heard_as_another_language_is_held_and_a_short_word_is_answered",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.16319920700016155,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 20475,
+      "process_group": 20475,
+      "timeout_seconds": 4735
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 12,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::sounds::a_sound_heard_as_another_language_is_held_and_a_short_word_is_answered",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::sounds::a_sound_heard_as_another_language_is_held_and_a_short_word_is_answered",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.29381602300009035,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 20772,
+      "process_group": 20772,
+      "timeout_seconds": 4729
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 13,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::sounds::a_sound_with_a_word_right_after_the_lamps_question_is_answered",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::sounds::a_sound_with_a_word_right_after_the_lamps_question_is_answered",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.3818707700002051,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 21794,
+      "process_group": 21794,
+      "timeout_seconds": 4720
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 13,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::sounds::a_sound_with_a_word_right_after_the_lamps_question_is_answered",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::sounds::a_sound_with_a_word_right_after_the_lamps_question_is_answered",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.20101529100020343,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 24979,
+      "process_group": 24979,
+      "timeout_seconds": 4710
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 14,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::sounds::in_a_conversation_a_turn_heard_in_another_script_or_as_a_bare_number_is_asked_again",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::sounds::in_a_conversation_a_turn_heard_in_another_script_or_as_a_bare_number_is_asked_again",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.24393136799972126,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 26360,
+      "process_group": 26360,
+      "timeout_seconds": 4702
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 14,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::sounds::in_a_conversation_a_turn_heard_in_another_script_or_as_a_bare_number_is_asked_again",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::sounds::in_a_conversation_a_turn_heard_in_another_script_or_as_a_bare_number_is_asked_again",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.16664448399978937,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 27428,
+      "process_group": 27428,
+      "timeout_seconds": 4695
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 15,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::sounds::with_the_switch_a_misheard_cut_in_is_said_as_one_and_the_next_request_is_told",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::sounds::with_the_switch_a_misheard_cut_in_is_said_as_one_and_the_next_request_is_told",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.22651986100026988,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 27961,
+      "process_group": 27961,
+      "timeout_seconds": 4689
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 15,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::sounds::with_the_switch_a_misheard_cut_in_is_said_as_one_and_the_next_request_is_told",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::sounds::with_the_switch_a_misheard_cut_in_is_said_as_one_and_the_next_request_is_told",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.30261441799984823,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 28353,
+      "process_group": 28353,
+      "timeout_seconds": 4683
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 16,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::a_turn_nobody_said_to_the_lamp_never_changes_the_lamp",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::spoken_to::a_turn_nobody_said_to_the_lamp_never_changes_the_lamp",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.40577992499993343,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 30199,
+      "process_group": 30199,
+      "timeout_seconds": 4675
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 16,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::a_turn_nobody_said_to_the_lamp_never_changes_the_lamp",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::spoken_to::a_turn_nobody_said_to_the_lamp_never_changes_the_lamp",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.4678752390000227,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 34382,
+      "process_group": 34382,
+      "timeout_seconds": 4667
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 17,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::an_own_turn_completed_silent_is_no_news",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::spoken_to::an_own_turn_completed_silent_is_no_news",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.1155039189998206,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 38835,
+      "process_group": 38835,
+      "timeout_seconds": 4660
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 17,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::an_own_turn_completed_silent_is_no_news",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::spoken_to::an_own_turn_completed_silent_is_no_news",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.6636648329999844,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 40992,
+      "process_group": 40992,
+      "timeout_seconds": 4654
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 18,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::the_lamp_called_by_name_or_in_a_conversation_is_answered_with_the_switch",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::spoken_to::the_lamp_called_by_name_or_in_a_conversation_is_answered_with_the_switch",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.10545472100011466,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 41896,
+      "process_group": 41896,
+      "timeout_seconds": 4648
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 18,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::the_lamp_called_by_name_or_in_a_conversation_is_answered_with_the_switch",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::spoken_to::the_lamp_called_by_name_or_in_a_conversation_is_answered_with_the_switch",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.10890225399998599,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 42921,
+      "process_group": 42921,
+      "timeout_seconds": 4642
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 19,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::the_same_turn_with_the_lamps_name_changes_the_lamp",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::spoken_to::the_same_turn_with_the_lamps_name_changes_the_lamp",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.16106279199993878,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 43792,
+      "process_group": 43792,
+      "timeout_seconds": 4637
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 19,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::the_same_turn_with_the_lamps_name_changes_the_lamp",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::spoken_to::the_same_turn_with_the_lamps_name_changes_the_lamp",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.16116383400003542,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 44544,
+      "process_group": 44544,
+      "timeout_seconds": 4631
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 20,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::what_nobody_said_to_the_lamp_is_held_with_the_switch_and_played_without",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::spoken_to::what_nobody_said_to_the_lamp_is_held_with_the_switch_and_played_without",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.16211955699964165,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 45196,
+      "process_group": 45196,
+      "timeout_seconds": 4626
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 20,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::what_nobody_said_to_the_lamp_is_held_with_the_switch_and_played_without",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::spoken_to::what_nobody_said_to_the_lamp_is_held_with_the_switch_and_played_without",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.16278549800017572,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 46566,
+      "process_group": 46566,
+      "timeout_seconds": 4620
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 21,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::with_the_switch_a_line_answered_by_an_action_alone_keeps_the_conversation",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::spoken_to::with_the_switch_a_line_answered_by_an_action_alone_keeps_the_conversation",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.22217743999999584,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 47831,
+      "process_group": 47831,
+      "timeout_seconds": 4615
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 21,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::with_the_switch_a_line_answered_by_an_action_alone_keeps_the_conversation",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::spoken_to::with_the_switch_a_line_answered_by_an_action_alone_keeps_the_conversation",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.22192033799956334,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 49025,
+      "process_group": 49025,
+      "timeout_seconds": 4609
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 22,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::with_the_switch_a_lookup_then_not_for_me_is_no_answer",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::spoken_to::with_the_switch_a_lookup_then_not_for_me_is_no_answer",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.22492018699995242,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 49840,
+      "process_group": 49840,
+      "timeout_seconds": 4603
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 22,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::with_the_switch_a_lookup_then_not_for_me_is_no_answer",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::spoken_to::with_the_switch_a_lookup_then_not_for_me_is_no_answer",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.2189133399997445,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 51034,
+      "process_group": 51034,
+      "timeout_seconds": 4598
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 23,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::with_the_switch_two_lines_the_lamp_left_alone_end_its_conversation",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::spoken_to::with_the_switch_two_lines_the_lamp_left_alone_end_its_conversation",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.6310585940000237,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 52992,
+      "process_group": 52992,
+      "timeout_seconds": 4592
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 23,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::spoken_to::with_the_switch_two_lines_the_lamp_left_alone_end_its_conversation",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::spoken_to::with_the_switch_two_lines_the_lamp_left_alone_end_its_conversation",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.7739218820001952,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 53350,
+      "process_group": 53350,
+      "timeout_seconds": 4586
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 24,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::stop_and_heartbeat_are_serviced_while_a_reconnect_hangs",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::stop_and_heartbeat_are_serviced_while_a_reconnect_hangs",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.9717332850000275,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 54215,
+      "process_group": 54215,
+      "timeout_seconds": 4579
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 24,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::stop_and_heartbeat_are_serviced_while_a_reconnect_hangs",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::stop_and_heartbeat_are_serviced_while_a_reconnect_hangs",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.8204852369999571,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 54796,
+      "process_group": 54796,
+      "timeout_seconds": 4573
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 25,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::the_first_request_after_a_stop_tells_the_model_it_was_stopped",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::the_first_request_after_a_stop_tells_the_model_it_was_stopped",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.0645329940002739,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 57271,
+      "process_group": 57271,
+      "timeout_seconds": 4566
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 25,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::the_first_request_after_a_stop_tells_the_model_it_was_stopped",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::the_first_request_after_a_stop_tells_the_model_it_was_stopped",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.06496253500017701,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 57392,
+      "process_group": 57392,
+      "timeout_seconds": 4561
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3828,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "5076a8d2cba69a126fd4b80184e48abf3bec42edbd90d70cbe72b9f8da8ac702",
+    "index": 26,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3828,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::the_models_sign_that_it_heard_its_name_is_answered_silently_and_changes_nothing_played",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/candidate-driver",
+        "provider_worker::tests::the_models_sign_that_it_heard_its_name_is_answered_silently_and_changes_nothing_played",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-diagnostic-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.06636872100034452,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 57463,
+      "process_group": 57463,
+      "timeout_seconds": 4555
+    },
+    "side": "candidate",
+    "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+    "status": "passed"
+  },
+  {
+    "all_summary_lines": [
+      {
+        "failed": 0,
+        "filtered": 3710,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      }
+    ],
+    "driver_sha256": "b88b6afc87862404b4846acbf309a36dc58f4b987c1f2dff86645bdea901ebe7",
+    "index": 26,
+    "last_top_level_summary": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 1,
+      "status": "ok"
+    },
+    "name": "provider_worker::tests::the_models_sign_that_it_heard_its_name_is_answered_silently_and_changes_nothing_played",
+    "named_status_occurrences": [
+      "ok"
+    ],
+    "nested_child_output_not_added_to_top_level_count": true,
+    "process": {
+      "command": [
+        "/private/tmp/fourth-common-recovered-diagnostic-20261024/attempt1/baseline-driver",
+        "provider_worker::tests::the_models_sign_that_it_heard_its_name_is_answered_silently_and_changes_nothing_played",
+        "--exact",
+        "--format",
+        "pretty",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/fourth-common-baseline-recovery-20261024/lampOS",
+      "elapsed_seconds": 0.07613340199986851,
+      "exit": 0,
+      "group_absent": true,
+      "group_absent_after_cleanup": true,
+      "pid": 57530,
+      "process_group": 57530,
+      "timeout_seconds": 4550
+    },
+    "side": "baseline",
+    "source_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+    "status": "passed"
+  }
+]
