@@ -1,0 +1,35 @@
+{
+  "scope": "Actual Running paths match captured no-run compiler artifacts. Hashes are post-terminal; no per-launch byte/profile observation is inferred.",
+  "bindings": [
+    {
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-c75c87452d24a363",
+      "sha256": "ac1bf119f333be132708248ba4b33f339e37c77d93c647dbacc4e74fcfaa4a62",
+      "bytes": 102258448
+    },
+    {
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837",
+      "sha256": "b4b15f735124ba18aedc1f15f4b2d82719d8c2baaf6623b67fc30afdb5870bb3",
+      "bytes": 141214664
+    },
+    {
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-3ab8ef644bb4cec9",
+      "sha256": "5b6dc94c109b2e0be2782d62ffa7a2572937e396f2aede3c4c717f0ebddcb090",
+      "bytes": 1158168
+    },
+    {
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/release_pair-92b41c10fde060fb",
+      "sha256": "5cd2151bb30f28599be2d950e2a1f4687dc88fd0de7301df33466770aa7b3b3e",
+      "bytes": 6113488
+    },
+    {
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/render_line_second-64bf83bb8828a9bd",
+      "sha256": "a69770881ae50962b27edd94ca503add02cf095e80dff7c0e092f26acef310a5",
+      "bytes": 1588016
+    },
+    {
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/stop_words_stt_replay-b4b5bc69dcd2f200",
+      "sha256": "2a21e955911604c440a3fe1f14dd00db0289e284a4cbb8e03f2a300bc5633ae4",
+      "bytes": 3401832
+    }
+  ]
+}

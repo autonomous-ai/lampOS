@@ -1,0 +1,6 @@
+{
+  "head": "a039cc7fbbd06923db1fd038558ae1b9afba593f",
+  "base": "3d1a13ae7d937e56d4af3606732333812c805961",
+  "prior_head": "fa82c279e7b056ff45dd1af3fd77d3a3ea7adaa3",
+  "scope": "Current-base two-file fixture carry; fresh changed Voice fmt/strict Clippy/full tests. Prior failed/full/native epochs stay separate."
+}

@@ -1,0 +1,26 @@
+{
+  "old_head": "fa82c279e7b056ff45dd1af3fd77d3a3ea7adaa3",
+  "head": "a039cc7fbbd06923db1fd038558ae1b9afba593f",
+  "base": "3d1a13ae7d937e56d4af3606732333812c805961",
+  "owned_blobs": {
+    "lampOS/crates/voice/src/remember_speaker.rs": {
+      "fa82c279e7b056ff45dd1af3fd77d3a3ea7adaa3": "6147192170c3caf691d942c63ea44def0c5947fb",
+      "a039cc7fbbd06923db1fd038558ae1b9afba593f": "6147192170c3caf691d942c63ea44def0c5947fb"
+    },
+    "lampOS/docs/voice-test-fixtures.md": {
+      "fa82c279e7b056ff45dd1af3fd77d3a3ea7adaa3": "785e1d56580d7a4c575fe5b780355aa0efe2980f",
+      "a039cc7fbbd06923db1fd038558ae1b9afba593f": "785e1d56580d7a4c575fe5b780355aa0efe2980f"
+    }
+  },
+  "owned_blobs_unchanged": true,
+  "whole_tree_changed": true,
+  "other_changed_paths": [
+    "lampOS/crates/voice/src/activity.rs",
+    "lampOS/crates/voice/src/coordinator.rs",
+    "lampOS/crates/voice/src/coordinator/tests/duplex.rs",
+    "lampOS/crates/voice/tests/it/soft_start.rs",
+    "lampOS/docs/duplex-listening.md",
+    "lampOS/docs/switches.md"
+  ],
+  "qualification_scope": "Fresh current Voice gate runs separately. Old local/native/read observations are not renamed to this source."
+}

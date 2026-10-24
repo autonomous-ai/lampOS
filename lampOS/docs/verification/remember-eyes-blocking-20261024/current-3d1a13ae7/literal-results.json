@@ -1,0 +1,23 @@
+{
+  "head": "a039cc7fbbd06923db1fd038558ae1b9afba593f",
+  "base": "3d1a13ae7d937e56d4af3606732333812c805961",
+  "full_changed_voice": {
+    "passed": 4029,
+    "failed": 0,
+    "ignored": 21
+  },
+  "literal_summaries": [
+    "test result: ok. 3743 passed; 0 failed; 15 ignored; 0 measured; 0 filtered out; finished in 536.38s",
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 275 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.08s",
+    "test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ],
+  "additional_direct_module": {
+    "passed": 16,
+    "failed": 0
+  },
+  "source_unchanged": true
+}
