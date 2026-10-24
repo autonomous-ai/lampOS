@@ -1,3 +1,22 @@
+## Current checkpoint: 2026-10-24 17:51 +07, independent shipping source HOLD
+
+Took #3355's new `51925472d` shipping hearing repair read while #3361 is on
+train 85. [Exact source/control proof](verification/two-faces-forward-clock-reader-20261024/README.md)
+reproduces a new P2: a 500 ms forward wall step makes 1.0 s of monotonic
+looks pass the 1.5 s persistence bar. Five positive/refusal controls pass,
+one negative fails, helper unchanged. HOLD posted to Sixth/reviewers; full
+Mac gate deferred until source repair. The wrapper's separate reserved-
+variable error and uncaptured Rust exit are explicit, not relabelled.
+
+#3361 remains cleared/ready on train85 (#3368); its pair/Clippy pass,
+ordinary train gate is active. #1812 release6592 **63/63** download proof and
+#2809's concrete sheet/static product audit are published. Holder/person,
+trusted public half and isolated bad/restoration route still wait with
+First/Migrate/Fifth. No device/key/release change. Next: qualify this actual
+shipping repair when corrected, act on train findings and holder/key input.
+
+---
+
 ## Current checkpoint: 2026-10-24 17:31 +07, release 6592 downloads qualified
 
 #1812/#2809 current immutable release [6592 proof](verification/signed-channel-6592-20261024/README.md):

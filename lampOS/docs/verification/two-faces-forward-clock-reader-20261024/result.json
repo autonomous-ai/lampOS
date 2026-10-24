@@ -1,0 +1,9 @@
+{
+  "head": "51925472d61d712db1d2169edd9d33892c9ac9d8",
+  "passed_controls": 5,
+  "failed_controls": 1,
+  "finding": "500 ms forward wall-clock step makes 1.0 s monotonic observations satisfy 1.5 s persistence",
+  "source_unmodified": true,
+  "wrapper_exit": 1,
+  "wrapper_limitation": "The Rust test completed and its failure summary is retained; a subsequent zsh reserved-variable assignment failed, so the separate Rust process exit code was not captured. No wrapper success is claimed."
+}

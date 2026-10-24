@@ -1,0 +1,10 @@
+{
+  "head": "51925472d61d712db1d2169edd9d33892c9ac9d8",
+  "source": "lampOS/crates/voice/src/second_provider/worker.rs",
+  "full_source_sha256": "528241dff2e2c8724ad80066582c0da4a9cc56e91a54cb52dc53a51f3108def5",
+  "extracted_helper_sha256": "8e3e01973d82201187d0f5bf9c74aea9c908acd9138d7b1f5d1e8824747bdbc8",
+  "helper_unmodified": true,
+  "shim": "lamp_bus::EXPIRY_GRACE_MS=50, matching production constant",
+  "controls_sha256": "c04d48ea6206a199e72face438b62dde0394d5e6645db94ea2926c8dfb3a984c",
+  "source_edited": false
+}
