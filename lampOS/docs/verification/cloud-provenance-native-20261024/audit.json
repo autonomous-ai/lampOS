@@ -15,17 +15,23 @@
       "queries": 9,
       "positive_hashes": 5,
       "synthetic_null_hashes": 4,
-      "owned_exits": 7
+      "owned_exits": 7,
+      "snapshot_manifests_verified": 18,
+      "snapshot_file_hashes_verified": 72,
+      "actual_package_hashes_verified": 2
     },
     {
       "test": "release_6498_cloud_reads_6408_packages_and_6408_reads_the_replacement",
       "queries": 9,
       "positive_hashes": 5,
       "synthetic_null_hashes": 4,
-      "owned_exits": 7
+      "owned_exits": 7,
+      "snapshot_manifests_verified": 18,
+      "snapshot_file_hashes_verified": 72,
+      "actual_package_hashes_verified": 2
     }
   ],
   "isolated_container_verified": true,
   "owned_container_removed": true,
-  "scope": "source, isolation, process exits and replies audited; installed preservation assertions additionally rely on executed fixture"
+  "scope": "source, isolation, process exits, actual package hashes, replies and snapshot content/paired manifests audited; transient installed preservation additionally relies on executed fixture"
 }
