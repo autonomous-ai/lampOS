@@ -10,6 +10,7 @@ mod music_warm_name;
 mod name_carries;
 mod name_near;
 mod not_for_me_words;
+mod remember_speaker;
 mod short_done;
 mod unplayed_join;
 use futures_util::stream::{self, BoxStream};
@@ -58,6 +59,8 @@ struct Script {
     /// The final words come this long after the line's end, as `Finalize`'s
     /// answer does.
     finish_after: Option<Duration>,
+    /// A deterministic pause while this line's final words are in flight.
+    finish_gate: Option<Arc<FinishGate>>,
     /// The functions each chat told only some was told ([`Services::chat_only`]).
     told_only: Mutex<Vec<&'static [&'static str]>>,
     /// How many listeners were asked for, and whether those made say their
@@ -78,11 +81,18 @@ struct Script {
     said: Mutex<VecDeque<Vec<String>>>,
 }
 
+#[derive(Default)]
+struct FinishGate {
+    entered: tokio::sync::Notify,
+    resume: tokio::sync::Notify,
+}
+
 struct ScriptListener {
     heard: net::Result<String>,
     samples: Arc<AtomicUsize>,
     early: Vec<net::Early>,
     finish_after: Option<Duration>,
+    finish_gate: Option<Arc<FinishGate>>,
     closed: Arc<AtomicBool>,
     drops_after: Option<usize>,
     sent: AtomicUsize,
@@ -114,6 +124,10 @@ impl Listener for ScriptListener {
     }
     fn finish(self: Box<Self>, _request: u64) -> BoxFuture<'static, net::Result<String>> {
         Box::pin(async move {
+            if let Some(gate) = self.finish_gate {
+                gate.entered.notify_one();
+                gate.resume.notified().await;
+            }
             if let Some(after) = self.finish_after {
                 tokio::time::sleep(after).await;
             }
@@ -149,6 +163,7 @@ impl Services for Script {
                 samples: self.samples_heard.clone(),
                 early: self.early.lock().unwrap().pop_front().unwrap_or_default(),
                 finish_after: self.finish_after,
+                finish_gate: self.finish_gate.clone(),
                 closed: self.closed.clone(),
                 drops_after: self.drops_after.lock().unwrap().pop_front().flatten(),
                 sent: AtomicUsize::new(0),
@@ -7039,6 +7054,7 @@ fn every_function_that_grants_or_keeps_for_someone_is_withheld_from_a_held_line(
             crate::known_faces::FaceSwitches {
                 checked: true,
                 visits: true,
+                remember_speaker: false,
             },
         ))
         .chain(crate::photo_faces::tools())

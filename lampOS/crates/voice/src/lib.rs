@@ -78,6 +78,7 @@ pub mod misheard_hum;
 pub mod motion_voice;
 pub mod person;
 pub mod photo_faces;
+pub mod remember_speaker;
 pub mod scoped_session;
 pub mod sign_in;
 pub use lamp_ipc::log_relay;
