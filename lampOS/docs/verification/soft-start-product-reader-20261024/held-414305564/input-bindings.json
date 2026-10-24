@@ -1,0 +1,82 @@
+{
+  "head": "4143055641e45da8a06fe2f2f992945f2739b785",
+  "owned_inputs": {
+    "lampOS/deploy/lamp-4ace/lamp-voice.service": {
+      "git_blob": "5fc9c166731a229088272e2b127be89219c15cd9",
+      "sha256": "32abc88efd626f3fc21bd943afc43d2dc569ab58630518efcca62630bdb797dc"
+    },
+    "lampOS/deploy/product/lamp-voice.service": {
+      "git_blob": "15b0bc88f6761aeec84c869eab8c1aa832fa7086",
+      "sha256": "75ad6c49221e937575df07d414b734b13d594c8fbe76974ea6020664b71002d4"
+    },
+    "lampOS/docs/duplex-listening.md": {
+      "git_blob": "33ad4b2907840977b90450a7a5c3db4e922b76c7",
+      "sha256": "eb24d17153c0c029e9b72e69ec2d4351780d53bcb5cce0cb92f08d22775a836f"
+    },
+    "lampOS/docs/switches.md": {
+      "git_blob": "c468da9e13029cef683bff686ad44e1cc8fc732d",
+      "sha256": "2093b6171c23aab2d095dfbe971a9677f5967ae5f6e7eeb76b90f338113ddf93"
+    },
+    "lampOS/docs/verification/soft-start-product-20261025/README.md": {
+      "git_blob": "afde2b40f1d09f8a8f6988d82dfb0028f5a89fad",
+      "sha256": "a52c162e1ca8f6ee526780cd66684c218074511c6033ca0906a6ff900f770131"
+    },
+    "lampOS/docs/verification/soft-start-product-20261025/ab3-arm0-onset.txt": {
+      "git_blob": "763654b13a8dd713cdceb114dedf15b4531e8922",
+      "sha256": "34c253a834b7e97d56b3f584def04b21d03f7a843b88e1e114df7090178345d1"
+    },
+    "lampOS/docs/verification/soft-start-product-20261025/ab3-arm0-owner-rH0-0402.txt": {
+      "git_blob": "b6204a04f962af8131be24a4767524044e4732cb",
+      "sha256": "7382e6b507314c34a912d4f5eec0f90815a9b8fe12c866b38ba26e50bc805d17"
+    },
+    "lampOS/docs/verification/soft-start-product-20261025/ab3-arm0-pause-rP-0355.txt": {
+      "git_blob": "9ebfc974c580d1cf12604188125cd2213ca4f82f",
+      "sha256": "2993872d257961e288c5785fa21791b2cedce21c5b4e9d98a1a914a7c9d6f3f6"
+    },
+    "lampOS/docs/verification/soft-start-product-20261025/ab3-arm1-onset.txt": {
+      "git_blob": "162fc5102714e3bded52e81887595f94ae4b270f",
+      "sha256": "90220f176c491f411521a3a80c553592431f3f8a16b076636e85d28185a834e7"
+    },
+    "lampOS/docs/verification/soft-start-product-20261025/ab3-arm1-owner-rH1-0419.txt": {
+      "git_blob": "ebf9b52548093c2aab6147db0f9e7f51ff9cd64b",
+      "sha256": "a197f490370a0756f090f4df3592b17113684feeb86330958f29226e0291e0e4"
+    },
+    "lampOS/docs/verification/soft-start-product-20261025/ab3-arm1-pause-rP-0412.txt": {
+      "git_blob": "c992c7cd639bf3224199cdf91e1d3bf5847d3bb4",
+      "sha256": "03398376a6e3fa413a656d1f2fbc1b5e0728d0358988615795a0c2dc588bcfe3"
+    },
+    "lampOS/docs/verification/soft-start-product-20261025/ab3-flags-readback.txt": {
+      "git_blob": "028f0b584f2129b7004bb43de988577d7c07d660",
+      "sha256": "37abda7eda52ae9a3c7d7b6991db61ee36dff80dda8f83fb4cb8242a1b351b72"
+    },
+    "lampOS/docs/verification/soft-start-product-20261025/onset2.py": {
+      "git_blob": "b72323aa9f067cc3288e8da2c93797207dc5fa97",
+      "sha256": "31e3f06ed814b187e9a83eb09fe5ba642c4a9c22c04504b8e700ee48652749a8"
+    },
+    "lampOS/docs/verification/soft-start-product-20261025/unit-dropin.py": {
+      "git_blob": "a34b82d7807d97871221aceb27d72ab96f960d70",
+      "sha256": "6716b4658a4b50d15f90a452a2d9ef3446f3ffb15dc9be5f26def85c621dff73"
+    },
+    "lampOS/docs/verification/soft-start-product-20261025/unit-round-cmdline.txt": {
+      "git_blob": "26ae6dde0b9a5e706520d0c879f2d9d370c3b727",
+      "sha256": "d7e46cd67d87c39014d8fce6697fffe988b5cdefd81582ba75e2d64bcfe31cc8"
+    },
+    "lampOS/docs/verification/soft-start-product-20261025/unit-round-dropin.conf": {
+      "git_blob": "ef1fb20bdc9fe64f6b6f6140a39675abb553517b",
+      "sha256": "0dfe6df19fd15ca758f9c4335e8385cb51c405ad7399af799303b4e0a79f93f9"
+    },
+    "lampOS/docs/verification/soft-start-product-20261025/unit-round-envcheck.txt": {
+      "git_blob": "c2fa26d4c50e2a6538a97530660fc53ff7e76f40",
+      "sha256": "c6fdc3525b76eced6f817e33edb356b23d8610f449b10880ab90846a64caad26"
+    },
+    "lampOS/docs/verification/soft-start-product-20261025/unit-round-rUG-0454.txt": {
+      "git_blob": "8f946859308a5b310f18fad4338d99e0ab746ee3",
+      "sha256": "3d9e45d4473ec2c6fb75d9433829cbb4e5a257b534a2b2da3d643617fbbd1c4b"
+    }
+  },
+  "trace_inputs": {
+    "lampOS/tools/played/night.py": "3013dbc264dee6f5d41bccdf2cef15b3a85d3ae477524118262473869128c835",
+    "lampOS/crates/voice/src/second_provider.rs": "deab04e7b7fdddc39b3f02b23149e8112575f77ae8aadbd3640fb4982dce21d4"
+  },
+  "scope": "Archived Python source is hashed/read only, never executed or copied into this evidence branch."
+}

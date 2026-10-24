@@ -1,0 +1,37 @@
+{
+  "head": "4143055641e45da8a06fe2f2f992945f2739b785",
+  "base": "fc31e012334cda59eb3c489560454c515fb86386",
+  "latest_base_requirement": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+  "product_lamp_environment_count": 89,
+  "archived_dropin_lamp_environment_count": 83,
+  "documented_exceptions": [
+    "LAMP_BUS_ROOT",
+    "LAMP_ONBOARDING_FILE",
+    "LAMP_PERSON_NAME",
+    "LAMP_PRIVACY_CONTROLS",
+    "LAMP_SAY_GROUP",
+    "LAMP_TASKS_NEEDS"
+  ],
+  "dropin_exactly_product_minus_exceptions": true,
+  "both_units_soft_start_on_first_words_kept_duplex": true,
+  "call_takes_next_line_not_enabled": true,
+  "duplicate_lamp_environment_keys": [],
+  "unit_rows": 22,
+  "journal_answered_rows": 22,
+  "first_journal_value_count": 22,
+  "upper_middle_ms": 1864,
+  "midpoint_median_ms": 1848.0,
+  "max_ms": 4733,
+  "source_trace": {
+    "timer_start": "crates/voice/src/second_provider.rs:7137 Instant::now inside answer processing",
+    "output_boundary": "Shared::emit sends ProviderOutput::Audio to output channel before journal first answer audio",
+    "scoring": "tools/played/night.py takes firsts[:1] per row; answered=bool(firsts); right tests response-versus-desk expectation, not semantic answer grading",
+    "aggregation": "first_ms_median is sorted list index len//2, upper middle for even22"
+  },
+  "findings": "Confirms R2 P2 boundary-label HOLD; no added runtime/physical claim or cause. Latest-base ancestry also pending.",
+  "not_run": [
+    "Archived onset2.py/unit-dropin.py",
+    "Any SSH/device/playback",
+    "Any new Cargo test or runtime experiment on this older held head"
+  ]
+}
