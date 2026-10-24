@@ -2220,6 +2220,27 @@ faces gave them 98% at 60 px. The clip has no silent face, so `no` is not
 shown there: how far the gap moves on a still, silent face on the lamp's
 camera, at 0.5 and 1 m, is the next run.
 
+**Every face's mouth (`LAMP_EYES_SPEAKING_ALL_FACES=on`, off unless set).**
+Off, only the largest face is meshed, so another face's `speaking` is the
+corners' and a colleague talking beside the one at the lamp is not read
+from the lips. On, up to three faces a look (`MOST_MESHED_FACES`,
+`src/mesh.rs`), largest first, are meshed, each from its own box, and
+each face's mouth goes to its own passing id's window, as every face's
+corners already do. A face after the largest is meshed only if the look's
+meshing so far plus the last mesh's time stays within 200 ms
+(`EXTRA_MESH_BUDGET_MS`): on lamp-52e6 that is two faces under tract on a
+big core (85 ms each), three under ONNX Runtime (33 ms each), and the
+largest only on a small core (290 ms). The look's pace stays at 250 ms
+while it follows a face, so a 2 s window keeps its five looks. Faces are
+not meshed in turn across looks: a window reads the mesh only when every
+one of its looks has it, so a face meshed every other look would be judged
+on the corners all the same. A face the budget skips on a look is judged
+on the corners until its window is all mesh again. The voice reads every
+face's `speaking` on `humans/faces/tracked` (`crates/voice/src/speaking_faces.rs`),
+so a second face's `yes` is a face seen speaking with nothing more. The
+cost is one more mesh a look while two faces are in view (with
+`--mouth-on-heard on`, only while a line is heard). Not yet run on a lamp.
+
 **Only while the voice hears a line (`--mouth-on-heard on`, off unless
 given, with `--mouth-model`).** lamp-eyes subscribes to `voice/heard` and
 runs the mesh from a line's first words until 2 s after it is finished
