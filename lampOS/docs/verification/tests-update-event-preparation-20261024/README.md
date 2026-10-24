@@ -1,0 +1,11 @@
+Ready for lamp-voice: no
+
+This is source preparation under #1569, claimed on Queue comment 6382562079. Nothing here ran a Rust build, formatter, test, binary or device. It neither explains nor qualifies the historical Phone full-run and standalone Update failures, which occurred at different OLD/NEW boundaries.
+
+The timeout-only diagnostic retains the original two-second after-spawn failure and adds a single capped nonblocking stdout sample plus exact descriptor-flag restoration. Its plan preserves the original eleven-reader compilation selection and permits exactly one named original-case observation after artifact/source binding; a pass gives no cause finding and authorizes no retry. Synthetic probe controls are separate observations.
+
+The independent candidate changes only the test harness: up to five seconds to first observed byte, then one absolute two-second deadline for both exit and EOF. This explicitly changes the old fixture boundary. Exact script/mode/link/recovery checks, successful status and full twelve-byte output including newline remain required. A single-thread collector owns bounded nonblocking reads; direct Child cleanup and inherited outer process-group ownership remain. Ten unexecuted controls cover startup, full/partial output hangs, later bytes without deadline renewal, held EOF after leader exit, invalid output/status, overflow, descriptor restoration and direct-child reaping receipts.
+
+Root reviewed all proposed Rust source and requested the cleanup, never-first-output and later-byte controls before freezing this snapshot. Candidate source is on the private local own branch `tests/1569-update-runnable-events`, based on `c6dfe9809`; it is not committed or pushed. Current clock qualification retains exclusive Cargo ownership. Separate gate planning and explicit allocation are required before any execution. No product code, manifest, process group, device, or product deadline changes are proposed.
+
+Each JSON wrapper preserves exact UTF-8 source bytes with its length and SHA-256. The candidate patch includes all four proposed paths; reconstruct against the recorded Git base. Local paths in the original plans identify scratch inputs, not published executable artifacts. No binary or Python source is included.

@@ -1,0 +1,7 @@
+{
+  "source_file": "forced-timeout-control.patch",
+  "source_sha256": "75da987dbbf5ed29412849af33e6aedb22cc79228b66f7fa007b6e418ccc65eb",
+  "source_bytes": 1220,
+  "execution_status": "Uncompiled, unformatted and unexecuted preparation only",
+  "utf8": "--- a/lampOS/crates/update/tests/round/self_cuts.rs\n+++ b/lampOS/crates/update/tests/round/self_cuts.rs\n@@ -122,7 +122,9 @@\n     let mut polls = 0;\n     let status = loop {\n         let poll_started = started.elapsed();\n-        let observed = child.0.try_wait();\n+        // Scratch-only observer control: suppress the ordinary parent status.\n+        // The real final status/probe/cleanup and original panic stay unchanged.\n+        let observed = Ok::<Option<std::process::ExitStatus>, io::Error>(None);\n         let poll_finished = started.elapsed();\n         polls += 1;\n         if let Some(status) = observed.unwrap_or_else(|error| {\n@@ -496,3 +498,14 @@\n     assert_eq!(lamp.round(), Outcome::UpToDate(2), \"{:?}\", lamp.said);\n     boundary(&lamp, OLD);\n }\n+\n+// Scratch-only synthetic timeout: this is not the original recovery scenario.\n+#[test]\n+#[should_panic(expected = \"updater fixture did not exit\")]\n+fn timeout_stdout_never_clears_the_original_timeout_panic() {\n+    let root = tempfile::tempdir().unwrap();\n+    let path = root.path().join(\"old-fixture\");\n+    fs::write(&path, OLD).unwrap();\n+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();\n+    executable(&path, OLD);\n+}\n"
+}

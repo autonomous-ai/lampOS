@@ -4204,3 +4204,9 @@ Ready for lamp-voice: no
 No clock implementation, runtime improvement or new test run yet. No lamp
 was accessed. The existing 977-second measurement is DevOps' ARM64
 baseline, not a new local measurement.
+
+## 24 October, 17:12 — Update event harness preparation
+
+Ready for lamp-voice: no
+
+Under #1569, source-reviewed a timeout-only diagnostic and a separate test-only startup/output/exit collector. The old two-second-after-spawn boundary is explicitly replaced in the candidate by first-byte startup and absolute exit/EOF bounds; product and recovery assertions remain unchanged. Added negative controls for startup, nonrenewing later bytes, held EOF and explicit direct-child reaping receipts. Nothing compiled, formatted or executed; no cause or historical qualification claim. Exact patch/plan snapshots: [preparation](verification/tests-update-event-preparation-20261024/). Current clock gate retains exclusive Cargo ownership.

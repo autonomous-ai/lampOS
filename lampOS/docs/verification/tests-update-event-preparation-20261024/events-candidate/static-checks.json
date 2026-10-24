@@ -1,0 +1,7 @@
+{
+  "source_file": "static-checks.json",
+  "source_sha256": "d63a190488f31aec4d76164d4fc175c8c905185b7d03892d85f664757b8c3a37",
+  "source_bytes": 362,
+  "execution_status": "Uncompiled, unformatted and unexecuted preparation only",
+  "utf8": "{\n  \"all_tests_and_state_checks_from_build_onward_byte_identical\": true,\n  \"direct_child_running_drop_byte_identical\": true,\n  \"normal_byte_mode_prechecks_and_spawn_byte_identical\": true,\n  \"script_constants_byte_identical\": true,\n  \"exact_final_payload_assert_byte_identical\": true,\n  \"successful_status_assert_still_present\": true,\n  \"no_new_manifest\": true\n}\n"
+}
