@@ -99,12 +99,49 @@ Environment=LAMP_SECOND_STEADY_FIRST=on
 Environment=LAMP_SECOND_CHAT_WARM=on
 Environment=LAMP_SECOND_SPEECH_WARM=on
 Environment=LAMP_SECOND_STT_WARM=on
-# Measured on lamp-4ace on 21 Oct, one evening's played tests, from the end of speech to the lamp's first sound, 13
-# replies each (lamp-runs.md): a median 1.61 s with both, 1.99 s with early finalize off, 1.84 s with the second route's
-# playout start at the unit's 350 ms (set for Live's bursts). The playback gaps were the same at 100 and 350 ms (1.29
-# and 1.36 a reply), and all 12 day lines were answered in each.
-Environment=LAMP_SECOND_EARLY_FINALIZE=on
+# The second route's playout starts at 100 ms. Measured on lamp-4ace on 21 Oct, one evening's played tests, from the
+# end of speech to the lamp's first sound, 13 replies each (lamp-runs.md): 1.84 s at the unit's 350 ms (set for Live's
+# bursts). The playback gaps were the same at 100 and 350 ms (1.29 and 1.36 a reply), and all 12 day lines were
+# answered in each.
+# LAMP_SECOND_EARLY_FINALIZE stays off (24 Oct): asking for a line's words at its first 150 ms pause answered lines in
+# pieces. On lamp-75c9's desk set (23 Oct) 8 of 15 lines were split with it on and 3 of 15 with it off, and lamp-4ace
+# and lamp-52e6 have run without it since 22 and 23 Oct. It saved time (1.61 s to the first sound against 1.99 s on
+# 21 Oct), but lamp-4ace measured 1.46-1.50 s without it on 23 Oct. Whole lines before speed.
 Environment=LAMP_SECOND_PLAYOUT_START_MS=100
+# The owner's lamp's hearing, 24 Oct: a played A/B on lamp-4ace of the owner's own lines and ten "Lamp, {pause}
+# question" lines in six voices (night.py ROUND owner), lamp-4ace's setup against this unit's: 20 of 21 heard and
+# answered against 18 of 21, the pause lines 9 of 10 against 8 of 10, the owner's lines 11 of 11 against 10 of 11,
+# and the first sound at a median 1.59 s against 1.86 s. The owner's own retest on that setup went 3 of 3. These
+# are its voice switches; left out are what was lamp-4ace's own (its city, its office's task machine, Vietnamese
+# place names for speech to text, its relay's address), diagnostics, and what the played set did not exercise (the
+# Policy acting on calls, the stop words). lamp-name's --near 0.5 is in lamp-name.service, for LAMP_NAME_NEAR.
+# The name: a line that is the lamp's name alone waits 2.5 s for the line after it, and carries to it.
+Environment=LAMP_SECOND_NAME_CARRIES=on
+Environment=LAMP_SECOND_OPEN_NAME=on
+Environment=LAMP_NAME_NEAR=on
+Environment=LAMP_NAME_SECOND_SIGN=on
+# The line's end: a 0.5 s line is a line, a short one gets the end-of-turn model's verdict, an unsure one waits.
+Environment=LAMP_ENDPOINT_LEAST_SPEECH_MS=500
+Environment=LAMP_ENDPOINT_SHORT_VERDICT=on
+Environment=LAMP_ENDPOINT_UNFINISHED_BELOW=0.5
+Environment=LAMP_ENDPOINT_UNSURE_MS=1200
+Environment=LAMP_SECOND_UNFINISHED_WAIT=on
+Environment=LAMP_JOIN_CUT_WORDS=on
+Environment=LAMP_REPLY_END_REACH=on
+# Its own voice heard back, a cut-in told as one, words said once, and a reply that is not for it.
+Environment=LAMP_SECOND_OWN_ECHO=on
+Environment=LAMP_CUT_IN_TOLD=on
+Environment=LAMP_SECOND_SAID_ONCE=on
+Environment=LAMP_NOT_FOR_ME_WORDS=on
+Environment=LAMP_BUSY_ENDS_SOONER=on
+# The weather for any place and day. LAMP_SECOND_FACE_NAME and LAMP_SECOND_MEMORY_HITS, on in the A/B, stay off
+# until a request is bound to the person seen speaking it (reviewer-two on #3371): a silent face in view would
+# otherwise give its name and kept notes to an off-camera caller's answer.
+Environment=LAMP_SECOND_WEATHER=on
+# Speed: the relay's near routes, the chat's connection kept, the link said for lamp/online.
+Environment=LAMP_RELAY_ROUTES=on
+Environment=LAMP_SECOND_CHAT_KEPT=on
+Environment=LAMP_VOICE_LINK=on
 # The eyes' camera permitted with the microphone, without which every turn is the room's (#2233): per-person memory on
 # a product lamp. Run on lamp-52e6 on 21 Oct (#2402). A name told before the lamp knows the face is the room's
 # (memory.md).
