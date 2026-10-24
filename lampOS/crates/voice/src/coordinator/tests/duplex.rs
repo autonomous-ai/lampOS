@@ -300,8 +300,12 @@ impl Harness {
             let sounding = echo.as_ref().is_some_and(|echo| {
                 echo.render_quiet_blocks < Hearing::EVALUATED.clear_after_blocks
             });
-            self.detector
-                .unfloored(unfloored_score(sounding, false, self.reply.as_ref(), score));
+            self.detector.unfloored(unfloored_score(
+                sounding,
+                false,
+                reply_sounding(&self.mask, &self.reply, at),
+                score,
+            ));
         }
         let samples = observation.samples;
         let (update, _) = observe_prospective_heard(
@@ -886,6 +890,40 @@ fn with_soft_starts_a_line_under_a_quiet_unretired_reply_starts_as_before() {
     let (off, _) = request(false);
     assert_eq!(on, off);
     assert_eq!(on[0], trigger + 1 - crate::activity::PRE_ROLL_BLOCKS as u64);
+}
+
+/// With `LAMP_SOFT_START=on`, a line begun once the lamp's answer is all
+/// handed over and its sound quiet a second, though its turn is not retired
+/// and its playback still held, keeps 200 ms more than the usual 300 ms (on
+/// lamp-4ace on 25 October the playback token alone kept every such line
+/// from it). While any of the answer is still to hand over, as above, it
+/// starts as before; and never reaches into the 300 ms after the lamp's
+/// sound, which the echo evidence still hears as it.
+#[test]
+fn with_soft_starts_a_line_after_the_lamps_answer_keeps_its_200_ms() {
+    let request = |soft: bool| {
+        let mut h = Harness::keeping_first_words(true, 100);
+        h.soft_start = soft;
+        h.detector.keep_soft_starts(soft);
+        h.reply.as_mut().unwrap().pcm.clear();
+        h.blocks(50, 0.1, Some(evidence(0, OWN)));
+        for quiet in 1..=100 {
+            h.block(0.1, Some(evidence(quiet, None)));
+        }
+        let line = h.blocks(6, 0.95, Some(evidence(101, None)));
+        let accepted = line[5].accepted.as_ref().expect("the line was not let in");
+        assert!(accepted.audio.windows(2).all(|pair| pair[1] == pair[0] + 1));
+        (accepted.audio.clone(), accepted.trigger_sequence)
+    };
+    let (on, trigger) = request(true);
+    let (off, _) = request(false);
+    let usual = trigger + 1 - crate::activity::PRE_ROLL_BLOCKS as u64;
+    assert_eq!(off[0], usual);
+    assert_eq!(
+        on[0],
+        usual - crate::activity::SOFT_START_LEAD_BLOCKS as u64
+    );
+    assert_eq!(on.last(), off.last());
 }
 
 /// #1722: only a start as the lamp's sound ends reaches back: with the
