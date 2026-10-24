@@ -1,0 +1,173 @@
+   Compiling rustix v1.1.5
+   Compiling serde v1.0.229
+   Compiling getrandom v0.4.3
+   Compiling rusqlite v0.40.2
+   Compiling lamp-local-time v0.1.0 (/private/tmp/second-caps-release-pair-20261024/lampOS/crates/local-time)
+   Compiling lamp-bus v0.1.0 (/private/tmp/second-caps-release-pair-20261024/lampOS/crates/bus)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/second-caps-release-pair-20261024/lampOS/crates/msgs)
+   Compiling lamp-ipc v0.1.0 (/private/tmp/second-caps-release-pair-20261024/lampOS/crates/ipc)
+   Compiling tempfile v3.27.0
+   Compiling lamp-schedule v0.1.0 (/private/tmp/second-caps-release-pair-20261024/lampOS/crates/schedule)
+   Compiling lamp-actions v0.1.0 (/private/tmp/second-caps-release-pair-20261024/lampOS/crates/actions)
+    Finished `test` profile [unoptimized] target(s) in 5.18s
+     Running unittests src/lib.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_actions-43b5100b9d5bd654)
+
+running 65 tests
+test caps::tests::live_puts_refuse_unknown_and_duplicate_fields ... ok
+test caps::tests::removing_unknown_or_wrong_tokens_changes_nothing ... ok
+test caps::tests::a_failed_store_commit_is_not_accepted_and_requires_recovery ... ok
+test caps::tests::exact_retries_are_idempotent_but_changed_retries_are_refused ... ok
+test caps::tests::invalid_names_caps_and_clock_bounds_do_not_mutate_state ... ok
+test caps_service::tests::configuration_is_exactly_opt_in_and_never_touches_disabled_paths ... ok
+test caps::tests::replacement_needs_newer_issue_time_and_old_tokens_cannot_remove_it ... ok
+test caps::tests::restore_retires_known_expired_entries_but_keeps_protection_when_time_is_unknown ... ok
+test caps::tests::expiry_is_durable_and_clock_rollback_does_not_revive_a_retired_cap ... ok
+test caps::tests::cancellation_survives_restart_and_late_puts_cannot_revive_it ... ok
+test caps::tests::saved_additive_fields_are_tolerated_and_known_values_remain_validated ... ok
+test caps::tests::independent_caps_compose_and_removing_one_does_not_remove_another ... ok
+test light::tests::a_colour_is_set_by_name_said_by_name_and_switches_the_light_on ... ok
+test light::tests::a_glow_over_the_light_is_ended_by_asking_for_the_persons_own_light ... ok
+test light::tests::a_light_shown_a_moment_after_the_ask_is_confirmed_at_the_next_read ... ok
+test caps_service::tests::caps_begun_beside_a_kept_aside_store_say_so ... ok
+test caps_service::tests::a_suppressed_bus_error_cannot_turn_into_false_readiness ... ok
+test light::tests::brighter_and_dimmer_are_one_level_keep_the_colour_and_stop_at_the_ends ... ok
+test light::tests::on_and_off_keep_the_colour_and_the_level_and_neither_is_asked_twice ... ok
+test caps_service::tests::a_store_from_a_later_build_holds_the_caps_off_and_is_kept_as_it_is ... ok
+test caps_service::tests::heartbeat_republishes_without_polling_a_confirmed_mixer ... ok
+test light::tests::warmer_and_cooler_step_along_white_warm_and_orange ... ok
+test sound::tests::a_control_rounding_above_the_limit_or_above_silence_is_not_confirmed ... ok
+test sound::tests::a_control_that_rounds_by_a_point_is_taken_as_set_and_the_level_read_is_the_one_said ... ok
+test sound::tests::a_failed_limit_still_restricts_later_calls_and_can_be_retried ... ok
+test sound::tests::a_failure_is_said_as_a_failure ... ok
+test caps_service::tests::strict_original_bytes_refuse_unknown_duplicate_and_oversized_requests ... ok
+test sound::tests::a_limit_lowers_the_mixer_and_keeps_the_product_ceiling ... ok
+test sound::tests::a_limit_whose_readback_fails_is_kept_without_claiming_it_was_applied ... ok
+test sound::tests::an_exhausted_observation_identity_cannot_recover_into_audible_evidence ... ok
+test caps::tests::newer_schema_corruption_and_unknown_status_are_never_overwritten ... ok
+test sound::tests::entering_or_releasing_a_limit_never_raises_or_unmutes_the_speaker ... ok
+test sound::tests::every_person_write_obeys_the_limit_when_the_mixer_is_above_it_again ... ok
+test caps_service::tests::hardware_failure_keeps_accepted_state_and_retries_only_on_the_bounded_cadence ... ok
+test sound::tests::louder_is_one_step_and_stops_at_the_ceiling ... ok
+test sound::tests::invalid_limits_leave_the_existing_restriction_and_hardware_alone ... ok
+test sound::tests::mute_remembers_where_the_volume_was_and_unmute_puts_it_back ... ok
+test sound::tests::observation_loss_survives_recovery_without_counting_successful_writes ... ok
+test sound::tests::one_louder_undoes_one_quieter ... ok
+test sound::tests::quieter_is_one_step_and_stops_where_it_can_still_be_heard ... ok
+test sound::tests::releasing_a_limit_cannot_revive_a_louder_pre_mute_level ... ok
+test sound::tests::releasing_a_limit_does_not_undo_a_persons_quieter_or_muted_choice ... ok
+test sound::tests::the_app_and_explicit_unmute_use_the_effective_range_even_below_the_floor ... ok
+test sound::tests::the_apps_slider_is_a_share_of_the_ceiling_read_back ... ok
+test sound::tests::the_level_is_read_from_what_amixer_prints ... ok
+test speaker_state::tests::only_exact_on_inspects_configuration ... ok
+test speaker_state::tests::only_executable_volume_arguments_signal_an_intent ... ok
+test caps_service::tests::restored_volume_is_applied_and_a_full_snapshot_is_kept_before_readiness ... ok
+test tests::an_outcome_is_one_line_the_voice_can_hand_to_the_model ... ok
+test tests::only_a_done_light_or_volume_call_is_answered_short_and_only_with_the_switch ... ok
+test tests::softer_alone_is_the_light_not_the_volume ... ok
+test tests::only_what_can_be_done_now_is_offered_and_every_function_is_one_the_voice_accepts ... ok
+test tests::turning_yourself_down_or_up_is_the_voice_not_the_light ... ok
+test tests::turning_yourself_up_or_down_is_the_voice_and_the_light_turned_is_the_light ... ok
+test tests::white_and_warm_are_named_as_colours_not_brightness ... ok
+test caps_service::tests::storage_failure_never_publishes_a_release_or_claims_acceptance ... ok
+test caps_service::tests::explicit_release_with_unknown_time_preserves_a_newer_person_choice ... ok
+test speaker_state::tests::a_failed_publisher_still_passes_retained_mixer_evidence_to_caps_without_polling ... ok
+test speaker_state::tests::mute_generation_exhaustion_never_wraps_or_authorizes_audio ... ok
+test speaker_state::tests::a_publication_failure_stops_all_publication_even_when_the_bus_recovers ... ok
+test caps::tests::source_budget_includes_tombstones_and_never_evicts_old_identities ... ok
+test speaker_state::tests::an_exhausted_or_regressed_observation_identity_stays_unknown ... ok
+test light::tests::a_light_that_cannot_be_read_or_does_not_change_is_said_so ... ok
+test light::tests::through_the_bus_a_request_is_kept_and_a_stale_state_is_no_light ... ok
+test light::tests::a_light_stays_there_through_its_grace_and_goes_after_it ... ok
+
+test result: ok. 65 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.91s
+
+     Running unittests src/main.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_actions-83a11eb4b3ec98a0)
+
+running 3 tests
+test tests::cap_storage_also_comes_by_environment_held_to_the_same_rule ... ok
+test tests::cap_storage_is_an_explicit_absolute_option ... ok
+test tests::the_options_are_read_and_anything_else_is_refused_with_the_reason ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/it/main.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-0e27a928cad8396a)
+
+running 29 tests
+test schedule::empty_filtered_list_and_service_pagination_remain_explicit ... ok
+test schedule::disabled_switch_preserves_the_old_catalog_and_refuses_all_six_names ... ok
+test caps::disabled_service_keeps_existing_volume_behavior_and_creates_no_cap_state ... ok
+test schedule::listing_keeps_complete_escaped_labels_and_returns_the_actual_remaining_cursor ... ok
+test schedule::definite_conflicts_are_not_retried_and_storage_failures_stay_uncertain ... ok
+test schedule::incorrect_success_identity_revision_or_deadline_never_becomes_confirmation ... ok
+test caps::a_stop_request_cannot_hide_an_already_reported_storage_failure ... ok
+test schedule::malformed_arguments_and_unknown_fields_open_no_schedule_connection ... ok
+test schedule::lost_commit_reply_is_unknown_and_never_retried_with_another_guard ... ok
+test schedule::new_schemas_use_the_small_provider_vocabulary ... ok
+test schedule::malformed_lists_and_snooze_nonpending_state_never_make_a_mutation ... ok
+test caps::unavailable_hardware_removes_readiness_but_exact_state_can_be_recovered_on_the_socket ... ok
+test schedule::published_catalog_routes_relative_reminders_to_elapsed_timers ... ok
+test server::its_report_says_what_it_can_do_and_how_much_it_did ... ok
+test caps::socket_restores_before_ready_and_release_keeps_the_persons_newer_volume ... ok
+test schedule::missing_schedule_socket_is_truthful_and_mutation_free ... ok
+test server::one_executive_to_a_directory ... ok
+test schedule::a_just_set_timer_is_listed_counted_beside_a_due_only_list_and_cancelled_for_good ... ok
+test schedule::real_engine_failure_before_or_after_snapshot_commit_is_never_confirmed ... ok
+test server::with_the_switch_a_volume_change_is_answered_short_and_nothing_else_changes ... ok
+test server::a_caller_is_answered_at_once_and_an_idle_server_still_reports_and_stops ... ok
+test server::caps_held_back_leave_the_server_serving_with_a_warning ... ok
+test schedule::cancel_my_timer_with_a_reminder_also_due_cancels_only_the_timer ... ok
+test schedule::all_six_tools_reach_real_schedule_through_the_real_actions_server ... ok
+test schedule::all_adapter_hops_share_one_deadline_and_uncertain_call_is_not_reissued ... ok
+test schedule::host_first_and_repeated_actions_to_durable_schedule_receipts_are_measured ... ok
+test server::the_light_is_offered_when_its_owner_appears_and_withdrawn_when_it_goes ... ok
+test server::the_list_is_there_a_call_changes_the_control_and_anything_else_is_refused_in_words ... ok
+test schedule::a_full_due_only_page_still_fits_its_count_of_what_is_not_yet_due ... ok
+
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.23s
+
+     Running tests/release_pair.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/release_pair-fee8e64c50b836f0)
+
+running 2 tests
+test release_6408_keeps_6498_caps_and_6498_reads_its_changes ... ignored, requires the pinned 6408/6498 ELF files on native Linux ARM64
+test release_6498_keeps_6408_caps_and_6408_reads_its_changes ... ignored, requires the pinned 6408/6498 ELF files on native Linux ARM64
+
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/speaker_state.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/speaker_state-4fbe7a3f0f823969)
+
+running 23 tests
+test disabled_wrapper_keeps_original_mixer_counts_and_creates_no_speaker_topic ... ok
+test all_volume_paths_publish_confirmed_state_without_extra_post_call_reads ... ok
+test already_muted_and_rapid_unmute_keep_the_consumed_generation ... ok
+test concurrent_stop_preserves_cap_failure_and_publishes_unknown_without_mixer_work ... ok
+test failed_readback_followed_by_rapid_success_keeps_the_revocation_in_latest ... ok
+test a_zero_observed_inside_up_or_unmute_cannot_disappear_from_the_audio_fence ... ok
+test a_tighter_cap_withdraws_old_audio_before_blocking_mixer_io ... ok
+test an_unrelated_light_publication_failure_does_not_withdraw_compliant_sound ... ok
+test explicit_mute_still_precedes_mixer_io_under_a_volume_cap_and_release_stays_muted ... ok
+test failed_caps_never_authorize_positive_out_of_limit_readback_and_a_valid_read_recovers ... ok
+test heartbeat_is_bounded_and_missing_readback_is_unknown ... ok
+test heartbeat_publication_failure_keeps_mute_and_ordinary_actions_serving ... ok
+test shutdown_publication_failure_does_not_turn_graceful_stop_into_an_actions_failure ... ok
+test failed_speaker_publication_keeps_cap_confirmation_and_storage_failure_authoritative ... ok
+test startup_is_unknown_before_the_first_mixer_read_and_restart_has_a_new_session ... ok
+test startup_publication_failure_keeps_serving_without_optional_mixer_work ... ok
+test model_and_app_mutes_publish_before_their_first_blocking_mixer_io ... ok
+test restored_volume_cap_is_confirmed_before_ready_without_a_second_speaker_read ... ok
+test cap_only_zero_or_lost_observation_survives_recovery_and_latest_coalescing ... ok
+test failed_read_write_and_readback_cannot_erase_mute_intent ... ok
+test invalid_volume_arguments_leave_confirmed_caps_and_the_audio_fence_unchanged ... ok
+test every_output_switch_combination_keeps_one_mixer_owner_and_off_paths_idle ... ok
+test actual_mixer_failures_still_withdraw_confirmed_caps_and_audio_permission ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.54s
+
+   Doc-tests lamp_actions
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+real 15.09
+user 11.97
+sys 5.14

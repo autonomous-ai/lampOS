@@ -1,0 +1,23 @@
+    Checking typenum v1.20.1
+   Compiling getrandom v0.4.3
+    Checking serde v1.0.229
+    Checking rustix v1.1.5
+    Checking generic-array v0.14.7
+    Checking lamp-bus v0.1.0 (/private/tmp/second-caps-release-pair-20261024/lampOS/crates/bus)
+    Checking crypto-common v0.1.7
+    Checking block-buffer v0.10.4
+    Checking smallvec v1.16.3
+    Checking lamp-ipc v0.1.0 (/private/tmp/second-caps-release-pair-20261024/lampOS/crates/ipc)
+    Checking digest v0.10.7
+    Checking rusqlite v0.40.2
+    Checking lamp-local-time v0.1.0 (/private/tmp/second-caps-release-pair-20261024/lampOS/crates/local-time)
+    Checking sha2 v0.10.9
+    Checking once_cell v1.21.4
+    Checking lamp-msgs v0.1.0 (/private/tmp/second-caps-release-pair-20261024/lampOS/crates/msgs)
+    Checking tempfile v3.27.0
+    Checking lamp-schedule v0.1.0 (/private/tmp/second-caps-release-pair-20261024/lampOS/crates/schedule)
+    Checking lamp-actions v0.1.0 (/private/tmp/second-caps-release-pair-20261024/lampOS/crates/actions)
+    Finished `dev` profile [unoptimized] target(s) in 5.90s
+real 5.98
+user 7.16
+sys 1.89

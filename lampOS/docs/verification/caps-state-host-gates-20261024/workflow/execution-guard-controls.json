@@ -1,0 +1,36 @@
+{
+  "function_sha256": "76023211be6b236c8cd4d50abd7aeb64e46c8a363f424cd9defa28e63f443c0d",
+  "boundary": "Synthetic summaries/result JSON only; no Cargo or released executable execution.",
+  "controls": [
+    {
+      "control": "two-complete",
+      "exit": 0,
+      "expected_pass": true
+    },
+    {
+      "control": "zero",
+      "exit": 1,
+      "expected_pass": false
+    },
+    {
+      "control": "partial",
+      "exit": 1,
+      "expected_pass": false
+    },
+    {
+      "control": "duplicate-names",
+      "exit": 1,
+      "expected_pass": false
+    },
+    {
+      "control": "missing-reap",
+      "exit": 1,
+      "expected_pass": false
+    },
+    {
+      "control": "extra-result",
+      "exit": 1,
+      "expected_pass": false
+    }
+  ]
+}
