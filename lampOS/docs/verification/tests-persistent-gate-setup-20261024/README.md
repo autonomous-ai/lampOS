@@ -1,0 +1,11 @@
+# Persistent local qualification setup
+
+Ready for lamp-voice: no new source qualification is claimed. This record freezes the rebuilt external runner setup before #3218's new full attempt; #3273 follows sequentially.
+
+The source commits and complete source-map hashes reproduce the earlier frozen carries exactly: #3218 e63a86d0d and #3273 4f969a57b, each with the same twelve-package closure. The exact historical runner body was recovered from original edit operations; its only code change is the persistent target location. The helper and parser have explicit new identities, rather than pretending unrecovered earlier bytes survived.
+
+Four complete published base/candidate raw-stream replays preserve every target, case row, count and outcome. Two further replays preserve outcomes with JSON scalar/array diagnostic output, which is not a Cargo build object. Twelve negative inputs reject unknown/missing/duplicate cases, nested/missing summaries, duplicate launches and malformed/ambiguous split readiness rows. No Rust executable or test ran in those parser checks.
+
+The root review found that the initial helper could return after its direct process exited while a descendant remained. The corrected helper checks the owned process group through bounded TERM/KILL escalation, explicitly waits its direct child, records unresolved permission probes and requires final group absence. Four stdlib-only process controls passed: clean exit, timeout with TERM-ignoring descendant, controller exception, and a normal direct exit leaving a residual group (correctly refused after cleanup). Initial failed control evidence remains separate in persistent workspace. Orphan descendants were observed absent after OS reaping; this is not a claim that the helper called waitpid on grandchildren. New sessions/groups created inside fixtures remain those fixture owners' responsibility.
+
+Every Cargo launch requires at least 5 GiB free space. Each full phase retains exact command, source guards, raw stdout/stderr, executable hashes, actual census bindings, failures and any incomplete/unrun stages. The prior erased infrastructure attempts are not qualifying results. No runtime/product change, local ARM build, container or lamp action belongs to this setup record. The Python helper source is retained as exact UTF-8 data inside JSON, not as an executable lampOS script.

@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-24 15:22 +0700 — persistent full gate resumed
+
+Ready for lamp-voice: #3190 remains ready; no new #3218/#3273 result yet.
+
+The [reviewed persistent setup](verification/tests-persistent-gate-setup-20261024/) binds unchanged source carries, a rebuilt full-census parser and bounded owned-process cleanup. Four complete raw-stream and two JSON-diagnostic replays preserve outcomes; twelve malformed inputs are rejected. Four owned-process controls pass, including timeout and exceptional cleanup. All helper revisions have explicit new hashes and the initial failed control is retained separately. #3218's one new full attempt is launched after source/manifest and disk preflight; actual outcomes are pending. #3273 follows after terminal evidence and prescribed standalone checks.
+
+The privacy source formatter passed once and only changed layout in two owned Rust files; its seven-file guard and new source/control freeze pass. No privacy compilation or tests have run. No local ARM build or lamp action ran.
+
 ## 2026-10-24 15:07 +0700 — ready clock PR and durable draft recovery
 
 Ready for lamp-voice: yes for #3190; three recovered drafts still require their execution gates.

@@ -1,0 +1,160 @@
+{
+  "status": "passed",
+  "Cargo_executed": false,
+  "executables_invoked": false,
+  "census_sha256": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716",
+  "positive_raw_stream_replays": 4,
+  "positive_diagnostic_JSON_replays": 2,
+  "negative_inputs_rejected": 12,
+  "reports": [
+    {
+      "label": "base-voice-default-parallel",
+      "complete_binding": true,
+      "targets": 6,
+      "all_actual_rows_counts_outcomes_equal": true,
+      "stdout_retained_sha256": "938d79c2a2997f1000595c9589cef7cec682eb5499f00a9796cca604a36ca851",
+      "stderr_sha256": "fcaadd17ba698692ffe2d3b2fdd18caf43855ae6927cedddb6fab9c5ee183046",
+      "original_manifest_sha256": "5cb0d93641afd6697499c76f483c0a335b24e6e219f116f97bcbb35fa4e17ac0"
+    },
+    {
+      "label": "base-readers-default-parallel",
+      "complete_binding": true,
+      "targets": 69,
+      "all_actual_rows_counts_outcomes_equal": true,
+      "stdout_retained_sha256": "e212505228f2aae1411e208edf4725105a460ccf156e73991e34b15cfa46bcad",
+      "stderr_sha256": "b52e4ff19383e78fae11048b5bf629674d6e39bc482c810aa342cd537e66a239",
+      "original_manifest_sha256": "5cb0d93641afd6697499c76f483c0a335b24e6e219f116f97bcbb35fa4e17ac0"
+    },
+    {
+      "label": "candidate-voice-default-parallel",
+      "complete_binding": true,
+      "targets": 6,
+      "all_actual_rows_counts_outcomes_equal": true,
+      "stdout_retained_sha256": "c6f8a58a4b4c6e9a15a4824c6c048b0846ef4d15fc2721c9b2d6f558049ce175",
+      "stderr_sha256": "dbe45e2d788be00ed7f80dd1a541e2c5523a583dc2326742c434224bb1a40797",
+      "original_manifest_sha256": "a283c117fb9140cb6b16b23215d9e41d199b0db030fcd2553b674e4ec9afcf15"
+    },
+    {
+      "label": "candidate-readers-default-parallel",
+      "complete_binding": true,
+      "targets": 69,
+      "all_actual_rows_counts_outcomes_equal": true,
+      "stdout_retained_sha256": "2168e9328844343fda901e39d74836da5bf29041b2dbb11dba9f3f3da4c6b5bd",
+      "stderr_sha256": "c82aae157b95d6be3f3a3e9950c5ec974bce37c00dbb3c4ba86c38d02bd800d3",
+      "original_manifest_sha256": "a283c117fb9140cb6b16b23215d9e41d199b0db030fcd2553b674e4ec9afcf15"
+    },
+    {
+      "label": "json-diagnostics-voice-default-parallel",
+      "complete_binding": true,
+      "actual_rows_unchanged": true,
+      "scalar_array_diagnostics_ignored_by_Cargo_object_parsers": true
+    },
+    {
+      "label": "json-diagnostics-readers-default-parallel",
+      "complete_binding": true,
+      "actual_rows_unchanged": true,
+      "scalar_array_diagnostics_ignored_by_Cargo_object_parsers": true
+    },
+    {
+      "label": "unknown-case",
+      "negative_rejected": true,
+      "errors": [
+        "lamp-voice:lib:lamp_voice: Executed case names do not match the bound compiled census"
+      ]
+    },
+    {
+      "label": "missing-case",
+      "negative_rejected": true,
+      "errors": [
+        "lamp-voice:lib:lamp_voice: Test-row count does not match the target summary",
+        "lamp-voice:lib:lamp_voice: Test-row outcomes do not match the target summary",
+        "lamp-voice:lib:lamp_voice: Executed case names do not match the bound compiled census"
+      ]
+    },
+    {
+      "label": "duplicate-case",
+      "negative_rejected": true,
+      "errors": [
+        "lamp-voice:lib:lamp_voice: Test-row count does not match the target summary",
+        "lamp-voice:lib:lamp_voice: Test-row outcomes do not match the target summary",
+        "lamp-voice:lib:lamp_voice: Executed case names do not match the bound compiled census"
+      ]
+    },
+    {
+      "label": "nested-extra-summary",
+      "negative_rejected": true,
+      "errors": [
+        "Cargo launch/result count mismatch"
+      ]
+    },
+    {
+      "label": "missing-summary",
+      "negative_rejected": true,
+      "errors": [
+        "Cargo launch/result count mismatch"
+      ]
+    },
+    {
+      "label": "duplicate-launch",
+      "negative_rejected": true,
+      "errors": [
+        "Cargo launches do not cover the compiled executable census exactly once",
+        "Cargo launch/result count mismatch"
+      ]
+    },
+    {
+      "label": "split-unknown-event",
+      "negative_rejected": true,
+      "errors": [
+        "lamp-voice-eval:lib:lamp_voice_eval: Test-row count does not match the target summary",
+        "lamp-voice-eval:lib:lamp_voice_eval: Test-row outcomes do not match the target summary",
+        "lamp-voice-eval:lib:lamp_voice_eval: Executed case names do not match the bound compiled census"
+      ]
+    },
+    {
+      "label": "split-malformed-json",
+      "negative_rejected": true,
+      "errors": [
+        "lamp-voice-eval:lib:lamp_voice_eval: Test-row count does not match the target summary",
+        "lamp-voice-eval:lib:lamp_voice_eval: Test-row outcomes do not match the target summary",
+        "lamp-voice-eval:lib:lamp_voice_eval: Executed case names do not match the bound compiled census"
+      ]
+    },
+    {
+      "label": "split-wrong-type",
+      "negative_rejected": true,
+      "errors": [
+        "lamp-voice-eval:lib:lamp_voice_eval: Test-row count does not match the target summary",
+        "lamp-voice-eval:lib:lamp_voice_eval: Test-row outcomes do not match the target summary",
+        "lamp-voice-eval:lib:lamp_voice_eval: Executed case names do not match the bound compiled census"
+      ]
+    },
+    {
+      "label": "split-duplicate-key",
+      "negative_rejected": true,
+      "errors": [
+        "lamp-voice-eval:lib:lamp_voice_eval: Test-row count does not match the target summary",
+        "lamp-voice-eval:lib:lamp_voice_eval: Test-row outcomes do not match the target summary",
+        "lamp-voice-eval:lib:lamp_voice_eval: Executed case names do not match the bound compiled census"
+      ]
+    },
+    {
+      "label": "split-extra-status",
+      "negative_rejected": true,
+      "errors": [
+        "lamp-voice-eval:lib:lamp_voice_eval: Test-row count does not match the target summary",
+        "lamp-voice-eval:lib:lamp_voice_eval: Test-row outcomes do not match the target summary",
+        "lamp-voice-eval:lib:lamp_voice_eval: Executed case names do not match the bound compiled census"
+      ]
+    },
+    {
+      "label": "split-extra-record",
+      "negative_rejected": true,
+      "errors": [
+        "lamp-voice-eval:lib:lamp_voice_eval: Test-row count does not match the target summary",
+        "lamp-voice-eval:lib:lamp_voice_eval: Test-row outcomes do not match the target summary",
+        "lamp-voice-eval:lib:lamp_voice_eval: Executed case names do not match the bound compiled census"
+      ]
+    }
+  ]
+}
