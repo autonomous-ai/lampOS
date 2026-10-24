@@ -1,0 +1,9 @@
+
+running 4 tests
+test read_error_then_same_frame_cannot_admit ... ok
+test repeated_read_errors_cannot_create_enrollment ... ok
+test same_frame_without_gap_cannot_admit ... ok
+test two_fresh_frames_still_admit ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,125 @@
+diff --git a/lampOS/crates/voice/src/speaking_faces.rs b/lampOS/crates/voice/src/speaking_faces.rs
+index 6650f62e8d..8123d9e2a6 100644
+--- a/lampOS/crates/voice/src/speaking_faces.rs
++++ b/lampOS/crates/voice/src/speaking_faces.rs
+@@ -245,15 +245,13 @@ impl SpeakingFaces {
+             }
+             Some(((boot, seq), _)) => looks.frame = Some((boot.to_owned(), seq)),
+             None => {
+-                if looks.frame.is_none()
+-                    && looks
+-                        .kept
+-                        .back()
+-                        .is_some_and(|last| at.saturating_duration_since(last.at) < EYES_EVERY)
+-                {
++                // A missed read is not a new publisher frame. Keep its
++                // deduplication key so recovery cannot count it twice.
++                if looks.kept.back().is_some_and(|last| {
++                    last.boot.is_empty() && at.saturating_duration_since(last.at) < EYES_EVERY
++                }) {
+                     return;
+                 }
+-                looks.frame = None;
+             }
+         }
+         let speaking_faces: Vec<_> = frame
+@@ -1209,6 +1207,67 @@ mod tests {
+         assert!(eyes.positive_speaker(from, from + EVERY * 2).is_empty());
+     }
+ 
++    /// A transient bus error becomes None in the reader. Reading the same
++    /// still-fresh publisher frame afterward cannot create another look.
++    #[test]
++    fn missing_reads_do_not_recount_a_published_speaking_frame() {
++        const BOOT: &str = "0123456789abcdef";
++        for reads in [3, 7] {
++            let eyes = SpeakingFaces::default();
++            let from = Instant::now();
++            let speaking = faces(&[("f1", Yes)]);
++            for read in 0..reads {
++                eyes.look(
++                    from + EVERY * read,
++                    (read % 2 == 0).then_some(((BOOT, 1), &speaking)),
++                );
++            }
++            let to = from + EVERY * reads;
++            assert!(eyes.positive_speaker(from, to).is_empty());
++            assert!(eyes.enrollment_speaker(from, to).is_none());
++            assert!(eyes.speakers(from, to).is_empty());
++            let looks = eyes.looks.lock().unwrap();
++            assert_eq!(
++                looks
++                    .kept
++                    .iter()
++                    .filter(|look| !look.boot.is_empty())
++                    .count(),
++                1
++            );
++        }
++    }
++
++    #[test]
++    fn recovery_after_a_missing_read_counts_a_new_frame() {
++        const BOOT: &str = "0123456789abcdef";
++        let eyes = SpeakingFaces::default();
++        let from = Instant::now();
++        let speaking = faces(&[("f1", Yes)]);
++        eyes.look(from, Some(((BOOT, 1), &speaking)));
++        eyes.look(from + EVERY, None);
++        eyes.look(from + EVERY * 2, Some(((BOOT, 1), &speaking)));
++        assert!(eyes.positive_speaker(from, from + EVERY * 3).is_empty());
++        eyes.look(from + EVERY * 3, Some(((BOOT, 2), &speaking)));
++        assert_eq!(
++            eyes.positive_speaker(from, from + EVERY * 4),
++            [format!("{BOOT}/f1")]
++        );
++        assert!(eyes.enrollment_speaker(from, from + EVERY * 4).is_none());
++    }
++
++    #[test]
++    fn repeated_missing_reads_keep_the_original_empty_look_rate() {
++        let eyes = SpeakingFaces::default();
++        let from = Instant::now();
++        for read in 0..10 {
++            eyes.look(from + EVERY * read, None);
++        }
++        let looks = eyes.looks.lock().unwrap();
++        assert_eq!(looks.kept.len(), 2);
++        assert!(looks.kept.iter().all(|look| look.boot.is_empty()));
++    }
++
+     /// #2287's follow-up: of the faces speaking, only those turned to the
+     /// lamp in at least half the looks are its own person's; one turned away,
+     /// or not said, is the room's. The speakers are as before.
+diff --git a/lampOS/docs/memory.md b/lampOS/docs/memory.md
+index 698115f63e..ae179030bd 100644
+--- a/lampOS/docs/memory.md
++++ b/lampOS/docs/memory.md
+@@ -2386,8 +2386,12 @@ positive cannot hide a missed forget or privacy transition. A geometric face
+ track is not identity proof; this conservative policy does not establish every
+ real lowered-face or dim-room case. Two distinct sole-face positive frames may
+ qualify a short line; a second unknown/silent face, one frame or a repeated
+-frame cannot. The existing three-or-more-look rule and legacy three-look
+-narrowing bar remain unchanged. This authority is checked before
++frame cannot. A missing bus sample, including a transient read error, keeps
++that publisher frame's deduplication key: recovering the same unexpired frame
++cannot create another positive look. Missing samples retain their existing
++500 ms rate limit; a new publisher sequence can still count immediately. The
++existing three-or-more-look rule and legacy three-look narrowing bar remain
++unchanged. See the [Vietnamese frame-count note](vi/memory-speaking-frames_vi.md). This authority is checked before
+ the memory note or history is read and again after composition. This applies
+ to private notes, thread recall, history messages, dated follow-up notes and
+ automatic hits, independently of
+diff --git a/lampOS/docs/vi/memory-speaking-frames_vi.md b/lampOS/docs/vi/memory-speaking-frames_vi.md
+new file mode 100644
+index 0000000000..5a4d08b24a
+--- /dev/null
++++ b/lampOS/docs/vi/memory-speaking-frames_vi.md
+@@ -0,0 +1,7 @@
++# Đếm khung hình nói khi đọc lại sau lỗi
++
++Mỗi khung hình của Eyes, xác định bằng boot và số thứ tự của bên phát, chỉ được tính một lần. Mẫu bị thiếu hoặc lỗi đọc bus tạm thời không xóa khóa chống trùng. Nếu lần đọc sau trả về cùng khung hình vẫn còn hạn, khung đó không trở thành một quan sát dương tính mới và không được dùng để tăng bằng chứng cho ngữ cảnh riêng tư hoặc việc ghi nhớ khuôn mặt theo yêu cầu.
++
++Các mẫu thiếu vẫn chỉ được tính một lần mỗi 500 ms; khung hình có số thứ tự mới vẫn có thể được tính ngay. Ngưỡng hiện tại không đổi: hai khung hình dương tính riêng biệt, mỗi khung chỉ có đúng một khuôn mặt, có thể chứng minh một câu ngắn; đường thu hẹp ngữ cảnh cũ vẫn cần ít nhất ba quan sát. Kiểm tra quyền riêng tư, quên, thời hạn và boot vẫn áp dụng. Đây không phải bằng chứng nhận dạng hay liveness.
++
++Xem [hợp đồng Memory bằng tiếng Anh](../memory.md). Thay đổi này chưa được xác nhận trên đèn; các cổng kiểm tra đầy đủ và lượt đọc quyền riêng tư vẫn là điều kiện trước khi chấp nhận.

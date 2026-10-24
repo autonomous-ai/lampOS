@@ -1,0 +1,13 @@
+{
+  "source": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice/src/speaking_faces.rs",
+  "source_sha256": "d97a33d48c6895a05185ab9a034e2afef80762517835c827a1a8e5370c9bad58",
+  "helper_sections_sha256": {
+    "definitions": "52d69a4f1c2ccb7579dedafca530a95810e8c78cfe822d20120a3f898ec134bd",
+    "look": "47f3a5bf39dd6134a9112ee489bad8587d053162fa67f512fea07bb671c92a22",
+    "positive_speaker": "73a60877b329fa7f1e3812a5b213e7ae5c15fd8d2ed73aa786d86c0ffec2d7a6",
+    "enrollment_speaker": "23f6b7044f9fd8447cc55fe2c6dd4962b39065bd3ea31e7c58a4dc583e075052",
+    "qualified_speaker": "da30becb8cc3785898567049c5aeaec8bb2d2e676e0385dd912f0e79031db380"
+  },
+  "harness_sha256": "6d78cdf0fb0cf9579d750ca0396855a03aab43b0cfc88e1ef9637373ce7b8673",
+  "boundary": "Exact helper source slices, minimal message-type scaffolding; not the full crate, production bus, native ARM64 or lamp."
+}

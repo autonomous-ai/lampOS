@@ -1,0 +1,7 @@
+{
+  "compile_exit": 0,
+  "test_exit": 101,
+  "expected_failure": true,
+  "exact_helper_extraction": true,
+  "not_full_crate": true
+}

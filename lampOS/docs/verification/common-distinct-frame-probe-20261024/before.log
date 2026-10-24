@@ -1,0 +1,27 @@
+
+running 4 tests
+test read_error_then_same_frame_cannot_admit ... FAILED
+test repeated_read_errors_cannot_create_enrollment ... FAILED
+test same_frame_without_gap_cannot_admit ... ok
+test two_fresh_frames_still_admit ... ok
+
+failures:
+
+---- read_error_then_same_frame_cannot_admit stdout ----
+
+thread 'read_error_then_same_frame_cannot_admit' (2210783) panicked at /private/tmp/fourth-common-distinct-frame-probe-20261024/before.rs:254:248:
+one distinct frame must not authorize disclosure
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- repeated_read_errors_cannot_create_enrollment stdout ----
+
+thread 'repeated_read_errors_cannot_create_enrollment' (2210784) panicked at /private/tmp/fourth-common-distinct-frame-probe-20261024/before.rs:255:220:
+one distinct frame must not authorize enrollment
+
+
+failures:
+    read_error_then_same_frame_cannot_admit
+    repeated_read_errors_cannot_create_enrollment
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

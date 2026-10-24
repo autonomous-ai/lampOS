@@ -1,0 +1,13 @@
+{
+  "source": "/private/tmp/fourth-common-freeze-carry-20261024/lampOS/crates/voice/src/speaking_faces.rs",
+  "source_sha256": "17c0160bc184cd58ced1c6324ab5233d1ed14a85ecc89db2239fef3ed795b0fb",
+  "helper_sections_sha256": {
+    "definitions": "52d69a4f1c2ccb7579dedafca530a95810e8c78cfe822d20120a3f898ec134bd",
+    "look": "0400d0697326d44c9f5bffc167ea92fa3fd874ce8396e39f1e579cc7eddd9d2b",
+    "positive_speaker": "73a60877b329fa7f1e3812a5b213e7ae5c15fd8d2ed73aa786d86c0ffec2d7a6",
+    "enrollment_speaker": "23f6b7044f9fd8447cc55fe2c6dd4962b39065bd3ea31e7c58a4dc583e075052",
+    "qualified_speaker": "da30becb8cc3785898567049c5aeaec8bb2d2e676e0385dd912f0e79031db380"
+  },
+  "harness_sha256": "bd89a065c4d78f0e839f55283c4b8d43b46172156b31620e464ef5191445047a",
+  "boundary": "Exact helper source slices, minimal message-type scaffolding; not the full crate, production bus, native ARM64 or lamp."
+}
