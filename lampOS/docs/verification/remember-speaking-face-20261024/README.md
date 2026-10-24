@@ -106,3 +106,17 @@ Mac formatting, strict Eyes Clippy and full Eyes **337/0/5 ignored** pass;
 all recorded source hashes remain unchanged. Source review also checks the
 detector-index mapping into `bus.saw` and the one-near-face enrollment fence.
 Current native gates and renewed reads are requested. See `multiface-carry-*`.
+
+## Landed guard and remaining physical boundary
+
+#3318 landed as `9ed44f88c`, whose tree equals `207358456`. Both public
+readers renewed their exact-head reads. Second’s exact-head Linux formatting
+receipt reports pass, all 6,967 files unchanged and cleanup verified; Third
+checked both repository and lampOS subtree hashes against git. The receipt
+is retained as `multiface-linux-fmt-reported.json`. Native latest-head and
+landed runs remain watched separately from the prior green run.
+
+The [physical trial sheet](physical-trial.md) is prepared, **not run**.
+It covers short-line cadence, wrong-person names/faces, cancellation, saved
+name refusals and observable latency boundaries; First/lamp holder owns it.
+The separately claimed name-ownership follow-up is still being gated.

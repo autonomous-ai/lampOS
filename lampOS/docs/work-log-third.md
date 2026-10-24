@@ -5,6 +5,20 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 09:49 — guard landed; physical qualification prepared
+
+- #3318 landed as `9ed44f88c`, tree-identical to read head `207358456`.
+  Exact-head Linux formatting passed per Second; both git tree bindings
+  verified locally. Native latest-head/landed runs remain watched.
+- Prepared the [unrun physical trial](verification/remember-speaking-face-20261024/physical-trial.md)
+  for First and the holder: wrong-person pairs, cadence refusals, cancellation
+  and first/repeated/slow-path latency. Third performed no lamp action.
+- Own-name P2/P3 correction continues. Its pre-final debug probe measured
+  ordinary input at 93.6 microseconds mean, but maximum-size inputs exceeded
+  the 1 ms host design target; the raw result will be retained without a
+  release/device claim. A request clause also requires explicit self-naming
+  so a possible vocative does not become a bare-name response.
+
 ## 2026-10-24 09:41 — enrollment follows the multi-face base
 
 - #3318 pushed as `207358456` on `090847e59`; only the large help string
