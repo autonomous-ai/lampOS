@@ -518,12 +518,20 @@ impl Interruption {
                 // commit waits for them, and one whose words never come
                 // resumes the reply rather than end it (lamp-52e6 on #3200:
                 // a wordless yield, room sound or the lamp's own echo, cut a
-                // story). A sentence still commits without them.
+                // story). A sentence still commits without them, and so does
+                // speech that goes on after they were asked for: the ask
+                // heard only what came before its pause, and a "Wait" whose
+                // question follows 300 ms on came back as no words
+                // (lamp-52e6 on 24 Oct, 2 of 3 cut-ins held to the deadline).
+                let after_ask = self
+                    .speech_at_ask
+                    .map_or(0, |asked| speech.saturating_sub(asked));
                 let wordless = self.holds_backchannels
                     && self.words_pending
                     && !self.stop_heard
                     && !self.forced_yield
-                    && !sentence;
+                    && !sentence
+                    && after_ask < self.rule.speech_blocks.max(1);
                 // Held for its words, never past the deadline: the request
                 // kept for the commit is kept no longer than a yield lasts.
                 let held = due
