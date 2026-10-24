@@ -147,6 +147,9 @@ jobs:
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: formatting (every crate)
+        working-directory: lampOS
+        run: cargo +1.96.0 fmt --all --check
       - name: artifact provenance regression (offline, disposable Cargo workspace)
         if: matrix.shard == 1
         run: python3 -B -I .github/scripts/lampos-publish-artifact-test.py
