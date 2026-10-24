@@ -1,0 +1,17 @@
+{
+  "head": "42cf24d5a965abbc386e61672b15a4591a338607",
+  "controller_sha256": "b4e5a28eff498140e959397e053a2ce1d268b58e897186d76a43f8393d0cc555",
+  "controller_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run.py",
+  "controller_line_start": 141,
+  "controller_line_end": 149,
+  "exact_controller_lines": "        stamp = time.time_ns()\n        for row in rows:\n            path = WT / row['path']\n            stat = path.lstat()\n            os.utime(path, ns=(stat.st_atime_ns, stamp), follow_symlinks=False)\n        _, refreshed = source_guard()\n        result['freshness'] = {'mtime_ns': stamp, 'paths': len(rows), 'before_sha256': before,\n                               'after_sha256': refreshed, 'bytes_modes_symlinks_identical': before == refreshed}\n        save()\n",
+  "recorded_freshness": {
+    "mtime_ns": 1792833824714310000,
+    "paths": 10363,
+    "before_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+    "after_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+    "bytes_modes_symlinks_identical": true
+  },
+  "mtime_set_to_utc": "2026-10-24T09:23:44.714310+00:00",
+  "disclosure": "All10363trackedfile mtimes were deliberately changed before fmt/Clippy/build/test; this was after rustc-vV/cargo-V toolchain probes. Byte,Gitmode,literal-symlink maps stayed equal. Source mtimes were NOT unchanged. This receipt supports but does not alone prove Cargo library freshness; actual artifact fresh/path/profile/features records must also be assessed."
+}

@@ -1,0 +1,296 @@
+{
+  "head": "42cf24d5a965abbc386e61672b15a4591a338607",
+  "count": 17,
+  "failures": [
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+      "actual_status": "FAILED",
+      "binary_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 727925,
+        "original_stream_sha256": "6d3962b9ffe8ef06de45607343c2b5102a622aab582bcc6b6e6d16e4464f4cdb",
+        "byte_offset": 689923,
+        "bytes": 628,
+        "sha256": "fb71a16d7918655a3baf7763bd65feb6e67df83d4fb241158ae779cb35dd6b0a",
+        "utf8": "---- body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found stdout ----\n\nthread 'body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found' (1518162) panicked at crates/voice/src/body_motion.rs:389:9:\nStill\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found\n   3: lamp_voice::body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "actual_status": "FAILED",
+      "binary_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 727925,
+        "original_stream_sha256": "6d3962b9ffe8ef06de45607343c2b5102a622aab582bcc6b6e6d16e4464f4cdb",
+        "byte_offset": 690551,
+        "bytes": 3272,
+        "sha256": "dea7e9d8d2808fabbc7595e2658323d08f5e819ee8ebf81041f165626774c055",
+        "utf8": "---- coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture stdout ----\n{\"seconds\":null,\"status\":\"listening_ready\"}\nlamp-voice: the body was pushed: the search ended; its look's picture is dropped; its turn in hand is cut\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 18821 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"look_dropped\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"speaker_rejected\", \"worker_shutdown_event\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (None, false, false)]\n\nthread 'coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture' (1552166) panicked at crates/voice/src/coordinator/tests/second_route.rs:384:9:\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 18821 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"look_dropped\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"speaker_rejected\", \"worker_shutdown_event\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (None, false, false)]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::panic_display\n   3: lamp_voice::coordinator::tests::second_route::Run::assert_clean\n   4: lamp_voice::coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture\n   5: lamp_voice::coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer",
+      "actual_status": "FAILED",
+      "binary_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 727925,
+        "original_stream_sha256": "6d3962b9ffe8ef06de45607343c2b5102a622aab582bcc6b6e6d16e4464f4cdb",
+        "byte_offset": 693823,
+        "bytes": 3721,
+        "sha256": "82aeb42dcefa8e128470ee99fe005398f85fcd97e3d8e4b1c3a386d12cb13b32",
+        "utf8": "---- coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer stdout ----\n{\"seconds\":null,\"status\":\"listening_ready\"}\nlamp-voice: the body was pushed: the search ended; its turn in hand is cut\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 20107 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"speech_final_sample_retired\", \"turn_finished\", \"look_full_still\", \"input_admitted\", \"ring_requested\", \"ring_feedback\", \"provider_input_started\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking, Waiting]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (Some(2), true, false), (None, true, false), (None, false, false)]\n\nthread 'coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer' (1552421) panicked at crates/voice/src/coordinator/tests/second_route.rs:384:9:\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 20107 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"speech_final_sample_retired\", \"turn_finished\", \"look_full_still\", \"input_admitted\", \"ring_requested\", \"ring_feedback\", \"provider_input_started\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking, Waiting]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (Some(2), true, false), (None, true, false), (None, false, false)]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::panic_display\n   3: lamp_voice::coordinator::tests::second_route::Run::assert_clean\n   4: lamp_voice::coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer\n   5: lamp_voice::coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives",
+      "actual_status": "FAILED",
+      "binary_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 727925,
+        "original_stream_sha256": "6d3962b9ffe8ef06de45607343c2b5102a622aab582bcc6b6e6d16e4464f4cdb",
+        "byte_offset": 697544,
+        "bytes": 859,
+        "sha256": "f2d6db77fd3e6f5d0dd451527d642580bbf3725e5a70425806e7eb05e2249155",
+        "utf8": "---- hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives stdout ----\n\nthread 'hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives' (1587761) panicked at crates/voice/src/hand_controls/tests.rs:1529:13:\nthe touch never arrived: Health { received: 2, rejected: 1, lost: 0, reconnects: 0, discontinuities: 2, pump_running: false, persistence_failed: false }\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::hand_controls::tests::head_touch_rounds\n   3: lamp_voice::hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives\n   4: lamp_voice::hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "actual_status": "FAILED",
+      "binary_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 727925,
+        "original_stream_sha256": "6d3962b9ffe8ef06de45607343c2b5102a622aab582bcc6b6e6d16e4464f4cdb",
+        "byte_offset": 698403,
+        "bytes": 870,
+        "sha256": "ab26b360eadf6d6e571ada2e55d4b21f5877f647d87a34e0b73a9928154e952c",
+        "utf8": "---- privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second stdout ----\n\nthread 'privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second' (1591156) panicked at crates/voice/src/privacy_bus.rs:1313:25:\nthe host stalled in 10 of 10 attempts: privacy publisher unavailable\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second\n   3: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:test:it",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "actual_status": "FAILED",
+      "binary_sha256": "a10b677e9964105cc2e1c4520176ed5673a36d0f637b6e9db42dd20eadb8b40f",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 727925,
+        "original_stream_sha256": "6d3962b9ffe8ef06de45607343c2b5102a622aab582bcc6b6e6d16e4464f4cdb",
+        "byte_offset": 724489,
+        "bytes": 1233,
+        "sha256": "c4e0455102ff96dc52ee7140bd330c3aa21c0b3f34edb41aa89d82d7d7000e46",
+        "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [19.596512ms, 19.829849ms, 22.374837ms, 31.021801ms, 39.95119ms, 43.780721ms, 44.001296ms, 44.989698ms, 59.63044ms, 62.297939ms, 62.520906ms, 65.588784ms, 77.671648ms, 97.248714ms, 119.839058ms, 165.009813ms, 170.039629ms, 175.708726ms, 175.907831ms, 213.880664ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (1618330) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[19.596512ms, 19.829849ms, 22.374837ms, 31.021801ms, 39.95119ms, 43.780721ms, 44.001296ms, 44.989698ms, 59.63044ms, 62.297939ms, 62.520906ms, 65.588784ms, 77.671648ms, 97.248714ms, 119.839058ms, 165.009813ms, 170.039629ms, 175.708726ms, 175.907831ms, 213.880664ms]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\n   3: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-expression:test:runtime",
+      "name": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "actual_status": "FAILED",
+      "binary_sha256": "bb3c9527997614bda38982ee77046aaab0ade4babf53f1446a282d4ef8fe35a7",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 770089,
+        "original_stream_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "byte_offset": 546630,
+        "bytes": 699,
+        "sha256": "626de06cb0cef728cd997f11e49a0d75e2446f59b03bdbc7fe102e73e3c01e94",
+        "utf8": "---- enabled_output_uses_a_new_session_and_expires_after_input_loss stdout ----\n\nthread 'enabled_output_uses_a_new_session_and_expires_after_input_loss' (1649934) panicked at crates/expression/tests/runtime.rs:127:28:\nfresh voice and joints\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::enabled_output_uses_a_new_session_and_expires_after_input_loss\n   5: runtime::enabled_output_uses_a_new_session_and_expires_after_input_loss::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-expression:test:runtime",
+      "name": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "actual_status": "FAILED",
+      "binary_sha256": "bb3c9527997614bda38982ee77046aaab0ade4babf53f1446a282d4ef8fe35a7",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 770089,
+        "original_stream_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "byte_offset": 547329,
+        "bytes": 859,
+        "sha256": "44c9a3060289f43d0e0f450d8415eefbf494bea3b92c8b76faccfe9ff65e0d36",
+        "utf8": "---- only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline stdout ----\n\nthread 'only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline' (1649938) panicked at crates/expression/tests/runtime.rs:1048:14:\na light request\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline::{{closure}}\n   5: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline\n   6: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-expression:test:runtime",
+      "name": "without_a_pause_said_expression_asks_exactly_as_before",
+      "actual_status": "FAILED",
+      "binary_sha256": "bb3c9527997614bda38982ee77046aaab0ade4babf53f1446a282d4ef8fe35a7",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 770089,
+        "original_stream_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "byte_offset": 548188,
+        "bytes": 743,
+        "sha256": "fe363d5e2f23e2050d2740bcbb06050ae2f03f4b04cc99842531355e78aceafb",
+        "utf8": "---- without_a_pause_said_expression_asks_exactly_as_before stdout ----\n\nthread 'without_a_pause_said_expression_asks_exactly_as_before' (1649986) panicked at crates/expression/tests/runtime.rs:1008:57:\na body request\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::without_a_pause_said_expression_asks_exactly_as_before::{{closure}}\n   5: runtime::without_a_pause_said_expression_asks_exactly_as_before\n   6: runtime::without_a_pause_said_expression_asks_exactly_as_before::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-expression:test:runtime",
+      "name": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+      "actual_status": "FAILED",
+      "binary_sha256": "bb3c9527997614bda38982ee77046aaab0ade4babf53f1446a282d4ef8fe35a7",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 770089,
+        "original_stream_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "byte_offset": 548931,
+        "bytes": 663,
+        "sha256": "0233e9fa367a7ccf675935d0229624d53cfc1136ce7a7f8ccc96f502facc6af8",
+        "utf8": "---- sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service stdout ----\n\nthread 'sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service' (1649945) panicked at crates/expression/tests/runtime.rs:943:13:\njournal fixture host watchdog\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: runtime::sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service\n   3: runtime::sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-memory:test:it",
+      "name": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals",
+      "actual_status": "FAILED",
+      "binary_sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 770089,
+        "original_stream_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "byte_offset": 587883,
+        "bytes": 752,
+        "sha256": "e35bcc65a3d2ec8984541d5855243bb88d892a148474d86db89f18d78c74b38f",
+        "utf8": "---- health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals stdout ----\n\nthread 'health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals' (1676561) panicked at crates/memory/tests/it/health.rs:237:13:\nmemory never became ready; \nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::health::Process::ready\n   3: it::health::counts_through_real_requests\n   4: it::health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals\n   5: it::health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-memory:test:it",
+      "name": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+      "actual_status": "FAILED",
+      "binary_sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 770089,
+        "original_stream_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "byte_offset": 588635,
+        "bytes": 748,
+        "sha256": "317afe49c17f5c5ab12dd7777ef9eb3b4c6238103f142b79d0be00352570bb4e",
+        "utf8": "---- health::the_environment_alone_does_not_enable_reporting_or_create_bus_data stdout ----\n\nthread 'health::the_environment_alone_does_not_enable_reporting_or_create_bus_data' (1676576) panicked at crates/memory/tests/it/health.rs:237:13:\nmemory never became ready; lamp-memory: health reports off: no --bus-root\n\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::health::Process::ready\n   3: it::health::the_environment_alone_does_not_enable_reporting_or_create_bus_data\n   4: it::health::the_environment_alone_does_not_enable_reporting_or_create_bus_data::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-memory:test:it",
+      "name": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+      "actual_status": "FAILED",
+      "binary_sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 770089,
+        "original_stream_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "byte_offset": 589383,
+        "bytes": 805,
+        "sha256": "5866610c5126f0d35d2e56544315af4674226ddcfbb05e1bca3011340d4c5c19",
+        "utf8": "---- voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note stdout ----\n\nthread 'voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note' (1676919) panicked at crates/memory/tests/it/voice.rs:142:18:\ncalled `Result::unwrap()` on an `Err` value: Timeout\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::result::unwrap_failed\n   3: it::voice::Fixture::next\n   4: it::voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note\n   5: it::voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-memory:test:it",
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "actual_status": "FAILED",
+      "binary_sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 770089,
+        "original_stream_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "byte_offset": 590188,
+        "bytes": 1108,
+        "sha256": "aa36f34847a36f7195d11f6d68b931170ee08a7310939ef252d46a7e1b6e648a",
+        "utf8": "---- voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh stdout ----\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\n\nthread 'voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh' (1676960) panicked at crates/memory/tests/it/voice.rs:960:5:\nassertion `left == right` failed: the retry sends one forget: []\n  left: 0\n right: 1\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::assert_failed_inner\n   3: core::panicking::assert_failed::<usize, usize>\n   4: it::voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh\n   5: it::voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-memory:test:it",
+      "name": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+      "actual_status": "FAILED",
+      "binary_sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 770089,
+        "original_stream_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "byte_offset": 591296,
+        "bytes": 983,
+        "sha256": "329c26b8032bced42b7a80a07c662cdbfb3fc99f113850a0ed7220a8dbc593a5",
+        "utf8": "---- voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about stdout ----\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\n\nthread 'voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about' (1678282) panicked at crates/memory/tests/it/voice.rs:591:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::voice::forget_that_after\n   3: it::voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about\n   4: it::voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-memory:test:it",
+      "name": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+      "actual_status": "FAILED",
+      "binary_sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 770089,
+        "original_stream_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "byte_offset": 592279,
+        "bytes": 1097,
+        "sha256": "12598135021e876e28005b84c324aaf843582592e3b4c28e591a87a7878ce7c0",
+        "utf8": "---- voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation stdout ----\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: Days memory is answering\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\n\nthread 'voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation' (1678199) panicked at crates/memory/tests/it/voice.rs:591:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::voice::forget_that_after\n   3: it::voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation\n   4: it::voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\nlamp-voice provider: memory conversation end was not acknowledged; no retry\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-memory:test:it",
+      "name": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused",
+      "actual_status": "FAILED",
+      "binary_sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 770089,
+        "original_stream_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "byte_offset": 593376,
+        "bytes": 765,
+        "sha256": "231ce43ee562fed0d3f1113ede4d8bcbe646ba968a7c0742f25ebf651e113023",
+        "utf8": "---- voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused stdout ----\n\nthread 'voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused' (1679480) panicked at crates/memory/tests/it/voice_people.rs:416:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::voice_people::keep\n   3: it::voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused\n   4: it::voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    }
+  ],
+  "failure_policy": "Every original observation remains bound to its own source. No unrecorded retry, failure waiver or historical-cause claim."
+}

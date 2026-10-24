@@ -1,0 +1,1074 @@
+[
+  {
+    "target": "lamp-voice:lib:lamp_voice",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/compiled-census/lamp-voice-lamp_voice-00bfd2c9a0/all.stdout.txt",
+    "bytes": 346924,
+    "sha256": "7667b6df2db005020a041dd6a1da0334e1d58687e60c4ab072caccc248ea5ef2",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice:lib:lamp_voice",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/compiled-census/lamp-voice-lamp_voice-00bfd2c9a0/ignored.stdout.txt",
+    "bytes": 1015,
+    "sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice:bin:lamp-voice",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/compiled-census/lamp-voice-lamp-voice-6407d2759b/all.stdout.txt",
+    "bytes": 81,
+    "sha256": "06a935bb8d90864f89135737bc24cdf47eebc2877cf4d6fea3636c41aa298f9a",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice:bin:lamp-voice",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/compiled-census/lamp-voice-lamp-voice-6407d2759b/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice:test:it",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/compiled-census/lamp-voice-it-a10b677e99/all.stdout.txt",
+    "bytes": 22816,
+    "sha256": "a01042c2285c97806fc978b486484e9f84dfcee6cfea224378b477682b2b31ab",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice:test:it",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/compiled-census/lamp-voice-it-a10b677e99/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice:test:release_pair",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/compiled-census/lamp-voice-release_pair-da8e5c1a27/all.stdout.txt",
+    "bytes": 418,
+    "sha256": "4357598a4c7463bcc9b624be433d683169a013dec8fd508a96297bce49d60773",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice:test:release_pair",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/compiled-census/lamp-voice-release_pair-da8e5c1a27/ignored.stdout.txt",
+    "bytes": 418,
+    "sha256": "4357598a4c7463bcc9b624be433d683169a013dec8fd508a96297bce49d60773",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice:example:render_line_second",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/compiled-census/lamp-voice-render_line_second-9f595b2510/all.stdout.txt",
+    "bytes": 235,
+    "sha256": "b1ee3badf01c038fa473c3e33bad4fcf667022e6141fca493ddd991bca28c774",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice:example:render_line_second",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/compiled-census/lamp-voice-render_line_second-9f595b2510/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice:example:stop_words_stt_replay",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-613ea3275c/all.stdout.txt",
+    "bytes": 353,
+    "sha256": "6a80518e733a17dba4e8f03aa0c1609cc558aa7acf343d72b208f132784a5e28",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice:example:stop_words_stt_replay",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/compiled-census/lamp-voice-stop_words_stt_replay-613ea3275c/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-body:lib:lamp_body",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-body-lamp_body-473bf0d063/all.stdout.txt",
+    "bytes": 35084,
+    "sha256": "6f53c686cba479fc72343695469fcc0625947d80fc82f9295f7b34cd26d56558",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-body:lib:lamp_body",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-body-lamp_body-473bf0d063/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-body:bin:lamp-body",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-cc6d8f37c6/all.stdout.txt",
+    "bytes": 2147,
+    "sha256": "6647795d10431733ca6a1e5c8e346ee281ab8fd013de46f3c1210197ee8dff68",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-body:bin:lamp-body",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-cc6d8f37c6/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-body:bin:lamp-body-inspect",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-inspect-46579c8d51/all.stdout.txt",
+    "bytes": 140,
+    "sha256": "f948d790b56e45720dee8985090774d1a045824cc57ed457a16568cdb34c7f08",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-body:bin:lamp-body-inspect",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-inspect-46579c8d51/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-body:bin:lamp-body-measure",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-measure-ed45deb785/all.stdout.txt",
+    "bytes": 295,
+    "sha256": "d755cac4ac681b8b119586fbc0b0b69df7d3cc94d5a9c1023f31a2ae3360dee9",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-body:bin:lamp-body-measure",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-measure-ed45deb785/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-body:bin:lamp-body-mood",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-mood-00ae69951b/all.stdout.txt",
+    "bytes": 146,
+    "sha256": "60b7b0c061888bf71088b734d6c52cef293337793fdc9b986804187f7c738069",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-body:bin:lamp-body-mood",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-mood-00ae69951b/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-body:bin:lamp-body-worker",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-worker-03448e4578/all.stdout.txt",
+    "bytes": 52,
+    "sha256": "026a5cb2a3cf9cf9b7a96635782dffaf2438ef6000412532af66300ebfda204d",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-body:bin:lamp-body-worker",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-body-lamp-body-worker-03448e4578/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-body:test:it",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-body-it-11b9e549e8/all.stdout.txt",
+    "bytes": 10122,
+    "sha256": "5866b1cdca5f7e15fab4ee3e3c723f321fc28fa71a10b9dd463955327aaaf378",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-body:test:it",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-body-it-11b9e549e8/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-cloud:lib:lamp_cloud",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-cloud-lamp_cloud-0560168a22/all.stdout.txt",
+    "bytes": 12562,
+    "sha256": "65a1af78f7f5a5f4fae11cb562ec4172cb0283c09005f24b8c238aa3caaca0eb",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-cloud:lib:lamp_cloud",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-cloud-lamp_cloud-0560168a22/ignored.stdout.txt",
+    "bytes": 92,
+    "sha256": "c6bbe827c7ed16a7e17edb8410f049b4b86009a136c1bc67aaf0fead4a41af21",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-cloud:bin:lamp-cloud",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-cloud-lamp-cloud-20d2cdd3ae/all.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-cloud:bin:lamp-cloud",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-cloud-lamp-cloud-20d2cdd3ae/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-cloud:test:it",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-cloud-it-1e8d666cd2/all.stdout.txt",
+    "bytes": 2362,
+    "sha256": "fc341fc3b369cb62574795fb53824c4c9a475b11373aabd723a6689e13762b3a",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-cloud:test:it",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-cloud-it-1e8d666cd2/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-cloud:test:release_pair",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-cloud-release_pair-05f2bea317/all.stdout.txt",
+    "bytes": 152,
+    "sha256": "07c46bff77ea130bea2bada7b01d0efaa7b0ee4d8bfc9cb31c2c1ce62f539a46",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-cloud:test:release_pair",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-cloud-release_pair-05f2bea317/ignored.stdout.txt",
+    "bytes": 152,
+    "sha256": "07c46bff77ea130bea2bada7b01d0efaa7b0ee4d8bfc9cb31c2c1ce62f539a46",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-expression:lib:lamp_expression",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-expression-lamp_expression-69aca52074/all.stdout.txt",
+    "bytes": 2325,
+    "sha256": "34cef1e037f52a0b4b1610c00e236954880e2e11697845960c13728c4d1d0e75",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-expression:lib:lamp_expression",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-expression-lamp_expression-69aca52074/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-expression:bin:lamp-expression",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-expression-lamp-expression-34287613fd/all.stdout.txt",
+    "bytes": 252,
+    "sha256": "879f18a41c1bf6a82b6acf717f37cd966f9699b768e46b4bf09556221be3ca27",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-expression:bin:lamp-expression",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-expression-lamp-expression-34287613fd/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-expression:test:it",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-expression-it-1ee204dbaa/all.stdout.txt",
+    "bytes": 23406,
+    "sha256": "415f1cf0e5d0725e2f7d157193f049aa26d2d0d91de8196ad56e4c6ec427a2a6",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-expression:test:it",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-expression-it-1ee204dbaa/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-expression:test:runtime",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-expression-runtime-bb3c952799/all.stdout.txt",
+    "bytes": 1792,
+    "sha256": "de7efe0fa806e04d1bdf40df5fac23874d637caac75133ac9b5dd01c3c919abd",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-expression:test:runtime",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-expression-runtime-bb3c952799/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-keeper:lib:lamp_keeper",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-keeper-lamp_keeper-005a8804c0/all.stdout.txt",
+    "bytes": 2819,
+    "sha256": "2e4591cf36f94bb3cbc3d75561bb9b6476d3fbaf634b058d2a82ed66ec21fd3d",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-keeper:lib:lamp_keeper",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-keeper-lamp_keeper-005a8804c0/ignored.stdout.txt",
+    "bytes": 49,
+    "sha256": "004cc930537bae0f6e4aea018876ecab6479c14f8972a9b7f011cdbfc114a425",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-keeper:bin:lamp-keeper",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-keeper-lamp-keeper-b3e72f4d7d/all.stdout.txt",
+    "bytes": 117,
+    "sha256": "3ddacae3f1c526eec18f154149c362316af37c1a1c0227537143935f60a30162",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-keeper:bin:lamp-keeper",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-keeper-lamp-keeper-b3e72f4d7d/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-lean:lib:lamp_lean",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-lean-lamp_lean-44abcfe664/all.stdout.txt",
+    "bytes": 725,
+    "sha256": "8062296d7efa345c868aa9aeb7464ba5f391c132654aec11b980023bd381c19e",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-lean:lib:lamp_lean",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-lean-lamp_lean-44abcfe664/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-lean:test:it",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-lean-it-52e099afc9/all.stdout.txt",
+    "bytes": 4034,
+    "sha256": "f27dafdc40c0e3562fa5f17350d5575bc38de846d6ad88a5605fbd1bf0d0b893",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-lean:test:it",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-lean-it-52e099afc9/ignored.stdout.txt",
+    "bytes": 58,
+    "sha256": "42ed561c7f28d0bed5d81a3e99531ab158df915aedfc8c4f0e50be05032e40a2",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:lib:lamp_memory",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-lamp_memory-347a5988b1/all.stdout.txt",
+    "bytes": 8368,
+    "sha256": "0e44a0294b28733ba6e5e5d3af26aaeadfe966b464ca04a97a34e1219b1fccca",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:lib:lamp_memory",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-lamp_memory-347a5988b1/ignored.stdout.txt",
+    "bytes": 76,
+    "sha256": "8964966b0ba39baeee0d1bbda243723c8f7fb433747388793f9faf71966d5c0c",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:bin:lamp-memory",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-lamp-memory-7b3683b07f/all.stdout.txt",
+    "bytes": 664,
+    "sha256": "e230054ebdad4f645caf7e6948773c77de31914e0050ae7c350875a4cb6b42cd",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:bin:lamp-memory",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-lamp-memory-7b3683b07f/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:bin:lamp-memory-eval",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-lamp-memory-eval-1ecaf4a367/all.stdout.txt",
+    "bytes": 561,
+    "sha256": "1548e653eb304ea561ae66fd3c8753403bb2a8b228705af376451a83adcf0028",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:bin:lamp-memory-eval",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-lamp-memory-eval-1ecaf4a367/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:forget_person",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-forget_person-02d62fa692/all.stdout.txt",
+    "bytes": 262,
+    "sha256": "11d3ccea5fc5d3d4d30199793f24842a1e5428e14ca2b0e68651b594b5f420db",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:forget_person",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-forget_person-02d62fa692/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:forget_shared_exchange",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-forget_shared_exchange-3d953b71c6/all.stdout.txt",
+    "bytes": 292,
+    "sha256": "a3fe8867c9b8329eaf959605709da341313a4cfc2b03d9ffa1752c64ab4c0a90",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:forget_shared_exchange",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-forget_shared_exchange-3d953b71c6/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:forgot",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-forgot-1a8ce6431b/all.stdout.txt",
+    "bytes": 85,
+    "sha256": "f19803f12df615b76712e88e8b714e9f4bec95d9abe648e35768ba06643acaf4",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:forgot",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-forgot-1a8ce6431b/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:health_control",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-health_control-d1e431cd15/all.stdout.txt",
+    "bytes": 1475,
+    "sha256": "d70324e408f730535964c3ed40895c219da2cce3a012a7ef302168872b8158d8",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:health_control",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-health_control-d1e431cd15/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:it",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-it-4148c0a9db/all.stdout.txt",
+    "bytes": 13445,
+    "sha256": "d89a6496b867fc09a82145e3bf00984ec02dd8e608ea6a1555de178e385d5ad5",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:it",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-it-4148c0a9db/ignored.stdout.txt",
+    "bytes": 355,
+    "sha256": "1464fe30badbad989476eff83279c5f510934b883ca5efae66c8ca2c11a82de4",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:paraphrase_fixture",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-paraphrase_fixture-0e918311a4/all.stdout.txt",
+    "bytes": 39,
+    "sha256": "4802e7e066d8334b479e30dd35329a036e3997f6fe3219b737bc0b3885e9b5cb",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:paraphrase_fixture",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-paraphrase_fixture-0e918311a4/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:release_pair",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-release_pair-ceb3f21b13/all.stdout.txt",
+    "bytes": 151,
+    "sha256": "e5b941343bdb17d09027fd3ef848e148565d1f31855662379310c7be4b3e3264",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:release_pair",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-release_pair-ceb3f21b13/ignored.stdout.txt",
+    "bytes": 151,
+    "sha256": "e5b941343bdb17d09027fd3ef848e148565d1f31855662379310c7be4b3e3264",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_early_words",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_early_words-826280b7f6/all.stdout.txt",
+    "bytes": 81,
+    "sha256": "606ef84f3d1a5b6a00ff48f077ac845ae59a2672b10b079d4a217b1d62f82c4f",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_early_words",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_early_words-826280b7f6/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_follows_face",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_follows_face-b3a4e139a4/all.stdout.txt",
+    "bytes": 85,
+    "sha256": "6ee67dc9b22ed4e8656175b527181bb5f0303df7c4dd9c407b894d9bf02ca0b7",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_follows_face",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_follows_face-b3a4e139a4/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_forget",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget-a02dfc4119/all.stdout.txt",
+    "bytes": 340,
+    "sha256": "f56c417dd9fc870f58ce18c822ef86e1df4db8857fd5d4970f7442b855e98395",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_forget",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget-a02dfc4119/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_forget_about",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget_about-9644359ad7/all.stdout.txt",
+    "bytes": 153,
+    "sha256": "1860b7cb69830638041e0804ffe08ee4d0486d8499c731e2e84e3dc872528ef5",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_forget_about",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget_about-9644359ad7/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_forget_named",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget_named-911b3aa26d/all.stdout.txt",
+    "bytes": 166,
+    "sha256": "502371a94d348eaacc0c80809994620f19644491fc08703ba164e6d2ee45e461",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_forget_named",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_forget_named-911b3aa26d/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_link_used",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_link_used-08d2acf50b/all.stdout.txt",
+    "bytes": 117,
+    "sha256": "481207ee1c2f5c971ce68c79508f5eb78a49ab8a15591f6f8bd0be1f07fcd6f2",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_link_used",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_link_used-08d2acf50b/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_observe",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_observe-a603a26c89/all.stdout.txt",
+    "bytes": 82,
+    "sha256": "ee3e6e18f7012693fd723dea3add0a80849be303659914a9e93971118faa5c67",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_observe",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_observe-a603a26c89/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_since_until",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_since_until-1682e7cba8/all.stdout.txt",
+    "bytes": 111,
+    "sha256": "0fe5ad0ca785fe2b48a2a27690ad8e09b0bd8a7d6d7d890f9495c2d78c524887",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-memory:test:voice_since_until",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-memory-voice_since_until-1682e7cba8/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-peek:lib:lamp_peek",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-peek-lamp_peek-19fcac4ed9/all.stdout.txt",
+    "bytes": 1060,
+    "sha256": "7922c76e2cf7f5220b934020f4adf19b44353a39766b14e3350187142067d5ee",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-peek:lib:lamp_peek",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-peek-lamp_peek-19fcac4ed9/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-peek:bin:lamp-peek",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-peek-lamp-peek-e5b27000ff/all.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-peek:bin:lamp-peek",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-peek-lamp-peek-e5b27000ff/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-peek:test:peek",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-peek-peek-4e48a5b3d2/all.stdout.txt",
+    "bytes": 603,
+    "sha256": "51fa417c55e5b4c13b78d412d074169e878752a5e2fba36bea4ec305ae392d83",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-peek:test:peek",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-peek-peek-4e48a5b3d2/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-setup:lib:lamp_setup",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-setup-lamp_setup-9e18459abc/all.stdout.txt",
+    "bytes": 1073,
+    "sha256": "9e55733d54f242c443a09d9e59fbe326a206f882fe76a3663a9d904dcda66b25",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-setup:lib:lamp_setup",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-setup-lamp_setup-9e18459abc/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-setup:bin:lamp-setup",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-setup-lamp-setup-9a2fffb651/all.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-setup:bin:lamp-setup",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-setup-lamp-setup-9a2fffb651/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-setup:test:it",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-setup-it-11fc340d08/all.stdout.txt",
+    "bytes": 11252,
+    "sha256": "496453d5a9c0bb5302a776802853b2a52e72afe9ce3fdcbc47792c116aa7dc69",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-setup:test:it",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-setup-it-11fc340d08/ignored.stdout.txt",
+    "bytes": 44,
+    "sha256": "0878c01d3e3575a6590bc204c68c407c6aee4d7f49aa223c1c2639701387a325",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-setup:test:wake",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-setup-wake-1cfb0e04c4/all.stdout.txt",
+    "bytes": 396,
+    "sha256": "149791ca9f2cbec35c011115d131f43e23c85b268ffda223186336ff63971926",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-setup:test:wake",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-setup-wake-1cfb0e04c4/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-skills:lib:lamp_skills",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-skills-lamp_skills-bde7236c7d/all.stdout.txt",
+    "bytes": 12253,
+    "sha256": "42ec6d2276d6dca2b3df1444b38a68a1787d0171a08a4d867f3df284b550a10e",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-skills:lib:lamp_skills",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-skills-lamp_skills-bde7236c7d/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-skills:bin:lamp-skills",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-skills-lamp-skills-0d98107325/all.stdout.txt",
+    "bytes": 1406,
+    "sha256": "068898e2448ab71f7375db9a79d2cffab7b5ea923d6b27776e4ffb5670d3f45b",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-skills:bin:lamp-skills",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-skills-lamp-skills-0d98107325/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-skills:test:it",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-skills-it-20626ab8aa/all.stdout.txt",
+    "bytes": 23316,
+    "sha256": "a027127754ca063e375165d1f0c2d6813b3611ebe772d81dfde78b69234fcc7e",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-skills:test:it",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-skills-it-20626ab8aa/ignored.stdout.txt",
+    "bytes": 35,
+    "sha256": "163d33ee43b30a5a7645433ba3a13e9da5256f58bd03c729b798fc95ae23396c",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-skills:test:release_pair",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-skills-release_pair-bb96e59a2a/all.stdout.txt",
+    "bytes": 552,
+    "sha256": "826993a5feeba728e01272fc860bc9bff93d7bd555a6322ebcfac8d28c110963",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-skills:test:release_pair",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-skills-release_pair-bb96e59a2a/ignored.stdout.txt",
+    "bytes": 426,
+    "sha256": "f513f93157a2f404f404cda08df861d291b05df9c835d310fb6b31c2cde3ecc8",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-skills:test:requested_audio",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-skills-requested_audio-f022b228f3/all.stdout.txt",
+    "bytes": 2099,
+    "sha256": "776d471b3008d3d5429b0a7c738dfff7d036ab9972b872199d16b1c870f378fa",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-skills:test:requested_audio",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-skills-requested_audio-f022b228f3/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:lib:lamp_update",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-lamp_update-dc701447a7/all.stdout.txt",
+    "bytes": 9102,
+    "sha256": "73d4b7a0b6ae252fd4b922d473f624f10d072e717b667fd3b573bf2fbb3f7f24",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:lib:lamp_update",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-lamp_update-dc701447a7/ignored.stdout.txt",
+    "bytes": 92,
+    "sha256": "bc91a05483d02d07eac64b1dfbfc89be9ee76b939b7cbdf10473700665cba987",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:bin:lamp-update",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-lamp-update-8ca372c7d8/all.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:bin:lamp-update",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-lamp-update-8ca372c7d8/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:test:functions",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-functions-8879bdd6cd/all.stdout.txt",
+    "bytes": 314,
+    "sha256": "e646864d91e3a0e969823165f0300cb29d827a9f3f2e4630badfc24b9df3f594",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:test:functions",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-functions-8879bdd6cd/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:test:install",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-install-3a191b415d/all.stdout.txt",
+    "bytes": 5902,
+    "sha256": "96d459a03551e17534af4c5ebc361186e7e0797602856c364f27bf915e46bafb",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:test:install",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-install-3a191b415d/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:test:it",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-it-d307e9949e/all.stdout.txt",
+    "bytes": 897,
+    "sha256": "baddc58d8487566c4ab3bb050066f6f2725ff6b2b1be4e9de23aba32cef9ada6",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:test:it",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-it-d307e9949e/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:test:release_pair",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-release_pair-97d00dd63d/all.stdout.txt",
+    "bytes": 116,
+    "sha256": "dc225e21d620592b1c67f560a9aaca305bd16d460961d4ee34ee9e37cbbba993",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:test:release_pair",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-release_pair-97d00dd63d/ignored.stdout.txt",
+    "bytes": 116,
+    "sha256": "dc225e21d620592b1c67f560a9aaca305bd16d460961d4ee34ee9e37cbbba993",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:test:round",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-round-1ad85e5d92/all.stdout.txt",
+    "bytes": 11551,
+    "sha256": "3314760cf4c30362ca86b4d2be5857051d5d9ec6b5215088ab35b0f5a5aff086",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:test:round",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-round-1ad85e5d92/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:test:self-cli-exec",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-self-cli-exec-61fb916654/all.stdout.txt",
+    "bytes": 53,
+    "sha256": "635e634394d967384e42754cf17d0a7b33ba13614d6169cb8ba9d8ee2a6da7cd",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:test:self-cli-exec",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-self-cli-exec-61fb916654/ignored.stdout.txt",
+    "bytes": 53,
+    "sha256": "635e634394d967384e42754cf17d0a7b33ba13614d6169cb8ba9d8ee2a6da7cd",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:test:self-process-cuts",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-self-process-cuts-72da66f3ab/all.stdout.txt",
+    "bytes": 46,
+    "sha256": "902aefa939fe0a67e5b85cc08b264e25ed9ae462a25569e46159c9a20f948c17",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-update:test:self-process-cuts",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-update-self-process-cuts-72da66f3ab/ignored.stdout.txt",
+    "bytes": 46,
+    "sha256": "902aefa939fe0a67e5b85cc08b264e25ed9ae462a25569e46159c9a20f948c17",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice-eval:lib:lamp_voice_eval",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-voice-eval-lamp_voice_eval-f1484fe271/all.stdout.txt",
+    "bytes": 38504,
+    "sha256": "d48193bedf4b6a16d908580f393acf605bfa1de16ecd9ea867a59d9481a737c2",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice-eval:lib:lamp_voice_eval",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-voice-eval-lamp_voice_eval-f1484fe271/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice-eval:bin:lamp-voice-eval",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-voice-eval-lamp-voice-eval-38d90eb433/all.stdout.txt",
+    "bytes": 565,
+    "sha256": "651c0d94b911f0e7f3aafab4d76fbe653387a2ceb7174d4a9d58cea911608cf9",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice-eval:bin:lamp-voice-eval",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-voice-eval-lamp-voice-eval-38d90eb433/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice-eval:test:it",
+    "kind": "all",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-voice-eval-it-c6dc732e1b/all.stdout.txt",
+    "bytes": 20010,
+    "sha256": "146189c334547c5280ded4eb5f24ef0e706606e57258d6ca905d49164050b2dc",
+    "names_bound_to_actual_rows": true
+  },
+  {
+    "target": "lamp-voice-eval:test:it",
+    "kind": "ignored",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/compiled-census/lamp-voice-eval-it-c6dc732e1b/ignored.stdout.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "names_bound_to_actual_rows": true
+  }
+]

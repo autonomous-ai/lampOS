@@ -1,0 +1,1072 @@
+{
+  "head": "42cf24d5a965abbc386e61672b15a4591a338607",
+  "finished_at": "2026-10-24T10:53:28.421311+00:00",
+  "runner_exit_code": 1,
+  "status": "FAILED local gate; all planned independent gates completed and every failure retained",
+  "steps": [
+    {
+      "id": "fmt",
+      "state": "passed",
+      "source_before_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "command": {
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS",
+        "started_at": "2026-10-24T09:27:32.368432+00:00",
+        "timeout_seconds": 300,
+        "stdout": "fmt.stdout.txt",
+        "stderr": "fmt.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "available_bytes_before_Cargo": 99250995200,
+        "owned_pid": 73304,
+        "owned_process_group": 73304,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 12.643883,
+        "finished_at": "2026-10-24T09:27:45.012182+00:00",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "source_after_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4"
+    },
+    {
+      "id": "clippy",
+      "state": "passed",
+      "source_before_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "command": {
+        "command": [
+          "cargo",
+          "clippy",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-body",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-expression",
+          "-p",
+          "lamp-keeper",
+          "-p",
+          "lamp-lean",
+          "-p",
+          "lamp-memory",
+          "-p",
+          "lamp-peek",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-voice-eval",
+          "--all-targets",
+          "--message-format=json-render-diagnostics",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS",
+        "started_at": "2026-10-24T09:27:50.855479+00:00",
+        "timeout_seconds": 1800,
+        "stdout": "clippy.stdout.txt",
+        "stderr": "clippy.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "available_bytes_before_Cargo": 99239297024,
+        "owned_pid": 73912,
+        "owned_process_group": 73912,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 111.534643,
+        "finished_at": "2026-10-24T09:29:42.387868+00:00",
+        "stdout_sha256": "8321793bb3dbfb3fed6e5d42e18e73e3294c55bff1a9d6f3688281df34a072b2",
+        "stdout_bytes": 417527,
+        "stderr_sha256": "4cb6bf86a57ff81c751c118325856ecaf875c89eb86cd9a09f01f757147fa5eb",
+        "stderr_bytes": 5707
+      },
+      "source_after_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "compilation": {
+        "build_finished_messages": [
+          {
+            "reason": "build-finished",
+            "success": true
+          }
+        ],
+        "compiler_error_messages": [],
+        "successful": true
+      }
+    },
+    {
+      "id": "voice-default-parallel",
+      "state": "FAILED actual tests; complete census; continue independent gates without waiver",
+      "source_before_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "command": {
+        "command": [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-voice",
+          "--no-fail-fast",
+          "--message-format=json-render-diagnostics"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS",
+        "started_at": "2026-10-24T09:29:49.915251+00:00",
+        "timeout_seconds": 5400,
+        "stdout": "voice-default-parallel.stdout.txt",
+        "stderr": "voice-default-parallel.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "available_bytes_before_Cargo": 99061248000,
+        "owned_pid": 80986,
+        "owned_process_group": 80986,
+        "timed_out": false,
+        "exit_code": 101,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 101,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 101,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 546.740914,
+        "finished_at": "2026-10-24T09:38:56.716291+00:00",
+        "stdout_sha256": "6d3962b9ffe8ef06de45607343c2b5102a622aab582bcc6b6e6d16e4464f4cdb",
+        "stdout_bytes": 727925,
+        "stderr_sha256": "5ee53a4c864911cd9086e7afa30d242bca50efddfcc35febe75fa88a5b47dff0",
+        "stderr_bytes": 5430
+      },
+      "source_after_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "execution": {
+        "source": "actual test result lines only, including any harness-compatible summaries",
+        "command_exit_code": 101,
+        "command_timed_out": false,
+        "rows": [
+          {
+            "raw": "test result: FAILED. 3711 passed; 5 failed; 15 ignored; 0 measured; 0 filtered out; finished in 398.24s",
+            "status": "FAILED",
+            "passed": 3711,
+            "failed": 5,
+            "ignored": 15,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "status": "ok",
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: FAILED. 269 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.67s",
+            "status": "FAILED",
+            "passed": 269,
+            "failed": 1,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 6,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "status": "ok",
+            "passed": 4,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s",
+            "status": "ok",
+            "passed": 6,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          }
+        ],
+        "totals": {
+          "passed": 3991,
+          "failed": 6,
+          "ignored": 21,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        "qualification": "Nonzero or timeout is still a failed/incomplete gate regardless of parsed counts; compiled inventory is not execution."
+      },
+      "compilation": {
+        "build_finished_messages": [
+          {
+            "reason": "build-finished",
+            "success": true
+          }
+        ],
+        "compiler_error_messages": [],
+        "successful": true
+      }
+    },
+    {
+      "id": "readers-default-parallel",
+      "state": "FAILED actual tests; complete census; continue independent gates without waiver",
+      "source_before_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "command": {
+        "command": [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-body",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-expression",
+          "-p",
+          "lamp-keeper",
+          "-p",
+          "lamp-lean",
+          "-p",
+          "lamp-memory",
+          "-p",
+          "lamp-peek",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice-eval",
+          "--no-fail-fast",
+          "--message-format=json-render-diagnostics"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS",
+        "started_at": "2026-10-24T09:39:10.067034+00:00",
+        "timeout_seconds": 5400,
+        "stdout": "readers-default-parallel.stdout.txt",
+        "stderr": "readers-default-parallel.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "available_bytes_before_Cargo": 97611554816,
+        "owned_pid": 46802,
+        "owned_process_group": 46802,
+        "timed_out": false,
+        "exit_code": 101,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 101,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 101,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 4306.439286,
+        "finished_at": "2026-10-24T10:50:56.647507+00:00",
+        "stdout_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "stdout_bytes": 770089,
+        "stderr_sha256": "64e95b45bf6acbd44685fd4b06131b68969a348930c6616a326d19c2a4b297b0",
+        "stderr_bytes": 67987
+      },
+      "source_after_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "execution": {
+        "source": "actual test result lines only, including any harness-compatible summaries",
+        "command_exit_code": 101,
+        "command_timed_out": false,
+        "rows": [
+          {
+            "raw": "test result: ok. 431 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.13s",
+            "status": "ok",
+            "passed": 431,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+            "status": "ok",
+            "passed": 32,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "status": "ok",
+            "passed": 2,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+            "status": "ok",
+            "passed": 5,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+            "status": "ok",
+            "passed": 3,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "status": "ok",
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 125 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s",
+            "status": "ok",
+            "passed": 125,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 166 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 16.18s",
+            "status": "ok",
+            "passed": 166,
+            "failed": 0,
+            "ignored": 2,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.70s",
+            "status": "ok",
+            "passed": 30,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 2,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.60s",
+            "status": "ok",
+            "passed": 27,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+            "status": "ok",
+            "passed": 4,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 280 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.78s",
+            "status": "ok",
+            "passed": 280,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: FAILED. 23 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 88.90s",
+            "status": "FAILED",
+            "passed": 23,
+            "failed": 4,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 39 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 5.56s",
+            "status": "ok",
+            "passed": 39,
+            "failed": 0,
+            "ignored": 1,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s",
+            "status": "ok",
+            "passed": 2,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+            "status": "ok",
+            "passed": 10,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 51 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.23s",
+            "status": "ok",
+            "passed": 51,
+            "failed": 0,
+            "ignored": 2,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 96 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 28.95s",
+            "status": "ok",
+            "passed": 96,
+            "failed": 0,
+            "ignored": 1,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s",
+            "status": "ok",
+            "passed": 8,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+            "status": "ok",
+            "passed": 8,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.79s",
+            "status": "ok",
+            "passed": 3,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.57s",
+            "status": "ok",
+            "passed": 4,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s",
+            "status": "ok",
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s",
+            "status": "ok",
+            "passed": 23,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: FAILED. 157 passed; 7 failed; 5 ignored; 0 measured; 0 filtered out; finished in 201.35s",
+            "status": "FAILED",
+            "passed": 157,
+            "failed": 7,
+            "ignored": 5,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+            "status": "ok",
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 2,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.01s",
+            "status": "ok",
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.59s",
+            "status": "ok",
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.42s",
+            "status": "ok",
+            "passed": 5,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.45s",
+            "status": "ok",
+            "passed": 2,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.21s",
+            "status": "ok",
+            "passed": 2,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.57s",
+            "status": "ok",
+            "passed": 2,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.77s",
+            "status": "ok",
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.17s",
+            "status": "ok",
+            "passed": 2,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s",
+            "status": "ok",
+            "passed": 15,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.17s",
+            "status": "ok",
+            "passed": 11,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s",
+            "status": "ok",
+            "passed": 16,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 156 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 6.27s",
+            "status": "ok",
+            "passed": 156,
+            "failed": 0,
+            "ignored": 1,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.57s",
+            "status": "ok",
+            "passed": 6,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 157 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.05s",
+            "status": "ok",
+            "passed": 157,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.20s",
+            "status": "ok",
+            "passed": 20,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 306 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 55.73s",
+            "status": "ok",
+            "passed": 306,
+            "failed": 0,
+            "ignored": 1,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 2 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.13s",
+            "status": "ok",
+            "passed": 2,
+            "failed": 0,
+            "ignored": 6,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.41s",
+            "status": "ok",
+            "passed": 31,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 120 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 7.33s",
+            "status": "ok",
+            "passed": 120,
+            "failed": 0,
+            "ignored": 2,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.14s",
+            "status": "ok",
+            "passed": 5,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 90 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 392.78s",
+            "status": "ok",
+            "passed": 90,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.11s",
+            "status": "ok",
+            "passed": 13,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 2,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 157 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2859.37s",
+            "status": "ok",
+            "passed": 157,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 1,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 1,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 378 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.68s",
+            "status": "ok",
+            "passed": 378,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 38.64s",
+            "status": "ok",
+            "passed": 7,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 238 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 284.69s",
+            "status": "ok",
+            "passed": 238,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          }
+        ],
+        "totals": {
+          "passed": 3276,
+          "failed": 11,
+          "ignored": 29,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        "qualification": "Nonzero or timeout is still a failed/incomplete gate regardless of parsed counts; compiled inventory is not execution."
+      },
+      "compilation": {
+        "build_finished_messages": [
+          {
+            "reason": "build-finished",
+            "success": true
+          }
+        ],
+        "compiler_error_messages": [],
+        "successful": true
+      }
+    },
+    {
+      "id": "workspace-build",
+      "state": "passed",
+      "source_before_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "command": {
+        "command": [
+          "cargo",
+          "build",
+          "--offline",
+          "--locked",
+          "--workspace",
+          "--message-format=json-render-diagnostics"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS",
+        "started_at": "2026-10-24T10:51:48.051622+00:00",
+        "timeout_seconds": 1800,
+        "stdout": "workspace-build.stdout.txt",
+        "stderr": "workspace-build.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "available_bytes_before_Cargo": 95055212544,
+        "owned_pid": 58083,
+        "owned_process_group": 58083,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 89.845465,
+        "finished_at": "2026-10-24T10:53:17.895038+00:00",
+        "stdout_sha256": "77d7f650888af6d698a3f3c9d6e7ad89186aa6e8b1efbca3bfebe3093e09a6f3",
+        "stdout_bytes": 450151,
+        "stderr_sha256": "c3ef7dfb5eabee1813b6d45a0bab2816d81af53b9647ddd644658fa192b02962",
+        "stderr_bytes": 7064
+      },
+      "source_after_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "compilation": {
+        "build_finished_messages": [
+          {
+            "reason": "build-finished",
+            "success": true
+          }
+        ],
+        "compiler_error_messages": [],
+        "successful": true
+      }
+    },
+    {
+      "id": "diff-check",
+      "state": "passed",
+      "source_before_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "command": {
+        "command": [
+          "git",
+          "diff",
+          "--check",
+          "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice",
+        "started_at": "2026-10-24T10:53:23.149833+00:00",
+        "timeout_seconds": 60,
+        "stdout": "diff-check.stdout.txt",
+        "stderr": "diff-check.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 64111,
+        "owned_process_group": 64111,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.120424,
+        "finished_at": "2026-10-24T10:53:23.270337+00:00",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "source_after_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4"
+    }
+  ],
+  "unrun_steps": [],
+  "each_planned_command_execution_count": 1,
+  "original_results_sha256": "04e7d1bae478d2547c6c3fff1c0910d2c956ca48e7cc5a430181499f1d67f667"
+}

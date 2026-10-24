@@ -1,0 +1,145 @@
+{
+  "head": "42cf24d5a965abbc386e61672b15a4591a338607",
+  "case_count": 4,
+  "matched_base_phases": 2,
+  "unmatched": [
+    "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+    "without_a_pause_said_expression_asks_exactly_as_before"
+  ],
+  "current_target_sha256": "bb3c9527997614bda38982ee77046aaab0ade4babf53f1446a282d4ef8fe35a7",
+  "source_file": "lampOS/crates/expression/tests/runtime.rs",
+  "source_blobs": {
+    "4a84fa5ab6a9133aeec555ec4bc0636dd953f660": "33fecb0742bb7acb22c8e46d28ce6ec222a1eeda",
+    "42cf24d5a965abbc386e61672b15a4591a338607": "33fecb0742bb7acb22c8e46d28ce6ec222a1eeda"
+  },
+  "base_failures_manifest_sha256": "ea432903f98bb0ba134d95fb03de3663fd3b335b03ca1b6175f7212477836ac8",
+  "cases": [
+    {
+      "case": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "target": "lamp-expression:test:runtime",
+      "same_reviewed_assertion_phase": true,
+      "assertion_location": "crates/expression/tests/runtime.rs:127:28",
+      "panic_message": "fresh voice and joints",
+      "current_diagnostic": {
+        "raw_file": "lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "raw_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "byte_offset": 546630,
+        "bytes": 699,
+        "sha256": "626de06cb0cef728cd997f11e49a0d75e2446f59b03bdbc7fe102e73e3c01e94",
+        "utf8": "---- enabled_output_uses_a_new_session_and_expires_after_input_loss stdout ----\n\nthread 'enabled_output_uses_a_new_session_and_expires_after_input_loss' (1649934) panicked at crates/expression/tests/runtime.rs:127:28:\nfresh voice and joints\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::enabled_output_uses_a_new_session_and_expires_after_input_loss\n   5: runtime::enabled_output_uses_a_new_session_and_expires_after_input_loss::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "base_diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 669725,
+        "original_stream_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "byte_offset": 455135,
+        "bytes": 701,
+        "sha256": "27c11da307c069253fac10b31d033e7c24b17feb8b80f0d0cef75ca719c05249",
+        "utf8": "---- enabled_output_uses_a_new_session_and_expires_after_input_loss stdout ----\n\nthread 'enabled_output_uses_a_new_session_and_expires_after_input_loss' (717996380) panicked at crates/expression/tests/runtime.rs:127:28:\nfresh voice and joints\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::enabled_output_uses_a_new_session_and_expires_after_input_loss\n   5: runtime::enabled_output_uses_a_new_session_and_expires_after_input_loss::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "source_blob_context": {
+        "4a84fa5ab6a9133aeec555ec4bc0636dd953f660": "33fecb0742bb7acb22c8e46d28ce6ec222a1eeda",
+        "42cf24d5a965abbc386e61672b15a4591a338607": "33fecb0742bb7acb22c8e46d28ce6ec222a1eeda"
+      },
+      "qualification_note": "Same concrete failed assertion phase present in the retained complete clean-base run. This is not a historical cause claim; source equality alone is not a waiver. Overall current qualification remains pending compiler provenance and other unmatched failures.",
+      "same_assertion_site_and_message": true,
+      "subphase_proven": true
+    },
+    {
+      "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "target": "lamp-expression:test:runtime",
+      "same_reviewed_assertion_phase": false,
+      "assertion_location": "crates/expression/tests/runtime.rs:1048:14",
+      "panic_message": "a light request",
+      "current_diagnostic": {
+        "raw_file": "lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "raw_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "byte_offset": 547329,
+        "bytes": 859,
+        "sha256": "44c9a3060289f43d0e0f450d8415eefbf494bea3b92c8b76faccfe9ff65e0d36",
+        "utf8": "---- only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline stdout ----\n\nthread 'only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline' (1649938) panicked at crates/expression/tests/runtime.rs:1048:14:\na light request\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline::{{closure}}\n   5: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline\n   6: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "base_diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 669725,
+        "original_stream_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "byte_offset": 455836,
+        "bytes": 861,
+        "sha256": "22cd7326f4ccb080d868d65903ba74c8200317f4c7ea7b8633363e68d652cea5",
+        "utf8": "---- only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline stdout ----\n\nthread 'only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline' (717996384) panicked at crates/expression/tests/runtime.rs:1048:14:\na light request\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline::{{closure}}\n   5: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline\n   6: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "source_blob_context": {
+        "4a84fa5ab6a9133aeec555ec4bc0636dd953f660": "33fecb0742bb7acb22c8e46d28ce6ec222a1eeda",
+        "42cf24d5a965abbc386e61672b15a4591a338607": "33fecb0742bb7acb22c8e46d28ce6ec222a1eeda"
+      },
+      "qualification_note": "Same assertion-site/message but configuration subphase unresolved; require prescribed standalone observations rather than accepting a phase waiver.",
+      "same_assertion_site_and_message": true,
+      "subphase_proven": false,
+      "subphase_limit": "The closure runs for offline_face=false and true; diagnostics do not establish which invocation failed."
+    },
+    {
+      "case": "without_a_pause_said_expression_asks_exactly_as_before",
+      "target": "lamp-expression:test:runtime",
+      "same_reviewed_assertion_phase": false,
+      "assertion_location": "crates/expression/tests/runtime.rs:1008:57",
+      "panic_message": "a body request",
+      "current_diagnostic": {
+        "raw_file": "lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "raw_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "byte_offset": 548188,
+        "bytes": 743,
+        "sha256": "fe363d5e2f23e2050d2740bcbb06050ae2f03f4b04cc99842531355e78aceafb",
+        "utf8": "---- without_a_pause_said_expression_asks_exactly_as_before stdout ----\n\nthread 'without_a_pause_said_expression_asks_exactly_as_before' (1649986) panicked at crates/expression/tests/runtime.rs:1008:57:\na body request\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::without_a_pause_said_expression_asks_exactly_as_before::{{closure}}\n   5: runtime::without_a_pause_said_expression_asks_exactly_as_before\n   6: runtime::without_a_pause_said_expression_asks_exactly_as_before::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "base_diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 669725,
+        "original_stream_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "byte_offset": 456697,
+        "bytes": 745,
+        "sha256": "f333d52aefdee69e685c735dd638b69981114338b7d56f7f52f5e95fd2f06fa4",
+        "utf8": "---- without_a_pause_said_expression_asks_exactly_as_before stdout ----\n\nthread 'without_a_pause_said_expression_asks_exactly_as_before' (717996422) panicked at crates/expression/tests/runtime.rs:1008:57:\na body request\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::without_a_pause_said_expression_asks_exactly_as_before::{{closure}}\n   5: runtime::without_a_pause_said_expression_asks_exactly_as_before\n   6: runtime::without_a_pause_said_expression_asks_exactly_as_before::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "source_blob_context": {
+        "4a84fa5ab6a9133aeec555ec4bc0636dd953f660": "33fecb0742bb7acb22c8e46d28ce6ec222a1eeda",
+        "42cf24d5a965abbc386e61672b15a4591a338607": "33fecb0742bb7acb22c8e46d28ce6ec222a1eeda"
+      },
+      "qualification_note": "Same assertion-site/message but configuration subphase unresolved; require prescribed standalone observations rather than accepting a phase waiver.",
+      "same_assertion_site_and_message": true,
+      "subphase_proven": false,
+      "subphase_limit": "The closure runs for said=None and Some(false); diagnostics do not establish which invocation failed."
+    },
+    {
+      "case": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+      "target": "lamp-expression:test:runtime",
+      "same_reviewed_assertion_phase": true,
+      "assertion_location": "crates/expression/tests/runtime.rs:943:13",
+      "panic_message": "journal fixture host watchdog",
+      "current_diagnostic": {
+        "raw_file": "lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "raw_sha256": "cd67be234d41b5c22c6aa054f5a80fc253f2dc37652152374093f236a364c993",
+        "byte_offset": 548931,
+        "bytes": 663,
+        "sha256": "0233e9fa367a7ccf675935d0229624d53cfc1136ce7a7f8ccc96f502facc6af8",
+        "utf8": "---- sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service stdout ----\n\nthread 'sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service' (1649945) panicked at crates/expression/tests/runtime.rs:943:13:\njournal fixture host watchdog\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: runtime::sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service\n   3: runtime::sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "base_diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 669725,
+        "original_stream_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "byte_offset": 457442,
+        "bytes": 665,
+        "sha256": "cdb0107123a19a11a6bb69d2b349625d70064b2378385a4023df6f5bfb0fe625",
+        "utf8": "---- sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service stdout ----\n\nthread 'sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service' (717996391) panicked at crates/expression/tests/runtime.rs:943:13:\njournal fixture host watchdog\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: runtime::sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service\n   3: runtime::sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "source_blob_context": {
+        "4a84fa5ab6a9133aeec555ec4bc0636dd953f660": "33fecb0742bb7acb22c8e46d28ce6ec222a1eeda",
+        "42cf24d5a965abbc386e61672b15a4591a338607": "33fecb0742bb7acb22c8e46d28ce6ec222a1eeda"
+      },
+      "qualification_note": "Same concrete failed assertion phase present in the retained complete clean-base run. This is not a historical cause claim; source equality alone is not a waiver. Overall current qualification remains pending compiler provenance and other unmatched failures.",
+      "same_assertion_site_and_message": true,
+      "subphase_proven": true
+    }
+  ],
+  "same_assertion_site_count": 4
+}

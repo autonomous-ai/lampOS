@@ -1,0 +1,261 @@
+{
+  "head": "42cf24d5a965abbc386e61672b15a4591a338607",
+  "frozen_base": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+  "scope": "Current Voice phase complete; reader failures still unknown until terminal. Original frozen comparison remains separately published.",
+  "matched_failures": [
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "current_status": "FAILED",
+      "current_executable_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "current_diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_sha256": "6d3962b9ffe8ef06de45607343c2b5102a622aab582bcc6b6e6d16e4464f4cdb",
+        "byte_offset": 690551,
+        "bytes": 3272,
+        "sha256": "dea7e9d8d2808fabbc7595e2658323d08f5e819ee8ebf81041f165626774c055",
+        "utf8": "---- coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture stdout ----\n{\"seconds\":null,\"status\":\"listening_ready\"}\nlamp-voice: the body was pushed: the search ended; its look's picture is dropped; its turn in hand is cut\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 18821 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"look_dropped\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"speaker_rejected\", \"worker_shutdown_event\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (None, false, false)]\n\nthread 'coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture' (1552166) panicked at crates/voice/src/coordinator/tests/second_route.rs:384:9:\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 18821 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"look_dropped\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"speaker_rejected\", \"worker_shutdown_event\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (None, false, false)]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::panic_display\n   3: lamp_voice::coordinator::tests::second_route::Run::assert_clean\n   4: lamp_voice::coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture\n   5: lamp_voice::coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "disposition": "matched reviewed frozen-base failure",
+      "source_path": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+      "whole_source_byte_equal": true,
+      "source_sha256": "418607b8c2f0b03895b7f4f083bd0fbe69e17045c07d7de1ff50ad8e0ca2afb4",
+      "same_assertion_phase_markers": [
+        "second_route.rs:384:9",
+        "scenario host watchdog; verified cleanup failed",
+        "exit observation timed out (5 occurrences)"
+      ],
+      "issue_owner": "#1569 / Tests",
+      "base_diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 627692,
+        "bytes": 3274,
+        "sha256": "3c7cdf744815a24ac1e498a3cfbcaee6642ba08ed7d24697bd877deaa1ecd299",
+        "utf8": "---- coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture stdout ----\n{\"seconds\":null,\"status\":\"listening_ready\"}\nlamp-voice: the body was pushed: the search ended; its look's picture is dropped; its turn in hand is cut\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 43867 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"look_dropped\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"speaker_rejected\", \"worker_shutdown_event\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (None, false, false)]\n\nthread 'coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture' (717862251) panicked at crates/voice/src/coordinator/tests/second_route.rs:384:9:\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 43867 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"look_dropped\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"speaker_rejected\", \"worker_shutdown_event\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (None, false, false)]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::panic_display\n   3: lamp_voice::coordinator::tests::second_route::Run::assert_clean\n   4: lamp_voice::coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture\n   5: lamp_voice::coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "limit": "Same case, unchanged source and same failed assertion phase; no historical cause, idle-host or timing-improvement claim."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives",
+      "current_status": "FAILED",
+      "current_executable_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "current_diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_sha256": "6d3962b9ffe8ef06de45607343c2b5102a622aab582bcc6b6e6d16e4464f4cdb",
+        "byte_offset": 697544,
+        "bytes": 859,
+        "sha256": "f2d6db77fd3e6f5d0dd451527d642580bbf3725e5a70425806e7eb05e2249155",
+        "utf8": "---- hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives stdout ----\n\nthread 'hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives' (1587761) panicked at crates/voice/src/hand_controls/tests.rs:1529:13:\nthe touch never arrived: Health { received: 2, rejected: 1, lost: 0, reconnects: 0, discontinuities: 2, pump_running: false, persistence_failed: false }\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::hand_controls::tests::head_touch_rounds\n   3: lamp_voice::hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives\n   4: lamp_voice::hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "disposition": "matched reviewed frozen-base failure",
+      "source_path": "lampOS/crates/voice/src/hand_controls/tests.rs",
+      "whole_source_byte_equal": true,
+      "source_sha256": "3c3ce295763a7fe92c90535ca91fd4d5865a9effcb784963e09b2b77164cffaf",
+      "same_assertion_phase_markers": [
+        "hand_controls/tests.rs:1529:13",
+        "the touch never arrived: Health { received: 2, rejected: 1, lost: 0, reconnects: 0, discontinuities: 2, pump_running: false, persistence_failed: false }"
+      ],
+      "issue_owner": "#1569 / Tests",
+      "base_diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 632658,
+        "bytes": 861,
+        "sha256": "f43b5b30f221e79eb2fa9d1f9b8296bd7ba1c399ebe774a6db066ca892bd114c",
+        "utf8": "---- hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives stdout ----\n\nthread 'hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives' (717893356) panicked at crates/voice/src/hand_controls/tests.rs:1529:13:\nthe touch never arrived: Health { received: 2, rejected: 1, lost: 0, reconnects: 0, discontinuities: 2, pump_running: false, persistence_failed: false }\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::hand_controls::tests::head_touch_rounds\n   3: lamp_voice::hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives\n   4: lamp_voice::hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "limit": "Same case, unchanged source and same failed assertion phase; no historical cause, idle-host or timing-improvement claim."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "current_status": "FAILED",
+      "current_executable_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "current_diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_sha256": "6d3962b9ffe8ef06de45607343c2b5102a622aab582bcc6b6e6d16e4464f4cdb",
+        "byte_offset": 698403,
+        "bytes": 870,
+        "sha256": "ab26b360eadf6d6e571ada2e55d4b21f5877f647d87a34e0b73a9928154e952c",
+        "utf8": "---- privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second stdout ----\n\nthread 'privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second' (1591156) panicked at crates/voice/src/privacy_bus.rs:1313:25:\nthe host stalled in 10 of 10 attempts: privacy publisher unavailable\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second\n   3: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "disposition": "matched reviewed frozen-base failure",
+      "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "whole_source_byte_equal": true,
+      "source_sha256": "0c5187d595c326fda96aed34ca1c8faeb387bc946c34a23900c95480973c0674",
+      "same_assertion_phase_markers": [
+        "privacy_bus.rs:1313:25",
+        "the host stalled in 10 of 10 attempts: privacy publisher unavailable"
+      ],
+      "issue_owner": "#3315 / Tests",
+      "base_diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 639949,
+        "bytes": 871,
+        "sha256": "ab6a43cc86c3b66e8710d8f522997589edd6e6ab63fcca785ac6b2dd69509b6b",
+        "utf8": "---- privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second stdout ----\n\nthread 'privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second' (717900248) panicked at crates/voice/src/privacy_bus.rs:1313:25:\nthe host stalled in 10 of 10 attempts: privacy publisher unavailable\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second\n   3: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "limit": "Same case, unchanged source and same failed assertion phase; no historical cause, idle-host or timing-improvement claim.",
+      "category_precision": "Ten attempts exhausted; only the final reported reason is publisher unavailable. Earlier individual reason categories were not recorded."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "current_status": "FAILED",
+      "current_executable_sha256": "a10b677e9964105cc2e1c4520176ed5673a36d0f637b6e9db42dd20eadb8b40f",
+      "current_diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_sha256": "6d3962b9ffe8ef06de45607343c2b5102a622aab582bcc6b6e6d16e4464f4cdb",
+        "byte_offset": 724489,
+        "bytes": 1233,
+        "sha256": "c4e0455102ff96dc52ee7140bd330c3aa21c0b3f34edb41aa89d82d7d7000e46",
+        "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [19.596512ms, 19.829849ms, 22.374837ms, 31.021801ms, 39.95119ms, 43.780721ms, 44.001296ms, 44.989698ms, 59.63044ms, 62.297939ms, 62.520906ms, 65.588784ms, 77.671648ms, 97.248714ms, 119.839058ms, 165.009813ms, 170.039629ms, 175.708726ms, 175.907831ms, 213.880664ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (1618330) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[19.596512ms, 19.829849ms, 22.374837ms, 31.021801ms, 39.95119ms, 43.780721ms, 44.001296ms, 44.989698ms, 59.63044ms, 62.297939ms, 62.520906ms, 65.588784ms, 77.671648ms, 97.248714ms, 119.839058ms, 165.009813ms, 170.039629ms, 175.708726ms, 175.907831ms, 213.880664ms]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\n   3: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "disposition": "matched reviewed frozen-base failure",
+      "source_path": "lampOS/crates/voice/tests/it/light_call.rs",
+      "whole_source_byte_equal": true,
+      "source_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+      "same_assertion_phase_markers": [
+        "light_call.rs:90:5",
+        "light calls, fastest to slowest:"
+      ],
+      "issue_owner": "#3315 / Tests",
+      "base_diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 668892,
+        "bytes": 1247,
+        "sha256": "2b08efaa680ec373732818af7c6787191d0085eb9aa42afff20057c9d7daea85",
+        "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [23.075348ms, 27.16757ms, 43.833614ms, 44.032555ms, 46.669106ms, 59.052675ms, 63.048043ms, 87.220159ms, 102.111023ms, 105.964428ms, 106.352192ms, 108.157489ms, 108.403002ms, 109.60175ms, 120.718382ms, 125.785744ms, 127.273197ms, 140.786342ms, 161.497947ms, 185.122805ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (717937690) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[23.075348ms, 27.16757ms, 43.833614ms, 44.032555ms, 46.669106ms, 59.052675ms, 63.048043ms, 87.220159ms, 102.111023ms, 105.964428ms, 106.352192ms, 108.157489ms, 108.403002ms, 109.60175ms, 120.718382ms, 125.785744ms, 127.273197ms, 140.786342ms, 161.497947ms, 185.122805ms]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\n   3: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "limit": "Same case, unchanged source and same failed assertion phase; no historical cause, idle-host or timing-improvement claim.",
+      "strict_predicate": "sorted index10 <25ms",
+      "current_index10_ms": 62.520906
+    }
+  ],
+  "pending_standalone": [
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+      "current_status": "FAILED",
+      "current_executable_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "current_diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_sha256": "6d3962b9ffe8ef06de45607343c2b5102a622aab582bcc6b6e6d16e4464f4cdb",
+        "byte_offset": 689923,
+        "bytes": 628,
+        "sha256": "fb71a16d7918655a3baf7763bd65feb6e67df83d4fb241158ae779cb35dd6b0a",
+        "utf8": "---- body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found stdout ----\n\nthread 'body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found' (1518162) panicked at crates/voice/src/body_motion.rs:389:9:\nStill\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found\n   3: lamp_voice::body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "disposition": "exactly three standalone observations required after full gate terminal"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer",
+      "current_status": "FAILED",
+      "current_executable_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "current_diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/run-2026-10-24T092342.867399Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_sha256": "6d3962b9ffe8ef06de45607343c2b5102a622aab582bcc6b6e6d16e4464f4cdb",
+        "byte_offset": 693823,
+        "bytes": 3721,
+        "sha256": "82aeb42dcefa8e128470ee99fe005398f85fcd97e3d8e4b1c3a386d12cb13b32",
+        "utf8": "---- coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer stdout ----\n{\"seconds\":null,\"status\":\"listening_ready\"}\nlamp-voice: the body was pushed: the search ended; its turn in hand is cut\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 20107 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"speech_final_sample_retired\", \"turn_finished\", \"look_full_still\", \"input_admitted\", \"ring_requested\", \"ring_feedback\", \"provider_input_started\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking, Waiting]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (Some(2), true, false), (None, true, false), (None, false, false)]\n\nthread 'coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer' (1552421) panicked at crates/voice/src/coordinator/tests/second_route.rs:384:9:\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 20107 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"speech_final_sample_retired\", \"turn_finished\", \"look_full_still\", \"input_admitted\", \"ring_requested\", \"ring_feedback\", \"provider_input_started\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking, Waiting]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (Some(2), true, false), (None, true, false), (None, false, false)]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::panic_display\n   3: lamp_voice::coordinator::tests::second_route::Run::assert_clean\n   4: lamp_voice::coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer\n   5: lamp_voice::coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "disposition": "exactly three standalone observations required after full gate terminal"
+    }
+  ],
+  "qualified_yet": false,
+  "new_execution": false
+}

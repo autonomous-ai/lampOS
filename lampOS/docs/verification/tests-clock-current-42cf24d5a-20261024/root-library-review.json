@@ -1,0 +1,10 @@
+{
+  "audit_sha256": "dc6754ce9ba144becd8fdb1e7c97c711fd5574c84b2551c2374a979706f856f2",
+  "compiler_messages_byte_verified": 171,
+  "distinct_raw_streams": 4,
+  "promotion_aliases_independently_byte_verified": 4,
+  "unresolved": 0,
+  "result": "current-run local compiler provenance accepted; not test qualification or causal evidence",
+  "source_mtimes": "deliberately refreshed before Cargo; disclosed",
+  "exact_path_reuses_independently_traced": 4
+}

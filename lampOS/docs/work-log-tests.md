@@ -4222,3 +4222,9 @@ Read Fourth's demonstrated stale-library finding and put current clock qualifica
 Ready for lamp-voice: no
 
 Prepared the own isolated e63 diagnostic branch and applied only the reviewed timeout probe, verifying both source hashes, unchanged mode, one dirty path and diff checks. No compilation or observation ran and no target was touched. Original Phone and clock source remain clean. The clock carry merges cleanly with train 84; its complete reader outcome and library provenance are still pending. All three own PRs are inventoried and remain drafts. [Allocation and host-workload context](verification/tests-update-diagnostic-allocation-20261024/).
+
+## 24 October, 18:05 — Complete current clock run, provenance resolved
+
+Ready for lamp-voice: no
+
+Frozen `42cf24d5a` completed: 7,267 passed / 17 failed / 50 ignored; all 88 authored cases passed. Every target and case is bound, with unchanged source bytes/modes/symlinks. Fmt, strict Clippy, workspace build and diff checks passed. Resolved all 171 local compiler records, independently verifying raw messages, four exact-path reuses and four byte-equal promoted rlibs; the source-mtime refresh remains disclosed. Six failures match complete frozen-base phases; eleven require 33 planned standalone observations. Exact old Memory child programs were frozen because the workspace build replaced their paths; no standalone has run pending bounded artifact restoration review. [Complete run and all failures](verification/tests-clock-current-42cf24d5a-20261024/root-review.md).

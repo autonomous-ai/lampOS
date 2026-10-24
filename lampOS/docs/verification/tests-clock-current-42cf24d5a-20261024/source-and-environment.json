@@ -1,0 +1,95 @@
+{
+  "identity": {
+    "worktree": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice",
+    "head": "42cf24d5a965abbc386e61672b15a4591a338607",
+    "base_tree": "1c0e32d045a022fe2d3f7a8bd140e4f7e384e111",
+    "qualification_base": "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46",
+    "branch": "tests/1569-boot-clock-current",
+    "tracked_paths": 10363,
+    "lampos_paths": 7008,
+    "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+    "owned_paths": [],
+    "combined_authored_paths": [
+      "lampOS/crates/voice/src/coordinator/second.rs",
+      "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "lampOS/crates/voice/src/scenario_clock.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/stop_words.rs",
+      "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "source_map_sha256": "78193464ce9afa5a861cb7d6c3e3ae5e612201e9dedb07670cc307d8ab8f0e90",
+    "clean_committed_source": true
+  },
+  "source_unchanged": true,
+  "source_before_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+  "source_after_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+  "freshness": {
+    "mtime_ns": 1792833824714310000,
+    "paths": 10363,
+    "before_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+    "after_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+    "bytes_modes_symlinks_identical": true
+  },
+  "per_stage_source_guards": [
+    {
+      "step": "fmt",
+      "before": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "after": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4"
+    },
+    {
+      "step": "clippy",
+      "before": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "after": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4"
+    },
+    {
+      "step": "voice-default-parallel",
+      "before": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "after": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4"
+    },
+    {
+      "step": "readers-default-parallel",
+      "before": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "after": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4"
+    },
+    {
+      "step": "workspace-build",
+      "before": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "after": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4"
+    },
+    {
+      "step": "diff-check",
+      "before": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "after": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4"
+    }
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "RUST_BACKTRACE": "1",
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_TARGET_TMPDIR": null,
+    "RUSTC_WRAPPER": null,
+    "RUSTC_WORKSPACE_WRAPPER": null,
+    "LAMP_RELAY_PID_CONTROL_DIR": null
+  },
+  "PATH_prefix": "/Users/autonomous/.cargo/bin:",
+  "socket_preflight": "AF_UNIX datagram and IPv4 loopback succeeded before Cargo",
+  "source_map_metadata": {
+    "external_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/source-map.json",
+    "bytes": 2851393,
+    "sha256": "78193464ce9afa5a861cb7d6c3e3ae5e612201e9dedb07670cc307d8ab8f0e90"
+  },
+  "platform": "Rusthost x86_64-apple-darwin, no local ARM build or lamp action."
+}

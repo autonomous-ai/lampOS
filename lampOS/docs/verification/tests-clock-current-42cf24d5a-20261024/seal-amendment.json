@@ -1,0 +1,10 @@
+{
+  "original_sha256": "5d71a53fb5971e2446c3508808af4ba28cce7842ccd6171877c7234dfff5d0f9",
+  "amended_sha256": "b5ec1d3dc94c9feea417b9921bda1628b174ae027b10fbe9e494f4cefc9a1ce3",
+  "single_replacement": {
+    "before": "lineage=Q/(PR+'-local-artifact-freshness.json')",
+    "after": "lineage=Q/(PR+'-local-artifact-freshness-resolved.json')"
+  },
+  "new_execution": false,
+  "note": "Read-only completed-run projection; resolved library audit selected, initial report retained separately."
+}

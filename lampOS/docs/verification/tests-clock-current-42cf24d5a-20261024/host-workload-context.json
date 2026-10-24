@@ -1,0 +1,21 @@
+{
+  "source": "42cf24d5a965abbc386e61672b15a4591a338607",
+  "run": "3190-current-c6dfe/run-2026-10-24T092342.867399Z",
+  "exclusive_target": "qualification/cargo-target",
+  "concurrent_host_work": [
+    {
+      "operation": "Root initialized a separate isolated diagnostic source worktree; no Rust/Cargo execution",
+      "started_utc": "2026-10-24T10:16:00Z",
+      "start_precision": "Parent-reported minute, not measured by this worker",
+      "observation": "Source checkout completed; original Phone and frozen42source/target were unchanged.",
+      "completed_utc": "2026-10-24T10:38:50Z",
+      "completion_source": "Parent reported native18424 terminal0; no compile or executable observation."
+    }
+  ],
+  "claims_not_made": [
+    "No equal-load or idle-host assertion",
+    "No causal attribution of slow Update progress to the concurrent checkout",
+    "No before/after timing improvement inferred from these full-run wall times"
+  ],
+  "source_mutation": "Current frozen Voice source and target were not edited or cleaned by that checkout per parent report."
+}
