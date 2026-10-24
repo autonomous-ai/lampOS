@@ -1,0 +1,55 @@
+{
+  "train": 85,
+  "pr": 3368,
+  "landed": "6902cf8e203d165f63e73059d2747a9ec7002642",
+  "tested_merge": "c8974a3959879524fddece09e8646406f71a4bb4",
+  "tree": "aa4ad726239a901e4cb760740c539c08c8614bc4",
+  "complete_landed_tree_equals_tested_tree": true,
+  "ordinary_run": 40086166780,
+  "ordinary": {
+    "pass": 11227,
+    "leak": 1,
+    "failed": 0,
+    "unrun": 0,
+    "skipped": 106,
+    "seconds": 201.195
+  },
+  "clippy_run": 40086166798,
+  "pair_run": 40086166683,
+  "authored_head": "e14e3c51b64dcd03dcbf8a3374dac45c6f467960",
+  "authored_files": [
+    {
+      "path": ".github/workflows/lampos-surround-candidate-pair.yml",
+      "authored_sha256": "30d5a8e3a7da1e4b3ceb69553510a5f559a4bcbd34a0ad20554e1da0d541a5b5",
+      "landed_sha256": "30d5a8e3a7da1e4b3ceb69553510a5f559a4bcbd34a0ad20554e1da0d541a5b5",
+      "whole_file_equal": true
+    },
+    {
+      "path": "lampOS/crates/surround/tests/release_pair.rs",
+      "authored_sha256": "a9cf03be7da8e571b77678a79cdda62646e2f2500827e3515831060e2a5079fb",
+      "landed_sha256": "a9cf03be7da8e571b77678a79cdda62646e2f2500827e3515831060e2a5079fb",
+      "whole_file_equal": true
+    },
+    {
+      "path": "lampOS/crates/surround/tests/release_pair/README.md",
+      "authored_sha256": "9114787f5b6fac786037e6baf70f83c63749cdf86f9e217d934513c7f19a8033",
+      "landed_sha256": "9114787f5b6fac786037e6baf70f83c63749cdf86f9e217d934513c7f19a8033",
+      "whole_file_equal": true
+    },
+    {
+      "path": "lampOS/crates/surround/tests/release_pair/fixture.rs",
+      "authored_sha256": "058fa6326bc12bfcbcbc06e292d00cd32474ebb4d95713dfe398185689d70546",
+      "landed_sha256": "058fa6326bc12bfcbcbc06e292d00cd32474ebb4d95713dfe398185689d70546",
+      "whole_file_equal": true
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "authored_sha256": "83fd257f9b199ba7f25d6976b15743a4b067bd29f829220153ee7058ca2c5943",
+      "landed_sha256": "0788dc9930dcc784ef180eb6eb9a0596693e0fdf96d099ca03c0a49ff9f8bdc4",
+      "whole_file_equal": false,
+      "authored_addition_preserved": true,
+      "base_document_additions_prevent_whole_file_identity": true
+    }
+  ],
+  "primary_ordinary_log_sha256": "f8875cd3e02e8a85fd7764d13755913cd86155e6eb68cd7caf2d9269d819e2df"
+}
