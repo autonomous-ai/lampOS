@@ -1,5 +1,19 @@
 # Reviewer work log
 
+## 2026-10-24 (reviewer-two completed stop-word second read at 14:52 +07)
+
+#3345 READ-OK 53716252fa55755e19120f87bdfb40e4b298fa1d posted 6381673458; Queue completion/next 6381674217. Root full exact-head Mac gate passes formatting, strict Voice Clippy and serial tests 3,996/0/21 ignored in 811.61 seconds, including library 3,715/0/15 and integration 270/0. All 6,990 source hashes unchanged, exact export removed. Source read and original native evidence have no P1/P2: 11,198 PASS plus one Voice journal LEAK, 90 skipped, no failed/unrun, all 39 stop_words controls pass. Complete preview tree equals authored head and contains tested current base 411965dcb. Final PR head checked unchanged and ready. Fixed backoff/reset, late-close and journal-rate P3s remain; synthetic sub-450 millisecond assertions are not physical/real-relay latency evidence.
+
+#3342 author is correcting the receipt-stage P3 locally and has held draft; no new pushed head at last check. Its prior results stay tied to 7fc275d47. #3333 full-record P2 fix remains awaiting pushed qualification. #3319 and #3331 retain their separate integration/played limits. All ready eligible PRs are read, held or assigned. Continue incoming correction reads and the five-minute Queue watch without ending the turn. Own review log only, main inherited pr.json untouched; no product edit, manual merge, CI rerun, device/provider or released-binary execution.
+
+## 2026-10-24 (reviewer-two prepared composition read at 14:42 +07)
+
+#3330 READ-OK 4f44e25b49dfec41d93454f95d5d5fc70696ebad posted 6381566988 for the prepared eight-case composition. Original ordinary attempt 2 of run 40073299536 is SUCCESS on unchanged head, preview fbfd214bb and configuration: 7,351 literal PASS plus one LEAK, 49 skipped, zero failed/unrun. Both deadline controls and formerly failing room-state case pass; root verified primary SHA256 92fe37eb1e2ad6fdbb7b5ef254fba0626b8d9da74d76e2f39268eabf98c2d5b3. Original attempt 1 and its failed block remain byte-identical, with 1,349 unrun cases retained. The later pass does not establish original uptime/cause or repair the assigned clock hazard. Source review, local 516/0/9, dedicated 8/0 and strict Clippy are complete. Gate-pending HOLD superseded for the prepared source; parent/current-base carry remains required, and the draft is not a merge authorization.
+
+#3345 native evidence on 53716252fa55755e19120f87bdfb40e4b298fa1d is independently checked: original attempt-1 ARM 40073230299 has 11,198 PASS plus one journal LEAK, 90 skipped, zero failed/unrun; all 39 stop_words controls pass. Strict Clippy 40073230301 passes. Both primary hashes verified. Full preview 58f2347d6 tree equals authored tree, containing current base 411965dcb. Synthetic latency assertions are distinct from device measurements. Root Mac formatting and strict Voice Clippy pass; serial tests active, so no final READ-OK yet.
+
+No reviewer-initiated CI rerun, product change, manual merge or device/provider action. Continue current Voice gate and new incoming corrections in the same turn.
+
 ## 2026-10-24 (reviewer-two current-head native and local follow-through at 14:38 +07)
 
 #3330 exact 4f44e25b49dfec41d93454f95d5d5fc70696ebad now passes root Mac formatting, strict Skills Clippy and serial tests 516/0/9 ignored in 318.90 seconds. All 6,976 source hashes unchanged and exact export removed. Posted 6381536700. The original ordinary ARM Voice Unknown/Quiet failure and 1,349 unrun cases remain HOLD, separately from native dedicated eight-case success. Three original primary hashes checked. Author-announced official retry is a separate observation under audit; reviewer has not rerun CI.
