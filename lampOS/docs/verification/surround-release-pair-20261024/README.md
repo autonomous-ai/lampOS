@@ -23,8 +23,13 @@ private isolation/removal. Artifact 12556506712 is 921,887 bytes; verified
 API ZIP SHA-256 `0dfb969921302bc0f9c5c2c2494c84b20a141ca4ca64ef18f0715a74c66651cc`.
 Its evidence archive equals the gh download. No archive/binary/credential
 payload is committed here. Fresh strict Linux Clippy **40083987741** passes.
-Ordinary ARM64 **40083987635** and independent corrected-head read remain
-pending. All original-head results below stay historical and distinct.
+Ordinary ARM64 **40083987635** passes: **11,213 PASS + 1 LEAK**, zero
+failed/unrun, 106 skipped; all three ordinary Surround controls pass.
+The own process harness passes **12/0**, relay signals are OK and doc tests
+complete. [Terminal identities, log hashes and selected original lines](final-native/)
+bind ordinary and Clippy to the same tested merge. The separate Voice LEAK
+stays labelled LEAK; its cause and cleanup are not qualified here.
+Independent corrected-head disposition remains pending. All original-head results below stay historical and distinct.
 
 ---
 

@@ -1,0 +1,39 @@
+{
+  "authored_head": "e14e3c51b64dcd03dcbf8a3374dac45c6f467960",
+  "tested_merge": "1afef874944a4dee33856dfc1280da635c2d819c",
+  "base": "51767ec057b9407b43690fa4e130353d1e22291f",
+  "ordinary": {
+    "run": 40083987635,
+    "status": "completed",
+    "conclusion": "success",
+    "executed": 11214,
+    "pass": 11213,
+    "leak": 1,
+    "failed": 0,
+    "unrun": 0,
+    "skipped": 106,
+    "seconds": 206.754,
+    "current_cli_smoke": "passed",
+    "http_controls": 2,
+    "relay_signals": "ok",
+    "process_checks": {
+      "passed": 12,
+      "failed": 0
+    },
+    "primary_log_sha256": "95898f1768453cfccb97e24feb494e0b5686e04e030d183920bb3de240ee0c57"
+  },
+  "clippy": {
+    "run": 40083987741,
+    "conclusion": "success",
+    "primary_log_sha256": "ea8a877881a77378094763a739bffa51deb5ab82be193beb445c8d98d24c1d56"
+  },
+  "pair": {
+    "run": 40083987649,
+    "conclusion": "success",
+    "passed": 2,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 3
+  },
+  "limits": "The known separate Voice LEAK remains LEAK; no teardown or physical acceptance claim. Excerpts are selected text, not full byte-identical logs."
+}

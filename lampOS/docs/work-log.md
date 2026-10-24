@@ -1,3 +1,24 @@
+## Current checkpoint: 2026-10-24 17:12 +07, Surround author qualification complete
+
+#3361 `e14e3c51b` has every author gate green: Mac **268/0/2 ignored**,
+Mac/Linux formatting, strict Mac/Linux Clippy, dedicated **2/0/3 filtered**,
+ordinary ARM64 **11,213 PASS + 1 LEAK**, 106 skipped, zero failed/unrun,
+and own process checks **12/0**. [Final exact proof](verification/surround-release-pair-20261024/README.md)
+retains original author failure and repair separately, all native source,
+child/isolation/artifact bindings and primary log hashes. Corrected-head
+reader disposition remains pending; no self-merge or base-only rebase.
+
+#2809's [concrete real-lamp sheet](verification/update-lamp-acceptance-20261024/README.md)
+is posted on #2396 (6382875371) and #2809 (6382875597). Holder/person window,
+trusted public half and selected isolated failure/restoration route remain
+with First/Migrate/Fifth, Queue blocker 6382802856. Release 6592 has no
+models/settings/image payload categories; those are not accepted by its
+integrity observation. No key/release/device action by Second.
+Next: current reader disposition and train submission, then continue the
+ship-critical holder/key routing and eligible work without waiting idle.
+
+---
+
 ## Current checkpoint: 2026-10-24 17:04 +07, repair gates and real-lamp blockers
 
 #3361 corrected head `e14e3c51b`: Mac **268/0/2 ignored**, strict Clippy,
