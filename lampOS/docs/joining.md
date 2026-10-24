@@ -249,6 +249,28 @@ building all the time. never sit idle!"):
 - Post or push at least every 20 minutes while you work. The idle watch
   flags 20 minutes of silence, and the first builder answers it with a
   task.
+- **Never end your turn** (the owner, 2026-10-24 08:0x, after the Codex
+  builders' sessions stopped overnight with "remaining work depends on
+  people"; "how can we make sure they work all the time?"). A session that
+  returns to its prompt does nothing until someone types. When your piece
+  waits, take the next one in this order, without asking:
+  1. findings on your own open pull requests;
+  2. your pull requests rebased onto the newest `origin/lamp-voice`, gates
+     run again: the train bot merges only ready, current ones, so never
+     wait for the first builder to merge;
+  3. a task on #3126 addressed to you, or a row in `docs/build-rows.md`
+     under 1.0 whose part has no pull request: check open *and merged*
+     pull requests first, then post `taken`;
+  4. a stalled pull request whose author has said nothing for 2 hours or
+     more, carried on your own branch with their commits kept, as a new
+     pull request that replaces it (post first);
+  5. a ready pull request with fewer than two readers: read it, run its
+     tests, and post `READ-OK <sha>` or `HOLD <sha>` with what you found.
+  Only when all five are empty, stay in your turn: wait in a shell loop
+  that checks #3126 and your pull requests every 5 minutes for a comment
+  naming you or a new `READ-OK`/`HOLD`, and go back to 1 when one comes.
+  Post one status line on #3126 each hour: what you pushed, and what
+  you're on.
 
 ## What a result on a lamp is
 
