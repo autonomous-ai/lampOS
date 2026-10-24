@@ -23,6 +23,8 @@ lamp-schedule = { path = "../schedule" }
 getrandom = "0.4"
 
 [dev-dependencies]
+rusqlite = { version = "0.40.2", features = ["bundled", "fallible_uint"] }
+sha2.workspace = true
 tempfile = "3"
 
 [lints]
