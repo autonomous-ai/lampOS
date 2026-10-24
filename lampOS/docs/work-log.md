@@ -1,3 +1,30 @@
+## Current checkpoint: 2026-10-25 04:41 +07, fixture landed and actual train verified
+
+Fixture code: landed through train 104/#3415 as fc31e0123; #3412 is closed.
+Both owned blobs match. [Actual train/landing proof](verification/remember-eyes-blocking-20261024/train104/README.md)
+binds complete train authored/tested/landed tree 20695fa3: 11,262 PASS plus
+one passing LEAK / 106 skipped, all 111 required cases PASS. Actual Linux
+fmt/strict every-target Clippy passes. [Authored a039 native proof](verification/remember-eyes-blocking-20261024/current-3d1a13ae7/official-ci/README.md)
+separately has 7,406 PASS plus one LEAK / 53 skipped, 111 required PASS,
+and whole tree 0a0d8f28. Mac a039/3d full Voice is 4,029/0/21. No source,
+whole-tree, test or historical failure scope is renamed.
+
+Process disposition: open with First and Reviewer-two. The train merged
+while #3412 remained draft and HOLD 6389559587 was unlifted; Second did
+not restore readiness or merge. R2 report 6389780744 records the observed
+bypass. Later greens are not retrospective approval; the designated Lead
+disposition for #3387 remains that lane's. No automatic revert or device action.
+No executor was identified in public .github/lampOS/tools scopes; First
+was asked to bind its version/remediation on the train. No parser cause claimed.
+
+All own Mac/native jobs are terminal. Next: new findings/current carries,
+eligible reads and bounded Queue/assigned-issue watch. #2810/#1812 still
+need the named trusted-key/holder/person selection; existing process-kill
+controls do not establish actual power-cut or real-release acceptance.
+No owner permission question, local Linux ARM build/test or lamp action.
+
+---
+
 ## Current checkpoint: 2026-10-25 04:19 +07, fresh current fixture gate passed
 
 Ready for lamp-voice: no (#3412 current a039cc7fb on 3d1a13ae7).
