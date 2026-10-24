@@ -690,53 +690,74 @@ const ASKS_TO_REMEMBER: &[&[&str]] = &[
     &["remember", "what", "i", "look", "like"],
     &["learn", "my", "face"],
     &["save", "my", "face"],
-    &["keep", "my", "face"],
 ];
 
 /// Words anywhere in a line that make it no plain ask to remember them: a
 /// refusal or a wish not to be kept ("I'd rather you didn't remember me",
-/// "Please never remember me"), and any word ending in "n't" ("I don't want
-/// you to remember my face", "You shouldn't remember me"). With one, the
-/// model is asked as before (reviewer-three's P2 on #3298).
+/// "Please never remember me", "You cannot remember my face"), any word
+/// ending in "n't" ("I don't want you to remember my face"), and the same
+/// words written without the apostrophe ("You cant remember me"). With one,
+/// the model is asked as before (reviewer-three's and the reviewer-lead's
+/// P2s on #3298).
 const NOT_A_PLAIN_ASK: &[&str] = &[
-    "no", "not", "never", "nope", "dont", "rather", "stop", "without", "nobody", "neither", "nor",
+    "no", "not", "never", "nope", "rather", "stop", "without", "nobody", "neither", "nor",
+    "cannot", "dont", "cant", "wont", "didnt", "doesnt", "shouldnt", "wouldnt", "couldnt", "isnt",
+    "arent", "wasnt", "mustnt",
 ];
 
-/// What a sentence asking what the lamp already knows opens with, past a
-/// greeting and the lamp's name ([`BEFORE_A_LINE`]): "Do you still remember
-/// me?", "Did you remember my face?", "Have you remembered me?".
-const ASKS_WHAT_IT_KNOWS: &[&str] = &["do", "did", "does", "have", "has", "had"];
+/// What may stand before the ask at a sentence's start, past a greeting and
+/// the lamp's name ([`BEFORE_A_LINE`]): "please", and "can you", "could
+/// you", "would you" or "will you", in that order, each at most once.
+const ASKING_OPENERS: &[&str] = &["can", "could", "would", "will"];
 
 /// Whether what the person said is a plain ask that the lamp remember their
-/// own face or who they are ([`ASKS_TO_REMEMBER`]): "Lamp, remember my
-/// face", "Can you remember me?". Never with a refusal anywhere in the line
-/// ([`NOT_A_PLAIN_ASK`]), nor in a sentence that asks whether the lamp knows
-/// them already ([`ASKS_WHAT_IT_KNOWS`]). English only: [`gives_a_name`],
-/// which a forced call needs beside it, has no Vietnamese forms.
+/// own face or who they are ([`ASKS_TO_REMEMBER`]), at a sentence's start:
+/// "Lamp, remember my face", "Can you remember me?", "Please save my face".
+/// Never with a refusal anywhere in the line ([`NOT_A_PLAIN_ASK`]); never
+/// the phrase further in, so reported speech ("She said remember my face"),
+/// a question of what the lamp knows ("Do you remember me?") and "Help me
+/// remember my name tag" are not; and never a bare question ("Remember
+/// me?"), which asks whether the lamp knows them (the reviewer-lead's P2 on
+/// #3298). English only: [`gives_a_name`], which a forced call needs beside
+/// it, has no Vietnamese forms.
 pub fn asks_to_remember(said: &str) -> bool {
     let refused = lower_words(said)
         .iter()
         .any(|word| NOT_A_PLAIN_ASK.contains(&word.as_str()) || word.ends_with("n't"));
+    let said = said.replace('\u{2019}', "'");
     !refused
-        && said
-            .replace('\u{2019}', "'")
-            .split(['.', '!', '?', ';'])
-            .any(|sentence| {
-                let words = lower_words(sentence);
-                let opens = words
-                    .iter()
-                    .find(|word| !BEFORE_A_LINE.contains(&word.as_str()));
-                !opens.is_some_and(|word| ASKS_WHAT_IT_KNOWS.contains(&word.as_str()))
-                    && (0..words.len()).any(|at| {
-                        ASKS_TO_REMEMBER.iter().any(|phrase| {
-                            words.len() >= at + phrase.len()
-                                && words[at..at + phrase.len()]
-                                    .iter()
-                                    .zip(phrase.iter())
-                                    .all(|(word, asked)| word == asked)
-                        })
-                    })
-            })
+        && said.split_inclusive(['.', '!', '?', ';']).any(|sentence| {
+            let words = lower_words(sentence);
+            let mut at = 0;
+            while words
+                .get(at)
+                .is_some_and(|word| BEFORE_A_LINE.contains(&word.as_str()))
+            {
+                at += 1;
+            }
+            if words.get(at).is_some_and(|word| word == "please") {
+                at += 1;
+            }
+            let asking = words
+                .get(at)
+                .is_some_and(|word| ASKING_OPENERS.contains(&word.as_str()))
+                && words.get(at + 1).is_some_and(|word| word == "you");
+            if asking {
+                at += 2;
+                if words.get(at).is_some_and(|word| word == "please") {
+                    at += 1;
+                }
+            }
+            let a_question = sentence.trim_end().ends_with('?') && !asking;
+            !a_question
+                && ASKS_TO_REMEMBER.iter().any(|phrase| {
+                    words.len() >= at + phrase.len()
+                        && words[at..at + phrase.len()]
+                            .iter()
+                            .zip(phrase.iter())
+                            .all(|(word, asked)| word == asked)
+                })
+        })
 }
 
 /// What the model is told beside a request in which the person gave their
@@ -2025,6 +2046,8 @@ mod tests {
             "Could you save my face?",
             "Please remember my name is Jim.",
             "I'm Kess. Remember my face.",
+            "Lamp, could you please remember my face?",
+            "Will you remember me? I'm Kess.",
         ] {
             assert!(asks_to_remember(asked), "{asked}");
         }
@@ -2043,6 +2066,17 @@ mod tests {
             "Do you still remember me? I'm Kess.",
             "Do you even remember my face? I'm Kess.",
             "Remember my face? No.",
+            // The reviewer-lead's two P2s on #3298, and their neighbours.
+            "You cannot remember my face, I'm Kess.",
+            "You cant remember my face, I'm Kess.",
+            "I didnt ask you to remember me, I'm Kess.",
+            "She said remember my face, I'm Kess.",
+            "He told me to remember my name.",
+            "Help me remember my name tag.",
+            "Remember me?",
+            // An ask said another way is the model's, as before.
+            "I want you to remember my face, I'm Kess.",
+            "Keep my face, I'm Kess.",
             "Remember her face.",
             "Remember my friend.",
             "Remember to turn the light off.",

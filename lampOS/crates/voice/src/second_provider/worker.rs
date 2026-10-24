@@ -1991,7 +1991,7 @@ pub fn serve(
     let remember = (crate::known_faces::asked_on() && tools.who.is_some() && tools.names_checked)
         .then(|| {
             eprintln!(
-                "lamp-voice second: a line that asks the lamp to remember their face and gives their name, or gives it after such an ask, must call {} in its first round ({})",
+                "lamp-voice second: a line that plainly asks the lamp to remember their face and gives their name must call {} in its first round ({})",
                 crate::known_faces::REMEMBER,
                 crate::known_faces::ASKED_ENVIRONMENT
             );
