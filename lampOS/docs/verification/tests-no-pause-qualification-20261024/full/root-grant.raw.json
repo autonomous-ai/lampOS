@@ -1,0 +1,38 @@
+{
+  "plan_identity": "no-pause-canonical-fullgate-43ac-v1",
+  "plan_sha256": "2b415f7a9874b45aadeb1eaf68137d78180383379f1e3cea40ca3dd3f3211d7e",
+  "controller_sha256": "81633bb3eb6f3a2255402c64639365f7809fb2b00c9accaf1d5ab198e1b628ce",
+  "source_map_sha256": {
+    "canonical": "b77afcd3fd4ac7fff524951b3e1348230089329bf06d768364854f7412540a96"
+  },
+  "source_guards": {
+    "canonical": "d29aa04d6b93cc54aee014d2110559eceaea07fa0a70d14e79f29cc30c73d601"
+  },
+  "source_heads": {
+    "canonical": "43ac6c843ea91dfc051a9d25e165c9d93f895942"
+  },
+  "execution_authorized": true,
+  "grant_scope": "one-canonical-fmt-clippy-reverse-tests-workspace-build",
+  "exclusive_target_grant": {
+    "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+    "previous_owner_released": true,
+    "cpu_exclusive": false,
+    "target_exclusive": true
+  },
+  "grant_id": "root-no-pause-canonical-shared-20261024T163000Z",
+  "concurrency_context": {
+    "mode": "root-authorized overlap on distinct exclusive targets",
+    "other_active_native_session": 85212,
+    "other_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target",
+    "this_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+    "cpu_exclusive": false,
+    "this_target_exclusive": true,
+    "isolated_load_or_timing_claim": false,
+    "scope": "Concurrent at grant/start; other job can naturally finish during this gate. No duration or sole-load attribution.",
+    "other_active_compiler_jobs": 4,
+    "total_bounded_compile_jobs": 6,
+    "this_gate_compiler_jobs": 2
+  },
+  "resource_amendment_sha256": "4526c08ba70f7c597d2d09ed492365040cd05415fdf2819d5639d14ecca2e522",
+  "required_launch_context": "require_escalated for authorized local fixture sockets"
+}

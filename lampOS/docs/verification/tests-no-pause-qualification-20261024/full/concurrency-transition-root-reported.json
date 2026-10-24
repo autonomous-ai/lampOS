@@ -1,0 +1,21 @@
+{
+  "recorded_at": "2026-10-24T16:51:21.898572+00:00",
+  "source": "Parent root coordination message, not a process inspection",
+  "canonical_native_session": 98367,
+  "canonical_target": "REC/cargo-target",
+  "start_context_retained": "At grant/start Update85212jobs4+NoPausejobs2=6; originalresultconcurrency_context is as-at-grant and remainsunchanged",
+  "transition": {
+    "update85212": "rootreported terminal/released",
+    "new_other_native_session": 18840,
+    "new_other_owner": "root owns continuation; this worker does not poll",
+    "new_other_target": "REC/sleep-diagnostic-target",
+    "current_bounded_compile_jobs": {
+      "NoPause": 2,
+      "SleepingService": 2,
+      "total": 4
+    },
+    "distinct_targets": true
+  },
+  "isolated_load_or_timing_claim": false,
+  "no_frozen_inputs_or_source_WT_changed": true
+}

@@ -1,0 +1,88 @@
+{
+  "native_session": 26902,
+  "native_terminal_exit_code": 0,
+  "owned_jobs_outstanding": 0,
+  "all_nine_passed": true,
+  "unrun": 0,
+  "per_case_passes": {
+    "memory": 3,
+    "skills": 3,
+    "voice": 3
+  },
+  "no_target_access_or_restore": true,
+  "source_guard": {
+    "canonical": "d29aa04d6b93cc54aee014d2110559eceaea07fa0a70d14e79f29cc30c73d601"
+  },
+  "result_sha256": "941e36ff69b3f04d8a9b43c99b67f5b55181f49b1f86b3be4f7e094e754805c0",
+  "groups": [
+    {
+      "label": "01-1",
+      "pid": 21071,
+      "pgid": 21071,
+      "reaped": true,
+      "group_absent": true
+    },
+    {
+      "label": "01-2",
+      "pid": 21844,
+      "pgid": 21844,
+      "reaped": true,
+      "group_absent": true
+    },
+    {
+      "label": "01-3",
+      "pid": 22097,
+      "pgid": 22097,
+      "reaped": true,
+      "group_absent": true
+    },
+    {
+      "label": "02-1",
+      "pid": 22677,
+      "pgid": 22677,
+      "reaped": true,
+      "group_absent": true
+    },
+    {
+      "label": "02-2",
+      "pid": 22754,
+      "pgid": 22754,
+      "reaped": true,
+      "group_absent": true
+    },
+    {
+      "label": "02-3",
+      "pid": 22835,
+      "pgid": 22835,
+      "reaped": true,
+      "group_absent": true
+    },
+    {
+      "label": "03-1",
+      "pid": 22971,
+      "pgid": 22971,
+      "reaped": true,
+      "group_absent": true
+    },
+    {
+      "label": "03-2",
+      "pid": 23383,
+      "pgid": 23383,
+      "reaped": true,
+      "group_absent": true
+    },
+    {
+      "label": "03-3",
+      "pid": 23509,
+      "pgid": 23509,
+      "reaped": true,
+      "group_absent": true
+    }
+  ],
+  "original_full_run_counts_retained": {
+    "passed": 7299,
+    "failed": 3,
+    "ignored": 52
+  },
+  "classification": "Three-pass standalone category only; original full failures retained; no historical cause claim."
+}

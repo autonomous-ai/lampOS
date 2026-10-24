@@ -1,0 +1,52 @@
+{
+  "identity": "no-pause-nine-captured-observations-v1",
+  "frozen_case_plan": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/planned-nine-standalones/plan.json",
+  "frozen_case_plan_sha256": "e1a00d94a75dce69231572bef618fdbc61f874b5eb23e23a497d17a08ca37bba",
+  "full_run": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000",
+  "full_run_results_sha256": "a1dd03ff40cfe70acfcad2cb9998079ce8d745b1727a6c24d2c5fadf85b4e7b9",
+  "environment_sha256": "45b9c3f29f05426a6af8313e9a9f01ab094510058b866e19036b93ebcf86f5f6",
+  "canonical_controller": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep",
+  "canonical_controller_sha256": "81633bb3eb6f3a2255402c64639365f7809fb2b00c9accaf1d5ab198e1b628ce",
+  "variants": [
+    {
+      "name": "canonical",
+      "worktree": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause",
+      "branch": "tests/1569-no-pause-fresh-setup",
+      "head": "43ac6c843ea91dfc051a9d25e165c9d93f895942",
+      "owned_paths": [
+        "lampOS/crates/expression/tests/runtime.rs",
+        "lampOS/docs/realtime-tests.md"
+      ],
+      "source_map": "canonical-source-map.json",
+      "source_map_sha256": "b77afcd3fd4ac7fff524951b3e1348230089329bf06d768364854f7412540a96",
+      "tracked_paths": 10442
+    }
+  ],
+  "source_guards": {
+    "canonical": "d29aa04d6b93cc54aee014d2110559eceaea07fa0a70d14e79f29cc30c73d601"
+  },
+  "minimum_free_bytes": 1073741824,
+  "observations": 9,
+  "timeout_seconds": 120,
+  "argv_suffix": [
+    "--exact",
+    "<case>",
+    "--test-threads=1"
+  ],
+  "captured_output": true,
+  "no_compile_or_restore": true,
+  "environment_difference_allowlist": [
+    "CODEX_SANDBOX",
+    "CODEX_TOOL_CALL_ID",
+    "OLDPWD",
+    "PAGER",
+    "PATH",
+    "PWD",
+    "TERM"
+  ],
+  "root_grant_scope": "exactly-nine-frozen-witness-observations-no-Cargo-no-target-write",
+  "helpers": {
+    "support.py": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+    "census.py": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716"
+  }
+}

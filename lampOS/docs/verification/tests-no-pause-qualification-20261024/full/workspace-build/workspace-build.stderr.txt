@@ -1,0 +1,140 @@
+   Compiling syn v3.0.7
+   Compiling libc v0.2.190
+   Compiling jobserver v0.1.35
+   Compiling cc v1.7.0
+   Compiling lamp-ipc v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/ipc)
+   Compiling ring v0.17.14
+   Compiling serde_derive v1.0.229
+   Compiling serde v1.0.229
+   Compiling lamp-bus v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/bus)
+   Compiling lamp-msgs v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/msgs)
+   Compiling rustls v0.23.45
+   Compiling rustls-webpki v0.103.15
+   Compiling subtle v2.6.1
+   Compiling synstructure v0.14.0
+   Compiling lamp-local-time v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/local-time)
+   Compiling zerofrom-derive v0.1.8
+   Compiling tokio-macros v2.7.2
+   Compiling zerofrom v0.1.8
+   Compiling tokio v1.53.1
+   Compiling yoke-derive v0.8.4
+   Compiling yoke v0.8.3
+   Compiling futures-channel v0.3.34
+   Compiling futures-macro v0.3.34
+   Compiling futures-io v0.3.34
+   Compiling futures-util v0.3.34
+   Compiling lamp-turn-owner v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/turn-owner)
+   Compiling zerovec-derive v0.11.6
+   Compiling displaydoc v0.2.7
+   Compiling zerovec v0.11.8
+   Compiling lamp-update v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/update)
+   Compiling libsqlite3-sys v0.38.2
+   Compiling tinystr v0.8.4
+   Compiling icu_locale_core v2.3.0
+   Compiling potential_utf v0.1.6
+   Compiling zerotrie v0.2.5
+   Compiling icu_collections v2.3.0
+   Compiling icu_provider v2.3.1
+   Compiling rusqlite v0.40.2
+   Compiling string-interner v0.20.0
+   Compiling tract-linalg v0.23.8
+   Compiling lamp-keeper v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/keeper)
+   Compiling tract-data v0.23.8
+   Compiling hyper v1.12.0
+   Compiling icu_properties v2.3.0
+   Compiling icu_normalizer v2.3.0
+   Compiling hyper-util v0.1.21
+   Compiling idna_adapter v1.2.2
+   Compiling tower v0.5.3
+   Compiling tokio-rustls v0.26.6
+   Compiling lamp-lean v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/lean)
+   Compiling tract-core v0.23.8
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling lamp-body v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/body)
+   Compiling tokio-util v0.7.20
+   Compiling thiserror-impl v2.0.21
+   Compiling thiserror v2.0.21
+   Compiling lamp-camera v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/camera)
+   Compiling tower-http v0.6.11
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling hyper-rustls v0.27.10
+   Compiling bytemuck_derive v1.12.1
+   Compiling lamp-turn-end-wire v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/turn-end-wire)
+   Compiling tract-nnef v0.23.8
+   Compiling tract-extra v0.23.8
+   Compiling lamp-voice-processes v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/voice-processes)
+   Compiling tungstenite v0.30.0
+   Compiling tract-onnx-opl v0.23.8
+   Compiling tract-hir v0.23.8
+   Compiling bytemuck v1.25.2
+   Compiling reqwest v0.13.5
+   Compiling tract-onnx v0.23.8
+   Compiling tokio-tungstenite v0.30.0
+   Compiling sonora-agc2 v0.2.0
+   Compiling lamp-schedule v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/schedule)
+   Compiling sonora v0.2.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/third_party/sonora)
+   Compiling lamp-gemini v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/gemini)
+   Compiling lamp-ring v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/ring)
+   Compiling lamp-audio v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/audio)
+   Compiling lamp-controls v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/controls)
+   Compiling lamp-health v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/health)
+   Compiling lamp-near-call v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/near-call)
+   Compiling cmake v0.1.58
+   Compiling dunce v1.0.5
+   Compiling fs_extra v1.3.0
+   Compiling aws-lc-sys v0.46.0
+   Compiling lamp-voice v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/voice)
+   Compiling axum v0.8.9
+   Compiling lamp-expression v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/expression)
+   Compiling lamp-memory v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/memory)
+   Compiling pin-project-internal v1.1.13
+   Compiling aho-corasick v1.1.5
+   Compiling heck v0.5.0
+   Compiling aws-lc-rs v1.18.2
+   Compiling regex-syntax v0.8.11
+   Compiling regex-automata v0.4.18
+   Compiling snafu-derive v0.8.9
+   Compiling pin-project v1.1.13
+   Compiling lamp-turn-end v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/turn-end)
+   Compiling lamp-policy v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/policy)
+   Compiling lamp-records v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/records)
+   Compiling futures-executor v0.3.34
+   Compiling bstr v1.13.1
+   Compiling untrusted v0.7.1
+   Compiling globset v0.4.20
+   Compiling futures v0.3.34
+   Compiling lamp-observer v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/observer)
+   Compiling snafu v0.8.9
+   Compiling lamp-skills v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/skills)
+   Compiling lamp-actions v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/actions)
+   Compiling olpc-cjson v0.1.4
+   Compiling lamp-sound-fixtures v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/sound-fixtures)
+   Compiling tokio-stream v0.1.19
+   Compiling pem v3.0.6
+   Compiling lamp-air v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/air)
+   Compiling rustls-webpki v0.102.8
+   Compiling serde_plain v1.0.2
+   Compiling async-trait v0.1.92
+   Compiling async-recursion v1.2.0
+   Compiling hex v0.4.3
+   Compiling typed-path v0.9.3
+   Compiling tough v0.24.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/vendor/tough)
+   Compiling rumqttc v0.25.1
+   Compiling lamp-eyes v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/eyes)
+   Compiling lamp-tasks v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/tasks)
+   Compiling lamp-cloud v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/cloud)
+   Compiling lamp-surround v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/surround)
+   Compiling lamp-selftest v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/selftest)
+   Compiling lamp-voice-eval v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/voice-eval)
+   Compiling lamp-settings v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/settings)
+   Compiling lamp-peek v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/peek)
+   Compiling lamp-setup v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/setup)
+   Compiling lamp-same-voice v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/same-voice)
+   Compiling lamp-name v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/name)
+   Compiling lamp-ears v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/ears)
+   Compiling lamp-station v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/station)
+   Compiling lamp-addons v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/addons)
+   Compiling lamp-mood v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/mood)
+   Compiling lamp-environment v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/environment)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5m 40s

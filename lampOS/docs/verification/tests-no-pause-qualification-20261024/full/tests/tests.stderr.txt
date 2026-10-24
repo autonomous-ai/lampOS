@@ -1,0 +1,938 @@
+   Compiling serde_core v1.0.229
+   Compiling errno v0.3.14
+   Compiling memchr v2.8.3
+   Compiling typenum v1.20.1
+   Compiling rustix v1.1.5
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.151
+   Compiling generic-array v0.14.7
+   Compiling once_cell v1.21.4
+   Compiling zeroize v1.9.1
+   Compiling rustls-pki-types v1.15.1
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling lamp-bus v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/bus)
+   Compiling getrandom v0.2.17
+   Compiling untrusted v0.9.0
+   Compiling ring v0.17.14
+   Compiling lamp-msgs v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/msgs)
+   Compiling rustls-webpki v0.103.15
+   Compiling subtle v2.6.1
+   Compiling rustls v0.23.45
+   Compiling httparse v1.10.1
+   Compiling lamp-ipc v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/ipc)
+   Compiling webpki-roots v1.0.9
+   Compiling lamp-update v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/update)
+   Compiling smallvec v1.16.3
+   Compiling lamp-turn-owner v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/turn-owner)
+   Compiling bytes v1.12.1
+   Compiling pin-project-lite v0.2.17
+   Compiling signal-hook-registry v1.4.8
+   Compiling futures-core v0.3.34
+   Compiling lamp-lean v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/lean)
+   Compiling jiff v0.2.38
+   Compiling lamp-keeper v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/keeper)
+   Compiling lamp-body v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/body)
+   Compiling lamp-local-time v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/local-time)
+   Compiling mio v1.2.4
+   Compiling socket2 v0.6.5
+   Compiling tokio v1.53.1
+   Compiling http v1.5.0
+   Compiling futures-sink v0.3.34
+   Compiling log v0.4.34
+   Compiling foldhash v0.2.0
+   Compiling slab v0.4.12
+   Compiling futures-task v0.3.34
+   Compiling futures-util v0.3.34
+   Compiling zerofrom v0.1.8
+   Compiling stable_deref_trait v1.2.1
+   Compiling yoke v0.8.3
+   Compiling http-body v1.1.0
+   Compiling tracing-core v0.1.36
+   Compiling percent-encoding v2.3.2
+   Compiling tower-service v0.3.3
+   Compiling zerovec v0.11.8
+   Compiling tracing v0.1.44
+   Compiling try-lock v0.2.5
+   Compiling sync_wrapper v1.0.2
+   Compiling want v0.3.2
+   Compiling atomic-waker v1.1.2
+   Compiling tower-layer v0.3.3
+   Compiling cpufeatures v0.3.1
+   Compiling httpdate v1.0.3
+   Compiling futures-channel v0.3.34
+   Compiling hyper v1.12.0
+   Compiling base64 v0.23.1
+   Compiling ipnet v2.12.2
+   Compiling hyper-util v0.1.21
+   Compiling tower v0.5.3
+   Compiling tinystr v0.8.4
+   Compiling http-body-util v0.1.5
+   Compiling litemap v0.8.3
+   Compiling rand_core v0.10.1
+   Compiling writeable v0.6.4
+   Compiling zerotrie v0.2.5
+   Compiling icu_locale_core v2.3.0
+   Compiling potential_utf v0.1.6
+   Compiling serde_spanned v1.1.2
+   Compiling toml_datetime v1.1.2+spec-1.1.0
+   Compiling utf8_iter v1.0.4
+   Compiling icu_collections v2.3.0
+   Compiling icu_provider v2.3.1
+   Compiling toml v1.1.8+spec-1.1.0
+   Compiling getrandom v0.4.3
+   Compiling core-foundation-sys v0.8.7
+   Compiling icu_properties_data v2.3.0
+   Compiling icu_normalizer_data v2.3.0
+   Compiling icu_normalizer v2.3.0
+   Compiling icu_properties v2.3.0
+   Compiling core-foundation v0.10.1
+   Compiling security-framework-sys v2.17.0
+   Compiling tokio-rustls v0.26.6
+   Compiling security-framework v3.7.0
+   Compiling idna_adapter v1.2.2
+   Compiling idna v1.1.0
+   Compiling chacha20 v0.10.2
+   Compiling form_urlencoded v1.2.2
+   Compiling url v2.5.8
+   Compiling rand v0.10.3
+   Compiling tokio-util v0.7.20
+   Compiling hashbrown v0.17.1
+   Compiling libsqlite3-sys v0.38.2
+   Compiling hashlink v0.12.2
+   Compiling tower-http v0.6.11
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling hyper-rustls v0.27.10
+   Compiling fallible-iterator v0.3.0
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling rusqlite v0.40.2
+   Compiling reqwest v0.13.5
+   Compiling lamp-ring v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/ring)
+   Compiling hybrid-array v0.4.15
+   Compiling hound v3.5.1
+   Compiling derive_more v2.1.1
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling sonora-simd v0.2.0
+   Compiling sonora-fft v0.2.0
+   Compiling tinyvec v1.13.3
+   Compiling const-oid v0.10.2
+   Compiling digest v0.11.3
+   Compiling unicode-normalization v0.1.25
+   Compiling thiserror v2.0.21
+   Compiling sonora-common-audio v0.2.0
+   Compiling signal-hook v0.4.4
+   Compiling bytemuck v1.25.2
+   Compiling sha1 v0.11.0
+   Compiling data-encoding v2.11.1
+   Compiling lamp-camera v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/camera)
+   Compiling tungstenite v0.30.0
+   Compiling sonora-agc2 v0.2.0
+   Compiling sonora-aec3 v0.2.0
+   Compiling sonora-ns v0.2.0
+   Compiling webpki-roots v0.26.11
+   Compiling tokio-tungstenite v0.30.0
+   Compiling sonora v0.2.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/third_party/sonora)
+   Compiling lamp-schedule v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/schedule)
+   Compiling lamp-turn-end-wire v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/turn-end-wire)
+   Compiling rtrb v0.4.0
+   Compiling lamp-audio v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/audio)
+   Compiling lamp-gemini v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/gemini)
+   Compiling lamp-controls v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/controls)
+   Compiling lamp-health v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/health)
+   Compiling lamp-near-call v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/near-call)
+   Compiling lamp-voice-processes v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/voice-processes)
+   Compiling lamp-voice v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/voice)
+   Compiling lamp-expression v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/expression)
+   Compiling xattr v1.6.1
+   Compiling filetime v0.2.29
+   Compiling tar v0.4.46
+   Compiling libm v0.2.16
+   Compiling scopeguard v1.2.0
+   Compiling lock_api v0.4.14
+   Compiling num-traits v0.2.19
+   Compiling num-integer v0.1.47
+   Compiling zerocopy v0.8.62
+   Compiling either v1.19.0
+   Compiling anyhow v1.0.104
+   Compiling num-complex v0.4.6
+   Compiling same-file v1.0.6
+   Compiling rawpointer v0.2.1
+   Compiling matrixmultiply v0.3.11
+   Compiling walkdir v2.5.0
+   Compiling half v2.7.1
+   Compiling parking_lot_core v0.9.12
+   Compiling hashbrown v0.16.1
+   Compiling nom v8.0.0
+   Compiling nom-language v0.1.0
+   Compiling string-interner v0.20.0
+   Compiling parking_lot v0.12.5
+   Compiling tract-linalg v0.23.8
+   Compiling ndarray v0.17.2
+   Compiling itertools v0.15.0
+   Compiling lamp-actions v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/actions)
+   Compiling dyn-hash v1.0.0
+   Compiling strength_reduce v0.2.4
+   Compiling maplit v1.0.2
+   Compiling inventory v0.3.25
+   Compiling dyn-clone v1.0.20
+   Compiling lazy_static v1.5.1
+   Compiling downcast-rs v2.0.2
+   Compiling tract-data v0.23.8
+   Compiling transpose v0.2.3
+   Compiling lamp-skills v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/skills)
+   Compiling typeid v1.0.3
+   Compiling primal-check v0.3.4
+   Compiling byteorder v1.5.0
+   Compiling bit-vec v0.10.1
+   Compiling bit-set v0.11.1
+   Compiling rustfft v6.4.1
+   Compiling erased-serde v0.4.10
+   Compiling lamp-memory v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/memory)
+   Compiling anymap3 v1.1.0
+   Compiling tract-core v0.23.8
+   Compiling simd-adler32 v0.3.10
+   Compiling itertools v0.13.0
+   Compiling prost-derive v0.14.4
+   Compiling num-bigint v0.4.8
+   Compiling rand_distr v0.6.0
+   Compiling num-rational v0.4.2
+   Compiling prost v0.14.4
+   Compiling memmap2 v0.9.11
+   Compiling zune-core v0.4.12
+   Compiling zune-jpeg v0.4.21
+   Compiling jpeg-encoder v0.7.1
+   Compiling lamp-policy v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/policy)
+   Compiling tract-nnef v0.23.8
+   Compiling tract-extra v0.23.8
+   Compiling tract-onnx-opl v0.23.8
+   Compiling tract-hir v0.23.8
+   Compiling tract-onnx v0.23.8
+   Compiling mime v0.3.17
+   Compiling objc2-encode v4.1.0
+   Compiling objc2 v0.6.5
+   Compiling axum-core v0.5.6
+   Compiling serde_path_to_error v0.1.20
+   Compiling matchit v0.8.4
+   Compiling axum v0.8.9
+   Compiling fastrand v2.5.0
+   Compiling tempfile v3.27.0
+   Compiling block2 v0.6.2
+   Compiling dispatch2 v0.3.1
+   Compiling objc2-foundation v0.3.2
+   Compiling lamp-ears v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/ears)
+   Compiling lamp-tasks v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/tasks)
+   Compiling objc2-core-foundation v0.3.2
+   Compiling objc2-core-audio-types v0.3.2
+   Compiling lamp-setup v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/setup)
+   Compiling objc2-core-audio v0.3.2
+   Compiling objc2-audio-toolbox v0.3.2
+   Compiling coreaudio-rs v0.14.2
+   Compiling dasp_sample v0.11.0
+   Compiling mach2 v0.6.0
+   Compiling cpal v0.19.0 (https://github.com/RustAudio/cpal.git?rev=79275c2313da30e9f8b1ad8168385d091a2c9ada#79275c23)
+   Compiling objc2-av-foundation v0.3.2
+   Compiling spin v0.9.9
+   Compiling flume v0.11.1
+   Compiling lamp-observer v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/observer)
+   Compiling ort-sys v2.0.0-rc.14
+   Compiling lamp-sound-fixtures v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/sound-fixtures)
+   Compiling rustls-native-certs v0.8.5
+   Compiling tokio-stream v0.1.19
+   Compiling rustls-webpki v0.102.8
+   Compiling rustls-pemfile v2.2.0
+   Compiling libloading v0.9.0
+   Compiling fixedbitset v0.5.7
+   Compiling rumqttc v0.25.1
+   Compiling ort v2.0.0-rc.14
+   Compiling thread-priority v3.1.1
+   Compiling lamp-voice-eval v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/voice-eval)
+   Compiling lamp-turn-end v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/turn-end)
+   Compiling lamp-same-voice v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/same-voice)
+   Compiling lamp-cloud v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/cloud)
+   Compiling lamp-peek v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/peek)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13m 15s
+     Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_body-e3e309ea1afce98d)
+     Running unittests src/bin/lamp-body.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_body-6aa8d283b7d2353f)
+     Running unittests src/bin/lamp-body-inspect.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_body_inspect-786b5ad8d2a0a7e5)
+     Running unittests src/bin/lamp-body-measure.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_body_measure-160bb32b216afa14)
+     Running unittests src/bin/lamp-body-mood.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_body_mood-9d0446e9a36c0d5e)
+     Running unittests src/bin/lamp-body-worker.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_body_worker-9e6c54d8d16d8b9d)
+     Running tests/it/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-bda9dd473807073f)
+     Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_cloud-3b3a9a4f82d4ebc1)
+     Running unittests src/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_cloud-5a32893ab71db8d7)
+     Running tests/it/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-d42eb1c7e5987252)
+     Running tests/release_pair.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/release_pair-92f8243e031a1e05)
+     Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_expression-87834248cbd87140)
+     Running unittests src/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_expression-f768989f9c233433)
+     Running tests/it/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-d8575dda435eb43e)
+     Running tests/runtime.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-b52f6baa2e80330c)
+     Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_keeper-b90bc9f7ee259680)
+     Running unittests src/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_keeper-17c84dccfff326fb)
+     Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_lean-332a9af8170ca045)
+     Running tests/it/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-ea6f93305b6d7f2a)
+     Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_memory-0af22b32a7e8fee0)
+     Running unittests src/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_memory-83413b99be0ca219)
+lamp-memory: health worker could not start; serving without reports
+lamp-memory: health reports off: no --bus-root
+lamp-memory: health worker could not start; serving without reports
+lamp-memory: health reports off: no --bus-root
+     Running unittests src/bin/lamp-memory-eval.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_memory_eval-f5db972ba691a95b)
+     Running tests/forget_person.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/forget_person-0deddd938b7bacb2)
+     Running tests/forget_shared_exchange.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/forget_shared_exchange-4c78b7cb5f42ec18)
+     Running tests/forgot.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/forgot-fd6638675ad23908)
+     Running tests/health_control.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/health_control-a47aa33374660f52)
+     Running tests/it/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f)
+error: test failed, to rerun pass `-p lamp-memory --test it`
+     Running tests/paraphrase_fixture.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/paraphrase_fixture-48401515e5a149f1)
+     Running tests/release_pair.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/release_pair-4c330c26cfcb0f6b)
+     Running tests/voice_early_words.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/voice_early_words-177a409ed98660a5)
+     Running tests/voice_follows_face.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/voice_follows_face-1dd593594e591dfb)
+     Running tests/voice_forget.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/voice_forget-d4cb7fec5c0c3e47)
+     Running tests/voice_forget_about.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/voice_forget_about-f18de9cac46c9fa5)
+     Running tests/voice_forget_named.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/voice_forget_named-71edb0837cf0037a)
+     Running tests/voice_link_used.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/voice_link_used-05a182028a521157)
+     Running tests/voice_observe.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/voice_observe-8fca32d650057c26)
+     Running tests/voice_since_until.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/voice_since_until-28f83169b6275560)
+     Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_peek-5be1f9fb099b24a7)
+     Running unittests src/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_peek-73600315bdd6f294)
+     Running tests/peek.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/peek-f1e8827be703642e)
+     Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_setup-84cf96c59d18cc85)
+     Running unittests src/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_setup-0420e7dbd0bdd7fb)
+     Running tests/it/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-671b21cade528fe0)
+     Running tests/wake.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/wake-1817e6f65533e377)
+     Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_skills-1307f9b251c59b00)
+error: test failed, to rerun pass `-p lamp-skills --lib`
+     Running unittests src/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_skills-8d31d51df6f14a95)
+     Running tests/it/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-03d8e125c34f2f16)
+lamp-skills: skills from /tmp/cwgLTwqc/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["air", "faces", "rests", "wave"]
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: skills from /tmp/sktXre3J/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: loaded []
+lamp-skills: hello Done: light white: done, to level 2: done, steady: its pattern needs the ring's LAMP_LIGHT_REQUESTS=on; held until its trigger ended; light given back to on blue at 3: done, done
+lamp-skills: skills from /tmp/sk8B3rvu/skills, the Policy's ask skipped, a skill's light asked of the ring on light/request
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: skills from /tmp/skdBN6Qm/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: light white: asked of the ring at level 2, breathing every 10000 ms down to 1; held until its trigger ended; light given back: asked again with a time already passed
+lamp-skills: skills from /tmp/dnck4ggW/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: skills from /tmp/dnNzrhv4/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: loaded ["nods"]
+lamp-skills: skills from /tmp/dnTnCZUG/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: hello Done: light white: done, to level 2: done, steady: its pattern needs the ring's LAMP_LIGHT_REQUESTS=on; held until its trigger ended; light given back to on blue at 3: done, done
+lamp-skills: skills from /tmp/dnio2OLv/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: skills from /tmp/stXvPv1e/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: loaded ["tutor"]
+lamp-skills: skills from /tmp/skdECLC3/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: tutor Triggered: the model called check_my_work with {}
+lamp-skills: tutor Triggered: the model called check_my_work with {}
+lamp-skills: tutor Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: nobody_has_this with {} not run: No skill of mine does that just now.
+lamp-skills: tutor Done: light white: done; light given back to on blue at 3: done
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: skills from /tmp/skH5zrDE/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: loaded []
+lamp-skills: hello Done: dim: done; held until its trigger ended; light given back to on blue at 3: done
+lamp-skills: skill:nods: the body dropped nod (dropped: busy, skill, held by skill:stretch-break)
+lamp-skills: nods Done: after the say: spoken from 20 ms after the call, the turn over 494 ms later; light warm: done; gesture nod: told the body; gesture nod: not sent, the body dropped nod (dropped: busy, skill, held by skill:stretch-break), so nothing more is sent; light given back to on blue at 3: done
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 513 ms later; light warm: done; gesture nod: told the body; gesture nod: not sent, the body dropped nod (body/gesture), so nothing more is sent; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/skLjRack/skills, the Policy's ask skipped, a skill's light asked of the ring on light/request
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: nods Done: after the say: spoken from 20 ms after the call, the turn over 498 ms later; light warm: done; gesture nod: told the body; gesture nod: not sent, the body dropped nod (body/gesture), so nothing more is sent; light given back to on blue at 3: done
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: skills from /tmp/skmiS2kZ/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: skills from /tmp/skwet24c/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: skills from /tmp/tpnwiGvy/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: loaded ["look"]
+lamp-skills: hello Done: dim: done; say: spoken; light given back to on blue at 1: it already was
+lamp-skills: look_for with {"place":"found"} not run: look's search has no look held
+lamp-skills: skills from /tmp/skWn2l1a/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: hello Done: dim: asked of the ring at level 2; held until its trigger ended; light given back: asked again with a time already passed
+lamp-skills: hello Done: dim: done; held until its trigger ended; light given back to on blue at 3: done
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 520 ms later; light warm: done; gesture nod: told the body; gesture nod: told the body; light given back to on blue at 3: done
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; someone spoke to the lamp: the search ended; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/dnxStQmi/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: skills from /tmp/dnCa2KuK/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: look_for with {"place":"found"} not run: look's search has no look held
+lamp-skills: skills from /tmp/skYX60yA/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: skills from /tmp/skt6VU0V/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: skills from /tmp/tpdVMtR9/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: hello Done: dim: done; say: spoken; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/skE9DXMK/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: skill:show: show short: light purple: done
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy nudge
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: skills from /tmp/dnNdBg0K/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: hello Done: dim: done; say: spoken; held until its trigger ended; light given back to on blue at 3: done
+lamp-skills: hello Done: light white: done, to level 2: done, steady: its pattern needs the ring's LAMP_LIGHT_REQUESTS=on; held until its trigger ended; light: changed meanwhile or not known, so left as it is
+lamp-skills: skills from /tmp/tpKxdcUy/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: show Done: after the say: the voice's state is not known, so at once; show short: 3 frames shown; light given back to on blue at 3: done
+lamp-skills: loaded ["look"]
+lamp-skills: hello Done: look at the face: told the body; light warm: done, to level 5: done, done; say: spoken; light given back to on blue at 3: done, done, done
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 516 ms later; light warm: done; gesture nod: told the body; gesture nod: not sent, the body was pushed; light given back to on blue at 3: done
+lamp-skills: hello Done: dim: done; held until its trigger ended; light: changed meanwhile or not known, so left as it is
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: skill:show: show short: light purple: done
+lamp-skills: skills from /tmp/tpYSVigv/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: skills from /tmp/sk69zOZw/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded ["news"]
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: skills from /tmp/skXtVgFr/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded ["hello"]
+lamp-skills: show Done: after the say: the voice's state is not known, so at once; show short: stopped in frame 1 of 3, the voice is listening to someone; light given back to on blue at 3: done
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: news Triggered: task 4 of settled on tasks/status came to hold
+lamp-skills: news Asked: policy news
+lamp-skills: news Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: news Triggered: task 5 of settled on tasks/status came to hold
+lamp-skills: news Asked: policy news
+lamp-skills: news Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: news Triggered: task 6 of settled on tasks/status came to hold
+lamp-skills: news Asked: policy news
+lamp-skills: news Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 515 ms later; the line was cut (the voice went from speaking to listening): nothing after it is made
+lamp-skills: skills from /tmp/st8PJWPC/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["glow"]
+lamp-skills: skills from /tmp/sm7tsEMh/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["tutor"]
+lamp-skills: skill:nods: the body dropped nod (dropped: busy, skill, held by skill:stretch-break)
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 513 ms later; light warm: done; gesture nod: told the body; gesture nod: told the body; the body dropped nod (dropped: busy, skill, held by skill:stretch-break); light given back to on blue at 3: done
+lamp-skills: glow Triggered: the model called glow with {}
+lamp-skills: glow with {} not run: its run is under way
+lamp-skills: tutor Triggered: the model called check_my_work with {}
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; the lamp was paused: the search ended; light given back to on blue at 3: done
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: skills from /tmp/skaPE1DX/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: skills from /tmp/ska3SWX6/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: skills from /tmp/srB0c2n7/skills, the Policy's ask asked on skills/ask, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: skills from /tmp/sruURQtD/skills, the Policy's ask asked on skills/ask, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: loaded ["hello", "stuffy"]
+lamp-skills: loaded ["hello", "stuffy"]
+lamp-skills: stuffy Triggered: air/state has held for 0 s
+lamp-skills: stuffy Asked: policy nudge
+lamp-skills: loaded ["hello", "stuffy"]
+lamp-skills: stuffy Triggered: air/state has held for 0 s
+lamp-skills: stuffy Asked: policy nudge
+lamp-skills: stuffy Answered: the Policy answered say_now (unprompted, by rule)
+lamp-skills: stuffy Done: dim: done; held until its trigger ended; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/tpaxix1K/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["scenes-after"]
+lamp-skills: stuffy not run: in its cooldown, 10 min left
+lamp-skills: stuffy Answered: the Policy answered say_now (unprompted, by rule), but its trigger no longer holds: nothing is done
+lamp-skills: skills from /tmp/tpwe5xEX/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["scenes"]
+lamp-skills: scenes-after Triggered: the model called light_scene with {"scene":"reading"}
+lamp-skills: scenes Triggered: the model called light_scene with {"scene":"reading"}
+lamp-skills: hello Done: say: expired
+lamp-skills: news Done: say: spoken
+lamp-skills: news Done: not made: its item no longer holds as its turn came
+lamp-skills: hello Done: mood reading: told the body, held 1 s; light warm: done; say: spoken; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/tpwQ89Vz/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: hello Done: light warm: done; say: spoken; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/tpAV7Jg3/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: /tmp/tpYSVigv/tools is gone; ending, so that the folder is made again as lamp-skills starts
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: skills from /tmp/tpHF8Ybq/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: scenes-after Triggered: the model called light_scene with {"scene":"reading"}
+lamp-skills: scenes-after Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: scenes Triggered: the model called light_scene with {"scene":"relax"}
+lamp-skills: scenes Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: look Triggered: the model called look_for with {"place":"left"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: tutor Triggered: the model called check_my_work with {}
+lamp-skills: tutor Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look Triggered: the model called look_for with {"place":"left"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; someone spoke to the lamp: the search ended; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/tpxjWspw/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: look_for with {"place":"found"}: look's search found it
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: news Done: say: spoken
+lamp-skills: look_for with {"place":"left"} not run: its search took its 3 looks
+lamp-skills: skills from /tmp/skUeiN65/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: skills from /tmp/skSyysyH/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: scenes-after Done: mood reading: told the body, held 5 s; light white, the person's, kept: done
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: not made: its last run is still under way
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; light given back to on blue at 3: done
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: skills from /tmp/tp4NzNL4/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["point"]
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: not made: its last run is still under way
+lamp-skills: point Triggered: the model called point_light with {}
+lamp-skills: skills from /tmp/siwVNGzk/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["dance"]
+lamp-skills: scenes Done: mood reading: told the body, held 5 s; light white, the person's, kept: done
+lamp-skills: loaded ["dance", "desk-tutor"]
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; light given back to on blue at 3: done
+lamp-skills: scenes-after Triggered: the model called light_scene with {"scene":"relax"}
+lamp-skills: scenes-after Done: light warm, the person's, kept: done
+lamp-skills: loaded ["dance"]
+lamp-skills: skills from /tmp/dng7VweH/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: skills from /tmp/srLamVgB/skills, the Policy's ask asked on skills/ask, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: hello Done: look at the face: told the body; light warm: done; say: spoken; light given back to on blue at 3: done
+lamp-skills: point Triggered: the model called point_light with {"toward":"left"}
+lamp-skills: point Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: skills from /tmp/sp2MqOC4/skills, the Policy's ask asked on skills/ask, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy answered say_now (hello, by rule)
+lamp-skills: hello Done: say: spoken
+lamp-skills: hello not run: resting after runs nobody noticed, 720 min left
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Done: light warm: done; sound: spoken; light given back to on blue at 3: done
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy answered say_now (hello, by rule)
+lamp-skills: hello Done: say: spoken
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy answered wait (hello, by rule)
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy answered say_now (hello, by rule) in shadow: nothing is done
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy answered say_now (hello, by rule) in shadow: nothing is done
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy did not answer in time: nothing is done
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 4 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy answered say_now (hello, by rule), but its trigger no longer holds: nothing is done
+lamp-skills: skills from /tmp/skgfAIS7/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: skills from /tmp/shHbTmc7/skills, the Policy's ask asked on skills/ask, a skill's light set through the actions part and given back
+lamp-skills: loaded ["hello"]
+lamp-skills: loaded ["hello"]
+lamp-skills: skills from /tmp/snbfhCcN/skills, the Policy's ask asked on skills/ask, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: not asked: nobody is subscribed to skills/ask (lamp-policy --gate)
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: hello Done: sound: refused (the lamp is speaking)
+lamp-skills: look_for with {"place":"left"} not run: its search took its 3 looks
+lamp-skills: skills from /tmp/skeuBLQN/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: skills from /tmp/gqmLwYFH/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: skills from /tmp/gab9lHOS/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: skills from /tmp/gpBG9bwL/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: skills from /tmp/gmF5KCmS/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: skills from /tmp/gsz1M7Jt/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: guard-mode Triggered: the model called keep_watch with {"turn":"on"}
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: guard-mode Done: on, asked at the lamp, by someone whose face it does not know
+lamp-skills: guard from the app refused: guard mode from the app is not on: LAMP_GUARD_FROM_APP is not on
+lamp-skills: keep_watch with {"turn":"on"} not run: I keep an eye on things only when someone asks me out loud, at the lamp.
+lamp-skills: guard-mode Triggered: the model called keep_watch with {"turn":"on"}
+lamp-skills: guard-mode Triggered: the model called keep_watch with {"turn":"on"}
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: the desk is empty: keeping watch
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: guard-mode Done: on, asked at the lamp, by someone whose face it does not know
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: guard-mode Done: on, asked at the lamp, by someone whose face it does not know
+lamp-skills: guard-mode Done: text: sent on messages/out: I've paused watching while your light is off.
+lamp-skills: guard-mode Done: paused: the person's own light is over its mark; on again only when they ask
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 535 ms later; light warm: done; gesture nod: told the body; gesture nod: told the body; light given back to on blue at 3: done
+lamp-skills: skills from /tmp/srxEtdj5/skills, the Policy's ask asked on skills/ask, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the Policy answered wait (hello, by rule)
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 12 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: guard-mode Triggered: the model called keep_watch with {"turn":"on"}
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: guard-mode Done: on, asked at the lamp, by someone whose face it knows
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: the desk is empty: keeping watch
+lamp-skills: guard-mode Done: its mark has not been confirmed for 30 s: no visit counted
+lamp-skills: skill:guard-mode's light is outranked by person
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: text: sent on messages/out: Someone was at your desk, for about 2 minutes.
+lamp-skills: skills from /tmp/tpDnMgbG/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: guard-mode Done: mark: light given back: asked again with a time already passed
+lamp-skills: guard-mode Done: say: asked of the voice: I'm off guard.
+lamp-skills: guard-mode Done: off: the person who asked is back
+lamp-skills: skill:guard-mode: say: said
+lamp-skills: skills from /tmp/tpZawRMT/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["look"]
+lamp-skills: loaded ["look"]
+lamp-skills: skills from /tmp/gayPKw2v/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: skills from /tmp/sk2z770U/skills, the Policy's ask skipped, a skill's light asked of the ring on light/request
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Done: light warm: done; say: spoken; light given back to on blue at 3: done
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: guard from the app refused: guard mode is turned on and off from afar only by the owner's app
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy light
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: look Triggered: the model called look_for with {"place":"right"}
+lamp-skills: look Done: the model was told again what to do next; its last run is still under way, left as it is but for its poses, held again
+lamp-skills: guard-mode Done: mark: outranked by skill:light-out: asked for again with a new claim
+lamp-skills: skill:guard-mode's light is outranked by skill:light-out
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: skills from /tmp/agRa0fIf/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["jig"]
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; someone spoke to the lamp: the search ended; light given back to on blue at 3: done
+lamp-skills: jig Triggered: the model called jig with {}
+lamp-skills: jig Done: gesture acknowledge: told the body
+lamp-skills: jig with {} not run: You just danced.
+lamp-skills: skills from /tmp/gaLSiuhR/skills, the Policy's ask not asked: nothing is done, a skill's light asked of the ring on light/request
+lamp-skills: loaded ["guard-mode"]
+lamp-skills: hello Done: light out: asked of the ring, faded into over 30000 ms; held until its trigger ended; light given back: asked again with a time already passed
+lamp-skills: skills from /tmp/skbLNaqR/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: guard from the app refused: guard.on let go: it says no deadline_us, so it can't be told from one the app gave up on
+lamp-skills: guard from the app refused: guard.on let go: it waited 2000 ms behind another call, past the app's 2 s
+lamp-skills: guard-mode Triggered: the model called keep_watch with {"turn":"off"}
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: LAMP_SKILLS_ASK is not set: nothing the lamp starts itself is done (LAMP_SKILLS_ASK=policy asks the Policy's gate, skip acts without asking)
+lamp-skills: the skills a person turned off kept in /tmp/snMcbJ4n/state: []
+lamp-skills: skills from /tmp/snMcbJ4n/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded ["sip"]
+lamp-skills: the skills a person turned off kept in /tmp/soNFZtMX/state: []
+lamp-skills: skills from /tmp/soNFZtMX/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded ["sip"]
+lamp-skills: sip Triggered: the model called stuffy_nudges with {"how":"snooze"}, for ["sip"]
+lamp-skills: sip Done: the model was told what to do next
+lamp-skills: sip not run: snoozed, 720 min left
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: its mark has not been confirmed for 30 s: no visit counted
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: the desk is empty: keeping watch
+lamp-skills: guard-mode Done: its mark has not been confirmed for 30 s: no visit counted
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: text: sent on messages/out: Someone was at your desk, for about 2 minutes.
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 1 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: sip Triggered: the model called stuffy_nudges with {"how":"off"}, for ["sip"]
+lamp-skills: sip Done: the model was told what to do next
+lamp-skills: sip not run: off
+lamp-skills: skills from /tmp/skJJzCJZ/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: skills from /tmp/skohbJ73/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded ["news"]
+lamp-skills: guard-mode Done: its mark has not been confirmed for 30 s: no visit counted
+lamp-skills: jig Triggered: the model called jig with {}
+lamp-skills: jig with {} not run: its run is under way
+lamp-skills: jig Done: gesture acknowledge: told the body
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: news Triggered: task 1 of tasks on tasks/status came to hold
+lamp-skills: news Asked: policy news
+lamp-skills: news Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: news Triggered: task 2 of tasks on tasks/status came to hold
+lamp-skills: news Asked: policy news
+lamp-skills: news Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: skills from /tmp/dnpxRHbl/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: jig Triggered: the model called jig with {}
+lamp-skills: skills from /tmp/uoQKeOi2/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["dance"]
+lamp-skills: prepare_to_unplug with {} not run: No skill of mine does that just now.
+lamp-skills: skills from /var/folders/qg/lhfdx6q166z5cj705q22mh480000gn/T/.tmpM3Zsbi/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["prepare-unplug"]
+lamp-skills: prepare-unplug Triggered: the model called prepare_to_unplug with {}
+lamp-skills: guard-mode Triggered: the model called keep_watch with {"turn":"on"}
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: guard-mode Done: on again, asked at the lamp: its mark asked for anew
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: its mark has not been confirmed for 30 s: no visit counted
+lamp-skills: hello Done: look at the face: told the body; light warm: done; say: spoken; light given back to on blue at 3: done
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: the desk is empty: keeping watch
+lamp-skills: guard-mode Done: its mark has not been confirmed for 30 s: no visit counted
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: text: sent on messages/out: Someone was at your desk, for about 2 minutes.
+lamp-skills: skills from /tmp/dneGu8EK/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: skills from /tmp/dn0WgcPr/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: prepare-unplug Done: unplug readiness line: spoken
+lamp-skills: skills from /tmp/skQpkB4A/skills, the Policy's ask skipped, a skill's light asked of the ring on light/request
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: look Triggered: the model called look_for with {"place":"left"}
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; someone spoke to the lamp: the search ended; light given back to on blue at 3: done
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: the skills a person turned off kept in /tmp/snMcbJ4n/state: []
+lamp-skills: skills from /tmp/snMcbJ4n/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded ["sip"]
+lamp-skills: skills from /tmp/skNKC8PS/skills, the Policy's ask skipped, a skill's light asked of the ring on light/request
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: sip Triggered: air/indoor has held for 0 s
+lamp-skills: sip Asked: policy nudge
+lamp-skills: sip Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: news Done: say: spoken
+lamp-skills: skills from /tmp/skDg1Jb1/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded []
+lamp-skills: skills from /tmp/dn1E33RV/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: loaded ["hello"]
+lamp-skills: a tool call was not answered: Resource temporarily unavailable (os error 35)
+lamp-skills: guard from the app refused: guard.on let go: it waited 2493 ms behind another call, past the app's 2 s
+lamp-skills: the skills a person turned off kept in /tmp/soNFZtMX/state: ["sip"]
+lamp-skills: skills from /tmp/soNFZtMX/skills, the Policy's ask skipped, a skill's light set through the actions part and given back
+lamp-skills: loaded ["sip"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: guard-mode Done: text: sent on messages/out: Someone was at your desk, for under a minute.
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: hello Triggered: humans/faces/tracked has held for 0 s
+lamp-skills: hello Asked: policy light
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: hello Done: light out: left alone, since only the ring puts it out (LAMP_LIGHT_REQUESTS=on)
+lamp-skills: skills from /tmp/tpu5HMYM/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 1664 ms later; light warm: done; gesture nod: told the body; gesture nod: told the body; light given back to on blue at 3: done
+lamp-skills: loaded ["look"]
+lamp-skills: sip not run: off
+lamp-skills: look Triggered: the model called look_for with {"place":"desk"}
+lamp-skills: guard-mode Triggered: the owner's app asked guard.off
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 514 ms later; light warm: done; gesture nod: told the body; gesture nod: not sent, the body said no over for nod on body/gesture within 6168 ms of its send; light given back to on blue at 3: done
+lamp-skills: hello Done: look at the face: told the body; light warm: asked of the ring at level 5; say: spoken; light given back: asked again with a time already passed
+lamp-skills: skills from /tmp/skzrMudU/skills, the Policy's ask skipped, a skill's light asked of the ring on light/request
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: look Done: mood reading: told the body, held 10 s; light white: done; someone spoke to the lamp: the search ended; light given back to on blue at 3: done
+lamp-skills: hello Done: look at the face: told the body; light warm: left alone, since nothing takes light/request (the ring needs LAMP_LIGHT_REQUESTS=on); say: spoken
+lamp-skills: news Done: say: spoken
+lamp-skills: guard-mode Triggered: the owner's app asked guard.on
+lamp-skills: guard-mode Done: mark: light blue: asked of the ring at level 1
+lamp-skills: guard-mode Done: on, from the owner's app
+lamp-skills: guard-mode Done: its mark shows: counting visits
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 514 ms later; light warm: done; gesture nod: told the body; gesture nod: told the body; light given back to on blue at 3: done
+lamp-skills: hello Done: look at the face: told the body; light warm: asked of the ring at level 3; say: spoken; light given back: asked again with a time already passed
+lamp-skills: skills from /tmp/skYnbtqn/skills, the Policy's ask skipped, a skill's light asked of the ring on light/request
+lamp-skills: loaded []
+lamp-skills: loaded ["hello"]
+lamp-skills: sip Triggered: the model called stuffy_nudges with {"how":"on"}, for ["sip"]
+lamp-skills: sip Done: the model was told what to do next
+lamp-skills: sip Triggered: air/indoor has held for 0 s
+lamp-skills: sip Asked: policy nudge
+lamp-skills: sip Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: sip Done: light: left alone, since the light shown is not known and could not be given back
+lamp-skills: hello Triggered: it appeared on humans/faces/tracked after 0 s without
+lamp-skills: hello Asked: policy hello
+lamp-skills: hello Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate
+lamp-skills: guard from the app refused: turn is "on" or "off"
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 515 ms later; light warm: done; gesture nod: told the body; gesture nod: told the body; light given back to on blue at 3: done
+lamp-skills: guard-mode Done: mark: light given back: asked again with a time already passed
+lamp-skills: guard-mode Done: text: sent on messages/out: Guard is off: the privacy switch is closed.
+lamp-skills: guard-mode Done: off: the privacy switch closed
+lamp-skills: hello Done: dim: asked of the ring at level 2; say: spoken; light given back: asked again with a time already passed
+lamp-skills: hello Answered: the Policy did not answer in time: nothing is done
+lamp-skills: guard.on from the app refused: The privacy switch is closed, so I can't see: I won't keep an eye on things.
+lamp-skills: guard-mode Triggered: the owner's app asked guard.off
+     Running tests/release_pair.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/release_pair-6a7b383b0db4d353)
+     Running tests/requested_audio.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/requested_audio-7f311165d6904c49)
+     Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_update-848e77ac6440879c)
+     Running unittests src/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_update-37e912ef505f9124)
+     Running tests/functions.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/functions-f833487a161d2a87)
+     Running tests/install.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/install-50bf62de40b53745)
+     Running tests/it/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-f00b0d167c98c106)
+     Running tests/release_pair.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/release_pair-1cffc6d9d32163c9)
+     Running tests/round.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/round-11a459c39bb76aa7)
+     Running tests/self_cli_exec.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/self_cli_exec-f64b721a3e4209eb)
+     Running tests/self_process_cuts.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/self_process_cuts-584367f7ea7a7bb2)
+     Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_voice-a9b95286b805e668)
+     Running unittests src/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_voice-b6dc78794ec93371)
+     Running tests/it/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-73635c91cd8b88a3)
+error: test failed, to rerun pass `-p lamp-voice --test it`
+     Running tests/release_pair.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/release_pair-99d83a658939f458)
+     Running unittests examples/render_line_second.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/examples/render_line_second-b9b52812b570e84b)
+     Running unittests examples/stop_words_stt_replay.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/examples/stop_words_stt_replay-5bdbc6c296f69050)
+     Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_voice_eval-079f2fa93fdefee3)
+     Running unittests src/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_voice_eval-09c0422b7d9af692)
+     Running tests/it/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-6b946a5e051ef7a4)
+   Doc-tests lamp_body
+   Doc-tests lamp_cloud
+   Doc-tests lamp_expression
+   Doc-tests lamp_keeper
+   Doc-tests lamp_lean
+   Doc-tests lamp_memory
+   Doc-tests lamp_peek
+   Doc-tests lamp_setup
+   Doc-tests lamp_skills
+   Doc-tests lamp_update
+   Doc-tests lamp_voice
+   Doc-tests lamp_voice_eval
+error: 3 targets failed:
+    `-p lamp-memory --test it`
+    `-p lamp-skills --lib`
+    `-p lamp-voice --test it`

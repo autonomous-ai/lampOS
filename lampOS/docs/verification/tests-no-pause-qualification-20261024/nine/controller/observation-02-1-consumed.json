@@ -1,0 +1,14 @@
+{
+  "case": "glow::tests::a_light_is_asked_from_the_skill_asked_again_while_kept_and_given_back",
+  "observation": 1,
+  "grant_sha256": "87716f5ab2155e8c5c54a368946b75528afee6d887877544c9f73e775c6b8c34",
+  "executable": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/tests/frozen-executables/ec0b5ebe41d46d99a87a5ef62bc9f988ea14b3b2de5aefc97ce856bdf6fa60f0-lamp_skills-1307f9b251c59b00",
+    "sha256": "ec0b5ebe41d46d99a87a5ef62bc9f988ea14b3b2de5aefc97ce856bdf6fa60f0",
+    "mode": "0o555",
+    "bytes": 17385552
+  },
+  "source_guards": {
+    "canonical": "d29aa04d6b93cc54aee014d2110559eceaea07fa0a70d14e79f29cc30c73d601"
+  }
+}

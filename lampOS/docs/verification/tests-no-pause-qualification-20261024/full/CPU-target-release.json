@@ -1,0 +1,16 @@
+{
+  "released_at": "2026-10-24T17:38:38.887109+00:00",
+  "native_session": 98367,
+  "native_terminal_exit": 1,
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+  "CPU_allocation_and_target_released": true,
+  "no_owned_jobs_outstanding": true,
+  "proof": "Nativecontroller terminal/reaped. All owned command directchildren waited and everyownedPGabsent; all99witnesscopies unchanged/read-only. No processvisibility inference/whole-tree escape claim.",
+  "owned_command_count": 209,
+  "owned_command_records_sha256": "acf846b552dbd66e1cfd0fc1cd00cdc81c69c0de6373682f20583364b9ceb657",
+  "closed_review_sha256": "cc3771491ab932cb74225a840eeac8275b3fc0f9b4ba350fb5bec44c53ae5347",
+  "canonical_final2file_WT_unchanged": true,
+  "permanent_consumption_retained": true,
+  "no_new_execution_grant": true,
+  "shared_CPU_context_explicit": true
+}

@@ -1,0 +1,256 @@
+{
+  "identity": "no-pause-three-failures-exact-nine-frozen-observations-v1",
+  "execution_authorized": false,
+  "source_only_preparation": true,
+  "full_run_source_base": "43ac6c843ea91dfc051a9d25e165c9d93f895942",
+  "full_run_source_aggregate": "d29aa04d6b93cc54aee014d2110559eceaea07fa0a70d14e79f29cc30c73d601",
+  "full_run_original_standard_counts": {
+    "passed": 7299,
+    "failed": 3,
+    "ignored": 52
+  },
+  "raw_results_sha256": "a1dd03ff40cfe70acfcad2cb9998079ce8d745b1727a6c24d2c5fadf85b4e7b9",
+  "closed_review_sha256": "cc3771491ab932cb74225a840eeac8275b3fc0f9b4ba350fb5bec44c53ae5347",
+  "CPU_target_release_sha256": "9dd4c364927b9c7954f06524a0c3e836b1faa43fc2487380f3f2889eaae0eec6",
+  "source_bindings": {
+    "lampOS/crates/memory/tests/it/voice.rs": {
+      "git_blob": "a3ca35f2b896a8182410df298ed29ecb3b7b11fa",
+      "sha256": "ab0f14dd70f9b25ed71f4aeb23811b61f46dc78f06cc52bb1106d2cf375635a9"
+    },
+    "lampOS/crates/memory/src/server.rs": {
+      "git_blob": "c994fddecf150c1156300269d30319b3d40ca2f6",
+      "sha256": "73039982f1814258d3c37ce342c251b3b4ff73bc7db99b30be4b8b0f8db95f87"
+    },
+    "lampOS/crates/voice/src/remember.rs": {
+      "git_blob": "79d6414bc96d44442ca4ff7fd3c1f33bd5aa31ce",
+      "sha256": "92aca67917accf99ee2b63c36ab0fff62a217f26fc274eb5fcd68fd36e50a777"
+    },
+    "lampOS/crates/voice/src/local_time.rs": {
+      "git_blob": "f85aca9b952075dbc13a55c42dc88175a4204c17",
+      "sha256": "e589d390cdc12f12ceceef423482ee2d299cb18aad2f691b17f7472e736026bc"
+    },
+    "lampOS/crates/skills/src/glow.rs": {
+      "git_blob": "cee423f0c95ab06aaf55675f3b4e3a3609a66886",
+      "sha256": "2a7699566f1dfc17ea398748b09bfa1e7f4e0059a8359e47e771a47140f18fbe"
+    },
+    "lampOS/crates/voice/tests/it/light_call.rs": {
+      "git_blob": "2827452b9b6336d505c82219f036424858626ee5",
+      "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8"
+    },
+    "lampOS/crates/voice/src/ring_light.rs": {
+      "git_blob": "3e4591ab55caba9f7a52eaa95e4bf4276290116c",
+      "sha256": "1001f5d7a8d827273728f84baee3f23980a63b100a5d4fbf30f3b3cd5007c4f6"
+    },
+    "lampOS/crates/actions/src/light.rs": {
+      "git_blob": "74ddcbd937afa1345d02cdfa5cfba54201339c0b",
+      "sha256": "dfbdf2b49476bcf4e934e6980361b3a453d9050f7e6ccc2ae86b028770e1edf9"
+    }
+  },
+  "cases": [
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+      "fixed_observations": 3,
+      "executable": {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/tests/frozen-executables/b30acb7ad36606eb987d39f49a8d8e700a9f0876c67080d4a99702c29df2e142-it-b864a5069c6d724f",
+        "sha256": "b30acb7ad36606eb987d39f49a8d8e700a9f0876c67080d4a99702c29df2e142",
+        "mode": "0o555",
+        "bytes": 18574840
+      },
+      "compiler_artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/memory#lamp-memory@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/memory/Cargo.toml",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/memory/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "fresh": false
+      },
+      "inventory_total_cases": 169,
+      "expected_filtered_out": 168,
+      "child_scope": "Memory fixture runs realSocket/SQLite Traced Server in owned joinedstdthread; selectedDaysClient/tool/offset helpers do not launchsubprocesses. remember.rs current_exe references are other cfg(test) unitcases absent fromlinkednormalVoice library, not reachable.",
+      "compiled_child_programs": [],
+      "workspace_binary_restoration_required": false
+    },
+    {
+      "package": "lamp-skills",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_skills",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/skills/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "case": "glow::tests::a_light_is_asked_from_the_skill_asked_again_while_kept_and_given_back",
+      "fixed_observations": 3,
+      "executable": {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/tests/frozen-executables/ec0b5ebe41d46d99a87a5ef62bc9f988ea14b3b2de5aefc97ce856bdf6fa60f0-lamp_skills-1307f9b251c59b00",
+        "sha256": "ec0b5ebe41d46d99a87a5ef62bc9f988ea14b3b2de5aefc97ce856bdf6fa60f0",
+        "mode": "0o555",
+        "bytes": 17385552
+      },
+      "compiler_artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/skills#lamp-skills@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/skills/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_skills",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/skills/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_skills-1307f9b251c59b00"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_skills-1307f9b251c59b00",
+        "fresh": false
+      },
+      "inventory_total_cases": 157,
+      "expected_filtered_out": 156,
+      "child_scope": "Glows/RingLight fakepeers and renewal/ring loops are in-process ownedthreads; no executablechild/CARGO_BIN_EXE/current_exe in selectedcase/helperpath.",
+      "compiled_child_programs": [],
+      "workspace_binary_restoration_required": false
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "fixed_observations": 3,
+      "executable": {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/tests/frozen-executables/1b24543979809025077f5e1e2c9ed86da937e337570983bb0f1ac001b468bbbd-it-73635c91cd8b88a3",
+        "sha256": "1b24543979809025077f5e1e2c9ed86da937e337570983bb0f1ac001b468bbbd",
+        "mode": "0o555",
+        "bytes": 115408192
+      },
+      "compiler_artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/voice/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-73635c91cd8b88a3"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-73635c91cd8b88a3",
+        "fresh": false
+      },
+      "inventory_total_cases": 270,
+      "expected_filtered_out": 269,
+      "child_scope": "Glows/RingLight fakepeers and renewal/ring loops are in-process ownedthreads; no executablechild/CARGO_BIN_EXE/current_exe in selectedcase/helperpath.",
+      "compiled_child_programs": [],
+      "workspace_binary_restoration_required": false
+    }
+  ],
+  "fixed_total": 9,
+  "order": "Memory observations1,2,3; Skills1,2,3; Voice1,2,3, exactlyonceeach; no warmup/control/resample/fullrerun.",
+  "argv": [
+    "<case frozen saved witness>",
+    "--exact",
+    "<case>",
+    "--nocapture",
+    "--test-threads=1"
+  ],
+  "no_Cargo_target_rewrite_or_child_restore": true,
+  "current_target_not_read_or_needed": true,
+  "future_root_review_before_execution": [
+    "Freeze actualcontroller/parser/support/env/cwd/sourceguard bindings plus permanent execution-consumed +each9prelaunchclaim. This JSON is a plan, not an executiongrant.",
+    "Root must confirm selected callgraph/childscope and savedbinaryhash/fullmode/profile/features beforeeachobservation andafter; reject anyunexpectedexecutable/CARGO_BIN child instead ofsubstitution. Sourceguards mustbind identicalrecordedsource; ifHEADmoves butbytesunchanged publishnewsourceidentityreceipt beforegrant.",
+    "Root futuregrant records actualsharedCPU/concurrentjobs and permittedlocalSocketcontext; no isolatedload/performance/causeclaims. Currentrun startedwithUpdate4+own2, laterSleep2+own2, thenotherreleased.",
+    "Eachobservation has oneexacttestrow+oneactualsummary, ignored0, measured0, filtered_out exactlyitscapturedinventorytotal-1, record actualstderr/assertionphase+exit. Keeporiginalfullrunfailures. Group/directchildclosure andallstdoutstderr/source/executablehashguards mandatory.",
+    "Outer120s percase withapprovedownedPGTERM/KILL+absence. Ordinarytestfailure retainsallplanned3 andmeanscategoryNOTqualified; source/setup/storage/census/timeoutinvalid stops withoutretry.",
+    "Successful3/3 is onlytheacceptedstandalonecategory; no historicalcause/basefailureclaim, no deletionoforiginalfullfailures or defaulttestlimit changes. No actualobservation authorizedbythis plan."
+  ]
+}

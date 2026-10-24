@@ -1,0 +1,30 @@
+{
+  "command": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/tests/frozen-executables/1b24543979809025077f5e1e2c9ed86da937e337570983bb0f1ac001b468bbbd-it-73635c91cd8b88a3",
+    "--exact",
+    "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+    "--test-threads=1"
+  ],
+  "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS",
+  "started_at": "2026-10-24T17:54:44.623163+00:00",
+  "timeout_seconds": 120,
+  "stdout": "test.stdout.txt",
+  "stderr": "test.stderr.txt",
+  "timeout_cleanup": [],
+  "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+  "owned_pid": 22971,
+  "owned_process_group": 22971,
+  "timed_out": false,
+  "exit_code": 0,
+  "unexpected_residual_group_after_normal_exit": false,
+  "direct_status_before_cleanup": 0,
+  "owned_group_present_before_cleanup": false,
+  "direct_wait_status": 0,
+  "owned_group_absent_after_cleanup": true,
+  "wall_seconds": 2.084792,
+  "finished_at": "2026-10-24T17:54:46.708062+00:00",
+  "stdout_sha256": "89639fa69efa2096015e07e560ba782f902262c051da60877a19ea189ff58598",
+  "stdout_bytes": 208,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_bytes": 0
+}

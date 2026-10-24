@@ -1,0 +1,12 @@
+{
+  "consumed_at": "2026-10-24T16:32:23.895081+00:00",
+  "grant_id": "root-no-pause-canonical-shared-20261024T163000Z",
+  "grant_sha256": "0a07f832b124cd3c3d915ee12e8a9d6275b3c1cd83e7648acd1fc2c80ef6e54d",
+  "plan_sha256": "2b415f7a9874b45aadeb1eaf68137d78180383379f1e3cea40ca3dd3f3211d7e",
+  "controller_sha256": "81633bb3eb6f3a2255402c64639365f7809fb2b00c9accaf1d5ab198e1b628ce",
+  "source_guards": {
+    "canonical": "d29aa04d6b93cc54aee014d2110559eceaea07fa0a70d14e79f29cc30c73d601"
+  },
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+  "permanent_even_if_aborted": true
+}

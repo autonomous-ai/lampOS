@@ -1,0 +1,1 @@
+{"prepared": true, "source_guards": {"canonical": "d29aa04d6b93cc54aee014d2110559eceaea07fa0a70d14e79f29cc30c73d601"}, "environment_difference_keys": ["CODEX_TOOL_CALL_ID"]}

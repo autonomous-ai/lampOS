@@ -1,0 +1,156 @@
+{
+  "execution_authorized": true,
+  "grant_id": "root-reviewed-nine-20261024T1755",
+  "plan_identity": "no-pause-nine-captured-observations-v1",
+  "grant_scope": "exactly-nine-frozen-witness-observations-no-Cargo-no-target-write",
+  "plan_sha256": "28593534d90e4ea073b083f8e8a3c1b480bc205223864e2c5a00f332aaf0843c",
+  "controller_sha256": "a249fcba65999fef97d4bd03820007e33a57c7146c2cccd1919d779f2f7215f6",
+  "source_guards": {
+    "canonical": "d29aa04d6b93cc54aee014d2110559eceaea07fa0a70d14e79f29cc30c73d601"
+  },
+  "permitted_environment_difference_keys": [
+    "CODEX_SANDBOX",
+    "CODEX_TOOL_CALL_ID",
+    "OLDPWD",
+    "PAGER",
+    "PATH",
+    "PWD",
+    "TERM"
+  ],
+  "configured_environment_overrides": {
+    "CARGO_TARGET_DIR": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "original_environment_sha256": "45b9c3f29f05426a6af8313e9a9f01ab094510058b866e19036b93ebcf86f5f6",
+  "witnesses": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/tests/frozen-executables/b30acb7ad36606eb987d39f49a8d8e700a9f0876c67080d4a99702c29df2e142-it-b864a5069c6d724f",
+      "sha256": "b30acb7ad36606eb987d39f49a8d8e700a9f0876c67080d4a99702c29df2e142",
+      "mode": "0o555",
+      "bytes": 18574840
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/tests/frozen-executables/ec0b5ebe41d46d99a87a5ef62bc9f988ea14b3b2de5aefc97ce856bdf6fa60f0-lamp_skills-1307f9b251c59b00",
+      "sha256": "ec0b5ebe41d46d99a87a5ef62bc9f988ea14b3b2de5aefc97ce856bdf6fa60f0",
+      "mode": "0o555",
+      "bytes": 17385552
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/tests/frozen-executables/1b24543979809025077f5e1e2c9ed86da937e337570983bb0f1ac001b468bbbd-it-73635c91cd8b88a3",
+      "sha256": "1b24543979809025077f5e1e2c9ed86da937e337570983bb0f1ac001b468bbbd",
+      "mode": "0o555",
+      "bytes": 115408192
+    }
+  ],
+  "compiler_artifacts": [
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/memory#lamp-memory@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/memory/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+      "fresh": false
+    },
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/skills#lamp-skills@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/skills/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_skills",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/skills/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_skills-1307f9b251c59b00"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_skills-1307f9b251c59b00",
+      "fresh": false
+    },
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-73635c91cd8b88a3"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-73635c91cd8b88a3",
+      "fresh": false
+    }
+  ],
+  "helpers": {
+    "support.py": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+    "census.py": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716"
+  },
+  "local_socket_permissions_authorized": true,
+  "concurrency_context": {
+    "maximum_active_Rust_jobs": 2,
+    "other_active_Rust_jobs": 0,
+    "current_Update_qualification": "closed and released",
+    "claim": "No global hardware isolation or performance/cause claim"
+  },
+  "reviewed_at": "2026-10-24T17:53:39.746701+00:00",
+  "limits": "Exactly nine original saved-witness observations, no compile/target/restore. Preserve original7299/3/52 FAILED. Ordinary failure retains3 fixed observations; invalid setup stops withoutretry."
+}

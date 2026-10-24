@@ -1,0 +1,14 @@
+{
+  "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+  "observation": 3,
+  "grant_sha256": "87716f5ab2155e8c5c54a368946b75528afee6d887877544c9f73e775c6b8c34",
+  "executable": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/tests/frozen-executables/b30acb7ad36606eb987d39f49a8d8e700a9f0876c67080d4a99702c29df2e142-it-b864a5069c6d724f",
+    "sha256": "b30acb7ad36606eb987d39f49a8d8e700a9f0876c67080d4a99702c29df2e142",
+    "mode": "0o555",
+    "bytes": 18574840
+  },
+  "source_guards": {
+    "canonical": "d29aa04d6b93cc54aee014d2110559eceaea07fa0a70d14e79f29cc30c73d601"
+  }
+}

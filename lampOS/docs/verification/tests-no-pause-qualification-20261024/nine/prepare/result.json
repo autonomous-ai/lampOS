@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/planned-nine-standalones/controller/run.py",
+    "--prepare-only"
+  ],
+  "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep",
+  "started_at": "2026-10-24T17:53:16.141962+00:00",
+  "finished_at": "2026-10-24T17:53:20.751994+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "61f35f2bcb7205ac5d460e09dd4cfe9848facb18639f168e2f39765443463196",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "no_observation_or_Cargo": true
+}

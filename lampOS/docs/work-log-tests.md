@@ -4306,3 +4306,9 @@ Ready for lamp-voice: no
 Ready for lamp-voice: no
 
 The [unapplied proposal](verification/tests-shared-bus-clock-proposal-20261024/) makes the shared publisher/subscriber/latest/presence clock scope concrete before an API decision. Root read the entire patch, time-domain audit and six proposed controls; nothing was applied or executed. Default constructors remain System and all product bounds/privacy checks remain. First’s narrow scope decision is needed for this broader API while current-base test-only gates continue. Update draft #3403 is pushed on current427; native ARM40118324976 and LinuxClippy40118324982 are pending. NoPause’s nine saved-witness observations all passed; its exact two-file source is committed/rebased20874923d on427 with an equal range-diff, and publication follows.
+
+## 25 October, 01:14 — NoPause qualification published
+
+Ready for lamp-voice: no
+
+[Primary full and standalone evidence](verification/tests-no-pause-qualification-20261024/) records 7,299/3/52 ignored across79 actual targets, changed case passed, and exactly9/9 later frozen-executable standalone passes. The original full suite remains failed. Root independently checked all nine exact raw outcomes/stream hashes/direct waits/cleanup; no retry, rebuild or historical cause claim. Historical source e15ad2b835 on43ac was rebased with an equal range-diff to20874923d on427 and pushed. Current-base gates/native Linux checks remain pending, so its PR stays draft. Update #3403 likewise remains draft while current-base gates and ARM40118324976/LinuxClippy40118324982 proceed.

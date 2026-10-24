@@ -1,0 +1,158 @@
+{
+  "terminal": true,
+  "observations": [
+    {
+      "label": "01-1",
+      "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+      "passed": true,
+      "summary": {
+        "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 3.27s",
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 168
+      },
+      "command_record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/planned-nine-standalones/controller/run-2026-10-24T175358.620108+0000/01-1/raw-command-outcome.json"
+    },
+    {
+      "label": "01-2",
+      "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+      "passed": true,
+      "summary": {
+        "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 3.56s",
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 168
+      },
+      "command_record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/planned-nine-standalones/controller/run-2026-10-24T175358.620108+0000/01-2/raw-command-outcome.json"
+    },
+    {
+      "label": "01-3",
+      "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+      "passed": true,
+      "summary": {
+        "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 3.40s",
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 168
+      },
+      "command_record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/planned-nine-standalones/controller/run-2026-10-24T175358.620108+0000/01-3/raw-command-outcome.json"
+    },
+    {
+      "label": "02-1",
+      "case": "glow::tests::a_light_is_asked_from_the_skill_asked_again_while_kept_and_given_back",
+      "passed": true,
+      "summary": {
+        "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 0.32s",
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 156
+      },
+      "command_record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/planned-nine-standalones/controller/run-2026-10-24T175358.620108+0000/02-1/raw-command-outcome.json"
+    },
+    {
+      "label": "02-2",
+      "case": "glow::tests::a_light_is_asked_from_the_skill_asked_again_while_kept_and_given_back",
+      "passed": true,
+      "summary": {
+        "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 0.32s",
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 156
+      },
+      "command_record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/planned-nine-standalones/controller/run-2026-10-24T175358.620108+0000/02-2/raw-command-outcome.json"
+    },
+    {
+      "label": "02-3",
+      "case": "glow::tests::a_light_is_asked_from_the_skill_asked_again_while_kept_and_given_back",
+      "passed": true,
+      "summary": {
+        "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 0.32s",
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 156
+      },
+      "command_record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/planned-nine-standalones/controller/run-2026-10-24T175358.620108+0000/02-3/raw-command-outcome.json"
+    },
+    {
+      "label": "03-1",
+      "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "passed": true,
+      "summary": {
+        "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.08s",
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 269
+      },
+      "command_record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/planned-nine-standalones/controller/run-2026-10-24T175358.620108+0000/03-1/raw-command-outcome.json"
+    },
+    {
+      "label": "03-2",
+      "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "passed": true,
+      "summary": {
+        "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.08s",
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 269
+      },
+      "command_record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/planned-nine-standalones/controller/run-2026-10-24T175358.620108+0000/03-2/raw-command-outcome.json"
+    },
+    {
+      "label": "03-3",
+      "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "passed": true,
+      "summary": {
+        "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 269 filtered out; finished in 0.08s",
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 269
+      },
+      "command_record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/planned-nine-standalones/controller/run-2026-10-24T175358.620108+0000/03-3/raw-command-outcome.json"
+    }
+  ],
+  "unrun": 0,
+  "original_full_run_counts": {
+    "passed": 7299,
+    "failed": 3,
+    "ignored": 52
+  },
+  "concurrency_context": {
+    "maximum_active_Rust_jobs": 2,
+    "other_active_Rust_jobs": 0,
+    "current_Update_qualification": "closed and released",
+    "claim": "No global hardware isolation or performance/cause claim"
+  },
+  "historical_cause_claim": false,
+  "isolated_load_or_timing_claim": false,
+  "all_nine_passed": true,
+  "source_after": {
+    "canonical": "d29aa04d6b93cc54aee014d2110559eceaea07fa0a70d14e79f29cc30c73d601"
+  }
+}

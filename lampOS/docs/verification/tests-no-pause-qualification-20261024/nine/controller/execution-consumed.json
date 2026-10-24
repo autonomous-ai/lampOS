@@ -1,0 +1,9 @@
+{
+  "grant_sha256": "87716f5ab2155e8c5c54a368946b75528afee6d887877544c9f73e775c6b8c34",
+  "grant_id": "root-reviewed-nine-20261024T1755",
+  "plan_sha256": "28593534d90e4ea073b083f8e8a3c1b480bc205223864e2c5a00f332aaf0843c",
+  "controller_sha256": "a249fcba65999fef97d4bd03820007e33a57c7146c2cccd1919d779f2f7215f6",
+  "source_guards": {
+    "canonical": "d29aa04d6b93cc54aee014d2110559eceaea07fa0a70d14e79f29cc30c73d601"
+  }
+}

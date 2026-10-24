@@ -1,0 +1,26 @@
+[
+  {
+    "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+    "raw_primary": "full/tests/tests.stdout.txt",
+    "offset": 592204,
+    "bytes": 948,
+    "sha256": "cea2247ce653d5099d3f683b13b1b5cd69ae7c65296bf75bd2d9ddff45d24794",
+    "utf8": "---- voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about stdout ----\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\nlamp-voice provider: memory journal stopped until a fresh worker: why=forgotten\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: a bare forget after a follow-up forgets entry 2\n\nthread 'voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about' (5052476) panicked at crates/memory/tests/it/voice.rs:591:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+  },
+  {
+    "case": "glow::tests::a_light_is_asked_from_the_skill_asked_again_while_kept_and_given_back",
+    "raw_primary": "full/tests/tests.stdout.txt",
+    "offset": 625814,
+    "bytes": 831,
+    "sha256": "a71a13eeabac553d678e896fc5d68a113d12da64a723c02820078197782e07c7",
+    "utf8": "---- glow::tests::a_light_is_asked_from_the_skill_asked_again_while_kept_and_given_back stdout ----\n\nthread 'glow::tests::a_light_is_asked_from_the_skill_asked_again_while_kept_and_given_back' (5069703) panicked at crates/skills/src/glow.rs:562:9:\nassertion `left == right` failed: no renewal after the give-back: [LightRequest { claim: Claim { source: \"skill:desk-tutor\", priority: Skill, clock_id: \"boot-test\", until_us: 33404680950 }, light: Light { on: true, colour: \"white\", level: 3 }, pattern: None, fade_ms: None }, LightRequest { claim: Claim { source: \"skill:desk-tutor\", priority: Skill, clock_id: \"boot-test\", until_us: 33389811904 }, light: Light { on: true, colour: \"white\", level: 3 }, pattern: None, fade_ms: None }]\n  left: 2\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+  },
+  {
+    "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+    "raw_primary": "full/tests/tests.stdout.txt",
+    "offset": 1098134,
+    "bytes": 866,
+    "sha256": "adcf5fa979be47fa553e8e333cd1d7a0c12243457f311d007f842f89babf9b79",
+    "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [3.1356ms, 3.429952ms, 4.10738ms, 4.243406ms, 5.603069ms, 21.037741ms, 39.384324ms, 41.889811ms, 55.152982ms, 57.089132ms, 57.567531ms, 60.4149ms, 61.237767ms, 75.25431ms, 76.655905ms, 76.941642ms, 90.606175ms, 94.86694ms, 97.422275ms, 114.273193ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (5296523) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[3.1356ms, 3.429952ms, 4.10738ms, 4.243406ms, 5.603069ms, 21.037741ms, 39.384324ms, 41.889811ms, 55.152982ms, 57.089132ms, 57.567531ms, 60.4149ms, 61.237767ms, 75.25431ms, 76.655905ms, 76.941642ms, 90.606175ms, 94.86694ms, 97.422275ms, 114.273193ms]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "source_before": {
+    "canonical": "d29aa04d6b93cc54aee014d2110559eceaea07fa0a70d14e79f29cc30c73d601"
+  },
+  "source_after": {
+    "canonical": "d29aa04d6b93cc54aee014d2110559eceaea07fa0a70d14e79f29cc30c73d601"
+  },
+  "executable_after": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/tests/frozen-executables/b30acb7ad36606eb987d39f49a8d8e700a9f0876c67080d4a99702c29df2e142-it-b864a5069c6d724f",
+    "sha256": "b30acb7ad36606eb987d39f49a8d8e700a9f0876c67080d4a99702c29df2e142",
+    "mode": "0o555",
+    "bytes": 18574840
+  }
+}
