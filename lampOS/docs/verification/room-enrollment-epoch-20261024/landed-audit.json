@@ -1,0 +1,17 @@
+{
+  "original_head": "6213596a3e31f118f20f3d11f9a9687eb2c1ce32",
+  "landed": "ed0056b458eedd47981891cb96b3cc3a7ca2b09b",
+  "train": 3352,
+  "train_head": "f74645083e95e16ad1b090d86ab658c5e6332ed5",
+  "tested_preview": "2ed1740ff6c37fd0f6fc22ec02cf7bfffa451664",
+  "tree": "cb1519f3f243c93904b537b2025dfcd900618655",
+  "tested_preview_equals_landed_tree": true,
+  "original_test_and_docs_equal_landed": true,
+  "native_log_sha256": "5fe5b34c5c18d0133f33da2c52c204fc3d1307bf393c01126d25f78940cb4277",
+  "summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T09:10:33.8416742Z         PASS [   0.057s] (5748/7358) lamp-voice second_provider::tests::remember_speaker::remember_speaker_room_publish_after_forget_cannot_revive_its_original_proof",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T09:10:33.8932429Z         PASS [   0.057s] (5749/7358) lamp-voice second_provider::tests::remember_speaker::remember_speaker_room_publish_after_privacy_reopen_cannot_revive_its_original_proof",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T09:10:58.9504209Z      Summary [ 149.383s] 7358 tests run: 7358 passed (1 leaky), 51 skipped",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T09:11:12.5724519Z test result: 12 passed; 0 failed"
+  ]
+}

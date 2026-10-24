@@ -5,6 +5,21 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 16:27 — all three Third pieces landed
+
+- #3344/#3346 landed in train 77 `b2c9eb3dd`; #3349 landed in train 79
+  `ed0056b45`, equal patch and identical authored test/docs files.
+  [Current epoch audit](verification/room-enrollment-epoch-20261024/landed-audit.json).
+- Final train native **7,357 PASS plus 1 LEAK / 51 skipped**, process
+  **12/0**, both epoch cases PASS, Clippy green, exact landed-tree preview.
+  Original native and local rebased **3,999/0/21** results stay distinct.
+- Local duplicate rebase was dropped safely; no redundant push. #3333's
+  corrected survivor tests also landed in train 78 `c6dfe9809` after our
+  P2 read. Physical enrollment/touch sheets remain unrun by Third.
+- First-word audit/probe posted. Now second-reading #3353's heard-cut-in
+  prompt fix, scoped gates running; First retains its existing default
+  freeze/played decision. No device action or new voice behavior by Third.
+
 ## 2026-10-24 16:06 — train landed and hearing-boundary audit
 
 - Train 77 merged as `b2c9eb3dd`: #3344 and #3346 carried with equal

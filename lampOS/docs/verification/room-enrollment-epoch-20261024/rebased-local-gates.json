@@ -1,0 +1,91 @@
+{
+  "head_before_docs": "781b607bc20e874bfb69a6136368176f25dda745",
+  "base": "b2c9eb3dd9be0721dd5a7fa9e211275906383d27",
+  "source_sha256": "8e1b793dca9fb48ce212e6fe3357bfb032e1b20ba36adf7f35da8839ee403af0",
+  "checks": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 13.814,
+      "log": "/private/tmp/third-room-epoch-rebased-fmt.txt"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 36.788,
+      "log": "/private/tmp/third-room-epoch-rebased-clippy.txt"
+    },
+    {
+      "name": "focused",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "remember_speaker",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 76.951,
+      "log": "/private/tmp/third-room-epoch-rebased-focused.txt"
+    },
+    {
+      "name": "voice",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 746.331,
+      "log": "/private/tmp/third-room-epoch-rebased-voice.txt"
+    },
+    {
+      "name": "workspace",
+      "command": [
+        "cargo",
+        "build",
+        "-q",
+        "--locked",
+        "--offline",
+        "--workspace"
+      ],
+      "exit": 0,
+      "seconds": 43.314,
+      "log": "/private/tmp/third-room-epoch-rebased-workspace.txt"
+    }
+  ],
+  "complete": true,
+  "source_unchanged": true
+}
