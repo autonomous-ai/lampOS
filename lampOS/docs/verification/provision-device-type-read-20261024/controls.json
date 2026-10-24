@@ -1,0 +1,74 @@
+{
+  "head": "ee17eb8e6ce3b4800887a03d631a8a8e10e28404",
+  "installer_sha256": "0b25981b9e8269f3ce71fcd225c36d7d01562f6e5b795cfb338ffbf775a0550b",
+  "bash_n_exit": 0,
+  "commands": [
+    {
+      "path": "docs/bootstrap-ota.md",
+      "revision": "ee17eb8e6ce3b4800887a03d631a8a8e10e28404^",
+      "command": "curl -fsSL https://cdn.autonomous.ai/os/install.sh | sudo bash",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "/bin/bash: line 10: DEVICE_TYPE: DEVICE_TYPE must be set (e.g. DEVICE_TYPE=lamp) \u2014 no default\n"
+    },
+    {
+      "path": "docs/bootstrap-ota.md",
+      "revision": "ee17eb8e6ce3b4800887a03d631a8a8e10e28404",
+      "command": "curl -fsSL https://cdn.autonomous.ai/os/install.sh | sudo DEVICE_TYPE=lamp bash",
+      "exit": 0,
+      "stdout": "mock setup received DEVICE_TYPE=lamp and default metadata\n",
+      "stderr": ""
+    },
+    {
+      "path": "docs/vi/bootstrap-ota.md",
+      "revision": "ee17eb8e6ce3b4800887a03d631a8a8e10e28404^",
+      "command": "curl -fsSL https://cdn.autonomous.ai/os/install.sh | sudo bash",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "/bin/bash: line 10: DEVICE_TYPE: DEVICE_TYPE must be set (e.g. DEVICE_TYPE=lamp) \u2014 no default\n"
+    },
+    {
+      "path": "docs/vi/bootstrap-ota.md",
+      "revision": "ee17eb8e6ce3b4800887a03d631a8a8e10e28404",
+      "command": "curl -fsSL https://cdn.autonomous.ai/os/install.sh | sudo DEVICE_TYPE=lamp bash",
+      "exit": 0,
+      "stdout": "mock setup received DEVICE_TYPE=lamp and default metadata\n",
+      "stderr": ""
+    },
+    {
+      "path": "scripts/README.md",
+      "revision": "ee17eb8e6ce3b4800887a03d631a8a8e10e28404^",
+      "command": "DEVICE_TYPE=lamp curl -fsSL .../os/install.sh | sudo bash",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "/bin/bash: line 10: DEVICE_TYPE: DEVICE_TYPE must be set (e.g. DEVICE_TYPE=lamp) \u2014 no default\n"
+    },
+    {
+      "path": "scripts/README.md",
+      "revision": "ee17eb8e6ce3b4800887a03d631a8a8e10e28404",
+      "command": "curl -fsSL https://cdn.autonomous.ai/os/install.sh | sudo DEVICE_TYPE=lamp bash",
+      "exit": 0,
+      "stdout": "mock setup received DEVICE_TYPE=lamp and default metadata\n",
+      "stderr": ""
+    },
+    {
+      "path": "scripts/provision/install.sh",
+      "revision": "ee17eb8e6ce3b4800887a03d631a8a8e10e28404^",
+      "command": "curl -fsSL https://storage.googleapis.com/s3-autonomous-upgrade-3/os/install.sh | sudo bash",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "/bin/bash: line 10: DEVICE_TYPE: DEVICE_TYPE must be set (e.g. DEVICE_TYPE=lamp) \u2014 no default\n"
+    },
+    {
+      "path": "scripts/provision/install.sh",
+      "revision": "ee17eb8e6ce3b4800887a03d631a8a8e10e28404",
+      "command": "curl -fsSL https://cdn.autonomous.ai/os/install.sh | sudo DEVICE_TYPE=lamp bash",
+      "exit": 0,
+      "stdout": "mock setup received DEVICE_TYPE=lamp and default metadata\n",
+      "stderr": ""
+    }
+  ],
+  "network_root_device_or_real_setup_execution": false,
+  "shim_directory": "/private/tmp/third-3286-read-b1bw1m2h",
+  "earlier_harness_error": "README extraction selected first inline install.sh token instead of pipeline; exit 127 before installer execution for that input. Corrected extraction only; source unchanged."
+}
