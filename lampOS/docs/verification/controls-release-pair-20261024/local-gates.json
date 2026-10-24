@@ -1,0 +1,82 @@
+{
+  "before": {
+    "Cargo.lock": "6b7257a08c9a3efa708d74d1f48e3fe0ae0383ca13526dad83247bebe1bf9735",
+    "crates/controls/Cargo.toml": "14f43466f1273d70000af04ad0b12a5fb2c420bce9d8cb36110666d6a8cc94d4",
+    "crates/controls/tests/release_pair.rs": "b069a9ef44dc1ab5e44aefbdddde1f81eb8e6dc87fa3a10678cbbe6be5213489",
+    "crates/controls/tests/release_pair/fixture.rs": "dc8db5200ae7fb9d1217c5a7d8f4d61f97a4d6d080e4fc9e77ce0f34b9dd9b1c"
+  },
+  "checks": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 11.555,
+      "log": "/private/tmp/third-controls-pair-fmt.txt"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-controls",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 1.094,
+      "log": "/private/tmp/third-controls-pair-clippy.txt"
+    },
+    {
+      "name": "controls",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-controls",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 47.28,
+      "log": "/private/tmp/third-controls-pair-controls.txt"
+    },
+    {
+      "name": "workspace",
+      "command": [
+        "cargo",
+        "build",
+        "-q",
+        "--locked",
+        "--offline",
+        "--workspace"
+      ],
+      "exit": 0,
+      "seconds": 178.999,
+      "log": "/private/tmp/third-controls-pair-workspace.txt"
+    }
+  ],
+  "complete": true,
+  "after": {
+    "Cargo.lock": "6b7257a08c9a3efa708d74d1f48e3fe0ae0383ca13526dad83247bebe1bf9735",
+    "crates/controls/Cargo.toml": "14f43466f1273d70000af04ad0b12a5fb2c420bce9d8cb36110666d6a8cc94d4",
+    "crates/controls/tests/release_pair.rs": "b069a9ef44dc1ab5e44aefbdddde1f81eb8e6dc87fa3a10678cbbe6be5213489",
+    "crates/controls/tests/release_pair/fixture.rs": "dc8db5200ae7fb9d1217c5a7d8f4d61f97a4d6d080e4fc9e77ce0f34b9dd9b1c"
+  },
+  "authored_head": "27b3695f0235bc7a721dfb216cd21203c249491d",
+  "committed_blobs_match": true
+}

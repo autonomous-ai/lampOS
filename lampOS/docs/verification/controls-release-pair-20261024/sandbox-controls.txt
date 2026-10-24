@@ -1,0 +1,143 @@
+
+running 33 tests
+.................................
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 465 tests
+....................................................................................... 87/465
+............................................................................. 164/465
+no_slide::with_no_slide_a_still_second_says_the_marker_fifty_times --- FAILED
+no_slide::with_no_slide_the_touch_path_says_the_marker_fifty_times --- FAILED
+...... 172/465
+privacy::controls_says_the_switch_on_diagnostics_beside_its_own_report --- FAILED
+..........i. 185/465
+privacy::with_privacy_attached_a_still_second_says_controls_state_fifty_times --- FAILED
+................. 203/465
+program::sigterm_finishes_recording_and_releases_the_actual_serve_owner --- FAILED
+............................ 232/465
+runtime::missing_reader_publishes_an_error_without_claiming_hardware_readiness --- FAILED
+.. 235/465
+runtime::quiet_event_publisher_renews_liveness_without_inventing_a_gesture --- FAILED
+... 239/465
+runtime::typed_tap_event_has_a_matching_retained_stop_for_a_late_owner --- FAILED
+....................................................................................... 327/465
+....................................................................................... 414/465
+................... 433/465
+touch_runtime::a_button_held_is_said_at_each_reading_and_its_release_at_once --- FAILED
+touch_runtime::a_hand_held_with_the_pins_read_every_5_ms_is_said_at_most_50_times_a_second --- FAILED
+..... 440/465
+touch_runtime::a_still_pad_is_said_ten_times_a_second_and_a_hand_in_the_step_that_read_it --- FAILED
+. 442/465
+touch_runtime::a_touch_reader_failing_mid_run_leaves_the_privacy_reading_fresh --- FAILED
+..... 448/465
+touch_runtime::controls_says_the_head_lines_and_a_pad_left_out_on_diagnostics --- FAILED
+.......... 459/465
+touch_runtime::strip_startup_failure_leaves_primary_gpio_and_legacy_stop_working --- FAILED
+... 463/465
+touch_runtime::with_legacy_head_a_pat_is_still_the_old_engines_pet --- FAILED
+.
+failures:
+
+---- no_slide::with_no_slide_a_still_second_says_the_marker_fifty_times stdout ----
+
+thread 'no_slide::with_no_slide_a_still_second_says_the_marker_fifty_times' (242578228) panicked at crates/controls/tests/it/no_slide.rs:76:10:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /tmp/cns-60720-5/bus/controls/state/subs/test_no_slide.60720.0.new: Operation not permitted (os error 1)" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- no_slide::with_no_slide_the_touch_path_says_the_marker_fifty_times stdout ----
+
+thread 'no_slide::with_no_slide_the_touch_path_says_the_marker_fifty_times' (242578229) panicked at crates/controls/tests/it/no_slide.rs:76:10:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /tmp/cns-60720-6/bus/controls/state/subs/test_no_slide.60720.1.new: Operation not permitted (os error 1)" }
+
+---- privacy::controls_says_the_switch_on_diagnostics_beside_its_own_report stdout ----
+
+thread 'privacy::controls_says_the_switch_on_diagnostics_beside_its_own_report' (242578496) panicked at crates/controls/tests/it/privacy.rs:763:14:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /tmp/cps-60720-6/bus/diagnostics/subs/test.60720.2.new: Operation not permitted (os error 1)" }
+
+---- privacy::with_privacy_attached_a_still_second_says_controls_state_fifty_times stdout ----
+
+thread 'privacy::with_privacy_attached_a_still_second_says_controls_state_fifty_times' (242578593) panicked at crates/controls/tests/it/privacy.rs:432:73:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /tmp/cpv-60720/controls/state/subs/test_legacy.60720.3.new: Operation not permitted (os error 1)" }
+
+---- program::sigterm_finishes_recording_and_releases_the_actual_serve_owner stdout ----
+
+thread 'program::sigterm_finishes_recording_and_releases_the_actual_serve_owner' (242579051) panicked at crates/controls/tests/it/program.rs:309:10:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /tmp/cp-60720-6/bus/diagnostics/subs/test.60720.4.new: Operation not permitted (os error 1)" }
+
+---- runtime::missing_reader_publishes_an_error_without_claiming_hardware_readiness stdout ----
+
+thread 'runtime::missing_reader_publishes_an_error_without_claiming_hardware_readiness' (242579199) panicked at crates/controls/tests/it/runtime.rs:177:10:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /tmp/cr-60720-4/diagnostics/subs/test.60720.5.new: Operation not permitted (os error 1)" }
+
+---- runtime::quiet_event_publisher_renews_liveness_without_inventing_a_gesture stdout ----
+
+thread 'runtime::quiet_event_publisher_renews_liveness_without_inventing_a_gesture' (242579202) panicked at crates/controls/tests/it/runtime.rs:409:10:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /tmp/cr-60720-7/controls/gesture/subs/test.60720.6.new: Operation not permitted (os error 1)" }
+
+---- runtime::typed_tap_event_has_a_matching_retained_stop_for_a_late_owner stdout ----
+
+thread 'runtime::typed_tap_event_has_a_matching_retained_stop_for_a_late_owner' (242579206) panicked at crates/controls/tests/it/runtime.rs:101:10:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /tmp/cr-60720-11/controls/gesture/subs/test.60720.7.new: Operation not permitted (os error 1)" }
+
+---- touch_runtime::a_button_held_is_said_at_each_reading_and_its_release_at_once stdout ----
+
+thread 'touch_runtime::a_button_held_is_said_at_each_reading_and_its_release_at_once' (242580565) panicked at crates/controls/tests/it/touch_runtime.rs:1121:71:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /private/tmp/ctr-60720-0/controls/touch_state/subs/test_touch.60720.8.new: Operation not permitted (os error 1)" }
+
+---- touch_runtime::a_hand_held_with_the_pins_read_every_5_ms_is_said_at_most_50_times_a_second stdout ----
+
+thread 'touch_runtime::a_hand_held_with_the_pins_read_every_5_ms_is_said_at_most_50_times_a_second' (242580566) panicked at crates/controls/tests/it/touch_runtime.rs:1121:71:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /private/tmp/ctr-60720-1/controls/touch_state/subs/test_touch.60720.9.new: Operation not permitted (os error 1)" }
+
+---- touch_runtime::a_still_pad_is_said_ten_times_a_second_and_a_hand_in_the_step_that_read_it stdout ----
+
+thread 'touch_runtime::a_still_pad_is_said_ten_times_a_second_and_a_hand_in_the_step_that_read_it' (242580576) panicked at crates/controls/tests/it/touch_runtime.rs:1121:71:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /private/tmp/ctr-60720-6/controls/touch_state/subs/test_touch.60720.10.new: Operation not permitted (os error 1)" }
+
+---- touch_runtime::a_touch_reader_failing_mid_run_leaves_the_privacy_reading_fresh stdout ----
+
+thread 'touch_runtime::a_touch_reader_failing_mid_run_leaves_the_privacy_reading_fresh' (242580606) panicked at crates/controls/tests/it/touch_runtime.rs:1472:10:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /private/tmp/ctr-60720-9/controls/state/subs/test_state.60720.11.new: Operation not permitted (os error 1)" }
+
+---- touch_runtime::controls_says_the_head_lines_and_a_pad_left_out_on_diagnostics stdout ----
+
+thread 'touch_runtime::controls_says_the_head_lines_and_a_pad_left_out_on_diagnostics' (242580687) panicked at crates/controls/tests/it/touch_runtime.rs:281:10:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /private/tmp/ctr-60720-14/diagnostics/subs/test.60720.12.new: Operation not permitted (os error 1)" }
+
+---- touch_runtime::strip_startup_failure_leaves_primary_gpio_and_legacy_stop_working stdout ----
+
+thread 'touch_runtime::strip_startup_failure_leaves_primary_gpio_and_legacy_stop_working' (242580808) panicked at crates/controls/tests/it/touch_runtime.rs:357:10:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /private/tmp/ctr-60720-29/diagnostics/subs/test.60720.13.new: Operation not permitted (os error 1)" }
+
+---- touch_runtime::with_legacy_head_a_pat_is_still_the_old_engines_pet stdout ----
+
+thread 'touch_runtime::with_legacy_head_a_pat_is_still_the_old_engines_pet' (242580828) panicked at crates/controls/tests/it/touch_runtime.rs:634:73:
+called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: "bind /private/tmp/ctr-60720-36/controls/gesture/subs/test.60720.14.new: Operation not permitted (os error 1)" }
+
+
+failures:
+    no_slide::with_no_slide_a_still_second_says_the_marker_fifty_times
+    no_slide::with_no_slide_the_touch_path_says_the_marker_fifty_times
+    privacy::controls_says_the_switch_on_diagnostics_beside_its_own_report
+    privacy::with_privacy_attached_a_still_second_says_controls_state_fifty_times
+    program::sigterm_finishes_recording_and_releases_the_actual_serve_owner
+    runtime::missing_reader_publishes_an_error_without_claiming_hardware_readiness
+    runtime::quiet_event_publisher_renews_liveness_without_inventing_a_gesture
+    runtime::typed_tap_event_has_a_matching_retained_stop_for_a_late_owner
+    touch_runtime::a_button_held_is_said_at_each_reading_and_its_release_at_once
+    touch_runtime::a_hand_held_with_the_pins_read_every_5_ms_is_said_at_most_50_times_a_second
+    touch_runtime::a_still_pad_is_said_ten_times_a_second_and_a_hand_in_the_step_that_read_it
+    touch_runtime::a_touch_reader_failing_mid_run_leaves_the_privacy_reading_fresh
+    touch_runtime::controls_says_the_head_lines_and_a_pad_left_out_on_diagnostics
+    touch_runtime::strip_startup_failure_leaves_primary_gpio_and_legacy_stop_working
+    touch_runtime::with_legacy_head_a_pat_is_still_the_old_engines_pet
+
+test result: FAILED. 449 passed; 15 failed; 1 ignored; 0 measured; 0 filtered out; finished in 19.37s
+
+error: test failed, to rerun pass `-p lamp-controls --test it`

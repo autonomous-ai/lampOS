@@ -5,6 +5,20 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 14:53 — Controls actual-pair PR pushed
+
+- #3346 `27b3695f0` is pushed, clean: current native Controls **509/0/3**,
+  fmt/strict Clippy/workspace pass, authored blobs match gate hashes.
+  [Receipts](verification/controls-release-pair-20261024/README.md).
+- Actual 6408/6498 binaries run only in native CI. Both payloads are
+  identical; no product/hardware/update-row acceptance. One independent
+  test read and exact Linux fmt requested; native gates run separately.
+- Earlier sandbox socket failures retained; subsequent driver hardening
+  enforces original deadlines and preserves pre-wait command provenance.
+- #3344 still waits on Second’s privacy read; exact Linux fmt verified
+  against authored repository/lampOS trees and cleanup receipt. #3333 and
+  #3319 author follow-ups remain unchanged. No lamp action.
+
 ## 2026-10-24 14:48 — Controls actual-pair fixture and second privacy read
 
 - Claimed #2809’s unowned Controls calibration/pins slice after checking

@@ -1,0 +1,66 @@
+{
+  "before": {
+    "Cargo.lock": "6b7257a08c9a3efa708d74d1f48e3fe0ae0383ca13526dad83247bebe1bf9735",
+    "crates/controls/Cargo.toml": "14f43466f1273d70000af04ad0b12a5fb2c420bce9d8cb36110666d6a8cc94d4",
+    "crates/controls/tests/release_pair.rs": "b069a9ef44dc1ab5e44aefbdddde1f81eb8e6dc87fa3a10678cbbe6be5213489",
+    "crates/controls/tests/release_pair/fixture.rs": "f93d7dc5d8c707481b10eeb7735f60bfd907d794ef4af1a47e069e69b6ab77e3"
+  },
+  "checks": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 11.608,
+      "log": "/private/tmp/third-controls-pair-fmt.txt"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-controls",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 20.29,
+      "log": "/private/tmp/third-controls-pair-clippy.txt"
+    },
+    {
+      "name": "controls",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-controls",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "seconds": 39.918,
+      "log": "/private/tmp/third-controls-pair-controls.txt"
+    }
+  ],
+  "complete": false,
+  "after": {
+    "Cargo.lock": "6b7257a08c9a3efa708d74d1f48e3fe0ae0383ca13526dad83247bebe1bf9735",
+    "crates/controls/Cargo.toml": "14f43466f1273d70000af04ad0b12a5fb2c420bce9d8cb36110666d6a8cc94d4",
+    "crates/controls/tests/release_pair.rs": "b069a9ef44dc1ab5e44aefbdddde1f81eb8e6dc87fa3a10678cbbe6be5213489",
+    "crates/controls/tests/release_pair/fixture.rs": "f93d7dc5d8c707481b10eeb7735f60bfd907d794ef4af1a47e069e69b6ab77e3"
+  }
+}
