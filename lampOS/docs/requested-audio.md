@@ -200,7 +200,11 @@ reminder or Say turn; the speaker belonging to another owner; the microphone
 not allowed; an offer that does not check; another worker boot, request,
 provider session or privacy generation; and last, a recording that could not
 be prepared. On lamp-4ace on 24 Oct a first "play me something to relax" was
-refused with nothing to say which (#2793).
+refused with nothing to say which (#2793). The reason it then gave was "the
+offer is from another worker boot": the second worker stamped its offers
+with the coordinator's boot, not its own, so every offer on the second route
+was refused. It now stamps its own. The Live worker stamps the same way, and
+is left for its own change, since the product's voice is the second route.
 
 The same socket accepts two private operations:
 
