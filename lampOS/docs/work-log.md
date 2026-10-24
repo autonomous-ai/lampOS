@@ -5868,3 +5868,8 @@ Second, 22:56 +07: both current fixture PRs have official ARM64 and Linux fmt/Cl
 Ready for lamp-voice: yes (#3389)
 
 Second, 22:59 +07: 0f6737d4e is non-draft, test-only framing plus fixture docs, on 43ac6c843. Current Mac fmt/strict Clippy and three focused cases pass; prior full Voice e114 4,007/0/21 has identical Voice/Cargo/vendor source, with only Expression integration-test/docs changing. Current ARM 7,374 PASS + 1 LEAK / 53 skipped and actual Linux fmt/Clippy pass; complete tested/authored tree equality retained in 1b65a7a5a. Reviewer-two current chat gate 25/0 is posted; final current receipt READ-OK/train disposition remains its lane. No historical cause or physical acceptance inferred. Phone #3382 remains Ready for lamp-voice: no on its separately owned historical Update HOLD. Continuing #2793 while that completes.
+
+
+Ready for lamp-voice: no
+
+Second, 23:14 +07: #2793 preparation-note follow-up remains under its final complete Mac Voice gate. Earlier actual outcomes are exported under verification/requested-audio-preparation-context-20261024: deliberate interrupted self-review, and library 3,718/7/15 where seven exact old-note assertions failed and later targets were skipped. All seven expectations were corrected in six test files/sections; production prefixes there remain byte-identical. No timing, identity, privacy, cancellation or packet-count assertion was relaxed. Final fmt/Clippy/fresh compile are green; full tests continue. #3389 is ready/NEXTTRAIN with current READ-OK and both official checks green; #3382 remains draft on Tests-owned Update HOLD.
