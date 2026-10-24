@@ -4438,8 +4438,15 @@ pub(crate) const BUSY_TURNED: &str =
 /// conversation going on needs to be a question, or three words or more,
 /// or an answer to the lamp's own question (`lamp_asked`); one let out only
 /// by a face turned to the lamp needs to be a question. A line called by its
-/// name, its words, a tap, or said close to the lamp is let out as before.
+/// name, its words, a tap, or said close to the lamp is let out as before,
+/// and so is one whose words call the lamp, whatever else let it out: on
+/// lamp-4ace on 24 Oct the owner's "Lamp.", answered as a call once no line
+/// came after it, was let out as the conversation going on too, and held
+/// here as a short line.
 fn busy_bar(why: &str, heard: &str, lamp_asked: bool) -> Option<&'static str> {
+    if crate::attention::called_by_name_on(heard, true) {
+        return None;
+    }
     let question = heard.trim_end().ends_with('?');
     if why == crate::attention::GOING_ON {
         (!(question || heard.split_whitespace().count() >= 3 || lamp_asked)).then_some(BUSY_SHORT)
@@ -8819,6 +8826,26 @@ mod tests {
         assert_eq!(super::busy_bar(TURNED, "Is it raining?", false), None);
         let named = "its name was heard plainly in the room's sound";
         assert_eq!(super::busy_bar(named, "Okay.", false), None);
+    }
+
+    /// lamp-4ace on 24 Oct, the owner alone: "Lamp." said, nothing after it,
+    /// answered as a call, then held in a busy room as a short line of the
+    /// conversation going on. A line whose words call the lamp, or a word
+    /// written for its name where the name stands, is never held for being
+    /// short; one that only mentions it is.
+    #[test]
+    fn a_busy_room_never_holds_a_line_that_calls_the_lamp() {
+        use crate::attention::{GOING_ON, TURNED};
+        for called in ["Lamp.", "Lamp", "Hey Lamp.", "Plan.", "Man.", "Lynn."] {
+            assert_eq!(super::busy_bar(GOING_ON, called, false), None, "{called}");
+            assert_eq!(super::busy_bar(TURNED, called, false), None, "{called}");
+        }
+        assert_eq!(
+            super::busy_bar(GOING_ON, "The lamp.", false),
+            Some(BUSY_SHORT),
+            "the lamp mentioned, not called"
+        );
+        assert_eq!(super::busy_bar(GOING_ON, "Yes.", false), Some(BUSY_SHORT));
     }
 
     /// #1712, the first builder at 19:21: "And what about tomorrow?" came
