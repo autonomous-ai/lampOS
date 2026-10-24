@@ -5,6 +5,16 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 10:59 — Records cleanup correction verified
+
+- #3329 `6f79d33d6` closes the recursive-exit P2 before evidence deletion.
+  Exact extracted controls **6/0** on Mac; shell/jq **52/0** unchanged.
+- Fresh dedicated native **3/0** in 45.53 seconds; three terminal receipts,
+  six unit exits, five source-map pairs and authored/preview tree verified.
+  [Evidence](verification/records-release-pair-review-20261024/README.md).
+- #3328 remains green and offered to the train; #3319’s second source read
+  is posted, with First’s played/fold qualification remaining. No lamp action.
+
 ## 2026-10-24 10:48 — own-name native green; requested-audio second read
 
 - #3328 `7fb4feb20`: both privacy reads carried; author HOLD lifted. Native

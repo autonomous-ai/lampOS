@@ -1,0 +1,34 @@
+{
+  "head": "6f79d33d624f812e7ba0fb0ef9cc8acfcaccb550",
+  "source": "lampOS/crates/records/tests/support/release_pair/host.rs",
+  "source_sha256": "15efc4972db5938b29cfe8c896cfcf992c9555046fe4517801b616937538f172",
+  "extracted_sha256": "0f49298793853651ae0979a4a02bfea6cf28b518b6974f3fecba865dd39dff29",
+  "boundary": "Exact group_empty_at, plain_directory, plain_file, group_text and six existing tests, with only std imports added. Ordinary Mac filesystem; not real cgroup or systemd execution.",
+  "compile_command": [
+    "rustc",
+    "+1.96.0",
+    "--edition",
+    "2024",
+    "--test",
+    "/private/tmp/third-3329-cgroup-controls.rs",
+    "-o",
+    "/private/tmp/third-3329-cgroup-controls"
+  ],
+  "compile_exit": 0,
+  "test_command": [
+    "/private/tmp/third-3329-cgroup-controls",
+    "--test-threads=1"
+  ],
+  "test_exit": 0,
+  "passed": 6,
+  "failed": 0,
+  "offline_controls": {
+    "command": [
+      "bash",
+      ".github/scripts/lampos-records-pair-test.sh"
+    ],
+    "exit": 0,
+    "passed": 52,
+    "failed": 0
+  }
+}
