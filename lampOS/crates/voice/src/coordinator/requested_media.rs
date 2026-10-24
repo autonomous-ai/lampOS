@@ -123,23 +123,57 @@ impl Reply {
         self.media.ticket.is_some() && self.notice.origin() == SpeechOrigin::Provider
     }
 
+    #[cfg(test)]
     pub(super) fn requested_audio_invalid(
         &self,
         worker: BootId,
         snapshot: Snapshot,
         at_us: u64,
     ) -> bool {
-        self.media.ticket.as_ref().is_some_and(|ticket| {
-            !ticket.live(at_us)
-                || self.media.binding.as_ref().is_none_or(|binding| {
-                    binding.worker_boot != boot_text(worker)
-                        || binding.provider_session != self.cloud.session
-                        || binding.request != self.owner.turn()
-                        || snapshot.owner() != Some(self.owner)
-                        || snapshot.microphone_permission() != Permission::Allowed
-                        || binding.privacy_generation != snapshot.microphone_generation()
-                })
-        })
+        self.requested_audio_invalidity(worker, snapshot, at_us)
+            .is_some()
+    }
+
+    /// Why a bound recording is no longer valid, or `None` while it is: what
+    /// the journal says before the turn is revoked (#2793).
+    pub(super) fn requested_audio_invalidity(
+        &self,
+        worker: BootId,
+        snapshot: Snapshot,
+        at_us: u64,
+    ) -> Option<&'static str> {
+        let ticket = self.media.ticket.as_ref()?;
+        if !ticket.live(at_us) {
+            return Some("its recording is no longer live");
+        }
+        let Some(binding) = self.media.binding.as_ref() else {
+            return Some("it has no binding");
+        };
+        [
+            (
+                binding.worker_boot != boot_text(worker),
+                "another worker boot",
+            ),
+            (
+                binding.provider_session != self.cloud.session,
+                "another provider session",
+            ),
+            (binding.request != self.owner.turn(), "another request"),
+            (
+                snapshot.owner() != Some(self.owner),
+                "the speaker belongs to another owner",
+            ),
+            (
+                snapshot.microphone_permission() != Permission::Allowed,
+                "the microphone is not allowed",
+            ),
+            (
+                binding.privacy_generation != snapshot.microphone_generation(),
+                "another privacy generation",
+            ),
+        ]
+        .into_iter()
+        .find_map(|(invalid, why)| invalid.then_some(why))
     }
 
     /// Return true only when a new recording is selected. A completed model
