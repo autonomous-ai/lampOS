@@ -1,0 +1,27 @@
+{
+  "landed": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+  "train": 3377,
+  "train_head": "987cb653c57389464a21df248b0acefab1f75a30",
+  "executed_preview": "2a160ea29b403b58f5ecc1e58b1002e1abd8e095",
+  "executed_preview_tree": "931f8c99ee6e8f3f15d5011100511133283cf3ce",
+  "landed_tree": "931f8c99ee6e8f3f15d5011100511133283cf3ce",
+  "whole_tree_equal": true,
+  "arm_run": 40089495628,
+  "arm_conclusion": "success",
+  "arm_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T11:25:57.4980816Z      Summary [ 201.102s] 11228 tests run: 11228 passed (1 leaky), 106 skipped",
+  "process_controls": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T11:26:11.0760796Z test result: 12 passed; 0 failed",
+  "clippy_run": 40089495617,
+  "clippy_conclusion": "success",
+  "explicit_format_step": {
+    "completedAt": "2026-10-24T11:21:07Z",
+    "conclusion": "success",
+    "name": "formatting (whole workspace, pinned Rust)",
+    "number": 5,
+    "startedAt": "2026-10-24T11:20:57Z",
+    "status": "completed"
+  },
+  "raw_log_sha256": {
+    "arm": "ded5b5a571cd069b11f89e367ce1737d0638f193de778310d85c030e7dbf7444",
+    "clippy": "d24691b395c254cd514f7f42cea621aab8edea546c8aa0fac3e38b960699cc2e"
+  }
+}
