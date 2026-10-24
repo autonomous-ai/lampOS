@@ -423,6 +423,42 @@ mod tests {
     }
 
     #[test]
+    fn finish_reports_acknowledged_pending_and_disconnected_writers_truthfully() {
+        for outcome in ["acknowledged", "pending", "disconnected"] {
+            let (sender, _receiver) = mpsc::sync_channel(1);
+            let (finish, done) = mpsc::sync_channel(1);
+            let recorder = Recorder {
+                sender,
+                done,
+                counters: Arc::new(Counters::default()),
+                gap: false,
+                touch: false,
+            };
+            let finish = if outcome == "disconnected" {
+                drop(finish);
+                None
+            } else {
+                Some(finish)
+            };
+            if outcome == "acknowledged" {
+                finish.as_ref().unwrap().send(()).unwrap();
+            }
+            // A zero-duration observation needs neither a scheduling sleep
+            // nor an assumption about disk latency. Keep a pending peer alive.
+            let stats = if outcome == "acknowledged" {
+                // Preserve the real default finish path's positive guarantee
+                // with an acknowledgement already queued, independent of I/O.
+                recorder.finish()
+            } else {
+                recorder.finish_within(Duration::ZERO)
+            };
+            assert_eq!(stats.finished, outcome == "acknowledged", "{outcome}");
+            assert!(!stats.failed, "{outcome}");
+            drop(finish);
+        }
+    }
+
+    #[test]
     fn recording_formats_cannot_be_mixed_silently() {
         let (mut legacy, _) = recorder(1);
         legacy.submit_touch(&crate::touch_replay::Record {
