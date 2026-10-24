@@ -57,6 +57,10 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo fmt --all -- --check
 ```
 
+The Linux Clippy workflow explicitly runs `cargo +1.96.0 fmt --all --check`
+before Clippy. Installing rustfmt or passing the ARM64 tests alone does not
+establish that Linux formatting was checked.
+
 ## Current components
 
 | Crate | Responsibility |
