@@ -1,0 +1,12 @@
+{
+  "source_unchanged": true,
+  "cause": "all three stopped on explicit rustc ENOSPC before test execution",
+  "capacity_free_bytes": 33221636096,
+  "recovery_limit": "one new full-gate invocation per carry after completed own 27G target removal",
+  "no_product_or_original_native_retry": true,
+  "source_heads": {
+    "parent": "a0b3711669a6ec0dd4eea54f148edf76b9c78cad",
+    "controls": "db16f0312842b9ce08177fb31e2c6b40b79accda",
+    "child": "aab1344e33a41b5831e5483866680596ee0cc406"
+  }
+}

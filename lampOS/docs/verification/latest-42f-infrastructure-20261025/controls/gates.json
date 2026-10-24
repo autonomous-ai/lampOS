@@ -1,0 +1,76 @@
+{
+  "worktree": "/private/tmp/third-controls-recording-stop",
+  "base": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+  "carried_head": "db16f0312842b9ce08177fb31e2c6b40b79accda",
+  "target": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-controls-stop-target-hqfpb717",
+  "target_scope": "target exclusive to this Controls worktree; initially empty for controlled red, reused after test-only edits; no cross-worktree reuse",
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-controls-stop-target-hqfpb717",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "packages": [
+    "lamp-controls"
+  ],
+  "scope_reason": "Controls test-only recorder completion/CLI contract; production prefix unchanged, full Controls tests plus workspace build; no runtime/API/dependency/schema/default change",
+  "source_count": 7027,
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 13.259,
+      "log": "/private/tmp/third-controls-stop-42f-full-fmt.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-controls",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 6.879,
+      "log": "/private/tmp/third-controls-stop-42f-full-clippy.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "build",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "-q",
+        "--workspace",
+        "--locked",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit": 101,
+      "seconds": 29.246,
+      "log": "/private/tmp/third-controls-stop-42f-full-build.txt",
+      "source_unchanged": true
+    }
+  ],
+  "docker_available": false
+}

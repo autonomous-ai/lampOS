@@ -1,0 +1,31 @@
+{
+  "runs": {
+    "arm": 40136352454,
+    "linux": 40136352425
+  },
+  "binding": {
+    "authored": "96ec82d0dcc76db723d18d8acee2c8bb45c68e30",
+    "tested": "31d48735fa4b91646e2c2ddab29d44655aca9f90",
+    "parents": [
+      "fc31e012334cda59eb3c489560454c515fb86386",
+      "96ec82d0dcc76db723d18d8acee2c8bb45c68e30"
+    ],
+    "authored_tree": "9d49337f4743aba8cd5b3b27ea923ee5c58de599",
+    "tested_tree": "9d49337f4743aba8cd5b3b27ea923ee5c58de599",
+    "complete_trees_equal": true
+  },
+  "selected_terminal": 11265,
+  "status_counts": {
+    "PASS": 11264,
+    "LEAK": 1
+  },
+  "skipped": 106,
+  "failed_or_unrun": 0,
+  "process": "12/0",
+  "required_literal_PASS": {
+    "a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner": true,
+    "a_late_colleague_print_cannot_revive_a_closed_or_disabled_carry": true,
+    "sigterm_finishes_recording_and_releases_the_actual_serve_owner": true
+  },
+  "scope": "distinct fc31 authored/native epoch; old05 failed remains failed and no CI cause is inferred; latest42 carry is independently qualifying"
+}

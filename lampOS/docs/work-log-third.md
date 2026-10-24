@@ -5,6 +5,26 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 06:07 — latest carries and held-print P2
+
+Ready for lamp-voice: no (current native/reader dispositions remain).
+
+- Parent a0b371166 on42f is pushed after its bounded capacity recovery:
+  fmt/strict Clippy/workspace build/full **4,654/0/21**, 11 summaries,
+  all7,027 sources independently Git-bound. [Latest packet](verification/carry-late-verdict-20261025/latest-42f-a0b371166/README.md).
+- Controls #3419 latest db16f0312 is pushed after its one recovery: full
+  **510/0/3**, six summaries, all7,027 sources Git-bound; exact test-only
+  patch and100 ms production deadline unchanged. [Packet](verification/controls-recording-stop-20261025/latest-42f-db16f0312/README.md).
+- #3420 has a recent-call/forget availability P2. The child-only current
+  qualification was stopped143 after fmt/Clippy, later stages incomplete.
+  First diagnostic fixture passed because a max-kept old3-second answer
+  still allowed follow-up; the corrected old30→actual new12 clock fixture
+  fails0/1 as predicted. Closing carrying with its forgotten scope is now
+  under the worker gate; no new child full success is credited.
+- All three ENOSPC attempts and one-recovery plan/cache receipt are
+  [retained](verification/latest-42f-infrastructure-20261025/README.md).
+  No native failure, old source, calibration or physical result is renamed.
+
 ## 2026-10-25 05:25 — two follow-ups qualified and pushed
 
 Ready for lamp-voice: no (new native/current reads remain).

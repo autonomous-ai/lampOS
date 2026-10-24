@@ -1,0 +1,7 @@
+# Latest 42f Controls carry
+
+Head db16f0312842b9ce08177fb31e2c6b40b79accda is based on 42f08cf038660ff60b3415f7c3a64740ce782fcc. Its three-path test/docs patch is unchanged from d8; the sole new upstream path is a coordinator comment. Product production prefix and 100 ms limit remain unchanged. One-line commit, clean tree.
+
+The first latest carry attempt passed fmt/Clippy, then workspace build hit explicit ENOSPC before any tests. Those raw files/maps remain in the infrastructure packet. After the documented completed own 27 GiB target cleanup, the one predeclared recovery passes all four stages: workspace formatting, strict all-target Controls Clippy, workspace build and full serial Controls tests, six summaries totaling 510/0/3 ignored. All 7,027 byte/mode/symlink records independently match frozen before/after maps and committed Git blobs/modes. Same-worktree target reuse is explicit; no fresh-all-artifact or old-epoch transfer.
+
+Default finish positive acknowledgement, pending/disconnected false outcomes, real CLI bounded exit/owner release and existing five-second complete GPIO/privacy roundtrips retain their exact final-d8 semantics. The controlled predicate red and original failed parent native stay failed. New original current-head native checks and current-carry reader disposition remain required before ready. No device, local ARM64 link/execution, runtime source/deadline or physical-stop change.

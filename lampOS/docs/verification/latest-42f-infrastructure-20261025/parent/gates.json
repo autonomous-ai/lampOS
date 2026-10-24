@@ -1,0 +1,62 @@
+{
+  "worktree": "/private/tmp/third-carry-late-current",
+  "base": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+  "carried_head": "a0b3711669a6ec0dd4eea54f148edf76b9c78cad",
+  "target": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc",
+  "target_scope": "exclusive to this same current-base worktree, now reused after latest 42f comment-only rebase; no cross-worktree target reuse",
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "packages": [
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "scope_reason": "private worker verdict ordering only; no public API, dependency, schema or default change; full affected Voice and Voice-eval tests plus workspace build; parent full reverse closure not relabelled current",
+  "source_count": 7027,
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 13.112,
+      "log": "/private/tmp/third-carry-late-42f-full-fmt.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "seconds": 69.138,
+      "log": "/private/tmp/third-carry-late-42f-full-clippy.txt",
+      "source_unchanged": true
+    }
+  ],
+  "docker_available": false
+}

@@ -1,0 +1,145 @@
+{
+  "time": "2026-10-24T22:39:18.603319+00:00",
+  "target": "/private/tmp/third-carry-window-target-ld637ldg",
+  "scope": "completed own exclusive child Cargo cache only; no source, peer/global cache or Git cleanup",
+  "reason": "three latest carry attempts hit confirmed ENOSPC before tests; bounded recovery after freeing owned cache",
+  "last_success": "fc31 child4663/0/21",
+  "last_failure": "42fClippy101 ENOSPC, later stagesunrun",
+  "dependency_files": 1584,
+  "archive": "/private/tmp/third-held-completed-target-dep-info-42f.tar.gz",
+  "archive_sha256": "7c97100255cbd701251c7341d4100830d3854be70add231343ba170765a57d7f",
+  "late_executable_records": [
+    {
+      "path": "debug/deps/it-442652889f8c67a0",
+      "sha256": "c6837c09c27245a4c7376914c7149246f2f82ba5084c55e48098bc5e47eb423b",
+      "size": 19823656
+    },
+    {
+      "path": "debug/deps/it-cb05ead5f6bba31b",
+      "sha256": "123ee4443568ee8f8d72a6bc60384609ed9298cc7c8bc438b1f9e8d62ef18f28",
+      "size": 114989880
+    },
+    {
+      "path": "debug/deps/lamp_voice-a9b95286b805e668",
+      "sha256": "ce1b8adf05a1ead0082cc5509378add50451f9254e2fb6e9df65317ad739e57b",
+      "size": 139520368
+    },
+    {
+      "path": "debug/deps/lamp_voice-b264eb48e4f20f88",
+      "sha256": "b4f25942f73d54d19bc2d652ef9484a720c1b661da15c8488742f3cca36bb502",
+      "size": 50313624
+    },
+    {
+      "path": "debug/deps/lamp_voice_eval-fbfc9c077993693c",
+      "sha256": "5e1eb54de309e428f71ffe7cc79b00b5e5f472423511f3d2d7cc038191e18ce8",
+      "size": 7825984
+    },
+    {
+      "path": "debug/deps/it-b864a5069c6d724f",
+      "sha256": "2900377f06e5e364a0a21c3a9e2f978fb2db1f11d74aaa6ee75bbb96c0564427",
+      "size": 18385008
+    },
+    {
+      "path": "debug/deps/it-d8575dda435eb43e",
+      "sha256": "1f29cd7594573cc33ec6ce534b45a8a258430e1df0ff8045fb79a0aee44b1e59",
+      "size": 15712704
+    },
+    {
+      "path": "debug/deps/it-bda9dd473807073f",
+      "sha256": "1096991967ed897c1c0768e315f05a340555b61dd3624a796b6396c951a21dc5",
+      "size": 7059664
+    },
+    {
+      "path": "debug/deps/lamp_voice_eval-079f2fa93fdefee3",
+      "sha256": "a85259fbad48a2f40e1512eea178adc2d1ba4c94254323e08f9d020576cfcf92",
+      "size": 30367816
+    },
+    {
+      "path": "debug/deps/lamp_voice-9fae6186447de1a5",
+      "sha256": "9a44a8cd9189593ecf439a7181062406faaf285d5f8d33275b8b9829222f290c",
+      "size": 1247176
+    },
+    {
+      "path": "debug/deps/lamp_voice_eval-319773fc37acaf9a",
+      "sha256": "8d04cd68c05e7a23d5807e3c96750a2ecef7c22542c562f60b431fdcc29caa60",
+      "size": 36144864
+    },
+    {
+      "path": "debug/deps/lamp_voice-b6dc78794ec93371",
+      "sha256": "aedb13be73a97a65eddbe4f7686f3afbdf93056985264615231913ee67a322af",
+      "size": 1248776
+    },
+    {
+      "path": "debug/deps/it-d42eb1c7e5987252",
+      "sha256": "17b41009adfa55f328deff7ef72a90a3be8c52d601915862b163ffcd99fa567e",
+      "size": 19365648
+    },
+    {
+      "path": "debug/deps/it-03d8e125c34f2f16",
+      "sha256": "4c4f1205b2cbee367741dd4c437797073a7bb0d035da16eb5af1fef3c6475536",
+      "size": 25978888
+    },
+    {
+      "path": "debug/deps/lamp_voice-32528aba0e1951ce",
+      "sha256": "652770f8487b2af87c5b76ae649897b93a45165d869fbb95e49e339e473909b1",
+      "size": 50070480
+    },
+    {
+      "path": "debug/deps/it-f00b0d167c98c106",
+      "sha256": "153ab5417af7a809bd307597414f7a94c14dab79a1139cbb329f9ff0298dc381",
+      "size": 1980776
+    },
+    {
+      "path": "debug/deps/lamp_voice_eval-1365b232ea999c11",
+      "sha256": "14ff5a8eeac61880b17b8a910b1602b282545b06c605f6f4c0f81078a4d27173",
+      "size": 36760448
+    },
+    {
+      "path": "debug/deps/lamp_voice_eval-6400ace948dc189e",
+      "sha256": "bb790d26a273b0d4363ef4c41692869b4792fab7e2e5c3187412e8fa4487b1e9",
+      "size": 36137416
+    },
+    {
+      "path": "debug/deps/it-ea6f93305b6d7f2a",
+      "sha256": "f137800f4db83dfd2880794fb5260cb0ee2778cd889b4c460d1a6bcb5b17b615",
+      "size": 3853440
+    },
+    {
+      "path": "debug/deps/it-6b946a5e051ef7a4",
+      "sha256": "3d4b1581a0c1293717cc2b5f6955cc4907c71aae73adc4360eccc64fdd4114ce",
+      "size": 20097936
+    },
+    {
+      "path": "debug/deps/lamp_voice-4cc65ed959850dc5",
+      "sha256": "61b432b3ca44d06fc280b5ac43a19ee8674f7d186dbe51ad41245153eedf3975",
+      "size": 52444000
+    },
+    {
+      "path": "debug/deps/lamp_voice_eval-09c0422b7d9af692",
+      "sha256": "154d6b7bc4a7028afd9223c62bc588116d5492908809b9801f1ee96e803168f8",
+      "size": 7782328
+    },
+    {
+      "path": "debug/deps/lamp_voice-6afccc7ec26c06bc",
+      "sha256": "6654e9925a3dfba4763d6b043c1095c908d5b5f8f2a399886a30297da1e9f554",
+      "size": 139083608
+    },
+    {
+      "path": "debug/deps/lamp_voice_eval-0c96be27483fa8d6",
+      "sha256": "41190fd2947f82575dba9091fd15d33ff2d978d291b9d61680b2003dcebb52e2",
+      "size": 30332936
+    },
+    {
+      "path": "debug/deps/it-73635c91cd8b88a3",
+      "sha256": "8f7933471a399792b3f9afac06af321f36a5ed4e0c8c3e9839fdfbc7394cc8ff",
+      "size": 115069976
+    },
+    {
+      "path": "debug/deps/it-671b21cade528fe0",
+      "sha256": "b1146f2bdf1a9b2e0a270eaaea87eeecf88552d85cdd8703177a70da1753e83d",
+      "size": 15673640
+    }
+  ],
+  "hash_scope": "observed after later failed check-only Clippy; no historical initial-execution hash claim",
+  "action": "remove target only after source/results/dependency evidence retained"
+}

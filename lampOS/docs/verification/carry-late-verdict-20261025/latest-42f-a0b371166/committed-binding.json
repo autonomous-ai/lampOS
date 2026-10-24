@@ -1,0 +1,17 @@
+{
+  "gate_start_head": "a0b3711669a6ec0dd4eea54f148edf76b9c78cad",
+  "head": "a0b3711669a6ec0dd4eea54f148edf76b9c78cad",
+  "tree": "849843eeda1d11565933b8e3d8c762451b2c3b29",
+  "base": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+  "source_count": 7027,
+  "every_source_matches_frozen_map_and_committed_blob_mode": true,
+  "summary": {
+    "summaries": 11,
+    "passed": 4654,
+    "failed": 0,
+    "ignored": 21,
+    "source_unchanged": true
+  },
+  "worktree_clean": true,
+  "scope": "private worker verdict ordering only; no public API, dependency, schema or default change; full affected Voice and Voice-eval tests plus workspace build; parent full reverse closure not relabelled current"
+}

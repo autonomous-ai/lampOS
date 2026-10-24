@@ -1,0 +1,7 @@
+# Latest comment-only base carry, a0
+
+Authored a0b3711669a6ec0dd4eea54f148edf76b9c78cad directly parents 42f08cf038660ff60b3415f7c3a64740ce782fcc. The own three-file patch is unchanged from read96; only an upstream coordinator comment changed. The body/header/latest ancestry are not inferred from an older preview.
+
+Its first source-stable attempt hit explicit ENOSPC during Clippy before build/tests. After the documented completed own 27 GiB cache removal restored 30.9 GiB free, the one predeclared recovery passed workspace fmt, strict all-target Voice/Eval Clippy, workspace build and full affected serial tests: 4,654 passed / zero failed / 21 ignored, eleven summaries, test stage874.334 s. All7,027 byte/mode/symlink records remain unchanged and independently match committed Git blobs/modes; clean tree. Same exclusive worktree target reused, debug information/incremental off, assertions retained, two compile jobs. No sampled test or old-epoch transfer.
+
+The distinct successful96 native packet remains fc31-bound. New current original native gates and current-carry reader dispositions remain before ready. Old05's failed native and its9,616 unrun cases stay failed with no cause/waiver. The separate child recent-call/forget P2 is held on its own branch and does not alter this parent source. No local ARM64 linking/execution, device, calibration, physical or generic-personal-scope acceptance claim.

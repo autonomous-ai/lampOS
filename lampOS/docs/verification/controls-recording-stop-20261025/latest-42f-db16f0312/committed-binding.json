@@ -1,0 +1,17 @@
+{
+  "gate_start_head": "db16f0312842b9ce08177fb31e2c6b40b79accda",
+  "head": "db16f0312842b9ce08177fb31e2c6b40b79accda",
+  "tree": "52562173367cf4359d095109add53403f884f784",
+  "base": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+  "source_count": 7027,
+  "every_source_matches_frozen_map_and_committed_blob_mode": true,
+  "summary": {
+    "summaries": 6,
+    "passed": 510,
+    "failed": 0,
+    "ignored": 3,
+    "source_unchanged": true
+  },
+  "worktree_clean": true,
+  "scope": "Controls test-only recorder completion/CLI contract; production prefix unchanged, full Controls tests plus workspace build; no runtime/API/dependency/schema/default change"
+}

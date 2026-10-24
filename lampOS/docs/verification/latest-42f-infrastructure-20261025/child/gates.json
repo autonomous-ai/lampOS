@@ -1,0 +1,54 @@
+{
+  "worktree": "/private/tmp/third-carry-colleague-window",
+  "base": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+  "carried_head": "aab1344e33a41b5831e5483866680596ee0cc406",
+  "target": "/private/tmp/third-carry-window-target-ld637ldg",
+  "target_scope": "exclusive to this worktree; initially empty for red regression, reused after source edits/rebase; no all-fresh claim",
+  "packages": [
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "scope_reason": "private held-print helper and worker ownership verdict only; no public API, dependency, schema or default change; full Voice/Eval tests plus workspace build; rebased onto latest 42f parent source; new full composition gate, with inherited Soft/Name/fixture/Expression paths kept; no prior-base full execution transferred",
+  "source_count": 7028,
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 13.443,
+      "log": "/private/tmp/third-held-constraints-42f-full-fmt.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "seconds": 39.421,
+      "log": "/private/tmp/third-held-constraints-42f-full-clippy.txt",
+      "source_unchanged": true
+    }
+  ],
+  "docker_available": false
+}

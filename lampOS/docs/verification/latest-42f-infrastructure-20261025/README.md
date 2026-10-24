@@ -1,0 +1,7 @@
+# Latest 42f infrastructure attempts, preserved
+
+All three source-stable first attempts hit explicit rustc ENOSPC before tests: parent/child at Clippy, Controls after Clippy during workspace build. Unobserved later stages are unrun, not passed. Raw streams, stage receipts and both source maps are retained. There is no product-test result, source cause or original-native retry here.
+
+After every affected Cargo session terminated, only the completed exclusive child target was removed (27 GiB). Before removal, 1,584 dependency records were archived privately and 26 late executable hashes recorded; the receipt explicitly limits those to late observations. No source, peer/global cache or Git cleanup occurred. Free capacity rose to 30.9 GiB. The binary dependency archive stays outside the repository; only its hash/receipt is published.
+
+The predeclared plan allowed one full recovery invocation per carry after that material capacity correction. Parent/Controls retained their own exclusive targets; the child received a new empty debug0/no-incremental target, assertions retained, two compile jobs. Its later source-traced forget P2 caused a deliberate child-only stop after fmt/Clippy, terminal143, with build incomplete and tests unrun. That is separate from ENOSPC and never credited as success. Parent/Controls recoveries completed successfully and have their own final packets. No repeated sample/retry-until-green or historical waiver is claimed.
