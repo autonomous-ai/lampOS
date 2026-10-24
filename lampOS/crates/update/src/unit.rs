@@ -270,7 +270,7 @@ mod tests {
     /// lamp moved from V1 answers only when spoken to (Migrate on #2602,
     /// 22 Oct). Not `LAMP_NAMES`: it needs the eyes' who socket, which the
     /// generic eyes unit does not serve.
-    const WHO_IT_ANSWERS: [&str; 12] = [
+    const WHO_IT_ANSWERS: [&str; 13] = [
         "LAMP_BUS",
         "LAMP_BUS_AUDIO",
         "LAMP_ATTENTION",
@@ -283,6 +283,7 @@ mod tests {
         "LAMP_SHORT_SOUNDS",
         "LAMP_FAINT_HOLD_MS",
         "LAMP_WAIT_KEEPS_ANSWER",
+        "LAMP_BUSY_ENDS_SOONER",
     ];
 
     /// The clock and opening context need no per-lamp provider file: use
