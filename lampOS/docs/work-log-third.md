@@ -5,6 +5,22 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 14:48 — Controls actual-pair fixture and second privacy read
+
+- Claimed #2809’s unowned Controls calibration/pins slice after checking
+  open and merged work. `third/controls-release-pair` exercises the pinned
+  actual 6408/6498 writers/readers in native CI; current Mac CLI smoke
+  **1/0/2 ignored**, strict Controls Clippy pass. Full gates now running.
+- The first smoke caught an authored 17/18-command counter mismatch; an
+  explicit final recovery reopening makes all 18 commands execute. No
+  production change, ARM64 execution, device action or physical acceptance.
+- #3344 Second’s exact-head Linux fmt receipt passes with 6,990 source
+  hashes unchanged and container removal verified; their independent
+  second privacy read/full Voice suite is running. Existing own HOLD is
+  only for that second read. Native/Clippy and Lead READ-OK stay green.
+- #3333’s corrected Memory head/raw receipts and #3319’s corrected played
+  result/fold remain with their authors. Controls work continues meanwhile.
+
 ## 2026-10-24 14:21 — #3344 native green
 
 - ARM64 selected suite **7,351 passed (one journal LEAK), 45 skipped**,
