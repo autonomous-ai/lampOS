@@ -5,6 +5,16 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 14:21 — #3344 native green
+
+- ARM64 selected suite **7,351 passed (one journal LEAK), 45 skipped**,
+  process **12/0**, Linux Clippy pass. Four authored files match preview;
+  six unrelated base files differ. No whole-tree equality claim.
+- Lead READ-OK and both P3 notes retained; second privacy read and exact
+  Linux fmt remain. Own code/head unchanged.
+- #3319 second permission read/gates published; #3333 awaits its author’s
+  corrected head. [Own native receipt](verification/room-enrollment-proof-20261024/native.json).
+
 ## 2026-10-24 14:15 — #3344 open and permission read complete
 
 - Own #3344 `f653bc5bd` is pushed, clean: full Voice **3,993/0/21**,

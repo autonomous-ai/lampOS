@@ -40,3 +40,19 @@ test attempts and build, and every bound file matches its authored git blob.
 terminal checks. The initial failed library and all isolated reruns stay
 above. Official ARM64/Linux Clippy, two public privacy reads and Linux fmt
 remain distinct pending gates.
+
+## Official native result and first privacy read
+
+#3344 `f653bc5bd` passed ARM64 run 40072776658: selected suite
+**7,351 passed (one reported Voice journal LEAK), 45 skipped**, process
+**12/0**. Linux Clippy 40072776682 passed. Preview `c3566b8e7` carries
+base `411965dcb`; all four authored files match, while six unrelated base
+files differ. This is not whole-tree equality. `native.json` binds the raw
+log hash, preview parents, exact differences and result.
+
+The lead’s READ-OK is in with two nonblocking notes: with enrollment on
+and no lease, the whole room update is dropped; and a direct epoch-bump
+interleaving is untested by the new helper regression. Both are explicit
+in the PR body. Existing shared proof/forget/privacy checks and the unrun
+physical sheet remain distinct. Second privacy read and exact Linux fmt
+are pending; author HOLD is only for the two-reader privacy requirement.

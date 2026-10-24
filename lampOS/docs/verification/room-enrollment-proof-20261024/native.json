@@ -1,0 +1,31 @@
+{
+  "head": "f653bc5bdcdaecb661f27aa076f395dea38474c7",
+  "arm64_run": 40072776658,
+  "clippy_run": 40072776682,
+  "conclusion": "success",
+  "checkout": {
+    "sha": "c3566b8e70d64e4399e5ff975a56db2d6fbc35cf",
+    "tree": "faed66039f0cdc962a175880bc5d8b1bffec9d8c",
+    "parents": [
+      "411965dcb659e17188ff81fb4ba4b73b2b62012e",
+      "f653bc5bdcdaecb661f27aa076f395dea38474c7"
+    ]
+  },
+  "authored_four_files_match_preview": true,
+  "preview_equals_authored_tree": false,
+  "base_changes": [
+    "lampOS/crates/audio/src/duplex.rs",
+    "lampOS/crates/voice/src/coordinator/tests/duplex.rs",
+    "lampOS/docs/build-rows.md",
+    "lampOS/docs/duplex-listening.md",
+    "lampOS/docs/stop-word.md",
+    "lampOS/docs/switches.md"
+  ],
+  "summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T07:17:16.1570642Z         LEAK [   0.218s] (5178/7351) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T07:17:46.5931208Z      Summary [ 151.382s] 7351 tests run: 7351 passed (1 leaky), 45 skipped",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T07:18:00.3038378Z test result: 12 passed; 0 failed"
+  ],
+  "log_sha256": "a3fffeabb3f80b576137b45954073ccf5162679038634641eb4b933d6638de03",
+  "limits": "Selected ARM64 test suite, one reported Voice journal LEAK. No physical enrollment/cancellation/latency or product activation claim."
+}
