@@ -1,0 +1,18 @@
+{
+  "arm64-official.json": {
+    "original_sha256": "fdafa64cdf1385131deed50d4c775e749b7bf050d9a34c031b5b0d5aef6eaf9c",
+    "published_sha256": "fdafa64cdf1385131deed50d4c775e749b7bf050d9a34c031b5b0d5aef6eaf9c"
+  },
+  "arm64-official.txt": {
+    "original_sha256": "bf7e521116a4cb337adf9354cc7c8f3767816bd7de09b675a4d99473e876b5f0",
+    "published_sha256": "bf7e521116a4cb337adf9354cc7c8f3767816bd7de09b675a4d99473e876b5f0"
+  },
+  "linux-official.json": {
+    "original_sha256": "d1df5916d89148bc96f60dd2008354e1632d9afc1575b3fe78ed2f1cccc0bf0e",
+    "published_sha256": "d1df5916d89148bc96f60dd2008354e1632d9afc1575b3fe78ed2f1cccc0bf0e"
+  },
+  "linux-official.txt": {
+    "original_sha256": "eebbab3d73ec1d0a2726cbdbac727c1295bf5b66a7cbc9ad45557d51b9601766",
+    "published_sha256": "eebbab3d73ec1d0a2726cbdbac727c1295bf5b66a7cbc9ad45557d51b9601766"
+  }
+}
