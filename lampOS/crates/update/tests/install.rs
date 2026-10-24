@@ -863,7 +863,8 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
 
 /// #2860: the product sees who speaks, the eyes reading each face's speaking
 /// and the voice reading it, so a full update gives one lamp what the
-/// real-face run had.
+/// real-face run had. The held #2539 name proposal reaches the same installed
+/// unit; its person/privacy lamp run remains the activation gate.
 #[test]
 fn the_product_sees_who_speaks() {
     let unit = |name: &str| {
@@ -879,6 +880,7 @@ fn the_product_sees_who_speaks() {
             "lamp-voice.service",
             "Environment=LAMP_SECOND_SPEAKING_FACE=on",
         ),
+        ("lamp-voice.service", "Environment=LAMP_SECOND_FACE_NAME=on"),
         // The voice reads the eyes' switch too: a room's forget needs the
         // face seen saying it, and without it every one is NOT_THEIRS
         // (#3037, #3038).
