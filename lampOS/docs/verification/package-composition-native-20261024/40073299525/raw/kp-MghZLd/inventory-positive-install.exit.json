@@ -1,0 +1,7 @@
+{
+  "code": 0,
+  "event": "reaped",
+  "pid": 10200,
+  "signal": null,
+  "stage": "inventory-positive-install"
+}
