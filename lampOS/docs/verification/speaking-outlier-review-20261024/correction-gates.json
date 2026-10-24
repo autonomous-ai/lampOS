@@ -1,0 +1,91 @@
+{
+  "head": "be231f4520707c9f5dfc11aac2e2ca9d33f95845",
+  "hashes_before": {
+    "crates/eyes/src/speaking.rs": "6b012fdac51b5b5f5e64de9e1550545d95dc56d45d47515b2cab434a65a8c6fe",
+    "docs/eyes.md": "59c8da9bd0abeb3169d3fcbe3101e9455c155f136371c6cf75f00c68b82ad67f",
+    "docs/switches.md": "f9f49608b55d5da6de283c86bc4ce96ca6b2ba42423269c5ebc5172e22a50b11"
+  },
+  "fixtures_unchanged": {
+    "marks": true,
+    "run": true,
+    "corners_and_high_outliers_retain_talking_and_still_answers": true,
+    "distance_alone_and_one_missing_mesh_do_not_prove_unknown": true,
+    "an_angular_outlier_at_constant_distance_is_still_refused": true,
+    "two_outliers_report_outliers_and_real_scale_change_never_speaks": true,
+    "dropping_a_look_does_not_accelerate_a_subthreshold_mesh_change": true,
+    "dropping_a_look_does_not_accelerate_a_subthreshold_corner_change": true
+  },
+  "runs": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 11.99
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-eyes",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 11.14
+    },
+    {
+      "name": "focused",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-eyes",
+        "--lib",
+        "third_review_outlier",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "seconds": 21.58
+    },
+    {
+      "name": "full",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-eyes",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 68.99
+    }
+  ],
+  "hashes_after": {
+    "crates/eyes/src/speaking.rs": "6b012fdac51b5b5f5e64de9e1550545d95dc56d45d47515b2cab434a65a8c6fe",
+    "docs/eyes.md": "59c8da9bd0abeb3169d3fcbe3101e9455c155f136371c6cf75f00c68b82ad67f",
+    "docs/switches.md": "f9f49608b55d5da6de283c86bc4ce96ca6b2ba42423269c5ebc5172e22a50b11"
+  },
+  "status": ""
+}

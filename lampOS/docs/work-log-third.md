@@ -5,6 +5,19 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 09:11 — outlier correction read; Linux enrollment gates green
+
+- #3317 `be231f452`: READ-OK after original-adjacency source read,
+  unchanged six controls, focused **7/0**, full Eyes **318/0/5 ignored**,
+  fmt and strict Clippy. Both native gates passed; ARM64 **11,129 passed
+  (one Voice journal leak), 71 skipped**. Original P2 clears; the separate
+  newest-dropped-look P3 remains explicitly nonblocking.
+- #3318 `46c072c98`: Linux strict Clippy and Second's exact-head Linux
+  formatting pass. Third verified the latter's source tree binding. ARM64
+  and two full reads remain pending; First's forced-call joint read has
+  no finding and is explicitly not a full review marker.
+- Continuing the gate/comment watch and next eligible work; no lamp action.
+
 ## 2026-10-24 09:03 — guarded enrollment pushed as #3318
 
 - Pushed `46c072c98` on `third/remember-speaking-face`, current base

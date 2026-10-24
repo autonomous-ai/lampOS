@@ -1,0 +1,10 @@
+{
+  "marks": true,
+  "run": true,
+  "corners_and_high_outliers_retain_talking_and_still_answers": true,
+  "distance_alone_and_one_missing_mesh_do_not_prove_unknown": true,
+  "an_angular_outlier_at_constant_distance_is_still_refused": true,
+  "two_outliers_report_outliers_and_real_scale_change_never_speaks": true,
+  "dropping_a_look_does_not_accelerate_a_subthreshold_mesh_change": true,
+  "dropping_a_look_does_not_accelerate_a_subthreshold_corner_change": true
+}

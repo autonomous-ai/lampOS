@@ -1,0 +1,7 @@
+
+running 7 tests
+....third_review corners: off=Speaking { state: No, score: 0.018, from: Some(Corners) } on=Speaking { state: No, score: 0.017999997, from: Some(Corners) }
+.third_review mesh: off=Speaking { state: No, score: 0.0101, from: Some(Mesh) } on=Speaking { state: No, score: 0.010099999, from: Some(Mesh) }
+..
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 306 filtered out; finished in 0.00s
+

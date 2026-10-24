@@ -37,3 +37,18 @@ back to corners rather than directly producing Unknown. The linked device
 note says its verdict was not retained and the causal step was inferred.
 Treat that specific cause as unproven until bound to the actual diagnostic
 window. No source repair or device action was performed in this read.
+
+## Correction reread: #3317 at be231f452
+
+[Third's READ-OK](https://github.com/autonomous-ai/lampOS/pull/3317#issuecomment-6378600899)
+clears the P2 after exact-head execution. All six review controls and both
+helpers are unchanged; both original failure cases remain No. Original
+adjacency is now preserved for movement pairs and jitter triples.
+Formatting and strict Eyes Clippy pass; focused **7/0**, full Eyes
+**318 passed / 0 failed / 5 ignored**, unchanged source hashes, clean tree.
+ARM64 run 40052409675 and Linux Clippy 40052409765 succeeded. Native preview
+`ea41a6fcb` onto `4a84fa5ab` ran **11,129 passed (one existing Voice journal
+leak), 71 skipped**; Eyes 320 passed. The correction receipts are alongside
+this note. Reviewer-three's newest-dropped-look concern remains its
+explicitly nonblocking P3; no lamp result or complete classifier-accuracy
+claim is made here. The earlier missing-controls P3 is satisfied in source.

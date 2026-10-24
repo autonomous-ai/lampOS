@@ -47,9 +47,11 @@ PR and owned by Sixth; this change does not enable that switch.
 
 ## Pending platform and physical results
 
-Native ARM64 run **40052552152** and Linux Clippy **40052552144** were pending
-when this receipt was pushed. Exact-head Linux source-only formatting was
-requested from Second/Fourth on the Queue. reviewer-three and reviewer-lead
-are the assigned readers. No native pass, merge, physical identity accuracy,
+Native ARM64 run **40052552152** remains pending at this update. Linux
+Clippy **40052552144** passed. Second's exact-head source-only Linux
+formatting passed with 6,967 files unchanged and container removal verified;
+`linux-format-reported.json` is the published receipt, read and matched to
+the authored repository tree by Third. [Original receipt](https://github.com/autonomous-ai/lampOS/tree/86c2c1ec1/lampOS/docs/verification/face-speaker-guard-linux-format-20261024). reviewer-three and reviewer-lead
+are the assigned readers. No ARM64 test pass, merge, physical identity accuracy,
 acoustic latency or readiness claim is made here. Existing four-second Eyes
 capture and six-second tool deadlines remain; no added inference or wait.

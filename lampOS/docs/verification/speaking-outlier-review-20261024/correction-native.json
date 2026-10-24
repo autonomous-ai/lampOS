@@ -1,0 +1,15 @@
+{
+  "binding_and_summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T02:01:58.3728740Z HEAD is now at ea41a6f Merge be231f4520707c9f5dfc11aac2e2ca9d33f95845 into 4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T02:01:58.4297648Z [command]/usr/bin/git log -1 --format=%H",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T02:01:58.4319719Z ea41a6fcb47b49d4ac1fd6da4d02c89e9f5122a3",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T02:07:11.5264682Z         LEAK [   0.238s] ( 8963/11129) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T02:07:41.2827342Z      Summary [ 200.660s] 11129 tests run: 11129 passed (1 leaky), 71 skipped"
+  ],
+  "eyes_counts": {
+    "PASS lamp-eyes": 309,
+    "PASS lamp-eyes::bin/lamp-eyes": 9,
+    "PASS lamp-eyes::full_look_replay": 1,
+    "PASS lamp-eyes::example/glance_replay": 1
+  }
+}
