@@ -5871,6 +5871,10 @@ fn conversation_with_gate_inner(
     // Off unless set.
     let counts_real = duplex && crate::turn_taking::cut_in_counts_real();
     detector.keep_first_words(first_words);
+    // A line that begins softly keeps its first word (`LAMP_SOFT_START=on`):
+    // an ordinary start, the lamp silent, may begin at it. Off unless set;
+    // only with first words kept.
+    detector.keep_soft_starts(first_words && crate::activity::soft_start());
     let hold = match (duplex, first_words) {
         (true, true) => Hold::DUPLEX.keeping_first_words(),
         (true, false) => Hold::DUPLEX,
@@ -8105,6 +8109,18 @@ fn conversation_with_gate_inner(
             let sounding = frame.echo.as_ref().is_some_and(|echo| {
                 echo.render_quiet_blocks < Hearing::EVALUATED.clear_after_blocks
             });
+            // The block's score before the faint floor, for a soft start
+            // (`LAMP_SOFT_START`): only while the lamp is silent, so that a
+            // start never reaches back into its own voice.
+            detector.unfloored(
+                (!sounding
+                    && !keeping_answer
+                    && frame.probability.is_finite()
+                    && reply
+                        .as_ref()
+                        .is_none_or(|current| current.playback.is_none()))
+                .then_some(frame.probability),
+            );
             let (update, input_ended) = observe_prospective_heard(
                 &mut playback_mask,
                 &mut detector,
