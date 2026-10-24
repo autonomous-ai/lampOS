@@ -5960,7 +5960,10 @@ fn run_on<P: PortIo, R: Runtime>(
                     if until > now
                         && retreated_at.len() >= usize::from(Standing::RETREATS_ALLOWED) =>
                 {
-                    u16::try_from((until - now).as_secs()).unwrap_or(u16::MAX)
+                    // Rounded up, so the last part second still says it rests.
+                    let left = until - now;
+                    u16::try_from(left.as_secs() + u64::from(left.subsec_nanos() > 0))
+                        .unwrap_or(u16::MAX)
                 }
                 _ => 0,
             },
