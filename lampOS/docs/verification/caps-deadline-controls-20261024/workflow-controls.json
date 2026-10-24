@@ -1,0 +1,38 @@
+[
+  {
+    "case": "guard-duplicate-names",
+    "exit": 1,
+    "expected_accept": false,
+    "synthetic": true
+  },
+  {
+    "case": "guard-extra-result",
+    "exit": 1,
+    "expected_accept": false,
+    "synthetic": true
+  },
+  {
+    "case": "guard-missing-reap",
+    "exit": 1,
+    "expected_accept": false,
+    "synthetic": true
+  },
+  {
+    "case": "guard-partial",
+    "exit": 1,
+    "expected_accept": false,
+    "synthetic": true
+  },
+  {
+    "case": "guard-two-complete",
+    "exit": 0,
+    "expected_accept": true,
+    "synthetic": true
+  },
+  {
+    "case": "guard-zero",
+    "exit": 1,
+    "expected_accept": false,
+    "synthetic": true
+  }
+]

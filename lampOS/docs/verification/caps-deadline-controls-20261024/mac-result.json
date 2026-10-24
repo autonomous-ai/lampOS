@@ -1,0 +1,62 @@
+{
+  "head": "63e2d963d1d0ec4b9ee341e5be144e8518ecc2ee",
+  "base": "5074d860c2be76d1f201a59f8380e33f70de6618",
+  "crates": [
+    "lamp-actions"
+  ],
+  "steps": [
+    {
+      "stage": "fmt",
+      "argv": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 5.748
+    },
+    {
+      "stage": "clippy",
+      "argv": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-actions",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 0.728
+    },
+    {
+      "stage": "tests",
+      "argv": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-actions"
+      ],
+      "exit": 0,
+      "seconds": 7.358,
+      "totals": {
+        "passed": 122,
+        "failed": 0,
+        "ignored": 2,
+        "filtered": 0
+      }
+    }
+  ],
+  "source_count": 6994,
+  "source_unchanged": true,
+  "result": "passed"
+}
