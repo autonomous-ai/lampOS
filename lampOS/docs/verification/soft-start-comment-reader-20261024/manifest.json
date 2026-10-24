@@ -1,0 +1,18 @@
+{
+  "result.json": {
+    "original_sha256": "23bdc79346b71c5ff65eee455131efe8185cb6f7ead7cb3bca60888b47d36430",
+    "published_sha256": "b6292e925edd7c7be7f858325d8585896c2cfcb79f8c83fa972c7280327f7df6"
+  },
+  "reviewed.diff": {
+    "original_sha256": "19fbbf3614f2bca6dac523f52024c545248a73151cf0fd9ac37e7798ca6553f5",
+    "published_sha256": "19fbbf3614f2bca6dac523f52024c545248a73151cf0fd9ac37e7798ca6553f5"
+  },
+  "file-rustfmt.txt": {
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "workspace-fmt.txt": {
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "head": "a6e780f86c4d5ab725ef9c9de7cc1c73726ad0a9",
+  "base": "fc31e012334cda59eb3c489560454c515fb86386",
+  "only_changed_path": "lampOS/crates/voice/src/coordinator.rs",
+  "all_changed_lines_are_doc_comments": true,
+  "non_doc_comment_bytes_equal": true,
+  "source_sha256": "42ead204ad252a25fb91345ca16851ff5adb61872df77f1b0ad8077afd63dc5a",
+  "stages": [
+    {
+      "tag": "file-rustfmt",
+      "command": [
+        "<private-home>/.cargo/bin/rustfmt",
+        "+1.96.0",
+        "--edition",
+        "2024",
+        "--check",
+        "crates/voice/src/coordinator.rs"
+      ],
+      "exit": 0,
+      "seconds": 0.39
+    },
+    {
+      "tag": "workspace-fmt",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 5.53
+    }
+  ],
+  "scope": "Comment-only source/format review. No implementation/test change, Cargo build, Clippy or behavioral/physical experiment.",
+  "file_unchanged": true
+}
