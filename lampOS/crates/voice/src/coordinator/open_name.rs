@@ -29,6 +29,44 @@ pub(super) fn from_environment() -> bool {
     )
 }
 
+/// Where the coordinator reads whether a line that is only the lamp's name
+/// lets the line said next take the turn at once (`on`; off unless set; only
+/// with `LAMP_SECOND_NAME_CARRIES=on` on the second route).
+///
+/// Why: the second route holds a bare "Lamp." for the line after it, as
+/// long as `second_provider::NAME_CARRIES_FOR` (2.5 s). But the line after
+/// it began while that answer was awaited, so the answer wait (#1123) judged
+/// it as a sound: one that ended or went quiet before it had gone on was let
+/// go as the room's, and the name was answered as a call. On lamp-4ace on
+/// 24 October "Lamp, {2 s} tell me a joke." went so in 2 of 10 pause lines
+/// with `LAMP_WAIT_KEEPS_ANSWER=on` ("Yes?", "Mm? I'm here."), and 1 of 10
+/// with `words`, whose words were not back before it was let go.
+pub const CALL_TAKES_NEXT_ENVIRONMENT: &str = "LAMP_CALL_TAKES_NEXT_LINE";
+
+pub(super) fn call_takes_next_from_environment() -> bool {
+    enabled(std::env::var(CALL_TAKES_NEXT_ENVIRONMENT).ok().as_deref())
+        && enabled(
+            std::env::var(crate::second_provider::NAME_CARRIES_ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        )
+}
+
+/// The turn, and when its speech ended, whose final `words` are only the
+/// lamp's name (`crate::attention::only_the_name`), as [`opened`] finds a
+/// line that ends before a name: a sound begun within 2.5 s of its end takes
+/// the turn as [`goes_on`] says, decided at once. `None` with the switch off.
+pub(super) fn called(
+    on: bool,
+    words: &str,
+    in_hand: Option<(u64, bool)>,
+    ended: Option<(u64, u64)>,
+) -> Option<(u64, u64)> {
+    let (turn, _) = in_hand.filter(|(_, unheard)| on && *unheard)?;
+    let ended = ended.filter(|(ended, _)| *ended == turn)?;
+    crate::attention::only_the_name(words).then_some(ended)
+}
+
 fn enabled(value: Option<&str>) -> bool {
     value == Some("on")
 }
@@ -113,5 +151,36 @@ mod tests {
         let heard = Some((7, false));
         assert!(!goes_on(open, heard, 1_009_000), "its answer heard");
         assert_eq!(opened(true, "Hey Lamp, my name is", heard, ended), None);
+    }
+
+    /// `LAMP_CALL_TAKES_NEXT_LINE`: the turn in hand whose words are only the
+    /// lamp's name, its answer unheard, is called; a sound begun within 2.5 s
+    /// of its end takes the turn. Nothing with the switch off, with more words
+    /// than the name, for an end not this turn's, or once its answer is heard.
+    #[test]
+    fn a_sound_just_after_the_bare_name_takes_the_turn() {
+        let waiting = Some((7, true));
+        let ended = Some((7, 1_000_000));
+        for alone in ["Lamp.", "Lamp", "Hey Lamp,", "Lamb."] {
+            assert_eq!(
+                called(true, alone, waiting, ended),
+                Some((7, 1_000_000)),
+                "{alone}"
+            );
+        }
+        assert_eq!(called(false, "Lamp.", waiting, ended), None);
+        assert_eq!(called(true, "Lamp, tell me a joke.", waiting, ended), None);
+        assert_eq!(called(true, "Hey Lamp, my name is", waiting, ended), None);
+        assert_eq!(called(true, "Lamp.", waiting, Some((6, 1_000_000))), None);
+        assert_eq!(called(true, "Lamp.", Some((7, false)), ended), None);
+        assert_eq!(called(true, "Lamp.", None, ended), None);
+        let call = called(true, "Lamp.", waiting, ended);
+        assert!(goes_on(call, waiting, 1_300_000), "the line 300 ms after");
+        assert!(goes_on(call, waiting, 3_500_000), "at 2.5 s");
+        assert!(!goes_on(call, waiting, 3_500_001), "past 2.5 s");
+        assert!(
+            !goes_on(call, Some((7, false)), 1_300_000),
+            "its answer heard"
+        );
     }
 }

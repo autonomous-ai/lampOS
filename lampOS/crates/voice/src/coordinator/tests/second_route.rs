@@ -212,6 +212,8 @@ struct Script {
     second_waits_first: bool,
     /// `LAMP_SECOND_OPEN_NAME` in the rig.
     open_name: bool,
+    /// `LAMP_CALL_TAKES_NEXT_LINE` in the rig.
+    call_takes_next: bool,
     /// The second route fails each turn before any audio, as its worker
     /// does when its speech to text or chat cannot be reached.
     second_fails: Option<Fault>,
@@ -288,6 +290,7 @@ impl Script {
             second_holds: false,
             second_waits_first: false,
             open_name: false,
+            call_takes_next: false,
             second_fails: None,
             ignores_stop: None,
             limit: LIMIT,
@@ -1522,6 +1525,7 @@ fn run(script: Script) -> Run {
         early_end_blocks: None,
         early_finalize: false,
         open_name: script.open_name,
+        call_takes_next: script.call_takes_next,
         unfinished_wait: false,
         faint_level: None,
         speaker: spawn("speaker"),
@@ -5412,6 +5416,68 @@ fn a_name_said_just_after_a_line_that_ended_before_it_goes_on_from_it() {
             .filter(|admitted| admitted["goes_on_from_its_name"] == true)
             .count();
         assert_eq!(went_on, usize::from(on), "on {on}: {}", run.summary());
+        assert_eq!(run.finished(1)["outcome"], "user_interrupted", "on {on}");
+    }
+}
+
+/// `LAMP_CALL_TAKES_NEXT_LINE` (24 Oct): with the second route alone, a line
+/// that is only the lamp's name ("Lamp."), its answer held as the name's
+/// carry holds it, and speech again as soon as its End is sent. With
+/// `LAMP_WAIT_KEEPS_ANSWER=on`, as in the product, that speech waits as a
+/// sound while the answer is awaited (`answer_waits`; on lamp-4ace a short
+/// "tell me a joke" was let go so). With the switch it takes the turn at
+/// once, never waiting, and its Start is not marked as going on from the
+/// name's line: the second route joins the two itself. Without the answer
+/// wait it is decided at once either way.
+#[test]
+fn the_line_just_after_the_bare_name_takes_the_turn_at_once() {
+    let _one = super::pilot_faults::one_session();
+    for (on, waits) in [(false, true), (true, true), (false, false), (true, false)] {
+        TEST_WAIT_KEEPS_ANSWER.with(|wait| wait.set(waits));
+        let run = run(Script {
+            second: false,
+            only: true,
+            call_takes_next: on,
+            second_hears: Some("Lamp."),
+            second_waits_first: true,
+            speak_again: Some(When::Ended(1)),
+            turns: 2,
+            turn_taking: TurnTaking::VadOnly,
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_WAIT_KEEPS_ANSWER.with(|wait| wait.set(false));
+        run.assert_clean();
+        assert_eq!(
+            run.events("answer_waits").is_empty(),
+            !waits || on,
+            "on {on}, waits {waits}: {}",
+            run.summary()
+        );
+        assert_eq!(
+            run.events("call_takes_next").len(),
+            usize::from(on),
+            "on {on}: {}",
+            run.summary()
+        );
+        let continues: Vec<(u64, bool)> = run
+            .seen
+            .second
+            .iter()
+            .filter_map(|input| match input {
+                ProviderInput::Start {
+                    request,
+                    continues_cut_off,
+                    ..
+                } => Some((*request, *continues_cut_off)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            continues,
+            [(1, false), (2, false)],
+            "on {on}, waits {waits}: {}",
+            run.summary()
+        );
         assert_eq!(run.finished(1)["outcome"], "user_interrupted", "on {on}");
     }
 }
