@@ -1,0 +1,127 @@
+1:  4f8e95111d ! 1:  0882cb9047 lampOS: verify published Memory readers preserve private state across rollback
+    @@ Metadata
+     Author: deehw <dee@autonomous.ai>
+
+      ## Commit message ##
+    -    lampOS: verify published Memory readers preserve private state across rollback
+    +    lampOS: verify published Memory readers across rollback
+
+      ## lampOS/crates/memory/tests/release_pair.rs (new) ##
+     @@
+    @@ lampOS/crates/memory/tests/release_pair.rs (new)
+     +        before.iter().find(|entry| entry["id"] == linked).unwrap()["source_ids"],
+     +        json!([kept])
+     +    );
+    ++    let unrelated_before = vec![
+    ++        before
+    ++            .iter()
+    ++            .find(|entry| entry["id"] == unrelated)
+    ++            .unwrap()
+    ++            .clone(),
+    ++    ];
+    ++    let other_before = fixture.entries("write", B);
+    ++    let room_before = fixture.entries("write", "everyone");
+    ++    assert_eq!(ids(&other_before), BTreeSet::from([other]));
+    ++    assert_eq!(ids(&room_before), BTreeSet::from([room]));
+    ++    assert!(other_before.iter().all(|entry| entry["person"] == B));
+    ++    assert!(
+    ++        room_before
+    ++            .iter()
+    ++            .all(|entry| entry["person"] == "everyone")
+    ++    );
+     +    let note = fixture.snapshot("write", A);
+     +    assert!(note["note"].as_str().unwrap().contains("pair erase fact"));
+     +    assert!(!note["note"].as_str().unwrap().contains("pair other scope"));
+     +    let other_note = fixture.snapshot("write", B);
+    ++    assert!(
+    ++        other_note["note"]
+    ++            .as_str()
+    ++            .unwrap()
+    ++            .contains("pair other scope")
+    ++    );
+    ++    assert!(!other_note["note"].as_str().unwrap().contains("pair erase"));
+    ++    assert!(
+    ++        !other_note["note"]
+    ++            .as_str()
+    ++            .unwrap()
+    ++            .contains("pair unrelated")
+    ++    );
+    ++    assert!(!other_note["note"].as_str().unwrap().contains("pair room"));
+     +    process.finish();
+     +    fixture.audit_database(7);
+     +
+    @@ lampOS/crates/memory/tests/release_pair.rs (new)
+     +        "persisted session snapshot"
+     +    );
+     +    assert_eq!(fixture.snapshot("opposite", B), other_note);
+    ++    assert_eq!(fixture.entries("opposite", B), other_before);
+    ++    assert_eq!(fixture.entries("opposite", "everyone"), room_before);
+     +    assert_eq!(
+     +        fixture.ask("opposite", json!({"op":"forget","person":A,"id":kept}))["removed"],
+     +        3
+    @@ lampOS/crates/memory/tests/release_pair.rs (new)
+     +        ids(&fixture.entries("opposite", A)),
+     +        BTreeSet::from([unrelated])
+     +    );
+    ++    assert_eq!(fixture.entries("opposite", A), unrelated_before);
+    ++    assert_eq!(fixture.entries("opposite", B), other_before);
+    ++    assert_eq!(fixture.entries("opposite", "everyone"), room_before);
+     +    let invalidated = fixture.snapshot("opposite", A);
+     +    assert_eq!(invalidated["invalidated"], true);
+     +    assert_eq!(invalidated["note"], "");
+    @@ lampOS/crates/memory/tests/release_pair.rs (new)
+     +        fixture.ask("opposite", json!({"op":"forget_person","person":A})),
+     +        json!({"ok":true,"removed":2,"rules":1})
+     +    );
+    ++    assert_eq!(fixture.entries("opposite", B), other_before);
+    ++    assert_eq!(fixture.entries("opposite", "everyone"), room_before);
+     +    process.finish();
+     +    fixture.audit_database(2);
+     +
+    @@ lampOS/crates/memory/tests/release_pair.rs (new)
+     +        ids(&fixture.entries("return", "everyone")),
+     +        BTreeSet::from([room])
+     +    );
+    ++    assert_eq!(fixture.entries("return", B), other_before);
+    ++    assert_eq!(fixture.entries("return", "everyone"), room_before);
+     +    let final_id = fixture.add("return", "remember", A, "pair final fresh fact", &[]);
+     +    assert!(
+     +        final_id > fresh,
+    @@ lampOS/docs/verification/memory-release-pair-20261024/README.md (new)
+     @@
+     +# Memory release 6408 ↔ 6449: actual-binary controls
+     +
+    -+Part of #2809, Fourth's SQLite rollback-floor row, claimed in comment
+    -+6378017508. **Both actual artifact cases passed on Linux (2/0/0)** on source tree `db30c396c9ad1ebb88b84714265809cd1c22054f`, based on `4a84fa5ab`. Earlier failures remain recorded below. This establishes the bounded reader cases, not release acceptance. The fixture is
+    -+`crates/memory/tests/release_pair.rs`. Records/session cleanup is a separate
+    -+piece with the Voice owner; updater #3278 and the Reminder/Task row are not
+    -+changed here.
+    ++Part of #2809. The revised full-record fixture passes both actual published Memory **6408 ↔ 6449 cases: 2/0/0**, with **41 successful RPCs per direction**, on tested source tree `6b42fd91e4ed4e0e4b52194cbb257ac036f163a0`, based on `d7b85b1dd`. Fresh Mac and Linux formatting, strict Memory all-target Clippy, full Memory **314/0/8 ignored** and workspace builds pass. [Complete raw qualification evidence](https://github.com/autonomous-ai/lampOS/tree/eadd636ba7/lampOS/docs/verification/memory-survivor-recovered-20261024) binds the executed driver, source, assets, exports and cleanup. Official ARM64/Clippy on the pushed revision and renewed review remain required.
+    ++
+    ++The fixture is `crates/memory/tests/release_pair.rs`. Earlier historical runs and their weaker survivor assertions are retained below; their results do not qualify the review repair. Records/session cleanup and whole-update/lamp acceptance remain separate.
+     +
+     +First selected build **6408** as the rollback floor and the first published
+     +post-update build **6449** as the current side. These Memory executables are
+    @@ lampOS/docs/verification/memory-release-pair-20261024/README.md (new)
+     +
+     +The first status RPC once the ready file and socket were available took 14,377 / 22,047 / 21,185 microseconds across the 6408→6449→6408 phases, and 13,958 / 18,375 / 17,187 microseconds in the reverse direction. Each measurement starts immediately before socket connection and ends after complete JSON parsing, before evidence I/O. These are six host observations, not startup time, an acceptance bound or lamp UX latency.
+     +
+    -+The fixture was carried onto current base `9ed44f88c`, keeping the actual-pair driver byte-identical (SHA256 `321113c0513df44ebec303b8fb6be8f1c434ffc558aaf00393f639efa6b66a72`). Current candidate tree `69bf9af35f7a79b4f67f4dfc74e4bf794307b1c1` passed workspace formatting on both hosts, strict Memory all-target Clippy on Mac, strict workspace all-target Clippy on Linux, the Linux workspace build, and fresh full Memory tests **314/0/8 ignored on each host**. The fresh suite covers the changed Voice transport used by Memory integration tests; the unchanged direct actual-binary pair was not repeated. All 10,315 tracked files retained bytes, modes and mtimes, semantic index stayed unchanged, and all owned processes/containers were cleaned up. This final result-only README update changes no executable source. Exact-head native ARM64 and Clippy PR gates remain required before readiness.
+    ++The previous fixture carry onto base `9ed44f88c`, keeping the actual-pair driver byte-identical (SHA256 `321113c0513df44ebec303b8fb6be8f1c434ffc558aaf00393f639efa6b66a72`). Current candidate tree `69bf9af35f7a79b4f67f4dfc74e4bf794307b1c1` passed workspace formatting on both hosts, strict Memory all-target Clippy on Mac, strict workspace all-target Clippy on Linux, the Linux workspace build, and fresh full Memory tests **314/0/8 ignored on each host**. The fresh suite covers the changed Voice transport used by Memory integration tests; the unchanged direct actual-binary pair was not repeated. All 10,315 tracked files retained bytes, modes and mtimes, semantic index stayed unchanged, and all owned processes/containers were cleaned up. This final result-only README update changes no executable source. Exact-head native ARM64 and Clippy PR gates remain required before readiness.
+     +
+     +The initial current-base gate launcher stopped in preflight because its validated release-receipt projection omitted the target field. No Cargo/container/target writer started in that failure. The scratch bookkeeping correction preserved source and commands before the successful current gates. The earlier `db30c396c` source also separately passed strict Linux workspace Clippy and workspace build; neither that result nor the actual **2/0** artifact result is relabelled as a current native ARM64-host run.
+     +
+    @@ lampOS/docs/verification/memory-release-pair-20261024/README.md (new)
+     +the stopped gate.
+     +
+     +The corrected runner executes each entire case in native `/tmp`, retains regular stderr/RPC/database/terminal evidence, and verifies the pinned size/hash of regenerated executable copies before omitting only those copies from export. Archive names/types, exit receipts and both complete terminal receipts were checked before the corrected run was accepted. The original test/export deadlines were not enlarged. The successful result does not erase either preceding failed attempt.
+    ++
+    ++## Survivor-record review repair and fresh execution
+    ++
+    ++The historical execution checked A's complete initial records but only survivor IDs after forget/rollback. Reviewers identified that as insufficient to qualify survivor content and scope preservation. The revised fixture captures complete A-unrelated, B and room records from the original writer and compares every JSON field and order through opposite-reader, targeted-forget, forget-person and return-reader boundaries. Existing ID, snapshot, count and fresh-write assertions remain. B's note must contain its own synthetic canary and exclude A/room canaries. Both strengthened cases passed in the fresh recovered execution above.
+    ++
+    ++The exact tested fixture SHA256 is `1f551d5b71416047d609e6b65f6519084725877bc0bbb6b146454acf9339af6f`; compiled Linux test driver SHA256 is `6c8f62a35e6d278d1684f3400c10015528153735681d7e7e5dc21e656b51a64d`. Raw archive SHA256 is `6619cb8d9c505c4f352d8aff546bf481e08dd29fbe117b9fffdf09607b4cd90d`. Every tracked source file retained bytes, modes and mtimes through the fresh gates and pair execution; semantic index, owned-container removal and host process-group absence receipts pass. This final result-only README update changes no executable source.
+    ++
+    ++The six reaps are fixture terminal assertions backed by source finish calls, not an independent raw child-event trace. Both raw binary databases and archive remain local; the published packet contains complete logical SQL/all-table JSON exports with original byte hashes and integrity/version/foreign-key receipts. FTS SQL-dump restoration is not claimed.
+    ++
+    ++The initial recovered Linux attempt failed connecting to the stopped local VM before Cargo or a released executable ran; the complete fresh attempt supersedes its qualification and retains its failure. Earlier ENOSPC failures and unpublished pre-cleanup receipts were lost when the temporary workspace was cleared; their committed historical observations remain, and are not used as fresh proof. [Original 30-RPC evidence](https://github.com/autonomous-ai/lampOS/tree/c189a237e6/lampOS/docs/verification/memory-raw-pair-20261024) remains independently auditable.

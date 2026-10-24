@@ -1,0 +1,6 @@
+{
+  "tested_tree": "6b42fd91e4ed4e0e4b52194cbb257ac036f163a0",
+  "only_changed_path": "lampOS/docs/verification/memory-release-pair-20261024/README.md",
+  "executable_source_byte_exact": true,
+  "final_doc_sha256": "4e27dd646649902c3ed0cd468f28fb21fb30c81b80a210d504280f8901e7f766"
+}
