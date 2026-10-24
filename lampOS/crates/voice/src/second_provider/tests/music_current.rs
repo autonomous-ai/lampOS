@@ -466,7 +466,7 @@ async fn a_lost_line_retry_dispatches_music_once_with_the_original_identity() {
         asked[2].last(),
         Some(&Message::tool(
             "music-on-retry",
-            json!({"next":"Say one short confirmation."}).to_string()
+            json!({"next":"Say one short confirmation. The recording has only been offered for preparation; playback has not started and may still be refused. Confirm only that you will try to play it. Do not say it is playing, has started, or is ready."}).to_string()
         ))
     );
     drop(asked);

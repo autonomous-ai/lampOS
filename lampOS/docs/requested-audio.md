@@ -121,7 +121,15 @@ context binds these exact fields:
 
 Skills returns the offer in `result.requested_audio` beside the ordinary
 `next` confirmation note. Voice removes that private object before sending
-the result to the model. Both direct skill calls and `use_skill` preserve
+the result to the model. For a validated offer, Voice also appends the same
+preparation-only instruction to `next` on both voice routes: playback has
+not started and may still be refused, so the confirmation says only that
+it will try to play the recording. The note is not an acceptance, readiness
+or handoff receipt. It adds no asset, identity or private offer data. This
+supplies truthful model context; it cannot prove a provider follows the
+instruction or establish audible playback. The lamp run must still check
+the words it actually says when the coordinator refuses an offer.
+Both direct skill calls and `use_skill` preserve
 the original request/call identity. Missing or invalid spoken context
 refuses media. Written requests, Messages requests and Messages
 `speak=true` never create this context or grant playback.

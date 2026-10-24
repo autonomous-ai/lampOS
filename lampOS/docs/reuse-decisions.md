@@ -1648,3 +1648,17 @@ No new I/O, inference, polling, topic, switch or protocol field is added.
 The known-file read remains background work; the immediate publish target
 is under 1 ms without added I/O, with no device latency claim. The combined
 switches still need the physical two-person/cancellation enrollment trial.
+
+
+## Requested music confirmation before handoff (#2793, 24 October)
+
+V1 `skills/music/SKILL.md` asks for a play marker followed by one short
+confirmation and distinguishes playback errors. Its “Playing” example does
+not establish that sound started. V2 retains the short confirmation and
+its existing Voice-owned retirement/handoff; it must not copy that example
+as a success receipt for an offer. Reuse the shared checked tool-result
+boundary to tell both voice routes that the recording is only offered,
+not playing or ready, and may be refused. No new round trip, wait, timer
+or playback authority is added. Target: no additional I/O or scheduling
+on the confirmation path. Model wording and acoustic latency remain lamp
+acceptance, not established by prompt-context assertions.
