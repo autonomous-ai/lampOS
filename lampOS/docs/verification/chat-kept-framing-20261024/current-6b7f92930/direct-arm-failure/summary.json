@@ -1,0 +1,16 @@
+{
+  "head": "95a04165b329199c22495fcadb1bc35fe4a8cc9f",
+  "run": 40111245085,
+  "outcome": "failure",
+  "passed": 1139,
+  "failed": 1,
+  "skipped": 53,
+  "selected_unrun": 6235,
+  "case": "sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up",
+  "assertion": "SleepingService::step counts.refused == 0",
+  "observed": 2,
+  "expected": 0,
+  "fixture_unchanged_from_base": true,
+  "cause": "not established",
+  "train_success_is_separate": true
+}

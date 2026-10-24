@@ -1,0 +1,18 @@
+{
+  "full-current-test.txt": {
+    "original_sha256": "925187606d83f76f0b97ea46056a4610ce9118fafc6d412ada9cd2acf62c9660",
+    "published_sha256": "3428b84d74b4dc724c6c153fb3ea13c5cdb06fd2dd1cab7aca21b18f3f52eca6"
+  },
+  "full-current-source-before.json": {
+    "original_sha256": "cccd950f1d1ca66f0c70910f9d39408e2ea18578dd04ec2a9735744810bf6876",
+    "published_sha256": "cccd950f1d1ca66f0c70910f9d39408e2ea18578dd04ec2a9735744810bf6876"
+  },
+  "full-current-source-after.json": {
+    "original_sha256": "cccd950f1d1ca66f0c70910f9d39408e2ea18578dd04ec2a9735744810bf6876",
+    "published_sha256": "cccd950f1d1ca66f0c70910f9d39408e2ea18578dd04ec2a9735744810bf6876"
+  },
+  "full-current-result.json": {
+    "original_sha256": "cdce4e509ab14d655b8c9c7a6e6cee37699f96f0e78a66c074cc05e72ef778e1",
+    "published_sha256": "58b64a3bda270e09c4684537382e59e9b5eeb53ec41e961eb7d3491ad2c2f076"
+  }
+}
