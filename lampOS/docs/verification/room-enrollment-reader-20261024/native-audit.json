@@ -1,0 +1,50 @@
+{
+  "head": "f653bc5bdcdaecb661f27aa076f395dea38474c7",
+  "tested_merge": "c3566b8e70d64e4399e5ff975a56db2d6fbc35cf",
+  "parents": [
+    "411965dcb659e17188ff81fb4ba4b73b2b62012e",
+    "f653bc5bdcdaecb661f27aa076f395dea38474c7"
+  ],
+  "authored_files": [
+    {
+      "path": "lampOS/crates/voice/src/second_provider.rs",
+      "sha256": "deab04e7b7fdddc39b3f02b23149e8112575f77ae8aadbd3640fb4982dce21d4",
+      "matches_preview": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests/remember_speaker.rs",
+      "sha256": "9efff3bba1c082f248fb18d8c516db663cdfdb358bd0aeb66b9aab763d80e358",
+      "matches_preview": true
+    },
+    {
+      "path": "lampOS/docs/eyes.md",
+      "sha256": "052d9ec09d089fc2930d674d51f73b0612e3aa2053e882b9b37f83c3d933840f",
+      "matches_preview": true
+    },
+    {
+      "path": "lampOS/docs/reuse-decisions.md",
+      "sha256": "dda7671f7ae1e08d9c4ee7fa7bbbc929ce6b3d0306a253138bb2a1b7ff045e4d",
+      "matches_preview": true
+    }
+  ],
+  "other_preview_differences": [
+    "lampOS/crates/audio/src/duplex.rs",
+    "lampOS/crates/voice/src/coordinator/tests/duplex.rs",
+    "lampOS/docs/build-rows.md",
+    "lampOS/docs/duplex-listening.md",
+    "lampOS/docs/stop-word.md",
+    "lampOS/docs/switches.md"
+  ],
+  "ordinary_summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T07:17:46.5931208Z      Summary [ 151.382s] 7351 tests run: 7351 passed (1 leaky), 45 skipped"
+  ],
+  "critical_controls": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T07:17:22.0299609Z         PASS [   0.057s] (5743/7351) lamp-voice second_provider::tests::remember_speaker::remember_speaker_privacy_close_and_reopen_during_stt_cannot_revive_enrollment",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T07:17:22.1446531Z         PASS [   0.057s] (5747/7351) lamp-voice second_provider::tests::remember_speaker::remember_speaker_room_publish_keeps_only_its_live_request_proof"
+  ],
+  "primary_log_sha256": {
+    "40072776658": "a3fffeabb3f80b576137b45954073ccf5162679038634641eb4b933d6638de03",
+    "40072776682": "a7dab0a39ee51235cf511fd6fe4bfa36adacde522a25d6e0127ceca89e644567"
+  },
+  "scope": "source and terminal logs checked; no artifact binary or lamp execution by reviewer"
+}

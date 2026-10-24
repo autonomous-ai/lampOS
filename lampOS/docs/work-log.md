@@ -1,3 +1,36 @@
+## Current checkpoint: 2026-10-24 14:53 +07, reader gate complete and Cloud metadata correction
+
+#3344 `f653bc5bd` independent privacy read finds no new source P1/P2.
+Exact Mac Voice **3,993/0/21 ignored**, fmt and strict Clippy pass;
+6,990 source hashes unchanged. Official native **7,350 PASS + 1 LEAK**,
+45 skipped and Linux Clippy independently verified against its merge preview.
+[Reader receipt](verification/room-enrollment-reader-20261024/README.md).
+Direct epoch-interleaving authored regression and physical behavior remain
+unverified; no activation is implied.
+
+#3327 `e4005f25a` and #3334 `63e2d963d` have current READ-OK and green gates.
+#3330 `4f44e25b4` prepared eight-case composition has current READ-OK,
+Mac **516/0/9 ignored**, dedicated native **8/0** and green Linux Clippy.
+Its original ordinary ARM failure and 1,349 unrun cases remain retained;
+same-head attempt 2 passes **7,351 PASS + 1 LEAK**, 49 skipped.
+Package stays draft until parent #3327 lands, then a final conflict carry.
+[Corrected Skills proof](verification/skills-deadline-native-20261024/).
+[Prepared package proof](verification/package-composition-native-20261024/).
+
+#3342 remote `7fc275d47` has current READ-OK and native **2/0**,
+ordinary **11,195 PASS + 1 LEAK**, 92 skipped, Linux Clippy green.
+A reader's diagnostic P3 is being corrected at local `e81c64854`:
+explicit Skills/Cloud stage maps replace ambiguous return-reader metadata.
+Exact Linux fmt passes; scoped Mac Cloud gate is running before push.
+New native evidence will bind that correction, without relabeling old receipts.
+
+Second owns no lamp; #1812 still needs the trusted key and #2810 an attended
+lamp window. Integration belongs to the train. Status remains in this log;
+Queue posts are reserved for claims, blocks and decisions under the updated
+protocol.
+
+---
+
 ## Current checkpoint: 2026-10-24 14:08 +07, deadline correction and sibling composition
 
 #3334 `63e2d963d` is ready with Reviewer-two's current READ-OK, source P2
