@@ -1,0 +1,169 @@
+{
+  "old_reviewed_head": "fb8d2f71b836266df07bf1b658e40c0aa13804f3",
+  "current_head": "be88244fbd68c4cc08d7d1043635b3de416e2174",
+  "current_base": "8219e711ad6de24a63f124ba86b985b2fcb3e8a3",
+  "actual_preview": "534266e6d14e43b3a08d2d411a62411024fa0fa7",
+  "complete_trees": {
+    "be88244fbd68c4cc08d7d1043635b3de416e2174": "b763c64e30463e726d66c0a2727b5bd59b11bccc",
+    "534266e6d14e43b3a08d2d411a62411024fa0fa7": "b763c64e30463e726d66c0a2727b5bd59b11bccc"
+  },
+  "owned_blobs": {
+    "lampOS/crates/update/tests/round/runnable_event_controls.rs": {
+      "fb8d2f71b836266df07bf1b658e40c0aa13804f3": "357756e28b0fe397a2c46310eded0bc3e27b8566",
+      "be88244fbd68c4cc08d7d1043635b3de416e2174": "357756e28b0fe397a2c46310eded0bc3e27b8566"
+    },
+    "lampOS/crates/update/tests/round/runnable_events.rs": {
+      "fb8d2f71b836266df07bf1b658e40c0aa13804f3": "8f1d99ba24dc7f2aa807c018e519909351944139",
+      "be88244fbd68c4cc08d7d1043635b3de416e2174": "8f1d99ba24dc7f2aa807c018e519909351944139"
+    },
+    "lampOS/crates/update/tests/round/self_cuts.rs": {
+      "fb8d2f71b836266df07bf1b658e40c0aa13804f3": "876279be733d86116c59be4cfb1f13c2bf144792",
+      "be88244fbd68c4cc08d7d1043635b3de416e2174": "876279be733d86116c59be4cfb1f13c2bf144792"
+    },
+    "lampOS/docs/updates.md": {
+      "fb8d2f71b836266df07bf1b658e40c0aa13804f3": "a22792661011bbc3ebd395686810a23d5fba3c49",
+      "be88244fbd68c4cc08d7d1043635b3de416e2174": "a22792661011bbc3ebd395686810a23d5fba3c49"
+    }
+  },
+  "unchanged_update_cargo_vendor_inputs": {
+    "lampOS/crates/update": {
+      "fb8d2f71b836266df07bf1b658e40c0aa13804f3": "0eff25d2a256f2eadec2d60a682cec9bb032e5cf",
+      "be88244fbd68c4cc08d7d1043635b3de416e2174": "0eff25d2a256f2eadec2d60a682cec9bb032e5cf"
+    },
+    "lampOS/Cargo.toml": {
+      "fb8d2f71b836266df07bf1b658e40c0aa13804f3": "7416fa9986f29ce44496e9e74b550780b7780b24",
+      "be88244fbd68c4cc08d7d1043635b3de416e2174": "7416fa9986f29ce44496e9e74b550780b7780b24"
+    },
+    "lampOS/Cargo.lock": {
+      "fb8d2f71b836266df07bf1b658e40c0aa13804f3": "4d5a2729d87a14de090e7c7cfa7605329a98ef1e",
+      "be88244fbd68c4cc08d7d1043635b3de416e2174": "4d5a2729d87a14de090e7c7cfa7605329a98ef1e"
+    },
+    "lampOS/rust-toolchain.toml": {
+      "fb8d2f71b836266df07bf1b658e40c0aa13804f3": "e3b40113e65befef4d5d198284b99c78c27136f0",
+      "be88244fbd68c4cc08d7d1043635b3de416e2174": "e3b40113e65befef4d5d198284b99c78c27136f0"
+    },
+    "lampOS/third_party": {
+      "fb8d2f71b836266df07bf1b658e40c0aa13804f3": "0cc6621bb46ee558b53a40e2fac74f6dd54c684a",
+      "be88244fbd68c4cc08d7d1043635b3de416e2174": "0cc6621bb46ee558b53a40e2fac74f6dd54c684a"
+    }
+  },
+  "author_date_message_equal": true,
+  "single_patch_equal": true,
+  "base_changes": [
+    "lampOS/crates/voice/src/attention.rs",
+    "lampOS/crates/voice/src/room_told.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs",
+    "lampOS/crates/voice/src/second_provider/worker/carry_window.rs",
+    "lampOS/docs/second-voice.md",
+    "lampOS/docs/switches.md"
+  ],
+  "arm64_run": 40120126122,
+  "linux_run": 40120126124,
+  "census": {
+    "PASS": 7408,
+    "LEAK": 1,
+    "selected_terminal": 7409,
+    "failed": 0,
+    "selected_unrun": 0,
+    "skipped": 53,
+    "raw_terminal_lines": 7443,
+    "identical_echoed_lines": 34
+  },
+  "update_passes": 397,
+  "six_recovery_and_ten_controls": {
+    "self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate": {
+      "status": "PASS",
+      "index": 2673,
+      "test": "lamp-update::round self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate"
+    },
+    "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart": {
+      "status": "PASS",
+      "index": 2674,
+      "test": "lamp-update::round self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart"
+    },
+    "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back": {
+      "status": "PASS",
+      "index": 2676,
+      "test": "lamp-update::round self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back"
+    },
+    "self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round": {
+      "status": "PASS",
+      "index": 2675,
+      "test": "lamp-update::round self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round"
+    },
+    "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart": {
+      "status": "PASS",
+      "index": 2679,
+      "test": "lamp-update::round self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart"
+    },
+    "self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog": {
+      "status": "PASS",
+      "index": 2701,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog"
+    },
+    "self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog": {
+      "status": "PASS",
+      "index": 2680,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog"
+    },
+    "self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned": {
+      "status": "PASS",
+      "index": 2678,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned"
+    },
+    "self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete": {
+      "status": "PASS",
+      "index": 2681,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete"
+    },
+    "self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog": {
+      "status": "PASS",
+      "index": 2682,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog"
+    },
+    "self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog": {
+      "status": "PASS",
+      "index": 2688,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog"
+    },
+    "self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline": {
+      "status": "PASS",
+      "index": 2690,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline"
+    },
+    "self_cuts::runnable_events::controls::no_output_is_not_readiness": {
+      "status": "PASS",
+      "index": 2683,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::no_output_is_not_readiness"
+    },
+    "self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly": {
+      "status": "PASS",
+      "index": 2684,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly"
+    },
+    "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture": {
+      "status": "PASS",
+      "index": 2685,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture"
+    },
+    "self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written": {
+      "status": "PASS",
+      "index": 2686,
+      "test": "lamp-update::round self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written"
+    }
+  },
+  "primary_renderings": {
+    "arm64": {
+      "command": "gh run view 40120126122 --repo autonomous-ai/lampOS --log",
+      "sha256": "ab07c9aeab9e2a193bf118e7598925872caa4e0cb396d64ce212ac5bd8813dac",
+      "bytes": 1834404
+    },
+    "linux": {
+      "command": "gh run view 40120126124 --repo autonomous-ai/lampOS --log",
+      "sha256": "006d457786597b59782b9bbf00e371a7f94ea8ccb46ef5f67ab9e5908c373c2d",
+      "bytes": 74658
+    }
+  },
+  "local_execution_scope": "Independent 395/0/6 remains exact fb8; no current-head Mac test execution relabelled.",
+  "historical_scope": "Historical failed full suite remains FAILED; original phone HOLD awaits its separate reader disposition."
+}

@@ -1,0 +1,26 @@
+{
+  "current-review.json": {
+    "original_sha256": "ecc5a71dfa4bfff846e32c389ae3e21058e50d7754f91271fb7032ea9d02a7cf",
+    "published_sha256": "ecc5a71dfa4bfff846e32c389ae3e21058e50d7754f91271fb7032ea9d02a7cf"
+  },
+  "range-diff.txt": {
+    "original_sha256": "e6ce0781152ef3e83e74bdcc798ac2de3aaf12cf58977b27ce942a86308d8e4f",
+    "published_sha256": "e6ce0781152ef3e83e74bdcc798ac2de3aaf12cf58977b27ce942a86308d8e4f"
+  },
+  "arm64-official.json": {
+    "original_sha256": "0dcd6d98f969f4145fa93f37721a309aed57732402ae6dbc2c9152c278bdcf44",
+    "published_sha256": "0dcd6d98f969f4145fa93f37721a309aed57732402ae6dbc2c9152c278bdcf44"
+  },
+  "linux-official.json": {
+    "original_sha256": "02ce755053ef2121c5bc6bc6e57dbfb9434981016c53a9519f4227075f83e37e",
+    "published_sha256": "02ce755053ef2121c5bc6bc6e57dbfb9434981016c53a9519f4227075f83e37e"
+  },
+  "arm64-selected.txt": {
+    "original_sha256": "5fcac3224d21ad28934e3a0b2213742a824cb4babe5be343e4a87a6c4ba3b5fe",
+    "published_sha256": "5fcac3224d21ad28934e3a0b2213742a824cb4babe5be343e4a87a6c4ba3b5fe"
+  },
+  "linux-selected.txt": {
+    "original_sha256": "630ff371a9d760c2057fab333310b337315c54b53a820f2441f6011c960723c9",
+    "published_sha256": "630ff371a9d760c2057fab333310b337315c54b53a820f2441f6011c960723c9"
+  }
+}

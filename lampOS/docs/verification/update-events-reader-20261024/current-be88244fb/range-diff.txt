@@ -1,0 +1,1 @@
+1:  fb8d2f71b = 1:  be88244fb lampOS: observe updater fixture output and exit as bounded events
