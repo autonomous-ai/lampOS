@@ -1328,6 +1328,17 @@ enum Command {
 
 /// How long a failed connection waits before the next.
 const RETRY: Duration = Duration::from_secs(5);
+/// A stream the relay closed sooner than this after it connected is a
+/// failed connection: the next waits [`RETRY`], so a relay that closes
+/// each stream as it opens is not asked again and again.
+const FAST_CLOSE: Duration = Duration::from_secs(3);
+/// Heard in yields, the streams kept connected while a reply is under
+/// way: the ready one and a spare, so a yield that takes one leaves one
+/// for the next (lamp-52e6, 24 Oct 13:40: a yield began 0.6 s after the
+/// one before took the ready stream, the next connected 666 ms later,
+/// and its words came after the hold ran out). Listening to everything,
+/// and for a waited sound's words, one.
+const MOST_READY_IN_YIELDS: usize = 2;
 /// The most audio kept while no stream is ready: 3 s of 10 ms blocks.
 const MOST_WAITING: usize = 300;
 /// A block captured longer ago than this is never handed on: the most
@@ -1434,7 +1445,7 @@ impl RelayEars {
     /// waited sound's words (`crate::wait_words`, #1123): its journal lines
     /// say `wait words`, and nothing it hears is kept or counted.
     pub fn for_waits(config: SecondConfig) -> io::Result<Self> {
-        Self::named("wait words", false, None, None, move || {
+        Self::named("wait words", false, 1, None, None, move || {
             let config = config.clone();
             async move {
                 SttStream::connect(&config)
@@ -1455,13 +1466,17 @@ impl RelayEars {
         C: Fn() -> F + Send + 'static,
         F: Future<Output = Result<SttStream, String>> + Send + 'static,
     {
-        Self::named("stop words", always, record, counts, connect)
+        let most_ready = if always { 1 } else { MOST_READY_IN_YIELDS };
+        Self::named("stop words", always, most_ready, record, counts, connect)
     }
 
-    /// [`Self::with`], its thread and its journal lines called `name`.
+    /// [`Self::with`], its thread and its journal lines called `name`,
+    /// keeping up to `most_ready` streams connected while a reply is under
+    /// way.
     fn named<C, F>(
         name: &'static str,
         always: bool,
+        most_ready: usize,
         record: Option<std::path::PathBuf>,
         counts: Option<std::path::PathBuf>,
         connect: C,
@@ -1484,7 +1499,7 @@ impl RelayEars {
                 {
                     // Its streams and their tasks go with the runtime.
                     Ok(runtime) => runtime.block_on(serve(
-                        name, connect, always, record, counts, queued, said, &shared,
+                        name, connect, always, most_ready, record, counts, queued, said, &shared,
                     )),
                     Err(error) => {
                         eprintln!("lamp-voice: {name} cannot be heard: {error}");
@@ -1698,14 +1713,44 @@ impl Handed {
     }
 }
 
-/// The thread's loop: a stream connected and kept ready while a reply is
-/// under way, the yield's audio to it, and its words back once asked for.
-/// Its journal lines are called `name`.
+/// The ready streams the relay has closed are dropped, and another is
+/// asked for; one closed within [`FAST_CLOSE`] of connecting holds the
+/// next connection off until [`RETRY`] from now.
+fn drop_closed(
+    name: &str,
+    ready: &mut VecDeque<(tokio::time::Instant, SttStream)>,
+    retry_at: &mut Option<tokio::time::Instant>,
+) {
+    ready.retain(|(connected, stream)| {
+        if stream.still_open() {
+            return true;
+        }
+        let fast = connected.elapsed() < FAST_CLOSE;
+        eprintln!(
+            "lamp-voice: {name}: a ready stream was closed {} ms after it connected; another is asked for{}",
+            connected.elapsed().as_millis(),
+            if fast {
+                format!(" in {} s", RETRY.as_secs())
+            } else {
+                String::new()
+            }
+        );
+        if fast {
+            *retry_at = Some(tokio::time::Instant::now() + RETRY);
+        }
+        false
+    });
+}
+
+/// The thread's loop: up to `most_ready` streams connected and kept ready
+/// while a reply is under way, the yield's audio to one, and its words
+/// back once asked for. Its journal lines are called `name`.
 #[allow(clippy::too_many_arguments)]
 async fn serve<C, F>(
     name: &str,
     connect: C,
     always: bool,
+    most_ready: usize,
     record: Option<std::path::PathBuf>,
     counts: Option<std::path::PathBuf>,
     mut queued: queue::Receiver<Command>,
@@ -1716,9 +1761,12 @@ async fn serve<C, F>(
     F: Future<Output = Result<SttStream, String>> + Send + 'static,
 {
     let mut wanted = false;
-    let mut ready: Option<SttStream> = None;
-    // The stream a yield's audio goes to, and that yield.
+    // Oldest first, each with when it connected.
+    let mut ready: VecDeque<(tokio::time::Instant, SttStream)> = VecDeque::new();
+    // The stream a yield's audio goes to, and that yield; and when it
+    // connected.
     let mut current: Option<(u64, SttStream)> = None;
+    let mut current_connected = tokio::time::Instant::now();
     // With `always`, the current stream's words as they come, and its yield.
     let mut listening: Option<(u64, tokio::sync::mpsc::UnboundedReceiver<String>)> = None;
     // Beside it, whether each result is final and where it ends (#2939).
@@ -1782,8 +1830,9 @@ async fn serve<C, F>(
         {
             task.abort();
         }
+        drop_closed(name, &mut ready, &mut retry_at);
         if wanted
-            && ready.is_none()
+            && ready.len() < most_ready
             && connecting.is_none()
             && retry_at.is_none_or(|at| tokio::time::Instant::now() >= at)
         {
@@ -1810,7 +1859,12 @@ async fn serve<C, F>(
                             continue;
                         }
                         if current.is_none() {
-                            current = ready.take().map(|stream| (of, stream));
+                            // One the relay has closed since is passed over.
+                            drop_closed(name, &mut ready, &mut retry_at);
+                            current = ready.pop_front().map(|(connected, stream)| {
+                                current_connected = connected;
+                                (of, stream)
+                            });
                             base = total;
                         }
                         match &current {
@@ -1921,7 +1975,7 @@ async fn serve<C, F>(
                         last_replies = None;
                         handed = Handed::default();
                         wanted = false;
-                        ready = None;
+                        ready.clear();
                         current = None;
                         listening = None;
                         waiting.clear();
@@ -1961,10 +2015,13 @@ async fn serve<C, F>(
                                         stream.finished().await.map_err(|error| error.to_string())
                                     })));
                                 }
-                                None => current = Some((number, stream)),
+                                None => {
+                                    current_connected = tokio::time::Instant::now();
+                                    current = Some((number, stream));
+                                }
                             }
                         } else {
-                            ready = Some(stream);
+                            ready.push_back((tokio::time::Instant::now(), stream));
                         }
                     }
                     Ok(Err(error)) => {
@@ -1997,6 +2054,9 @@ async fn serve<C, F>(
                         listening = None;
                         if always && let Some((_, stream)) = current.take() {
                             handed.reopened += 1;
+                            if current_connected.elapsed() < FAST_CLOSE {
+                                retry_at = Some(tokio::time::Instant::now() + RETRY);
+                            }
                             eprintln!(
                                 "lamp-voice: {name}: the stream ended during the reply after it sent back {}; another is asked for",
                                 stream.replies().told()
@@ -2787,6 +2847,10 @@ mod tests {
         /// Each stream's words are also given as an interim result once its
         /// first audio comes, as the service does while someone speaks.
         interim: bool,
+        /// How long each connection takes, as the relay's 0.6 to 0.7 s.
+        delay: Duration,
+        /// Each stream is closed by the service as soon as it opens.
+        closes_on_open: bool,
     }
 
     type Connected =
@@ -2799,6 +2863,8 @@ mod tests {
                 connections: Arc::default(),
                 words: Arc::new(Mutex::new(words.iter().copied().collect())),
                 interim: false,
+                delay: Duration::ZERO,
+                closes_on_open: false,
             }
         }
 
@@ -2810,11 +2876,13 @@ mod tests {
         }
 
         fn connect(&self) -> impl Fn() -> Connected + Send + 'static {
-            let (audio, connections, words, interim) = (
+            let (audio, connections, words, interim, delay, closes_on_open) = (
                 Arc::clone(&self.audio),
                 Arc::clone(&self.connections),
                 Arc::clone(&self.words),
                 self.interim,
+                self.delay,
+                self.closes_on_open,
             );
             move || {
                 use futures_util::{SinkExt, StreamExt};
@@ -2826,10 +2894,15 @@ mod tests {
                 let audio = Arc::clone(&audio);
                 let said = words.lock().unwrap().pop_front().unwrap_or("");
                 Box::pin(async move {
+                    tokio::time::sleep(delay).await;
                     let (near, far) = tokio::io::duplex(1 << 16);
                     tokio::spawn(async move {
                         let mut socket =
                             WebSocketStream::from_raw_socket(far, Role::Server, None).await;
+                        if closes_on_open {
+                            let _ = socket.close(None).await;
+                            return;
+                        }
                         let mut told = !interim;
                         while let Some(Ok(message)) = socket.next().await {
                             match message {
@@ -2894,7 +2967,9 @@ mod tests {
             let mut ears = Some(RelayEars::with(false, None, None, service.connect()).unwrap());
             let live = Arc::clone(&ears.as_ref().unwrap().live);
             ears.as_mut().unwrap().ready();
-            until("a stream is asked for", || service.connections() == 1);
+            until("the ready stream and a spare are asked for", || {
+                service.connections() >= 2
+            });
             let paused = live.pause.lock().unwrap();
             for _ in 0..50 {
                 ears.as_mut()
@@ -2924,7 +2999,9 @@ mod tests {
         let service = Service::new(&[]);
         let mut ears = RelayEars::with(false, None, None, service.connect()).unwrap();
         ears.ready();
-        until("a stream is asked for", || service.connections() == 1);
+        until("the ready stream and a spare are asked for", || {
+            service.connections() >= 2
+        });
         ears.hear(lamp_ipc::monotonic_us() - 4_000_000, &[1; 160]);
         ears.hear(lamp_ipc::monotonic_us(), &[1; 160]);
         until("the fresh block goes", || service.audio() >= 320);
@@ -2941,7 +3018,9 @@ mod tests {
         let mut ears = RelayEars::with(false, None, None, service.connect()).unwrap();
         let live = Arc::clone(&ears.live);
         ears.ready();
-        until("a stream is asked for", || service.connections() == 1);
+        until("the ready stream and a spare are asked for", || {
+            service.connections() >= 2
+        });
         let held = live.hold_words.lock().unwrap();
         ears.hear(lamp_ipc::monotonic_us(), &[1; 160]);
         ears.finalize();
@@ -2951,7 +3030,7 @@ mod tests {
         ears.forget();
         // The thread tells them only now, after the yield is over.
         drop(held);
-        until("a stream for the next yield", || service.connections() == 2);
+        until("a spare for the next yield", || service.connections() >= 3);
         ears.hear(lamp_ipc::monotonic_us(), &[1; 160]);
         std::thread::sleep(Duration::from_millis(100));
         assert_eq!(ears.words(), None);
@@ -2962,6 +3041,89 @@ mod tests {
             words.is_some()
         });
         assert_eq!(words.as_deref(), Some("Mm-hm."));
+    }
+
+    /// lamp-52e6, 24 Oct 13:40: a yield began after the one before took
+    /// the ready stream, and its words waited 666 ms for the next to
+    /// connect. With a spare kept, two yields 300 ms apart each find one
+    /// connected, though connecting takes 700 ms.
+    #[test]
+    fn two_yields_300_ms_apart_both_find_a_connected_stream() {
+        let service = Service {
+            delay: Duration::from_millis(700),
+            ..Service::new(&["Stop.", "Wait."])
+        };
+        let mut ears = RelayEars::with(false, None, None, service.connect()).unwrap();
+        ears.ready();
+        until("the spare is asked for", || service.connections() >= 2);
+        std::thread::sleep(Duration::from_millis(900));
+        let mut heard = Vec::new();
+        for _ in 0..2 {
+            let began = std::time::Instant::now();
+            ears.hear(lamp_ipc::monotonic_us(), &[1; 160]);
+            ears.finalize();
+            let mut words = None;
+            until("the yield's words", || {
+                words = words.take().or_else(|| ears.words());
+                words.is_some()
+            });
+            // Under the 700 ms a connection takes, with room for a busy
+            // test machine.
+            assert!(
+                began.elapsed() < Duration::from_millis(450),
+                "the words waited {:?} for a stream",
+                began.elapsed()
+            );
+            heard.push(words.unwrap());
+            ears.forget();
+            std::thread::sleep(Duration::from_millis(300).saturating_sub(began.elapsed()));
+        }
+        assert_eq!(heard, ["Stop.", "Wait."]);
+    }
+
+    /// A relay that closes each stream as it opens is not asked again and
+    /// again: a stream closed within `FAST_CLOSE` of connecting holds the
+    /// next connection off for `RETRY`, through a second of yields 10 ms
+    /// apart, each looking for a ready stream.
+    #[test]
+    fn a_stream_the_relay_closes_on_open_is_not_asked_for_again_and_again() {
+        let service = Service {
+            closes_on_open: true,
+            ..Service::new(&[])
+        };
+        let mut ears = RelayEars::with(false, None, None, service.connect()).unwrap();
+        ears.ready();
+        let began = std::time::Instant::now();
+        while began.elapsed() < Duration::from_secs(1) {
+            ears.hear(lamp_ipc::monotonic_us(), &[1; 160]);
+            std::thread::sleep(Duration::from_millis(10));
+            ears.forget();
+        }
+        assert!(
+            service.connections() <= 3,
+            "{} connections in a second",
+            service.connections()
+        );
+        assert_eq!(service.audio(), 0);
+    }
+
+    /// Off, the coordinator builds no ears; built, they open nothing
+    /// until a reply begins, and nothing more once it is over.
+    #[test]
+    fn no_stream_opens_with_the_switch_off_or_without_a_reply() {
+        assert_eq!(listen_for(None), Listen::Off);
+        let service = Service::new(&[]);
+        let mut ears = RelayEars::with(false, None, None, service.connect()).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        assert_eq!(service.connections(), 0);
+        ears.ready();
+        until("the ready stream and a spare", || {
+            service.connections() >= 2
+        });
+        ears.rest();
+        ears.hear(lamp_ipc::monotonic_us(), &[1; 160]);
+        std::thread::sleep(Duration::from_millis(100));
+        assert_eq!(service.connections(), 2);
     }
 
     #[test]
