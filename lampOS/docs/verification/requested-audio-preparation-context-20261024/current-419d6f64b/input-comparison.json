@@ -1,0 +1,17 @@
+{
+  "previous_head": "c9c8d660fd7fc0f33b4582a762cb39714567897e",
+  "current_head": "9456d86349b028c28db7efb933c5626920d6327e",
+  "compared_files": 7023,
+  "changed_files": [
+    "lampOS/crates/voice/src/second_provider/net/chat.rs",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "runtime_chat_prefix_identical": true,
+  "whole_tree_equal": false,
+  "current_network_fixture_cases_included": [
+    "second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it",
+    "second_provider::net::chat::tests::a_kept_client_keeps_one_idle_connection_per_host",
+    "second_provider::net::chat::tests::the_kept_fixture_answers_a_split_header_once_after_it_is_complete"
+  ],
+  "limits": "Earlier full test counts retain their own source; current scoped tests cover owned controls and all changed network fixture cases. New official full ARM64 checks required."
+}

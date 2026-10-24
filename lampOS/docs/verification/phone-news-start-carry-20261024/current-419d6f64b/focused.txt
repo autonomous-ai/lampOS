@@ -1,0 +1,11 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running unittests src/lib.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837)
+
+running 4 tests
+test messages::tests::a_text_never_waits_on_the_news_for_the_phone ... ok
+test second_provider::net::chat::tests::a_kept_client_keeps_one_idle_connection_per_host ... ok
+test second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it ... ok
+test second_provider::net::chat::tests::the_kept_fixture_answers_a_split_header_once_after_it_is_complete ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 3737 filtered out; finished in 6.14s
+
