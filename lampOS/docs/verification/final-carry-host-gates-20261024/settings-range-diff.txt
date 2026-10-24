@@ -1,0 +1,14 @@
+1:  8f5c600c1 ! 1:  0844ce154 lampOS: qualify published Settings store readers both ways
+    @@ lampOS/crates/settings/tests/release_pair/fixture.rs (new)
+     +}
+     
+      ## lampOS/docs/updates.md ##
+    -@@ lampOS/docs/updates.md: The fixtures distinguish reminder continuity, task restart fencing and delivery
+    - ledger recovery from real speech, external task completion and physical reboot
+    - acceptance. See the [pair's artifacts, scope and commands](verification/reminder-task-release-pair-20261024/README.md).
+    +@@ lampOS/docs/updates.md: The two cases are ignored in ordinary tests and require explicit native
+    + execution; see the [cap-state verification record](verification/caps-state-release-pair-20261024/README.md)
+    + for qualification status, retained evidence and limits.
+      
+     +**Published Settings store readers** (#2809). The explicit Settings
+     +`release_pair` target uses actual pinned 6408/6498 servers for private desired
