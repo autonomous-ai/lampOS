@@ -17,3 +17,7 @@ No device, Mac ARM64 link/execution, runtime or physical acceptance. Latest inte
 Train 88 (#3377) landed the workflow as lamp-voice **2e2eee360**. Both authored files equal the landed files. Train checkout **2a160ea29** and landed commit have identical complete trees **931f8c99ee6e8f3f15d5011100511133283cf3ce**, independently checked in Git. Both original train job logs name that same checkout.
 
 Original train ARM64 **40089495628** passed: **11,228 passed (1 leaky), 106 skipped**, process controls **12/0**. Original train Linux **40089495617** passed the explicit pinned formatting step and strict workspace Clippy. Raw log hashes, step metadata and tree IDs are retained in train-audit.json and the run metadata. The author's separate ARM64 run 40089244321 remained active after the merge; its later result must not be substituted for this completed train qualification. No local ARM link or execution, device or physical acceptance.
+
+## Author ARM64 terminal result
+
+Original author run **40089244321** subsequently completed SUCCESS: **11,228 passed (1 leaky), 106 skipped**, process controls **12/0**. Its checkout log names **822f8c584**, the same preview as author Linux fmt/Clippy. author-arm-audit.json retains exact summary lines and raw GitHub log SHA256. This closes the earlier pending author-job observation; the already completed train qualification remains separately bound to its own executed and landed tree. No run was repeated to obtain success.
