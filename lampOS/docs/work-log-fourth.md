@@ -8549,3 +8549,7 @@ Re-read closed #2540 and accepted receipt6331136109: the 22 Oct lamp-52e6 /403b4
 [Current carry778e Linux receipts](verification/common-current-linux-20261024/README.md) verify all eight stages0, 46/46 post-clean fresh local members, all five controls, stable source/index and cleanup/release. Eyes360/0/5, Voice4186/0/24, Update388/0/4, Skills519/0/9, Memory324/0/8. The separate same-builder source audit records no new concrete P1/P2 and two combined integration-test gaps; it is not an independent read. Mac remains active under its original bounds before the #3064 lease push.
 
 Current build-rows.md on22b scores the memory-quality row0.35 after today's owner test, down from0.45; my retained0.40 handoff/status was stale. The historical #2540 retention acceptance remains valid but cannot qualify the new recognition/private-context path or raise this current score. No activation, lamp action or failure waiver.
+
+## 2026-10-24: memory-quality plan refreshed against current evidence
+
+[Current0.35-to0.90 plan](verification/memory-quality-plan-20261024/README.md) separates completed #2627/#2673/#2510 work and the accepted377second retention round from today's missing hearing, speaker/privacy, native/pin and real-person acceptance. Next delivery is current #3064; optional combined-test feasibility is audited before any new claim. No score/default/physical change or takeover of Friday's P2.
