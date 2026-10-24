@@ -1,0 +1,54 @@
+{
+  "gate-result.json": {
+    "original_sha256": "df751297219025a85ace26b9b017c433e57854db5958d5ae0749e442f7ea21a1",
+    "published_sha256": "c5977441ee6ea321129a8ddab89229d5700bc705e55c284df280b232ebceba98"
+  },
+  "fmt.txt": {
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "clean-selected.txt": {
+    "original_sha256": "8311a3d68782e4a7f29444baed0f2682d184d83091bb63336070a45fddf08761",
+    "published_sha256": "8311a3d68782e4a7f29444baed0f2682d184d83091bb63336070a45fddf08761"
+  },
+  "source-before.json": {
+    "original_sha256": "3fca69ce0e2d30d2a0bd3a83a618602caa95b966f1673f89f8cc86059d706975",
+    "published_sha256": "3fca69ce0e2d30d2a0bd3a83a618602caa95b966f1673f89f8cc86059d706975"
+  },
+  "source-after.json": {
+    "original_sha256": "3fca69ce0e2d30d2a0bd3a83a618602caa95b966f1673f89f8cc86059d706975",
+    "published_sha256": "3fca69ce0e2d30d2a0bd3a83a618602caa95b966f1673f89f8cc86059d706975"
+  },
+  "input-comparison.json": {
+    "original_sha256": "e89d9bcf798c64be77ed1d44b9ca77ae7fe18c2b1cfdd13aa56e71dd9f968bfa",
+    "published_sha256": "e89d9bcf798c64be77ed1d44b9ca77ae7fe18c2b1cfdd13aa56e71dd9f968bfa"
+  },
+  "focused-0.txt": {
+    "original_sha256": "c928ccd1eafca2cf0ddc089e02184cdfbc02751d06251045d1de93f6bc838b12",
+    "published_sha256": "ed8ca1c8cf0f2a9f2494bc8646febe3017f172e078aacf47a14db045f9163b01"
+  },
+  "clippy-summary.json": {
+    "original_sha256": "bd8976ccf446fe203ae04f284f949b998eda068770540f7cf9877729a360c7d7",
+    "published_sha256": "44de4e00f748b057adc6dbee811b6354abdf268cbbf400810c8765c96e5da6ac"
+  },
+  "test-compile-summary.json": {
+    "original_sha256": "eadd00a33f9f4bf8ebf07365610aa8fb3ee1e778a645f681afefc0938038b98e",
+    "published_sha256": "da602449e07926f19ba8c035a10bacea302d077c302b68e9117dcb7fb07ed55f"
+  },
+  "dependency-input-audit.json": {
+    "original_sha256": "d196b2c3b574d55522426f13c8e91e215223b4c3fef95dc0c2865fd82dcff7ea",
+    "published_sha256": "d196b2c3b574d55522426f13c8e91e215223b4c3fef95dc0c2865fd82dcff7ea"
+  },
+  "linux-fmt-current.json": {
+    "original_sha256": "08c600fa5cb47cc48556b607cd9b07793c6b371408af75bbcf24bf349e195ce6",
+    "published_sha256": "08c600fa5cb47cc48556b607cd9b07793c6b371408af75bbcf24bf349e195ce6"
+  },
+  "linux-fmt-current-cleanup.json": {
+    "original_sha256": "23ee34ae2b6d06020ccf09febea6d580bda462a8d5ce8b33d50f24cadef3b51c",
+    "published_sha256": "23ee34ae2b6d06020ccf09febea6d580bda462a8d5ce8b33d50f24cadef3b51c"
+  },
+  "linux-fmt-current.txt": {
+    "original_sha256": "f6c95e4b36744496c17bbf37fb1fa59ba19ee1b0057e1e6c4c1798e49b616a44",
+    "published_sha256": "f6c95e4b36744496c17bbf37fb1fa59ba19ee1b0057e1e6c4c1798e49b616a44"
+  }
+}

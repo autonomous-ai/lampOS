@@ -1,0 +1,22 @@
+{
+  "qualified_head": "e1140f2ef0af5f224eeb2bad96f7b4b258337d0e",
+  "qualified_base": "508b5b37f4f31b52ccd4b338bda9cd4092988e37",
+  "current_head": "0f6737d4ee634836b2db7c2752acc6ffc11046bc",
+  "current_base": "43ac6c843ea91dfc051a9d25e165c9d93f895942",
+  "compared_tracked_inputs": 7023,
+  "changed_files": [
+    {
+      "path": "lampOS/crates/expression/tests/runtime.rs",
+      "old": "ed1ed5d64f6338357b25bdcbda739985b1c68c501695d20d9bf2e374ce6318e4",
+      "new": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95"
+    },
+    {
+      "path": "lampOS/docs/expression.md",
+      "old": "eed243fe00dd913f5ed11809b6d25c1123941c5da09192f27057de51ce1217be",
+      "new": "3a430011794fb6fd1768a92beca373c4c8276d1273a0bc69a20b2c385d623bc8"
+    }
+  ],
+  "all_voice_cargo_and_vendor_files_identical": true,
+  "whole_tree_equal": false,
+  "limits": "Full gate remains bound to qualified head. Changes are other-package test target/docs; current fmt/Clippy/focused tests and compiled-input checks will be separate."
+}
