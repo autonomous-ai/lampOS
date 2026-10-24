@@ -1635,6 +1635,14 @@ timeout are reported; a recording with any of these is incomplete evidence.
 Shutdown gives the optional writer 100 ms to finish; disk synchronization is
 not a hard userspace bound. Replay output errors are returned, never called a
 complete replay. Keep the printed summary with a real recording.
+The real CLI SIGTERM test verifies bounded exit, reader accounting and release
+of the actual serve owner. It accepts either truthful `recording.finished`
+outcome within that unchanged product window; only a finished recording is
+used as complete replay evidence. Deterministic recorder controls cover an
+acknowledged, pending and disconnected writer without sleeps. Complete GPIO
+and privacy replay roundtrips retain their separate five-second **test-only**
+finish window; this does not extend the product's 100 ms deadline.
+
 
 ## Qualification and evidence
 
