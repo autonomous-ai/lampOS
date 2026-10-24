@@ -19,6 +19,10 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+#[path = "package.rs"]
+mod package;
+pub use package::packages;
+
 const INPUT: &str = "fixture/pair";
 const WITHIN: Duration = Duration::from_secs(15);
 const IO_WITHIN: Duration = Duration::from_secs(2);

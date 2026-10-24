@@ -1694,8 +1694,21 @@ Fresh owner probes distinguish persisted history from resumed active rest.
 Fixed local offsets map consecutive dates; no physical night is elapsed and
 no timezone migration is qualified. The separate
 [rested-state plan and gate record](verification/rested-state-release-pair-20261024/README.md)
-records the passing Mac source gate and the still-pending native execution;
-ordinary-suite skips establish no released-process result.
+records dedicated native six-case passes on its separate earlier heads;
+the combined eight-case composition requires its own execution. Ordinary
+suite skips establish no released-process result.
+
+**Published local-package readers** (#2809): two additional ignored Skills
+`release_pair` cases use actual 6408/6498 `pack`, `install` and `list` commands
+in both directions. They check synthetic versioned installable folders,
+disabled inventory/tool reservation, selected strict refusals and preservation
+of the existing files after a refused replacement. The
+[package scope and execution record](verification/package-state-release-pair-20261024/README.md)
+records the earlier separate six-case pass and requires new evidence for
+the combined eight-case composition. Inspecting the installer's
+`.package.json` output does not execute Cloud's provenance reader; this slice
+also excludes Store trust, the full product catalog, updater restoration and
+physical output.
 
 What follows is the audit for #1680 at `647f1ee63`, read from the code
 (paths relative to `lampOS/`). The tasks, schedule, eyes and cloud rows
