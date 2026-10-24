@@ -1,0 +1,6 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T20:41:08.7121500Z HEAD is now at 9fa61c6 Merge 72a5a0f67c1a9d12d257e38d85cff7bfaf268999 into bcb540a085408cdf764dfdb211d415a0e8239727
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T20:50:08.7265082Z         PASS [   5.035s] ( 317/1216) lamp-cloud settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T20:50:31.8273488Z      Summary [  31.166s] 1216 tests run: 1216 passed, 8 skipped
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-24T20:41:05.8534001Z HEAD is now at 9fa61c6 Merge 72a5a0f67c1a9d12d257e38d85cff7bfaf268999 into bcb540a085408cdf764dfdb211d415a0e8239727
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	﻿2026-10-24T20:42:13.0425230Z ##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-24T20:42:13.0426215Z [36;1mcargo clippy --locked --workspace --all-targets -- -D warnings[0m

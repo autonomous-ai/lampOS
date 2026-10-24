@@ -1,0 +1,58 @@
+{
+  "head": "72a5a0f67c1a9d12d257e38d85cff7bfaf268999",
+  "base": "bcb540a085408cdf764dfdb211d415a0e8239727",
+  "actual_preview": "9fa61c699afe5cd6f0a07219442bc175ad7f3e0f",
+  "whole_trees": {
+    "72a5a0f67c1a9d12d257e38d85cff7bfaf268999": "e2ea465c26f5f536b61df310ba1d612f36249400",
+    "9fa61c699afe5cd6f0a07219442bc175ad7f3e0f": "e2ea465c26f5f536b61df310ba1d612f36249400"
+  },
+  "whole_trees_equal": true,
+  "arm64_run": 40130844249,
+  "linux_run": 40130844271,
+  "selected": 1216,
+  "PASS": 1216,
+  "LEAK": 0,
+  "failed": 0,
+  "unrun": 0,
+  "skipped": 8,
+  "primary_terminal_lines": 1216,
+  "identical_echoes": 0,
+  "target_counts": {
+    "lamp-cloud": 166,
+    "lamp-cloud::it": 30,
+    "lamp-update": 120,
+    "lamp-update::functions": 5,
+    "lamp-update::install": 90,
+    "lamp-update::it": 13,
+    "lamp-update::round": 167,
+    "lamp-voice-eval": 378,
+    "lamp-update::self-cli-exec": 1,
+    "lamp-voice-eval::it": 238,
+    "lamp-update::self-process-cuts": 1,
+    "lamp-voice-eval::bin/lamp-voice-eval": 7
+  },
+  "cloud_all_target_cases": 196,
+  "changed_case": [
+    {
+      "status": "PASS",
+      "index": 317,
+      "target": "lamp-cloud settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks"
+    }
+  ],
+  "primary_renderings": {
+    "arm64": {
+      "sha256": "20e958916354deb79932347e264a18499eaedff635c354efc924d9f16d136124",
+      "bytes": 412755,
+      "representation": "gh run view --log, not raw Actions ZIP/API job-log representation"
+    },
+    "linux": {
+      "sha256": "04be8cb47b70bfae813f2850803a372d21c5e979caacbab4b3e0c500c2f05374",
+      "bytes": 74655,
+      "representation": "gh run view --log, not raw Actions ZIP/API job-log representation"
+    }
+  },
+  "limits": [
+    "Original existing runs, no rerun.",
+    "No repeated timing pair, full workspace, real Wi-Fi or physical claim."
+  ]
+}
