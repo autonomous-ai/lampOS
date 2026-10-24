@@ -1,0 +1,124 @@
+{
+  "at_utc": "2026-10-24T14:16:30.182222+00:00",
+  "tested_tree": "778e51d10695f37e5d4e05250f9814ea022edf26",
+  "base": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+  "final_tree": "9c78587ee3e8bcd3cb865e6ed5c564a71f36cc5f",
+  "changed_from_tested": [
+    "lampOS/docs/verification/common-checking-20261023/README.md",
+    "lampOS/docs/vi/memory-speaking-frames_vi.md"
+  ],
+  "all_other_git_blobs_and_modes_unchanged": true,
+  "counts": {
+    "mac": {
+      "fmt": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      },
+      "clippy": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      },
+      "workspace-build": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      },
+      "full-eyes": {
+        "failed": 0,
+        "ignored": 5,
+        "passed": 357
+      },
+      "full-voice": {
+        "failed": 0,
+        "ignored": 21,
+        "passed": 4125
+      },
+      "full-update": {
+        "failed": 0,
+        "ignored": 6,
+        "passed": 386
+      },
+      "full-skills": {
+        "failed": 0,
+        "ignored": 9,
+        "passed": 516
+      },
+      "full-memory": {
+        "failed": 0,
+        "ignored": 8,
+        "passed": 324
+      }
+    },
+    "linux": {
+      "fmt": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      },
+      "clippy": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      },
+      "workspace-build": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      },
+      "full-eyes": {
+        "failed": 0,
+        "ignored": 5,
+        "passed": 360
+      },
+      "full-voice": {
+        "failed": 0,
+        "ignored": 24,
+        "passed": 4186
+      },
+      "full-update": {
+        "failed": 0,
+        "ignored": 4,
+        "passed": 388
+      },
+      "full-skills": {
+        "failed": 0,
+        "ignored": 9,
+        "passed": 519
+      },
+      "full-memory": {
+        "failed": 0,
+        "ignored": 8,
+        "passed": 324
+      }
+    }
+  },
+  "receipts": {
+    "mac": {
+      "terminal_sha256": "9be8913dbcf77117dfc0002c5f28c35929fd7b4416bedf2271ec55f9912f1a9b",
+      "stages_sha256": "fe12e166e2f14f685d38d63663784e5caa5f48be1816855d6b0464d55da1641e",
+      "fresh_sha256": "34b3339b1dbff05011ae3b9764f9efcea3add5e7b3eaad14aca517a6ed6e5214",
+      "source_guard_sha256": "8c86958284df3d249e34b1b0dfc306a9fbcd17e19f34c2d33d4bdbb52b02667a"
+    },
+    "linux": {
+      "terminal_sha256": "41004331c90d1714e04cae06aac40bd4fdddbaf92aeaa61268151c55ac3fb477",
+      "stages_sha256": "a02f1c15a66d0ae860405453bbb9714bb2d82aea0f5c8ffdfff04bee01125057",
+      "fresh_sha256": "a03f9baa6361b7667244c07642917858f0e4710666c0012fc2b2a3fe51577c51",
+      "source_guard_sha256": "b156ff3a5a945565f7ae4cbac7ace53cc1a597913ca6fd6edb6e2e1f7daf053d"
+    }
+  },
+  "documentation": {
+    "lampOS/docs/verification/common-checking-20261023/README.md": {
+      "tested_git_blob": "c5e562e9ea156d29b3964a6c802ede0c480a6745",
+      "final_git_blob": "423f418ab8fef6b5bf6908f08917fef43339b8c2",
+      "final_sha256": "34303bb3882c1b418da65022e163b20a1e14b0fa7b872034c81bf641494ef62f"
+    },
+    "lampOS/docs/vi/memory-speaking-frames_vi.md": {
+      "tested_git_blob": "15b772a3af436272a3a5962363edc89d42e45d02",
+      "final_git_blob": "d11d8cc49f5e6807b6655f338dc989d48186045d",
+      "final_sha256": "5ce30c68886994105ce4b26b980f32957ba59735ad8fbaf294085bbd9c357be0"
+    }
+  },
+  "authored_head": "e9d00f935029a6d5054ddf35b0203fb8546f7995"
+}

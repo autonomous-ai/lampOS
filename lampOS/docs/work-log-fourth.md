@@ -8553,3 +8553,7 @@ Current build-rows.md on22b scores the memory-quality row0.35 after today's owne
 ## 2026-10-24: memory-quality plan refreshed against current evidence
 
 [Current0.35-to0.90 plan](verification/memory-quality-plan-20261024/README.md) separates completed #2627/#2673/#2510 work and the accepted377second retention round from today's missing hearing, speaker/privacy, native/pin and real-person acceptance. Next delivery is current #3064; optional combined-test feasibility is audited before any new claim. No score/default/physical change or takeover of Friday's P2.
+
+## 2026-10-24: current Common carry pushed after both full gates
+
+#3064 now owns one commit e9d00f935 on2e2eee360 after exact successful lease replacement of8ed. [Final binding and range-diff](verification/common-current-final-head-20261024/README.md) prove runtime/test identity to tested778e; only two result notes differ. Both complete eight-stage gates0, fresh46 each, all controls/source/cleanup valid. Mac357/4125/386/516/324 andLinux360/4186/388/519/324, every failure0, ignored recorded in table. GitHub reports mergeable and fresh native40101806082/Clippy40101805913 active, not passed. Draft/voice-freeze/privacy/pins/physical holds remain. Claimed separate combined name/hits→Engine→HTTP test before isolated code preparation; no runtime or product-default change.

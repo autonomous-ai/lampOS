@@ -1,0 +1,64 @@
+1:  8ed223f4eb ! 1:  e9d00f9350 lampOS: keep private answers bound to current speaker evidence
+    @@ Metadata
+     Author: deehw <dee@autonomous.ai>
+     
+      ## Commit message ##
+    -    lampOS: keep private answers bound to current speaker evidence
+    +    lampOS: bind private context to current speaker evidence
+     
+      ## lampOS/Cargo.lock ##
+     @@ lampOS/Cargo.lock: dependencies = [
+    @@ lampOS/crates/voice/src/second_provider/worker.rs: pub fn serve(
+     @@ lampOS/crates/voice/src/second_provider/worker.rs: pub fn serve(
+              runner.clone(),
+          )
+    -     .with_memory_scope(boot, face_cache.clone(), scoped_runner, scoped_system)
+    +     .with_memory_scope(boots.own, face_cache.clone(), scoped_runner, scoped_system)
+     +    .guarding_private_context(Arc::new(move |lease| {
+     +        private_context_state(private_who.as_deref(), lease)
+     +    }))
+    @@ lampOS/docs/verification/common-checking-20261023/README.md (new)
+     @@
+     +# Common private-context Checking correction, 23 October 2026
+     +
+    -+## Current local qualification, 24 October
+    ++## Current conflicting-carry qualification, 24 October
+    ++
+    ++Frozen tested tree `778e51d10695f37e5d4e05250f9814ea022edf26` on base
+    ++`2e2eee360c47f352dfe94f3d2bfe3d69db7048bd` passes all eight required stages
+    ++on Mac and offline Linux AMD64. The actual worker conflict keeps upstream's
+    ++separate worker/coordinator ownership and Common's private disclosure guard.
+    ++
+    ++| Host | Eyes | Voice | Update | Skills | Memory |
+    ++| --- | --- | --- | --- | --- | --- |
+    ++| Mac | 357 / 0 / 5 | 4,125 / 0 / 21 | 386 / 0 / 6 | 516 / 0 / 9 | 324 / 0 / 8 |
+    ++| Linux AMD64 | 360 / 0 / 5 | 4,186 / 0 / 24 | 388 / 0 / 4 | 519 / 0 / 9 | 324 / 0 / 8 |
+    ++
+    ++Counts are passed / failed / ignored, selected once per final Cargo target.
+    ++Formatting, strict workspace/all-target Clippy and workspace build exit 0 on
+    ++both hosts. Both runs validate/invalidate exactly 46 local workspace members
+    ++and retain source-bound post-clean fresh compilation for all 46 across
+    ++Clippy/build. Source/index stability, process/container cleanup and target
+    ++release are verified. All four required Voice controls pass once on each
+    ++host; Linux Eyes' capture/enrollment control also passes once.
+    ++
+    ++Raw receipts: `/private/tmp/fourth-common-current-gates-20261024/{mac,linux}/attempt1/`.
+    ++The final result update changes only this README and the existing private-context
+    ++note under `docs/vi/`; all runtime/test blobs remain exact to the tested tree.
+    ++Previous epochs below remain historical. No earlier failure is waived or
+    ++assigned a cause by these passes. Current PR ARM64/Clippy, renewed independent
+    ++privacy reads, compatible Voice/Eyes pins and physical acceptance remain
+    ++separate requirements. Voice freeze and merge HOLD remain; no lamp was touched.
+    ++
+    ++## Previous local qualification on 665d, 24 October
+     +
+     +The corrected Common source is based on `9872cb69288b9e113bb95e6b25140a60a1e91e19`.
+     +Frozen tested tree `665d44694def1048095deb236a27d9677dc084fa` passes all eight
+    @@ lampOS/docs/vi/memory-speaking-frames_vi.md (new)
+     +
+     +Xem [hợp đồng Memory bằng tiếng Anh](../memory.md). Thay đổi này chưa được xác nhận trên đèn; các cổng kiểm tra đầy đủ và lượt đọc quyền riêng tư vẫn là điều kiện trước khi chấp nhận.
+     +
+    -+Các cổng nguồn cục bộ đầy đủ trên Mac và Linux AMD64 đã đạt ở cây `665d44694`; ARM64 của PR, lượt đọc quyền riêng tư độc lập, cặp binary Voice/Eyes tương thích và lượt chạy trên đèn vẫn là những điều kiện riêng. Ghi chú CLI của Eyes cũ chỉ chứng minh cú pháp, không chứng minh khởi động hay nhận diện bình thường. Xem thêm [Eyes](../eyes.md), [đường thoại thứ hai](../second-voice.md) và [kết quả cổng cục bộ](../verification/common-checking-20261023/README.md).
+    ++Các cổng nguồn cục bộ đầy đủ trên Mac và Linux AMD64 đã đạt ở cây `778e51d10`; ARM64 của PR, lượt đọc quyền riêng tư độc lập, cặp binary Voice/Eyes tương thích và lượt chạy trên đèn vẫn là những điều kiện riêng. Ghi chú CLI của Eyes cũ chỉ chứng minh cú pháp, không chứng minh khởi động hay nhận diện bình thường. Xem thêm [Eyes](../eyes.md), [đường thoại thứ hai](../second-voice.md) và [kết quả cổng cục bộ](../verification/common-checking-20261023/README.md).
+    ++
+    ++Current carry qualification: tree `778e51d10` on base `2e2eee360` passes all eight required Mac and Linux AMD64 stages, with 46 fresh local members per host, required controls and verified source/index/cleanup. Current PR native checks, independent privacy reads, compatible pins and physical acceptance remain separate; voice freeze and merge HOLD stand. The final update changes documentation only.
