@@ -150,7 +150,8 @@ struct Speaker {
 
 impl Speaker {
     /// The cache, for a reader that must not wait on a lock. A clash is
-    /// tried again, spinning and never sleeping, for at most [`CLASH_SPIN`]:
+    /// tried again, spinning and never sleeping, for about [`CLASH_SPIN`]
+    /// (one more try may follow the last look at the clock):
     /// the monitor writes the cache every 20 ms and the worker reads it every
     /// 20 ms, each for microseconds, so the two meet often (#2793: on
     /// lamp-4ace a recording accepted at 13:18:46.68 was cancelled 0.66 s
@@ -261,11 +262,6 @@ impl Shared {
             if playback && !self.ready.load(Ordering::Acquire) {
                 return Err("its recording was not ready");
             }
-            let mut until = if self.started.load(Ordering::Acquire) {
-                self.offer.finish_before_us
-            } else {
-                self.offer.start_before_us
-            };
             let Some(cache) = self.speaker.try_cache() else {
                 return Err("the speaker's state was being read");
             };
@@ -273,6 +269,19 @@ impl Shared {
                 return Err(cache.refusal(&self.fence, now_us));
             };
             drop(cache);
+            // A cancellation or a stop can land while the cache is waited for
+            // (reviewer-two on #3319): looked at again before any permission.
+            if self.terminal.load(Ordering::Acquire) != ACTIVE {
+                return Err("already ended");
+            }
+            if !self.running.live() {
+                return Err("the requested-audio service stopped");
+            }
+            let mut until = if self.started.load(Ordering::Acquire) {
+                self.offer.finish_before_us
+            } else {
+                self.offer.start_before_us
+            };
             until = until.min(speaker);
             let lease = self.lease_until_us.load(Ordering::Acquire);
             if playback || lease != 0 {
@@ -1268,6 +1277,39 @@ mod tests {
         assert_eq!(shared.terminal.load(Ordering::Acquire), ACTIVE);
         assert!(shared.cancelled_for.get().is_none());
         assert!(ticket.may_play(1002));
+    }
+
+    /// Reviewer-two on #3319: the spin widens the window in which a
+    /// cancellation can land mid-check. One that does is seen once the cache
+    /// comes free, and its reason, the first, stands.
+    #[test]
+    fn a_cancellation_during_a_clash_gives_no_permission_when_the_cache_comes_free() {
+        let ticket = fixture(1, 1000, true);
+        assert!(ticket.started(1000));
+        let shared = ticket.shared.clone();
+        let cache = shared.speaker.cache.lock().unwrap();
+        let checker = {
+            let shared = shared.clone();
+            thread::spawn(move || shared.limit(1001, true))
+        };
+        // Well inside the tests' 200 ms spin: the checker is past its first
+        // looks and spinning on the cache.
+        thread::sleep(Duration::from_millis(20));
+        shared.cancel_for("Skills refused a lease renewal");
+        drop(cache);
+        assert_eq!(
+            checker.join().unwrap(),
+            None,
+            "no permission after a cancellation"
+        );
+        assert_eq!(shared.terminal.load(Ordering::Acquire), CANCELLED);
+        assert_eq!(
+            shared.cancelled_for.get(),
+            Some(&"Skills refused a lease renewal"),
+            "the first reason stands"
+        );
+        assert!(!ticket.may_play(1002));
+        assert!(!ticket.live(1002));
     }
 
     #[test]
