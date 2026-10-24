@@ -1,0 +1,7 @@
+{
+  "code": 0,
+  "event": "reaped",
+  "pid": 10086,
+  "signal": null,
+  "stage": "c-on"
+}
