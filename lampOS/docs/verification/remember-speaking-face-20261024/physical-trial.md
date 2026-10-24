@@ -24,6 +24,9 @@ publish their names, face images, embeddings or full transcripts.
 | Already-known face introduces a different name | Saved name stays unchanged; reply neither speaks the stored name nor requests unsupported replacement confirmation. |
 | Ordinary short bare-name and spelling reply, including a multiword name | Same current-line and speaker proof applies; old history cannot supply a name. |
 | Bare name after “What is your name?” versus after a question about the speaker’s friend | Record both contexts separately. A bare reply about the friend must not be saved on the speaker; the current line-only guard cannot distinguish these contexts itself, so this remains a physical/model qualification limit. |
+| Mixed introduction (“Remember my face, I'm Kess, and this is Mai”) and unsupported “remember me please”, “Im”, “It's”, “anh/chị là…” forms | Expect refusal and a fresh supported introduction; record the usability cost and never report that Kess was stored. |
+| Name plus addressee (“I'm Kess, Mai”) with a model proposing the joined name “Kess Mai” | Record the exact proposed alias privately and whether it was saved; comma folding can accept the joined name, so this is a model/physical qualification limit. |
+| Spoken question whose question mark is absent from STT, including “em là…” | Record the actual spoken intent separately from the transcript; text-only validation cannot recover lost question intonation. |
 
 For each attempt retain build, switches, recognition phase if observable,
 actual speaker, actual face saved or refusal category, and whether any spoken

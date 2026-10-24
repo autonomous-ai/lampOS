@@ -1,0 +1,53 @@
+ok 1 - all three bound successful terminal cases
+ok 2 - missing third case cannot pass
+ok 3 - wrong case label cannot pass
+ok 4 - preflight failure is not a successful case
+ok 5 - internal cleanup failure cannot pass
+ok 6 - cleanup error cannot hide behind a true flag
+ok 7 - wrong release digest cannot pass
+ok 8 - wrong artifact path cannot pass
+ok 9 - duplicate artifact does not stand for the fourth payload
+ok 10 - wrong source commit cannot pass
+ok 11 - wrong architecture cannot pass
+ok 12 - guard override cannot pass
+ok 13 - unreaped command cannot pass
+ok 14 - live process group cannot pass
+ok 15 - compacted cleanup failure marker cannot pass
+ok 16 - empty observations cannot pass
+ok 17 - unproved signature acceptance cannot pass
+ok 18 - actual terminal driver accepts the exact three filenames
+ok 19 - actual terminal driver refuses multiple JSON documents in one case
+ok 20 - actual terminal driver binds filename to case identity
+ok 21 - actual terminal driver rejects a nonpassing/zero-selection summary
+ok 22 - exact owned ledger
+ok 23 - unrelated or duplicate ownership refused before any manager command
+ok 24 - unrelated or duplicate ownership refused before any manager command
+ok 25 - unrelated or duplicate ownership refused before any manager command
+ok 26 - inactive manager snapshot requires both zero PIDs and no job
+ok 27 - incomplete or other-owned manager snapshot cannot prove exit
+ok 28 - incomplete or other-owned manager snapshot cannot prove exit
+ok 29 - incomplete or other-owned manager snapshot cannot prove exit
+ok 30 - incomplete or other-owned manager snapshot cannot prove exit
+ok 31 - incomplete or other-owned manager snapshot cannot prove exit
+ok 32 - unified v2 empty parent and descendants
+ok 33 - exact absent group on verified unified v2
+ok 34 - v1 missing events live descendants or members cannot prove cleanup
+ok 35 - v1 missing events live descendants or members cannot prove cleanup
+ok 36 - v1 missing events live descendants or members cannot prove cleanup
+ok 37 - v1 missing events live descendants or members cannot prove cleanup
+ok 38 - v1 missing events live descendants or members cannot prove cleanup
+ok 39 - absence does not bypass unified-v2 requirement
+ok 40 - decoded manifest binds fixed source and both payloads
+ok 41 - rehashed wrong decoded binding refused
+ok 42 - rehashed wrong decoded binding refused
+ok 43 - rehashed wrong decoded binding refused
+ok 44 - rehashed wrong decoded binding refused
+ok 45 - current single successful Cargo test artifact
+ok 46 - missing duplicate failed or wrong-source artifact refused
+ok 47 - missing duplicate failed or wrong-source artifact refused
+ok 48 - missing duplicate failed or wrong-source artifact refused
+ok 49 - missing duplicate failed or wrong-source artifact refused
+ok 50 - missing duplicate failed or wrong-source artifact refused
+ok 51 - missing duplicate failed or wrong-source artifact refused
+ok 52 - missing duplicate failed or wrong-source artifact refused
+offline controls: 52 passed; 0 failed; no Cargo, network, release executable or systemd execution

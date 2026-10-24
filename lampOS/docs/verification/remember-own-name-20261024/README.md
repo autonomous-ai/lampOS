@@ -80,3 +80,25 @@ can be interpreted as the speaker’s name. The line-only guard cannot know
 that preceding conversational context. The physical sheet now contrasts
 self-name and friend-name prompts; no activation or general semantic
 ownership guarantee is inferred from these host checks.
+
+## Public reads, native pass and requested refusal fixtures
+
+Both public readers approved implementation `390532a53` and closed the
+original findings. ARM64 run 40057250479 passed **11,171 tests (one reported
+Voice journal LEAK), 71 skipped**, process **12/0**; Linux Clippy 40057250486
+passed. Exact Linux fmt passed per Second, with 6,967 files unchanged;
+Third verified its repository/subtree bindings. See the implementation receipts.
+
+Reviewer-three’s independent Mac library run with its probe reported
+**3,700/4**, with each failing test passing twice alone. Those outcomes are
+retained on #3328; isolated success does not prove the cause of failure.
+Third’s full two-thread gate and native gate are separate passing evidence.
+
+The lead requested explicit refusal fixtures. `7fb4feb20` adds five string
+cases and documents the joined-name/addressee, bare-context and lost-question
+limits: 17 added lines in two files, no runtime change. Current focused
+**23/0**, formatting and strict Voice Clippy pass, with unchanged hashes.
+The full local Voice/workspace passes are carried from `390532a53`, not
+claimed rerun for this test/docs addition. Renewed public reads and native
+checks are requested for the new head. The physical sheet now includes all
+of the readers’ P3 contexts; it remains unrun.

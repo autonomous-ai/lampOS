@@ -5,6 +5,22 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 10:35 — requested refusal fixtures and Records cleanup HOLD
+
+- #3328 is now `7fb4feb20`: requested five negative inputs plus language
+  limits, 17 added lines, no runtime change. Current focused **23/0**, fmt
+  and strict Clippy pass; carried reads and fresh native checks requested.
+- Both readers approved implementation `390532a53`; its native gate passed
+  **11,171 (one reported journal LEAK) / 71 skipped**, process **12/0**,
+  Linux Clippy/fmt green. Evidence and the independent **3,700/4** library
+  report are retained without claiming isolated passes establish cause.
+- #3329 read: Mac Records **182/0/1**, fmt/Clippy and shell/jq **52/0** pass.
+  HOLD P2 for internal fixture deletion before descendant exit proof;
+  applies to current `38a8d5651` because the Rust path is unchanged. The
+  later external collector remains a distinct stronger gate, not a reason
+  to call the early internal cleanup confirmed. [Read](verification/records-release-pair-review-20261024/README.md).
+- No device actions or product switch changes. Watch both PRs and the Queue.
+
 ## 2026-10-24 10:13 — own-name correction pushed as #3328
 
 - Pushed `390532a53` on `third/remember-own-name`, current `9ed44f88c` base.

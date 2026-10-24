@@ -1,0 +1,37 @@
+
+running 138 tests
+....................................................................................... 87/138
+...................................................
+test result: ok. 138 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.24s
+
+
+running 23 tests
+....................{"schema_version":1,"config_fingerprint":"42507bb16edc9b4a091b3c9a9b98a5288287615c4b49e6860e0c41d706c64860","at_unix_s":1792812265,"mode":"apply","enabled":true,"roots":[{"root":"/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/lamp-records-newer-cleanup-28177/sessions","unit":"lamp-voice.service","before_bytes":8192,"planned_bytes":8192,"removed_bytes":8192,"remaining_bytes":0,"limit_bytes":500000000,"active":[],"planned":["00000000000000000000000000000001"],"removed":["00000000000000000000000000000001"],"refused":[],"disk":{"total_bytes":499963174912,"available_bytes":54825697280},"error":null}],"error":null}
+..{"schema_version":1,"config_fingerprint":"9da4e81a001e0412d2acc5aa8c273ddd175ccb5a20999d1807133040b056b99d","at_unix_s":1792812266,"mode":"apply","enabled":false,"roots":[],"error":null}
+.
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s
+
+
+running 8 tests
+......i.
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.50s
+
+
+running 14 tests
+.lamp-records: records fixture frame ended before LF
+......lamp-records: invalid records fixture bootstrap
+lamp-records: invalid records fixture bootstrap
+......lamp-records: records fixture host deadline
+.
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.07s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
