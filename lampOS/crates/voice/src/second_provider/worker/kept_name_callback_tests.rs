@@ -41,9 +41,47 @@ fn child(name: &str, mode: &str, markers: usize) -> bool {
         ])
         .env_clear()
         .env(CHILD, mode);
+    // Only this isolated mode owns this temporary root; the shared config
+    // helper builds its own children inside it, and the parent reaps all of
+    // them after the child process has exited, including a failed test.
+    struct OwnedTemp(PathBuf);
+    impl Drop for OwnedTemp {
+        fn drop(&mut self) {
+            if let Err(error) = std::fs::remove_dir_all(&self.0) {
+                if std::thread::panicking() {
+                    eprintln!("private callback temporary-root cleanup failed: {error}");
+                } else {
+                    panic!("private callback temporary-root cleanup failed: {error}");
+                }
+            }
+        }
+    }
+    let private_tmp = (mode == "privacy-defaults").then(|| {
+        use std::os::unix::fs::PermissionsExt;
+        // Keep nested Unix sockets below SUN_LEN on macOS, whose default
+        // temporary folder is too long for this child's Memory fixture.
+        let path =
+            PathBuf::from("/tmp").join(format!("lv-private-defaults-{}", std::process::id()));
+        std::fs::create_dir(&path).unwrap();
+        let owned = OwnedTemp(path);
+        std::fs::set_permissions(&owned.0, std::fs::Permissions::from_mode(0o700)).unwrap();
+        owned
+    });
     match mode {
         "days" | "days-room" | "privacy" => {
             command.env(crate::remember::DAYS_ENVIRONMENT, "on");
+        }
+        "privacy-defaults" => {
+            command
+                .env("TMPDIR", &private_tmp.as_ref().unwrap().0)
+                .env(crate::remember::DAYS_ENVIRONMENT, "on")
+                .env(crate::remember::HITS_ENVIRONMENT, "on")
+                .env(crate::second_provider::FACE_NAME_ENVIRONMENT, "on")
+                .env(
+                    crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
+                    "on",
+                )
+                .env(crate::speaking_faces::EYES_ENVIRONMENT, "on");
         }
         "days-resumes" => {
             command

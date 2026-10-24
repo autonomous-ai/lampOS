@@ -1,0 +1,29 @@
+# Private name and hits through the admitted request and HTTP
+
+Test-only follow-up to #3064, based on Common head `e9d00f935029a6d5054ddf35b0203fb8546f7995`. Two existing Voice test files add one top-level regression containing four internal cases. It uses actual Engine Start/Audio/End admission and current-piece speaker sealing, real known-name and memory-hit callbacks, the existing Unix Memory fixture and real Net guarded HTTP serialization. STT is deterministic; ordinary note/history callbacks are omitted so the kept canary has only the hit path.
+
+Every case inherits the same fresh known-person scope. Silent, Unknown and missing-face audio must return no private name from the real callback, perform zero kept RPCs, complete a neutral HTTP request and send neither private canary. Three distinct positive frames permit one matching-person kept RPC and both canaries in the proved-person case. The name callback records only a nonempty Boolean, asserted before HTTP capture can mask a selector regression. No manual speaker seal or permission Boolean substitutes for admission. A Done-only response avoids TTS/tools. The existing 10 second case bound, header/body limits and capture abort cleanup remain unchanged.
+
+The isolated child owns a private temporary root supplied only through that child's TMPDIR. The existing shared config helper alone constructs its child paths; the parent removes the root after child completion, including a failed child. No production path, timeout, source census or global process environment is changed.
+
+## Current corrected local qualification
+
+Tested tree `30eabf6bc5365006a44ebaf17ba617abcb6784d6`. Five stages per host: whole-workspace formatting, strict workspace/all-target Clippy, workspace build, full serial Voice tests and the exact Cargo Update scratch census in `tests/it/main.rs`.
+
+All five stages pass on both hosts. Full Voice totals are 4,126 passed / 0 failed / 21 ignored on Mac and 4,187 / 0 / 24 on Linux AMD64. The exact Update census executes 1 passed / 0 failed / 0 ignored with 12 filtered on each host. All five required Voice controls and that census appear once passed under their actual Cargo targets: six required controls per host.
+
+Each host validates and invalidates exactly 46 local workspace packages, then proves fresh source-bound compilation for all 46 across Clippy/build. Source/index/mode/mtime stability, process/container cleanup and target release verify. Terminal SHA-256: Mac `0921657e02a3613fc2d47f992d36519cdddfe8a814fa315f48ec4af34ea370eb`; Linux `dfcb1f9fdcc42418d8bc9e79431bce21123f9d65a9879ecd295d1ccb89efe61e`.
+
+After testing, only this result README changed; both Rust files and every other blob/mode remain tested-tree exact. Raw packets remain private following the automatic approval rejection of whole-packet public disclosure; only selected count/hash/Boolean summaries are published. The parent Common rebase is separately in qualification, so its new source receives no credit from these old-parent results.
+
+## Earlier observations remain separate
+
+Correction tree `a4acaf9aa01b420fe02e99957724355ce0489ba4` passed all five Linux stages, with Voice 4,187/0/24 ignored, six controls and the exact census 1/0 (12 filtered). Its Mac gate remains failed: Voice 4,117/9/21 ignored (raw 10 failures include the isolated child duplicate), exact census 1/0 (12 filtered), with source and cleanup verified. Four retained Voice controls and the census pass; the combined callback does not. Its new nested TMPDIR exceeded macOS SUN_LEN at Memory socket binding before admission. Current source shortens only that root, retains mode0700/parent cleanup and applies rustfmt's required wrapping. The intermediate short-root tree `7dfff2457bd73780ecb5288bcf9903c83cfdce55` stopped at formatting; it has no compile/test pass credit.
+
+The other eight Mac failures remain retained: three coordinator second-route watchdog/cleanup cases, startup link ordering, two signal-child completion cases, privacy lease-reader availability and light-call latency. Their five containing files are parent-Common exact, which is source identity, not a cause or matched-base waiver. They were handed to the existing Tests issue #1806. A new passing epoch, if obtained, will not erase those failed observations.
+
+Original tested tree `be860815986f43c8a1b37a8ac50a210216977039` passed four local stages: Mac Voice 4,126/0/21 ignored and Linux AMD64 Voice 4,187/0/24 ignored. That fixture had only two internal cases. Native ARM64 run 40105362608 on old head `8aed9d14acadbbf66fd5e309c880dead0225643d` then failed Update's actual scratch-folder census because the test reconstructed a shared helper's path template: 6,419 passed, 1 failed, 106 skipped and 4,954 selected tests unrun. This was a source defect; no retry or fixture waiver clears it. The current private-root correction removes the duplicate template.
+
+Separate controlled experiments are not ordinary suite passes. The earlier old-name selector experiment was inconclusive at HTTP capture timeout; the earlier old-hits selector was rejected by its zero-private-I/O assertion. The new name-only experiment on exact corrected four-case tests rejects directly at the silent case's callback Boolean assertion (observed nonempty true, expected false), raw Cargo exit 101 with expected-experiment exit 0. No HTTP leakage, words or extra RPC are inferred from that Boolean failure.
+
+This covers real callback/request/proof composition into loopback HTTP under explicit flags. It does not exercise full worker::serve/product-unit parsing, acoustic STT/Eyes, model decisions, identity/liveness, physical latency or activation. This corrected head still needs its own native ARM64 and reader acceptance. The parent Common dependency and voice-freeze/privacy/pin/physical holds remain; no lamp was touched.
