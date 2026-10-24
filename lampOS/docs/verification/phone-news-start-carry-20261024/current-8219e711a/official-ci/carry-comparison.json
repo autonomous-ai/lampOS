@@ -1,0 +1,14 @@
+{
+  "owned_files": {
+    "lampOS/crates/voice/src/messages.rs": {
+      "f27e3b691": "8fc4441fb1cb1a3eb6bf7f3f3bd9e1241364ce71233cf58ddf881ab0289cce49",
+      "e288e8d0c": "8fc4441fb1cb1a3eb6bf7f3f3bd9e1241364ce71233cf58ddf881ab0289cce49"
+    },
+    "lampOS/docs/messages.md": {
+      "f27e3b691": "e932d984aa99b3f9aa878ccc6c4ebdf414f5cf94813d72923e5ca6e665ebe5b9",
+      "e288e8d0c": "e932d984aa99b3f9aa878ccc6c4ebdf414f5cf94813d72923e5ca6e665ebe5b9"
+    }
+  },
+  "whole_tree_equal": false,
+  "range_diff_patches_equal": true
+}

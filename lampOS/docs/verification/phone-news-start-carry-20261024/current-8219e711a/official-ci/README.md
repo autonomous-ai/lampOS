@@ -1,0 +1,9 @@
+# Current original CI, phone e288 on 821
+
+ARM64 run 40119649844 attempt1 and Linux run 40119649873 both complete successfully for e288e8d0c7cdc9534f121934d7553b4b77108f0a. Both primary logs actually check out preview 62ebbbdacc32862100cb9f412bcb8b93d9e30fea, parents latest 8219e711a plus this feature. Complete preview/authored tree aa9d2b05ac5b1a25f1e927fedfb6b8b5ff9caf2b is equal.
+
+ARM64: **7,398 PASS plus one LEAK / 53 skipped**, all 7,399 selected terminal, zero failed or selected unrun. Every one of the 131 local required cases is a literal PASS. The primary log has 7,433 terminal-shaped lines because later workflow checks echo 34 identical PASS records. Reconciliation keys by selected index, verifies every repeated complete record is identical, and counts 7,399 distinct observations. The retained LEAK is same_voice::tests::each_line_the_check_says_is_said_to_its_journal; it is not hidden or reported as an additional PASS.
+
+Actual pinned Linux whole-workspace formatting and strict workspace/all-target Clippy steps succeed. Bounded primary excerpts, terminal metadata, original full-log hashes and all 131 case records are included. The hashed complete logs are frozen `gh run view <run> --repo autonomous-ai/lampOS --log` renderings, not raw Actions ZIP files. Complete primary logs remain available from their public GitHub runs; the selected files are not a claim to publish full streams. No job was rerun to produce this receipt.
+
+The range-diff proves both phone patches equal to the prior f27 carry, with both owned blobs identical. Six base paths changed. Earlier full local tests retain their actual source heads. The historical local Update FAILED/ok/ok remains held; neither this native success nor the separate fixture reader result waives it. No device, release signing/trust or physical acceptance claim.

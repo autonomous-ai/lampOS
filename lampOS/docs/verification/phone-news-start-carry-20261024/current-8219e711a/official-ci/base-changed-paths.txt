@@ -1,0 +1,6 @@
+lampOS/crates/voice/src/attention.rs
+lampOS/crates/voice/src/room_told.rs
+lampOS/crates/voice/src/second_provider/worker.rs
+lampOS/crates/voice/src/second_provider/worker/carry_window.rs
+lampOS/docs/second-voice.md
+lampOS/docs/switches.md
