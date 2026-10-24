@@ -799,36 +799,56 @@ impl TurnDetector {
     /// before the faint floor) that the start is on, through gaps shorter
     /// than [`SOFT_START_GAP_BLOCKS`], if that is earlier; never more than
     /// [`SOFT_START_BLOCKS`] before the usual start, nor past a block heard
-    /// while the lamp was sounding. Without the switch, the usual start.
+    /// while the lamp was sounding, nor into speech before the pause that
+    /// ends the run, and never later than the usual start. Without the
+    /// switch, the usual start.
     fn soft_begin(&self, usual: usize) -> usize {
         if !self.soft_start || self.unfloored.len() != self.prefix.len() {
             return usual;
         }
         let most = usual.saturating_sub(SOFT_START_BLOCKS);
+        // Never later than the usual start: a block heard while the lamp was
+        // sounding at or after it (the onset's own, under a reply's playback
+        // gone quiet but not retired) leaves the start as it was, never
+        // with less (the reviewer's P2 on #3392: `Start` with no audio).
         let floor = self
             .unfloored
             .iter()
             .rposition(Option::is_none)
             .map_or(0, |at| at + 1)
-            .max(most);
+            .max(most)
+            .min(usual);
+        let speech =
+            |at: usize| self.unfloored[at].is_some_and(|score| score >= SILENCE_PROBABILITY);
         let mut earliest = None;
+        let mut pause = None;
         let mut gap = 0;
         for at in (floor..self.prefix.len()).rev() {
-            if self.unfloored[at].is_some_and(|score| score >= SILENCE_PROBABILITY) {
+            if speech(at) {
                 earliest = Some(at);
                 gap = 0;
             } else {
                 gap += 1;
                 if gap >= SOFT_START_GAP_BLOCKS {
+                    pause = Some(at);
                     break;
                 }
             }
         }
-        let lead = usual.saturating_sub(SOFT_START_LEAD_BLOCKS).max(floor);
+        // Nor into speech before the pause that ends the run: a lead stops
+        // after it, so a name said before the pause isn't taken (the
+        // reviewer's P3 on #3392).
+        let after_pause = pause
+            .and_then(|at| (floor..at).rev().find(|&at| speech(at)))
+            .map_or(floor, |at| at + 1);
+        let lead = usual
+            .saturating_sub(SOFT_START_LEAD_BLOCKS)
+            .max(after_pause)
+            .min(usual);
         earliest.map_or(lead, |earliest| {
             earliest
                 .saturating_sub(REACH_LEAD_BLOCKS)
-                .max(floor)
+                .max(after_pause)
                 .min(lead)
         })
     }
