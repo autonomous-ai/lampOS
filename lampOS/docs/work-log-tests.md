@@ -1,5 +1,11 @@
 # Tests work log
 
+## 2026-10-25 06:10 — observation window closed; released-cache storage recovered
+
+Ready for lamp-voice: no
+
+The fixed NoPause schedule finished137/10/0unrun,43cases3/3 and6unqualified; its changed case passes3/3. Root independently verified147commands/294streams and group/session closure; no retry or failure waiver. Original full remainsFAILED. Primary packet publication follows. NoPause source,172sealed outputs and99readonly witnesses remain preserved. After checking Cloud's five immutable witnesses outside its released target, one supported full clean reclaimed only that reconstructible compiler cache,11.938seconds,free space13.814GiB; no source/raw/witness/other-builder deletion. Skills handoff wording now explicitly allows existing owned registry/Git source caches while retaining separate fresh compiler targets. The fixed control schedule and all outcomes/assertions remain unchanged. Shared-Mac compute can be allocated after explicit storage preflight; no compiler or additional observation started by this entry.
+
 ## 2026-10-25 06:02 — exact tested-tree Cloud carry on latest base
 
 Ready for lamp-voice: no
