@@ -1,0 +1,58 @@
+{
+  "head": "64a912417021475a6d450ab8313e26ef86495160",
+  "preview": "34fb4366f798a011bb79d076b0189208f8f70a42",
+  "parents": [
+    "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46",
+    "64a912417021475a6d450ab8313e26ef86495160"
+  ],
+  "changed_files_match": {
+    "lampOS/crates/voice/src/second_provider/worker.rs": true,
+    "lampOS/docs/second-voice.md": true
+  },
+  "whole_tree_equal": false,
+  "base_different_paths": [
+    ".github/workflows/lampos-caps-state-pair.yml",
+    ".github/workflows/lampos-cloud-provenance-pair.yml",
+    ".github/workflows/lampos-controls-pair.yml",
+    "lampOS/Cargo.lock",
+    "lampOS/crates/actions/Cargo.toml",
+    "lampOS/crates/actions/tests/release_pair.rs",
+    "lampOS/crates/actions/tests/release_pair/README.md",
+    "lampOS/crates/actions/tests/release_pair/fixture.rs",
+    "lampOS/crates/cloud/tests/release_pair.rs",
+    "lampOS/crates/cloud/tests/release_pair/README.md",
+    "lampOS/crates/cloud/tests/release_pair/broker.rs",
+    "lampOS/crates/cloud/tests/release_pair/fixture.rs",
+    "lampOS/crates/cloud/tests/release_pair/support.rs",
+    "lampOS/crates/controls/Cargo.toml",
+    "lampOS/crates/controls/tests/release_pair.rs",
+    "lampOS/crates/controls/tests/release_pair/README.md",
+    "lampOS/crates/controls/tests/release_pair/fixture.rs",
+    "lampOS/crates/memory/tests/release_pair.rs",
+    "lampOS/crates/skills/tests/release_pair.rs",
+    "lampOS/crates/skills/tests/release_pair/README.md",
+    "lampOS/crates/skills/tests/release_pair/fixture.rs",
+    "lampOS/crates/skills/tests/release_pair/rested.rs",
+    "lampOS/crates/voice/src/second_provider.rs",
+    "lampOS/crates/voice/src/second_provider/tests/remember_speaker.rs",
+    "lampOS/crates/voice/src/stop_words.rs",
+    "lampOS/docs/eyes.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/stop-word.md",
+    "lampOS/docs/switches.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/verification/caps-state-release-pair-20261024/README.md",
+    "lampOS/docs/verification/cloud-provenance-release-pair-20261024/README.md",
+    "lampOS/docs/verification/controls-release-pair-20261024/README.md",
+    "lampOS/docs/verification/memory-release-pair-20261024/README.md",
+    "lampOS/docs/verification/rested-state-release-pair-20261024/README.md"
+  ],
+  "log_sha256": "3bec9345798f213fe2d39b12ebf180d3f257ddcb58c8d8e8d9c1c6b65c3249aa",
+  "executed_controls_and_summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T09:11:35.0157028Z         PASS [   0.006s] (5870/7357) lamp-voice second_provider::worker::tests::a_line_begun_over_the_lamps_answer_is_not_told_it_may_be_peoples_talk",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T09:11:36.1511241Z         PASS [   0.006s] (5890/7357) lamp-voice second_provider::worker::tests::a_reply_to_nothing_the_lamp_asked_said_over_its_answer_is_someone_elses",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T09:11:36.7028787Z         PASS [   0.006s] (5951/7357) lamp-voice second_provider::worker::tests::the_hearing_hook_is_installed_with_the_switch_alone",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T09:11:58.0020089Z      Summary [ 151.965s] 7357 tests run: 7357 passed (1 leaky), 51 skipped",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T09:12:12.4359754Z test result: 12 passed; 0 failed"
+  ]
+}

@@ -5,6 +5,17 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 16:35 — heard-cut-in note read complete
+
+- #3353 `64a912417`: no source P1/P2, independent scoped Worker **201/0**,
+  fmt/strict Voice Clippy pass with source unchanged.
+- [Read receipt](verification/heard-cutin-note-read-20261024/README.md).
+  Native **7,356 PASS plus 1 LEAK / 51 skipped**, process **12/0**,
+  Linux Clippy green; changed blobs match preview, 35 base differences.
+- Note selection is proved; model response/calibrated played/default-freeze
+  acceptance stays separate with First. No new permission or author HOLD
+  introduced, and no lamp action. Completing the PR disposition next.
+
 ## 2026-10-24 16:27 — all three Third pieces landed
 
 - #3344/#3346 landed in train 77 `b2c9eb3dd`; #3349 landed in train 79

@@ -1,0 +1,65 @@
+{
+  "head": "64a912417021475a6d450ab8313e26ef86495160",
+  "before": {
+    "crates/voice/src/second_provider/worker.rs": "7948c1db473102d8e47a616580fa9d02d2f2f08a5a4cec427224b224a15e8ca8",
+    "docs/second-voice.md": "6aacee22ddc7aec8ae0a49f899235930b61a72fdc7b2d4b7f41193b16a15956b"
+  },
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 11.736,
+      "log": "/private/tmp/third-3353-fmt.txt"
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 95.812,
+      "log": "/private/tmp/third-3353-clippy.txt"
+    },
+    {
+      "name": "worker",
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 215.502,
+      "log": "/private/tmp/third-3353-worker.txt"
+    }
+  ],
+  "complete": true,
+  "after": {
+    "crates/voice/src/second_provider/worker.rs": "7948c1db473102d8e47a616580fa9d02d2f2f08a5a4cec427224b224a15e8ca8",
+    "docs/second-voice.md": "6aacee22ddc7aec8ae0a49f899235930b61a72fdc7b2d4b7f41193b16a15956b"
+  }
+}
