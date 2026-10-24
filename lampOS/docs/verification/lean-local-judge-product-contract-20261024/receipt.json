@@ -1,0 +1,131 @@
+{
+  "scope": "Fourth-owned Lean library and local Policy judge only; First retains Body/Policy unit/physical ownership",
+  "selected_release": 6592,
+  "release_source": "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46",
+  "current_sampled_source": "22b753df5db6434d21455f40f67926e0ecee9d91",
+  "source_comparisons": [
+    {
+      "path": "lampOS/crates/lean/Cargo.toml",
+      "sha256_by_commit": {
+        "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46": "01a2d6191ac67e2f07fd6d67b4dfdc7796c6e80b186138d84b5cfe0ad91c21c6",
+        "22b753df5db6434d21455f40f67926e0ecee9d91": "01a2d6191ac67e2f07fd6d67b4dfdc7796c6e80b186138d84b5cfe0ad91c21c6"
+      },
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/lean/src/lib.rs",
+      "sha256_by_commit": {
+        "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46": "e9f5fed013969fbd59d32fcc44d3742338b13ca903eff49d0d446439cf2cde8a",
+        "22b753df5db6434d21455f40f67926e0ecee9d91": "e9f5fed013969fbd59d32fcc44d3742338b13ca903eff49d0d446439cf2cde8a"
+      },
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/body/Cargo.toml",
+      "sha256_by_commit": {
+        "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46": "611ad97f3f8a30483b5b970fa9b5aa3657fd34e541238c2dcc46f500aa710227",
+        "22b753df5db6434d21455f40f67926e0ecee9d91": "611ad97f3f8a30483b5b970fa9b5aa3657fd34e541238c2dcc46f500aa710227"
+      },
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/body/src/cog.rs",
+      "sha256_by_commit": {
+        "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46": "276341f4088fa136c84afe55ba44e81f9f266119883051b44bf52d6208807451",
+        "22b753df5db6434d21455f40f67926e0ecee9d91": "276341f4088fa136c84afe55ba44e81f9f266119883051b44bf52d6208807451"
+      },
+      "identical": true
+    },
+    {
+      "path": "lampOS/deploy/lamp-4ace/lean-first-software.json",
+      "sha256_by_commit": {
+        "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46": "c78dda2dc87459e13e06171a7e1113fe41835ba5aa07bb71fe169e95faf3a8ad",
+        "22b753df5db6434d21455f40f67926e0ecee9d91": "c78dda2dc87459e13e06171a7e1113fe41835ba5aa07bb71fe169e95faf3a8ad"
+      },
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/policy/Cargo.toml",
+      "sha256_by_commit": {
+        "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46": "b1b4605a1ed8c783eee8a8aa746a16e07ae3c35212892b76bd52609f24a10e82",
+        "22b753df5db6434d21455f40f67926e0ecee9d91": "b1b4605a1ed8c783eee8a8aa746a16e07ae3c35212892b76bd52609f24a10e82"
+      },
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/policy/src/main.rs",
+      "sha256_by_commit": {
+        "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46": "8e35c386b6b1f90337a32fa3c09e0ba98adec3c26f048af708938223fb4d85a1",
+        "22b753df5db6434d21455f40f67926e0ecee9d91": "8e35c386b6b1f90337a32fa3c09e0ba98adec3c26f048af708938223fb4d85a1"
+      },
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/policy/src/policy/local.rs",
+      "sha256_by_commit": {
+        "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46": "4e177da620205b0df54d5033a28c6acb9ad9dd979828eaa7bdcb8a3a9f41e239",
+        "22b753df5db6434d21455f40f67926e0ecee9d91": "4e177da620205b0df54d5033a28c6acb9ad9dd979828eaa7bdcb8a3a9f41e239"
+      },
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/policy/src/bin/lamp-policy-judges.rs",
+      "sha256_by_commit": {
+        "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46": "aa1b62b28ece93096eaf5941483a9b7e6aa83180669068bff16a172aa999bc4b",
+        "22b753df5db6434d21455f40f67926e0ecee9d91": "aa1b62b28ece93096eaf5941483a9b7e6aa83180669068bff16a172aa999bc4b"
+      },
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/policy/src/bin/lamp-policy-fit.rs",
+      "sha256_by_commit": {
+        "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46": "db77bab79eea1d7180f4da0ee5acb2d713d626fc7a1a05adc9c95eb64dd72744",
+        "22b753df5db6434d21455f40f67926e0ecee9d91": "db77bab79eea1d7180f4da0ee5acb2d713d626fc7a1a05adc9c95eb64dd72744"
+      },
+      "identical": true
+    },
+    {
+      "path": "lampOS/deploy/product/lamp-policy.service",
+      "sha256_by_commit": {
+        "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46": "686df23f189912d88be530372e33c458a8ff326b5fc1708014ba3c3fb7f75aa2",
+        "22b753df5db6434d21455f40f67926e0ecee9d91": "686df23f189912d88be530372e33c458a8ff326b5fc1708014ba3c3fb7f75aa2"
+      },
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/policy/src/policy.rs",
+      "sha256_by_commit": {
+        "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46": "7389fe24bd32e93fee79a9686da036eabf55f36afa039e14ed177305c9a55f58",
+        "22b753df5db6434d21455f40f67926e0ecee9d91": "7389fe24bd32e93fee79a9686da036eabf55f36afa039e14ed177305c9a55f58"
+      },
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/policy/src/policy/judges.rs",
+      "sha256_by_commit": {
+        "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46": "0bc4a8c9e43a36c3ec00a2ebb95edb552bec78f060a874d520cd72b872d05dfb",
+        "22b753df5db6434d21455f40f67926e0ecee9d91": "0bc4a8c9e43a36c3ec00a2ebb95edb552bec78f060a874d520cd72b872d05dfb"
+      },
+      "identical": true
+    },
+    {
+      "path": "lampOS/deploy/product/lamp-body.service",
+      "sha256_by_commit": {
+        "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46": "ec1ccd4c9f5c63e7dd25880da09100d75d8c37687261d945e98fb08cc0808bfe",
+        "22b753df5db6434d21455f40f67926e0ecee9d91": "ec1ccd4c9f5c63e7dd25880da09100d75d8c37687261d945e98fb08cc0808bfe"
+      },
+      "identical": true
+    }
+  ],
+  "sampled": 14,
+  "identical": 14,
+  "lean_library_only": true,
+  "body_is_lean_consumer": true,
+  "lean_geometry_is_embedded_v1_model_not_device_measurement": true,
+  "product_policy_argv_has_no_rules_or_rule_decides_or_act_or_local_judge_cli": true,
+  "manifest_descriptor_names_for_lean_policy": [
+    "lamp-policy"
+  ],
+  "device_access": false,
+  "new_test_or_latency_claim": false
+}

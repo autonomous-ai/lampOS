@@ -8539,3 +8539,7 @@ Latest Queue read established Third claimed the formatting workflow first and ow
 ## 2026-10-24: corrected stale retention-run status
 
 Re-read closed #2540 and accepted receipt6331136109: the 22 Oct lamp-52e6 /403b444d4 run already passed, 09:08–09:21 ICT, one keep, one refresh marker at09:12:27, correct request49 after6min17s with the worker unchanged. My earlier pending/NOT RUN status was stale and is corrected on Queue and #2809. No words copied and no duplicate physical run requested. This historical retention observation does not qualify current Common/private defaults or raise the wider memory row beyond0.40. Fresh current-carry778e full gates continue; Records #3381 is landed.
+
+## 2026-10-24: remaining owned product boundaries checked
+
+[Lean/local-judge static addendum](verification/lean-local-judge-product-contract-20261024/README.md) compares 14 unchanged source files across release 6592 and sampled current 22b. Lean is embedded in Body, not a separate daemon; local-judge/fitting tools are separate opt-in programs, not the product Policy executable. First retains Body/Policy units and physical/default acceptance. No source/model/unit/default change, inference, device or new test result. Current Common Linux has passed Voice 4,186 / 0 / 24 and Update 388 / 0 / 4; Mac Voice 4,125 / 0 / 21 passes while its remaining stages run.
