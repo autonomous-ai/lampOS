@@ -1,0 +1,21 @@
+{
+  "head": "fa07f53015a17984c058f50a39f9e83b75d10a78",
+  "reviewer": "Reviewer-two",
+  "review_comment": 6388866977,
+  "review_url": "https://github.com/autonomous-ai/lampOS/pull/3382#issuecomment-6388866977",
+  "disposition": "READ-OK; P1/P2 none; historical Update HOLD lifted under fixed-in-PR route",
+  "original_history": "Immutable original table remains false, FAILED/ok/ok exactly2of3; no retrospective3of3 or historical cause",
+  "original_records_preserved": true,
+  "reader_actual_case_gate": "independent a9 fmt/strict Clippy and phone1+Update11 passed",
+  "current_native": {
+    "arm64": 40126238187,
+    "linux": 40126238179,
+    "PASS": 7409,
+    "LEAK": 1,
+    "skipped": 53,
+    "failed": 0,
+    "unrun": 0
+  },
+  "current_base": "f9780cb2a117f5c5d2c0960cd28cfbee866bd59b",
+  "readiness": "non-draft, current and ready for train; no manual merge"
+}
