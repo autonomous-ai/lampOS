@@ -1,0 +1,162 @@
+{
+  "worktree": "/private/tmp/third-controls-recording-stop",
+  "exclusive_target": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-controls-stop-target-hqfpb717",
+  "test_artifacts": [
+    {
+      "package_id": "path+file:///private/tmp/third-controls-recording-stop/lampOS/crates/controls#lamp-controls@0.1.0",
+      "src_path": "/private/tmp/third-controls-recording-stop/lampOS/crates/controls/src/lib.rs",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_controls",
+        "src_path": "/private/tmp/third-controls-recording-stop/lampOS/crates/controls/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-controls-stop-target-hqfpb717/debug/deps/lamp_controls-fd6539c48cdd5c79",
+      "executable_sha256": "f4b293e5ff6bdc58786e1a4644f9689fdead1e5c8a75730a9f670ad6285895d1",
+      "dep_info": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-controls-stop-target-hqfpb717/debug/deps/lamp_controls-fd6539c48cdd5c79.d",
+      "dep_info_sha256": "a4f36f3fd49e226a28e7f1cd80847a24f7c2ea36ecb1c8a1ded1d2a1cda89bab",
+      "source_entry_matches_frozen_map": true
+    },
+    {
+      "package_id": "path+file:///private/tmp/third-controls-recording-stop/lampOS/crates/controls#lamp-controls@0.1.0",
+      "src_path": "/private/tmp/third-controls-recording-stop/lampOS/crates/controls/src/main.rs",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-controls",
+        "src_path": "/private/tmp/third-controls-recording-stop/lampOS/crates/controls/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-controls-stop-target-hqfpb717/debug/deps/lamp_controls-b7486678d2d472a7",
+      "executable_sha256": "65ef8d2e536ae16bc56e547e937c361ebc0f4760ba380d80012ebed4614b88e1",
+      "dep_info": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-controls-stop-target-hqfpb717/debug/deps/lamp_controls-b7486678d2d472a7.d",
+      "dep_info_sha256": "b598ca38c91d8596c4d180ac18448987458610a6b8244bf048f3c5b68e213e94",
+      "source_entry_matches_frozen_map": true
+    },
+    {
+      "package_id": "path+file:///private/tmp/third-controls-recording-stop/lampOS/crates/controls#lamp-controls@0.1.0",
+      "src_path": "/private/tmp/third-controls-recording-stop/lampOS/crates/controls/tests/strip_worker.rs",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "strip_worker",
+        "src_path": "/private/tmp/third-controls-recording-stop/lampOS/crates/controls/tests/strip_worker.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-controls-stop-target-hqfpb717/debug/deps/strip_worker-e9fb0eba02e3f1f4",
+      "executable_sha256": "3e483579ee57a2bddcf2550f735c4da827fffd97e397007c155d1c265796b9f7",
+      "dep_info": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-controls-stop-target-hqfpb717/debug/deps/strip_worker-e9fb0eba02e3f1f4.d",
+      "dep_info_sha256": "f2a0d1611446c525249d40675f5fd9fc9699ac913171a1d3dce7955244ddfa4e",
+      "source_entry_matches_frozen_map": true
+    },
+    {
+      "package_id": "path+file:///private/tmp/third-controls-recording-stop/lampOS/crates/controls#lamp-controls@0.1.0",
+      "src_path": "/private/tmp/third-controls-recording-stop/lampOS/crates/controls/tests/release_pair.rs",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "release_pair",
+        "src_path": "/private/tmp/third-controls-recording-stop/lampOS/crates/controls/tests/release_pair.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-controls-stop-target-hqfpb717/debug/deps/release_pair-5c0d33014f2e397c",
+      "executable_sha256": "dd8175e683396b32002ed9f9395dcc02690acec1a83e623e9d8afb00b8cdba55",
+      "dep_info": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-controls-stop-target-hqfpb717/debug/deps/release_pair-5c0d33014f2e397c.d",
+      "dep_info_sha256": "3311c25577c60c38ec7f85af45510bdec9bf1761cf334be0774a86615ff775a1",
+      "source_entry_matches_frozen_map": true
+    },
+    {
+      "package_id": "path+file:///private/tmp/third-controls-recording-stop/lampOS/crates/controls#lamp-controls@0.1.0",
+      "src_path": "/private/tmp/third-controls-recording-stop/lampOS/crates/controls/tests/it/main.rs",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/third-controls-recording-stop/lampOS/crates/controls/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-controls-stop-target-hqfpb717/debug/deps/it-ff4d642a0ba9df2d",
+      "executable_sha256": "35139b9bc09566d91ec1cb246780b2ce545752307497b40f67d53f9c17094f36",
+      "dep_info": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-controls-stop-target-hqfpb717/debug/deps/it-ff4d642a0ba9df2d.d",
+      "dep_info_sha256": "bcb09bb61d733011b272c99e42f56cbaa6c91427d76da30f00fb3d7d1c0b070d",
+      "source_entry_matches_frozen_map": true
+    }
+  ],
+  "scope": "Post-compile snapshot of the exact Cargo test invocation compiler records, executable hashes and dep-info. Target exclusive to this worktree, no cross-root/compiler-target reuse. Same-worktree prior cache reuse permitted and fresh flags retained; no all-fresh or historical-hash claim. Complete frozen sources separately checked against committed blobs/modes."
+}
