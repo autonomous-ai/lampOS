@@ -1,0 +1,16 @@
+{
+  "authored_head": "22bf27d34156bb18eb3232dcd53cb8d5931fbe06",
+  "file_count": 6974,
+  "unique_blob_count": 5863,
+  "source_before_sha256": "9e3561d0c94ca99801032da5075b3098d4b48e4741f30bfd39ca4bf0a9cfd717",
+  "source_after_sha256": "9e3561d0c94ca99801032da5075b3098d4b48e4741f30bfd39ca4bf0a9cfd717",
+  "authored_manifest_sha256": "9e3561d0c94ca99801032da5075b3098d4b48e4741f30bfd39ca4bf0a9cfd717",
+  "all_paths_and_hashes_match": true,
+  "missing": [],
+  "extra": [],
+  "changed": [],
+  "method": "Every authored lampOS Git blob read through offline git cat-file --batch; complete paths and SHA-256s compared to both native manifests.",
+  "changes_from_8bc821736": [
+    "lampOS/docs/verification/rested-state-release-pair-20261024/README.md"
+  ]
+}
