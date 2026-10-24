@@ -229,6 +229,10 @@ The loops in work-split.md, in short, with the names from your role file:
    above for every crate and target at once, on x86 Linux
    (`.github/workflows/lampos-clippy.yml`): a crate your change breaks shows
    there even when your ARM64 run doesn't build it. It has to be green too.
+   That same x86 Linux job installs rustfmt and runs
+   `cargo +1.96.0 fmt --all --check` before restoring build caches or
+   running Clippy. A formatting failure fails the required job; successful
+   compilation or linting alone is not a Linux formatting result.
 5. **Run on the lamp**, if you have one: install as above, `sudo sync`, run,
    keep the raw readings.
 6. **Pull request.** When the task is finished and shown, open a pull
