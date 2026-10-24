@@ -1,0 +1,231 @@
+[
+    {
+        "Id": "2b0a5d2a6f30043bbe3ad3db2c2bf0ae6f2fd9f238c8fbe680bcf29a7a9f9695",
+        "Created": "2026-10-24T07:58:46.688086693Z",
+        "Path": "/bin/bash",
+        "Args": [
+            "--noprofile",
+            "--norc",
+            "-c",
+            "set -euo pipefail\numask 077\nmkdir -m 0700 /tmp/pair-output /tmp/pair-input\nexec 3>&1\nexec > /tmp/pair-output/runtime.txt 2>&1\ncollect() {\n  runtime_status=$?\n  trap - EXIT\n  set +e\n  printf '%s\\n' \"$runtime_status\" > /tmp/pair-output/runtime-exit.txt\n  roots=(tmp/pair-output)\n  for path in var/lib/lampOS var/lib/lampos-skills-state; do\n    if [ -d \"/$path\" ]; then roots+=(\"$path\"); fi\n  done\n  cd /\n  find \"${roots[@]}\" -type f \\\n    ! -name lamp-skills-6408 ! -name lamp-skills-6498 \\\n    ! -name lamp-cloud-6408 ! -name lamp-cloud-6498 -print0 \\\n    | LC_ALL=C sort -z > /tmp/evidence-files\n  list_status=$?\n  if [ \"$list_status\" -ne 0 ]; then exit 97; fi\n  timeout --kill-after=5s 30s tar --null --verbatim-files-from -T /tmp/evidence-files -czf - >&3\n  archive_status=$?\n  if [ \"$archive_status\" -ne 0 ]; then exit 98; fi\n  exit \"$runtime_status\"\n}\ntrap collect EXIT\ntest \"$(id -u)\" = 0\ntest \"$(uname -m)\" = aarch64\ntar --no-same-owner -xf - -C /tmp/pair-input\n(\n  cd /tmp/pair-input\n  sha256sum --check --strict SHA256SUMS\n)\ncp /tmp/pair-input/SHA256SUMS /tmp/pair-output/verified-inputs.sha256\nfor binary in /tmp/pair-input/cloud-release-pair /tmp/pair-input/lamp-*; do\n  timeout 20s ldd \"$binary\" > \"/tmp/pair-output/$(basename \"$binary\").ldd.txt\" 2>&1\n  ! grep -q 'not found' \"/tmp/pair-output/$(basename \"$binary\").ldd.txt\"\ndone\nprintf 'lamp-cloud-provenance-pair network-none tmpfs-v1\\n' > /run/lamp-cloud-pair-isolated\nchmod 0400 /run/lamp-cloud-pair-isolated\ntest ! -e /var/lib/lampOS && test ! -e /var/lib/lampos-skills-state\nset +e\ntimeout --signal=TERM --kill-after=5s 300s /tmp/pair-input/cloud-release-pair \\\n  --ignored --nocapture --test-threads=1 > /tmp/pair-output/tests.txt 2>&1\ntest_status=$?\nset -e\nprintf '%s\\n' \"$test_status\" > /tmp/pair-output/test-exit.txt\ntest \"$test_status\" = 0 || exit \"$test_status\"\ntest ! -e /var/lib/lampOS && test ! -e /var/lib/lampos-skills-state\nprintf 'fixed_paths_absent=true\\n' > /tmp/pair-output/fixed-paths-after.txt\n(\n  cd /tmp/pair-input\n  sha256sum --check --strict SHA256SUMS\n)"
+        ],
+        "State": {
+            "Status": "created",
+            "Running": false,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 0,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "0001-01-01T00:00:00Z",
+            "FinishedAt": "0001-01-01T00:00:00Z"
+        },
+        "Image": "sha256:bc626df99ee31b6aaa3a76cfe6dc384d3754b4da2f2c3ff8a33f999bf5ff8e85",
+        "ResolvConfPath": "",
+        "HostnamePath": "",
+        "HostsPath": "",
+        "LogPath": "",
+        "Name": "/cloud-provenance-40075952499-1",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": null,
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "none",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "no",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": null,
+            "CapDrop": [
+                "ALL"
+            ],
+            "CgroupnsMode": "private",
+            "Dns": [],
+            "DnsOptions": [],
+            "DnsSearch": [],
+            "ExtraHosts": null,
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": true,
+            "SecurityOpt": [
+                "no-new-privileges"
+            ],
+            "Tmpfs": {
+                "/run": "rw,noexec,nosuid,nodev,size=16m,mode=0700",
+                "/tmp": "rw,exec,nosuid,nodev,size=1536m,mode=0700",
+                "/var/lib": "rw,noexec,nosuid,nodev,size=256m,mode=0700"
+            },
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 2147483648,
+            "NanoCpus": 2000000000,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": [],
+            "BlkioDeviceReadBps": [],
+            "BlkioDeviceWriteBps": [],
+            "BlkioDeviceReadIOps": [],
+            "BlkioDeviceWriteIOps": [],
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": [],
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "MemoryReservation": 0,
+            "MemorySwap": 4294967296,
+            "MemorySwappiness": null,
+            "OomKillDisable": false,
+            "PidsLimit": 128,
+            "Ulimits": [],
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": [
+                "/proc/asound",
+                "/proc/acpi",
+                "/proc/interrupts",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/sys/firmware",
+                "/sys/devices/virtual/powercap"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ],
+            "Init": true
+        },
+        "GraphDriver": {
+            "Data": {
+                "ID": "2b0a5d2a6f30043bbe3ad3db2c2bf0ae6f2fd9f238c8fbe680bcf29a7a9f9695",
+                "LowerDir": "/var/lib/docker/overlay2/04ce8325f2c8f3aff0a181eccd9c350f07595eefa86480752a3f800e83464d5c-init/diff:/var/lib/docker/overlay2/8iix87zrils5cuch86xenrape/diff:/var/lib/docker/overlay2/bb97a81695e5d93b58c122bc25faf816368b397e4393ddce2ad9141b7c3968c0/diff:/var/lib/docker/overlay2/e298601a672d6889d511a1652f107e36650a708bd02e321c87afa26b4315e335/diff:/var/lib/docker/overlay2/7974e8deae6e7409fa9d69e83d6d47c9f622294965cf5d7b641ed1123d476e90/diff:/var/lib/docker/overlay2/881d59f4763dbb761db63ee1da9c830951220bd6d3027774f89ca1cda74211c9/diff:/var/lib/docker/overlay2/04d389492810182f9fd902b486c76506ea9a1b57f011fc31b854b0c91940f0f4/diff",
+                "MergedDir": "/var/lib/docker/overlay2/04ce8325f2c8f3aff0a181eccd9c350f07595eefa86480752a3f800e83464d5c/merged",
+                "UpperDir": "/var/lib/docker/overlay2/04ce8325f2c8f3aff0a181eccd9c350f07595eefa86480752a3f800e83464d5c/diff",
+                "WorkDir": "/var/lib/docker/overlay2/04ce8325f2c8f3aff0a181eccd9c350f07595eefa86480752a3f800e83464d5c/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [],
+        "Config": {
+            "Hostname": "cloud-provenance-pair",
+            "Domainname": "",
+            "User": "0:0",
+            "AttachStdin": true,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "Tty": false,
+            "OpenStdin": true,
+            "StdinOnce": true,
+            "Env": [
+                "LAMP_COMPAT_OUTPUT=/tmp/pair-output",
+                "LAMP_COMPAT_SKILLS_6408=/tmp/pair-input/lamp-skills-6408",
+                "LAMP_COMPAT_SKILLS_6498=/tmp/pair-input/lamp-skills-6498",
+                "LAMP_COMPAT_CLOUD_6408=/tmp/pair-input/lamp-cloud-6408",
+                "LAMP_COMPAT_CLOUD_6498=/tmp/pair-input/lamp-cloud-6498",
+                "PATH=/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "RUSTUP_HOME=/usr/local/rustup",
+                "CARGO_HOME=/usr/local/cargo",
+                "RUST_VERSION=1.96.0"
+            ],
+            "Cmd": [
+                "--noprofile",
+                "--norc",
+                "-c",
+                "set -euo pipefail\numask 077\nmkdir -m 0700 /tmp/pair-output /tmp/pair-input\nexec 3>&1\nexec > /tmp/pair-output/runtime.txt 2>&1\ncollect() {\n  runtime_status=$?\n  trap - EXIT\n  set +e\n  printf '%s\\n' \"$runtime_status\" > /tmp/pair-output/runtime-exit.txt\n  roots=(tmp/pair-output)\n  for path in var/lib/lampOS var/lib/lampos-skills-state; do\n    if [ -d \"/$path\" ]; then roots+=(\"$path\"); fi\n  done\n  cd /\n  find \"${roots[@]}\" -type f \\\n    ! -name lamp-skills-6408 ! -name lamp-skills-6498 \\\n    ! -name lamp-cloud-6408 ! -name lamp-cloud-6498 -print0 \\\n    | LC_ALL=C sort -z > /tmp/evidence-files\n  list_status=$?\n  if [ \"$list_status\" -ne 0 ]; then exit 97; fi\n  timeout --kill-after=5s 30s tar --null --verbatim-files-from -T /tmp/evidence-files -czf - >&3\n  archive_status=$?\n  if [ \"$archive_status\" -ne 0 ]; then exit 98; fi\n  exit \"$runtime_status\"\n}\ntrap collect EXIT\ntest \"$(id -u)\" = 0\ntest \"$(uname -m)\" = aarch64\ntar --no-same-owner -xf - -C /tmp/pair-input\n(\n  cd /tmp/pair-input\n  sha256sum --check --strict SHA256SUMS\n)\ncp /tmp/pair-input/SHA256SUMS /tmp/pair-output/verified-inputs.sha256\nfor binary in /tmp/pair-input/cloud-release-pair /tmp/pair-input/lamp-*; do\n  timeout 20s ldd \"$binary\" > \"/tmp/pair-output/$(basename \"$binary\").ldd.txt\" 2>&1\n  ! grep -q 'not found' \"/tmp/pair-output/$(basename \"$binary\").ldd.txt\"\ndone\nprintf 'lamp-cloud-provenance-pair network-none tmpfs-v1\\n' > /run/lamp-cloud-pair-isolated\nchmod 0400 /run/lamp-cloud-pair-isolated\ntest ! -e /var/lib/lampOS && test ! -e /var/lib/lampos-skills-state\nset +e\ntimeout --signal=TERM --kill-after=5s 300s /tmp/pair-input/cloud-release-pair \\\n  --ignored --nocapture --test-threads=1 > /tmp/pair-output/tests.txt 2>&1\ntest_status=$?\nset -e\nprintf '%s\\n' \"$test_status\" > /tmp/pair-output/test-exit.txt\ntest \"$test_status\" = 0 || exit \"$test_status\"\ntest ! -e /var/lib/lampOS && test ! -e /var/lib/lampos-skills-state\nprintf 'fixed_paths_absent=true\\n' > /tmp/pair-output/fixed-paths-after.txt\n(\n  cd /tmp/pair-input\n  sha256sum --check --strict SHA256SUMS\n)"
+            ],
+            "Image": "sha256:bc626df99ee31b6aaa3a76cfe6dc384d3754b4da2f2c3ff8a33f999bf5ff8e85",
+            "Volumes": null,
+            "WorkingDir": "",
+            "Entrypoint": [
+                "/bin/bash"
+            ],
+            "OnBuild": null,
+            "Labels": {
+                "lamp.compat.owner": "cloud-provenance-40075952499-1",
+                "org.opencontainers.image.source": "https://github.com/rust-lang/docker-rust"
+            },
+            "StopTimeout": 5
+        },
+        "NetworkSettings": {
+            "Bridge": "",
+            "SandboxID": "",
+            "SandboxKey": "",
+            "Ports": {},
+            "HairpinMode": false,
+            "LinkLocalIPv6Address": "",
+            "LinkLocalIPv6PrefixLen": 0,
+            "SecondaryIPAddresses": null,
+            "SecondaryIPv6Addresses": null,
+            "EndpointID": "",
+            "Gateway": "",
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "IPAddress": "",
+            "IPPrefixLen": 0,
+            "IPv6Gateway": "",
+            "MacAddress": "",
+            "Networks": {
+                "none": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": null,
+                    "MacAddress": "",
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "",
+                    "EndpointID": "",
+                    "Gateway": "",
+                    "IPAddress": "",
+                    "IPPrefixLen": 0,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": null
+                }
+            }
+        }
+    }
+]

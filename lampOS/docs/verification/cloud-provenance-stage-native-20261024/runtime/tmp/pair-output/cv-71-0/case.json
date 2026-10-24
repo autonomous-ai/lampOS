@@ -1,0 +1,57 @@
+{
+  "artifacts": [
+    {
+      "bytes": 8807104,
+      "part": "skills",
+      "release": 6408,
+      "sha256": "2c6bc8f34c9fd4a56784a54fa2d03b1e76be9d1833ccf37db905f88dba67d3d5"
+    },
+    {
+      "bytes": 10802168,
+      "part": "cloud",
+      "release": 6408,
+      "sha256": "9f3abad362555ad11177bdf41706e91d740bca8689928a8555c4ce3f257fc664"
+    },
+    {
+      "bytes": 8786048,
+      "part": "skills",
+      "release": 6498,
+      "sha256": "87e500127793db88df8bcd7af793879faeee95f36a8e0d2ef8483c59fef26984"
+    },
+    {
+      "bytes": 10804480,
+      "part": "cloud",
+      "release": 6498,
+      "sha256": "6d4d566d837dad9df137b475557f330deb62a84405128b879686368a9de30bf4"
+    }
+  ],
+  "cloud_stages": {
+    "opposite-cloud": 6408,
+    "original-cloud": 6498,
+    "return-cloud": 6408
+  },
+  "distinct_cloud_payloads": true,
+  "excluded": [
+    "accounts and remote MQTT",
+    "HTTP/provider",
+    "hardware",
+    "Store signature trust",
+    "updater",
+    "new schema policy",
+    "power-loss durability"
+  ],
+  "identical_provenance_parser": true,
+  "isolation_marker": "/run/lamp-cloud-pair-isolated",
+  "network": "loopback only; no default route",
+  "off_path": "/var/lib/lampos-skills-state/off",
+  "reader": 6408,
+  "skills_path": "/var/lib/lampOS/skills",
+  "skills_stages": {
+    "install-a": 6498,
+    "install-b": 6408,
+    "pack-a": 6498,
+    "pack-b": 6408
+  },
+  "test": "release_6408_cloud_reads_6498_packages_and_6498_reads_the_replacement",
+  "writer": 6498
+}
