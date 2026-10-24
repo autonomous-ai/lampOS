@@ -1,0 +1,528 @@
+{
+  "foreign_key_check": [],
+  "integrity_check": [
+    [
+      "ok"
+    ]
+  ],
+  "original_archive_path": "lm-pair-3-0/store/memory-days.sqlite3",
+  "original_bytes": 114688,
+  "original_sha256": "f4b94191daf1d07f78f6c8a20773534b5696ce971e57c9dca43683a4a59ca9d3",
+  "representation": "Complete logical schemas/columns/observed rows, not raw database bytes. Individual SQLite BLOB cells use hex plus digest/size; the binary database is not re-encoded.",
+  "row_order": "Observed SELECT order, not a database ordering contract",
+  "sql_restore_claimed": false,
+  "tables": [
+    {
+      "columns": [
+        "rid",
+        "person",
+        "id",
+        "kind",
+        "at_unix_ms",
+        "day",
+        "heard",
+        "said",
+        "text",
+        "category",
+        "used_unix_ms",
+        "active"
+      ],
+      "name": "entries",
+      "rows": [
+        [
+          5,
+          "p-2222222222222222",
+          1,
+          "kept",
+          1792829869151,
+          "2026-10-24",
+          "",
+          "",
+          "pair other scope",
+          null,
+          1792829869406,
+          1
+        ],
+        [
+          6,
+          "everyone",
+          1,
+          "kept",
+          1792829869151,
+          "2026-10-24",
+          "",
+          "",
+          "pair room scope",
+          null,
+          1792829869409,
+          1
+        ],
+        [
+          9,
+          "p-1111111111111111",
+          6,
+          "kept",
+          1792829869151,
+          "2026-10-24",
+          "",
+          "",
+          "pair final fresh fact",
+          null,
+          1792829870022,
+          1
+        ]
+      ],
+      "schema": "CREATE TABLE entries (\n    rid INTEGER PRIMARY KEY AUTOINCREMENT,\n    person TEXT NOT NULL REFERENCES people(person),\n    id INTEGER NOT NULL,\n    kind TEXT NOT NULL CHECK(kind IN ('exchange','kept','observation')),\n    at_unix_ms INTEGER NOT NULL,\n    day TEXT NOT NULL,\n    heard TEXT NOT NULL DEFAULT '',\n    said TEXT NOT NULL DEFAULT '',\n    text TEXT NOT NULL DEFAULT '',\n    category TEXT,\n    used_unix_ms INTEGER NOT NULL,\n    active INTEGER NOT NULL DEFAULT 1,\n    UNIQUE(person,id)\n)"
+    },
+    {
+      "columns": [
+        "rid",
+        "day"
+      ],
+      "name": "event_days",
+      "rows": [],
+      "schema": "CREATE TABLE event_days (\n    rid INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE,\n    day TEXT NOT NULL\n)"
+    },
+    {
+      "columns": [
+        "rid",
+        "person",
+        "offers",
+        "offered_unix_ms"
+      ],
+      "name": "follow_up_offers",
+      "rows": [],
+      "schema": "CREATE TABLE follow_up_offers (\n    rid INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE,\n    person TEXT NOT NULL,\n    offers INTEGER NOT NULL,\n    offered_unix_ms INTEGER NOT NULL\n)"
+    },
+    {
+      "columns": [
+        "rid",
+        "person",
+        "asked_unix_ms"
+      ],
+      "name": "follow_ups",
+      "rows": [],
+      "schema": "CREATE TABLE follow_ups (\n    rid INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE,\n    person TEXT NOT NULL,\n    asked_unix_ms INTEGER NOT NULL\n)"
+    },
+    {
+      "columns": [
+        "job",
+        "person",
+        "conversation",
+        "generation",
+        "at_unix_ms",
+        "state",
+        "input",
+        "result"
+      ],
+      "name": "jobs",
+      "rows": [],
+      "schema": "CREATE TABLE jobs (\n    job INTEGER PRIMARY KEY AUTOINCREMENT,\n    person TEXT NOT NULL REFERENCES people(person),\n    conversation TEXT NOT NULL,\n    generation INTEGER NOT NULL,\n    at_unix_ms INTEGER NOT NULL,\n    state TEXT NOT NULL CHECK(state IN ('pending','done')),\n    input TEXT NOT NULL DEFAULT '',\n    result TEXT NOT NULL DEFAULT '[]',\n    UNIQUE(person,conversation)\n)"
+    },
+    {
+      "columns": [
+        "person",
+        "next_id",
+        "generation",
+        "skipped"
+      ],
+      "name": "people",
+      "rows": [
+        [
+          "p-1111111111111111",
+          7,
+          2,
+          0
+        ],
+        [
+          "p-2222222222222222",
+          2,
+          0,
+          0
+        ],
+        [
+          "everyone",
+          2,
+          0,
+          0
+        ],
+        [
+          "r-1111111111111111",
+          2,
+          1,
+          0
+        ]
+      ],
+      "schema": "CREATE TABLE people (\n    person TEXT PRIMARY KEY,\n    next_id INTEGER NOT NULL DEFAULT 1,\n    generation INTEGER NOT NULL DEFAULT 0,\n    skipped INTEGER NOT NULL DEFAULT 0\n)"
+    },
+    {
+      "columns": [
+        "newer",
+        "older"
+      ],
+      "name": "replacements",
+      "rows": [],
+      "schema": "CREATE TABLE replacements (\n    newer INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE,\n    older INTEGER NOT NULL UNIQUE REFERENCES entries(rid) ON DELETE CASCADE\n)"
+    },
+    {
+      "columns": [
+        "body"
+      ],
+      "name": "search",
+      "rows": [
+        [
+          "  pair other scope"
+        ],
+        [
+          "  pair room scope"
+        ],
+        [
+          "  pair final fresh fact"
+        ]
+      ],
+      "schema": "CREATE VIRTUAL TABLE search USING fts5(\n    body, tokenize='unicode61 remove_diacritics 2'\n)"
+    },
+    {
+      "columns": [
+        "k",
+        "v"
+      ],
+      "name": "search_config",
+      "rows": [
+        [
+          "secure-delete",
+          1
+        ],
+        [
+          "version",
+          5
+        ]
+      ],
+      "schema": "CREATE TABLE 'search_config'(k PRIMARY KEY, v) WITHOUT ROWID"
+    },
+    {
+      "columns": [
+        "id",
+        "c0"
+      ],
+      "name": "search_content",
+      "rows": [
+        [
+          5,
+          "  pair other scope"
+        ],
+        [
+          6,
+          "  pair room scope"
+        ],
+        [
+          9,
+          "  pair final fresh fact"
+        ]
+      ],
+      "schema": "CREATE TABLE 'search_content'(id INTEGER PRIMARY KEY, c0)"
+    },
+    {
+      "columns": [
+        "id",
+        "block"
+      ],
+      "name": "search_data",
+      "rows": [
+        [
+          1,
+          {
+            "bytes": 2,
+            "sha256": "323b730f87b4e7cc0948351a1c11b757b3026cda6784282576757bca21f12483",
+            "sqlite_blob_hex": "030a"
+          }
+        ],
+        [
+          10,
+          {
+            "bytes": 36,
+            "sha256": "b0feae37e81d591f7374a63a760bc2a2f799b819209201c1201856f571c7d6b2",
+            "sqlite_blob_hex": "000000040109090009010101020101030101040101050101060101070101080101090101"
+          }
+        ],
+        [
+          137438953473,
+          {
+            "bytes": 4,
+            "sha256": "1bc5d0e3df0ea12c4d0078668d14924f95106bbe173e196de50fe13a900b0937",
+            "sqlite_blob_hex": "00000004"
+          }
+        ],
+        [
+          274877906945,
+          {
+            "bytes": 4,
+            "sha256": "1bc5d0e3df0ea12c4d0078668d14924f95106bbe173e196de50fe13a900b0937",
+            "sqlite_blob_hex": "00000004"
+          }
+        ],
+        [
+          412316860417,
+          {
+            "bytes": 4,
+            "sha256": "1bc5d0e3df0ea12c4d0078668d14924f95106bbe173e196de50fe13a900b0937",
+            "sqlite_blob_hex": "00000004"
+          }
+        ],
+        [
+          549755813889,
+          {
+            "bytes": 4,
+            "sha256": "1bc5d0e3df0ea12c4d0078668d14924f95106bbe173e196de50fe13a900b0937",
+            "sqlite_blob_hex": "00000004"
+          }
+        ],
+        [
+          687194767361,
+          {
+            "bytes": 36,
+            "sha256": "794be41b82295daab79fda440bb011d14efd5473949e0e446f3e9c532c0e5555",
+            "sqlite_blob_hex": "0000002106306f74686572050203010470616972050202010573636f7065050204040a09"
+          }
+        ],
+        [
+          824633720833,
+          {
+            "bytes": 35,
+            "sha256": "818bfc34ec80453867c44ccb26922f254484f5b16d9b1c077e223389e5033fa7",
+            "sqlite_blob_hex": "000000200530706169720602020104726f6f6d060203010573636f7065060204040909"
+          }
+        ],
+        [
+          962072674305,
+          {
+            "bytes": 4,
+            "sha256": "1bc5d0e3df0ea12c4d0078668d14924f95106bbe173e196de50fe13a900b0937",
+            "sqlite_blob_hex": "00000004"
+          }
+        ],
+        [
+          1099511627777,
+          {
+            "bytes": 4,
+            "sha256": "1bc5d0e3df0ea12c4d0078668d14924f95106bbe173e196de50fe13a900b0937",
+            "sqlite_blob_hex": "00000004"
+          }
+        ],
+        [
+          1236950581249,
+          {
+            "bytes": 44,
+            "sha256": "42f69c0c7b920975591d21833ba5028061c3fcf37672a25d1b7499d6dd62ce65",
+            "sqlite_blob_hex": "000000280530666163740902050204696e616c09020302047265736809020401047061697209020204090909"
+          }
+        ]
+      ],
+      "schema": "CREATE TABLE 'search_data'(id INTEGER PRIMARY KEY, block BLOB)"
+    },
+    {
+      "columns": [
+        "id",
+        "sz"
+      ],
+      "name": "search_docsize",
+      "rows": [
+        [
+          5,
+          {
+            "bytes": 1,
+            "sha256": "084fed08b978af4d7d196a7446a86b58009e636b611db16211b65a9aadff29c5",
+            "sqlite_blob_hex": "03"
+          }
+        ],
+        [
+          6,
+          {
+            "bytes": 1,
+            "sha256": "084fed08b978af4d7d196a7446a86b58009e636b611db16211b65a9aadff29c5",
+            "sqlite_blob_hex": "03"
+          }
+        ],
+        [
+          9,
+          {
+            "bytes": 1,
+            "sha256": "e52d9c508c502347344d8c07ad91cbd6068afc75ff6292f062a09ca381c89e71",
+            "sqlite_blob_hex": "04"
+          }
+        ]
+      ],
+      "schema": "CREATE TABLE 'search_docsize'(id INTEGER PRIMARY KEY, sz BLOB)"
+    },
+    {
+      "columns": [
+        "segid",
+        "term",
+        "pgno"
+      ],
+      "name": "search_idx",
+      "rows": [
+        [
+          1,
+          {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sqlite_blob_hex": ""
+          },
+          2
+        ],
+        [
+          2,
+          {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sqlite_blob_hex": ""
+          },
+          2
+        ],
+        [
+          3,
+          {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sqlite_blob_hex": ""
+          },
+          2
+        ],
+        [
+          4,
+          {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sqlite_blob_hex": ""
+          },
+          2
+        ],
+        [
+          5,
+          {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sqlite_blob_hex": ""
+          },
+          2
+        ],
+        [
+          6,
+          {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sqlite_blob_hex": ""
+          },
+          2
+        ],
+        [
+          7,
+          {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sqlite_blob_hex": ""
+          },
+          2
+        ],
+        [
+          8,
+          {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sqlite_blob_hex": ""
+          },
+          2
+        ],
+        [
+          9,
+          {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "sqlite_blob_hex": ""
+          },
+          2
+        ]
+      ],
+      "schema": "CREATE TABLE 'search_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID"
+    },
+    {
+      "columns": [
+        "person",
+        "session",
+        "opened_unix_ms",
+        "generation",
+        "max_bytes",
+        "note",
+        "ids",
+        "invalidated"
+      ],
+      "name": "sessions",
+      "rows": [
+        [
+          "p-1111111111111111",
+          "pair-session",
+          1792829869452,
+          0,
+          1200,
+          "",
+          "[]",
+          1
+        ],
+        [
+          "p-2222222222222222",
+          "pair-session",
+          1792829869462,
+          0,
+          1200,
+          "{\"facts\":[{\"id\":1,\"kind\":\"preference\",\"text\":\"pair other scope\"}],\"scope\":\"caller-supplied person; identity not verified\",\"untrusted\":true}",
+          "[1]",
+          0
+        ]
+      ],
+      "schema": "CREATE TABLE sessions (\n    person TEXT NOT NULL REFERENCES people(person),\n    session TEXT NOT NULL,\n    opened_unix_ms INTEGER NOT NULL,\n    generation INTEGER NOT NULL,\n    max_bytes INTEGER NOT NULL,\n    note TEXT NOT NULL,\n    ids TEXT NOT NULL,\n    invalidated INTEGER NOT NULL DEFAULT 0,\n    PRIMARY KEY(person,session)\n)"
+    },
+    {
+      "columns": [
+        "key",
+        "value"
+      ],
+      "name": "settings",
+      "rows": [
+        [
+          "import_complete",
+          1
+        ]
+      ],
+      "schema": "CREATE TABLE settings (\n    key TEXT PRIMARY KEY,\n    value INTEGER NOT NULL\n)"
+    },
+    {
+      "columns": [
+        "child",
+        "parent"
+      ],
+      "name": "sources",
+      "rows": [],
+      "schema": "CREATE TABLE sources (\n    child INTEGER NOT NULL REFERENCES entries(rid) ON DELETE CASCADE,\n    parent INTEGER NOT NULL REFERENCES entries(rid) ON DELETE CASCADE,\n    PRIMARY KEY(child,parent),\n    CHECK(child != parent)\n)"
+    },
+    {
+      "columns": [
+        "name",
+        "seq"
+      ],
+      "name": "sqlite_sequence",
+      "rows": [
+        [
+          "entries",
+          9
+        ]
+      ],
+      "schema": "CREATE TABLE sqlite_sequence(name,seq)"
+    }
+  ],
+  "user_version": [
+    [
+      1
+    ]
+  ]
+}

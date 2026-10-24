@@ -1,0 +1,201 @@
+[
+  {
+    "stage": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "timeout_seconds": 5400,
+    "container": null,
+    "pid": 91706,
+    "process_group": 91706,
+    "exit": 0,
+    "group_absent": true,
+    "elapsed_seconds": 20.585026192999976,
+    "summaries": []
+  },
+  {
+    "stage": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-memory",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "timeout_seconds": 5400,
+    "container": null,
+    "pid": 94470,
+    "process_group": 94470,
+    "exit": 0,
+    "group_absent": true,
+    "elapsed_seconds": 99.24032178499999,
+    "summaries": []
+  },
+  {
+    "stage": "full-memory",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--no-fail-fast",
+      "-p",
+      "lamp-memory",
+      "--",
+      "--format",
+      "pretty",
+      "--test-threads=1"
+    ],
+    "timeout_seconds": 5400,
+    "container": null,
+    "pid": 98863,
+    "process_group": 98863,
+    "exit": 0,
+    "group_absent": true,
+    "elapsed_seconds": 661.8258537989999,
+    "summaries": [
+      {
+        "status": "ok",
+        "passed": 96,
+        "failed": 0,
+        "ignored": 1
+      },
+      {
+        "status": "ok",
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 23,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 154,
+        "failed": 0,
+        "ignored": 5
+      },
+      {
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 2
+      },
+      {
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      }
+    ]
+  },
+  {
+    "stage": "workspace-build",
+    "command": [
+      "cargo",
+      "build",
+      "-q",
+      "--offline",
+      "--locked",
+      "--workspace"
+    ],
+    "timeout_seconds": 5400,
+    "container": null,
+    "pid": 67904,
+    "process_group": 67904,
+    "exit": 0,
+    "group_absent": true,
+    "elapsed_seconds": 308.3932671690002,
+    "summaries": []
+  }
+]

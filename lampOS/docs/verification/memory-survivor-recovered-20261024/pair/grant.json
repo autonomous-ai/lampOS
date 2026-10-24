@@ -1,0 +1,9 @@
+{
+  "authorized_by": "Fourth: reviewed exact driver and bounded exporter; verified all four Linux stages terminal0, complete source guards, exclusively released target and pinned assets",
+  "driver_sha256": "1f551d5b71416047d609e6b65f6519084725877bc0bbb6b146454acf9339af6f",
+  "frozen_sha256": "093e531ff779c1871f3c6d2392c14095393f868258392d60c4caadd66d7b8088",
+  "release_sha256": "f8b062d03e471648577bd76dff6ee7b22ef73b17cc13ee17193da4a337fc114d",
+  "released_by": "/private/tmp/fourth-memory-recovery-checks-20261024/linux-attempt2/terminal.json",
+  "runner_design_sha256": "8de2f27d725d98de8247dbc3842a9b3fd086dc1e1af488b6c6496a7dc16e3579",
+  "tree": "6b42fd91e4ed4e0e4b52194cbb257ac036f163a0"
+}

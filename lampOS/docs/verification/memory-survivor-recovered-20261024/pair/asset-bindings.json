@@ -1,0 +1,22 @@
+[
+  {
+    "bytes": 4738136,
+    "envelope_sha256": "696c6ae70a5cdf164c4a319bdc0887e5d1286519c36157a9c0c8db2cc0d80734",
+    "key": "54213f8d3aa2f241",
+    "payload_manifest_binding_only": true,
+    "release": "6408",
+    "sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+    "signature_trust_verified": false,
+    "source": "ee53765c8d014eb00e41c1a5a7054d2546c18bdb"
+  },
+  {
+    "bytes": 4738136,
+    "envelope_sha256": "2f8f218c41b74576b52451248f0df2f9251634bfc68658b42062282bc0c68a6a",
+    "key": "54213f8d3aa2f241",
+    "payload_manifest_binding_only": true,
+    "release": "6449",
+    "sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+    "signature_trust_verified": false,
+    "source": "be16c3327524ccef8a1908a3b8ebf40c16efba8a"
+  }
+]

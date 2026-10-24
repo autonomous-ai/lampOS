@@ -1,0 +1,22 @@
+{
+  "command": [
+    "cargo",
+    "clippy",
+    "-q",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-memory",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "timeout_seconds": 5400,
+  "container": null,
+  "pid": 94470,
+  "process_group": 94470,
+  "exit": 0,
+  "group_absent": true,
+  "elapsed_seconds": 99.24032178499999
+}

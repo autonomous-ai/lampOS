@@ -1,0 +1,14 @@
+{
+  "availability": "Original ENOSPC and missing-run receipts are historical observations in the committed work log; their unpublished raw files were lost when /private/tmp was cleared. They are not republished or represented as available here.",
+  "committed_loss_excerpt_sha256": "34e76245e20d5b37eda5b82706855f16a4acbe37db9879c72e2c1a5acb0eee21",
+  "historical_raw_evidence_commit": "c189a237e6",
+  "lost_local_records": [
+    "earlier strengthened41RPCrawpacket",
+    "Linux linker ENOSPC logs",
+    "Mac storage-full suite/runner logs",
+    "final pre-cleanup Mac retry outcome"
+  ],
+  "published_log_commit": "e7e79f1c02",
+  "published_prior_observation_comment": "https://github.com/autonomous-ai/lampOS/pull/3333#issuecomment-6381033155",
+  "qualification": "Only fresh recovered checks in this packet qualify this candidate; prior observed counts do not replace these receipts."
+}

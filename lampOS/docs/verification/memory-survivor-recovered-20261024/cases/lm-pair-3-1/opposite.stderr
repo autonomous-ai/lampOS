@@ -1,0 +1,19 @@
+lamp-memory: health reports off: no --bus-root
+lamp-memory: started memory_days=true; the model adapter is not configured
+lamp-memory: status person=everyone ok entries=0
+lamp-memory: search person=p-1111111111111111 ok entries=4
+lamp-memory: session_open person=p-1111111111111111 ok entries=0
+lamp-memory: session_open person=p-2222222222222222 ok entries=0
+lamp-memory: search person=p-2222222222222222 ok entries=1
+lamp-memory: search person=everyone ok entries=1
+lamp-memory: forget person=p-1111111111111111 ok entries=0
+lamp-memory: search person=p-1111111111111111 ok entries=1
+lamp-memory: search person=p-1111111111111111 ok entries=1
+lamp-memory: search person=p-2222222222222222 ok entries=1
+lamp-memory: search person=everyone ok entries=1
+lamp-memory: session_open person=p-1111111111111111 ok entries=0
+lamp-memory: session_open person=p-2222222222222222 ok entries=0
+lamp-memory: remember person=p-1111111111111111 ok entries=0
+lamp-memory: forget_person person=p-1111111111111111 ok entries=0
+lamp-memory: search person=p-2222222222222222 ok entries=1
+lamp-memory: search person=everyone ok entries=1

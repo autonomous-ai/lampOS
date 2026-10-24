@@ -1,0 +1,15 @@
+{
+  "command": [
+    "cargo",
+    "fmt",
+    "--all",
+    "--check"
+  ],
+  "timeout_seconds": 5400,
+  "container": null,
+  "pid": 91706,
+  "process_group": 91706,
+  "exit": 0,
+  "group_absent": true,
+  "elapsed_seconds": 20.585026192999976
+}

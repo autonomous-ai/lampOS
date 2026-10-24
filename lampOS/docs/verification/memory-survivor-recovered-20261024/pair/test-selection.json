@@ -1,0 +1,15 @@
+{
+  "named_pass_counts": {
+    "current_reads_release_6408_days_and_forget_survives_release_6408_reopen": 1,
+    "release_6408_reads_current_days_and_forget_survives_current_reopen": 1
+  },
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 0,
+      "ignored": 0,
+      "passed": 2,
+      "status": "ok"
+    }
+  ]
+}

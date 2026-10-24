@@ -1,0 +1,70 @@
+{
+  "archive_bytes": 286720,
+  "archive_sha256": "6619cb8d9c505c4f352d8aff546bf481e08dd29fbe117b9fffdf09607b4cd90d",
+  "cases": 2,
+  "errors": [],
+  "excluded_node_types": [
+    "s",
+    "s"
+  ],
+  "export.exit": 0,
+  "member_count": 18,
+  "omitted_inputs": [
+    {
+      "bytes": 4738136,
+      "case": "lm-pair-3-0",
+      "name": "memory-6408",
+      "sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb"
+    },
+    {
+      "bytes": 4738136,
+      "case": "lm-pair-3-0",
+      "name": "memory-6449",
+      "sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb"
+    },
+    {
+      "bytes": 4738136,
+      "case": "lm-pair-3-1",
+      "name": "memory-6408",
+      "sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb"
+    },
+    {
+      "bytes": 4738136,
+      "case": "lm-pair-3-1",
+      "name": "memory-6449",
+      "sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb"
+    }
+  ],
+  "passing_expected": true,
+  "regular_files": 14,
+  "rpc_counts": {
+    "lm-pair-3-0": 41,
+    "lm-pair-3-1": 41
+  },
+  "terminal_receipts": [
+    {
+      "identical_release_payloads": true,
+      "opposite_reader": "6449",
+      "physical_or_signature_acceptance": false,
+      "processes_reaped": 3,
+      "release_6408_sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+      "release_6449_sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+      "result": "passed",
+      "return_reader": "6408",
+      "writer": "6408"
+    },
+    {
+      "identical_release_payloads": true,
+      "opposite_reader": "6408",
+      "physical_or_signature_acceptance": false,
+      "processes_reaped": 3,
+      "release_6408_sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+      "release_6449_sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+      "result": "passed",
+      "return_reader": "6449",
+      "writer": "6449"
+    }
+  ],
+  "test.exit": 0,
+  "valid": true
+}

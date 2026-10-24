@@ -1,0 +1,100 @@
+[
+  {
+    "bytes": 888,
+    "mode": 420,
+    "path": "lm-pair-3-0/write.stderr",
+    "publication": "exact_text_bytes",
+    "sha256": "8ec5dcd5003e82257f125362f34dad9ba75e65cb5ef1155243a5b20cde5f8778"
+  },
+  {
+    "bytes": 1118,
+    "mode": 420,
+    "path": "lm-pair-3-0/opposite.stderr",
+    "publication": "exact_text_bytes",
+    "sha256": "f887e9c9bc8d2bea1c4f34e5c34dd9b0037ffe46f02647f692d91e5818c24e61"
+  },
+  {
+    "bytes": 761,
+    "mode": 420,
+    "path": "lm-pair-3-0/return.stderr",
+    "publication": "exact_text_bytes",
+    "sha256": "2af4c9a0c2af3c312c7f289da4dafe51bdaa2f6ad9a169c3d5fed13a3d51daef"
+  },
+  {
+    "bytes": 14335,
+    "mode": 420,
+    "path": "lm-pair-3-0/rpc.jsonl",
+    "publication": "exact_text_bytes",
+    "sha256": "e42088c2612ece4f35eac6175f520e4005995142635a89c5c23bb2e6c3589b4a"
+  },
+  {
+    "bytes": 394,
+    "mode": 420,
+    "path": "lm-pair-3-0/terminal.json",
+    "publication": "exact_text_bytes",
+    "sha256": "773e1a8eff4bdace010d8781a0ad5764c517a8ca64d1ae719430cde1366add5d"
+  },
+  {
+    "bytes": 6,
+    "mode": 384,
+    "path": "lm-pair-3-0/ready",
+    "publication": "exact_text_bytes",
+    "sha256": "ed1a545bb85e55816bbf9566b028b2a0bc456b88f49f6f266c0401048824194b"
+  },
+  {
+    "bytes": 114688,
+    "mode": 384,
+    "path": "lm-pair-3-0/store/memory-days.sqlite3",
+    "publication": "logical_sql_and_complete_rows",
+    "sha256": "f4b94191daf1d07f78f6c8a20773534b5696ce971e57c9dca43683a4a59ca9d3"
+  },
+  {
+    "bytes": 888,
+    "mode": 420,
+    "path": "lm-pair-3-1/write.stderr",
+    "publication": "exact_text_bytes",
+    "sha256": "8ec5dcd5003e82257f125362f34dad9ba75e65cb5ef1155243a5b20cde5f8778"
+  },
+  {
+    "bytes": 1118,
+    "mode": 420,
+    "path": "lm-pair-3-1/opposite.stderr",
+    "publication": "exact_text_bytes",
+    "sha256": "f887e9c9bc8d2bea1c4f34e5c34dd9b0037ffe46f02647f692d91e5818c24e61"
+  },
+  {
+    "bytes": 761,
+    "mode": 420,
+    "path": "lm-pair-3-1/return.stderr",
+    "publication": "exact_text_bytes",
+    "sha256": "2af4c9a0c2af3c312c7f289da4dafe51bdaa2f6ad9a169c3d5fed13a3d51daef"
+  },
+  {
+    "bytes": 14333,
+    "mode": 420,
+    "path": "lm-pair-3-1/rpc.jsonl",
+    "publication": "exact_text_bytes",
+    "sha256": "1a4fc7c9ed01aebc7086fc5cf38669ccad1275e1569b9d6ad027781474f95aad"
+  },
+  {
+    "bytes": 394,
+    "mode": 420,
+    "path": "lm-pair-3-1/terminal.json",
+    "publication": "exact_text_bytes",
+    "sha256": "494dd9a4d10d52ad648272eddbaa8e4fb82ebb0e7a25619a9fbf3c87f6b3cfc3"
+  },
+  {
+    "bytes": 6,
+    "mode": 384,
+    "path": "lm-pair-3-1/ready",
+    "publication": "exact_text_bytes",
+    "sha256": "ed1a545bb85e55816bbf9566b028b2a0bc456b88f49f6f266c0401048824194b"
+  },
+  {
+    "bytes": 114688,
+    "mode": 384,
+    "path": "lm-pair-3-1/store/memory-days.sqlite3",
+    "publication": "logical_sql_and_complete_rows",
+    "sha256": "292749c6aa4b494d137e725b65b66cbb99508aaad7fe32d7009e9ec8ff8fefc8"
+  }
+]

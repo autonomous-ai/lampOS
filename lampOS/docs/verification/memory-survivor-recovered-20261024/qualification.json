@@ -1,0 +1,51 @@
+{
+  "actual_pair": {
+    "archive_bytes": 286720,
+    "archive_sha256": "6619cb8d9c505c4f352d8aff546bf481e08dd29fbe117b9fffdf09607b4cd90d",
+    "compiled_driver": {
+      "bytes": 4419136,
+      "container_path": "/target/debug/deps/release_pair-3fcc8857fb334971",
+      "host_path": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/release_pair-3fcc8857fb334971",
+      "sha256": "6c8f62a35e6d278d1684f3400c10015528153735681d7e7e5dc21e656b51a64d"
+    },
+    "failed": 0,
+    "ignored": 0,
+    "passed": 2,
+    "processes_reaped_per_direction": 3,
+    "reap_proof_kind": "Fixture terminal assertions and source finish calls; no independent child-PID/reap-event trace",
+    "rpc_counts": {
+      "lm-pair-3-0": 41,
+      "lm-pair-3-1": 41
+    }
+  },
+  "all_validation_before_writing": true,
+  "linux": {
+    "all_four_stages_passed": true,
+    "directory": "/private/tmp/fourth-memory-recovery-checks-20261024/linux-attempt2",
+    "ordinary_tests_only": true,
+    "platform": "linux",
+    "terminal_sha256": "f8b062d03e471648577bd76dff6ee7b22ef73b17cc13ee17193da4a337fc114d",
+    "totals": {
+      "failed": 0,
+      "ignored": 8,
+      "passed": 314
+    }
+  },
+  "mac": {
+    "all_four_stages_passed": true,
+    "directory": "/private/tmp/fourth-memory-recovery-checks-20261024/mac",
+    "ordinary_tests_only": true,
+    "platform": "mac",
+    "terminal_sha256": "13af2d4b94d71f4f1c492eb4db4028d9e1f6a15dbcac449fd172e04791991b68",
+    "totals": {
+      "failed": 0,
+      "ignored": 8,
+      "passed": 314
+    }
+  },
+  "payloads_identical": true,
+  "signature_or_lamp_acceptance": false,
+  "source_files": 10321,
+  "source_fixture_sha256": "1f551d5b71416047d609e6b65f6519084725877bc0bbb6b146454acf9339af6f",
+  "source_tree": "6b42fd91e4ed4e0e4b52194cbb257ac036f163a0"
+}

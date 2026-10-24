@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "-q",
+    "--offline",
+    "--locked",
+    "--workspace"
+  ],
+  "timeout_seconds": 5400,
+  "container": null,
+  "pid": 67904,
+  "process_group": 67904,
+  "exit": 0,
+  "group_absent": true,
+  "elapsed_seconds": 308.3932671690002
+}

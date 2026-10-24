@@ -1,0 +1,8 @@
+{
+  "exit": 0,
+  "target": "/private/tmp/fourth-memory-recovery-linux-target-20261024",
+  "target_release_permitted": true,
+  "tree": "6b42fd91e4ed4e0e4b52194cbb257ac036f163a0",
+  "stages": 4,
+  "source_stable": true
+}
