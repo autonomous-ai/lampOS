@@ -1,0 +1,11 @@
+{
+  "package": "lamp-expression",
+  "target": "runtime",
+  "case": "without_a_pause_said_expression_asks_exactly_as_before",
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-b52f6baa2e80330c",
+  "sha256": "1dc1d7489f551a62e34bff7d7ae68ac160310725ecd2d51ec7d0f476523d0a50",
+  "raw_offset": 565541,
+  "raw_bytes": 296,
+  "raw_sha256": "d6fa33a0e75caf7f6b9e27e829059a06c919bc2acc5ede91b6d41cc524b20a61",
+  "utf8": "---- without_a_pause_said_expression_asks_exactly_as_before stdout ----\nlamp-expression: refused an input (1 so far): stale body/joint_states: 654 ms\n\nthread 'without_a_pause_said_expression_asks_exactly_as_before' (5987643) panicked at crates/expression/tests/runtime.rs:1009:57:\na body request\n"
+}

@@ -1,0 +1,11 @@
+{
+  "reused": [
+    {
+      "binary_sha256": "1aaece8ae8c42e795f7c41cf0eb51de59c13c3ae270b11a745aaada6bd3f4dcc",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/new-base-fb8-epoch/restored-candidate/round-binding.json",
+      "profile_features_identity": "[\"path+file://<source-root>/lampOS/crates/update#lamp-update@0.1.0\", [\"test\"], \"round\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": true}, []]"
+    }
+  ],
+  "newly_listed": 60,
+  "policy": "Exact executable digest + full raw unit/profile/features/current source path; no old-e63/old-overlay census claim. Whole-source/artifact guards bracket the inventory phase, not each unrelated listing."
+}

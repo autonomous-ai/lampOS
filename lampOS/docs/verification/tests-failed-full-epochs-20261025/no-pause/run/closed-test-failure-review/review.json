@@ -1,0 +1,12 @@
+{
+  "full_stdout_sha256": "aa27b2a06e5773395720660f2ab892f0658a7c3e94d353993e65d771aa6d918f",
+  "full_stderr_sha256": "be94573266dd76e1f5e32596a3c39aac9a5cdd396bbc4211762ae093575dcf80",
+  "failures": 49,
+  "infrastructure_substrings": {
+    "No space left on device": 0,
+    "Too many open files": 0,
+    "Permission denied": 0,
+    "Address already in use": 0
+  },
+  "no_cause_or_failure_waiver": true
+}

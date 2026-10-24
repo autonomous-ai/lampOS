@@ -1,0 +1,16 @@
+{
+  "new_epoch": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/new-base-fb8-epoch",
+  "head": "fb8d2f71b836266df07bf1b658e40c0aa13804f3",
+  "base": "4270083a2",
+  "source_rows": 10445,
+  "source_guard_sha256": "98037a579fef394e108f2af05b51857c772faa1689730c32b0c2862be5bd95e2",
+  "metadata_controller_sha256": "0950558ee5126a8c9fa56ef64154f03c10286a1ce16d7bbcd07517da1efbe1cd",
+  "seed_plan_sha256": "5c27d834a0b42ac671036be9dd483c5340a0463023317f2523229c114013be77",
+  "component_controller_sha256": "613a43124d98f7865e0456e08da7112b1822e7a5186534ca3d438ef980c4cf8a",
+  "full_controller_sha256": "3ecd5aef8f916b716ae6bb2c90075231387189b1bf6e5b6f8f5013783c92f723",
+  "full_plan_sha256": "fec87ec4b2c322600529cc6b25f2ac7fd0a776aa171873a421fe03db38c4e667",
+  "no_commands_executed": true,
+  "reviewed_full_runner_diff": "Only replace historical hardcoded Round identity/cache source with new actual sealed Round binding; strict provenance ledger retained.",
+  "actual_metadata_complete": true,
+  "metadata_executed_seed_sha256": "9230c487bfa4a153cce95886924bb31654d0e6dc4f9c258dab7611b4238e1cbd"
+}

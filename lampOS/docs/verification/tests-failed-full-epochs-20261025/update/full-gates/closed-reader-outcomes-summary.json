@@ -1,0 +1,41 @@
+{
+  "totals": {
+    "passed": 3299,
+    "failed": 7,
+    "ignored": 31,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "complete_binding": true,
+  "failed_cases": [
+    {
+      "target": "lamp-voice-eval:lib:lamp_voice_eval",
+      "name": "physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times"
+    },
+    {
+      "target": "lamp-voice-eval:test:it",
+      "name": "physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored"
+    },
+    {
+      "target": "lamp-voice-eval:test:it",
+      "name": "physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields"
+    },
+    {
+      "target": "lamp-voice-eval:test:it",
+      "name": "physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn"
+    },
+    {
+      "target": "lamp-voice-eval:test:it",
+      "name": "physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup"
+    },
+    {
+      "target": "lamp-voice-eval:test:it",
+      "name": "physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues"
+    },
+    {
+      "target": "lamp-voice-eval:test:it",
+      "name": "physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason"
+    }
+  ],
+  "raw_stdout_sha256": "efbe5e154c1ded83f3e26743d9b64fc61e6ec3d610e2b4e4cc81eca853b4b7e4"
+}

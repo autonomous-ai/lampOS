@@ -1,0 +1,16 @@
+{
+  "recorded_at": "2026-10-24T19:29:40.363183+00:00",
+  "provenance": "Parent message: Native29327WHOLEclosed/released now (7316/8/52failed).",
+  "initial_sibling_native": 29327,
+  "root_reported_sibling_closed": true,
+  "root_reported_sibling_full_counts": {
+    "passed": 7316,
+    "failed": 8,
+    "ignored": 52
+  },
+  "NoPause_owned_native": 23013,
+  "NoPause_still_active": "planned workspace build after complete49failure test census",
+  "exact_sibling_terminal_timestamp_not_supplied": true,
+  "subsequent_other_jobs_not_inferred": true,
+  "global_load_isolation_or_performance_claim": false
+}

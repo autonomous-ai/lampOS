@@ -1,0 +1,5 @@
+{
+  "reused": [],
+  "newly_listed": 6,
+  "policy": "Exact executable digest + full raw unit/profile/features/current source path; no old-e63/old-overlay census claim. Whole-source/artifact guards bracket the inventory phase, not each unrelated listing."
+}

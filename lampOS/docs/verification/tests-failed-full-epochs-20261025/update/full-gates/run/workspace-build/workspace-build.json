@@ -1,0 +1,33 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--offline",
+    "--locked",
+    "--workspace",
+    "--message-format=json-render-diagnostics"
+  ],
+  "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS",
+  "started_at": "2026-10-24T19:15:29.597890+00:00",
+  "timeout_seconds": 1800,
+  "stdout": "workspace-build.stdout.txt",
+  "stderr": "workspace-build.stderr.txt",
+  "timeout_cleanup": [],
+  "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+  "available_bytes_before_Cargo": 33798168576,
+  "owned_pid": 92883,
+  "owned_process_group": 92883,
+  "timed_out": false,
+  "exit_code": 0,
+  "unexpected_residual_group_after_normal_exit": false,
+  "direct_status_before_cleanup": 0,
+  "owned_group_present_before_cleanup": false,
+  "direct_wait_status": 0,
+  "owned_group_absent_after_cleanup": true,
+  "wall_seconds": 71.691765,
+  "finished_at": "2026-10-24T19:16:41.340490+00:00",
+  "stdout_sha256": "b4cc0a1d25a331039a7a21d201f2e7d07503b52661475122b7f25a0e0f91d35f",
+  "stdout_bytes": 452463,
+  "stderr_sha256": "3f434a2f1190a22c68ae32b4a710e45dca203dcf9864a3fb287f665c2f1a3fe5",
+  "stderr_bytes": 7424
+}

@@ -1,0 +1,16 @@
+{
+  "authorized_at": "2026-10-24T18:16:51.612874+00:00",
+  "owned_CPU_exclusivity_ends_at_this_authorization": true,
+  "Update_native": 29327,
+  "Update_compiler_jobs": 4,
+  "NoPause_compiler_jobs": 2,
+  "maximum_owned_Rust_jobs": 2,
+  "total_bounded_compiler_jobs": 6,
+  "distinct_exclusive_targets": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target"
+  ],
+  "source_epochs": "fb8/427 and208/427 frozen; later PR rebases use independent repo and do not relabel these local gates",
+  "global_hardware_isolation_or_latency_claim": false,
+  "grant_sha256": "ae17c9d63f23c860e24d0cd0f027191df9d0cca5a3dbf366bfc8f25546f0a554"
+}

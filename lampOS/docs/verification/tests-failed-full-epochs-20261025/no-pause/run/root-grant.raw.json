@@ -1,0 +1,36 @@
+{
+  "plan_identity": "no-pause-current-20874923d-fullgate-v1",
+  "plan_sha256": "ca6de9a30817b7c22fd7c1213dddec07d600f5549d3f6575d950949789622e31",
+  "controller_sha256": "e08ceaf291d1b0ab75981593cf7e0730245edc81bea57c60569426b2c22950b1",
+  "source_map_sha256": {
+    "canonical": "34b70b0945fb74ecf433796036d927aef9cd4d8e04b55e1d773dee9a11bec5f2"
+  },
+  "source_guards": {
+    "canonical": "e40b78ce78eb78aee9618f6e4b8401a772eb363a6888ae7b93be155c037817d7"
+  },
+  "source_heads": {
+    "canonical": "20874923d41d7a1b9baab4532df7eca3b1d09666"
+  },
+  "execution_authorized": true,
+  "grant_scope": "one-canonical-fmt-clippy-reverse-tests-workspace-build",
+  "exclusive_target_grant": {
+    "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+    "previous_owner_released": true,
+    "cpu_exclusive": false,
+    "target_exclusive": true
+  },
+  "grant_id": "root-current-no-pause-20261024T1815",
+  "concurrency_context": {
+    "mode": "root-authorized overlap on distinct exclusive targets",
+    "other_active_native_session": 29327,
+    "other_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target",
+    "this_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+    "cpu_exclusive": false,
+    "this_target_exclusive": true,
+    "isolated_load_or_timing_claim": false,
+    "scope": "Concurrent at grant/start; other job can naturally finish during this gate. No duration or sole-load attribution.",
+    "other_active_compiler_jobs": 4,
+    "total_bounded_compile_jobs": 6,
+    "this_gate_compiler_jobs": 2
+  }
+}

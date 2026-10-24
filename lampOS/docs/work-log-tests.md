@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-25 03:12 — retain newer failed full epochs
+
+Ready for lamp-voice: no
+
+Published complete primary Mac full-run streams, command/provenance records, failure excerpts and full source guards for frozen Update fb8/427 (7,316 passed / 8 failed / 52 ignored) and NoPause 208/427 (7,265 / 49 / 52, including the changed runtime case refusing 654 ms-old joints). These are FAILED historical epochs, not current-head passes. Formatting, strict twelve-package Clippy and workspace build passed separately. The 216 copied text/JSON payloads are byte-for-byte with SHA-256/size manifest in [the record](verification/tests-failed-full-epochs-20261025/); no binary or Python measurement script is included.
+
+Current f978 carries are #3403 9ce73c76a and #3404 ea10e4c7d, both equal range-diffs, current Linux/ARM64 checks green and software reads posted. Producer failure classification still gates readiness. The latest-base compile-only prerequisite now runs at four jobs beside Cloud's two jobs on distinct targets; no case observations authorized until the child cleanup wrapper is reviewed. Cloud's exact one-baseline/one-candidate control passed at 11.813293 / 5.783800 seconds; its canonical full gates continue. No cause, isolated-load or device claim; no ARM64 build on the Mac.
+
 ## 2026-10-24 16:55 +0700 — current clock Voice phase retained
 
 Ready for lamp-voice: no; current carry's dependent gates and standalone review continue.

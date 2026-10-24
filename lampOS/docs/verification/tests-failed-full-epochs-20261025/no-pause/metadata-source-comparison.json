@@ -1,0 +1,333 @@
+{
+  "frozen_metadata_sha256": "9d5a342a1653b28af891a761568f955ddae47d25e69ff4213fdc6371f0c160b1",
+  "frozen_command": [
+    "cargo",
+    "+1.96.0",
+    "metadata",
+    "--offline",
+    "--locked",
+    "--format-version",
+    "1"
+  ],
+  "frozen_head": "22b753df5db6434d21455f40f67926e0ecee9d91",
+  "canonical_base": "20874923d41d7a1b9baab4532df7eca3b1d09666",
+  "frozen_prefix": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS",
+  "canonical_prefix": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS",
+  "local_manifests": 48,
+  "workspace_members": 46,
+  "all_manifest_root_lock_config_comparisons": [
+    {
+      "path": "lampOS/.cargo/config.toml",
+      "frozen_sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71",
+      "canonical_sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71",
+      "identical": true
+    },
+    {
+      "path": "lampOS/Cargo.lock",
+      "frozen_sha256": "2aef97a9d7207015f96c216a96f3225e68a7c6bd7defd2327df5101a85ad3280",
+      "canonical_sha256": "2aef97a9d7207015f96c216a96f3225e68a7c6bd7defd2327df5101a85ad3280",
+      "identical": true
+    },
+    {
+      "path": "lampOS/Cargo.toml",
+      "frozen_sha256": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+      "canonical_sha256": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/actions/Cargo.toml",
+      "frozen_sha256": "d6aa1c2a6c48254e1842a34ff5eddac1ebf7b897805a7540392e8b598782d910",
+      "canonical_sha256": "d6aa1c2a6c48254e1842a34ff5eddac1ebf7b897805a7540392e8b598782d910",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/addons/Cargo.toml",
+      "frozen_sha256": "2313f6976e096857edc27ce74df34a88cab5cbec28576186143ed515232640bd",
+      "canonical_sha256": "2313f6976e096857edc27ce74df34a88cab5cbec28576186143ed515232640bd",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/air/Cargo.toml",
+      "frozen_sha256": "795020feb9e842ceddc67b334d5088850d7af3f185875d97932e433a4bcf48e8",
+      "canonical_sha256": "795020feb9e842ceddc67b334d5088850d7af3f185875d97932e433a4bcf48e8",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/audio/Cargo.toml",
+      "frozen_sha256": "1217da4568c1f6b78abfed2dde059b1e6f0294cfe5bff8b8d637a8840ade331c",
+      "canonical_sha256": "1217da4568c1f6b78abfed2dde059b1e6f0294cfe5bff8b8d637a8840ade331c",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/body/Cargo.toml",
+      "frozen_sha256": "611ad97f3f8a30483b5b970fa9b5aa3657fd34e541238c2dcc46f500aa710227",
+      "canonical_sha256": "611ad97f3f8a30483b5b970fa9b5aa3657fd34e541238c2dcc46f500aa710227",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/bus/Cargo.toml",
+      "frozen_sha256": "96afd70eaaaf81e64f8c104f0a4d536d4c6dfc32f6e80cc2cc21c49aa5814f34",
+      "canonical_sha256": "96afd70eaaaf81e64f8c104f0a4d536d4c6dfc32f6e80cc2cc21c49aa5814f34",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/camera/Cargo.toml",
+      "frozen_sha256": "fc40d4ec1d0531c4dc7abde83bda7aee98b79d88dfe789db390002f472db43b1",
+      "canonical_sha256": "fc40d4ec1d0531c4dc7abde83bda7aee98b79d88dfe789db390002f472db43b1",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/cloud/Cargo.toml",
+      "frozen_sha256": "57a154cf64d7adc8b5e21be9338f57d6da62b1ed01497647ace3a7aa495009d8",
+      "canonical_sha256": "57a154cf64d7adc8b5e21be9338f57d6da62b1ed01497647ace3a7aa495009d8",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/controls/Cargo.toml",
+      "frozen_sha256": "14f43466f1273d70000af04ad0b12a5fb2c420bce9d8cb36110666d6a8cc94d4",
+      "canonical_sha256": "14f43466f1273d70000af04ad0b12a5fb2c420bce9d8cb36110666d6a8cc94d4",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/ears/Cargo.toml",
+      "frozen_sha256": "15092825ec95e74d0a1fe0317f14b1f7aba793b87e1b1c50fcd5aeac9f319ce3",
+      "canonical_sha256": "15092825ec95e74d0a1fe0317f14b1f7aba793b87e1b1c50fcd5aeac9f319ce3",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/environment/Cargo.toml",
+      "frozen_sha256": "d8ccf1efc3d22b827075dad2c24a8f92b1ccfe839bbd6b3f2920a6bd8c2bd52b",
+      "canonical_sha256": "d8ccf1efc3d22b827075dad2c24a8f92b1ccfe839bbd6b3f2920a6bd8c2bd52b",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/expression/Cargo.toml",
+      "frozen_sha256": "2c0dd67e2a2c85585b029bf807fc102ecdc375bc607ddd97fde3d514e6cf5cf4",
+      "canonical_sha256": "2c0dd67e2a2c85585b029bf807fc102ecdc375bc607ddd97fde3d514e6cf5cf4",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/eyes/Cargo.toml",
+      "frozen_sha256": "d64054a50be704348c702ec88bf807f467ce4f94756e6467343b97b80fd790fe",
+      "canonical_sha256": "d64054a50be704348c702ec88bf807f467ce4f94756e6467343b97b80fd790fe",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/gemini/Cargo.toml",
+      "frozen_sha256": "9b2f7c250fc853d7736da0f2f8655e89755742b6b0fb3ff7562bbd0a54a0e9e0",
+      "canonical_sha256": "9b2f7c250fc853d7736da0f2f8655e89755742b6b0fb3ff7562bbd0a54a0e9e0",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/health/Cargo.toml",
+      "frozen_sha256": "2e3ce14aeacb0bfe189499392baed7356738e9252279ad502f32ddd84f42a19d",
+      "canonical_sha256": "2e3ce14aeacb0bfe189499392baed7356738e9252279ad502f32ddd84f42a19d",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/ipc/Cargo.toml",
+      "frozen_sha256": "6e9983ce84d6352b1975a76229c7e16c9e75142445ed56c386f369df06146d54",
+      "canonical_sha256": "6e9983ce84d6352b1975a76229c7e16c9e75142445ed56c386f369df06146d54",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/keeper/Cargo.toml",
+      "frozen_sha256": "d2ee7a3c1db7ac89ab020b99e2d7ec95c3ee31f2de57cfe69b74fcc5e3abfa44",
+      "canonical_sha256": "d2ee7a3c1db7ac89ab020b99e2d7ec95c3ee31f2de57cfe69b74fcc5e3abfa44",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/lean/Cargo.toml",
+      "frozen_sha256": "01a2d6191ac67e2f07fd6d67b4dfdc7796c6e80b186138d84b5cfe0ad91c21c6",
+      "canonical_sha256": "01a2d6191ac67e2f07fd6d67b4dfdc7796c6e80b186138d84b5cfe0ad91c21c6",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/local-time/Cargo.toml",
+      "frozen_sha256": "d58feea860df9b3d83ec2e5963a2e529cb963f143e4fc9074b44c619626d84ea",
+      "canonical_sha256": "d58feea860df9b3d83ec2e5963a2e529cb963f143e4fc9074b44c619626d84ea",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/memory/Cargo.toml",
+      "frozen_sha256": "aef3519411f1e2fed21a93d645fc26a617a66ccda5733a10d8d2a69f683b3553",
+      "canonical_sha256": "aef3519411f1e2fed21a93d645fc26a617a66ccda5733a10d8d2a69f683b3553",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/mood/Cargo.toml",
+      "frozen_sha256": "2f105fca474e979705906e5aabaf08f60ce6fd843ca24a009bc949955565d540",
+      "canonical_sha256": "2f105fca474e979705906e5aabaf08f60ce6fd843ca24a009bc949955565d540",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/msgs/Cargo.toml",
+      "frozen_sha256": "d8dd853a40180e5437d873871c49f0b8e48dece23370cc11ac58ad997a2db0ec",
+      "canonical_sha256": "d8dd853a40180e5437d873871c49f0b8e48dece23370cc11ac58ad997a2db0ec",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/name/Cargo.toml",
+      "frozen_sha256": "fbd95fe8ac4d9a80188f7de3e06b88ac5f192de56c8fc2db063a4255a9d25e7f",
+      "canonical_sha256": "fbd95fe8ac4d9a80188f7de3e06b88ac5f192de56c8fc2db063a4255a9d25e7f",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/near-call/Cargo.toml",
+      "frozen_sha256": "3b375ca80370b7fb22c6b9a596b424d2cd9ecfa0f2324faeab9d898af9988816",
+      "canonical_sha256": "3b375ca80370b7fb22c6b9a596b424d2cd9ecfa0f2324faeab9d898af9988816",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/observer/Cargo.toml",
+      "frozen_sha256": "5cd6a10993b4922534b8a9546a33444465eb5323e5a3c14a73f875027f21201b",
+      "canonical_sha256": "5cd6a10993b4922534b8a9546a33444465eb5323e5a3c14a73f875027f21201b",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/peek/Cargo.toml",
+      "frozen_sha256": "6f5014cd4095e438afda490a0c5aa12492780f5265729b6d58ec8e3b5e47ae8b",
+      "canonical_sha256": "6f5014cd4095e438afda490a0c5aa12492780f5265729b6d58ec8e3b5e47ae8b",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/policy/Cargo.toml",
+      "frozen_sha256": "b1b4605a1ed8c783eee8a8aa746a16e07ae3c35212892b76bd52609f24a10e82",
+      "canonical_sha256": "b1b4605a1ed8c783eee8a8aa746a16e07ae3c35212892b76bd52609f24a10e82",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/records/Cargo.toml",
+      "frozen_sha256": "861b9cb0111913fa919503dd1935fa364f8ab4df39353f6865b1f9fe34817b99",
+      "canonical_sha256": "861b9cb0111913fa919503dd1935fa364f8ab4df39353f6865b1f9fe34817b99",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/ring/Cargo.toml",
+      "frozen_sha256": "3e66786b7841a5d26c563f428e4705f9b09566b3af51df46e41bec02015c4e5d",
+      "canonical_sha256": "3e66786b7841a5d26c563f428e4705f9b09566b3af51df46e41bec02015c4e5d",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/same-voice/Cargo.toml",
+      "frozen_sha256": "156eaaf0b32f316690d229b66a2b4f02d9ee0790527205bdc3f72a3b17b142f3",
+      "canonical_sha256": "156eaaf0b32f316690d229b66a2b4f02d9ee0790527205bdc3f72a3b17b142f3",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/schedule/Cargo.toml",
+      "frozen_sha256": "b96f73df3f89b8c76c3278216bad8f5ecec36e69d3e14a13dbc0dbb0425ca73f",
+      "canonical_sha256": "b96f73df3f89b8c76c3278216bad8f5ecec36e69d3e14a13dbc0dbb0425ca73f",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/selftest/Cargo.toml",
+      "frozen_sha256": "ed7f0e2eaa35e588ba085dc8a4bbfba36ff6ed0c077cdcdc6181d0e7709f15e1",
+      "canonical_sha256": "ed7f0e2eaa35e588ba085dc8a4bbfba36ff6ed0c077cdcdc6181d0e7709f15e1",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/settings/Cargo.toml",
+      "frozen_sha256": "2a81f720c4a925b4b353575e48a187e6d71af8dde3677f3cfda7e534fb71241f",
+      "canonical_sha256": "2a81f720c4a925b4b353575e48a187e6d71af8dde3677f3cfda7e534fb71241f",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/setup/Cargo.toml",
+      "frozen_sha256": "586d2dffe23e80f94d8d75ab9f7a05e7b40e39bb9ae929eea379b5f188ddcd4e",
+      "canonical_sha256": "586d2dffe23e80f94d8d75ab9f7a05e7b40e39bb9ae929eea379b5f188ddcd4e",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/skills/Cargo.toml",
+      "frozen_sha256": "8588ef3204b62820ca39258ce078a6feb84f8282dc99aca0ca7a071004a7130b",
+      "canonical_sha256": "8588ef3204b62820ca39258ce078a6feb84f8282dc99aca0ca7a071004a7130b",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/sound-fixtures/Cargo.toml",
+      "frozen_sha256": "b790403fada9e341620a67350d6c09844ff2e243ec44c8b549ef7b1f461fd28f",
+      "canonical_sha256": "b790403fada9e341620a67350d6c09844ff2e243ec44c8b549ef7b1f461fd28f",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/station/Cargo.toml",
+      "frozen_sha256": "636baa8ceca9e7cc87349170ffd3b9bbbace785b00ddf3421214522b82fc26a3",
+      "canonical_sha256": "636baa8ceca9e7cc87349170ffd3b9bbbace785b00ddf3421214522b82fc26a3",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/surround/Cargo.toml",
+      "frozen_sha256": "df922e176c16c3166befe98c1914117a10bd3b8ae1a0bedfb30d758ba12e2f73",
+      "canonical_sha256": "df922e176c16c3166befe98c1914117a10bd3b8ae1a0bedfb30d758ba12e2f73",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/tasks/Cargo.toml",
+      "frozen_sha256": "bca60458e6a227ecd037caab2d4db20008e1c7a6e7c271a833872fffc225bdc9",
+      "canonical_sha256": "bca60458e6a227ecd037caab2d4db20008e1c7a6e7c271a833872fffc225bdc9",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/turn-end-wire/Cargo.toml",
+      "frozen_sha256": "cbe9801fc8288a139af537fac219710a2a8a4d74aa061057d3e7c9092e9eb6f2",
+      "canonical_sha256": "cbe9801fc8288a139af537fac219710a2a8a4d74aa061057d3e7c9092e9eb6f2",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/turn-end/Cargo.toml",
+      "frozen_sha256": "00baa6bc919c905199d1a3581e19195cd0b0292fc29d8bd6a77d1b80a5ee4153",
+      "canonical_sha256": "00baa6bc919c905199d1a3581e19195cd0b0292fc29d8bd6a77d1b80a5ee4153",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/turn-owner/Cargo.toml",
+      "frozen_sha256": "ec4874833178228f469757f2a652bb9f16408cd2bcdfa0552e75c94e216d76d4",
+      "canonical_sha256": "ec4874833178228f469757f2a652bb9f16408cd2bcdfa0552e75c94e216d76d4",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/update/Cargo.toml",
+      "frozen_sha256": "2e791c3e5eb8fc99f4ade7a0a6c484c60a0f988a5bf25c37a25176c6bf7a7792",
+      "canonical_sha256": "2e791c3e5eb8fc99f4ade7a0a6c484c60a0f988a5bf25c37a25176c6bf7a7792",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/voice-eval/Cargo.toml",
+      "frozen_sha256": "eeb211074c1d8a2813ebb0c73422f20385fc56922480163d0303df43e3e59cb7",
+      "canonical_sha256": "eeb211074c1d8a2813ebb0c73422f20385fc56922480163d0303df43e3e59cb7",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/voice-processes/Cargo.toml",
+      "frozen_sha256": "300431dab9923809f63632cca6a107171c8df39a8e8e50efe6c93275d85761b3",
+      "canonical_sha256": "300431dab9923809f63632cca6a107171c8df39a8e8e50efe6c93275d85761b3",
+      "identical": true
+    },
+    {
+      "path": "lampOS/crates/voice/Cargo.toml",
+      "frozen_sha256": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+      "canonical_sha256": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+      "identical": true
+    },
+    {
+      "path": "lampOS/third_party/sonora/Cargo.toml",
+      "frozen_sha256": "1e4ee33b416b79c0d03f009ae2252d14f9bdec5e9846e355a944c8b7331bf50d",
+      "canonical_sha256": "1e4ee33b416b79c0d03f009ae2252d14f9bdec5e9846e355a944c8b7331bf50d",
+      "identical": true
+    },
+    {
+      "path": "lampOS/vendor/tough/Cargo.toml",
+      "frozen_sha256": "1980c850b72070031a2e6f639ad804a841ac5adb135a527bd50e7033effba5bb",
+      "canonical_sha256": "1980c850b72070031a2e6f639ad804a841ac5adb135a527bd50e7033effba5bb",
+      "identical": true
+    }
+  ],
+  "all_match": true,
+  "registry_git_packages": 403,
+  "external_package_limit": "External registry/git manifests are not in canonical source tree. Their resolved identity/checksums are bound by byte-identical Cargo.lock; no independent external-manifest byte identity claim.",
+  "new_Cargo_metadata_executed": false,
+  "canonical_parent": "4270083a2e32af70397be5c705ec42af046f7a33",
+  "prior_comparison_sha256": "697694ba2830e61e541b359c9b233055f7350be1095447e7e703b13ae23b0852",
+  "comparison_note": "All51 manifest/root-lock/config bytes match frozen metadata. Current source identity freshly frozen; no Cargo metadata query executed."
+}
