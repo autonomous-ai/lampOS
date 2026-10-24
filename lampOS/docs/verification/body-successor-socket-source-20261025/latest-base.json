@@ -1,0 +1,13 @@
+{
+  "base": "efbf42a02974ff130cb979abc0499ba699c1b34d",
+  "superseded_unrun_base": "da57072b2e6420ae25cf6779f1ee1756178ce724",
+  "changed_upstream_paths": [
+    "lampOS/crates/voice/src/attention.rs",
+    "lampOS/crates/voice/src/known_faces.rs",
+    "lampOS/docs/build-rows.md",
+    "lampOS/docs/eyes.md"
+  ],
+  "body_and_cargo_inputs_unchanged": true,
+  "all_validation_observations_still_unrun": true,
+  "plan": "Before any observation, baseline and candidate are both frozen on this latest base. One exact baseline, one exact candidate, one candidate complete Body gate, one distinct ownership-negative mutation. No unchanged-case retries; two compiler jobs only after allocation."
+}

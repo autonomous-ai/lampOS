@@ -16,3 +16,21 @@ Candidate validation is UNRUN apart from workspace formatting and whitespace che
 - No retry-until-green, removed assertion, increased deadline, synthetic scheduling claim or historical waiver. A failure is retained and diagnosed before any changed plan. Source/head and actual resource overlap are recorded; the shared compiler allocation must be available before compilation.
 
 This published source packet is not a passing code gate, pull-request readiness or CI result.
+
+## Latest-base preparation before any execution
+
+Main advanced through trains 107 and 108. Before the first observation, both
+baseline and candidate were carried to `efbf42a02974ff130cb979abc0499ba699c1b34d`.
+The four upstream changed paths are recorded in `latest-base.json`; Body and
+Cargo inputs are unchanged. All validation observations remain UNRUN. The
+earlier da570 source audit remains historical; it is not renamed execution.
+
+The private prepared driver requires an explicit released two-job allocation
+flag and refuses reuse of an existing result file. Each command records its
+actual compiler artifacts and post-terminal executable hashes; these hashes
+are not pre-launch binary witnesses. Source maps bracket the complete run.
+The ownership-negative uses a caught peer-assertion panic so explicit owned
+kill/reap/path cleanup runs before that same panic is resumed. Every launched
+command owns a separate process group, whose closure is checked before any
+next observation. The baseline accepts and preserves either 0 or 101; no
+unchanged observation is retried. No controller or test has been executed.
