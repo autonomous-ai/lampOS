@@ -1,0 +1,93 @@
+{
+  "worktree": "/private/tmp/third-carry-colleague-window",
+  "base": "8219e711ad6de24a63f124ba86b985b2fcb3e8a3",
+  "carried_head": "8219e711ad6de24a63f124ba86b985b2fcb3e8a3",
+  "target": "/private/tmp/third-carry-window-target-ld637ldg",
+  "target_scope": "exclusive to this worktree; initially empty for red regression, reused after source edits/rebase; no all-fresh claim",
+  "packages": [
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "scope_reason": "private worker verdict ordering only; no public API, dependency, schema or default change; full affected Voice and Voice-eval tests plus workspace build; parent full reverse closure not relabelled current",
+  "source_count": 7025,
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 12.805,
+      "log": "/private/tmp/third-carry-late-full-fmt.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 99.455,
+      "log": "/private/tmp/third-carry-late-full-clippy.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "build",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "-q",
+        "--workspace",
+        "--locked",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 33.613,
+      "log": "/private/tmp/third-carry-late-full-build.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "tests",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--message-format=json",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 879.783,
+      "log": "/private/tmp/third-carry-late-full-tests.txt",
+      "source_unchanged": true
+    }
+  ],
+  "docker_available": false
+}

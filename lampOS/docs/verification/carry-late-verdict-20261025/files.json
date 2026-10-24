@@ -1,7 +1,7 @@
 {
   "README.md": {
-    "bytes": 2467,
-    "sha256": "be174294ae5adba08d3ff6c51e1f240984455f6e25a4af4e54b5047b12a94939"
+    "bytes": 4036,
+    "sha256": "f12c53b188ed92957bb4abc171ee4e4ba03ccc7088c52fa4c8020c5b5c21d28f"
   },
   "busy-first-focused.txt": {
     "bytes": 118,
@@ -34,6 +34,50 @@
   "clamped-focused.txt": {
     "bytes": 118,
     "sha256": "db279882e9a5a60fc4c92939094217804a531b5e731340c60af904fe833cdd86"
+  },
+  "final-binding.json": {
+    "bytes": 709,
+    "sha256": "1d37d676c1a67ffe3efcef73c4f2801a51b935bf1c03194c6f1c5ef4f580a484"
+  },
+  "final-build.txt": {
+    "bytes": 364422,
+    "sha256": "dea0474897da0ac2164317ec6abac713af528a73ec214fdbc34581948cafc177"
+  },
+  "final-clippy.txt": {
+    "bytes": 276601,
+    "sha256": "b844bce7ffd332b2536c9509ae5aeb917cc683784c6cdb578d4427ab72ef7715"
+  },
+  "final-fmt.txt": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "final-gates.json": {
+    "bytes": 2314,
+    "sha256": "ab4d4e12df7d9c16f75fe097c80584df49869f2f6b740a89b697e02629ff67b9"
+  },
+  "final-named.json": {
+    "bytes": 1735,
+    "sha256": "b874f9fb080979fcab2662052950657ecdc0d2a78edf057f7029c78ba45e46da"
+  },
+  "final-named.txt": {
+    "bytes": 338,
+    "sha256": "27daf5a165e6f82a8212e919075ec99b88865959c0dc66e05746836e1dbdfa44"
+  },
+  "final-source-after.json": {
+    "bytes": 1460636,
+    "sha256": "bc3db8b2b0170a5d6bee987d50d0c341fa8f8a0a999d6a153cd882e432ef2b54"
+  },
+  "final-source-before.json": {
+    "bytes": 1460636,
+    "sha256": "bc3db8b2b0170a5d6bee987d50d0c341fa8f8a0a999d6a153cd882e432ef2b54"
+  },
+  "final-summary.json": {
+    "bytes": 100,
+    "sha256": "f0e69c75331cef0a256059f5f2c7ae02a6d06639eb83bd56c38a614069830dc1"
+  },
+  "final-tests.txt": {
+    "bytes": 300415,
+    "sha256": "b70ffb82e3f224b14e98b7a4b87549d5fcc349762be0ebcb73ec8dd78c374394"
   },
   "initial-red-source.json": {
     "bytes": 687,

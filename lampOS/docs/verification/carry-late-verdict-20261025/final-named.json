@@ -1,0 +1,48 @@
+{
+  "artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-carry-colleague-window/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/private/tmp/third-carry-colleague-window/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_voice",
+      "src_path": "/private/tmp/third-carry-colleague-window/lampOS/crates/voice/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-carry-window-target-ld637ldg/debug/deps/lamp_voice-6afccc7ec26c06bc"
+    ],
+    "executable": "/private/tmp/third-carry-window-target-ld637ldg/debug/deps/lamp_voice-6afccc7ec26c06bc",
+    "fresh": false
+  },
+  "executable_sha256_before_after": "f87bd47debef50c6c333f814dea63ac5e2d1a19390806ef83ba44be41b94132d",
+  "argv": [
+    "/private/tmp/third-carry-window-target-ld637ldg/debug/deps/lamp_voice-6afccc7ec26c06bc",
+    "second_provider::worker::tests::a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner",
+    "second_provider::worker::tests::a_late_colleague_print_cannot_revive_a_closed_or_disabled_carry",
+    "--exact",
+    "--test-threads=1",
+    "--format=pretty"
+  ],
+  "exit": 0,
+  "named_tests": 2,
+  "asserted_rows": "30 room/voice/time plus4 cancellation/off; includes stored-room invariants",
+  "source_binding": "final full-gate compiler artifact and committed source map",
+  "no_full_gate_repeat": true
+}

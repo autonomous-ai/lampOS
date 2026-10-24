@@ -1,0 +1,17 @@
+{
+  "head": "fdf6b0598ad84ad1b9ffac1296314f59bb496c5f",
+  "tree": "ea320d4e87c176c2750796ebc8974dab440f101e",
+  "base": "8219e711ad6de24a63f124ba86b985b2fcb3e8a3",
+  "all_qualified_source_blobs_match_committed_git": true,
+  "source_count": 7025,
+  "worktree_clean": true,
+  "own_commit_one_line": "lampOS: apply late carry evidence to the current verdict",
+  "full_affected_test_summary": {
+    "summaries": 11,
+    "passed": 4656,
+    "failed": 0,
+    "ignored": 21
+  },
+  "scope": "private worker ordering only; fmt/strict Voice+Eval Clippy/workspace build/full Voice+Eval tests; no parent full reverse-closure relabel",
+  "native_jobs": "pending new PR; no local ARM64 execution/link or device activity"
+}
