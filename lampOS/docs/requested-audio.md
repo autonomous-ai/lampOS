@@ -400,9 +400,11 @@ Admission reserves the one active slot before reading the speaker cache, so
 a second offer refused for capacity cannot contend with the current item's
 permission check. A failed cache lookup returns that reservation immediately.
 The permission check remains nonblocking: a clash for the cache is tried
-again, spinning and never sleeping, for at most 200 µs, and a cache still held
+again, spinning and never sleeping, for about 200 µs, and a cache still held
 after that, stale data, or an observation newer than the caller's sampled
-time cancels the item. A later fresh observation cannot revive it or extend
+time cancels the item. Whether the item ended or the service stopped is
+looked at again once the cache is read, since a cancellation can land
+during the spin. A later fresh observation cannot revive it or extend
 its original deadlines. The spin is there because the monitor writes the
 cache every 20 ms and the worker reads it every 20 ms, so the two meet
 often: on lamp-4ace on 24 Oct (#2793) a recording accepted at 13:18:46.68
