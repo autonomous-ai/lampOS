@@ -1,0 +1,21 @@
+{
+  "status": "Recovered prospective controls, unapplied and unexecuted",
+  "patches": [
+    {
+      "name": "candidate-hold.patch",
+      "bytes": 950,
+      "sha256": "527dd96d3e407939fab29b9f9ce76cc452c388f22a7a84e15dfa9bc141fe3d89",
+      "utf8": "--- a/lampOS/crates/voice/src/privacy_bus.rs\n+++ b/lampOS/crates/voice/src/privacy_bus.rs\n@@ -1339,6 +1339,16 @@\n                 Arc::clone(&time),\n             )\n             .unwrap();\n+            // Unapplied counterfactual: hold this owned continuation, then publish.\n+            let held_from = std::time::Instant::now();\n+            let release_at = held_from + Duration::from_millis(25);\n+            while let Some(left) = release_at.checked_duration_since(std::time::Instant::now()) {\n+                thread::park_timeout(left);\n+            }\n+            let held = held_from.elapsed();\n+            assert!(held < Duration::from_millis(500), \"control host watchdog elapsed\");\n+            assert_eq!(time.monotonic_us(), 1_000_001, \"the hold advanced semantic time\");\n+            eprintln!(\"kept-clock control: host_hold_us={} clock=fixture\", held.as_micros());\n             Self { reader, publisher, bus, time, root }\n         }\n \n",
+      "applied": false,
+      "executed": false
+    },
+    {
+      "name": "original-hold.patch",
+      "bytes": 1006,
+      "sha256": "3bf906bd29001962f750596d2ecaa119b24ed80bb975e5a1d7952dde0e2dc66b",
+      "utf8": "--- a/lampOS/crates/voice/src/privacy_bus.rs\n+++ b/lampOS/crates/voice/src/privacy_bus.rs\n@@ -1282,6 +1282,15 @@\n             let mut reader =\n                 LeaseReader::with_clock(&root.0, INDICATOR_SUBSCRIBER, \"host_fixture\".into())\n                     .unwrap();\n+            // Unapplied counterfactual: hold this owned continuation, then publish.\n+            let held_from = std::time::Instant::now();\n+            let release_at = held_from + Duration::from_millis(25);\n+            while let Some(left) = release_at.checked_duration_since(std::time::Instant::now()) {\n+                thread::park_timeout(left);\n+            }\n+            let held = held_from.elapsed();\n+            assert!(held < Duration::from_millis(500), \"control host watchdog elapsed\");\n+            eprintln!(\"kept-clock control: host_hold_us={} clock=system\", held.as_micros());\n             // Each lease read just after it is put down, so it is fresh.\n             lease(2);\n             read_on(&mut reader, 2)?;\n",
+      "applied": false,
+      "executed": false
+    }
+  ]
+}

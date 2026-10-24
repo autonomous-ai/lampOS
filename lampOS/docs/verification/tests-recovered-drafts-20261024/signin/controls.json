@@ -1,0 +1,13 @@
+{
+  "status": "Recovered prospective controls, unapplied and unexecuted",
+  "patches": [
+    {
+      "name": "control.patch",
+      "bytes": 2281,
+      "sha256": "abd93986d431957a1e46be962270329d3a84f577b581e20ba21725bfd8dcb9a1",
+      "utf8": "--- a/lampOS/crates/voice/src/sign_in.rs\n+++ b/lampOS/crates/voice/src/sign_in.rs\n@@ -458,47 +458,11 @@\n                     true,\n                 );\n             }\n-            let id = state[\"id\"].as_u64();\n             while state[\"sign_in\"] == \"starting\" && left() > LOOK_EVERY + ASK_DEADLINE {\n-                let Some(id) = id else {\n-                    return (crate::tools::unavailable(), false);\n-                };\n                 std::thread::sleep(LOOK_EVERY);\n-                let claim_started = Instant::now();\n-                let Some(read) = ask(\n-                    &socket,\n-                    &json!({\"op\": \"sign_in_take_code\", \"id\": id}),\n-                    left(),\n-                ) else {\n-                    return (crate::tools::unavailable(), false);\n-                };\n-                if refused(&read) {\n-                    return (start_refused(&read), true);\n-                }\n-                match read[\"claim\"].as_str() {\n-                    Some(\"waiting\") => {}\n-                    Some(\"granted\")\n-                        if read[\"id\"] == id && code_until(&read, claim_started).is_some() =>\n-                    {\n-                        state = read;\n-                    }\n-                    Some(\"already_given\") => {\n-                        return (\n-                            json!({\n-                                \"next\": \"The sign-in code is already being provided. Do not say it again.\"\n-                            }),\n-                            true,\n-                        );\n-                    }\n-                    Some(\"not_available\" | \"granted\") => {\n-                        return (\n-                            json!({\n-                                \"error\": \"That sign-in code is no longer available. Say they can ask to sign in again.\"\n-                            }),\n-                            true,\n-                        );\n-                    }\n-                    _ => return (needs_tasks_update(), true),\n+                match ask(&socket, &json!({\"op\": \"sign_in_start\"}), left()) {\n+                    Some(read) if !refused(&read) => state = read,\n+                    _ => break,\n                 }\n             }\n             if let Some(code) = state[\"code\"].as_str() {\n",
+      "applied": false,
+      "executed": false
+    }
+  ]
+}

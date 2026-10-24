@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-24 15:07 +0700 — ready clock PR and durable draft recovery
+
+Ready for lamp-voice: yes for #3190; three recovered drafts still require their execution gates.
+
+#3190 is marked ready with READ-OK, green PR/full ARM64 and Linux Clippy. Its exact frozen source archive is now public, closing commit fetchability. The room-state 400/90-second hazard reported on #3330 is already covered by this shared 600-second clock change; that exact case passes both fresh native runs, without establishing the older failure's cause.
+
+[Recovered draft snapshots](verification/tests-recovered-drafts-20261024/) preserve all **17** original owned source files and the four prospective control patches. Every recorded source hash matches; controls remain unapplied/unexecuted. #3218's exact historical runner was recovered, while helper/plan recovery and fresh path binding are underway before local execution. The main user worktree's unrelated changes remain untouched. No local ARM build or lamp action ran.
+
 ## 2026-10-24 14:58 +0700 — #3190 native qualified; scratch recovery
 
 Ready for lamp-voice: yes for #3190 at 414b2df34; reviewer-two READ-OK and all native gates pass.
