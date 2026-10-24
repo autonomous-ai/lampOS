@@ -1,3 +1,26 @@
+## Current checkpoint: 2026-10-24 18:04 +07, Surround landed; new hearing HOLD
+
+#3361 is landed through train85 at `6902cf8e2`. [Exact train proof](verification/surround-release-pair-20261024/train85/landing-audit.json)
+binds the complete landed tree to tested preview; four fixture/workflow
+files are byte-identical, documentation addition preserved with base
+changes. Train ordinary **11,227 PASS + 1 LEAK**, 106 skipped, zero
+failed/unrun; dedicated pair and Linux Clippy green. Original author failure
+and repair stay retained. No self-merge or new device claim.
+
+#3355 new source HOLD on `51925472d` is independently confirmed by
+Reviewer-two: forward wall step invents 0.5 s persistence. [My exact proof](verification/two-faces-forward-clock-reader-20261024/README.md)
+is **5 controls pass / 1 fails**; their separate confirmation has six prior
+controls pass and one negative fail, exit101. Source findings still block
+that shipping repair regardless of its current broad/native gates.
+
+Release6592 **63/63** integrity proof, updater item6 contract and concrete
+#2809/#2396 attended sheet are published. Trusted public half, holder/person
+window and isolated bad/restoration route remain First/Migrate/Fifth inputs.
+Next: repaired hearing source qualification and new own/shipping findings;
+no lamp, release, key or default action by Second.
+
+---
+
 ## Current checkpoint: 2026-10-24 17:51 +07, independent shipping source HOLD
 
 Took #3355's new `51925472d` shipping hearing repair read while #3361 is on

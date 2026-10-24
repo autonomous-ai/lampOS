@@ -1,3 +1,22 @@
+# Landed through train 85, 24 October 2026
+
+#3361 is landed at `6902cf8e203d165f63e73059d2747a9ec7002642`, with
+#3365 Body rest and #3367 heat thresholds. [Exact landing proof](train85/)
+checks the entire landed Git tree equals tested preview
+`c8974a3959879524fddece09e8646406f71a4bb4` (tree `aa4ad7262`). All four
+authored fixture/workflow files remain byte-identical; the Surround docs
+addition is preserved alongside intervening base additions, so whole
+updates.md identity is not claimed.
+
+Train ordinary ARM64 **40086166780**: **11,227 PASS + 1 LEAK**, zero
+failed/unrun, 106 skipped, 201.195 s. Repaired smoke and both HTTP controls
+pass. Dedicated pair **40086166683** and strict Linux Clippy
+**40086166798** pass. Author and reader proofs/failures below remain bound
+to their recorded heads. No lamp/configuration application, real-key
+signature trust, physical two-person, heat or power-loss claim is added.
+
+---
+
 # Current repaired head e14e3c51b, 24 October 2026
 
 Draft #3361's original ordinary ARM64 failed its new current-CLI pre-spawn

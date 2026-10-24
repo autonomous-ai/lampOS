@@ -1,0 +1,9 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:30:43.9881722Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=2 origin +c8974a3959879524fddece09e8646406f71a4bb4:refs/remotes/pull/3368/merge
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:30:51.7266192Z HEAD is now at c8974a3 Merge 6b10b9581807ac0e9b03d9e105398ad7b2495f5d into 9bd23ebf0d0fc7c8a1a19b0cd40c35501c329246
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:48:37.4874527Z         PASS [   0.004s] ( 5871/11228) lamp-surround::release_pair http_complete_reply_is_framed
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:48:37.6334627Z         PASS [   0.146s] ( 5886/11228) lamp-surround::release_pair http_dribbling_reply_cannot_renew_deadline
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:48:38.8383700Z         PASS [   1.358s] ( 6005/11228) lamp-surround::release_pair current_cli_candidate_smoke
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:49:40.6685985Z         LEAK [   0.217s] ( 9047/11228) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:50:11.5711025Z      Summary [ 201.195s] 11228 tests run: 11228 passed (1 leaky), 106 skipped
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:50:20.6132861Z relay_signals: ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:50:25.1686559Z test result: 12 passed; 0 failed
