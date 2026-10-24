@@ -1,0 +1,97 @@
+{
+  "format": "common-9df-Mac-count-hash-boolean/1",
+  "head": "9df96e1151c8f2d1b0ed9323c096da04cb80d402",
+  "tree": "dde5fd2106a01a882649121568c6135f8018c415",
+  "platform": "mac",
+  "exit": 0,
+  "required_stages": 8,
+  "observed_stages": 8,
+  "stage_results": [
+    {
+      "stage": "fmt",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    },
+    {
+      "stage": "clippy",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    },
+    {
+      "stage": "workspace-build",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    },
+    {
+      "stage": "full-eyes",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 5,
+        "passed": 357
+      }
+    },
+    {
+      "stage": "full-voice",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 21,
+        "passed": 4153
+      }
+    },
+    {
+      "stage": "full-update",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 6,
+        "passed": 396
+      }
+    },
+    {
+      "stage": "full-skills",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 9,
+        "passed": 516
+      }
+    },
+    {
+      "stage": "full-memory",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 8,
+        "passed": 324
+      }
+    }
+  ],
+  "required_controls": 5,
+  "all_required_controls_observed_once_passed": true,
+  "workspace_members_freshly_compiled": 46,
+  "source_stable": true,
+  "cleanup_and_target_release": true,
+  "terminal_sha256": "392fa98b2eceb85fafb634865aacc55d5fbf6ce0ae71a934a857f494bc44defa",
+  "source_binding_sha256": "8e8f18bdc56d8a7fc573e4c16ea4a2e48fe5b0de8b5e923a72659b6119321064",
+  "current_fc31_qualification": false,
+  "Linux_full_gate_failed": true,
+  "Linux_first_three_diagnostics_failed": true,
+  "ready_for_lamp_voice": false,
+  "activation_or_physical_acceptance": false,
+  "historical_failure_waived": false,
+  "raw_publication_authorized": false
+}

@@ -6,6 +6,12 @@ results here are from the development machine unless explicitly attributed
 to the first builder's lamp measurements. There is no lamp access here.
 
 
+## 2026-10-25 05:39: Common Mac complete; Name takes released slot
+
+- [Selected Common Mac result](verification/common-9df-mac-selected-20261025/README.md): eight stages pass, Eyes 357/0/5, Voice 4153/0/21, Update 396/0/6, Skills 516/0/9 and Memory 324/0/8; five controls, fresh 46 and source/cleanup/release verified. Linux full Skills and three direct failures remain failed; Tests owns repair. No source epoch, native or readiness credit transfers.
+- Name d60 now runs both independent host gates on its pinned parent. Callback 225 and Photo 2698 preparation checks independently rerun; actual gates stay pending. First's child order holds and Photo trusted capture/strict interval/privacy/physical holds remain.
+- Claimed stalled #3107 on Queue and PR after open/merged/source checks; preparing a current own-branch carry preserving its author's commit and final per-dispatch guards. Original first-chat-event winner prevents duplicate tool streams; acoustic timing remains unverified. Raw evidence stays private; no lamp action.
+
 ## 2026-10-25 05:15: Linux Skills failure reproduced; next Name gate active
 
 - [Selected failed Linux results](verification/common-9df-skills-failed-selected-20261025/README.md): Common 9df all eight stages observed, only Skills failed 518/1/9; other seven pass, with Voice 4214/0/24 and Update 398/0/4. First three prescribed Skills observations all fail 101 at the same unchanged 8 s assertion; procedure 0 means three observed, never three passed. Local/full conditions remain false and original 101 stays HOLD. Tests owns #1806; source-only event-drain mechanism is handed on without a cause claim or Fourth fixture code.
