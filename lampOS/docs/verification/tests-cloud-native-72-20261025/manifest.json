@@ -51,5 +51,5 @@
       "sha256": "369cbb0bc7293d657c58250a9b56445d0dd329930d016ffca803ea6a93379735"
     }
   ],
-  "source": "Original completed CI logs, not a rerun. Derived projections are labeled by filenames. No current-carry result is implied."
+  "source": "Complete byte-preserved gh run view --log console renderings and original run metadata; derived projections are labeled by filenames. Not a raw API archive claim or current-carry result."
 }
