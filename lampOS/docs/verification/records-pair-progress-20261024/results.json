@@ -1,0 +1,157 @@
+{
+  "qualified_tree": "e49f75850de132b12e9f2867450d0d85c6e2afeb",
+  "base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+  "lanes": {
+    "mac": {
+      "original_receipt_sha256": "46fedb7b9a1fe2bfa2895375d316108cec116e3360423243d59af78df7c01a6e",
+      "exit": 0,
+      "finished_utc": "2026-10-24T03:10:05.741231+00:00",
+      "head": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+      "tree": "e49f75850de132b12e9f2867450d0d85c6e2afeb",
+      "source_stable": true,
+      "target_release_permitted": true,
+      "required_stages": 3,
+      "stages": [
+        {
+          "cleanup_confirmed": true,
+          "elapsed_seconds": 15.287858709227294,
+          "exit": 0,
+          "primary_command_exit": 0,
+          "stage": "fmt",
+          "summaries": []
+        },
+        {
+          "cleanup_confirmed": true,
+          "elapsed_seconds": 15.240750411059707,
+          "exit": 0,
+          "primary_command_exit": 0,
+          "stage": "clippy",
+          "summaries": []
+        },
+        {
+          "cleanup_confirmed": true,
+          "elapsed_seconds": 53.15534986089915,
+          "exit": 0,
+          "manual_tests_not_executed": "Linux-only integration target selects zero cases on Mac",
+          "primary_command_exit": 0,
+          "stage": "full-records",
+          "summaries": [
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 138,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 23,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 1,
+              "measured": 0,
+              "passed": 7,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 14,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 0,
+              "status": "ok"
+            },
+            {
+              "failed": 0,
+              "filtered": 0,
+              "ignored": 0,
+              "measured": 0,
+              "passed": 0,
+              "status": "ok"
+            }
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "original_receipt_sha256": "96f85c6f37da8d27c2e1228653afaa053503a4864240350eb99c7437dcfdc8fd",
+      "exit": 0,
+      "finished_utc": "2026-10-24T03:11:19.278551+00:00",
+      "head": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+      "tree": "e49f75850de132b12e9f2867450d0d85c6e2afeb",
+      "source_stable": true,
+      "target_release_permitted": true,
+      "required_stages": 3,
+      "stages": [
+        {
+          "cleanup_confirmed": true,
+          "elapsed_seconds": 26.418826176784933,
+          "exit": 0,
+          "primary_command_exit": 0,
+          "stage": "fmt",
+          "summaries": []
+        },
+        {
+          "cleanup_confirmed": true,
+          "elapsed_seconds": 2.736717659048736,
+          "exit": 0,
+          "primary_command_exit": 0,
+          "stage": "clippy",
+          "summaries": []
+        },
+        {
+          "cleanup_confirmed": true,
+          "elapsed_seconds": 123.72467811591923,
+          "exit": 0,
+          "primary_command_exit": 0,
+          "stage": "workspace-build",
+          "summaries": []
+        }
+      ]
+    }
+  },
+  "historical_linux_records": {
+    "passed": 187,
+    "failed": 0,
+    "ignored": 5,
+    "tree": "e6c42840b8ff32a15235d1cea00dc4fbec692a3b",
+    "relevant_files_identical_on_carry": 104
+  },
+  "offline_controls": {
+    "passed": 52,
+    "failed": 0
+  },
+  "native_failures": [
+    {
+      "run": 40057441482,
+      "head": "fc9274387bf4c8c738b5a949cf600516f9d1de3a",
+      "stage": "workflow validation",
+      "jobs_started": 0,
+      "artifact_cases_executed": 0
+    },
+    {
+      "run": 40058164064,
+      "head": "92eac9990e3ed3bf66d42c371e1cda49b9fc2c77",
+      "stage": "native host preflight",
+      "jobs_started": 1,
+      "artifact_cases_executed": 0,
+      "proven_host": "Linux aarch64, ordinary UID 1001",
+      "exact_failing_prerequisite": "not identified by retained output"
+    }
+  ]
+}

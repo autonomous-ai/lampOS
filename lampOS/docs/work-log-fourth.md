@@ -8425,3 +8425,9 @@ Ready for lamp-voice: no (remaining workspace/current-head/native gates pending)
 The corrected actual 6408↔6449 Memory pair passes 2/0/0, ordinary Memory 314/0/8, strict Memory Clippy and formatting; both releases contain identical Memory payloads. [Evidence and retained failures](verification/release-pair-progress-20261024/README.md) records the original startup and fixture-ID failures, verified export/cleanup, exact source and socket timing boundaries. Full Common Voice failures remain 4,063/15/15 Mac and 4,131/8/18 Linux; source parity establishes no cause or waiver. Linux Update 388/0/4 and Skills 23/0/0 pass; Mac Update continues.
 
 Taken per the ship-critical Queue: #2809 Memory and Records coverage. Records' actual systemd fixture and native lane are being finished; no Python helper will be committed, following Fourth's role. No lamp result or build-row increase.
+
+## 2026-10-24 10:28 +07: Records PR and current compatibility checks
+
+Ready for lamp-voice: no (#3329 native artifact execution remains pending).
+
+Published Records #3329 and folded two workflow fixes into `38a8d5651`, retaining both zero-execution failures. [Results and limitations](verification/records-pair-progress-20261024/README.md) bind Mac 182/0/1, historical Linux 187/0/5 with exact relevant-source parity, current fmt/strict Clippy/workspace build and shell/jq 52/0. The native host requirements remain intact. Memory's current-base checks continue; Common's completed old gates retain all Voice failures while its current enrollment carry is being resolved. No lamp action or row increase.
