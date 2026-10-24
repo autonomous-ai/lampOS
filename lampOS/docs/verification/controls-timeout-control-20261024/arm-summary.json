@@ -1,0 +1,10 @@
+{
+  "run": 40087074229,
+  "head_sha": "714c30820d81d4300627e22a250917b2d2a1de1d",
+  "conclusion": "success",
+  "nextest_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T11:03:00.2607368Z      Summary [ 155.915s] 7964 tests run: 7964 passed (1 leaky), 56 skipped",
+  "ordinary_controls_fixture": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T11:00:45.1501004Z         PASS [   0.424s] (1397/7964) lamp-controls::release_pair current_cli_exercises_the_controls_pair_fixture",
+  "process_controls": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T11:03:13.6670670Z test result: 12 passed; 0 failed",
+  "raw_log_sha256": "5561eb9aed7f475d1bfd526495ddf04b50acefeea197ba5ff87f86a7f01dadec",
+  "linux_formatting_executed": false
+}

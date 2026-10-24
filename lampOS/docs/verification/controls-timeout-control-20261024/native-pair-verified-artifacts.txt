@@ -1,0 +1,2 @@
+release=6408 asset_id=668607702 url=https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-6408/lamp-controls bytes=2463440 sha256=fc3f73157e21c6b3f662ee469f5febeeaa56bbc84091e0b781157192a3961555 ELF=64-bit-little-endian-AArch64
+release=6498 asset_id=670759835 url=https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-6498/lamp-controls bytes=2463440 sha256=fc3f73157e21c6b3f662ee469f5febeeaa56bbc84091e0b781157192a3961555 ELF=64-bit-little-endian-AArch64

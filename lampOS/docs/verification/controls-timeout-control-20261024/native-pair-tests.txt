@@ -1,0 +1,97 @@
+info: syncing channel updates for 1.96.0-aarch64-unknown-linux-gnu
+info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)
+info: downloading component clippy
+    Updating crates.io index
+    Updating git repository `https://github.com/RustAudio/cpal.git`
+ Downloading crates ...
+  Downloaded block-buffer v0.10.4
+  Downloaded cfg-if v1.0.5
+  Downloaded byteorder v1.5.0
+  Downloaded bitflags v2.13.2
+  Downloaded version_check v0.9.5
+  Downloaded errno v0.3.14
+  Downloaded zmij v1.0.23
+  Downloaded unicode-ident v1.0.26
+  Downloaded quote v1.0.47
+  Downloaded serde_core v1.0.229
+  Downloaded proc-macro2 v1.0.107
+  Downloaded memchr v2.8.3
+  Downloaded typenum v1.20.1
+  Downloaded gpiocdev v0.8.0
+  Downloaded serde_json v1.0.151
+  Downloaded i2cdev v0.6.2
+  Downloaded gpiocdev-uapi v0.7.0
+  Downloaded generic-array v0.14.7
+  Downloaded digest v0.10.7
+  Downloaded cpufeatures v0.2.17
+  Downloaded thiserror v2.0.21
+  Downloaded nix v0.26.4
+  Downloaded nix v0.29.0
+  Downloaded signal-hook-registry v1.4.8
+  Downloaded signal-hook v0.4.4
+  Downloaded serde v1.0.229
+  Downloaded syn v3.0.7
+  Downloaded rustix v1.1.5
+  Downloaded itoa v1.0.18
+  Downloaded crypto-common v0.1.7
+  Downloaded cfg_aliases v0.2.2
+  Downloaded bitflags v1.3.2
+  Downloaded thiserror-impl v2.0.21
+  Downloaded sha2 v0.10.9
+  Downloaded serde_derive v1.0.229
+  Downloaded ioctl-sys v0.8.0
+  Downloaded libc v0.2.190
+  Downloaded linux-raw-sys v0.12.1
+   Compiling libc v0.2.190
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling version_check v0.9.5
+   Compiling serde_core v1.0.229
+   Compiling generic-array v0.14.7
+   Compiling bitflags v2.13.2
+   Compiling zmij v1.0.23
+   Compiling typenum v1.20.1
+   Compiling syn v3.0.7
+   Compiling cfg-if v1.0.5
+   Compiling serde_json v1.0.151
+   Compiling itoa v1.0.18
+   Compiling thiserror v2.0.21
+   Compiling cfg_aliases v0.2.2
+   Compiling memchr v2.8.3
+   Compiling serde v1.0.229
+   Compiling nix v0.29.0
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling rustix v1.1.5
+   Compiling digest v0.10.7
+   Compiling thiserror-impl v2.0.21
+   Compiling serde_derive v1.0.229
+   Compiling errno v0.3.14
+   Compiling cpufeatures v0.2.17
+   Compiling signal-hook v0.4.4
+   Compiling bitflags v1.3.2
+   Compiling linux-raw-sys v0.12.1
+   Compiling ioctl-sys v0.8.0
+   Compiling gpiocdev-uapi v0.7.0
+   Compiling nix v0.26.4
+   Compiling sha2 v0.10.9
+   Compiling signal-hook-registry v1.4.8
+   Compiling byteorder v1.5.0
+   Compiling lamp-bus v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/bus)
+   Compiling i2cdev v0.6.2
+   Compiling lamp-msgs v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/msgs)
+   Compiling gpiocdev v0.8.0
+   Compiling lamp-ipc v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/ipc)
+   Compiling lamp-controls v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/controls)
+    Finished `release` profile [optimized] target(s) in 20.27s
+     Running tests/release_pair.rs (target/release/deps/release_pair-6b0d2f6b5f12c0dc)
+
+running 2 tests
+test release_6408_reads_6498_calibration_and_6498_reads_returned_pins ... Controls pair evidence: /tmp/controls-pair-output/controls-pair-16761-0
+ok
+test release_6498_reads_6408_calibration_and_6408_reads_returned_pins ... Controls pair evidence: /tmp/controls-pair-output/controls-pair-16761-1
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.79s
+

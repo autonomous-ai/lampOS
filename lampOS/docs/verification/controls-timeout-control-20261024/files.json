@@ -19,6 +19,10 @@
     "bytes": 675,
     "sha256": "a55f1fd79e40a7508d1e5d19a13d373473303854208f41471024a0c1974e74b2"
   },
+  "native-pair-execution-validation.txt": {
+    "bytes": 5,
+    "sha256": "a17fcf0a2f50e2d495e4f90ce263410edc183add6c62699a2facbccf60410f74"
+  },
   "compiler-artifacts.json": {
     "bytes": 11214,
     "sha256": "293f7e42371d59372dbb71e8a4a4f0a2815b22b055c508004b82153a74073bf4"
@@ -27,16 +31,56 @@
     "bytes": 2300,
     "sha256": "48dfc111599fbc66389940100576b03c331aad9310ea680340684ba4214ca694"
   },
+  "arm-run.json": {
+    "bytes": 5159,
+    "sha256": "b57ad26f5f7a52fde6d1a1543f03db60a2191451693becda2086d4867b27adaf"
+  },
+  "native-pair-verified-artifacts.txt": {
+    "bytes": 500,
+    "sha256": "cc9d2ced9d4ade749652e433243cc944d9aeb4d5cc8d2976d096e4182d0b64ea"
+  },
   "mutant.txt": {
     "bytes": 4125,
     "sha256": "8c126e1b4814c9f2dc6fc24a864347e17632fb4e53aa15d540a282731f94daa8"
+  },
+  "native-pair-run.json": {
+    "bytes": 238,
+    "sha256": "4acc323fd56ccaed39b64edcce06e48a3c18c4505f55c8d1fed27a37a0fb1d6e"
+  },
+  "README.md": {
+    "bytes": 4265,
+    "sha256": "bd9502cff1864c54a4b4a66ba66ba1c1d9a7a01ec8736200d5404cd15167c7a9"
+  },
+  "native-pair-audit.json": {
+    "bytes": 35461,
+    "sha256": "23c91cca5b935d2b0a0f7f310c651acd5709ad3f335695df088c3b59230f6a8e"
+  },
+  "native-pair-cleanup-validation.txt": {
+    "bytes": 5,
+    "sha256": "a17fcf0a2f50e2d495e4f90ce263410edc183add6c62699a2facbccf60410f74"
   },
   "mutant-packaging-failure.txt": {
     "bytes": 1227,
     "sha256": "efde4b1053806c4487226787dda03bf939371ba1a57b162736d1c573725ad620"
   },
+  "native-pair-source-revision": {
+    "bytes": 82,
+    "sha256": "e7a0683d95d666b437f406c2892ed92645508b89f53c3a942f891fa9be8d01ee"
+  },
+  "native-pair-tests.txt": {
+    "bytes": 3454,
+    "sha256": "2ab1ee902b0e836302176a19d2db8d73c4201a0778d7cd914bb44012a44604eb"
+  },
+  "native-pair-run-provenance.txt": {
+    "bytes": 101,
+    "sha256": "17b2e591d627125e3500b7c39a5cb06eb4935e69288a7454d71a553d608a712f"
+  },
   "final-controls.txt": {
     "bytes": 44593,
     "sha256": "f55e250f15c51e66570c75fc092c5da0f0f24482fdad49833d658b52d132c675"
+  },
+  "arm-summary.json": {
+    "bytes": 822,
+    "sha256": "c57c82278a29b215aaa7219e2777c8dd620ab2133a957e37fe57acdb5ed0065d"
   }
 }
