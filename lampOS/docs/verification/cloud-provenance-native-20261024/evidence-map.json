@@ -1,0 +1,1286 @@
+[
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/execution-validation-exit.txt",
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/container-start-exit.txt",
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/runtime-image-id.txt",
+    "sha256": "4bef688e53b61f627de256b311f06fecbe666714cd6c67f53117dbcc1203926c"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/runtime-image.json",
+    "sha256": "c6771892c608d266b0ccefaefcb5a91653e889fcbcea550fccbb92dacfc14659"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/platform.txt",
+    "sha256": "8c675c547fba3929494a135c3e737588f309e469625bba04a846247793d15995"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/container-create.txt",
+    "sha256": "316a9015dc96148edccdd480f2cabe0f76f4dc4a75a73d6e01fc405e51397631"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/container-before.json",
+    "sha256": "e902017dfabc64b84e9e58191c0507f364b433ac6c4085f4722c9d78ca3c7081"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/isolation-check.txt",
+    "sha256": "a17fcf0a2f50e2d495e4f90ce263410edc183add6c62699a2facbccf60410f74"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/native-member-types.txt",
+    "sha256": "828dfa210f3651c1168628afaf42cc483a1030e567936cd2d914d3e0978cadbc"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/source-compare-exit.txt",
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/cleanup-owner-check.txt",
+    "sha256": "a17fcf0a2f50e2d495e4f90ce263410edc183add6c62699a2facbccf60410f74"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/build-exit.txt",
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/run-provenance.txt",
+    "sha256": "9efe44d1c6558bc09f699d9076dd1142cdd20d5718818493d69c11ccbe9158f3"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/verified-payloads.txt",
+    "sha256": "ceb0039498c8f8ce96a84335d082fe6bac368b55616b48a47fd2e2dc4eea8bcb"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/test-binary.sha256",
+    "sha256": "0b192cbf13eacbdbf259f151e4e82fcc5aab9a665ab60c58fd277ef903a11ef3"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/build.stderr",
+    "sha256": "b4ca1057827b8c221a83b84c66e2ff0b44e004bb4b27a08ae7ef2f2275a86517"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/image-build.txt",
+    "sha256": "1cfebe951d407cf834f6e42a6627d63332635d476a1f02e9c0c56b1045c10de3"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/container-after.json",
+    "sha256": "90e38bb13874c4e1ac05ca8199a236970b8a148777fc68a845ba43e0f1a562ac"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/cleanup-before.json",
+    "sha256": "90e38bb13874c4e1ac05ca8199a236970b8a148777fc68a845ba43e0f1a562ac"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/cleanup-remove.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/source-revision.txt",
+    "sha256": "3eca86035bc9d7bb499cae847f72b79fe189e7964cd45f74b97a93c490fb1096"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/base-image.json",
+    "sha256": "598c9b6ca855edaec8acd827f09012893d6a096e6cf32a517b34a8a4df581583"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/cleanup.json",
+    "sha256": "9f11751c10b231af9ed90433f7e09f8d2cca266576d38d9c51e6ee9078c03126"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/cleanup-remove.txt",
+    "sha256": "9ad12cfd1795ef9095951b7296899264f9203aadb510784e7ce43e63d19f8d4f"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/rustc-version.txt",
+    "sha256": "f77b0143371b8a220549f762eacd32249d05c8c34f767890aef5fff616c3a07a"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/container-start.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/test-binary-format.txt",
+    "sha256": "3897e747dcfeddb92436975ff8b3ea1a416f5cda99db72ef46364bf81f13ca92"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/image-pull.txt",
+    "sha256": "0b7fcb1d4491b00f826979fb424bf7a24662e6da594d3f7fae7b4ec1747b0a3e"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/cleanup-remaining.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/native-members.txt",
+    "sha256": "46d2888a2c7f0bbe3ad8e7d6fb68241e18b89cff4e25c174a457115664aa78c0"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/input-after-exit.txt",
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/cleanup-inspect.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/selected-artifact.json",
+    "sha256": "e5387b8c2b11cde1cbb83a7c51b664dd291001c2ec235a019892d39c2906ff49"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/container-state-check.txt",
+    "sha256": "a17fcf0a2f50e2d495e4f90ce263410edc183add6c62699a2facbccf60410f74"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/input-archive.sha256",
+    "sha256": "872dd197f1aaf5de7aacb6eeea988987b4cd0c28b99a8dd21e6aaecba1000099"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/test-binary-host-ldd.txt",
+    "sha256": "e081fc7ffc69609d182849a1c68e72d05ae4c3d45360cb2eda7d2ec5813026a9"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/input-after-check.txt",
+    "sha256": "af9e377fb9443f59307755030c80c7bff08fcd54720c0d55949af7f482eb05d6"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/execution-validation.txt",
+    "sha256": "bac7d42e1b32ebd0439b99df69486e9761c9f2e2f2f2f744fd33d53e36b06dbb"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/input-before.sha256",
+    "sha256": "e34bc881d7503a82704ac9934a62e812258d1eda31d7901d0b98809b670afefb"
+  },
+  {
+    "path": "host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/source-compare.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cloud-release-pair.ldd.txt",
+    "sha256": "aa7010af2c845a8270840dd93f7fd0d11f51f65922446dc31270da7b67cf7a38"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/case.json",
+    "sha256": "f340597ece09cfdf192f83d9285dd420da1b419b6e9a5ab1b6b3465afb9f6a93"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/credentials/opposite-cloud/account",
+    "sha256": "0a0d5336456849624433a0266471c7a62990179b56e474f849b6874a243e3f48"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/credentials/opposite-cloud/build",
+    "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/credentials/opposite-cloud/key",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/credentials/original-cloud/account",
+    "sha256": "a0c1a279eb527d55be5572de1f2253facb9dc60307b0a41b48a66ef36be0095a"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/credentials/original-cloud/build",
+    "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/credentials/original-cloud/key",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/credentials/return-cloud/account",
+    "sha256": "7e2df6bde9ac758ba2cc6e8630c9f993fda856634046204d32784254c8d3739e"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/credentials/return-cloud/build",
+    "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/credentials/return-cloud/key",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/install-a.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/install-a.stdout",
+    "sha256": "27c2aa46f1917f5e8fa0457842f6c17e0218fda986ff01157dfec8e48f123054"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/install-b.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/install-b.stdout",
+    "sha256": "3bc15d086e19879cb390f0a84019ecd4ee2190ec0efc9325efa39cbcd6cb34f1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/opposite-cloud-malformed-reply.json",
+    "sha256": "04c66b0d1cb1fbc3e8f85945522735bc2fe718d2350007f72eb0fb0b11f189c1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/opposite-cloud-positive-reply.json",
+    "sha256": "6f74e6642422648d01c6274724acf03e9e87fadc6e78f3fcb0d8ef71a902b3cd"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/opposite-cloud-restored-reply.json",
+    "sha256": "6f74e6642422648d01c6274724acf03e9e87fadc6e78f3fcb0d8ef71a902b3cd"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/opposite-cloud-unknown-field-reply.json",
+    "sha256": "04c66b0d1cb1fbc3e8f85945522735bc2fe718d2350007f72eb0fb0b11f189c1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/opposite-cloud.stderr",
+    "sha256": "f73599a16bd7e3c535ed4a593c1bed6497db860470c5f9fa85f0bb630662f772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/opposite-cloud.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/original-cloud-malformed-reply.json",
+    "sha256": "bc7be6518d9f570b369f800cc18e64880d49533431c3d4b172ef1f2d5c2edcda"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/original-cloud-positive-reply.json",
+    "sha256": "ad133ab676355acae84f063e4df40f6de991fa4b7bfaf6376d9ecfbab7488d48"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/original-cloud-restored-reply.json",
+    "sha256": "ad133ab676355acae84f063e4df40f6de991fa4b7bfaf6376d9ecfbab7488d48"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/original-cloud-unknown-field-reply.json",
+    "sha256": "bc7be6518d9f570b369f800cc18e64880d49533431c3d4b172ef1f2d5c2edcda"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/original-cloud.stderr",
+    "sha256": "e96d286f01492b132f7767953af1320684bc6ae260a3543eef32ab8a00c67b5d"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/original-cloud.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/pack-a.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/pack-a.stdout",
+    "sha256": "1673680609fa567d075d07ef6b209a099778210a78ad152b8fd1fab061c5535f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/pack-b.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/pack-b.stdout",
+    "sha256": "01aa53b47295ef74ec7ed279d1e3c2551c87d3fd50e9828b02f878e1e03f5684"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/packages/a/provenance-kit-1.0.0.tar",
+    "sha256": "3c2799a1113f51aa554b6f88498c94adbbd995c0929f316e82aa879817948406"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/packages/b/provenance-kit-1.1.0.tar",
+    "sha256": "49d9285f2f7aa3631acf5cb20f94878a27ba70a121cb9bef86daabb3447a4f05"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/result.json",
+    "sha256": "2f73991a490fb7249b782559c4cac0e32f1c89dc24984431d2c43edf8b840a5d"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/return-cloud-positive-reply.json",
+    "sha256": "ad133ab676355acae84f063e4df40f6de991fa4b7bfaf6376d9ecfbab7488d48"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/return-cloud.stderr",
+    "sha256": "6d7ee7a120785e9b022f63ab5021a23be88dc730bdba58a6bce970076cb623f3"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/return-cloud.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-malformed-after/files.json",
+    "sha256": "81599ebef0b0b9dde2fdac289aac3eb26d3c372d9964629940d8b3e71c1b9499"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-malformed-after/provenance-kit/.package.json",
+    "sha256": "4e570edd8b32d17e35e082c716a37f3b4967b53d9805092146674a8061409632"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-malformed-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-malformed-after/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-malformed-after/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-malformed-before/files.json",
+    "sha256": "81599ebef0b0b9dde2fdac289aac3eb26d3c372d9964629940d8b3e71c1b9499"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-malformed-before/provenance-kit/.package.json",
+    "sha256": "4e570edd8b32d17e35e082c716a37f3b4967b53d9805092146674a8061409632"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-malformed-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-malformed-before/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-malformed-before/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-positive-after/files.json",
+    "sha256": "e8ecf5672544f01e117e72d03389ff5611785cb6b3c23d2832d050a33a0ba71c"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-positive-after/provenance-kit/.package.json",
+    "sha256": "5602bc206ddda0f64c66fe4512e4c5022dbe8bf123b9defcdc82a2348e8985da"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-positive-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-positive-after/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-positive-after/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-positive-before/files.json",
+    "sha256": "e8ecf5672544f01e117e72d03389ff5611785cb6b3c23d2832d050a33a0ba71c"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-positive-before/provenance-kit/.package.json",
+    "sha256": "5602bc206ddda0f64c66fe4512e4c5022dbe8bf123b9defcdc82a2348e8985da"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-positive-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-positive-before/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-positive-before/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-restored-after/files.json",
+    "sha256": "a1257cb343ef7ff8d1d296422a7ce0e667214606faf494b96881c9a76a500a9c"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-restored-after/provenance-kit/.package.json",
+    "sha256": "5602bc206ddda0f64c66fe4512e4c5022dbe8bf123b9defcdc82a2348e8985da"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-restored-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-restored-after/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-restored-after/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-restored-before/files.json",
+    "sha256": "a1257cb343ef7ff8d1d296422a7ce0e667214606faf494b96881c9a76a500a9c"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-restored-before/provenance-kit/.package.json",
+    "sha256": "5602bc206ddda0f64c66fe4512e4c5022dbe8bf123b9defcdc82a2348e8985da"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-restored-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-restored-before/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-restored-before/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-unknown-field-after/files.json",
+    "sha256": "0b124bbb7e3c50883ae0526a386c397bdbaf5e245d9c843be52c221aef78b2ce"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-unknown-field-after/provenance-kit/.package.json",
+    "sha256": "e172b6adf04ea8b89aba40dd79bae927d3c6b1a6a09cfa2e7efb6375358c4dc6"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-unknown-field-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-unknown-field-after/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-unknown-field-after/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-unknown-field-before/files.json",
+    "sha256": "0b124bbb7e3c50883ae0526a386c397bdbaf5e245d9c843be52c221aef78b2ce"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-unknown-field-before/provenance-kit/.package.json",
+    "sha256": "e172b6adf04ea8b89aba40dd79bae927d3c6b1a6a09cfa2e7efb6375358c4dc6"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-unknown-field-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-unknown-field-before/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-opposite-cloud-unknown-field-before/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-malformed-after/files.json",
+    "sha256": "60965a23e629347e320cab1b052857f3f74489973fe6d4e7c05eadbdc8e983f5"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-malformed-after/provenance-kit/.package.json",
+    "sha256": "4e570edd8b32d17e35e082c716a37f3b4967b53d9805092146674a8061409632"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-malformed-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-malformed-after/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-malformed-after/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-malformed-before/files.json",
+    "sha256": "60965a23e629347e320cab1b052857f3f74489973fe6d4e7c05eadbdc8e983f5"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-malformed-before/provenance-kit/.package.json",
+    "sha256": "4e570edd8b32d17e35e082c716a37f3b4967b53d9805092146674a8061409632"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-malformed-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-malformed-before/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-malformed-before/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-positive-after/files.json",
+    "sha256": "ab6680244717edbffc55e2c7e174235746ebcd84f5ba82f244ed2892b14959a5"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-positive-after/provenance-kit/.package.json",
+    "sha256": "48341fd2e15688543f52ca177a3f1c51b1122015593970afdaf688e70ae902c9"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-positive-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-positive-after/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-positive-after/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-positive-before/files.json",
+    "sha256": "ab6680244717edbffc55e2c7e174235746ebcd84f5ba82f244ed2892b14959a5"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-positive-before/provenance-kit/.package.json",
+    "sha256": "48341fd2e15688543f52ca177a3f1c51b1122015593970afdaf688e70ae902c9"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-positive-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-positive-before/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-positive-before/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-restored-after/files.json",
+    "sha256": "88101169174870af9605acdc5eeb09630e9ed286457c7a62caa5dad2e4d9c114"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-restored-after/provenance-kit/.package.json",
+    "sha256": "48341fd2e15688543f52ca177a3f1c51b1122015593970afdaf688e70ae902c9"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-restored-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-restored-after/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-restored-after/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-restored-before/files.json",
+    "sha256": "88101169174870af9605acdc5eeb09630e9ed286457c7a62caa5dad2e4d9c114"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-restored-before/provenance-kit/.package.json",
+    "sha256": "48341fd2e15688543f52ca177a3f1c51b1122015593970afdaf688e70ae902c9"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-restored-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-restored-before/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-restored-before/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-unknown-field-after/files.json",
+    "sha256": "a8fe884c954bf51b12e55086fb016c22a51b257e3711ee1870207330d3be1b14"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-unknown-field-after/provenance-kit/.package.json",
+    "sha256": "589adfdccb2889e1cb41c861ce3c325b37d1fedf87e2810f17f8da9d532620c0"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-unknown-field-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-unknown-field-after/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-unknown-field-after/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-unknown-field-before/files.json",
+    "sha256": "a8fe884c954bf51b12e55086fb016c22a51b257e3711ee1870207330d3be1b14"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-unknown-field-before/provenance-kit/.package.json",
+    "sha256": "589adfdccb2889e1cb41c861ce3c325b37d1fedf87e2810f17f8da9d532620c0"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-unknown-field-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-unknown-field-before/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-original-cloud-unknown-field-before/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-return-cloud-positive-after/files.json",
+    "sha256": "88101169174870af9605acdc5eeb09630e9ed286457c7a62caa5dad2e4d9c114"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-return-cloud-positive-after/provenance-kit/.package.json",
+    "sha256": "48341fd2e15688543f52ca177a3f1c51b1122015593970afdaf688e70ae902c9"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-return-cloud-positive-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-return-cloud-positive-after/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-return-cloud-positive-after/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-return-cloud-positive-before/files.json",
+    "sha256": "88101169174870af9605acdc5eeb09630e9ed286457c7a62caa5dad2e4d9c114"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-return-cloud-positive-before/provenance-kit/.package.json",
+    "sha256": "48341fd2e15688543f52ca177a3f1c51b1122015593970afdaf688e70ae902c9"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-return-cloud-positive-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-return-cloud-positive-before/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/snapshot-return-cloud-positive-before/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/sources-after.json",
+    "sha256": "ba536a448f15012843e5a93a3244b1fc764ed09b29f64efd72f546d076edb2e7"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/sources-before.json",
+    "sha256": "ba536a448f15012843e5a93a3244b1fc764ed09b29f64efd72f546d076edb2e7"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/sources/a/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/sources/a/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/sources/a/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/sources/b/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/sources/b/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/sources/b/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-0/transcript.jsonl",
+    "sha256": "2cd1bdac0307116cdb427eb7b9ebda6b0e8187d92eccb22fbde9234d68a5ffef"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/case.json",
+    "sha256": "8bf930ec2c7f5629245aa6b4dd6a11bf7990adca76bf8cd296b5820c6494fa53"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/credentials/opposite-cloud/account",
+    "sha256": "9b4cfe1372da2707bb5a3e69236595d5c8a13d6b5cb6a602363f478728bb0790"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/credentials/opposite-cloud/build",
+    "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/credentials/opposite-cloud/key",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/credentials/original-cloud/account",
+    "sha256": "0b5c53836c83ba8e76f0efa9f529cd3349d2592dac80c31133c50d827202a5d5"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/credentials/original-cloud/build",
+    "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/credentials/original-cloud/key",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/credentials/return-cloud/account",
+    "sha256": "02687d9518baa20b93ca0a4d42daf31c3d6d51698ba514e1e7451ab5d0dfff5d"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/credentials/return-cloud/build",
+    "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/credentials/return-cloud/key",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/install-a.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/install-a.stdout",
+    "sha256": "27c2aa46f1917f5e8fa0457842f6c17e0218fda986ff01157dfec8e48f123054"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/install-b.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/install-b.stdout",
+    "sha256": "3bc15d086e19879cb390f0a84019ecd4ee2190ec0efc9325efa39cbcd6cb34f1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/opposite-cloud-malformed-reply.json",
+    "sha256": "a9649a3adb38ae3d0e12ceb79090669cb258753a8703c9faad26a5026df8bbcc"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/opposite-cloud-positive-reply.json",
+    "sha256": "f99fba11001864e1dbcd434dedf0234e4a1da7967e9ffee821ac95614677b18d"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/opposite-cloud-restored-reply.json",
+    "sha256": "e09e78542b16389850b099aa2cacb9748cb20b21616be13bd8dc596bda1d5095"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/opposite-cloud-unknown-field-reply.json",
+    "sha256": "20e776c6b19df98e419f994131255b72ff13fd3bd013e8c933e716c82d732425"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/opposite-cloud.stderr",
+    "sha256": "5de8935a83adf62a7b493dd3a616ab413e9699606106d37b5f1fe35540246eaa"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/opposite-cloud.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/original-cloud-malformed-reply.json",
+    "sha256": "18a248db1dcd6b3e6dec101cf816ce726d9b596e54b4b2d5b436bbed71e6be95"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/original-cloud-positive-reply.json",
+    "sha256": "3ab9b051ca771f909de147101f6786105994bf5949b3886ca169b2538ce53666"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/original-cloud-restored-reply.json",
+    "sha256": "3ab9b051ca771f909de147101f6786105994bf5949b3886ca169b2538ce53666"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/original-cloud-unknown-field-reply.json",
+    "sha256": "18a248db1dcd6b3e6dec101cf816ce726d9b596e54b4b2d5b436bbed71e6be95"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/original-cloud.stderr",
+    "sha256": "e5676a6990716aa21a43a23e23438c0001e34db52cf0f95bfa7de6d7dd729334"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/original-cloud.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/pack-a.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/pack-a.stdout",
+    "sha256": "1673680609fa567d075d07ef6b209a099778210a78ad152b8fd1fab061c5535f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/pack-b.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/pack-b.stdout",
+    "sha256": "01aa53b47295ef74ec7ed279d1e3c2551c87d3fd50e9828b02f878e1e03f5684"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/packages/a/provenance-kit-1.0.0.tar",
+    "sha256": "3c2799a1113f51aa554b6f88498c94adbbd995c0929f316e82aa879817948406"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/packages/b/provenance-kit-1.1.0.tar",
+    "sha256": "49d9285f2f7aa3631acf5cb20f94878a27ba70a121cb9bef86daabb3447a4f05"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/result.json",
+    "sha256": "46276d77d99c79d15c45f5331a3544bd2c3b78cb6104fd38ba7e5727f9fd3b9f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/return-cloud-positive-reply.json",
+    "sha256": "3ab9b051ca771f909de147101f6786105994bf5949b3886ca169b2538ce53666"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/return-cloud.stderr",
+    "sha256": "97daf5396cb553e6b2a177b33677fa594667431371afac548045755e637d75f4"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/return-cloud.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-malformed-after/files.json",
+    "sha256": "64c77ce046236e080e82d0f347a0c47695a0c2be4e246f5a8d52a6c470c53cf9"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-malformed-after/provenance-kit/.package.json",
+    "sha256": "4e570edd8b32d17e35e082c716a37f3b4967b53d9805092146674a8061409632"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-malformed-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-malformed-after/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-malformed-after/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-malformed-before/files.json",
+    "sha256": "64c77ce046236e080e82d0f347a0c47695a0c2be4e246f5a8d52a6c470c53cf9"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-malformed-before/provenance-kit/.package.json",
+    "sha256": "4e570edd8b32d17e35e082c716a37f3b4967b53d9805092146674a8061409632"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-malformed-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-malformed-before/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-malformed-before/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-positive-after/files.json",
+    "sha256": "d81367f2f4fa2a07968403e0198a3533ec451dd828dcbe11691e2e15580ee02a"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-positive-after/provenance-kit/.package.json",
+    "sha256": "5602bc206ddda0f64c66fe4512e4c5022dbe8bf123b9defcdc82a2348e8985da"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-positive-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-positive-after/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-positive-after/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-positive-before/files.json",
+    "sha256": "d81367f2f4fa2a07968403e0198a3533ec451dd828dcbe11691e2e15580ee02a"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-positive-before/provenance-kit/.package.json",
+    "sha256": "5602bc206ddda0f64c66fe4512e4c5022dbe8bf123b9defcdc82a2348e8985da"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-positive-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-positive-before/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-positive-before/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-restored-after/files.json",
+    "sha256": "15fadc9dbdb95a7464db2d4de323b5fbb312052704e06a24dc1818a7d2ba6dce"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-restored-after/provenance-kit/.package.json",
+    "sha256": "5602bc206ddda0f64c66fe4512e4c5022dbe8bf123b9defcdc82a2348e8985da"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-restored-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-restored-after/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-restored-after/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-restored-before/files.json",
+    "sha256": "15fadc9dbdb95a7464db2d4de323b5fbb312052704e06a24dc1818a7d2ba6dce"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-restored-before/provenance-kit/.package.json",
+    "sha256": "5602bc206ddda0f64c66fe4512e4c5022dbe8bf123b9defcdc82a2348e8985da"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-restored-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-restored-before/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-restored-before/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-unknown-field-after/files.json",
+    "sha256": "6efd113b9f60a9c6a240e00a9a0231678e18f2b78762035a7e06dc4b1742dfdc"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-unknown-field-after/provenance-kit/.package.json",
+    "sha256": "e172b6adf04ea8b89aba40dd79bae927d3c6b1a6a09cfa2e7efb6375358c4dc6"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-unknown-field-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-unknown-field-after/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-unknown-field-after/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-unknown-field-before/files.json",
+    "sha256": "6efd113b9f60a9c6a240e00a9a0231678e18f2b78762035a7e06dc4b1742dfdc"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-unknown-field-before/provenance-kit/.package.json",
+    "sha256": "e172b6adf04ea8b89aba40dd79bae927d3c6b1a6a09cfa2e7efb6375358c4dc6"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-unknown-field-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-unknown-field-before/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-opposite-cloud-unknown-field-before/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-malformed-after/files.json",
+    "sha256": "4c6c358ca063c52838f7142c8e239ee0edce69175ae67f6817fd33ce4330adca"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-malformed-after/provenance-kit/.package.json",
+    "sha256": "4e570edd8b32d17e35e082c716a37f3b4967b53d9805092146674a8061409632"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-malformed-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-malformed-after/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-malformed-after/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-malformed-before/files.json",
+    "sha256": "4c6c358ca063c52838f7142c8e239ee0edce69175ae67f6817fd33ce4330adca"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-malformed-before/provenance-kit/.package.json",
+    "sha256": "4e570edd8b32d17e35e082c716a37f3b4967b53d9805092146674a8061409632"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-malformed-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-malformed-before/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-malformed-before/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-positive-after/files.json",
+    "sha256": "4d4c89c6bbfc64d7834bbe40143d05c9d62bca9d89c7dff2ea2a9c40a77319f8"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-positive-after/provenance-kit/.package.json",
+    "sha256": "48341fd2e15688543f52ca177a3f1c51b1122015593970afdaf688e70ae902c9"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-positive-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-positive-after/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-positive-after/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-positive-before/files.json",
+    "sha256": "4d4c89c6bbfc64d7834bbe40143d05c9d62bca9d89c7dff2ea2a9c40a77319f8"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-positive-before/provenance-kit/.package.json",
+    "sha256": "48341fd2e15688543f52ca177a3f1c51b1122015593970afdaf688e70ae902c9"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-positive-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-positive-before/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-positive-before/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-restored-after/files.json",
+    "sha256": "5c3102824c552bc37b7adc0ed7be401f781e04e4d47eb0e89c8d07af016c0a04"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-restored-after/provenance-kit/.package.json",
+    "sha256": "48341fd2e15688543f52ca177a3f1c51b1122015593970afdaf688e70ae902c9"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-restored-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-restored-after/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-restored-after/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-restored-before/files.json",
+    "sha256": "5c3102824c552bc37b7adc0ed7be401f781e04e4d47eb0e89c8d07af016c0a04"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-restored-before/provenance-kit/.package.json",
+    "sha256": "48341fd2e15688543f52ca177a3f1c51b1122015593970afdaf688e70ae902c9"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-restored-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-restored-before/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-restored-before/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-unknown-field-after/files.json",
+    "sha256": "486fe5cf05ba2eb75b4010c7095b84b337aadf0d819695d1c796ddd562391b4b"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-unknown-field-after/provenance-kit/.package.json",
+    "sha256": "589adfdccb2889e1cb41c861ce3c325b37d1fedf87e2810f17f8da9d532620c0"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-unknown-field-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-unknown-field-after/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-unknown-field-after/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-unknown-field-before/files.json",
+    "sha256": "486fe5cf05ba2eb75b4010c7095b84b337aadf0d819695d1c796ddd562391b4b"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-unknown-field-before/provenance-kit/.package.json",
+    "sha256": "589adfdccb2889e1cb41c861ce3c325b37d1fedf87e2810f17f8da9d532620c0"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-unknown-field-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-unknown-field-before/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-original-cloud-unknown-field-before/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-return-cloud-positive-after/files.json",
+    "sha256": "5c3102824c552bc37b7adc0ed7be401f781e04e4d47eb0e89c8d07af016c0a04"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-return-cloud-positive-after/provenance-kit/.package.json",
+    "sha256": "48341fd2e15688543f52ca177a3f1c51b1122015593970afdaf688e70ae902c9"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-return-cloud-positive-after/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-return-cloud-positive-after/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-return-cloud-positive-after/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-return-cloud-positive-before/files.json",
+    "sha256": "5c3102824c552bc37b7adc0ed7be401f781e04e4d47eb0e89c8d07af016c0a04"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-return-cloud-positive-before/provenance-kit/.package.json",
+    "sha256": "48341fd2e15688543f52ca177a3f1c51b1122015593970afdaf688e70ae902c9"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-return-cloud-positive-before/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-return-cloud-positive-before/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/snapshot-return-cloud-positive-before/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/sources-after.json",
+    "sha256": "c811e4ab02b3a9802dfe64d55dea5c74e4c34298d56d6e4649be5faba18194e4"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/sources-before.json",
+    "sha256": "c811e4ab02b3a9802dfe64d55dea5c74e4c34298d56d6e4649be5faba18194e4"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/sources/a/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/sources/a/provenance-kit/notes.txt",
+    "sha256": "8a00ac69eeb53d1263e109fd73f320b5405332b6e107dc3189b078951cacb772"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/sources/a/provenance-kit/skill.toml",
+    "sha256": "e55e641567f412a28ea7c56db678ef59a28da8e588ad9d441da107ad01d7d781"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/sources/b/provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/sources/b/provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/sources/b/provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  },
+  {
+    "path": "runtime/tmp/pair-output/cv-71-1/transcript.jsonl",
+    "sha256": "94ed2f76957514f2f3875994d26d6edcec099c264195897f640dcf48f6838cac"
+  },
+  {
+    "path": "runtime/tmp/pair-output/fixed-paths-after.txt",
+    "sha256": "5864e65ea5d62a08c8675e4a8471deb4aaaed978688ff9caf7ecc08f5c51a294"
+  },
+  {
+    "path": "runtime/tmp/pair-output/lamp-cloud-6408.ldd.txt",
+    "sha256": "2cc323c194b0a6bb1286f56e023b24f2113ecc3862e5d35ef49b01b2198e6d76"
+  },
+  {
+    "path": "runtime/tmp/pair-output/lamp-cloud-6498.ldd.txt",
+    "sha256": "17b9bf1c0baa230788637da73f39f6cbf9120a3c94d9238bfe65510e7ba85688"
+  },
+  {
+    "path": "runtime/tmp/pair-output/lamp-skills-6408.ldd.txt",
+    "sha256": "ad98ce83e88dcdd7192b45117c1db1fced7ee6b0681d8387cf39a63d635dab97"
+  },
+  {
+    "path": "runtime/tmp/pair-output/lamp-skills-6498.ldd.txt",
+    "sha256": "16f421f47788a4531c2d1d01fee21116ada71700554ae2551b00520fa84b75d4"
+  },
+  {
+    "path": "runtime/tmp/pair-output/runtime-exit.txt",
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "path": "runtime/tmp/pair-output/runtime.txt",
+    "sha256": "f1bd3b25fcbc19b483b10be804e4cb3aae94622329e1b511798a09fc3de6ea50"
+  },
+  {
+    "path": "runtime/tmp/pair-output/test-exit.txt",
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "path": "runtime/tmp/pair-output/tests.txt",
+    "sha256": "0690aa6b5a7106aa799a6e4a81978e690a5970f067f88c70c83bee0e77b3735b"
+  },
+  {
+    "path": "runtime/tmp/pair-output/verified-inputs.sha256",
+    "sha256": "e34bc881d7503a82704ac9934a62e812258d1eda31d7901d0b98809b670afefb"
+  }
+]
