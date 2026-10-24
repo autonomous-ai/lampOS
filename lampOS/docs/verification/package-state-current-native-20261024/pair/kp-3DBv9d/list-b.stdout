@@ -1,0 +1,4 @@
+NAME          KIND         VERSION  MAY USE
+pair-kit      installable  1.0.0    speak
+sleeping-kit  installable  1.0.0    disabled; speak
+The skills here give the model 1 function (fixture_package). A session takes 32, the voice's own and the actions part's first (30 on a product lamp), and past 32 the last are dropped unless the voice runs with LAMP_USE_SKILL=on (every skill through one function, use_skill).

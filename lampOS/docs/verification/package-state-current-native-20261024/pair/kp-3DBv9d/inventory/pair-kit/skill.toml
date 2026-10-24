@@ -1,0 +1,10 @@
+kind = "installable"
+version = "1.1.0"
+enabled = true
+tool = "fixture_package"
+
+[permissions]
+speak = true
+
+[[do]]
+say = "Synthetic package 1.1.0."

@@ -1,0 +1,41 @@
+kind = "core"
+version = "1.0.0"
+enabled = true
+
+[permissions]
+topics = ["fixture/pair"]
+body = true
+
+[[trigger]]
+name = "first"
+topic = "fixture/pair"
+field = "phase"
+equals = "first"
+rearm = "ends"
+during = { from = "11:00", to = "13:00" }
+once_per_day = true
+
+[[trigger]]
+name = "second"
+topic = "fixture/pair"
+field = "phase"
+equals = "second"
+rearm = "ends"
+during = { from = "11:00", to = "13:00" }
+once_per_day = true
+
+[[trigger]]
+name = "third"
+topic = "fixture/pair"
+field = "phase"
+equals = "third"
+rearm = "ends"
+during = { from = "11:00", to = "13:00" }
+once_per_day = true
+
+
+[ask]
+policy = "nudge"
+
+[[do]]
+body = { gesture = "nod" }
