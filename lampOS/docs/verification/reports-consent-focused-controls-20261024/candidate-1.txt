@@ -1,0 +1,10 @@
+   Compiling lamp-camera v0.1.0 (/private/tmp/second-reminder-task-release-pair-20261024/lampOS/crates/camera)
+   Compiling lamp-voice v0.1.0 (/private/tmp/second-reminder-task-release-pair-20261024/lampOS/crates/voice)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 55.50s
+     Running unittests src/lib.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837)
+
+running 1 test
+test provider_worker::tests::held_consent::asked_about_reports_after_a_held_stop_it_says_who_and_when ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3717 filtered out; finished in 0.55s
+

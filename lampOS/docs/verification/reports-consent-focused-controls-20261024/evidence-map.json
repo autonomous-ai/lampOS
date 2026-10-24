@@ -1,0 +1,38 @@
+[
+  {
+    "file": "base-1.txt",
+    "original_sha256": "358229fb83920fe1434c86293d6555e137adb1c0ffd7b5b7dc631358fedbbc24",
+    "published_sha256": "77056bb19806d35d2b10aa0de4dd860442cddead1bf585a98427c16df090aa21",
+    "home_prefix_replacements": 1
+  },
+  {
+    "file": "base-2.txt",
+    "original_sha256": "9b5acffc1b1d5e12663b8e35e74150c70814c6ae8a3b3c5ff5da7e5293752a2c",
+    "published_sha256": "e94d2417a850260149fdb568fc57106b5c10e474b883a19b5963945844330bdb",
+    "home_prefix_replacements": 1
+  },
+  {
+    "file": "base-3.txt",
+    "original_sha256": "63054fbd49d54ae5d38b681ecf7a22dc4f73804f1896aec6326c4b03d6e661b6",
+    "published_sha256": "ae5ed977fd48763fce25db01c45fd28046523cd9d61d994611ae0b14972f34fc",
+    "home_prefix_replacements": 1
+  },
+  {
+    "file": "candidate-1.txt",
+    "original_sha256": "d787e8b364745b5cf48573fe218c202d75eeccce25bf22128de22f576ebd032f",
+    "published_sha256": "3e96aa5f24d74a3a7420eb6a962f377d6074c627c40c851aa40f9ebb4d30a849",
+    "home_prefix_replacements": 1
+  },
+  {
+    "file": "candidate-2.txt",
+    "original_sha256": "78a4c241569c3f3c23c4565d8045e01f723b16784801ee560947e51892e9a66e",
+    "published_sha256": "ffc61dbb64f805d642472392b159bdeb2c33d2adc2d1702a5ed45c5bc769ab91",
+    "home_prefix_replacements": 1
+  },
+  {
+    "file": "candidate-3.txt",
+    "original_sha256": "5a568dfee2983c06bc6eed3fb91606b8bd723e29a0b5040a51e0aafc30fcda00",
+    "published_sha256": "eb12e649be3ae4dab967513b93cf258eea97cb4af24d323aab2b0619138f93f8",
+    "home_prefix_replacements": 1
+  }
+]
