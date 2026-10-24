@@ -8443,3 +8443,11 @@ Pushed Records #3329 `6f79d33d6` with both P2 fixes, Linux 193/0/5 and Mac 182/0
 Records #3329 landed in train 71, with dedicated native 3/0, full ARM 11,169 PASS plus one Voice journal LEAK, strict Clippy and two READ-OKs. No redundant rebase is needed after merge. Memory #3333 remains held for survivor records compared only by IDs; full-record checks are authored and a fresh actual-pair run is next. [Historical raw RPC/source evidence](verification/memory-raw-pair-20261024/README.md) publishes the requested streams, terminal/cleanup/source receipts and complete logical SQL database exports. Binary databases remain local under the repository's binary-artifact rule.
 
 Common's frozen Linux gate passed all eight stages; Mac completed all stages with Voice failures, which remain unwaived. Both released their targets after unchanged-source and cleanup checks. Latest process decisions remove holds solely for a stale base; genuine conflicts and changed-source checks still require repair. No lamp is assigned.
+
+## 2026-10-24 13:36 +07: Memory P2 actual pair and Common diagnosis
+
+Memory's strengthened survivor comparisons passed both actual published-binary cases, 2/0/0, with 41 successful RPCs and three reaps per direction. Linux full Memory passes314/0/8; Mac strict Clippy and formatting pass. Remaining checks and final source/cleanup receipts still precede the folded push.
+
+[Common qualification audit](verification/common-qualification-audit-20261024/mac-failures/README.md) separates27top-level Mac Voice failures from one embedded duplicate; no cause or waiver inferred. A matched baseline/candidate experiment is being prepared on the released global Mac target. The [current carry](verification/common-qualification-audit-20261024/current-carry/README.md) retains both conflicting appended test modules and all outside-owned paths from5074d860c. Its known upstream room-speaker enrollment-proof P2 remains routed toFirst on#3306. No current carry qualification is claimed.
+
+Retired the inactive disposable Records Linux Cargo cache after exact terminal0/source/cleanup proof, preserving source, logs and native receipts, to make room for ongoing gates. No active cache was removed.

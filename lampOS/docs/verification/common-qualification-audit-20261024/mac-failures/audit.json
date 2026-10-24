@@ -1,0 +1,584 @@
+{
+  "source_head": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+  "source_tree": "89b46e6f1cc57211c7746ed6c72abdf2e0108aa2",
+  "comparison_current": "5074d860c2be76d1f201a59f8380e33f70de6618",
+  "mac_log": "/private/tmp/fourth-common-9ed-mac-checks-20261024/mac/attempt1/full-voice.log",
+  "mac_log_sha256": "2df9f3d61ec58c322bec0cb456357559c84f0dc06cf3476d4ffdac007a0f5638",
+  "mac_raw_aggregated": {
+    "passed": 4068,
+    "failed": 28,
+    "ignored": 15
+  },
+  "mac_top_level": {
+    "passed": 4068,
+    "failed": 27,
+    "ignored": 15
+  },
+  "nested_duplicate": "provider_worker::tests::review_2026_10_14::an_accepted_decline_allows_reports_withdrawal_without_reviving_speech",
+  "unique_failure_count": 27,
+  "connection_reset_failures": 20,
+  "failures": [
+    {
+      "name": "coordinator::tests::reminders::a_mute_past_an_hour_leaves_the_reminder_to_the_one_hour_rule",
+      "panic_path": "crates/voice/src/reminders/consumer/roundtrip_tests.rs",
+      "panic_line": 371,
+      "message": "fresh durable offer",
+      "connection_reset": false,
+      "embedded_child_failure": false,
+      "body_sha256": "43231db31558ebb5e336f1a72886410fbbf3e5329ae8d1a9d3d09ab395ae7bc0"
+    },
+    {
+      "name": "coordinator::tests::reminders::reminder_waits_for_named_request_second_look_before_its_window_can_expire",
+      "panic_path": "crates/voice/src/coordinator/tests/reminders.rs",
+      "panic_line": 287,
+      "message": "called `Result::unwrap()` on an `Err` value: StaleOwner",
+      "connection_reset": false,
+      "embedded_child_failure": false,
+      "body_sha256": "82f34939508b5d8a0698f09e416c2840227501a4663408e19c053159fdb3bfb6"
+    },
+    {
+      "name": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives",
+      "panic_path": "crates/voice/src/hand_controls/tests.rs",
+      "panic_line": 1529,
+      "message": "the touch never arrived: Health { received: 2, rejected: 1, lost: 0, reconnects: 0, discontinuities: 2, pump_running: false, persistence_failed: false }",
+      "connection_reset": false,
+      "embedded_child_failure": false,
+      "body_sha256": "cd03b12f35e6573349bfb5f78c938778aca60d0f993b7530ef2d7354a1c94602"
+    },
+    {
+      "name": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once",
+      "panic_path": "crates/voice/src/hand_controls/tests.rs",
+      "panic_line": 1375,
+      "message": "55 passes in 1 s",
+      "connection_reset": false,
+      "embedded_child_failure": false,
+      "body_sha256": "366d7c2dcf910cfee10d25d7940e91ca58a6b631060f94f5765c47823fcb65f6"
+    },
+    {
+      "name": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+      "panic_path": "crates/voice/src/privacy_bus.rs",
+      "panic_line": 1425,
+      "message": "the host stalled in 10 of 10 attempts: invalid privacy message discarded",
+      "connection_reset": false,
+      "embedded_child_failure": false,
+      "body_sha256": "05b4fb2ac8368aa4ecd8db7314886e0bb0b78693b507258547087bac857b3219"
+    },
+    {
+      "name": "provider_worker::tests::catalog::no_renewal_while_a_turn_is_open",
+      "panic_path": "crates/voice/src/provider_worker/tests/catalog.rs",
+      "panic_line": 362,
+      "message": "renewed with a turn open",
+      "connection_reset": false,
+      "embedded_child_failure": false,
+      "body_sha256": "5713f3127d9b76b0192458219f9b7eeb88b243a3244cda45b607909503770ec1"
+    },
+    {
+      "name": "provider_worker::tests::catalog::the_light_back_renews_at_the_first_short_gap_between_owned_turns",
+      "panic_path": "crates/voice/src/provider_worker/tests/catalog.rs",
+      "panic_line": 335,
+      "message": "renewed with a turn owned",
+      "connection_reset": false,
+      "embedded_child_failure": false,
+      "body_sha256": "72c273b008dcbf74036f779654fa73c59b89a76f6c1ae9448ed6fcce3e694ac6"
+    },
+    {
+      "name": "provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "fb1fa5d9e0be669c8fa560617f93e569ffb36bdce2dd9825c7f312f7464ee101"
+    },
+    {
+      "name": "provider_worker::tests::review_2026_10_14::an_accepted_decline_allows_reports_withdrawal_without_reviving_speech",
+      "panic_path": "crates/voice/src/provider_worker/tests/review_2026_10_14.rs",
+      "panic_line": 1001,
+      "message": "isolated reports regression failed: stdout=",
+      "connection_reset": true,
+      "embedded_child_failure": true,
+      "body_sha256": "b629320f585bcd6e774774e5ef7d8a883adfb2e4adcc05fef378d4a05507dad3"
+    },
+    {
+      "name": "provider_worker::tests::review_2026_10_14::an_accepted_decline_blocks_later_and_mixed_music_calls",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "200339eeb0af0aa34e9163d241eb00bb56ff9dea05b0aea17750c549f9cd86b4"
+    },
+    {
+      "name": "provider_worker::tests::review_2026_10_14::an_accepted_decline_does_not_release_a_parked_music_call",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "32c555471b7e1edbf4de5b9bf41cb4b639ffded8b172c7c9aaa247afa50732b2"
+    },
+    {
+      "name": "provider_worker::tests::sounds::a_cut_in_heard_as_a_fragment_is_asked_again_and_stop_is_answered",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "1b11d6bb4d1b788849a6b5dc923edd30e336d500a73b764ae4c7f348dafdd200"
+    },
+    {
+      "name": "provider_worker::tests::sounds::a_sound_heard_as_another_language_is_held_and_a_short_word_is_answered",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "ed277e6a046a9d635f29c72ad2fc56cb6acf3e8d91645b9ac726751b658e13b2"
+    },
+    {
+      "name": "provider_worker::tests::sounds::a_sound_with_a_word_right_after_the_lamps_question_is_answered",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "f8cf70e73b972c548f15e667a1de0ed3e4d3cccfb476cc7c52e61879ad08aa24"
+    },
+    {
+      "name": "provider_worker::tests::sounds::in_a_conversation_a_turn_heard_in_another_script_or_as_a_bare_number_is_asked_again",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "10a203d6097312a7f3320043e8721b1f8fe08be676c5d9fc1f622a52b5a96e37"
+    },
+    {
+      "name": "provider_worker::tests::sounds::with_the_switch_a_misheard_cut_in_is_said_as_one_and_the_next_request_is_told",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "f2f535e7839ce82e2d6d8f79ad9052f26a63a9f6f75e2595748b8241f9ba4333"
+    },
+    {
+      "name": "provider_worker::tests::spoken_to::a_turn_nobody_said_to_the_lamp_never_changes_the_lamp",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "9118e56f243c71c0b87430506e1e19749563e272ef5664a3ebfc16bdbf4eaf82"
+    },
+    {
+      "name": "provider_worker::tests::spoken_to::an_own_turn_completed_silent_is_no_news",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "52a9bfab5fba823821503be2ab9b2918269210463613eb033099c8a9e9a66420"
+    },
+    {
+      "name": "provider_worker::tests::spoken_to::the_lamp_called_by_name_or_in_a_conversation_is_answered_with_the_switch",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "c8121c5a1443635cea95f05c5ba625ddd436234a7965a1f113846c1afc2dd196"
+    },
+    {
+      "name": "provider_worker::tests::spoken_to::the_same_turn_with_the_lamps_name_changes_the_lamp",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "88dc25a0210c6f8824f2974f0d850b87d2e690796bd169a498a92a0cab25395f"
+    },
+    {
+      "name": "provider_worker::tests::spoken_to::what_nobody_said_to_the_lamp_is_held_with_the_switch_and_played_without",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "9bc650302565d9de4fc217811615bbefd9ae75279768eb74255bcdc8e023ecb6"
+    },
+    {
+      "name": "provider_worker::tests::spoken_to::with_the_switch_a_line_answered_by_an_action_alone_keeps_the_conversation",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "e89fe2e5a33f708da7b95af52f0c7063c29119461d158d44ad5779146e36be20"
+    },
+    {
+      "name": "provider_worker::tests::spoken_to::with_the_switch_a_lookup_then_not_for_me_is_no_answer",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "8a53309ccc87c43c9ff0b3b8ef381739b2433c90b26100788bfb0a43d29098f2"
+    },
+    {
+      "name": "provider_worker::tests::spoken_to::with_the_switch_two_lines_the_lamp_left_alone_end_its_conversation",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "05bc2dccd9752ddc521f2fbe209340b53cca36ba194b3125594a64206325f5f8"
+    },
+    {
+      "name": "provider_worker::tests::stop_and_heartbeat_are_serviced_while_a_reconnect_hangs",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "493b9402e78f4f725c7954017f26a842d1eaadd18f0bb7c7516a9ed252be2d31"
+    },
+    {
+      "name": "provider_worker::tests::the_first_request_after_a_stop_tells_the_model_it_was_stopped",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "269aa9dff52fef0388c40476a8d880ead8db06f2a0503a1624390ba5f82ebfd4"
+    },
+    {
+      "name": "provider_worker::tests::the_models_sign_that_it_heard_its_name_is_answered_silently_and_changes_nothing_played",
+      "panic_path": "crates/voice/src/provider_worker.rs",
+      "panic_line": 9978,
+      "message": "called `Result::unwrap()` on an `Err` value: Custom { kind: ConnectionReset, error: \"provider.c.p: Connection reset by peer (os error 54)\" }",
+      "connection_reset": true,
+      "embedded_child_failure": false,
+      "body_sha256": "8d0bbbcf92720b3e4d7280952957f8a21fcddcaf8a48842828c524710de9a044"
+    }
+  ],
+  "file_comparisons": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/reminders.rs",
+      "candidate_sha256": "702d4ee903197016353b1d3b1a3dc538e85aab3fc4b50e364c234424c82e8444",
+      "refs": {
+        "9ed44f88c573837c50451c94f4d88f010e8a6721": {
+          "sha256": "702d4ee903197016353b1d3b1a3dc538e85aab3fc4b50e364c234424c82e8444",
+          "byte_equal": true
+        },
+        "5074d860c2be76d1f201a59f8380e33f70de6618": {
+          "sha256": "702d4ee903197016353b1d3b1a3dc538e85aab3fc4b50e364c234424c82e8444",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/hand_controls/tests.rs",
+      "candidate_sha256": "3c3ce295763a7fe92c90535ca91fd4d5865a9effcb784963e09b2b77164cffaf",
+      "refs": {
+        "9ed44f88c573837c50451c94f4d88f010e8a6721": {
+          "sha256": "3c3ce295763a7fe92c90535ca91fd4d5865a9effcb784963e09b2b77164cffaf",
+          "byte_equal": true
+        },
+        "5074d860c2be76d1f201a59f8380e33f70de6618": {
+          "sha256": "3c3ce295763a7fe92c90535ca91fd4d5865a9effcb784963e09b2b77164cffaf",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "candidate_sha256": "0c5187d595c326fda96aed34ca1c8faeb387bc946c34a23900c95480973c0674",
+      "refs": {
+        "9ed44f88c573837c50451c94f4d88f010e8a6721": {
+          "sha256": "0c5187d595c326fda96aed34ca1c8faeb387bc946c34a23900c95480973c0674",
+          "byte_equal": true
+        },
+        "5074d860c2be76d1f201a59f8380e33f70de6618": {
+          "sha256": "0c5187d595c326fda96aed34ca1c8faeb387bc946c34a23900c95480973c0674",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker.rs",
+      "candidate_sha256": "81d7368deb6f1bea8aa5eae3037d9a4b3ce1cf25502e81e8e9bc93a6f1932aaa",
+      "refs": {
+        "9ed44f88c573837c50451c94f4d88f010e8a6721": {
+          "sha256": "81d7368deb6f1bea8aa5eae3037d9a4b3ce1cf25502e81e8e9bc93a6f1932aaa",
+          "byte_equal": true
+        },
+        "5074d860c2be76d1f201a59f8380e33f70de6618": {
+          "sha256": "81d7368deb6f1bea8aa5eae3037d9a4b3ce1cf25502e81e8e9bc93a6f1932aaa",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/catalog.rs",
+      "candidate_sha256": "b46a1b8c5b0769aedc8cf8d49984d178e2202af5324cc116c4b77d131cb8905b",
+      "refs": {
+        "9ed44f88c573837c50451c94f4d88f010e8a6721": {
+          "sha256": "b46a1b8c5b0769aedc8cf8d49984d178e2202af5324cc116c4b77d131cb8905b",
+          "byte_equal": true
+        },
+        "5074d860c2be76d1f201a59f8380e33f70de6618": {
+          "sha256": "b46a1b8c5b0769aedc8cf8d49984d178e2202af5324cc116c4b77d131cb8905b",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs",
+      "candidate_sha256": "f2555660c24b644d750686aac312be772def54819df86d4785ba8ce15dcae45d",
+      "refs": {
+        "9ed44f88c573837c50451c94f4d88f010e8a6721": {
+          "sha256": "f2555660c24b644d750686aac312be772def54819df86d4785ba8ce15dcae45d",
+          "byte_equal": true
+        },
+        "5074d860c2be76d1f201a59f8380e33f70de6618": {
+          "sha256": "f2555660c24b644d750686aac312be772def54819df86d4785ba8ce15dcae45d",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/sounds.rs",
+      "candidate_sha256": "5d4386593b153f2bc8fd529255a3d8ae7f3752b0f5ffba2087c45775b76b6cb5",
+      "refs": {
+        "9ed44f88c573837c50451c94f4d88f010e8a6721": {
+          "sha256": "5d4386593b153f2bc8fd529255a3d8ae7f3752b0f5ffba2087c45775b76b6cb5",
+          "byte_equal": true
+        },
+        "5074d860c2be76d1f201a59f8380e33f70de6618": {
+          "sha256": "5d4386593b153f2bc8fd529255a3d8ae7f3752b0f5ffba2087c45775b76b6cb5",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "candidate_sha256": "2fb8205fb7ebd46161f13f7403e4de713675b4c64c0438f34c4f01e2b6dfae26",
+      "refs": {
+        "9ed44f88c573837c50451c94f4d88f010e8a6721": {
+          "sha256": "2fb8205fb7ebd46161f13f7403e4de713675b4c64c0438f34c4f01e2b6dfae26",
+          "byte_equal": true
+        },
+        "5074d860c2be76d1f201a59f8380e33f70de6618": {
+          "sha256": "2fb8205fb7ebd46161f13f7403e4de713675b4c64c0438f34c4f01e2b6dfae26",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/reminders/consumer/roundtrip_tests.rs",
+      "candidate_sha256": "79e34df46c650a41137f6778a29b08ea8bd174f5ea48da7867d49eb750a3829d",
+      "refs": {
+        "9ed44f88c573837c50451c94f4d88f010e8a6721": {
+          "sha256": "79e34df46c650a41137f6778a29b08ea8bd174f5ea48da7867d49eb750a3829d",
+          "byte_equal": true
+        },
+        "5074d860c2be76d1f201a59f8380e33f70de6618": {
+          "sha256": "79e34df46c650a41137f6778a29b08ea8bd174f5ea48da7867d49eb750a3829d",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/scenario_clock.rs",
+      "candidate_sha256": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80",
+      "refs": {
+        "9ed44f88c573837c50451c94f4d88f010e8a6721": {
+          "exists": true,
+          "byte_equal": true
+        },
+        "5074d860c2be76d1f201a59f8380e33f70de6618": {
+          "exists": true,
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/reminders/consumer.rs",
+      "candidate_sha256": "395e0c9e902a2331405cbdad974e7db79d0f3c25c348950d75b27ce3fdaa3d8f",
+      "refs": {
+        "9ed44f88c573837c50451c94f4d88f010e8a6721": {
+          "exists": true,
+          "byte_equal": true
+        },
+        "5074d860c2be76d1f201a59f8380e33f70de6618": {
+          "exists": true,
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/hand_controls.rs",
+      "candidate_sha256": "65c5e16916267fca8d029a60191f21ae7d3becf6dfca342f16df9f0ea666c49a",
+      "refs": {
+        "9ed44f88c573837c50451c94f4d88f010e8a6721": {
+          "exists": true,
+          "byte_equal": true
+        },
+        "5074d860c2be76d1f201a59f8380e33f70de6618": {
+          "exists": true,
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/turn-owner/src/lib.rs",
+      "candidate_sha256": "5f375e273e59c81368b0874cffb188b45b8880b8484e0d56ed3c9d454780bb84",
+      "refs": {
+        "9ed44f88c573837c50451c94f4d88f010e8a6721": {
+          "exists": true,
+          "byte_equal": true
+        },
+        "5074d860c2be76d1f201a59f8380e33f70de6618": {
+          "exists": true,
+          "byte_equal": true
+        }
+      }
+    }
+  ],
+  "mac_stages": [
+    {
+      "stage": "fmt",
+      "exit": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "cleanup": true
+    },
+    {
+      "stage": "clippy",
+      "exit": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "cleanup": true
+    },
+    {
+      "stage": "workspace-build",
+      "exit": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "cleanup": true
+    },
+    {
+      "stage": "full-eyes",
+      "exit": 0,
+      "passed": 357,
+      "failed": 0,
+      "ignored": 5,
+      "cleanup": true
+    },
+    {
+      "stage": "full-voice",
+      "exit": 101,
+      "passed": 4068,
+      "failed": 28,
+      "ignored": 15,
+      "cleanup": true
+    },
+    {
+      "stage": "full-update",
+      "exit": 0,
+      "passed": 386,
+      "failed": 0,
+      "ignored": 6,
+      "cleanup": true
+    },
+    {
+      "stage": "full-skills",
+      "exit": 0,
+      "passed": 514,
+      "failed": 0,
+      "ignored": 1,
+      "cleanup": true
+    },
+    {
+      "stage": "full-memory",
+      "exit": 0,
+      "passed": 314,
+      "failed": 0,
+      "ignored": 6,
+      "cleanup": true
+    }
+  ],
+  "linux_stages": [
+    {
+      "stage": "fmt",
+      "exit": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "cleanup": true
+    },
+    {
+      "stage": "clippy",
+      "exit": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "cleanup": true
+    },
+    {
+      "stage": "workspace-build",
+      "exit": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "cleanup": true
+    },
+    {
+      "stage": "full-eyes",
+      "exit": 0,
+      "passed": 360,
+      "failed": 0,
+      "ignored": 5,
+      "cleanup": true
+    },
+    {
+      "stage": "full-voice",
+      "exit": 0,
+      "passed": 4156,
+      "failed": 0,
+      "ignored": 18,
+      "cleanup": true
+    },
+    {
+      "stage": "full-update",
+      "exit": 0,
+      "passed": 388,
+      "failed": 0,
+      "ignored": 4,
+      "cleanup": true
+    },
+    {
+      "stage": "full-skills",
+      "exit": 0,
+      "passed": 517,
+      "failed": 0,
+      "ignored": 1,
+      "cleanup": true
+    },
+    {
+      "stage": "full-memory",
+      "exit": 0,
+      "passed": 314,
+      "failed": 0,
+      "ignored": 6,
+      "cleanup": true
+    }
+  ],
+  "audit_source_files_bytes_modes_mtimes_unchanged": true,
+  "execution": "audit only; no Cargo, test, cache, source/ref/index changes",
+  "waived_failures": 0
+}

@@ -1,0 +1,13 @@
+# Common current carry, prepared only
+
+Candidate staged tree `5191c66e97f7407fd136f9582454c3643be22cc1` is on `5074d860c2be76d1f201a59f8380e33f70de6618` in `/private/tmp/fourth-common-latest-carry-20261024`, branch `fourth/speaker-foundation-latest-20261024`. It carries the exact source of tested tree `89b46e6f1cc57211c7746ed6c72abdf2e0108aa2` from `9ed44f88c573837c50451c94f4d88f010e8a6721`. No final commit or push, Cargo, test, cache access, device operation or qualification claim was made.
+
+The one conflict was adjacent appended test modules in `remember.rs`: current `room_speaker` and Common's `EventReadFixture`/first-fence test. Both are retained in full. Production files merged automatically. `git diff --check` passes, unmerged paths are empty, and no cherry-pick operation marker remains (`--no-commit`). Synthetic source commit `464ec14d3489fd81057d4eb41f63c3437af6186b` exists only as an object, with a one-line message.
+
+Exactly 35 owned paths differ from current base. All 10,317 paths outside that set are exact base blobs/modes. Of the owned paths, 28 are byte-exact to the tested source; seven retain upstream additions: `remember.rs`, `second_provider.rs`, `second_provider/worker.rs`, and docs `eyes.md`, `memory.md`, `reuse-decisions.md`, `switches.md`. The complete target patch, owned-path delta from tested source, and upstream-overlap patch are retained beside `receipt.json`.
+
+Source spot checks retain Common tri-state NotePermission and absolute permission deadlines, request-local enrollment guards independent of private disclosure, the composed enrollment/private-current-line test, and Eyes capture clearing private grant before Taking. The newer own-name enrollment/refusal files are untouched base blobs. Current room-speaker protocol, Memory changes and forced remember-first-round composition remain present. Full gates and review are still required.
+
+Known upstream #3306 composition P2 is intentionally preserved and routed separately: the room-speaker-only asynchronous fallback republishes the same request's LineSeen with `enrollment: None` through unscoped `saw_line`, replacing previously published enrollment proof. Reviewer-three already reported it on #3306 at 06:04:45 UTC, with a concrete reproducer and repair recommendation; #3306 remains First's open `first/room-speaker-carry` PR. This carry does not fix or qualify that fault. Root owns routing and may request a separately scoped composition repair.
+
+The original frozen worktree and its successful Linux / failed Mac test evidence are unchanged. Mac failure diagnosis is another audit. Original failed checks are not waived by this preparation.
