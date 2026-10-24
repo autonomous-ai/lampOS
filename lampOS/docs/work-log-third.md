@@ -5,6 +5,17 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 14:15 — #3344 open and permission read complete
+
+- Own #3344 `f653bc5bd` is pushed, clean: full Voice **3,993/0/21**,
+  fmt/Clippy/workspace pass. Lead READ-OK in; second privacy read, exact
+  Linux fmt and ARM64 remain. Lead’s scope-None/epoch-coverage P3s are
+  answered in the body; no source change since the read.
+- #3319 `606e84a11`: second source read finds no new P1/P2; independent
+  focused **55/0**, fmt/Clippy pass. [Read](verification/requested-audio-spin-review-20261024/README.md).
+  Corrected playback/production-budget evidence and fold remain First’s.
+- #3333 still awaits Fourth’s published survivor correction. No lamp access.
+
 ## 2026-10-24 13:49 — room enrollment proof reproduced and corrected
 
 - Claimed #3306’s same-request proof overwrite; focused before **0/1**,

@@ -1,0 +1,7 @@
+
+running 2 tests
+test complete_reply_finishes_inside_absolute_deadline ... ok
+test dribbling_reply_cannot_renew_absolute_deadline ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
