@@ -1,0 +1,319 @@
+{
+  "pr": 3218,
+  "old_head": "328f7da0f5c1fd729bd5d22a974f9c0a67cf07dd",
+  "old_base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+  "head": "c46e6cfe15af814cf4a50a1b5cad9f9940333e14",
+  "base": "88b1ad796e5045490ad678eb240eea2dab010c81",
+  "tree": "31bebc99c7289508166e0dad02b25982bd44b89a",
+  "changed_paths": [
+    "lampOS/crates/voice/src/messages.rs",
+    "lampOS/docs/messages.md"
+  ],
+  "range_diff": "1:  328f7da0f5 = 1:  c46e6cfe15 lampOS: wait for the phone-news round before timing text preemption",
+  "format_result": {
+    "source_kind": "exact_git_commit",
+    "source": "c46e6cfe15af814cf4a50a1b5cad9f9940333e14",
+    "candidate_commit": "c46e6cfe15af814cf4a50a1b5cad9f9940333e14",
+    "declared_overlays": [],
+    "format_container_exit": 0,
+    "timed_out": false,
+    "container_elapsed_seconds": 30.958227389026433,
+    "timing_boundary": "Entire container command including setup, extraction, rustfmt and source hashing.",
+    "formatting_success": true,
+    "source_archive_unchanged": true,
+    "git_identity_unchanged": true,
+    "snapshots_unchanged": true,
+    "compilation": false,
+    "tests": false,
+    "ARM_build": false,
+    "source_edits": false,
+    "evidence_directory": "/private/tmp/tests-3218-linux-fmt-20261024/run-20261024T011541.403377Z"
+  },
+  "format_source": {
+    "label": "3218-c46e6cfe1",
+    "kind": "exact_git_commit",
+    "pr": 3218,
+    "source": {
+      "commit": "c46e6cfe15af814cf4a50a1b5cad9f9940333e14",
+      "root_tree": "31bebc99c7289508166e0dad02b25982bd44b89a",
+      "parents": [
+        "88b1ad796e5045490ad678eb240eea2dab010c81"
+      ],
+      "workspace_tree": "b34ec28d25cabd0b661ee90a87ab9b0b47c5574a"
+    },
+    "expected_parent": "88b1ad796e5045490ad678eb240eea2dab010c81",
+    "overlays": [],
+    "image": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+    "status": "One authorized exact-head source-only Linux formatting run, no network pulls/build/tests/target access; archive600s/container300s.",
+    "base_archive_sha256": "14f08abd099ba5c9c4e444c760ca7f0f64f42cc6f142d6488d4d8b3d91cf8105",
+    "archive_file": "source-lampOS.tar",
+    "archive_bytes": 212725760,
+    "archive_sha256": "14f08abd099ba5c9c4e444c760ca7f0f64f42cc6f142d6488d4d8b3d91cf8105",
+    "input_scope": "All tracked lampOS files; exact Git commit or declared frozen two-file overlay only.",
+    "overlay_all_lampOS_bytes_and_modes_verified": false,
+    "runner_sha256": "ea38ef8fe5ecf817cd6feeab227ae6af0b12e9e434d172bd889b09460f024a40"
+  },
+  "commands": [
+    {
+      "name": "source-identity",
+      "command": [
+        "git",
+        "show",
+        "-s",
+        "--format=%H%n%T%n%P",
+        "c46e6cfe15af814cf4a50a1b5cad9f9940333e14"
+      ],
+      "cwd": "<shared-repository>",
+      "started_utc": "2026-10-24T01:15:41.404734+00:00",
+      "finished_utc": "2026-10-24T01:15:41.462092+00:00",
+      "elapsed_seconds": 0.05739592807367444,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 60,
+      "stdout_bytes": 123,
+      "stderr_bytes": 0,
+      "stdout_sha256": "6c331da3d0662067bf5293f54a82422b577e6b0eebae445be84606705265a11a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "workspace-tree",
+      "command": [
+        "git",
+        "rev-parse",
+        "c46e6cfe15af814cf4a50a1b5cad9f9940333e14:lampOS"
+      ],
+      "cwd": "<shared-repository>",
+      "started_utc": "2026-10-24T01:15:41.462709+00:00",
+      "finished_utc": "2026-10-24T01:15:41.502682+00:00",
+      "elapsed_seconds": 0.040013208985328674,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 60,
+      "stdout_bytes": 41,
+      "stderr_bytes": 0,
+      "stdout_sha256": "f677624e9b9061d0cf06f132337e6b6967b7303cc6fc06836e9f3cd81214aa7e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "image-inspect",
+      "command": [
+        "podman",
+        "image",
+        "inspect",
+        "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c"
+      ],
+      "cwd": null,
+      "started_utc": "2026-10-24T01:15:41.503237+00:00",
+      "finished_utc": "2026-10-24T01:15:41.681391+00:00",
+      "elapsed_seconds": 0.17820396786555648,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 60,
+      "stdout_bytes": 7701,
+      "stderr_bytes": 0,
+      "stdout_sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "archive",
+      "command": [
+        "git",
+        "archive",
+        "--format=tar",
+        "--output=/private/tmp/tests-3218-linux-fmt-20261024/run-20261024T011541.403377Z/source-lampOS.tar",
+        "c46e6cfe15af814cf4a50a1b5cad9f9940333e14",
+        "lampOS"
+      ],
+      "cwd": "<shared-repository>",
+      "started_utc": "2026-10-24T01:15:41.682129+00:00",
+      "finished_utc": "2026-10-24T01:15:44.041587+00:00",
+      "elapsed_seconds": 2.3595539671368897,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 600,
+      "stdout_bytes": 0,
+      "stderr_bytes": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "archive-commit",
+      "command": [
+        "git",
+        "get-tar-commit-id"
+      ],
+      "cwd": null,
+      "started_utc": "2026-10-24T01:15:44.042370+00:00",
+      "finished_utc": "2026-10-24T01:15:44.101432+00:00",
+      "elapsed_seconds": 0.059167321305722,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 60,
+      "stdout_bytes": 41,
+      "stderr_bytes": 0,
+      "stdout_sha256": "bbcd842b3c3f7a4ba4f754eb7d152072a4c4a83582f3f7a18356600a552e6a77",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "format",
+      "command": [
+        "podman",
+        "run",
+        "--rm",
+        "--pull=never",
+        "--network=none",
+        "--read-only",
+        "--tmpfs",
+        "/tmp:rw,size=1g,mode=1777",
+        "--workdir",
+        "/tmp",
+        "--env",
+        "CARGO_NET_OFFLINE=true",
+        "--env",
+        "CARGO_TARGET_DIR=/tmp/format-target",
+        "--entrypoint",
+        "/bin/sh",
+        "--name",
+        "tests-3218-c46e6cfe1-fmt-38958",
+        "-i",
+        "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+        "-ec",
+        "set -eu\nuname -a\ncargo --version\nrustfmt --version\nrustc -vV\nrustc -vV | grep -Fx 'host: x86_64-unknown-linux-gnu'\ncargo --version | grep -F 'cargo 1.96.0 '\nrustfmt --version | grep -F 'rustfmt 1.9.0-stable '\nmkdir /tmp/source\ntar -xf - -C /tmp/source\ncd /tmp/source\nsource_fingerprint() {\n  find lampOS -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum\n  find lampOS -type l -printf '%p -> %l\\n' | LC_ALL=C sort\n}\nsource_fingerprint > /tmp/source-before.sha256\nprintf 'source-before-manifest '\nsha256sum /tmp/source-before.sha256\ncd lampOS\nset +e\ncargo fmt --all --check\nformat_status=$?\nset -e\ncd ..\nsource_fingerprint > /tmp/source-after.sha256\nprintf 'source-after-manifest '\nsha256sum /tmp/source-after.sha256\nif ! cmp -s /tmp/source-before.sha256 /tmp/source-after.sha256; then\n  diff -u /tmp/source-before.sha256 /tmp/source-after.sha256 >&2 || true\n  printf 'source changed during formatting check\\n' >&2\n  exit 125\nfi\nprintf 'cargo_fmt_exit=%s\\n' \"$format_status\"\nexit \"$format_status\"\n"
+      ],
+      "cwd": null,
+      "started_utc": "2026-10-24T01:15:46.008343+00:00",
+      "finished_utc": "2026-10-24T01:16:16.965830+00:00",
+      "elapsed_seconds": 30.958227389026433,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 300,
+      "stdout_bytes": 746,
+      "stderr_bytes": 0,
+      "stdout_sha256": "20146e906b501a16e8dfd9d6b411726e05a1d7f08bf440672baebcf90bab2343",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "final-source-identity",
+      "command": [
+        "git",
+        "show",
+        "-s",
+        "--format=%H%n%T%n%P",
+        "c46e6cfe15af814cf4a50a1b5cad9f9940333e14"
+      ],
+      "cwd": "<shared-repository>",
+      "started_utc": "2026-10-24T01:16:16.966874+00:00",
+      "finished_utc": "2026-10-24T01:16:17.018083+00:00",
+      "elapsed_seconds": 0.05123997200280428,
+      "exit_code": 0,
+      "timed_out": false,
+      "timeout_seconds": 60,
+      "stdout_bytes": 123,
+      "stderr_bytes": 0,
+      "stdout_sha256": "6c331da3d0662067bf5293f54a82422b577e6b0eebae445be84606705265a11a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "streams": [
+    {
+      "file": "archive-commit.stderr",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "projection": [],
+      "text": ""
+    },
+    {
+      "file": "archive-commit.stdout",
+      "original_bytes": 41,
+      "original_sha256": "bbcd842b3c3f7a4ba4f754eb7d152072a4c4a83582f3f7a18356600a552e6a77",
+      "projection": [],
+      "text": "c46e6cfe15af814cf4a50a1b5cad9f9940333e14\n"
+    },
+    {
+      "file": "archive.stderr",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "projection": [],
+      "text": ""
+    },
+    {
+      "file": "archive.stdout",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "projection": [],
+      "text": ""
+    },
+    {
+      "file": "final-source-identity.stderr",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "projection": [],
+      "text": ""
+    },
+    {
+      "file": "final-source-identity.stdout",
+      "original_bytes": 123,
+      "original_sha256": "6c331da3d0662067bf5293f54a82422b577e6b0eebae445be84606705265a11a",
+      "projection": [],
+      "text": "c46e6cfe15af814cf4a50a1b5cad9f9940333e14\n31bebc99c7289508166e0dad02b25982bd44b89a\n88b1ad796e5045490ad678eb240eea2dab010c81\n"
+    },
+    {
+      "file": "format.stderr",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "projection": [],
+      "text": ""
+    },
+    {
+      "file": "format.stdout",
+      "original_bytes": 746,
+      "original_sha256": "20146e906b501a16e8dfd9d6b411726e05a1d7f08bf440672baebcf90bab2343",
+      "projection": [
+        "ephemeral container hostname replaced"
+      ],
+      "text": "Linux <container-host> 6.12.13-200.fc41.x86_64 #1 SMP PREEMPT_DYNAMIC Sat Feb 8 20:05:26 UTC 2025 x86_64 GNU/Linux\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nrustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.96.0\nLLVM version: 22.1.2\nhost: x86_64-unknown-linux-gnu\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nsource-before-manifest eff6924b2c83d32136a5209f83ca27d8c299e14c6ed61effdaaa92f7c733b684  /tmp/source-before.sha256\nsource-after-manifest eff6924b2c83d32136a5209f83ca27d8c299e14c6ed61effdaaa92f7c733b684  /tmp/source-after.sha256\ncargo_fmt_exit=0\n"
+    },
+    {
+      "file": "image-inspect.stderr",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "projection": [],
+      "text": ""
+    },
+    {
+      "file": "image-inspect.stdout",
+      "original_bytes": 7701,
+      "original_sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74",
+      "projection": [],
+      "text": "[\n     {\n          \"Id\": \"eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c\",\n          \"Digest\": \"sha256:340a3bdf76419083569becb186cae71d5c97cb46b24314c917a0305b322162a9\",\n          \"RepoTags\": [\n               \"localhost/lampos-fourth-native-user-check:latest\"\n          ],\n          \"RepoDigests\": [\n               \"localhost/lampos-fourth-native-user-check@sha256:340a3bdf76419083569becb186cae71d5c97cb46b24314c917a0305b322162a9\"\n          ],\n          \"Parent\": \"09de8d2eb0b0a3075180387ddc675cd5ceec6f422da0e516dc9d8fadd6a22908\",\n          \"Comment\": \"debuerreotype 0.17\",\n          \"Created\": \"2026-10-14T17:55:59.324085844Z\",\n          \"Config\": {\n               \"User\": \"1000:1000\",\n               \"Env\": [\n                    \"CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc\",\n                    \"CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER=qemu-aarch64-static\",\n                    \"CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc\",\n                    \"CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++\",\n                    \"AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar\",\n                    \"PKG_CONFIG_ALLOW_CROSS=1\",\n                    \"PKG_CONFIG_PATH_aarch64_unknown_linux_gnu=/usr/lib/aarch64-linux-gnu/pkgconfig\",\n                    \"BINDGEN_EXTRA_CLANG_ARGS_aarch64_unknown_linux_gnu=--target=aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu\",\n                    \"CARGO_INCREMENTAL=0\",\n                    \"PATH=/root/.rustup/toolchains/1.96.0-x86_64-unknown-linux-gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\n                    \"CARGO_HOME=/cargo\"\n               ],\n               \"Cmd\": [\n                    \"bash\"\n               ],\n               \"WorkingDir\": \"/src\",\n               \"Labels\": {\n                    \"io.buildah.version\": \"1.39.4\"\n               }\n          },\n          \"Version\": \"\",\n          \"Author\": \"\",\n          \"Architecture\": \"amd64\",\n          \"Os\": \"linux\",\n          \"Size\": 2544081605,\n          \"VirtualSize\": 2544081605,\n          \"GraphDriver\": {\n               \"Name\": \"overlay\",\n               \"Data\": {\n                    \"LowerDir\": \"/var/home/core/.local/share/containers/storage/overlay/088872fbec000bd44b73c90fbd95cf123c91977d7ad7528981fe7827b58ab63e/diff:/var/home/core/.local/share/containers/storage/overlay/d283144b0729679456992e832ab57354ded1501be7ffe59d0db2de4141804347/diff:/var/home/core/.local/share/containers/storage/overlay/6c5391a24f46840f7872ae1d2f33df5da30d5badf2b053bba9237401ac56b57e/diff:/var/home/core/.local/share/containers/storage/overlay/6439a9e3affca36e4cc323dd241724b62721af4a3f4aa590ced4ae11f8083a4b/diff\",\n                    \"UpperDir\": \"/var/home/core/.local/share/containers/storage/overlay/134495c0219d703424de882260b883a09db1927b65b38554e4724d27cc7eaefb/diff\",\n                    \"WorkDir\": \"/var/home/core/.local/share/containers/storage/overlay/134495c0219d703424de882260b883a09db1927b65b38554e4724d27cc7eaefb/work\"\n               }\n          },\n          \"RootFS\": {\n               \"Type\": \"layers\",\n               \"Layers\": [\n                    \"sha256:6439a9e3affca36e4cc323dd241724b62721af4a3f4aa590ced4ae11f8083a4b\",\n                    \"sha256:0699a1bae29b829331deac0a591d798bd930ee93fed2cddaecadb8a33e664c16\",\n                    \"sha256:e2a10c29832b4b5829cccc5f739a92c3947f800c502962c199e55723e63d3272\",\n                    \"sha256:85f8cee76f8091687b2a0a2fa611cd2603721eb86e500e86b9ff24c9da305526\",\n                    \"sha256:d95e4bfd4fc04b7e4981face0d28fc72ae79348d8cabd22b3d0442fbfc90ba61\"\n               ]\n          },\n          \"Labels\": {\n               \"io.buildah.version\": \"1.39.4\"\n          },\n          \"Annotations\": {\n               \"org.opencontainers.image.base.digest\": \"sha256:cd9b3138f04268d06261c942637724b960a2c788358a3f09a5fe5428a2f1f12e\",\n               \"org.opencontainers.image.base.name\": \"localhost/lampos-fourth-native-check:latest\"\n          },\n          \"ManifestType\": \"application/vnd.oci.image.manifest.v1+json\",\n          \"User\": \"1000:1000\",\n          \"History\": [\n               {\n                    \"created\": \"2026-10-05T00:00:00Z\",\n                    \"created_by\": \"# debian.sh --arch 'amd64' out/ 'bookworm' '@1791158400'\",\n                    \"comment\": \"debuerreotype 0.17\"\n               },\n               {\n                    \"created\": \"2026-10-10T17:30:18.175114698Z\",\n                    \"created_by\": \"/bin/sh -c dpkg --add-architecture arm64  && apt-get update  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends       ca-certificates curl git build-essential pkg-config clang libclang-dev       gcc-aarch64-linux-gnu g++-aarch64-linux-gnu       libc6-dev:arm64 libasound2-dev:arm64 qemu-user-static file  && rm -rf /var/lib/apt/lists/*\",\n                    \"comment\": \"FROM docker.io/library/debian:bookworm\"\n               },\n               {\n                    \"created\": \"2026-10-10T17:31:03.930706138Z\",\n                    \"created_by\": \"/bin/sh -c curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs   | sh -s -- -y --profile minimal --default-toolchain 1.96.0       -c clippy -c rustfmt -t aarch64-unknown-linux-gnu\"\n               },\n               {\n                    \"created\": \"2026-10-10T17:31:11.271218503Z\",\n                    \"created_by\": \"/bin/sh -c #(nop) ENV PATH=/root/.cargo/bin:$PATH     CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc     CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER=qemu-aarch64-static     CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc     CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++     AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar     PKG_CONFIG_ALLOW_CROSS=1     PKG_CONFIG_PATH_aarch64_unknown_linux_gnu=/usr/lib/aarch64-linux-gnu/pkgconfig     BINDGEN_EXTRA_CLANG_ARGS_aarch64_unknown_linux_gnu=\\\"--target=aarch64-linux-gnu -I/usr/include/aarch64-linux-gnu\\\"     CARGO_INCREMENTAL=0\",\n                    \"empty_layer\": true\n               },\n               {\n                    \"created\": \"2026-10-10T17:31:11.316345936Z\",\n                    \"created_by\": \"/bin/sh -c #(nop) WORKDIR /src\",\n                    \"empty_layer\": true\n               },\n               {\n                    \"created\": \"2026-10-14T04:39:43.319966965Z\",\n                    \"created_by\": \"/bin/sh -c apt-get update && apt-get install -y --no-install-recommends libasound2-dev:amd64 libudev-dev:amd64 procps && rm -rf /var/lib/apt/lists/*\",\n                    \"comment\": \"FROM localhost/lampos-arm64-cross:latest\"\n               },\n               {\n                    \"created\": \"2026-10-14T17:55:59.104432203Z\",\n                    \"created_by\": \"/bin/sh -c chmod 0755 /root\",\n                    \"comment\": \"FROM localhost/lampos-fourth-native-check:latest\"\n               },\n               {\n                    \"created\": \"2026-10-14T17:55:59.208671397Z\",\n                    \"created_by\": \"/bin/sh -c #(nop) ENV PATH=/root/.rustup/toolchains/1.96.0-x86_64-unknown-linux-gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\",\n                    \"empty_layer\": true\n               },\n               {\n                    \"created\": \"2026-10-14T17:55:59.265340319Z\",\n                    \"created_by\": \"/bin/sh -c #(nop) ENV CARGO_HOME=/cargo\",\n                    \"empty_layer\": true\n               },\n               {\n                    \"created\": \"2026-10-14T17:55:59.324311999Z\",\n                    \"created_by\": \"/bin/sh -c #(nop) USER 1000:1000\",\n                    \"empty_layer\": true\n               }\n          ],\n          \"NamesHistory\": [\n               \"localhost/lampos-fourth-native-user-check:latest\"\n          ]\n     }\n]\n"
+    },
+    {
+      "file": "source-identity.stderr",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "projection": [],
+      "text": ""
+    },
+    {
+      "file": "source-identity.stdout",
+      "original_bytes": 123,
+      "original_sha256": "6c331da3d0662067bf5293f54a82422b577e6b0eebae445be84606705265a11a",
+      "projection": [],
+      "text": "c46e6cfe15af814cf4a50a1b5cad9f9940333e14\n31bebc99c7289508166e0dad02b25982bd44b89a\n88b1ad796e5045490ad678eb240eea2dab010c81\n"
+    },
+    {
+      "file": "workspace-tree.stderr",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "projection": [],
+      "text": ""
+    },
+    {
+      "file": "workspace-tree.stdout",
+      "original_bytes": 41,
+      "original_sha256": "f677624e9b9061d0cf06f132337e6b6967b7303cc6fc06836e9f3cd81214aa7e",
+      "projection": [],
+      "text": "b34ec28d25cabd0b661ee90a87ab9b0b47c5574a\n"
+    }
+  ]
+}

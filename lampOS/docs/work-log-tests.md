@@ -1,5 +1,24 @@
 # Tests work log
 
+## 2026-10-24 08:18 +0700 — current carries and qualification started
+
+Ready for lamp-voice: no; local qualification and fresh native CI remain.
+
+[Three source carries](verification/tests-current-carries-20261024/) bind
+#3190 at 5f87be93c, #3218 at c46e6cfe1 and #3273 at 2c244d708 to current
+88b1ad796. All three one-commit range-diffs are equal, with no conflicts;
+exact-head Linux x86 formatting passed for each. Old owned heads are
+archived. PR branches remain unpushed until their local gates complete.
+
+The matched clean-base full run is active under one reserved local target.
+Candidate gates follow sequentially, preserving all original failures and
+recording the fixed three standalone observations required for classification.
+The source-only Linux formatter finished before full tests began. No local
+ARM build, device operation or historical-cause claim was made.
+
+#3277 is merged as 822efff7c. The Queue's continuous-work order is active:
+current qualification comes first, then the authorized #2839 sign-in repair.
+
 ## 2026-10-24 00:01 +0700 — fixed privacy/search comparison complete
 
 Ready for lamp-voice: no; #3190's original local gate remains held.
