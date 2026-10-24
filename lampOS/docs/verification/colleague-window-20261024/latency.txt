@@ -1,0 +1,1 @@
+100 batches of 10000 complete policy cycles; nanoseconds per cycle: median 51.2, p95 batch-average 55.5, max batch-average 58.3

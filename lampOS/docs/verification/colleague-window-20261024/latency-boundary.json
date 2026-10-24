@@ -1,0 +1,17 @@
+{
+  "platform": "macOS-26.6.2-x86_64-i386-64bit",
+  "compiler": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "helper_sha256": "62ba7869bdb6dd28e3b1405f261b3607397340a4ab2bfb74e9b8fe91d24645b2",
+  "argv": [
+    "rustc",
+    "+1.96.0",
+    "--edition=2024",
+    "-O",
+    "/private/tmp/third-carry-window-latency.rs",
+    "-o",
+    "/private/tmp/third-carry-window-latency"
+  ],
+  "boundary": "begin, actual answer, remember one actual audio end, classify held, two eligibility decisions, clear; optimized native Mac helper only",
+  "samples": "100 batch means, 10000 cycles each; not individual latency percentiles",
+  "target": "under 1 ms host policy bookkeeping; no device or end-to-end measurement"
+}

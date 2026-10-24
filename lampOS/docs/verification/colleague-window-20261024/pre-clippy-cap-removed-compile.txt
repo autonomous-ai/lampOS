@@ -1,0 +1,10 @@
+warning: constant `MAX_CARRY_US` is never used
+ --> /private/tmp/third-window-cap-removed-64gxkzel/carry_window.rs:5:7
+  |
+5 | const MAX_CARRY_US: u64 = 40_000_000;
+  |       ^^^^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: 1 warning emitted
+

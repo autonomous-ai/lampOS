@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "a_held_colleague_extends_the_carry_window_but_not_past_its_cap",
+    "--",
+    "--test-threads=1"
+  ],
+  "exit": 101,
+  "seconds": 192.458,
+  "log": "/private/tmp/third-carry-window-red.txt",
+  "target": "/private/tmp/third-carry-window-target-ld637ldg",
+  "purpose": "original carry plus new First-contract regression, before extension implementation"
+}

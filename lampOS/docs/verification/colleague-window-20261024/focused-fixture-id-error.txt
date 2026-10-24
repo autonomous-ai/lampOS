@@ -1,0 +1,27 @@
+
+running 18 tests
+................ 16/18
+second_provider::worker::tests::the_extended_carry_still_needs_the_owner_and_ends_on_stop_privacy_or_forget --- FAILED
+.
+failures:
+
+---- second_provider::worker::tests::the_extended_carry_still_needs_the_owner_and_ends_on_stop_privacy_or_forget stdout ----
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: one line from someone else: the conversation's carry stands, and the line makes the room neither busy nor talked past (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 4: in a busy room, begun 24999 ms after the lamp's words ended and judged 60000 ms after, past a follow-up's window or after talk past the lamp: it goes on only as the same speaker's conversation, within 20 s of their end by its start, if its voice or face is the one the lamp answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 4: someone else (voice not known, from 0 ms of speech; faces seen speaking ["f1"], turned to the lamp ["f1"], the caller's ["b/f1"]): held, not answered (LAMP_SAME_SPEAKER_CARRIES)
+
+thread 'second_provider::worker::tests::the_extended_carry_still_needs_the_owner_and_ends_on_stop_privacy_or_forget' (248162395) panicked at crates/voice/src/second_provider/worker.rs:10288:17:
+assertion `left == right` failed
+  left: Some(false)
+ right: Some(true)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    second_provider::worker::tests::the_extended_carry_still_needs_the_owner_and_ends_on_stop_privacy_or_forget
+
+test result: FAILED. 17 passed; 1 failed; 0 ignored; 0 measured; 3732 filtered out; finished in 0.04s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

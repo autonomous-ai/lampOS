@@ -1,0 +1,15 @@
+# Bounded held-colleague window, 24 October 2026
+
+Claimed stale #3331 on Queue 6385318988 and original PR 6385319561. Both original author commits are preserved, now 520e8cacf and 5e472a08d on current train 508b5b37f. This follow-up implements only First's approved decision 6380629183: twenty seconds from the later of the actual answer end and one held colleague line's actual audio end, once per actual answer, capped forty seconds after the answer. Two colleagues in a row still end carry. Existing switch stays off; Sixth retains the separate no-sure-sign personal-scope privacy guard. No activation, played round or device action.
+
+The original carried source on 22b753df5 plus the new regression failed at +25 s, expected exit 101; its +45 s iteration was not reached. After implementation the first 17 focused carry tests passed. The expanded fixture then failed because it invented an unqualified f1 face ID rather than the existing boot-qualified b/f1; corrected to take the actual caller IDs. All 18 focused controls then passed, including owner/colleague identity and stop/privacy/forget/two-colleague/turn-away/off controls. Both failed observations are retained. An initial formatting command was run in the repository parent rather than lampOS and failed without formatting; the corrected workspace command ran afterward.
+
+A separate optimized native Mac helper probe measured median 51.2 ns, p95 batch-average 55.5 ns, maximum batch-average 58.3 ns per complete bookkeeping cycle across 100 batches of 10000 cycles. This is policy bookkeeping only, including allocation/clear, not an individual-call percentile or microphone/provider/device latency measurement. No wait, I/O, worker or wire field is added; at most four eligible line ends are retained. The source hash and compiler boundary are recorded.
+
+The current full source-guarded twelve-package Mac reverse-closure gate is running; no full green or Linux result is claimed at this checkpoint. Docker is unavailable on this Mac, so official PR native formatting/Clippy and ARM64 jobs are required before readiness. No ARM64 linking or execution is done here. Historical played busy-room limits and privacy/physical acceptance remain held.
+
+## First full gate stopped at strict Clippy
+
+Whole-workspace formatting passed with unchanged source. Strict twelve-package all-target Clippy then reported three nonminimal boolean expressions in the new helper and exited 101. Build and full tests did not run. The suggested is_none_or forms replaced the equivalent negated is_some_and forms; no lint suppression. A second source-guarded sequential gate is active. Pre-simplification isolated mutations compiled successfully and each failed its exact assertion as intended: removing the forty-second cap fails the cap control, and removing the once guard fails the repeated/late control. Those receipts and the earlier helper performance hash are explicitly pre-simplification, not relabelled final-source runs.
+
+#3386 independently landed through train 93 as 43ac6c843 while this source gate was running. It is complete; this carry remains the active work.
