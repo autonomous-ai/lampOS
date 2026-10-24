@@ -1,0 +1,6 @@
+{
+  "excluded_count": 0,
+  "excluded_files": [],
+  "format": 1,
+  "note": "All omitted binary case storage remains bound by the verified private ZIP. Full source manifests and authored blob maps are represented by their hashes and exact comparison in ci.json. Raw API objects and workflow logs are not copied."
+}
