@@ -53,8 +53,14 @@ No lamp, GPIO/I2C, acoustic measurement, real touch, motor, provider, service
 restart or updater transaction participates. This establishes only the
 selected published file writer/reader behavior if the native gate passes.
 Physical calibration and action-to-feedback latency remain unverified.
-There is no authored hanging-child cleanup control; output size is checked
-after each bounded command rather than enforced by a live disk quota.
+The later ordinary fixture adds a hanging-child cleanup control, separate
+from either released-pair case: a 60 s helper crosses an original 25 ms
+deadline, then the existing guard must kill/reap it and prove group absence.
+Independent `waitpid` verifies that the primary guard already reaped it; a
+bounded fallback prevents a failed probe leaving its child alive. Historical
+pair runs above do not retroactively qualify this added control. Output size
+is still checked after each bounded command rather than by a live disk quota;
+no descendant-adoption or kernel-hard-deadline claim is added.
 
 ## Local driver gates
 
