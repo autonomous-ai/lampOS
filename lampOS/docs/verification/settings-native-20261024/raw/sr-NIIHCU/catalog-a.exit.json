@@ -1,0 +1,8 @@
+{
+  "code": 0,
+  "event": "reaped",
+  "groups_absent": true,
+  "pid": 16589,
+  "signal": null,
+  "stage": "catalog-a"
+}

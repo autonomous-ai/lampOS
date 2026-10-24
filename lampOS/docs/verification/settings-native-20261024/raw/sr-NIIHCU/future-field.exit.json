@@ -1,0 +1,8 @@
+{
+  "code": 2,
+  "event": "reaped",
+  "groups_absent": true,
+  "pid": 16597,
+  "signal": null,
+  "stage": "future-field"
+}

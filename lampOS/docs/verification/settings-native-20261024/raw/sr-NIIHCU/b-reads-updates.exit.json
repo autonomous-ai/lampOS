@@ -1,0 +1,8 @@
+{
+  "code": null,
+  "event": "reaped",
+  "groups_absent": true,
+  "pid": 16593,
+  "signal": 9,
+  "stage": "b-reads-updates"
+}

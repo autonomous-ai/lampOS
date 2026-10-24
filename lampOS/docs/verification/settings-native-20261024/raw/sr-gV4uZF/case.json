@@ -1,0 +1,11 @@
+{
+  "boundary": "released Settings CLI and Unix-socket desired-state store only",
+  "bus_root": null,
+  "consumers": false,
+  "pair": [
+    6408,
+    6498
+  ],
+  "physical_or_power_loss": false,
+  "test": "release_6498_settings_reads_6408_and_6408_reads_return"
+}
