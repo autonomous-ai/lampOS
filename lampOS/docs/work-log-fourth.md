@@ -8481,3 +8481,9 @@ Both published payloads are identical AArch64 executables running through existi
 ## 2026-10-24: Memory P2 closed and train handoff
 
 Reviewer-two and Third both renewed READ-OK on0882cb904, with all P1/P2 closed and native gates green. Published the [exact tested README and reconstructed-tree binding](verification/memory-tested-readme-20261024/README.md), closing the remaining nonblocking availability note without a code change. Author HOLD lifted; #3333 is offered to the train. Common's full Mac/Linux eight-stage qualification remains active.
+
+## 2026-10-24 15:53 +07: next test-only control and voice freeze
+
+Taken: #3329's nonblocking bounded-reader size-cap control follow-up, under #2809, after open and merged searches found no follow-up. Add direct exact-limit/limit-plus-one checks for4096-byte events and65536-byte member reads, separately from content parsing; preserve all six existing controls and production guards. Claimed on #3329 and Queue before code. Gate slots follow Common's exclusively held targets.
+
+First's15:41 voice freeze holds Common's new default-on voice/unit merge until the hearing acceptance bar is met. Local full qualification and review preparation continue; no activation or device action is inferred. Memory3333 is test-only and remains reader-cleared/green/offered to the train.
