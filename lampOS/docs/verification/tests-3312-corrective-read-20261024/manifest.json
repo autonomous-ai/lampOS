@@ -1,0 +1,29 @@
+{
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 2894,
+      "sha256": "976cda992fa34970b79a606bf803f1f3780f6684d403ab81489186832c5d18cf"
+    },
+    {
+      "path": "artifact-protocol-verification.json",
+      "bytes": 8430,
+      "sha256": "0de4c49e768db41175b187c9afe55dc5ad866cfd7603a623a9796736129b4361"
+    },
+    {
+      "path": "artifact-source-verification.json",
+      "bytes": 868,
+      "sha256": "c37c880e6f26b5bfbce49f09f319f32718d64b08b384ba8ae4adddbec1d2c1ef"
+    },
+    {
+      "path": "native-summary.json",
+      "bytes": 3574,
+      "sha256": "1bae20a8054ab75ca68b6e0354c6051b736b03dff1baac994acd895fece25a76"
+    },
+    {
+      "path": "source-receipt.json",
+      "bytes": 1431,
+      "sha256": "a20e70c8cb905495322c042747b67cff4970053720e3ac934d8a720333f59650"
+    }
+  ]
+}

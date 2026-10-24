@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-24 09:46 +0700 — corrected release-pair native evidence read
+
+Ready for lamp-voice: no; own qualification continues and #3312 still needs its current carry/fold.
+
+[Independent #3312 audit](verification/tests-3312-corrective-read-20261024/) clears the two corrected fixture faults at cec3372b7. Dedicated native ARM passed 12/0/0; ordinary native had 11,128 PASS plus one journal LEAK, zero failed/unrun and 83 skipped. Strict Linux Clippy passed. Artifact digest, exact tree, all 6,973 source hashes, six release pins and Tasks/Voice protocol evidence were independently checked. The original failures remain visible; no older result qualifies the newer 090847e59 base or a folded head. The same-voice LEAK is another retained observation for the prepared #1569 cleanup, not proof of its cause.
+
+The fixed #3190 base comparison is still in its dependent suites; its candidate follows without starting another baseline merely to chase integration. The latest authored-base and applicable-gate requirements remain separate and mandatory. No local ARM build or lamp action ran.
+
 ## 2026-10-24 09:31 +0700 — bounded comparison and prepared failure controls
 
 Ready for lamp-voice: no; full qualification remains active.

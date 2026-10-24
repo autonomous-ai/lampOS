@@ -1,0 +1,293 @@
+{
+  "artifact_run": 40054409458,
+  "head": "cec3372b7f26a728d0b96e0e681d257d191ff7fb",
+  "tasks_commands": [
+    {
+      "path": "tasks-6408-to-6498-5nlhVM/claude/opposite.command.json",
+      "release": 6498,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6408-to-6498-5nlhVM/claude/writer-reopen.command.json",
+      "release": 6408,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6408-to-6498-5nlhVM/claude/writer.command.json",
+      "release": 6408,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6408-to-6498-5nlhVM/devin/opposite.command.json",
+      "release": 6498,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6408-to-6498-5nlhVM/devin/writer-reopen.command.json",
+      "release": 6408,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6408-to-6498-5nlhVM/devin/writer.command.json",
+      "release": 6408,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6408-to-6498-5nlhVM/devin-cloud/opposite.command.json",
+      "release": 6498,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6408-to-6498-5nlhVM/devin-cloud/writer-reopen.command.json",
+      "release": 6408,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6408-to-6498-5nlhVM/devin-cloud/writer.command.json",
+      "release": 6408,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6498-to-6408-SA6WKn/claude/opposite.command.json",
+      "release": 6408,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6498-to-6408-SA6WKn/claude/writer-reopen.command.json",
+      "release": 6498,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6498-to-6408-SA6WKn/claude/writer.command.json",
+      "release": 6498,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6498-to-6408-SA6WKn/devin/opposite.command.json",
+      "release": 6408,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6498-to-6408-SA6WKn/devin/writer-reopen.command.json",
+      "release": 6498,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6498-to-6408-SA6WKn/devin/writer.command.json",
+      "release": 6498,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6498-to-6408-SA6WKn/devin-cloud/opposite.command.json",
+      "release": 6408,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6498-to-6408-SA6WKn/devin-cloud/writer-reopen.command.json",
+      "release": 6498,
+      "mode_octal": "0700",
+      "uid": 0
+    },
+    {
+      "path": "tasks-6498-to-6408-SA6WKn/devin-cloud/writer.command.json",
+      "release": 6498,
+      "mode_octal": "0700",
+      "uid": 0
+    }
+  ],
+  "tasks_scenarios": [
+    {
+      "writer": 6408,
+      "opposite": 6498,
+      "schema": 1,
+      "engine": "claude",
+      "accepted_tasks": 2,
+      "observations": 2,
+      "replayed_launches": 0,
+      "completion": "unverified",
+      "old_escaped_prompt_case": true,
+      "preservation_verified": true
+    },
+    {
+      "writer": 6408,
+      "opposite": 6498,
+      "schema": 2,
+      "engine": "devin",
+      "accepted_tasks": 2,
+      "observations": 2,
+      "replayed_launches": 0,
+      "completion": "unverified",
+      "old_escaped_prompt_case": false,
+      "preservation_verified": null
+    },
+    {
+      "writer": 6408,
+      "opposite": 6498,
+      "schema": 3,
+      "engine": "devin-cloud",
+      "accepted_tasks": 2,
+      "observations": 2,
+      "replayed_launches": 0,
+      "completion": "unverified",
+      "old_escaped_prompt_case": false,
+      "preservation_verified": null
+    },
+    {
+      "writer": 6498,
+      "opposite": 6408,
+      "schema": 1,
+      "engine": "claude",
+      "accepted_tasks": 2,
+      "observations": 2,
+      "replayed_launches": 0,
+      "completion": "unverified",
+      "old_escaped_prompt_case": false,
+      "preservation_verified": null
+    },
+    {
+      "writer": 6498,
+      "opposite": 6408,
+      "schema": 2,
+      "engine": "devin",
+      "accepted_tasks": 2,
+      "observations": 2,
+      "replayed_launches": 0,
+      "completion": "unverified",
+      "old_escaped_prompt_case": false,
+      "preservation_verified": null
+    },
+    {
+      "writer": 6498,
+      "opposite": 6408,
+      "schema": 3,
+      "engine": "devin-cloud",
+      "accepted_tasks": 2,
+      "observations": 2,
+      "replayed_launches": 0,
+      "completion": "unverified",
+      "old_escaped_prompt_case": false,
+      "preservation_verified": null
+    }
+  ],
+  "voice_scenarios": [
+    {
+      "directory": "vr-1201d92164cc",
+      "writer": 6408,
+      "reader": 6498,
+      "cut": "completed",
+      "first_attempt": 1,
+      "completion_attempt": 1,
+      "completion_stage": "writer",
+      "ack_request_id": "due.046c29ae694afe9a87826561e291e2de.1",
+      "identical_ack_requests": 6,
+      "acknowledged_replies": 1,
+      "ack_commits": 1,
+      "final_next_attempt": 2,
+      "return_reader_no_offer_or_ack": true,
+      "recovered_returned_snapshots_identical": true,
+      "spawned_killed_reaped": 3
+    },
+    {
+      "directory": "vr-78be34f7b770",
+      "writer": 6498,
+      "reader": 6408,
+      "cut": "unfinished",
+      "first_attempt": 1,
+      "completion_attempt": 2,
+      "completion_stage": "reader",
+      "ack_request_id": "due.7e6f2be91e6c706eada588e34b0785d8.1",
+      "identical_ack_requests": 6,
+      "acknowledged_replies": 1,
+      "ack_commits": 1,
+      "final_next_attempt": 3,
+      "return_reader_no_offer_or_ack": true,
+      "recovered_returned_snapshots_identical": true,
+      "spawned_killed_reaped": 3
+    },
+    {
+      "directory": "vr-824ea93eb994",
+      "writer": 6408,
+      "reader": 6498,
+      "cut": "ack-intent",
+      "first_attempt": 1,
+      "completion_attempt": 1,
+      "completion_stage": "writer",
+      "ack_request_id": "due.32205c1f2777a3f8394c62990c548379.1",
+      "identical_ack_requests": 8,
+      "acknowledged_replies": 1,
+      "ack_commits": 1,
+      "final_next_attempt": 2,
+      "return_reader_no_offer_or_ack": true,
+      "recovered_returned_snapshots_identical": true,
+      "spawned_killed_reaped": 3
+    },
+    {
+      "directory": "vr-9757f40e0636",
+      "writer": 6408,
+      "reader": 6498,
+      "cut": "unfinished",
+      "first_attempt": 1,
+      "completion_attempt": 2,
+      "completion_stage": "reader",
+      "ack_request_id": "due.c50f161a3b4050bb2c5e5cbfcff74d4f.1",
+      "identical_ack_requests": 6,
+      "acknowledged_replies": 1,
+      "ack_commits": 1,
+      "final_next_attempt": 3,
+      "return_reader_no_offer_or_ack": true,
+      "recovered_returned_snapshots_identical": true,
+      "spawned_killed_reaped": 3
+    },
+    {
+      "directory": "vr-c8aff854ae10",
+      "writer": 6498,
+      "reader": 6408,
+      "cut": "completed",
+      "first_attempt": 1,
+      "completion_attempt": 1,
+      "completion_stage": "writer",
+      "ack_request_id": "due.2d748acf34e15bd429ced604b21f957d.1",
+      "identical_ack_requests": 6,
+      "acknowledged_replies": 1,
+      "ack_commits": 1,
+      "final_next_attempt": 2,
+      "return_reader_no_offer_or_ack": true,
+      "recovered_returned_snapshots_identical": true,
+      "spawned_killed_reaped": 3
+    },
+    {
+      "directory": "vr-e435c548a1e2",
+      "writer": 6498,
+      "reader": 6408,
+      "cut": "ack-intent",
+      "first_attempt": 1,
+      "completion_attempt": 1,
+      "completion_stage": "writer",
+      "ack_request_id": "due.ce9d53d9e4feeaaed55c25603de7da39.1",
+      "identical_ack_requests": 8,
+      "acknowledged_replies": 1,
+      "ack_commits": 1,
+      "final_next_attempt": 2,
+      "return_reader_no_offer_or_ack": true,
+      "recovered_returned_snapshots_identical": true,
+      "spawned_killed_reaped": 3
+    }
+  ],
+  "limits": "Recorded fixture evidence only: published Tasks and Voice binaries execute as real processes. Tasks uses a fixture Harness CLI stand-in; Voice uses a fixture Schedule API server and authored completion packets. These are not actual Harness completion or acoustic playback evidence. Tasks completion remains explicitly unverified. The old escaped-prompt special case applies only to writer 6408/schema 1; preservation_verified is null when not applicable. No binary execution in this audit."
+}

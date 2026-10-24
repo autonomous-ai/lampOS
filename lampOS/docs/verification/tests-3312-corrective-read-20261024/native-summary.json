@@ -1,0 +1,88 @@
+{
+  "head": "cec3372b7f26a728d0b96e0e681d257d191ff7fb",
+  "run": 40054409431,
+  "job": 120754083262,
+  "counts": {
+    "PASS": 11128,
+    "LEAK": 1
+  },
+  "skipped_from_summary": 83,
+  "actual_indices_contiguous": true,
+  "unique_test_identities": 11129,
+  "identical_repeated_display_rows": 35,
+  "log_sha256": "df29bafc61315c18f9f35e97b6764171f46602e4396c4f423158d985e1b049fd",
+  "case_status_identity_sha256": "9a99d12c95266885e4493e39085d41f8d0ad4654327ae9ada6583a0109efab12",
+  "case_status_source": "Complete ordered indices and unique identities independently parsed from the retained ordinary ARM log; 35 identical repeated display rows are not additional executions.",
+  "dedicated": {
+    "run": 40054409458,
+    "job": 120754083162,
+    "schedule_passed": 4,
+    "tasks_passed": 2,
+    "voice_passed": 6,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 0,
+    "artifact_id": 12545355488,
+    "artifact_zip_bytes": 704678,
+    "artifact_zip_sha256": "7ae4c87e5a8a1d5c7e2939d81f8fd676ce2087c595e63628c1558c34072a4fbb",
+    "regular_evidence_files": 472,
+    "merge_commit": "084a5c57d30f8d2018e9167b049ff03fd77595c1",
+    "tree": "334f31b22a2071c64d607cd8a76bf534a6d2e439",
+    "head_tree_matches": true
+  },
+  "linux_clippy": {
+    "run": 40054409449,
+    "job": 120754083367,
+    "status": "completed",
+    "conclusion": "success",
+    "source": "GitHub check metadata"
+  },
+  "leak": [
+    {
+      "status": "LEAK",
+      "seconds": 0.224,
+      "index": 8963,
+      "identity": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+    }
+  ],
+  "excerpts": [
+    {
+      "kind": "ordinary",
+      "complete_log_bytes": 2654835,
+      "complete_log_sha256": "df29bafc61315c18f9f35e97b6764171f46602e4396c4f423158d985e1b049fd",
+      "lines": [
+        {
+          "offset": 2551216,
+          "bytes": 166,
+          "sha256": "06deedca0e8b6d45be4b1547ae233f845a47b3af1a64e5f3293fb65ba0324129",
+          "utf8": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T02:36:39.5564352Z      Summary [ 201.988s] 11129 tests run: 11129 passed (1 leaky), 83 skipped\n"
+        }
+      ]
+    },
+    {
+      "kind": "dedicated",
+      "complete_log_bytes": 192281,
+      "complete_log_sha256": "f78c02f700a359165de43138a6571f87373d1d87543ae73c4635d240d8954915",
+      "lines": [
+        {
+          "offset": 97460,
+          "bytes": 222,
+          "sha256": "489b986a7a4ab5dfbb8f2d2d6412c1d4883c7eccaaf9e96d33b14ef0462eed34",
+          "utf8": "published 6408 and 6498 state readers on ARM64\texecute the published writers and opposite readers\t2026-10-24T02:32:09.2104696Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.82s\n"
+        },
+        {
+          "offset": 100664,
+          "bytes": 221,
+          "sha256": "2929f5362f0a4c10b612e97c68e9f6abf46bd2200124e4ae88656491c08b0096",
+          "utf8": "published 6408 and 6498 state readers on ARM64\texecute the published writers and opposite readers\t2026-10-24T02:32:32.1800908Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.27s\n"
+        },
+        {
+          "offset": 180429,
+          "bytes": 222,
+          "sha256": "c50d2b0a1865ea64b99749a07130ec2a4896bf5000bc1f3b4adf452b76a67384",
+          "utf8": "published 6408 and 6498 state readers on ARM64\texecute the published writers and opposite readers\t2026-10-24T02:37:26.2635943Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.03s\n"
+        }
+      ]
+    }
+  ]
+}

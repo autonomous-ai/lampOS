@@ -1,0 +1,35 @@
+{
+  "head": "cec3372b7f26a728d0b96e0e681d257d191ff7fb",
+  "base": "59c4ac7959bfe4709e85c2be4799f58bbefe2736",
+  "previous_published_head": "ba7031f589611d1834c882d82ea8aed2c243fe34",
+  "original_carried_commits_equal": true,
+  "correction_files": [
+    {
+      "path": ".github/workflows/lampos-state-pair.yml",
+      "sha256": "03d2a70aa21e9ce1206a54eddf5ac5c34ca4c362b95536d13d3db2d9845b1179",
+      "blob": "f98c768e635da2e193451ed23592e4c63841e57f"
+    },
+    {
+      "path": "lampOS/crates/tasks/tests/release_pair/linux.rs",
+      "sha256": "47a476d0f744b3d4813737aad4f4165fe6a113d1bd051b07559aabe748f8a45f",
+      "blob": "4f6771e8414fcb74af4c10daa34002b623dfde5a"
+    },
+    {
+      "path": "lampOS/crates/voice/tests/release_pair/README.md",
+      "sha256": "d0ab1927d59fd0f0cf8589f3dd15927b3b8dca930ab90d9be6d40d90cd26b1b5",
+      "blob": "924186585af71863622c95dc890a5282d1448234"
+    },
+    {
+      "path": "lampOS/crates/voice/tests/release_pair/fixture.rs",
+      "sha256": "8acdf89d3fbd2d2adfa8bed9aa8c72665bd88ddce6b7398b89bd7facd774b986",
+      "blob": "ec144bd86df8bf997ebbc58b4b7c2288eb413c06"
+    },
+    {
+      "path": "lampOS/docs/verification/reminder-task-release-pair-20261024/README.md",
+      "sha256": "371ac56fbdf4da2525c2c28563aa7f6a0f806dbcdd3c6b79241e1c3d14a38fda",
+      "blob": "5df9303c23ba552dfa5b6c8253f247a89c945b77"
+    }
+  ],
+  "published_delivery_source_equal": true,
+  "executed": false
+}
