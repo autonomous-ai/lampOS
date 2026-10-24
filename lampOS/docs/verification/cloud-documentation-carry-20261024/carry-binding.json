@@ -1,0 +1,13 @@
+{
+  "old_head": "2ad786f91e43bbefbb6d7edab3176a4b3510f040",
+  "new_head": "7fc275d47efc0ec980170b2d2b2fd1d61e7fbf88",
+  "changed_paths": [
+    "lampOS/crates/cloud/tests/release_pair/README.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/verification/cloud-provenance-release-pair-20261024/README.md"
+  ],
+  "only_documentation_changed": true,
+  "rust_dependency_workflow_bytes_unchanged": true,
+  "host_gate_carried": "196 passed / 0 failed / 4 ignored; original execution, identical Rust inputs",
+  "fresh_linux_fmt": "6973 unchanged files, owned container removed"
+}

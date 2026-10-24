@@ -1,0 +1,22 @@
+   Compiling lamp-camera v0.1.0 (/private/tmp/second-routine-rested-release-pair-20261024/lampOS/crates/camera)
+    Checking lamp-voice v0.1.0 (/private/tmp/second-routine-rested-release-pair-20261024/lampOS/crates/voice)
+    Checking lamp-skills v0.1.0 (/private/tmp/second-routine-rested-release-pair-20261024/lampOS/crates/skills)
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> crates/skills/tests/release_pair/rested.rs:474:22
+    |
+474 |         let answer = read_answer(stream, 1024);
+    |                      ^^^^^^^^^^^-------------- argument #3 of type `std::time::Instant` is missing
+    |
+note: function defined here
+   --> crates/skills/tests/release_pair/fixture.rs:673:4
+    |
+673 | fn read_answer(mut stream: UnixStream, most: u64, deadline: Instant) -> Value {
+    |    ^^^^^^^^^^^                                    -----------------
+help: provide the argument
+    |
+474 |         let answer = read_answer(stream, 1024, /* std::time::Instant */);
+    |                                              ++++++++++++++++++++++++++
+
+For more information about this error, try `rustc --explain E0061`.
+error: could not compile `lamp-skills` (test "release_pair") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
