@@ -4324,3 +4324,9 @@ Update #3403 and NoPause #3404 are separate pushed drafts on427. Update Linux fo
 Ready for lamp-voice: no
 
 The [qualification evidence](verification/tests-update-parent-qualification-20261024/) now also publishes unchanged primary full Voice/readers stdout/stderr and original command receipts, addressing the reader’s independent-reprojection limit. All stream hashes/lengths and ten failure-excerpt byte offsets verify. The original 7,300/10/52 stays failed; no run was repeated. Root notes the historical319-file manifest is superseded by the explicit326-payload supplemented manifest while the earlier commit remains unchanged.
+
+## 25 October, 01:30 — NoPause publication P3 closed and latest carries pushed
+
+Ready for lamp-voice: no
+
+Published the exact missing nine-controller manifest (476 bytes, b180e343...) and clarified that e15 is an unpushed post-execution local snapshot, not the execution head. Historical execution binds43ac plus the recorded two-file hashes; no unavailable Git identity is used as proof. Both task branches now carry equal range-diffs on821: Update be88244fb and NoPause7c0cf8d33. Independent clone/worktree rebases preserve the frozen427 local gates. Original ARM Update is7,395 PASS+1LEAK/53skip on427; original NoPause is7,398 PASS+1LEAK/53skip and its actual3053 checkout includes821 and exactly matches the complete7c authored tree. New-head checks are pending; local Update Voice is4,017/1/21, readers active. The private Linux rollback control stopped at unsupported CAP_SYS_CHROOT before test allocation; no privileges/settings changed.
