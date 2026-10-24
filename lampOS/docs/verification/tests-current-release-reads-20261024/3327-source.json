@@ -1,0 +1,12 @@
+{
+  "head": "8bc821736be09d62bd27f635f054350fca85a1d0",
+  "artifact_id": 12545653600,
+  "source_files_verified": 6974,
+  "source_before_after_equal": true,
+  "manifest_sha256": "9470dbd00b9d627ac2b24222b865dbafe4a5725f3a19ed2eb9f01160998f14fc",
+  "merge_revision_and_tree": [
+    "9ca22aff7e09b3ca4937e9a23a5b9dceea1aabb6",
+    "6740f0e2db87236421febc3e653b6dac3f321c68"
+  ],
+  "head_tree": "6740f0e2db87236421febc3e653b6dac3f321c68"
+}

@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-24 10:28 +0700 — two current native release-reader reads
+
+Ready for lamp-voice: no; owned fixture qualification continues.
+
+[Independent current-head reads](verification/tests-current-release-reads-20261024/) clear #3312 at 4ba9d959f and the #3327 directory fix at 8bc821736. Dedicated native pairs pass 12/0 and 6/0 respectively. Each ordinary ARM run has 11,163 PASS plus one separately retained journal LEAK, zero failed/unrun; skips are 83 and 77. Strict Linux Clippy passes. Exact source-tree/manifests and artifact protocol/cleanup receipts were independently checked. #3327 still has its declared parent/rebase sequence and a README P3; integration remains with the train.
+
+The frozen own candidate 93c995a6b finished full Voice at 3,959/2/15, all 88 changed fixture cases passing. Its privacy and light-call failures match base phases; dependent suites are still running. Privacy's ten attempts cover several accepted stalled categories and only the final reported error is publisher unavailable; no per-attempt cause is inferred. A source-only investigation is tracing the separate transport and lease clocks without changing contracts or starting a new code draft.
+
 ## 2026-10-24 10:11 +0700 — fixed baseline complete; matched candidate running
 
 Ready for lamp-voice: no; candidate qualification is active.

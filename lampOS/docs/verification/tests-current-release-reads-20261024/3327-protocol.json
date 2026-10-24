@@ -1,0 +1,225 @@
+{
+  "head": "8bc821736be09d62bd27f635f054350fca85a1d0",
+  "run": 40057211166,
+  "artifact": 12545653600,
+  "cases": [
+    {
+      "directory": "kn-BqcCIv",
+      "transcript_sha256": "833e1fe38d946a13ac5f04db553af396588865cca490a5dc466b5122d56265cc",
+      "records": 135,
+      "process_releases": [
+        6408,
+        6498,
+        6408
+      ],
+      "pids": [
+        10114,
+        10120,
+        10125
+      ],
+      "all_three_sigkill_reaped": true,
+      "terminal_runs": [
+        {
+          "stage": "a",
+          "phase": "night_stale",
+          "allowed": false,
+          "why": "rest transition was not confirmed in time"
+        },
+        {
+          "stage": "a",
+          "phase": "night_unmatched",
+          "allowed": false,
+          "why": "rest transition was not confirmed in time"
+        },
+        {
+          "stage": "a",
+          "phase": "night",
+          "allowed": null,
+          "why": ""
+        },
+        {
+          "stage": "b",
+          "phase": "probe",
+          "allowed": null,
+          "why": ""
+        },
+        {
+          "stage": "b",
+          "phase": "morning",
+          "allowed": null,
+          "why": "gesture stretching: told the body"
+        },
+        {
+          "stage": "a-return",
+          "phase": "probe",
+          "allowed": false,
+          "why": "Expression is not fresh and enabled"
+        },
+        {
+          "stage": "a-return",
+          "phase": "probe",
+          "allowed": null,
+          "why": ""
+        }
+      ],
+      "negative_receipts": {
+        "stale_payload_age_us": 1000000,
+        "wrong_episode_delta": 1,
+        "both_refused_and_cancelled": true
+      },
+      "admitted_renewal_elapsed_us": 1001652,
+      "b_probe_state_byte_identical": true,
+      "one_private_stretch_then_synthetic_body_over": true,
+      "night_claims": {
+        "night_stale": [
+          20749
+        ],
+        "night_unmatched": [
+          20749
+        ],
+        "night": [
+          20749
+        ]
+      },
+      "after_morning_claims": {
+        "night_stale": [
+          20749
+        ],
+        "night_unmatched": [
+          20749
+        ],
+        "night": [
+          20749
+        ],
+        "morning": [
+          20750
+        ]
+      },
+      "return_suppression_with_stale_then_fresh_owner_probe": true,
+      "five_snapshots_hashes_verified": true,
+      "immutable_manifest_pins": {
+        "SKILL.md": [
+          "c7fba59a65e44c3ef01e57d637ea0a209c50532553c95c0cc736b4810128b58f",
+          75
+        ],
+        "skill.toml": [
+          "6aa43551259cb9b5c545bd0a7e174e1fb7eb9a15762c36592870a17881527f27",
+          1288
+        ]
+      },
+      "final_artifact_pins_verified": true
+    },
+    {
+      "directory": "kn-MNJXD1",
+      "transcript_sha256": "189a87f359dd9a1d02dfdeaf26f0a5ea4720dbd10ac75d3fb2635b824ec0bff8",
+      "records": 135,
+      "process_releases": [
+        6498,
+        6408,
+        6498
+      ],
+      "pids": [
+        10068,
+        10074,
+        10079
+      ],
+      "all_three_sigkill_reaped": true,
+      "terminal_runs": [
+        {
+          "stage": "a",
+          "phase": "night_stale",
+          "allowed": false,
+          "why": "rest transition was not confirmed in time"
+        },
+        {
+          "stage": "a",
+          "phase": "night_unmatched",
+          "allowed": false,
+          "why": "rest transition was not confirmed in time"
+        },
+        {
+          "stage": "a",
+          "phase": "night",
+          "allowed": null,
+          "why": ""
+        },
+        {
+          "stage": "b",
+          "phase": "probe",
+          "allowed": null,
+          "why": ""
+        },
+        {
+          "stage": "b",
+          "phase": "morning",
+          "allowed": null,
+          "why": "gesture stretching: told the body"
+        },
+        {
+          "stage": "a-return",
+          "phase": "probe",
+          "allowed": false,
+          "why": "Expression is not fresh and enabled"
+        },
+        {
+          "stage": "a-return",
+          "phase": "probe",
+          "allowed": null,
+          "why": ""
+        }
+      ],
+      "negative_receipts": {
+        "stale_payload_age_us": 1000000,
+        "wrong_episode_delta": 1,
+        "both_refused_and_cancelled": true
+      },
+      "admitted_renewal_elapsed_us": 1002781,
+      "b_probe_state_byte_identical": true,
+      "one_private_stretch_then_synthetic_body_over": true,
+      "night_claims": {
+        "night_stale": [
+          20749
+        ],
+        "night_unmatched": [
+          20749
+        ],
+        "night": [
+          20749
+        ]
+      },
+      "after_morning_claims": {
+        "night_stale": [
+          20749
+        ],
+        "night_unmatched": [
+          20749
+        ],
+        "night": [
+          20749
+        ],
+        "morning": [
+          20750
+        ]
+      },
+      "return_suppression_with_stale_then_fresh_owner_probe": true,
+      "five_snapshots_hashes_verified": true,
+      "immutable_manifest_pins": {
+        "SKILL.md": [
+          "c7fba59a65e44c3ef01e57d637ea0a209c50532553c95c0cc736b4810128b58f",
+          75
+        ],
+        "skill.toml": [
+          "6aa43551259cb9b5c545bd0a7e174e1fb7eb9a15762c36592870a17881527f27",
+          1288
+        ]
+      },
+      "final_artifact_pins_verified": true
+    }
+  ],
+  "limits": [
+    "Read-only audit of recorded native fixture outputs; no local binary execution.",
+    "Actual published Skills processes; Expression state/receipts and Body Over are synthetic. No physical output, provider, updater, synchronization, DST or power-loss claims.",
+    "No separate pre-admission filesystem snapshot exists for failed admissions. Their absence-of-rested checks are executed source assertions; traces independently verify refusal and Cancel, while root verifies exact-source/run binding.",
+    "Source manifest/tree binding is separately audited by root, not claimed by this script."
+  ]
+}

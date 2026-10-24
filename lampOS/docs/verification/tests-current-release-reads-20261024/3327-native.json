@@ -1,0 +1,50 @@
+{
+  "head": "8bc821736be09d62bd27f635f054350fca85a1d0",
+  "run": 40057211171,
+  "job": 120762838431,
+  "counts": {
+    "PASS": 11163,
+    "LEAK": 1
+  },
+  "skipped_from_summary": 77,
+  "actual_indices_contiguous": true,
+  "unique_test_identities": 11164,
+  "identical_repeated_display_rows": 0,
+  "log_sha256": "75b0956ce0fb7e8c4f4a0020f237f1e91c18ada1e58c5292944bbb53072fc193",
+  "summary": "Summary [ 199.891s] 11164 tests run: 11164 passed (1 leaky), 77 skipped",
+  "non_pass_rows": [
+    {
+      "status": "LEAK",
+      "seconds": 0.249,
+      "index": 8992,
+      "identity": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+    }
+  ],
+  "required_job": {
+    "id": 120762838431,
+    "run_id": 40057211171,
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-10-24T03:11:02Z",
+    "completed_at": "2026-10-24T03:24:42Z",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40057211171/job/120762838431"
+  },
+  "dedicated_pair": {
+    "run": 40057211166,
+    "job": 120762717252,
+    "passed": 6,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 0,
+    "log_sha256": "4efb366c8e66c195302d624e328b7bc7692fcb5f8d291370980d8dec962b4ce9"
+  },
+  "clippy_successful_run": 40057211165,
+  "artifact": {
+    "artifact": 12545653600,
+    "zip_bytes": 639625,
+    "zip_sha256": "f05d6bedfd260f67ff292f90ee1784cdf44bbb2a9673d45842809021c8bde368",
+    "regular_files": 382
+  },
+  "full_primary_rows_external": "/private/tmp/tests-3327-8bc-arm-primary.json",
+  "scope": "Exact-head native observations; full raw primary rows remain in the native job log and external audit file. Skipped cases and LEAK are not ordinary PASS. No local ARM execution."
+}
