@@ -1,3 +1,23 @@
+## Current checkpoint: 2026-10-24 22:11 +07, literal-name repair landed
+
+Ready for lamp-voice: yes (#3380).
+[Train 92 landing](verification/busy-room-real-call-20261024/train92/README.md)
+is verified at508b5b37f. Its full tree equals tested/authored29cbcd69f;
+original3380 is closed through train3388, not a direct feature-PR merge.
+Original3356 is closed. No manual merge or physical claim by Second.
+
+Ready for lamp-voice: no.
+Both remaining own branches are equally rebased onto508b: framing local
+e1140f2ef and phone localbdb95e3af. Serial scoped gates run framing first,
+phone next, with no terminal new-base count yet. Public heads remain5053
+and6cd until their new-base gates complete. #3382's historical Update2/3
+classification still waits on Tests/#1569; its two source P3s are resolved.
+#3389's prior4005/0/21 and deterministic two-replies-versus-one negative
+remain source-bound; no historical cause inference. Current native/read
+checks stay separate. Physical/key/restoration tasks stay with their holders.
+
+---
+
 ## Current checkpoint: 2026-10-24 21:49 +07, ready repair and controlled fixture follow-up
 
 Ready for lamp-voice: yes (#3380, software; First keeps played acceptance).
