@@ -1,0 +1,13 @@
+{
+  "original_pr": 3380,
+  "original_pr_state": "CLOSED",
+  "train_pr": 3388,
+  "train_pr_state": "MERGED",
+  "landed": "508b5b37f4f31b52ccd4b338bda9cd4092988e37",
+  "authored": "29cbcd69fce7c0ff9e415e6f7ab32a1aec477db1",
+  "landed_tree": "bb1602e156923c4fa743f4ef37ba8806f10bf6d2",
+  "tested_authored_tree": "bb1602e156923c4fa743f4ef37ba8806f10bf6d2",
+  "whole_tree_equal": true,
+  "original_3356_closed": true,
+  "limits": "Source-tree landing proof, not binary equality or played/activation acceptance."
+}
