@@ -383,7 +383,7 @@ text, and the client answers with `session.commentary.append` (said aloud,
 500 tokens; `session.instructions.append` can interrupt its speech but
 cancels no backend work; the mode is fixed per session. The repo's own
 research has it at 0.8 to 1.3 s published, US and Europe only, $0.05 a
-minute billed by the second, Vietnamese not confirmed
+minute billed by the second
 (`docs/faster-answers.md:613, 649-656`).
 
 So `openai-live` plugs in like this:
@@ -520,7 +520,7 @@ standing by).
 | 2b. A relay route for GPT-Live's websocket (backend team) | M | outside this repo; lamps carry no provider keys |
 | 2c. A client crate (`crates/openai-live`) and the worker role, contract v1, lamp-gated listening, link states and failure stages | L | turn ends are guessed; sessions open all day may bill all day: open per conversation, close when quiet |
 | 2d. Client delegation on the shared text brain | M | paraphrase; duplicate actions if a request is rebuilt twice: one task per delegation id, results checked before retry |
-| 2e. Tier 1 and the played tests, cost per hour | M | Vietnamese and latency from Vietnam unknown |
+| 2e. Tier 1 and the played tests, cost per hour | M | latency from the customers' region unknown (our customers speak English, the owner, 24 Oct) |
 
 **Phase 3. The user's switch.** `voice.route.get/set` in `lamp-cloud`, the
 root helper, the drop-in, the quiet restart, proof and rollback, the
