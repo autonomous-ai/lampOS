@@ -1,0 +1,2 @@
+    Checking lamp-actions v0.1.0 (/private/tmp/second-caps-release-pair-20261024/lampOS/crates/actions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.51s

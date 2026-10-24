@@ -1,0 +1,58 @@
+   Compiling serde_core v1.0.229
+    Checking memchr v2.8.3
+   Compiling rustix v1.1.5
+    Checking tokio v1.53.1
+    Checking httpdate v1.0.3
+   Compiling lamp-camera v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/camera)
+    Checking rustls-native-certs v0.8.5
+    Checking spin v0.9.9
+    Checking rustls-webpki v0.102.8
+    Checking rustls-pemfile v2.2.0
+    Checking fixedbitset v0.5.7
+    Checking mime v0.3.17
+    Checking matchit v0.8.4
+    Checking axum-core v0.5.6
+    Checking flume v0.11.1
+    Checking tokio-rustls v0.26.6
+    Checking hyper v1.12.0
+    Checking tower v0.5.3
+    Checking tokio-util v0.7.20
+    Checking tokio-stream v0.1.19
+    Checking serde_json v1.0.151
+    Checking serde v1.0.229
+    Checking jiff v0.2.38
+    Checking serde_spanned v1.1.2
+    Checking toml_datetime v1.1.2+spec-1.1.0
+    Checking serde_path_to_error v0.1.20
+    Checking tokio-tungstenite v0.30.0
+    Checking tower-http v0.6.11
+    Checking rumqttc v0.25.1
+    Checking toml v1.1.8+spec-1.1.0
+    Checking hyper-util v0.1.21
+    Checking lamp-ipc v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/ipc)
+    Checking lamp-bus v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/bus)
+    Checking lamp-turn-owner v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/turn-owner)
+    Checking lamp-near-call v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/near-call)
+    Checking lamp-gemini v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/gemini)
+    Checking lamp-turn-end-wire v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/turn-end-wire)
+    Checking lamp-local-time v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/local-time)
+    Checking lamp-ring v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/ring)
+    Checking lamp-audio v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/audio)
+    Checking lamp-msgs v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/msgs)
+    Checking hyper-rustls v0.27.10
+    Checking axum v0.8.9
+    Checking reqwest v0.13.5
+    Checking lamp-lean v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/lean)
+    Checking lamp-keeper v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/keeper)
+    Checking lamp-schedule v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/schedule)
+    Checking lamp-update v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/update)
+    Checking lamp-health v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/health)
+    Checking lamp-controls v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/controls)
+    Checking lamp-body v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/body)
+    Checking lamp-actions v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/actions)
+    Checking lamp-setup v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/setup)
+    Checking lamp-expression v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/expression)
+    Checking lamp-voice v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/voice)
+    Checking lamp-skills v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/skills)
+    Checking lamp-cloud v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/cloud)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 28.15s

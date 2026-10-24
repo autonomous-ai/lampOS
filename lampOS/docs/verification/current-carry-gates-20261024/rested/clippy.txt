@@ -1,0 +1,5 @@
+    Checking lamp-schedule v0.1.0 (/private/tmp/second-routine-rested-release-pair-20261024/lampOS/crates/schedule)
+    Checking lamp-expression v0.1.0 (/private/tmp/second-routine-rested-release-pair-20261024/lampOS/crates/expression)
+    Checking lamp-voice v0.1.0 (/private/tmp/second-routine-rested-release-pair-20261024/lampOS/crates/voice)
+    Checking lamp-skills v0.1.0 (/private/tmp/second-routine-rested-release-pair-20261024/lampOS/crates/skills)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.03s
