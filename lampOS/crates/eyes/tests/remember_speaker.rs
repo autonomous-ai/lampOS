@@ -119,3 +119,52 @@ fn guarded_proof_cannot_be_mixed_with_a_legacy_operation_or_unknown_fields() {
         assert!(ask_of(line.as_bytes()).is_none(), "{line}");
     }
 }
+
+#[test]
+fn a_short_line_between_recognition_ticks_has_no_anchor_and_never_falls_back() {
+    use lamp_eyes::{
+        remember_speaker::{Anchors, Request},
+        who::recognise_due,
+    };
+    use std::time::{Duration, Instant};
+
+    // Both 1.8 s lines have a visible speaking face at every look. Only
+    // their phase against the real recognition policy differs: the first
+    // lies between ticks, while the second includes the tick at 3 s.
+    for (began_us, ended_us, accepted) in
+        [(1_100_000, 2_900_000, false), (2_100_000, 3_900_000, true)]
+    {
+        let start = Instant::now();
+        let mut looked_for = None;
+        let mut anchors = Anchors::default();
+        anchors.refresh(1, Some(7));
+        let mut prints = 0;
+        for step in 0..=30 {
+            let at = start + Duration::from_millis(step * 100);
+            if recognise_due(looked_for, false, at) {
+                looked_for = Some(at);
+                prints += 1;
+                let frame_us = 1_000_000 + step * 100_000;
+                anchors.observe("boot/f3", &print(0), frame_us, frame_us, Some(7), Some(7));
+            }
+        }
+        assert_eq!(
+            prints, 2,
+            "enrollment evidence adds no background inference"
+        );
+        let request = Request {
+            name: "Fixture Speaker".into(),
+            face: "boot/f3".into(),
+            began_us,
+            ended_us,
+            replace: false,
+            apart: false,
+        };
+        let result = anchors.begin(&request, 4_100_000, Some(7));
+        if accepted {
+            assert!(result.is_ok());
+        } else {
+            assert_eq!(result.unwrap_err(), "speaker_not_seen");
+        }
+    }
+}
