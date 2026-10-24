@@ -120,3 +120,8 @@ The [physical trial sheet](physical-trial.md) is prepared, **not run**.
 It covers short-line cadence, wrong-person names/faces, cancellation, saved
 name refusals and observable latency boundaries; First/lamp holder owns it.
 The separately claimed name-ownership follow-up is still being gated.
+
+Current carry `207358456` also passed ARM64 run 40055128367: **11,164
+passed (one reported Voice journal LEAK), 71 skipped**, process **12/0**.
+Strict Linux Clippy run 40055128358 passed. The CI preview, authored and
+landed `9ed44f88c` trees are identical; see `multiface-carry-native.json`.

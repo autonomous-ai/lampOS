@@ -5,6 +5,20 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 10:13 — own-name correction pushed as #3328
+
+- Pushed `390532a53` on `third/remember-own-name`, current `9ed44f88c` base.
+  Exact five files, one-line commit, no attribution; clean worktree.
+- Mac fmt, strict Voice Clippy, focused **23/0**, full Voice **3,984/0/15
+  ignored**, workspace build pass. Recorded hashes match the committed blobs.
+  [Receipts](verification/remember-own-name-20261024/README.md).
+- Requested reviewer-three/reviewer-lead reads, exact Linux fmt and native
+  gates; own HOLD preserves the two-reader privacy requirement. Next work
+  follows the Queue/PR feedback while these run, with no product activation.
+- Parent #3318’s latest native gate is also retained: **11,164 passed
+  (one reported journal LEAK), 71 skipped**, process **12/0**, equal preview,
+  authored and landed trees. #3325 waits on its author’s wording correction.
+
 ## 2026-10-24 09:59 — own-name final controls and build-row read
 
 - Own-name follow-up is on landed `9ed44f88c`. Independent read found and
