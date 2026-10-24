@@ -1,0 +1,29 @@
+{
+  "build": {
+    "rows": 70,
+    "sum": "65.02",
+    "percentage": "92.88571428571428571428571429",
+    "rounded": "92.9"
+  },
+  "quality": {
+    "rows": 16,
+    "sum": "9.90",
+    "percentage": "61.87500",
+    "rounded": "61.9"
+  },
+  "mood": {
+    "rows": 2,
+    "sum": "1.17",
+    "percentage": "58.500",
+    "rounded": "58.5"
+  },
+  "body_quality_delta": "0.05",
+  "mean_percentage_point_delta": "0.312500",
+  "source_commit": "3fdf42df9144e3b9db92780ad01b708632ed2ed0",
+  "source_sha256": "cdb6e89df52bbc62e41d0cc68b12f1b3f8c06cc1a9cf4a21d7387c93c6b9dbe5",
+  "exclusive_paths": [
+    "lampOS/docs/build-rows.md"
+  ],
+  "whitespace_check": "passed",
+  "limits": "Arithmetic/scope only, no new grading or physical evidence; existing train attribution and snapshot time P3s retained."
+}
