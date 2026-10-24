@@ -1,3 +1,33 @@
+# Current repaired head e14e3c51b, 24 October 2026
+
+Draft #3361's original ordinary ARM64 failed its new current-CLI pre-spawn
+file metadata assertion: **5,864 passed / 1 failed / 106 skipped / 5,348
+unrun**. [Original failure receipt/excerpt](original-ordinary-failure/)
+retains exact original attribution and the full private log hash. Cargo may
+hard-link its built executable on Linux. The repair permits only that
+read-only current-source case, retains its exact byte/mode/link-count checks,
+and executes a new single-link copy. Released downloads and saved state
+remain single-link. No failure is relabelled a pass.
+
+Fresh Mac **268/0/2 ignored**, formatting and strict Clippy pass;
+[repaired host proof](repaired-host/) binds all 7,016 unchanged source files
+to `e14e3c51b64dcd03dcbf8a3374dac45c6f467960`. Home prefixes in logs are
+redacted; exact original log identity is not claimed for those text files.
+Fresh source-only offline Linux fmt passes and its owned container is removed.
+
+Fresh dedicated run **40083987649** passes **2/0/0 ignored/3 filtered**.
+[Safe native evidence and audit](native-40083987649/) bind tested merge
+`1afef8749` (base `51767ec05` plus authored head), all 10,379 tracked path
+hashes, 14 reaps/absent groups, 50 completed HTTP exchanges, exact pins and
+private isolation/removal. Artifact 12556506712 is 921,887 bytes; verified
+API ZIP SHA-256 `0dfb969921302bc0f9c5c2c2494c84b20a141ca4ca64ef18f0715a74c66651cc`.
+Its evidence archive equals the gh download. No archive/binary/credential
+payload is committed here. Fresh strict Linux Clippy **40083987741** passes.
+Ordinary ARM64 **40083987635** and independent corrected-head read remain
+pending. All original-head results below stay historical and distinct.
+
+---
+
 # Surround candidate/journal qualification, 24 October 2026
 
 Authored head `806e4006c0af067ef8d66854ab4d45d86d74f984`, draft #3361,

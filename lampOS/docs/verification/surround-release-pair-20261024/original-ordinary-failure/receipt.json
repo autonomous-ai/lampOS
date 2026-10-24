@@ -1,0 +1,13 @@
+{
+  "run": 40083244728,
+  "head": "806e4006c0af067ef8d66854ab4d45d86d74f984",
+  "result": "failed",
+  "passed": 5864,
+  "failed": 1,
+  "skipped": 106,
+  "unrun": 5348,
+  "failure": "new Surround current CLI artifact pre-spawn bounded file assertion",
+  "full_private_log_sha256": "6234eb36ae0f061acdf85efcf10b54443a57d59879494a4d6b7cf5b91f19af75",
+  "published_excerpt_is_not_complete_or_byte_identical_log": true,
+  "repair": "Allow read-only hard-linked current Cargo executable, preserve exact before/after bytes, mode and links; released inputs/private copies/state stay single-link."
+}

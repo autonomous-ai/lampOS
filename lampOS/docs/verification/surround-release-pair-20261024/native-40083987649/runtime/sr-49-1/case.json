@@ -1,0 +1,30 @@
+{
+  "actual_released_pair": true,
+  "artifacts_identical": true,
+  "credential_and_cookie_values_omitted": true,
+  "excluded": [
+    "configuration activation",
+    "provider or model requests",
+    "network, release, reset, probe and startup operations",
+    "hardware",
+    "power-loss durability",
+    "future stored schema compatibility"
+  ],
+  "operations": [
+    "save_provider"
+  ],
+  "origin": "https://fixture.example",
+  "private_payload_paths_not_for_publication": [
+    "settings",
+    "configuration"
+  ],
+  "stages": [
+    6498,
+    6408,
+    6498,
+    6408
+  ],
+  "synthetic_inputs_only": true,
+  "test": "release_6498_surround_candidates_cross_6408_and_return",
+  "transport": "private Unix HTTP/1.1"
+}
