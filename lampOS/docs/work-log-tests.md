@@ -1,5 +1,48 @@
 # Tests work log
 
+## 2026-10-24 08:39 +0700 — base Voice result and source preparation
+
+Ready for lamp-voice: no; matched qualification and fresh native CI remain.
+
+The clean-base 88b1ad796 Voice package stage finished with 3,958 passed,
+3 failed and 15 ignored across six bound targets. Its dependent suites
+are still running, so this is not the full gate result. Failures are the
+reminder-cancelled-while-muted fixture, held-consent reports-stop fixture,
+and light-call's strict 25 ms assertion. The latter matches the original
+assertion phase; no historical cause is inferred. Candidate runs and the
+fixed three standalone observations have not run yet.
+
+Proposed tasks: tests-P1 requests dedicated fixture IDs with Tests as owner
+for light-call, privacy lease resync, Body successor sockets, the three
+Expression cases, and Memory refused-follow-up-forget. The
+[Queue proposal](https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6378179569)
+keeps classifications pending; search/push already has #1569's ledger and
+sleeping-name has #1386. Issue routing does not stop execution.
+
+The authorized #2839 source draft is on tests/2839-sign-in-atomic-claim:
+Tasks owns one atomic initial-code claim; Voice requires the capability,
+uses one START per heard request, and applies conservative code expiry.
+The queued regression now uses a separate provider process, preserves
+both payload counts and ordinary-news order, and the new compatibility
+mocks own and join their listeners. This is source work only: no formatting,
+compilation, test pass or acoustic delivery is claimed yet. The five
+product-path files match the original b7700b7c2 baseline byte for byte
+before this draft; the earlier reproduced overlap remains retained.
+
+Reviewer-two's two same-voice LEAK observations are recorded separately
+from PASS. Open/merged work was checked and source preparation claimed on
+[#1569](https://github.com/autonomous-ai/lampOS/issues/1569#issuecomment-6378214334),
+behind the existing qualification and #2839 execution priorities. The
+planned test-only seam observes worker completion after child cleanup;
+restart/journal assertions and product deadlines stay intact.
+
+The local test target remains reserved to the bounded qualification.
+An unexpectedly slow new worktree checkout was stopped (exit 143); its
+source-preparation I/O is recorded in the qualification's shared-host
+context. No idle-machine or equal-host-load claim is made. The completed,
+clean privacy diagnostic checkout is being reused instead; historical
+source commits and raw diagnostic receipts remain retained.
+
 ## 2026-10-24 08:18 +0700 — current carries and qualification started
 
 Ready for lamp-voice: no; local qualification and fresh native CI remain.
