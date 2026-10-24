@@ -1,0 +1,19 @@
+
+running 1 test
+remember_speaker::tests::remember_speaker_own_name_refuses_reported_quoted_negated_or_ambiguous_lines --- FAILED
+
+failures:
+
+---- remember_speaker::tests::remember_speaker_own_name_refuses_reported_quoted_negated_or_ambiguous_lines stdout ----
+
+thread 'remember_speaker::tests::remember_speaker_own_name_refuses_reported_quoted_negated_or_ambiguous_lines' (238829617) panicked at crates/voice/src/remember_speaker.rs:319:9:
+Unproven declarations reached Eyes: [("Hi Kess.", [Object {"remember_speaker": Object {"apart": Bool(false), "began_us": Number(2726193394570), "ended_us": Number(2726194394570), "face": String("eyes/f1"), "name": String("Kess"), "replace": Bool(false)}}], Object {"ok": Bool(true), "remembered": String("Kess")}), ("Hello, Kess!", [Object {"remember_speaker": Object {"apart": Bool(false), "began_us": Number(2726193396670), "ended_us": Number(2726194396670), "face": String("eyes/f1"), "name": String("Kess"), "replace": Bool(false)}}], Object {"ok": Bool(true), "remembered": String("Kess")}), ("Hey Kess.", [Object {"remember_speaker": Object {"apart": Bool(false), "began_us": Number(2726193398211), "ended_us": Number(2726194398211), "face": String("eyes/f1"), "name": String("Kess"), "replace": Bool(false)}}], Object {"ok": Bool(true), "remembered": String("Kess")}), ("Okay, Kess.", [Object {"remember_speaker": Object {"apart": Bool(false), "began_us": Number(2726193399755), "ended_us": Number(2726194399755), "face": String("eyes/f1"), "name": String("Kess"), "replace": Bool(false)}}], Object {"ok": Bool(true), "remembered": String("Kess")}), ("Yes, Kess.", [Object {"remember_speaker": Object {"apart": Bool(false), "began_us": Number(2726193401707), "ended_us": Number(2726194401707), "face": String("eyes/f1"), "name": String("Kess"), "replace": Bool(false)}}], Object {"ok": Bool(true), "remembered": String("Kess")}), ("Please, Kess.", [Object {"remember_speaker": Object {"apart": Bool(false), "began_us": Number(2726193403711), "ended_us": Number(2726194403711), "face": String("eyes/f1"), "name": String("Kess"), "replace": Bool(false)}}], Object {"ok": Bool(true), "remembered": String("Kess")}), ("Kess, please.", [Object {"remember_speaker": Object {"apart": Bool(false), "began_us": Number(2726193405745), "ended_us": Number(2726194405745), "face": String("eyes/f1"), "name": String("Kess"), "replace": Bool(false)}}], Object {"ok": Bool(true), "remembered": String("Kess")})]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    remember_speaker::tests::remember_speaker_own_name_refuses_reported_quoted_negated_or_ambiguous_lines
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3717 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

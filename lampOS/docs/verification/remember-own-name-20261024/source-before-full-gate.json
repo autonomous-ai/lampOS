@@ -1,0 +1,11 @@
+{
+  "base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+  "files": {
+    "lampOS/crates/voice/src/known_faces.rs": "0367448a0ea0c3d4ec123dd192cd9341ad7ed7ddf68c91c5fecaf295fc17ed77",
+    "lampOS/crates/voice/src/remember_speaker.rs": "09813d98f2ca45d3ad8c6bc55f7e95c621ebcda3b040234e33be2adb6099dc02",
+    "lampOS/docs/eyes.md": "db84181e0201f0243dc4746b415f1fff4c00445119c834ed8464cc21e0cc6d91",
+    "lampOS/docs/reuse-decisions.md": "1b16b9c757aadd22f5918fb97168046b883c5ed38016114735566c85ec21e4e7",
+    "lampOS/docs/switches.md": "b5f99210d6f9757a444bc7f4d57dba938899c456a65cdfe5435b3a2121810051"
+  },
+  "measured_known_faces_sha256": "4b381a7ee865840a263ea86aa7bcb9127bdb194338672d5aa79bf4144f1cefbb"
+}

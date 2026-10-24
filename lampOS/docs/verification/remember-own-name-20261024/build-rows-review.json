@@ -1,0 +1,18 @@
+{
+  "head": "1bf689a480b8d0720f430c6dbde394175ba136d2",
+  "build": {
+    "count": 70,
+    "sum": "64.97",
+    "percent": "92.8"
+  },
+  "quality": {
+    "count": 16,
+    "sum": "10.20",
+    "percent": "63.8"
+  },
+  "mood": {
+    "count": 2,
+    "sum": "1.17",
+    "percent": "58.5"
+  }
+}

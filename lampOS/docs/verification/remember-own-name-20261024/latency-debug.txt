@@ -1,0 +1,23 @@
+rustc 1.96.0 (ac68faa20 2026-05-25)
+binary: rustc
+commit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96
+commit-date: 2026-05-25
+host: x86_64-apple-darwin
+release: 1.96.0
+LLVM version: 22.1.2
+Darwin x86_64
+8b42bb15f26169f9d148940ac42dc8f745a65887
+4b381a7ee865840a263ea86aa7bcb9127bdb194338672d5aa79bf4144f1cefbb  crates/voice/src/known_faces.rs
+
+running 1 test
+BOUNDARY raw candidate cap -> trim -> Said allocation -> name_heard -> speaker_named_self; no socket/proof work; debug test profile
+ordinary_intro: iterations=1000 name_bytes=4 heard_bytes=33 accepted=true p50_us=92.721 max_us=469.587 mean_us=93.639
+heard_4096_spaces: iterations=1000 name_bytes=4 heard_bytes=4096 accepted=true p50_us=2151.648 max_us=2586.936 mean_us=2160.446
+heard_4096_questions: iterations=1000 name_bytes=4 heard_bytes=4096 accepted=false p50_us=2175.658 max_us=2817.048 mean_us=2183.580
+heard_4096_prose: iterations=1000 name_bytes=4 heard_bytes=4096 accepted=false p50_us=3680.875 max_us=4822.338 mean_us=3693.874
+candidate_4096_spaces: iterations=1000 name_bytes=4096 heard_bytes=33 accepted=true p50_us=242.654 max_us=303.311 mean_us=244.222
+candidate_and_heard_4079_unique_tokens: iterations=100 name_bytes=4079 heard_bytes=4079 accepted=true p50_us=9536.662 max_us=9830.023 mean_us=9550.889
+candidate_oversized: iterations=1000 name_bytes=4100 heard_bytes=33 accepted=false p50_us=0.034 max_us=0.068 mean_us=0.034
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3718 filtered out; finished in 9.34s
+

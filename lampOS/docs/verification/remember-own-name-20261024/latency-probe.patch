@@ -1,0 +1,326 @@
+--- a/lampOS/crates/voice/src/known_faces.rs
++++ b/lampOS/crates/voice/src/known_faces.rs
+@@ -670,6 +670,211 @@
+     })
+ }
+ 
++/// The guarded enrollment path needs the requested name to be the speaker's
++/// declaration, not merely a name somewhere in the same line. Consume a
++/// complete, simple introduction or bare name/spelling. Mixed narration and
++/// corrections require a fresh introduction rather than selecting one clause.
++/// `name_heard` still supplies the existing spelling and letter-count checks.
++fn speaker_named_self(name: &str, said: &str) -> bool {
++    let characters: Vec<_> = said.chars().collect();
++    // Unsupported punctuation refuses before folding can erase quotation
++    // marks or turn a non-ASCII question into an affirmative declaration.
++    if characters
++        .iter()
++        .enumerate()
++        .any(|(at, character)| match character {
++            c if c.is_alphanumeric()
++                || c.is_whitespace()
++                || ('\u{300}'..='\u{36f}').contains(c) =>
++            {
++                false
++            }
++            '.' | ',' | '!' | '-' | '?' => false,
++            '\'' | '’' => {
++                !(at.checked_sub(1)
++                    .is_some_and(|before| characters[before].is_alphanumeric())
++                    && characters
++                        .get(at + 1)
++                        .is_some_and(|after| after.is_alphanumeric()))
++            }
++            _ => true,
++        })
++    {
++        return false;
++    }
++    let name = folded_words(name);
++    let words = folded_words(said);
++    if DISAGREE
++        .iter()
++        .chain(NO_NAME_AFTER)
++        .any(|word| words.contains(&folded_words(word).concat()))
++    {
++        return false;
++    }
++    if words.iter().any(|word| {
++        [
++            "maybe",
++            "perhaps",
++            "possibly",
++            "probably",
++            "apparently",
++            "pretend",
++            "suppose",
++            "guess",
++            "think",
++            "said",
++            "says",
++            "told",
++            "tells",
++            "quote",
++            "unquote",
++        ]
++        .contains(&word.as_str())
++    }) {
++        return false;
++    }
++    let mut body = words.as_slice();
++    while body.first().is_some_and(|word| {
++        BEFORE_A_LINE.contains(&word.as_str()) || ["yes", "please"].contains(&word.as_str())
++    }) {
++        body = &body[1..];
++    }
++    let starts = |words: &[String], phrase: &[&str]| {
++        words.len() >= phrase.len() && words.iter().zip(phrase).all(|(word, part)| word == part)
++    };
++    const REQUESTS: &[&[&str]] = &[
++        &["can", "you", "remember", "my", "face"],
++        &["could", "you", "remember", "my", "face"],
++        &["will", "you", "remember", "my", "face"],
++        &["would", "you", "remember", "my", "face"],
++        &["can", "you", "remember", "my", "name"],
++        &["could", "you", "remember", "my", "name"],
++        &["please", "remember", "my", "face"],
++        &["please", "remember", "my", "name"],
++        &["remember", "my", "face"],
++        &["remember", "my", "name"],
++        &["remember", "me"],
++    ];
++    // A question mark can end an explicit request, not a tentative name:
++    // "Can you remember my face? I'm Kesh." differs from "I'm Kesh?".
++    let mut questions_at = Vec::new();
++    if !starts(body, &["remember", "my", "name", "is"])
++        && let Some(request) = REQUESTS.iter().find(|request| starts(body, request))
++    {
++        body = &body[request.len()..];
++        questions_at.push(words.len() - body.len());
++        if body.first().is_some_and(|word| word == "and") {
++            body = &body[1..];
++        }
++    }
++    if body.last().is_some_and(|word| word == "please") {
++        body = &body[..body.len() - 1];
++    }
++    if let Some(request) = REQUESTS.iter().find(|request| {
++        body.len() >= request.len() && starts(&body[body.len() - request.len()..], request)
++    }) {
++        questions_at
++            .push(words.len() - usize::from(words.last().is_some_and(|word| word == "please")));
++        body = &body[..body.len() - request.len()];
++        if body.last().is_some_and(|word| word == "and") {
++            body = &body[..body.len() - 1];
++        }
++    }
++    const INTRODUCTIONS: &[&[&str]] = &[
++        &["could", "you", "remember", "that", "my", "name", "is"],
++        &["can", "you", "remember", "that", "my", "name", "is"],
++        &["remember", "my", "name", "is"],
++        &["you", "can", "call", "me"],
++        &["can", "you", "call", "me"],
++        &["could", "you", "call", "me"],
++        &["will", "you", "call", "me"],
++        &["would", "you", "call", "me"],
++        &["i", "am", "called"],
++        &["i'm", "called"],
++        &["my", "name", "is"],
++        &["my", "name's"],
++        &["call", "me"],
++        &["i", "am"],
++        &["i'm"],
++        &["ten", "toi", "la"],
++        &["toi", "ten", "la"],
++        &["goi", "toi", "la"],
++        &["toi", "la"],
++        &["ten", "minh", "la"],
++        &["minh", "ten", "la"],
++        &["goi", "minh", "la"],
++        &["minh", "la"],
++        &["ten", "em", "la"],
++        &["em", "ten", "la"],
++        &["goi", "em", "la"],
++        &["em", "la"],
++    ];
++    if let Some(opening) = INTRODUCTIONS.iter().find(|opening| starts(body, opening)) {
++        if opening.contains(&"call") || opening.contains(&"remember") {
++            questions_at.push(words.len());
++        }
++        body = &body[opening.len()..];
++    }
++    let mut questions = said.match_indices('?');
++    if let Some((at, _)) = questions.next()
++        && (questions.next().is_some() || !questions_at.contains(&folded_words(&said[..at]).len()))
++    {
++        return false;
++    }
++    // Only the one final count belongs to this spelling. A second count or
++    // other material remains in `body` and refuses the whole line.
++    if body.len() >= 2 && matches!(body.last().map(String::as_str), Some("letter" | "letters")) {
++        let count = body[body.len() - 2..].join(" ");
++        if letters_counted(&count)
++            != Some(
++                name.iter()
++                    .flat_map(|word| word.chars())
++                    .filter(|c| c.is_alphabetic())
++                    .count(),
++            )
++        {
++            return false;
++        }
++        body = &body[..body.len() - 2];
++    }
++    // The caller cannot turn a sentence into a bare name by including its
++    // grammar in the argument ("Her Name Is Kess"). Ambiguous word names
++    // can still be given as an exact spelling, including the letter I.
++    let plain_name = !name.iter().any(|word| {
++        NOT_A_NAME.contains(&word.as_str())
++            || [
++                "my", "your", "his", "her", "their", "our", "name", "name's", "face", "is", "am",
++                "are", "and", "but", "she", "he", "they", "you", "me", "this", "that", "remember",
++            ]
++            .contains(&word.as_str())
++    });
++    if plain_name && body == name {
++        return !name.is_empty();
++    }
++    if plain_name && body.starts_with(&name) {
++        body = &body[name.len()..];
++        if body.first().is_some_and(|word| word == "spelled") {
++            body = &body[1..];
++        }
++    }
++    // Reuse the existing double-letter and "double U" rules, but no word
++    // from another clause may be ignored between the letters of this name.
++    let mut letters = body.iter();
++    while let Some(word) = letters.next() {
++        let letter = if word == "double" {
++            letters.next()
++        } else {
++            Some(word)
++        };
++        if !letter.is_some_and(|letter| {
++            letter.chars().count() == 1 && letter.chars().all(char::is_alphabetic)
++        }) {
++            return false;
++        }
++    }
++    !name.is_empty() && spelled_runs(body) == [name.concat()]
++}
++
+ /// What the model is told beside a request in which the person gave their
+ /// name, with names checked: a name told is a name kept (the first builder,
+ /// #705, 13:43: on 15 October the lamp only said it would remember).
+@@ -679,6 +884,8 @@
+ 
+ /// What the model is told when the name is not in what they said.
+ const NOT_HEARD: &str = "You did not hear that name in what they said. Say the name back to them and ask them to spell it, then call this again with the name as they said or spelled it.";
++const NOT_OWN_NAME: &str = "I could not confirm that this was their own name, so I have not remembered anyone. Ask them to look at me and state their own name directly, or spell their name by itself, then try again.";
++const NAME_UNCHANGED: &str = "I cannot safely replace a saved name from this request, so I have not changed anyone's saved face.";
+ /// What the model is told when it would replace a name before the person
+ /// agreed to the new one.
+ const NOT_AGREED: &str = "They have not said yes to that name yet. Say the new name back and ask whether they want to be known by it instead. Only if they say yes, call this again with the new name and replace true.";
+@@ -917,6 +1124,8 @@
+         .args
+         .get("name")
+         .and_then(Value::as_str)
++        // Bound caller-controlled work before trimming or checking the name.
++        .filter(|name| name.len() <= crate::remember_speaker::HEARD_BYTES)
+         .map(str::trim)
+         .filter(|name| !name.is_empty())
+     else {
+@@ -931,14 +1140,14 @@
+     if !name_heard(name, &said) {
+         return (json!({"error": NOT_HEARD}), true);
+     }
++    if !speaker_named_self(name, &said.this) {
++        return (json!({"error": NOT_OWN_NAME}), true);
++    }
+     let replace = call.args.get("replace").and_then(Value::as_bool) == Some(true);
+     // No earlier speaker confirmation is proven. Keep the existing
+     // replacement check; it conservatively refuses on this scoped path.
+     if replace && !agreed_to(name, &said) {
+-        return (
+-            json!({"error": "I cannot safely replace a saved name from this request, so I have not changed anyone's saved face."}),
+-            true,
+-        );
++        return (json!({"error": NAME_UNCHANGED}), true);
+     }
+     let apart = call.args.get("apart").and_then(Value::as_bool) == Some(true)
+         && spelled_by_them(name, &said.this);
+@@ -952,6 +1161,11 @@
+     }});
+     let current = || proof.is_current(lamp_ipc::monotonic_us());
+     match crate::remember::bounded_exchange_guarded(socket, &line, DEADLINE, lease, &current) {
++        // A similar face is not authority to disclose its stored name, and
++        // this path cannot prove a later replacement confirmation.
++        Some(answer) if answer.get("error").and_then(Value::as_str) == Some("known_as") => {
++            (json!({"error": NAME_UNCHANGED}), true)
++        }
+         Some(answer) => (told_asking(&answer, switches.visits), true),
+         None => (
+             json!({"error": "I could not finish remembering that face. I have not confirmed that it was saved."}),
+@@ -1589,6 +1803,62 @@
+ #[cfg(test)]
+ mod tests {
+     use super::*;
++
++    #[test]
++    fn temporary_own_name_latency_probe() {
++        let cap = crate::remember_speaker::HEARD_BYTES;
++        let intro = "Lamp, remember my face, I'm Kesh.";
++        let padded_heard = format!("{}{}", " ".repeat(cap - intro.len()), intro);
++        let padded_name = format!("{}Kesh", " ".repeat(cap - 4));
++        let questions = format!("Call me Kesh{}", "?".repeat(cap - "Call me Kesh".len()));
++        let long_prose = format!("My name is Kesh {}", "other ".repeat((cap - 16) / 6));
++        let unique = (0..680)
++            .map(|at| format!("N{at:04}"))
++            .collect::<Vec<_>>()
++            .join(" ");
++        let oversized = format!("{}Kesh", " ".repeat(cap));
++        println!(
++            "BOUNDARY raw candidate cap -> trim -> Said allocation -> name_heard -> speaker_named_self; no socket/proof work; debug test profile"
++        );
++        for (label, name, heard, iterations) in [
++            ("ordinary_intro", "Kesh", intro, 1_000),
++            ("heard_4096_spaces", "Kesh", padded_heard.as_str(), 1_000),
++            ("heard_4096_questions", "Kesh", questions.as_str(), 1_000),
++            ("heard_4096_prose", "Kesh", long_prose.as_str(), 1_000),
++            ("candidate_4096_spaces", padded_name.as_str(), intro, 1_000),
++            (
++                "candidate_and_heard_4079_unique_tokens",
++                unique.as_str(),
++                unique.as_str(),
++                100,
++            ),
++            ("candidate_oversized", oversized.as_str(), intro, 1_000),
++        ] {
++            let mut samples = Vec::with_capacity(iterations);
++            let mut accepted = false;
++            for _ in 0..iterations {
++                let began = Instant::now();
++                accepted = if name.len() > cap {
++                    false
++                } else {
++                    let name = name.trim();
++                    let said = Said::now(heard);
++                    name_heard(name, &said) && speaker_named_self(name, &said.this)
++                };
++                std::hint::black_box(accepted);
++                samples.push(began.elapsed().as_nanos());
++            }
++            samples.sort_unstable();
++            let mean = samples.iter().sum::<u128>() as f64 / iterations as f64 / 1_000.0;
++            println!(
++                "{label}: iterations={iterations} name_bytes={} heard_bytes={} accepted={accepted} p50_us={:.3} max_us={:.3} mean_us={mean:.3}",
++                name.len(),
++                heard.len(),
++                samples[iterations / 2] as f64 / 1_000.0,
++                samples[iterations - 1] as f64 / 1_000.0
++            );
++        }
++    }
+ 
+     #[test]
+     fn observations_expire_from_source_age_without_renewal_on_reread() {

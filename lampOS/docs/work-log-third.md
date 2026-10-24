@@ -5,6 +5,21 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 09:59 — own-name final controls and build-row read
+
+- Own-name follow-up is on landed `9ed44f88c`. Independent read found and
+  root reproduced seven greeting/polite vocatives before fixing them;
+  complete bare names need no introduction, prefaced requests do.
+- Final focused controls **23/0**, formatting and strict Voice Clippy pass;
+  full Voice tests and workspace build remain running. The interrupted
+  earlier gate and all red controls are retained, not represented as passes.
+- [Own-name evidence](verification/remember-own-name-20261024/README.md)
+  includes the pre-final debug timing probe and its reconstructable source.
+- #3325 `1bf689a48`: HOLD P2 for the absolute bystander-safety claim, which
+  contradicts #3318’s documented classifier limits. Arithmetic checks:
+  Build **92.8% / 70**, Quality **63.8% / 16**, mood **58.5% / 2**, excluded.
+  Replacement wording is on the PR; no inherited row requalification.
+
 ## 2026-10-24 09:49 — guard landed; physical qualification prepared
 
 - #3318 landed as `9ed44f88c`, tree-identical to read head `207358456`.
