@@ -1,0 +1,74 @@
+{
+  "format": "Name-d60-Mac-count-hash-boolean/1",
+  "head": "d60b75ac8a36483404c54a3141fb6b543a353be1",
+  "tree": "88d5059caa8e570755eefec59b6b841a5269451d",
+  "platform": "mac",
+  "exit": 0,
+  "required_stages": 5,
+  "observed_stages": 5,
+  "stage_results": [
+    {
+      "stage": "fmt",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    },
+    {
+      "stage": "clippy",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    },
+    {
+      "stage": "workspace-build",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    },
+    {
+      "stage": "full-voice",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 21,
+        "passed": 4150
+      }
+    },
+    {
+      "stage": "full-update",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 6,
+        "passed": 396
+      }
+    }
+  ],
+  "required_controls": 6,
+  "all_required_controls_observed_once_passed": true,
+  "fresh_workspace_members": 46,
+  "source_stable": true,
+  "cleanup_and_target_release": true,
+  "terminal_sha256": "c0aada011a2768826d4223e523c553a8e202f32e87344124aebb75a4cb023712",
+  "source_binding_sha256": "849e048c0876bc8b94b9222f223ceaa7388d892536d74111bc532d4777628148",
+  "Linux_failed_gate_exit": 101,
+  "Linux_Voice_counts": {
+    "passed": 4207,
+    "failed": 4,
+    "ignored": 24
+  },
+  "current_base_or_native_qualification": false,
+  "ready_for_lamp_voice": false,
+  "activation_or_physical_acceptance": false,
+  "historical_failures_waived": false,
+  "raw_publication_authorized": false
+}

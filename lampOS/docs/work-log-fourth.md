@@ -6,6 +6,12 @@ results here are from the development machine unless explicitly attributed
 to the first builder's lamp measurements. There is no lamp access here.
 
 
+## 2026-10-25 06:47: Name Mac complete; current carries and Skills preparation
+
+- [Selected Name Mac receipt](verification/name-d60-mac-selected-20261025/README.md): five stages pass, Voice 4150/0/21 and Update 396/0/6; six controls/fresh 46/source/cleanup/release verify. The separate Linux 101/four capture failures stay failed. No native/current-base/readiness or physical transfer; child order holds remain.
+- Current source-only train106 carries preserve authored patches and upstream soft-start settings: Common 618, Name 478, callback 82b, Photo 0f47 and hedge 905. All relevant Rust parity checks pass; no new gate or code-head push. Main later advanced again, so final composition remains open.
+- Tests released the two-job Skills slot with five-GiB storage reserve and shared read-only source-cache clarification. Exact public source/patch verified; source pair and bounded four-observation runner are being sealed before Root grant. Process capture source races were corrected before execution; no primary Skills observation has started. Old failed epochs stay intact; raw/witnesses stay private. No lamp action.
+
 ## 2026-10-25 05:50: Name Linux completes failed; Skills repair slot offered
 
 - [Selected Name Linux failure](verification/name-d60-linux-failed-selected-20261025/README.md): all five stages observed, Voice 4207/4/24, Update 398/0/4, six required controls/fresh 46/source/cleanup/release verified; overall 101 remains. Four existing capture timing boundaries handed to Tests. Public NoPause baseline49 contains no Voice case and gives no pass transfer. Initial driver launch hash is unobserved; later private capture is explicitly qualified.
