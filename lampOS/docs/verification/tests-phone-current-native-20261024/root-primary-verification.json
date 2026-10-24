@@ -1,0 +1,37 @@
+{
+  "run": 40108167455,
+  "head": "7c2a8fac5fc42f84a47fa40830c7e20a9a98ba0a",
+  "counts": {
+    "PASS": 7373,
+    "LEAK": 1
+  },
+  "skipped": 53,
+  "selected": 7374,
+  "all_primary_selected_terminal_unique": true,
+  "primary_region": "Before the single nextest Summary; 34 later detailed output repeats excluded, not extra executions.",
+  "postsummary_repeated_status_rows": 34,
+  "phone": [
+    {
+      "status": "PASS",
+      "seconds": 3.065,
+      "index": 4144,
+      "total": 7374,
+      "identity": "lamp-voice messages::tests::a_text_never_waits_on_the_news_for_the_phone"
+    }
+  ],
+  "summary_line": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T15:54:05.7456270Z      Summary [ 148.940s] 7374 tests run: 7374 passed (1 leaky), 53 skipped",
+  "raw_log_sha256": "bf7e521116a4cb337adf9354cc7c8f3767816bd7de09b675a4d99473e876b5f0",
+  "limits": "PR merge preview into43ac, not direct-head/full-workspace run; no historical Update HOLD waiver.",
+  "actual_checkout_sha": "c15211f4ae2376754668abc6b8739ad806fb56d7",
+  "authored_preview_complete_tree_equal": true,
+  "linux_check": {
+    "run": 40108167512,
+    "conclusion": "success",
+    "actual_commands": [
+      "cargo +1.96.0 fmt --all --check",
+      "cargo clippy --locked --workspace --all-targets -- -D warnings"
+    ],
+    "raw_log_sha256": "eebbab3d73ec1d0a2726cbdbac727c1295bf5b66a7cbc9ad45557d51b9601766"
+  },
+  "authored_git_tree": "bdb043bd6245e5cf9924e1cabdecd96bdfb0e640"
+}
