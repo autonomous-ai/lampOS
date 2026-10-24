@@ -1,3 +1,27 @@
+## Current checkpoint: 2026-10-24 16:18 +07, both final carries cleared
+
+#3330 `6cba81532`: current Reviewer-two READ-OK, Mac **516/0/9 ignored**,
+Mac/Linux fmt and strict Clippy, dedicated native **8/0/2 filtered**,
+ordinary ARM64 **7,355 PASS + 1 LEAK**, 51 skipped, zero failed/unrun.
+Final one-commit package continuation over the landed rested parent preserves
+all eight cases. [Complete final proof](verification/package-final-native-20261024/40079853144/README.md).
+All original failed/retried prepared results remain separately attributed.
+
+#3347 `0844ce154`: current READ-OK, all gates green; dedicated **2/0**,
+ordinary **11,207 PASS + 1 LEAK**, 100 skipped; train 80 already queued it.
+The Markdown conflict was resolved with unchanged executable/workflow bytes.
+Train 77 landed #3327, #3334 and #3342; train 79 landed peer #3349 after
+my ordered-epoch read and exact original native checks. Physical/activation
+and newest-base integration claims remain with their proper lanes.
+
+Current work is test/docs qualification under the voice freeze. #2810 still
+needs selected artifacts/observer and the holder/person's attended lamp
+window; #1812 needs Migrate's trusted public key and protected publisher.
+No key, lamp or release mutation by Second. Next: submit #3330, watch train
+and incoming findings, then select the next eligible Queue piece or read.
+
+---
+
 ## Current checkpoint: 2026-10-24 16:09 +07, landed parent and final carries
 
 Train 77 landed #3327, #3334 and #3342 on `b2c9eb3dd`. #3347's real

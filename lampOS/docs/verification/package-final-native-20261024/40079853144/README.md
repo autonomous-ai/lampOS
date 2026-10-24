@@ -7,5 +7,9 @@ commands (32 successes, 28 intended refusals), eight actual positive package
 archives, 40 unchanged install inputs, 80 snapshot file hashes and 12 exact
 inventory comparisons. No executable was run by this audit. The API artifact
 ZIP digest/size verifies and its archive matches the audited download. Strict
-Linux Clippy **40079852895** is green; ordinary current-head ARM64 remains
-pending. All original prepared-head failures/results remain separate.
+Linux Clippy **40079852895** is green; ordinary current-head ARM64 **40079852889** is now green:
+**7,355 PASS plus one LEAK**, zero failed/unrun, 51 skipped. All original prepared-head failures/results remain separate.
+
+Reviewer-two READ-OK `6cba81532` carries from the byte-identical prepared
+Skills tree; parent is landed, and current source/gates are cleared. Integration
+onto later base advances remains the train’s responsibility.
