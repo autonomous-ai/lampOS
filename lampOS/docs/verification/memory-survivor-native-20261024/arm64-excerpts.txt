@@ -1,0 +1,3 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T08:23:38.5708700Z HEAD is now at 00565e0 Merge 0882cb90474edb19f11130c0771d019509eed9cb into 411965dcb659e17188ff81fb4ba4b73b2b62012e
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T08:26:25.7406807Z      Summary [  36.801s] 1530 tests run: 1530 passed, 14 skipped
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T08:26:39.9458062Z test result: 12 passed; 0 failed

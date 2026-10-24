@@ -1,0 +1,25 @@
+{
+  "head": "0882cb90474edb19f11130c0771d019509eed9cb",
+  "preview": "00565e08588b3997b1ae0f139aee71cd1134a192",
+  "preview_parents": [
+    "411965dcb659e17188ff81fb4ba4b73b2b62012e",
+    "0882cb90474edb19f11130c0771d019509eed9cb"
+  ],
+  "preview_tree": "4f2b6c4e4c701c89f5dc7319ddc4561327364988",
+  "author_tree": "6c36c30d0592bb5071f78f2b6619f51bf5e70f11",
+  "preview_equals_authored_tree": false,
+  "reason": "Preview carries the authored fixture onto newer lamp-voice411965dcb; no whole-tree equality claimed",
+  "fixture_sha256": "1f551d5b71416047d609e6b65f6519084725877bc0bbb6b146454acf9339af6f",
+  "arm64_run": 40077748435,
+  "arm64_conclusion": "success",
+  "selected_test_summary": "Summary [  36.801s] 1530 tests run: 1530 passed, 14 skipped",
+  "separate_process_cases": {
+    "passed": 12,
+    "failed": 0
+  },
+  "strict_clippy_run": 40077748328,
+  "strict_clippy_conclusion": "success",
+  "both_checked_out_same_preview": true,
+  "arm64_log_sha256": "2cd283048f01d06cc89f605487a77fbe44f7851b15c64b60118617ae150cb1fb",
+  "clippy_log_sha256": "6667b90923bad2ae54e168105b7faf577dc73bbcc3aa09a8df2acf0cc672fce1"
+}

@@ -8469,3 +8469,7 @@ Both published payloads are identical AArch64 executables running through existi
 ## 2026-10-24: survivor correction pushed and handed to readers
 
 #3333 now0882cb904, one commit on d7b85b1dd, with fresh raw evidence eadd636ba7 and [final-head parity/range-diff](verification/memory-survivor-final-head-20261024/README.md). Code and all original assertions are qualified; only the final result README changed afterward. Updated the PR and Queue with exact counts and author HOLD pending current official ARM64/Clippy and renewed P2 dispositions. The first published correction commit briefly retained stale pending wording because a document-transform anchor failed; the result-only amendment corrected it before the review request. Common's matched diagnostic continues on its released target.
+
+## 2026-10-24: corrected Memory native gates green
+
+#3333 head0882cb904 passes ARM6440077748435 selected1530/0with14skipped, separate process12/0, and strictworkspaceClippy40077748328. [Preview/driver binding](verification/memory-survivor-native-20261024/README.md) proves both jobs used the same newer-base merge and exact tested fixture, without a false whole-tree equality claim. Third and Reviewer-two are rereading the P2 correction. Common matched diagnostic completed27/0onbothsources with all54invocations, stable source/driver hashes and cleanup. That diagnostic does not waive the earlier full-suite failures; complete current carry gates are next.
