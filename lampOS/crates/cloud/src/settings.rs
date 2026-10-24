@@ -1805,7 +1805,16 @@ mod tests {
             if ack {
                 changes.acked(&failed);
             }
-            std::thread::sleep(WIFI_RESULT_ACK_WAIT + Duration::from_millis(500));
+            let until = Instant::now() + WIFI_RESULT_ACK_WAIT + Duration::from_millis(500);
+            // The worker clears busy after resolving the ack and asking for any
+            // relink. Observe that completion before checking the final result.
+            while changes.wifi_busy.load(Ordering::Acquire) {
+                assert!(
+                    Instant::now() < until,
+                    "still awaiting result ack; acked: {ack}"
+                );
+                std::thread::sleep(Duration::from_millis(10));
+            }
             assert_eq!(changes.take_relink(), !ack, "acked: {ack}");
             ended(&changes);
             serving.join().unwrap();
