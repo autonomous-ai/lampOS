@@ -1,0 +1,16 @@
+{
+  "head": "69975c6234d898970967bc0d41d62943656d610b",
+  "tree": "e1f014cebfd819ffebd2ad3a8f0aadc0e7a5a21d",
+  "base": "1d8384591bed9eb88ce353bf3f5638f01d704c3e",
+  "all_frozen_sources_match_committed_bytes_modes": true,
+  "source_count": 7026,
+  "summary": {
+    "summaries": 11,
+    "passed": 4666,
+    "failed": 0,
+    "ignored": 21,
+    "source_unchanged": true
+  },
+  "worktree_clean": true,
+  "scope": "private held-print helper and worker ownership verdict only; no public API, dependency, schema or default change; full Voice/Eval tests plus workspace build; stacked on preserved parent head 1d838; later retarget/rebase must qualify current composition"
+}

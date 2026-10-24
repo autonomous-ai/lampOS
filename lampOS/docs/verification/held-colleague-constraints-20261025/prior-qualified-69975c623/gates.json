@@ -1,0 +1,93 @@
+{
+  "worktree": "/private/tmp/third-carry-colleague-window",
+  "base": "f9780cb2a117f5c5d2c0960cd28cfbee866bd59b",
+  "carried_head": "1d8384591bed9eb88ce353bf3f5638f01d704c3e",
+  "target": "/private/tmp/third-carry-window-target-ld637ldg",
+  "target_scope": "exclusive to this worktree; initially empty for red regression, reused after source edits/rebase; no all-fresh claim",
+  "packages": [
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "scope_reason": "private held-print helper and worker ownership verdict only; no public API, dependency, schema or default change; full Voice/Eval tests plus workspace build; stacked on preserved parent head 1d838; later retarget/rebase must qualify current composition",
+  "source_count": 7026,
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 13.001,
+      "log": "/private/tmp/third-held-constraints-full-fmt.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 80.152,
+      "log": "/private/tmp/third-held-constraints-full-clippy.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "build",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "-q",
+        "--workspace",
+        "--locked",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 53.762,
+      "log": "/private/tmp/third-held-constraints-full-build.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "tests",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--message-format=json",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 920.48,
+      "log": "/private/tmp/third-held-constraints-full-tests.txt",
+      "source_unchanged": true
+    }
+  ],
+  "docker_available": false
+}

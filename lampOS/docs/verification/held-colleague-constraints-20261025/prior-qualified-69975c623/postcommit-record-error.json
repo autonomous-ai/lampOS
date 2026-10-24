@@ -1,0 +1,13 @@
+{
+  "command": [
+    "git",
+    "range-diff",
+    "1d8384591..1d8384591",
+    "1d8384591..HEAD"
+  ],
+  "exit": 129,
+  "reason": "empty old range was invalid; after successful source-bound exact-file commit, not a gate failure",
+  "recovery": "kept original committed source and binding; wrote qualified patch against parent instead; meaningful old/new range-diff follows actual rebase",
+  "head": "69975c6234d898970967bc0d41d62943656d610b",
+  "worktree_clean": true
+}

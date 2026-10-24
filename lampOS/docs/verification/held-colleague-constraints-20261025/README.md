@@ -1,4 +1,6 @@
-# Held-colleague constraints: claimed source audit, no implementation
+# Held-colleague constraints, 25 October 2026
+
+## Initial claim and source audit before implementation
 
 Current source: #3408 rebased on f978, with active-thread correction under full gate. No edits to frozen source for this audit.
 
@@ -21,3 +23,7 @@ The subsequent worker family passes 223/0, then 225/0 with actual stop/privacy/o
 The comparison microbenchmark is one optimized host invocation with 10,000 repetitions per case and synthetic 192-element vectors. It extracts the exact parent positive nearness method and cosine source, and includes the actual candidate helper under a cached stand-in. Parent one-known first/p99 are 3,254/589 ns; candidate one-known 1,013/496 ns; candidate eight-known 3,424/2,862 ns; candidate eight-missing 553/140 ns with at most nine cached lookups. Every first/p99 is below the selected 1 ms host kernel target. These are cached-comparison boundaries only: no inference, async poll, logging, complete worker, target hardware, acoustic or end-to-end latency claim; host load was uncontrolled. Raw samples, generated Rust, compiler identity and before/after hashes are retained. The orchestration script remains outside the repository; the Rust wrapper and the extraction/boundary description above describe reproduction. Later test/doc edits do not change the benchmarked helper or threshold; final helper binding will be verified.
 
 A missing held print can resolve only from that exact request's already-requested cached reply; it is face-only while unavailable. Capacity exhaustion is latched until a fresh call. These are identity-carry rules, not a new universal first-eight-second identity gate. At most eight held line requests are retained, which may include repeated lines from one visitor; no distinct-person census is claimed. No new inference, wait, persisted voice data, threshold or activation.
+
+## Prior-base full gate completed
+
+[Qualified snapshot 69975c623](prior-qualified-69975c623/README.md) passes all four frozen stages, 4,666/0/21 ignored, 11 summaries. All 7,026 source records match its committed Git blobs/modes and the benchmarked helper; nine new controls are present in the final compiler-bound listings. This is the historical tested base 1d838, not a ready latest-base composition. The next step is the actual rebase onto the separately qualifying bcb parent, then new current-source gates before pushing/opening the child PR.

@@ -1,0 +1,590 @@
+diff --git a/lampOS/crates/voice/src/second_provider/worker.rs b/lampOS/crates/voice/src/second_provider/worker.rs
+index 9500a92eb7..5d5b240ff8 100644
+--- a/lampOS/crates/voice/src/second_provider/worker.rs
++++ b/lampOS/crates/voice/src/second_provider/worker.rs
+@@ -31,6 +31,7 @@ use std::{
+ };
+ 
+ mod carry_window;
++mod held_colleagues;
+ #[cfg(test)]
+ mod memory_note_retries;
+ 
+@@ -4139,11 +4140,10 @@ pub(crate) struct Heeding {
+     /// Lines in a row from someone else held while the carry stands, each
+     /// request once ([`Self::colleague_held`]): the second ends it.
+     carry_others: Vec<u64>,
+-    /// Whether a line was held as someone else's in this carry, until a
+-    /// new carry begins, with the newest such print known: after it the
+-    /// owner's voice alone carries only when nearer theirs than that print
+-    /// ([`CARRY_NEARER_BY`]).
+-    held_colleague: Option<Option<Vec<f32>>>,
++    /// Bounded constraints from held colleagues in this call. The owner's
++    /// voice alone must be nearer theirs than every retained held print;
++    /// missing evidence or capacity exhaustion requires their face.
++    held_colleagues: held_colleagues::HeldColleagues,
+     /// How much speech a print under `same_voice::DIFFERENT_BELOW` needs to
+     /// be a sure other voice under a carry: [`CARRY_SURE_OTHER_SPEECH_SAMPLES`],
+     /// lowered only by tests for a synthetic classification control.
+@@ -4822,7 +4822,7 @@ impl Heeding {
+             carried: None,
+             carried_last: None,
+             carry_others: Vec::new(),
+-            held_colleague: None,
++            held_colleagues: held_colleagues::HeldColleagues::default(),
+             sure_other_samples: CARRY_SURE_OTHER_SPEECH_SAMPLES,
+             began_over: None,
+             voices: None,
+@@ -5491,8 +5491,7 @@ impl Heeding {
+             // borrowed). With the carry standing after it, it ends nothing.
+             if self.carries {
+                 let print = voices.print_of(late);
+-                let kept = self.held_colleague.take().flatten();
+-                self.held_colleague = Some(print.or(kept));
++                self.held_colleagues.hold(late, print);
+             }
+             let stands =
+                 self.carries && count_colleague(&mut self.carry_others, &mut self.carrying, late);
+@@ -5504,6 +5503,7 @@ impl Heeding {
+             } else {
+                 self.carrying = false;
+                 self.carry_window.clear();
++                self.held_colleagues.clear();
+                 eprintln!(
+                     "lamp-voice second: request {request}: no conversation is going on for it: request {late}'s voice, known after its answer, was another's"
+                 );
+@@ -5638,7 +5638,7 @@ impl Heeding {
+         // and no colleague's print is kept past it.
+         self.carrying = false;
+         self.carry_window.clear();
+-        self.held_colleague = None;
++        self.held_colleagues.clear();
+         // The lines' speaking faces too, for a join (`Self::same_speaker`),
+         // and how the room was.
+         self.spoke.clear();
+@@ -5740,6 +5740,7 @@ impl Heeding {
+             // has left the conversation, their voice sure or not.
+             self.carrying = false;
+             self.carry_window.clear();
++            self.held_colleagues.clear();
+             eprintln!(
+                 "lamp-voice second: request {request}: the one the lamp answered, turned away from it, talking to someone else ({heard}): not carried, and the conversation is carried no further until the lamp answers again (LAMP_SAME_SPEAKER_CARRIES)"
+             );
+@@ -5769,41 +5770,29 @@ impl Heeding {
+         }
+     }
+ 
+-    /// `LAMP_SAME_SPEAKER_CARRIES`: whether `request`'s print, at
+-    /// `likeness` to the conversation's voice, is nearer it by
+-    /// [`CARRY_NEARER_BY`] than to the line held as someone else's in this
+-    /// carry, if one was (reviewer-three on #3331). With none held, yes;
+-    /// with no held print known, no: the owner's face carries them.
++    /// With held colleagues in this call, the owner's voice alone must be
++    /// nearer the owner's than every retained held print by CARRY_NEARER_BY.
++    /// A missing held print or exhausted bound requires the owner's face.
+     fn nearer_than_the_colleague(&mut self, request: u64, likeness: Option<f32>) -> bool {
+-        let Some(colleague) = self.held_colleague.clone() else {
+-            return true;
+-        };
+-        let other = self
+-            .voices
+-            .as_mut()
+-            .and_then(|voices| voices.print_of(request))
+-            .zip(colleague)
+-            .and_then(|(print, colleague)| crate::same_voice::cosine(&print, &colleague));
+-        let nearer = likeness
+-            .zip(other)
+-            .is_some_and(|(own, other)| own >= other + CARRY_NEARER_BY);
++        let voices = &mut self.voices;
++        let nearer = self.held_colleagues.nearer(request, likeness, |of| {
++            voices.as_mut().and_then(|voices| voices.print_of(of))
++        });
+         if !nearer {
+             eprintln!(
+-                "lamp-voice second: request {request}: its voice ({likeness:?}) is not nearer the conversation's than the voice held as someone else's in this carry ({other:?}), by {CARRY_NEARER_BY}: the voice alone carries nothing (LAMP_SAME_SPEAKER_CARRIES)"
++                "lamp-voice second: request {request}: its voice ({likeness:?}) is not nearer the conversation's than every held colleague's known print, by {CARRY_NEARER_BY}, or a held print is missing or the bound exhausted: the voice alone carries nothing (LAMP_SAME_SPEAKER_CARRIES)"
+             );
+         }
+         nearer
+     }
+ 
+-    /// A line held as someone else's in this carry: its print, if known,
+-    /// else the one kept before ([`Self::nearer_than_the_colleague`]).
++    /// Retain this held line's constraint without replacing an older one.
+     fn hold_the_colleagues_print(&mut self, request: u64) {
+         let print = self
+             .voices
+             .as_mut()
+             .and_then(|voices| voices.print_of(request));
+-        let kept = self.held_colleague.take().flatten();
+-        self.held_colleague = Some(print.or(kept));
++        self.held_colleagues.hold(request, print);
+     }
+ 
+     /// `LAMP_SAME_SPEAKER_CARRIES`: `request`, begun while the carry
+@@ -5827,6 +5816,7 @@ impl Heeding {
+             }
+         } else {
+             self.carry_window.clear();
++            self.held_colleagues.clear();
+             eprintln!(
+                 "lamp-voice second: request {request}: {} lines in a row from someone else: the conversation is carried no further until the lamp answers again (LAMP_SAME_SPEAKER_CARRIES)",
+                 self.carry_others.len()
+@@ -5907,7 +5897,7 @@ impl Heeding {
+             crate::second_provider::Did::Stopped => {
+                 self.carrying = false;
+                 self.carry_window.clear();
+-                self.held_colleague = None;
++                self.held_colleagues.clear();
+             }
+         }
+     }
+@@ -6275,6 +6265,7 @@ impl Heeding {
+         // A delayed output receipt must not revive that forgotten scope.
+         if self.carries && said_ago.is_none() {
+             self.carry_window.clear();
++            self.held_colleagues.clear();
+         }
+         let carry = self.carries
+             && self.carrying
+@@ -6594,7 +6585,13 @@ impl Heeding {
+             // room. A generic same-voice continuation must not bypass the
+             // owner's stricter nearness check. An unsure held line is no
+             // talk for the room, just as in the existing quiet-room path.
+-            if late_window && !busy && carried.goes_on != Some(true) {
++            // A voice above SAME_FROM whose held-print comparison was
++            // refused is not an owner sign outside the ordinary follow-up,
++            // even in an active Unknown/Quiet thread. Generic missing or
++            // weak current evidence keeps its existing separate policy.
++            let constrained_voice =
++                !follow_up && carried.voice == Some(true) && carried.goes_on.is_none();
++            if (late_window || constrained_voice) && !busy && carried.goes_on != Some(true) {
+                 held_here = true;
+                 if carried.goes_on.is_none()
+                     && let Ok(mut room) = crate::room_told::room().lock()
+@@ -6602,7 +6599,7 @@ impl Heeding {
+                     room.colleague_held(request);
+                 }
+             }
+-            if busy || late_window {
++            if busy || late_window || constrained_voice {
+                 // No sure sign: past the 8 s held; within them the ordinary
+                 // follow-up rule, the legacy exception, whenever the print
+                 // comes.
+@@ -6950,9 +6947,7 @@ impl Heeding {
+                     || !spoken_by_the_caller_alone(&seen.speakers, &self.caller_faces));
+             if self.carries && (!self.carrying || new_caller) {
+                 self.carry_window.begin(request);
+-            }
+-            if !self.carrying {
+-                self.held_colleague = None;
++                self.held_colleagues.begin(request);
+             }
+             self.carrying = true;
+             self.carry_others.clear();
+@@ -10080,6 +10075,7 @@ mod tests {
+                 // A colleague's voice reading 0.75 against the owner's.
+                 4 => vec![0.75, 0.661_4],
+                 -1 => vec![0.0, 1.0],
++                -2 => vec![-1.0, 0.0],
+                 _ => return true,
+             };
+             self.prints.push_back((request, Ok(print)));
+@@ -10774,6 +10770,152 @@ mod tests {
+         }
+     }
+ 
++    /// A newer visitor's print cannot erase an earlier held visitor's
++    /// constraint when that earlier visitor returns without a visible face.
++    #[test]
++    fn two_held_colleagues_keep_the_older_voice_constraint() {
++        let _one = crate::provider_worker::tests::one_thread();
++        for room in ["busy", "unknown", "quiet"] {
++            let mut desk = CarryDesk::new(true);
++            desk.answered(12);
++            assert!(
++                desk.line(4, "f2", "The client liked the second draft.")
++                    .is_some()
++            );
++            assert_eq!(desk.line(1, "", "Will it rain in the afternoon?"), None);
++            desk.answered(12);
++            assert!(
++                desk.line(-2, "f3", "I sent the slides to the client.")
++                    .is_some()
++            );
++            assert_eq!(desk.line(1, "", "Should I take an umbrella then?"), None);
++            desk.answered(12);
++            {
++                let mut told = crate::room_told::room().lock().unwrap();
++                match room {
++                    "unknown" => {
++                        *told = crate::room_told::RoomTold::new();
++                        told.count_only_talk(true);
++                        told.count_held_talk(true);
++                        told.end_busy_sooner(true);
++                        told.end_busy_once_answered(true);
++                    }
++                    "quiet" => told.set_quiet(),
++                    _ => {}
++                }
++            }
++            assert!(
++                desk.line(4, "", "The client approved the slides this morning.")
++                    .is_some(),
++                "the older colleague off camera is still held after another visitor: {room}"
++            );
++            let expected = match room {
++                "unknown" => crate::room_told::Room::Unknown,
++                "quiet" => crate::room_told::Room::Quiet,
++                _ => crate::room_told::Room::Busy,
++            };
++            assert_eq!(
++                crate::room_told::room().lock().unwrap().at(monotonic_us()),
++                expected
++            );
++            assert_eq!(desk.line(1, "f1", "What time does the sun set?"), None);
++        }
++    }
++
++    #[test]
++    fn held_voice_constraints_close_with_the_carry_and_reject_old_callbacks() {
++        let _one = crate::provider_worker::tests::one_thread();
++        for end in ["stop", "privacy", "forget", "turned-away", "two-others"] {
++            let mut desk = CarryDesk::new(true);
++            desk.answered(12);
++            assert!(
++                desk.line(4, "f2", "The client liked the second draft.")
++                    .is_some()
++            );
++            let old = desk.request;
++            match end {
++                "stop" => desk.heeding.lamp_did(crate::second_provider::Did::Stopped),
++                "privacy" => desk.heeding.privacy_changed(),
++                "forget" => {
++                    crate::thread::THREAD.lock().unwrap().forget();
++                    let now = monotonic_us();
++                    desk.heeding
++                        .signs_begun(old + 1, (now, now + 2_000_000), now);
++                }
++                "turned-away" => {
++                    desk.away = true;
++                    assert!(desk.line(1, "f1", "The meeting starts at five.").is_some());
++                }
++                _ => assert!(
++                    desk.line(-2, "f3", "I sent the slides to the client.")
++                        .is_some()
++                ),
++            }
++            desk.heeding.held_colleagues.hold(old, Some(vec![1.0, 0.0]));
++            assert!(
++                !desk
++                    .heeding
++                    .held_colleagues
++                    .nearer(old + 10, Some(1.0), |_| {
++                        panic!("closed scope after {end} must not read a cached print")
++                    }),
++                "{end}"
++            );
++        }
++    }
++
++    #[test]
++    fn a_full_held_voice_bound_keeps_the_owner_by_face_until_a_fresh_call() {
++        let _one = crate::provider_worker::tests::one_thread();
++        let mut desk = CarryDesk::new(true);
++        for _ in 0..9 {
++            desk.answered(12);
++            assert!(
++                desk.line(4, "f2", "The client liked the second draft.")
++                    .is_some()
++            );
++            assert_eq!(desk.line(1, "f1", "Will it rain in the afternoon?"), None);
++        }
++        desk.answered(12);
++        assert!(
++            desk.line(1, "", "Should I take an umbrella then?")
++                .is_some()
++        );
++        assert_eq!(desk.line(1, "f1", "What time does the sun set?"), None);
++        desk.answered(12);
++        assert_eq!(
++            desk.line(1, "f1", "Lamp, what is on my calendar today?"),
++            None
++        );
++        desk.called_long_ago();
++        desk.answered(12);
++        assert_eq!(desk.line(1, "", "And what about tomorrow afternoon?"), None);
++    }
++
++    #[test]
++    fn a_fresh_call_clears_the_previous_callers_held_voice_constraints() {
++        let _one = crate::provider_worker::tests::one_thread();
++        let mut desk = CarryDesk::new(true);
++        desk.answered(12);
++        assert!(
++            desk.line(4, "f2", "The client liked the second draft.")
++                .is_some()
++        );
++        assert_eq!(desk.line(1, "", "Will it rain in the afternoon?"), None);
++        desk.answered(12);
++        assert_eq!(
++            desk.line(4, "f2", "Lamp, what is on my calendar today?"),
++            None
++        );
++        desk.called_long_ago();
++        desk.answered(12);
++        assert_eq!(
++            desk.line(4, "", "And what about tomorrow afternoon?"),
++            None,
++            "the new caller's voice is not constrained by their earlier held line"
++        );
++    }
++
+     /// The first builder at 09:34 on #3296: a colleague who calls the lamp
+     /// by its name while the owner's carry stands is answered, and is the
+     /// caller from then on: their own next line goes on by their face, and
+diff --git a/lampOS/crates/voice/src/second_provider/worker/held_colleagues.rs b/lampOS/crates/voice/src/second_provider/worker/held_colleagues.rs
+new file mode 100644
+index 0000000000..0787a75e1a
+--- /dev/null
++++ b/lampOS/crates/voice/src/second_provider/worker/held_colleagues.rs
+@@ -0,0 +1,158 @@
++//! Ephemeral constraints from held lines in one caller's conversation.
++//! No inference, wait, time window, admission or persistence is owned here.
++use super::CARRY_NEARER_BY;
++
++const MAX_HELD: usize = 8;
++
++#[derive(Default)]
++pub(super) struct HeldColleagues {
++    first_request: Option<u64>,
++    prints: Vec<(u64, Option<Vec<f32>>)>,
++    exhausted: bool,
++}
++
++impl HeldColleagues {
++    pub(super) fn clear(&mut self) {
++        *self = Self::default();
++    }
++
++    pub(super) fn begin(&mut self, request: u64) {
++        self.clear();
++        self.first_request = Some(request);
++    }
++
++    pub(super) fn hold(&mut self, request: u64, print: Option<Vec<f32>>) {
++        if self.first_request.is_none_or(|first| request < first) {
++            return;
++        }
++        if let Some((_, kept)) = self.prints.iter_mut().find(|(of, _)| *of == request) {
++            if kept.is_none() {
++                *kept = print;
++            }
++            return;
++        }
++        if self.prints.len() == MAX_HELD {
++            // Evicting a constraint would let an older visitor pass. Keep
++            // the bound and require a face until a fresh call instead.
++            self.exhausted = true;
++            return;
++        }
++        self.prints.push((request, print));
++    }
++
++    pub(super) fn nearer(
++        &mut self,
++        request: u64,
++        own: Option<f32>,
++        mut cached_print: impl FnMut(u64) -> Option<Vec<f32>>,
++    ) -> bool {
++        if self.first_request.is_none_or(|first| request < first) || self.exhausted {
++            return false;
++        }
++        if self.prints.is_empty() {
++            return true;
++        }
++        let Some(own) = own.filter(|own| own.is_finite()) else {
++            return false;
++        };
++        // Fill only already requested, cached replies. A missing or evicted
++        // reply stays a constraint requiring a face, never another's print.
++        for (of, print) in &mut self.prints {
++            if print.is_none() {
++                *print = cached_print(*of);
++            }
++        }
++        let Some(current) = cached_print(request) else {
++            return false;
++        };
++        self.prints.iter().all(|(_, held)| {
++            held.as_ref()
++                .and_then(|held| crate::same_voice::cosine(&current, held))
++                .is_some_and(|other| own >= other + CARRY_NEARER_BY)
++        })
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn every_held_print_constrains_the_voice_without_eviction() {
++        let mut held = HeldColleagues::default();
++        held.begin(1);
++        held.hold(2, Some(vec![0.75, 0.661_4]));
++        held.hold(4, Some(vec![-1.0, 0.0]));
++        assert!(!held.nearer(6, Some(0.75), |_| Some(vec![0.75, 0.661_4])));
++        assert!(held.nearer(7, Some(1.0), |_| Some(vec![1.0, 0.0])));
++        assert_eq!(held.prints.len(), 2);
++    }
++
++    #[test]
++    fn a_missing_held_print_needs_its_own_cached_reply() {
++        let mut held = HeldColleagues::default();
++        held.begin(1);
++        held.hold(2, None);
++        held.hold(3, Some(vec![-1.0, 0.0]));
++        assert!(!held.nearer(4, Some(1.0), |of| (of == 4).then(|| vec![1.0, 0.0])));
++        let mut reads = Vec::new();
++        assert!(held.nearer(4, Some(1.0), |of| {
++            reads.push(of);
++            Some(if of == 2 {
++                vec![0.0, 1.0]
++            } else {
++                vec![1.0, 0.0]
++            })
++        }));
++        assert_eq!(reads, [2, 4]);
++        assert!(held.nearer(5, Some(1.0), |_| Some(vec![1.0, 0.0])));
++    }
++
++    #[test]
++    fn duplicates_fill_missing_evidence_without_replacing_known_evidence() {
++        let mut held = HeldColleagues::default();
++        held.begin(1);
++        held.hold(2, None);
++        held.hold(2, Some(vec![1.0, 0.0]));
++        held.hold(2, Some(vec![-1.0, 0.0]));
++        held.hold(2, None);
++        assert_eq!(held.prints.len(), 1);
++        assert!(!held.nearer(3, Some(1.0), |_| Some(vec![1.0, 0.0])));
++    }
++
++    #[test]
++    fn capacity_exhaustion_stays_face_only_until_a_fresh_call() {
++        let mut held = HeldColleagues::default();
++        held.begin(1);
++        for request in 2..=MAX_HELD as u64 + 1 {
++            held.hold(request, Some(vec![-1.0, 0.0]));
++        }
++        assert!(held.nearer(20, Some(1.0), |_| Some(vec![1.0, 0.0])));
++        held.hold(2, None);
++        assert!(!held.exhausted);
++        held.hold(20, Some(vec![-1.0, 0.0]));
++        assert_eq!(held.prints.len(), MAX_HELD);
++        assert!(!held.nearer(21, Some(1.0), |_| panic!("exhausted: no cache read")));
++        held.begin(30);
++        assert!(held.nearer(31, Some(1.0), |_| panic!("no held line: no cache read")));
++    }
++
++    #[test]
++    fn closed_scopes_and_old_callbacks_cannot_restore_constraints() {
++        let mut held = HeldColleagues::default();
++        held.hold(2, Some(vec![1.0, 0.0]));
++        assert!(held.prints.is_empty());
++        held.begin(10);
++        held.hold(9, Some(vec![1.0, 0.0]));
++        assert!(held.prints.is_empty());
++        held.hold(11, Some(vec![1.0, 0.0]));
++        held.clear();
++        held.hold(11, Some(vec![1.0, 0.0]));
++        assert!(held.prints.is_empty());
++        assert!(!held.nearer(12, Some(1.0), |_| panic!("closed: no cache read")));
++        held.begin(20);
++        held.hold(11, Some(vec![1.0, 0.0]));
++        assert!(held.nearer(21, Some(1.0), |_| None));
++        assert!(!held.nearer(19, Some(1.0), |_| None));
++    }
++}
+diff --git a/lampOS/docs/second-voice.md b/lampOS/docs/second-voice.md
+index 3e775a7568..79f803b2d4 100644
+--- a/lampOS/docs/second-voice.md
++++ b/lampOS/docs/second-voice.md
+@@ -3151,9 +3151,9 @@ after a take-over, but now for every turn:
+   ends give no extension. Identity checks and the switch-off path remain
+   unchanged. When that colleague print is first learned at the current
+   owner's verdict, the worker rechecks the current line's captured start
+-  against the newly available window. It retains that line's own voice
+-  evidence if the first lookup consumed its one judgement; otherwise it
+-  reads the cached reply again. Neither lookup waits for a print.
++  against the newly available window. It always reads the cached reply
++  again and retains any own-voice likeness consumed by the first lookup
++  in preference to the second result. Neither lookup waits for a print.
+   In Busy, Unknown and Quiet, that new eligibility still needs the owner's
+   positive face or sufficiently nearer voice; missing, uncertain or
+   confusable voice evidence is held for this verdict without turning a
+@@ -3170,23 +3170,33 @@ after a take-over, but now for every turn:
+   talking to a colleague (reviewer-two at 03:01): held, and it ends the
+   carry, their voice sure or not, so turning back needs a fresh call or
+   answer (the first builder at 09:34; reviewer-two at 10:32 on #3331).
+-  These signs are read in any room while a carry stands (reviewer-two at
+-  10:35): in a room not busy, unknown or quiet, a line held by them, or
+-  in a voice not surely the owner's, is judged as in a busy room for its
+-  own verdict, the room itself unchanged. While the carry stands, the
+-  owner's carried line is no reply to a colleague's question held just
+-  before it (`Attention::carried_past_a_question`, no `AFTER_QUESTION`
+-  hold; the reviewer-lead on #3331). Once a line has been held as someone
+-  else's in a carry, the owner's voice alone carries only when its print
+-  is nearer the conversation's than the held line's print by
+-  `worker::CARRY_NEARER_BY` (0.10, provisional), with no held print known
+-  only their face does (reviewer-three on #3331: two voices have read 0.69,
+-  so owner and colleague lines could alternate, a colleague at 0.70
+-  carried as the owner); the held print is kept until a new carry, a stop
+-  or a privacy change. The faces read are those seen *speaking* the line.
+-  A line with no sure sign either way, a print not back, a short print
+-  under 0.70, no face seen speaking or only before the line, is held past
+-  the 8 s, goes on within them as any follow-up, and ends nothing. The existing score rows of
++  Another speaking face and the caller turned away are held in every
++  room while a carry stands. The owner's carried line is no reply to a
++  colleague's held question (`Attention::carried_past_a_question`, no
++  `AFTER_QUESTION` hold). Once a line is held as someone else's, voice-only
++  identity carry needs its print nearer the conversation's than **every**
++  retained held line's print by `worker::CARRY_NEARER_BY` (0.10, provisional).
++  A newer visitor cannot replace an older visitor's constraint. At most
++  eight held line requests and their optional prints are kept in memory
++  for this call. Duplicate requests only fill a missing print. A missing
++  held print requires the owner's speaking face until that request's own
++  already-requested cached reply is available; no new inference or wait is
++  started. At capacity, another distinct held line latches face-only
++  identity carry until a fresh call, rather than evicting an older print.
++  Owner admissions and answers do not discard these constraints. A fresh
++  call, stop, privacy change, observed forget, caller turned away or two
++  consecutive other lines clears the scope; late prior-call callbacks
++  cannot restore it. A fresh caller has no old caller's constraints.
++  In Busy, Unknown and Quiet, past the ordinary follow-up window, a
++  positive current voice whose held-print comparison was refused cannot
++  bypass that refusal through an active thread. The refused line is no
++  talk for the stored room. The caller's speaking face still carries.
++  The ordinary first 8 s follow-up remains unchanged. Generic missing or
++  weak current evidence in an Unknown/Quiet thread has a separate
++  personal-scope acceptance hold; this comparison does not close it.
++  In a Busy room, a line with no sure sign, a print not back, a short print
++  under 0.70 or no speaking face is held past 8 s, admitted within them as
++  the ordinary follow-up, and ends nothing. The existing score rows of
+   `docs/verification/same-voice-early-20261018`, selected by their clips'
+   original durations (no audio re-sliced, no CAM++ run again), give one
+   synthetic voice's short clips (three of 0.93 to 1.45 s against seven
+diff --git a/lampOS/docs/switches.md b/lampOS/docs/switches.md
+index f35d1bd93d..ed39120c09 100644
+--- a/lampOS/docs/switches.md
++++ b/lampOS/docs/switches.md
+@@ -207,7 +207,7 @@ motion, since lamp-4ace's motors stay still until Monday: `LAMP_STAFF_NOTE`
+ | LAMP_NAMED_ALWAYS | `on`; off. On the second route, with `--attention`, a line that begins with the lamp's name (heard by `lamp-name` from 1.5 s before the line to 1 s into it, or its words opening with "Lamp" set off as a call, after a greeting or before a pause, never a stand-in like "man") while the eyes' newest fresh look has a face turned to the lamp is answered in a busy room: the strict busy rule's and `busy_bar`'s holds are not kept for it, and the model's `not_for_me` on it is not taken once (it is asked again, told it was called by name while faced) | — | — | #2191 (#1722 hw-first-P1 finding 4: a production floor's named, faced lines all held or declined) | played lines over room noise on the second route, before and after, and the busy-room hold test unchanged for talk without the name | off until that run | A colleague's "Lamp, …" said while someone faces the lamp is answered | until |
+ | LAMP_NOT_FOR_ME_WORDS | `on`; off. On the second route, a reply to a line told `CONVERSATION_ALONE` whose text is "not for me" as the whole reply, or followed straight away by the refusal's own clause ("that's/that is/it's about me", "not to me"; "to answer"/"to reply" only at a sentence end), case, punctuation, quotes, dashes and leading speech tags aside, is taken as `not_for_me`: nothing said, the line told held back. Its first piece waits only until the opening is known; no other line waits. Any other words after "not for me" ("Not for me, thanks…", "Not for me to say, but…", "Not for me to answer, but…") are an answer and said | — | — | #3103 (lamp-4ace r06, request 131: "Not for me — that's about me, not to me." spoken) | on lamp-4ace, talk past the lamp after a conversation: no "not for me" spoken, and named lines and answers to the lamp's own question answered as before | off until that run | The model's refusal written as words is never said aloud | until |
+ | LAMP_BUSY_ENDS_SOONER | `on` exactly; off. The second route only, with `LAMP_SPOKEN_TO`: a busy room ends a minute after the last talk between people when nothing since was talk or answered (lines held, sounds, silence), not three minutes after; a line held only because the room is busy and it wasn't called (`BUSY_UNCALLED`, `BUSY_NAMED_UNTURNED`) is talk, so two people talking on keep it busy and the minute runs from their last line; once the lamp answers, a minute after its first answer since the talk (`end_busy_once_answered`, as Live with `LAMP_GOING_ON_ASKS`), never later than three minutes after the talk | — | — | The first builder on Queue #1722 (21 Oct, 04:00) | Tests only: talk to 36 s, lines held at 120/137/159 s, busy without the switch and quiet with it; talk at 100 s keeps it busy; a held line every 10 s (`BUSY_UNCALLED`/`BUSY_NAMED_UNTURNED`) keeps it busy with the switch, quiet a minute after the last; an answer 30 s after the talk ends it at 90 s with the switch, not without | off until a run on lamp-4ace (b0333's switches): two people talk, then one says "Hey Lamp, good morning!" a minute later, answered with the switch and held without | A room is busy while people are talking, not for three minutes after; people who stop for a minute and then talk again without the lamp are in a quiet room until their talk makes it busy again | until |
+-| LAMP_SAME_SPEAKER_CARRIES | `on` exactly; off. The second route only, with `LAMP_ATTENTION` and `LAMP_NAME_OR_FOLLOW_UP`: in a busy room, a line begun within 20 s (`SAME_SPEAKER_CARRIES_FOR`) of the end of the lamp's last words, by its start, past a follow-up's 8 s or after talk past the lamp, goes on as the conversation when it is the one the lamp answered: the caller's face alone seen speaking it turned to the lamp (the eyes' speaking faces), or the conversation's voice at `SAME_FROM` (0.70) or over. Another face seen speaking it, or a sure other voice (under 0.30 from 2.5 s of speech or more, `CARRY_SURE_OTHER_SPEECH_SAMPLES`, which no print reaches today), is held; one such line, or one held past a still turned face, or a print known late as a sure other voice, ends nothing, does not make the room busy by voice alone and is no talk (`RoomTold::colleague_held`), and the owner goes on (the first builder at 09:34 on #3296, replacing 03:46's one-line end); two lines in a row from someone else end the carry until the lamp answers again, as two lines left alone end a conversation; a colleague who calls the lamp by name is the caller from then on; the 20 s run from the later of the lamp's last words and the actual audio end of one held colleague line, once per actual answer, capped at 40 s from the lamp's last words (First's decision on Queue #3126, 24 Oct 12:57); delayed classification uses that recorded end, never its processing time; if it first opens the window at the current verdict, that line is rechecked by its captured start and its own positive owner/nearness evidence in Busy, Unknown and Quiet, with no wait for a missing print; a current-line likeness consumed by the first lookup is retained for that check rather than replaced by a second empty lookup (the answer clock is `Did::Said` queued-PCM bookkeeping, not an acoustic drain receipt); so do a stop and a privacy change, and a forgetting leaves no words to carry from. The caller's face seen speaking turned away is held and ends the carry, their voice sure or not; turning back needs a fresh call or answer. These signs are read in any room: in a room not busy, unknown or quiet, such a line, or one in a voice not surely the owner's, is held as in a busy room, the room unchanged. The owner's carried line is no reply to a colleague's question held before it (no `AFTER_QUESTION` hold). Once a colleague line is held in a carry, the owner's voice alone carries only when nearer the conversation's than the held line's print by `CARRY_NEARER_BY` (0.10, provisional); else only their face does. A short print under 0.70 is no sign either way, so with short lines the face carries. A line begun within the 8 s while the carry stands is read the same way: another face seen speaking it is held, and a line with no sure sign either way follows the ordinary follow-up rule whatever the print's arrival (at the verdict, late or never), an unsure print taken for no print. In short, the first 8 s are not identity-gated; past 8 s only a sure same-speaker sign carries; always held, inside the 8 s too: another face seen speaking, the caller turned away, and a sure other voice (not reachable today: prints carry at most 1.5 s of speech, under the provisional 2.5 s). A print that was no evidence never becomes evidence: a going-on line's print joins the conversation's voice only at 0.70 or over or seen spoken by the caller's face, at its verdict or late, caller-only on or off. Each answer renews the 20 s, so a chain of turns has no overall cap, but outside the 8 s window each carried turn needs its own sure sign. Such a line the model leaves unanswered is no talk (`RoomTold::carried`) | — | — | Sixth, the owner's P1 on Queue #3126 (23 Oct) | Tests only: five turns at 12 s gaps carried by voice and face, voice alone, face alone and face with 0.27 / 0.00 short prints; held without the switch; a colleague's line, face seen, any print, held and the owner goes on, two in a row end it until a new answer; the owner's five turns with one colleague line between turns 2 and 3 all answered, busy (face) and quiet (an off-camera voice, the room not made busy; without the switch it is); in a quiet room the colleague's held line closes as held, no talk, the room not busy; a late sure other voice (a synthetic control) is one line, the owner going on, and with the colleague's next line two in a row; a colleague's call makes them the caller; the owner turned away held and the carry ended, in busy, unknown and quiet rooms, turning back held until a fresh call; a colleague's face (-1/0/1 prints) held in unknown and quiet rooms, the room unchanged and the owner going on; a colleague's question held and the owner's next line carried; owner and colleague alternating, the owner by voice alone, a colleague voice at 0.75 off camera held after their face was held once; 19.99 s carried and 20.01 s held by the line's start; stop, privacy and forget end it; the owner's face with a 0.27 print at 7 s carried, the print back at the verdict or after it; a colleague's face at 3 s held, the owner at 12 s going on, two in a row ending the carry until a fresh call, a short print (0.27, 0.00, 0.50) or none, no face, at once or late: let out by the follow-up at 3 s, held at 12 s, the carry standing; an unknown voice, no face, 0.27 at 3 s let out, at once or late, then the same voice with no face at 12 s held while the owner's face at 12 s carries, caller-only on and off; a sure other voice at 3 s held (a synthetic control, the sure bar lowered to 1.5 s) | off until a played five-turn back-and-forth on lamp-52e6 or lamp-75c9, quiet and with desk talk | One person talking with the lamp in an office keeps talking with it by their own face and voice, while a colleague's line beside them is not answered | until |
++| LAMP_SAME_SPEAKER_CARRIES | `on` exactly; off. The second route only, with `LAMP_ATTENTION` and `LAMP_NAME_OR_FOLLOW_UP`: in a busy room, a line begun within 20 s (`SAME_SPEAKER_CARRIES_FOR`) of the end of the lamp's last words, by its start, past a follow-up's 8 s or after talk past the lamp, goes on as the conversation when it is the one the lamp answered: the caller's face alone seen speaking it turned to the lamp (the eyes' speaking faces), or the conversation's voice at `SAME_FROM` (0.70) or over. Another face seen speaking it, or a sure other voice (under 0.30 from 2.5 s of speech or more, `CARRY_SURE_OTHER_SPEECH_SAMPLES`, which no print reaches today), is held; one such line, or one held past a still turned face, or a print known late as a sure other voice, ends nothing, does not make the room busy by voice alone and is no talk (`RoomTold::colleague_held`), and the owner goes on (the first builder at 09:34 on #3296, replacing 03:46's one-line end); two lines in a row from someone else end the carry until the lamp answers again, as two lines left alone end a conversation; a colleague who calls the lamp by name is the caller from then on; the 20 s run from the later of the lamp's last words and the actual audio end of one held colleague line, once per actual answer, capped at 40 s from the lamp's last words (First's decision on Queue #3126, 24 Oct 12:57); delayed classification uses that recorded end, never its processing time; if it first opens the window at the current verdict, that line is rechecked by its captured start and its own positive owner/nearness evidence in Busy, Unknown and Quiet, with no wait for a missing print; a current-line likeness consumed by the first lookup is retained for that check rather than replaced by a second empty lookup (the answer clock is `Did::Said` queued-PCM bookkeeping, not an acoustic drain receipt); so do a stop and a privacy change, and a forgetting leaves no words to carry from. The caller's face seen speaking turned away is held and ends the carry, their voice sure or not; turning back needs a fresh call or answer. These signs are read in any room: in a room not busy, unknown or quiet, such a line, or one in a voice not surely the owner's, is held as in a busy room, the room unchanged. The owner's carried line is no reply to a colleague's question held before it (no `AFTER_QUESTION` hold). Voice-only identity carry must be nearer the conversation's than every held line's print by `CARRY_NEARER_BY` (0.10, provisional): up to eight per-call request/optional-print constraints, no eviction. Missing held prints require the owner's face until their own cached reply arrives; a ninth distinct held line latches face-only identity carry until a fresh call. Duplicates only fill missing evidence; owner admissions/answers do not reset constraints, but a fresh call, stop, privacy, observed forget, turn-away or two consecutive other lines clears them and fences old callbacks. Past the ordinary follow-up, a positive current voice refused by these constraints is held in Busy, Unknown and Quiet without making the stored room busy. Generic missing/weak current-evidence personal scope in Unknown/Quiet remains a separate acceptance hold; the first 8 s follow-up is unchanged. A short print under 0.70 is no sign either way, so with short lines the face carries. A line begun within the 8 s while the carry stands is read the same way: another face seen speaking it is held, and a line with no sure sign either way follows the ordinary follow-up rule whatever the print's arrival (at the verdict, late or never), an unsure print taken for no print. In short, the first 8 s are not identity-gated; past 8 s only a sure same-speaker sign carries; always held, inside the 8 s too: another face seen speaking, the caller turned away, and a sure other voice (not reachable today: prints carry at most 1.5 s of speech, under the provisional 2.5 s). A print that was no evidence never becomes evidence: a going-on line's print joins the conversation's voice only at 0.70 or over or seen spoken by the caller's face, at its verdict or late, caller-only on or off. Each answer renews the 20 s, so a chain of turns has no overall cap, but outside the 8 s window each carried turn needs its own sure sign. Such a line the model leaves unanswered is no talk (`RoomTold::carried`) | — | — | Sixth, the owner's P1 on Queue #3126 (23 Oct) | Tests only: five turns at 12 s gaps carried by voice and face, voice alone, face alone and face with 0.27 / 0.00 short prints; held without the switch; a colleague's line, face seen, any print, held and the owner goes on, two in a row end it until a new answer; the owner's five turns with one colleague line between turns 2 and 3 all answered, busy (face) and quiet (an off-camera voice, the room not made busy; without the switch it is); in a quiet room the colleague's held line closes as held, no talk, the room not busy; a late sure other voice (a synthetic control) is one line, the owner going on, and with the colleague's next line two in a row; a colleague's call makes them the caller; the owner turned away held and the carry ended, in busy, unknown and quiet rooms, turning back held until a fresh call; a colleague's face (-1/0/1 prints) held in unknown and quiet rooms, the room unchanged and the owner going on; a colleague's question held and the owner's next line carried; owner and colleague alternating, the owner by voice alone, a colleague voice at 0.75 off camera held after their face was held once; 19.99 s carried and 20.01 s held by the line's start; stop, privacy and forget end it; the owner's face with a 0.27 print at 7 s carried, the print back at the verdict or after it; a colleague's face at 3 s held, the owner at 12 s going on, two in a row ending the carry until a fresh call, a short print (0.27, 0.00, 0.50) or none, no face, at once or late: let out by the follow-up at 3 s, held at 12 s, the carry standing; an unknown voice, no face, 0.27 at 3 s let out, at once or late, then the same voice with no face at 12 s held while the owner's face at 12 s carries, caller-only on and off; a sure other voice at 3 s held (a synthetic control, the sure bar lowered to 1.5 s) | off until a played five-turn back-and-forth on lamp-52e6 or lamp-75c9, quiet and with desk talk | One person talking with the lamp in an office keeps talking with it by their own face and voice, while a colleague's line beside them is not answered | until |
+ | LAMP_BUSY_CALLED_STRICT | `on`; off. On the second route, with `--attention`, in a busy room with nobody turned to the lamp, a line's text shows the lamp was called only as "Lamp" or "Lamb" set off as a call (after a greeting or before a pause, `attention::begins_with_the_name`) or with the name heard by `lamp-name` for the line; a stand-in ("Man, …", "Plan …", "Mom, …") or "Lamp is broken, …" alone is not a call, and the strict busy rule holds it. Quiet rooms unchanged. Limits: "set off" needs the text's comma ("Lamp what time is it" counts only with the name heard), and a hearing at `called::LEAST_SCORE` (0.9) counts, which office false hearings reach (#829) | — | — | #1712 (the first builder on #1722, 16:11: five office lines let out in a busy room as "the text shows it was called") | Tests only: the five office lines held in a busy room with no name heard and no face, let out without the switch; "Hey Lamp, …" and "Lamp, …" still called; a stand-in with the name heard or a face turned still called; a quiet room unchanged | off until a busy office on lamp-4ace, before and after: office talk let out, and called lines held | A call heard only as a stand-in, with no `lamp-name` hearing and nobody facing the lamp, is held in a busy room | until |
+ | LAMP_SECOND_SKILL_LOOK | `on`; off. On the second route, a skills call (`skills/`, or `use_skill`) answered with `"look": true` (`skills/look-for-things`' `look_for`) asks the coordinator for the turn's full look as `take_a_look` does: the lamp says "Let me look." if nothing was said, the turn ends, the eyes are asked once the answer's first audio plays, and the still goes as the `lamp_looks` turn to the second route's own session, with the skill's note after "When the picture comes:" after its question; dropped if the person speaks first, and in a turn the lamp wrote itself, which goes on to its next round. A search's own written turns (its look's, the look note's) take the skill's next look; every other turn the lamp wrote takes none (#1146). Needs a full look (LAMP_LOOK_FULL and LAMP_EYES_LOOK_FILE); reaches the second route's worker only | — | — | #941 on the second route (#1712) | "Lamp, where are my keys?" with look-for-things installed on lamp-4ace, LAMP_VOICE_ROUTE=second: `look_full_asked` after the answer's first audio, `look_full_still` with the still, and the model saying what it sees; not run | off until that run | Off, the look rests on the model saying "Let me take a look." in a further round (the phrase rule); on, the turn ends without that round, and the lamp's words are "Let me look." | until |
+ | LAMP_SECOND_LOOK_NOTE | `on`; off. With LAMP_SECOND_SKILL_LOOK on, a skill's search on the second route (`skills/look-for-things`' `look_for`) whose look got an answer that called nothing is sent one written note on the same session once that answer has played and the room has been quiet a second: "Not found yet? Call look_for with the next place: left, right, far_left, then far_right. If you can see it, say where and stop." Once a search; never after the person speaks or another turn begins (`look_note_sent`, `look_note_dropped` with why); reaches the second route's worker and the coordinator | — | — | the first builder's step 2 for look-for-things (20 Oct: DeepSeek calls look_for once and never again) | "Lamp, where are my keys?" with look-for-things installed on lamp-4ace, LAMP_VOICE_ROUTE=second, keys off the desk: one `look_note_sent` after the first look's answer, and look_for called with the next place; not run | off until that run | One more turn after a look the model left: its words come a second after the lamp's | until |

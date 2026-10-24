@@ -5,6 +5,23 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 04:00 — held-print prior-base full gate complete
+
+Ready for lamp-voice: no (current-parent composition is next).
+
+- Exact four-file snapshot 69975c623 has fmt, strict Voice/Eval all-target
+  Clippy, workspace build and full affected serial tests green:
+  **4,666/0/21 ignored**, 11 summaries; all 7,026 source records match
+  committed Git blobs/modes. Nine new controls are in final binary listings.
+- [Complete prior-base receipt](verification/held-colleague-constraints-20261025/prior-qualified-69975c623/README.md)
+  retains raw output, source patch/maps, compiler/profile/hash records,
+  previous failed observations and the postcommit record-command error.
+- Parent #3408 bcb fmt/Clippy/build pass; its full tests remain active in
+  the isolated target. Once qualified/pushed, rebase this snapshot onto it
+  and run new current-source gates before publishing the child PR.
+- No result transfers across the rebase, default/threshold/personal-scope
+  activation or device claim. Continuing gates and incoming comments.
+
 ## 2026-10-25 03:41 — corrected native green; current carry and held-print gates
 
 Ready for lamp-voice: no (current-base carry is qualifying).
