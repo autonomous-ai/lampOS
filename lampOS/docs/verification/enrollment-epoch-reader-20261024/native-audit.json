@@ -1,0 +1,30 @@
+{
+  "run-final": {
+    "conclusion": "success",
+    "event": "workflow_dispatch",
+    "headSha": "6213596a3e31f118f20f3d11f9a9687eb2c1ce32",
+    "status": "completed",
+    "run": 40077846199
+  },
+  "clippy": {
+    "conclusion": "success",
+    "event": "workflow_dispatch",
+    "headSha": "6213596a3e31f118f20f3d11f9a9687eb2c1ce32",
+    "status": "completed",
+    "run": 40077847930
+  },
+  "head": "6213596a3e31f118f20f3d11f9a9687eb2c1ce32",
+  "summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T08:51:09.8424583Z      Summary [ 202.113s] 11198 tests run: 11198 passed (1 leaky), 90 skipped"
+  ],
+  "controls": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T08:50:45.4906744Z         PASS [   0.057s] ( 9589/11198) lamp-voice second_provider::tests::remember_speaker::remember_speaker_room_publish_after_forget_cannot_revive_its_original_proof",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T08:50:45.5068925Z         PASS [   0.057s] ( 9590/11198) lamp-voice second_provider::tests::remember_speaker::remember_speaker_room_publish_after_privacy_reopen_cannot_revive_its_original_proof"
+  ],
+  "checkout_head_present": true,
+  "primary_log_sha256": {
+    "ordinary": "c86117e733b2e52118474d049f2888407c2b37e5835b6ef67d150d3ad8e46b07",
+    "clippy": "36ffde6a551a3113ff8b158a900a3e3900df0d55d2ceb4121541b90dda86b86e"
+  },
+  "scope": "original branch workflow_dispatch at exact authored head; no latest-base/whole-tree equivalence claim; parent landed later and PR retargeted"
+}

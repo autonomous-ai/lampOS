@@ -1,0 +1,2 @@
+{"topic":"voice/state","kind":"latest","enc":"json","type":"lamp_msgs/VoiceState","source":"voice","boot":"a6cda66fad97ae7e","seq":600,"at_us":1594520810,"at_unix_ms":1792832301026}
+{"state":"resting"}

@@ -1,0 +1,26 @@
+{
+  "boundary": "released daily/on/off readers and writers; Policy never approves; no actuator",
+  "daily_window": {
+    "from": "11:00",
+    "to": "13:00"
+  },
+  "excluded": [
+    "rested",
+    "physical output",
+    "updater install",
+    "power-loss durability"
+  ],
+  "kind": "on-off",
+  "local_day": 20750,
+  "reader": 6408,
+  "reader_bytes": 8807104,
+  "reader_sha256": "2c6bc8f34c9fd4a56784a54fa2d03b1e76be9d1833ccf37db905f88dba67d3d5",
+  "reader_source": "ee53765c8d014eb00e41c1a5a7054d2546c18bdb",
+  "return_reader": 6498,
+  "sampled_unix_ms": 1792832297174,
+  "utc_offset_minutes": 182,
+  "writer": 6498,
+  "writer_bytes": 8786048,
+  "writer_sha256": "87e500127793db88df8bcd7af793879faeee95f36a8e0d2ef8483c59fef26984",
+  "writer_source": "846b3d203fc00ec3886d71f7673d8cc29cc4a634"
+}

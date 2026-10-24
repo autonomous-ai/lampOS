@@ -1,0 +1,20 @@
+{
+  "ordinary": {
+    "conclusion": "success",
+    "event": "pull_request",
+    "headSha": "0844ce154da6fb515db7cf2c8c727b14853baf75",
+    "status": "completed",
+    "run": 40079594472,
+    "primary_log_sha256": "bf0fdf305a98514ad2445de0fa3818fdd559dc70a115778fd9331fe0698b1644"
+  },
+  "clippy": {
+    "conclusion": "success",
+    "headSha": "0844ce154da6fb515db7cf2c8c727b14853baf75",
+    "status": "completed",
+    "run": 40079594459,
+    "primary_log_sha256": "1c7a69fc45c4529da768251b3590038d4103a61d770183747b57fb8f8729659f"
+  },
+  "ordinary_summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T09:04:16.8608859Z      Summary [ 204.332s] 11208 tests run: 11208 passed (1 leaky), 100 skipped"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "part": "settings",
+  "run": 40079594453,
+  "artifact_id": 12554069798,
+  "zip_bytes": 1072757,
+  "api_zip_sha256": "d9a9f341b7e8f98c789a84296c39237d62febbb453fb3d1fcbd6d70d78b7ee02",
+  "api_digest_verified": true,
+  "native_archive_sha256": "f2060c7b1798c4d3aff3768d7108a554a5e5c765e4fc871630070749e711c2cf",
+  "gh_download_matches_api_zip": true
+}

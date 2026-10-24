@@ -1,0 +1,25 @@
+{
+  "sha256": "61c23a05a00d33a11b869bc8b1eb5d5e239ffc85790167788b69a72e9250def2",
+  "manifest": {
+    "format": 1,
+    "name": "sleeping-kit",
+    "version": "1.0.0",
+    "files": [
+      {
+        "path": "SKILL.md",
+        "size": 107,
+        "sha256": "d3c594606c844096493a84c6a405ebb171a3289b91558afbe8e0162d255e35e7"
+      },
+      {
+        "path": "notes.txt",
+        "size": 46,
+        "sha256": "4bfc2936105f62f0e4af00190e9911f0488567177e6a623fd11bcdf69320231b"
+      },
+      {
+        "path": "skill.toml",
+        "size": 148,
+        "sha256": "7b15567b6e09eb5cec79c465933866e0d47e7f37aa726f921de5bfc37e429a65"
+      }
+    ]
+  }
+}

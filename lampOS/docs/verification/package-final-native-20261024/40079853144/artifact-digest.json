@@ -1,0 +1,10 @@
+{
+  "part": "package",
+  "run": 40079853144,
+  "artifact_id": 12554672127,
+  "zip_bytes": 668923,
+  "api_zip_sha256": "7dd6e2abdf4a3c0a9a08cfe58d3d7f565bf870e6605e3afbeb952f9e245d01cf",
+  "api_digest_verified": true,
+  "native_archive_sha256": "ab4bf8edadee05ac0b8072bbb0e648bc241423b42d083216c4a9e03db557130d",
+  "gh_download_matches_api_zip": true
+}
