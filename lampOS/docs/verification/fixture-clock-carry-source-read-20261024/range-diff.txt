@@ -1,0 +1,12 @@
+1:  414b2df34 ! 1:  42cf24d5a lampOS: bind fixture clocks and wait for cue peer closure
+    @@ lampOS/crates/voice/src/stop_words.rs: mod tests {
+     +            .set((600_000_000, std::time::Instant::now()))
+     +            .unwrap();
+              ears.ready();
+    -         until("a stream is asked for", || service.connections() == 1);
+    +         until("the ready stream and a spare are asked for", || {
+    +             service.connections() >= 2
+    +         });
+     -        ears.hear(lamp_ipc::monotonic_us() - 4_000_000, &[1; 160]);
+     -        ears.hear(lamp_ipc::monotonic_us(), &[1; 160]);
+     +        ears.hear(ears.live.fixture_now_us() - 4_000_000, &[1; 160]);

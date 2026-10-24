@@ -1,0 +1,60 @@
+{
+  "old": "414b2df34f5398d164affb128780fdad2ba78d63",
+  "new": "42cf24d5a965abbc386e61672b15a4591a338607",
+  "files": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/second.rs",
+      "old_patch_id": "6481ddcf39be1f2d2cd75e47ddd4c99f3bade981",
+      "new_patch_id": "6481ddcf39be1f2d2cd75e47ddd4c99f3bade981",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "old_patch_id": "936c83f3705f9a2a09d8cf32c0ef1d78a0f398bb",
+      "new_patch_id": "936c83f3705f9a2a09d8cf32c0ef1d78a0f398bb",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "old_patch_id": "46a4fc00291469eaa09cf6802bf232e92f4cd48c",
+      "new_patch_id": "46a4fc00291469eaa09cf6802bf232e92f4cd48c",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "old_patch_id": "f0eeb44b6fae6eb9b8d0378b4081175a993832e5",
+      "new_patch_id": "f0eeb44b6fae6eb9b8d0378b4081175a993832e5",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/scenario_clock.rs",
+      "old_patch_id": "7c49c9fd034ec174216796551d4cbf2ed0af9861",
+      "new_patch_id": "7c49c9fd034ec174216796551d4cbf2ed0af9861",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "old_patch_id": "ebeb0ed01498cdac717b76b7a364147739c5bad6",
+      "new_patch_id": "ebeb0ed01498cdac717b76b7a364147739c5bad6",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/stop_words.rs",
+      "old_patch_id": "0e7d3a019b33965508cf1ec89273267d4b89ec57",
+      "new_patch_id": "bc70e294cb8485cc1277cf9e57beda3b36e909de",
+      "equal": false
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "old_patch_id": "16830f3dd3c0cbf3415939e0c0e3a2194d5f39ad",
+      "new_patch_id": "16830f3dd3c0cbf3415939e0c0e3a2194d5f39ad",
+      "equal": true
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "old_patch_id": "e338daa2c14ce4687c047e8d8db1508665fc3077",
+      "new_patch_id": "e338daa2c14ce4687c047e8d8db1508665fc3077",
+      "equal": true
+    }
+  ]
+}
