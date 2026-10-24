@@ -776,8 +776,10 @@ fn while_answer_waits(
 /// the microphone by the echo evidence (`sounding`), nothing of a reply to
 /// yield as the duplex mask hears the block ([`reply_sounding`]: audio still
 /// to hand over, or the lamp's sound accepted, queued or within its tail),
-/// and no busy answer kept. A soft start never reaches back past a block that
-/// was not, so never into the lamp's own voice.
+/// and no busy answer kept. A soft start's additional lead never reaches back
+/// past a block that was not, so not into the lamp's own voice as this
+/// software evidence tells it. The ordinary 300 ms before the start is kept
+/// as without the switch, and may still hold the lamp's last sound.
 ///
 /// Not the reply's playback token: it is held from a reply's start until
 /// its audio is retired, so on lamp-4ace on 25 October the lines begun after
