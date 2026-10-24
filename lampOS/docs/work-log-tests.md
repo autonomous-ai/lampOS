@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-24 15:49 +0700 — equal conflict carry; phone dependent suites active
+
+Ready for lamp-voice: no for #3190's new carry; its qualified 414b2df34 remains archived.
+
+The train reported a real integration conflict and excluded #3190. Rebase onto 411965dcb completed cleanly as 80231a251, with an exactly equal range-diff and stable patch identity. The new 10,342-path source guard, 47-manifest twelve-package closure and 88 selected declarations pass preparation. Only upstream worker content changed among the nine owned paths. Fresh gates and publication follow the current phone run; the PR is draft meanwhile. Original source/result/READ-OK identities remain intact at `tests/archive-3190-qualified-414b2df34-20261024`.
+
+#3218's persistent run passed formatting and strict twelve-package Clippy. Full Voice completed **3,976 passed / 1 failed / 15 ignored**, including library **3,696/0/15** and the passing changed phone case. The unchanged light-call index-10 predicate measured **56.790411 ms** against strict **25 ms**, retained as a failure without a timing or cause claim. Eleven readers are active; no complete combined result is claimed. Its prescribed Update standalone observations follow before target reuse. The new #3190 carry then takes the gate slot before #3273. No local ARM build or lamp action ran.
+
 ## 2026-10-24 15:22 +0700 — persistent full gate resumed
 
 Ready for lamp-voice: #3190 remains ready; no new #3218/#3273 result yet.
