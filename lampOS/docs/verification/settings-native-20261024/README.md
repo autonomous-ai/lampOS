@@ -23,9 +23,11 @@ attempt 1 failed the unchanged Voice room-clock case: **9,846 PASS + 1 LEAK**,
 one failure, 92 skipped, **1,351 selected unrun**. Its primary log hash,
 source equality to the tested base, case and summary remain in the audit.
 The failure is routed to the existing #3190 clock repair; no original-clock
-capture or cause is claimed. One same-head failed-job recheck is running.
-The ordinary gate remains held until terminal disposition; dedicated success
-does not replace it. The earlier missing-input **0/2** failure stays
+capture or cause is claimed. One same-head failed-job recheck, attempt 2, is now terminal green:
+**11,198 PASS plus one LEAK**, zero failures or selected unrun, 92 skipped,
+203.328 seconds. The previously failing case passes. Its metadata, summary
+and primary log hash are retained separately; this does not establish or
+repair the original failure cause. Renewed reader disposition remains required. The earlier missing-input **0/2** failure stays
 [separate](../settings-first-native-failure-20261024/README.md).
 No real consumer, provider, device, signature trust, updater transaction,
 service-manager sandbox, cold boot, power-loss or whole-lamp acceptance.
