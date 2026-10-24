@@ -1,0 +1,10 @@
+{
+  "tested_tree": "6b42fd91e4ed4e0e4b52194cbb257ac036f163a0",
+  "author_head": "0882cb90474edb19f11130c0771d019509eed9cb",
+  "tested_readme_path": "lampOS/docs/verification/memory-release-pair-20261024/README.md",
+  "tested_readme_blob": "d3a35782f690b03998b0a7be40c5bf0d448bc88a",
+  "tested_readme_sha256": "d3fe3a48286155cafb004096ec95a2138110afc02a752ff607239ebb35c1f7f4",
+  "replace_only_this_readme_in_authored_tree_restores_tested_tree": true,
+  "reconstructed_tree": "6b42fd91e4ed4e0e4b52194cbb257ac036f163a0",
+  "all_other_10320_source_blobs_unchanged": true
+}

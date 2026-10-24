@@ -8477,3 +8477,7 @@ Both published payloads are identical AArch64 executables running through existi
 ## 2026-10-24: Common matched diagnosis completed
 
 [Matched diagnostic](verification/common-matched-recovered-20261024/README.md) passes all27 selected controls on both exact baseline and candidate sources,54 complete invocations, stable sources/drivers and proven cleanup. This standalone outcome does not establish the original full-suite failures' cause or waive them. Preparing fresh complete Mac/Linux qualification of current carry5191c66e9; both target handoffs are proven. Memory0882cb904 now waits only on the P2 reread, with current native gates green.
+
+## 2026-10-24: Memory P2 closed and train handoff
+
+Reviewer-two and Third both renewed READ-OK on0882cb904, with all P1/P2 closed and native gates green. Published the [exact tested README and reconstructed-tree binding](verification/memory-tested-readme-20261024/README.md), closing the remaining nonblocking availability note without a code change. Author HOLD lifted; #3333 is offered to the train. Common's full Mac/Linux eight-stage qualification remains active.
